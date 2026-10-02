@@ -59,6 +59,24 @@ second request because a polling window expired. Batch corrections before reques
 Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
 exits nonzero. A successful exit confirms review completion, not merge readiness.
 
+Authorized `--request` invocations also collapse original review commands after a verified eyes
+reaction from `chatgpt-codex-connector[bot]` or explicit matching code-review completion. This
+uses GraphQL `minimizeComment` with `RESOLVED` and the original node ID; findings and result
+comments remain visible. Summary-only completion with unknown findings does not authorize
+cleanup. Cosmetic failures warn without changing guard decisions, locks, quiet periods or
+completion evidence. Plain status/wait invocations remain read-only. Add `--collapse-requests`
+when authorized to clean up existing manually posted commands while observing status.
+
+GitHub's [issue_comment activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issue_comment)
+do not include reactions, so cleanup uses the existing bounded polling loop rather than inventing
+a reaction event. Commands posted outside that loop, or acknowledged after it ends, require a
+later authorized cleanup invocation. No new background workflow, credential or permission is
+added. Each pending request without eyes/completion adds zero calls; acknowledgement adds one
+reaction listing, one minimized-state query and at most one mutation; explicit completion needs
+only the query and mutation. A per-invocation cache removes repeat cleanup calls after success.
+The mock regression benchmark measures these counts and local compute overhead; network
+latency and token savings are unmeasured.
+
 The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
 code reviews for the current commit. Security-review completion alone is not code-review
 completion. A report's top-level security heading or dedicated leading marker identifies a security report; quoted
