@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createI18n } from 'vue-i18n';
+import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
 const UButtonStub = {
   props: ['icon'],
   emits: ['click'],
@@ -27,21 +28,7 @@ const i18n = createI18n({
   missingWarn: false,
   fallbackWarn: false,
   silentTranslationWarn: true,
-  messages: {
-    en: {},
-    cs: {},
-    de: {},
-    es: {},
-    fr: {},
-    it: {},
-    ja: {},
-    ru: {},
-    uk: {},
-    zh: {},
-    ko: {},
-    pl: {},
-    pt: {},
-  },
+  messages: createTestLocaleMessages(),
 });
 const setup = async () => {
   vi.resetModules();

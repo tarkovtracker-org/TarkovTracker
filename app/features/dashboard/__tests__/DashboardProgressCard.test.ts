@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createI18n } from 'vue-i18n';
 import type { ProgressCardColor } from '@/features/dashboard/progressCard';
+import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
 vi.mock('@/utils/formatters', () => ({
   useLocaleNumberFormatter: () => (value: number) => value.toLocaleString('en-US'),
 }));
@@ -10,30 +11,16 @@ const i18n = createI18n({
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: {
-    en: {
-      page: {
-        dashboard: {
-          progress_card: {
-            view_details: 'View details for {label}',
-            progress_label: '{label} progress',
-          },
+  messages: createTestLocaleMessages({
+    page: {
+      dashboard: {
+        progress_card: {
+          view_details: 'View details for {label}',
+          progress_label: '{label} progress',
         },
       },
     },
-    cs: {},
-    de: {},
-    es: {},
-    fr: {},
-    it: {},
-    ja: {},
-    ru: {},
-    uk: {},
-    zh: {},
-    ko: {},
-    pl: {},
-    pt: {},
-  },
+  }),
 });
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [
   { color: 'primary', barClass: 'bg-primary-500' },
