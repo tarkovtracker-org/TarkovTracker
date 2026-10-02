@@ -153,9 +153,11 @@ BEGIN
       WHEN 'pvp' THEN COALESCE(preferences.profile_share_pvp_public, false)
       ELSE COALESCE(preferences.profile_share_pve_public, false)
     END,
-    COALESCE(legacy.created_at, now()),
-    COALESCE(legacy.updated_at, now())
+    COALESCE(legacy.created_at, users.created_at, 'epoch'),
+    -- Never later than evidence account_last_activity already counts, so no retention change.
+    COALESCE(legacy.updated_at, users.created_at, 'epoch')
   FROM private.unmaterialized_mode_progress(p_from, p_to) legacy
+  LEFT JOIN auth.users users ON users.id = legacy.user_id
   LEFT JOIN public.user_preferences preferences ON preferences.user_id = legacy.user_id
   WHERE NOT legacy.has_row
   ON CONFLICT (user_id, game_mode, season_number) DO NOTHING;

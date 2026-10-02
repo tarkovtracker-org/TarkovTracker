@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(25);
 
 -- PL/pgSQL checks function privileges once per session, so service_role must be the first caller.
 SET LOCAL session_replication_role = replica;
@@ -17,7 +17,8 @@ INSERT INTO backfill_fixture VALUES
   ('missing', '00000000-0000-0000-0000-000000001101'),
   ('placeholder', '00000000-0000-0000-0000-000000001102'),
   ('normalized', '00000000-0000-0000-0000-000000001103'),
-  ('empty', '00000000-0000-0000-0000-000000001104');
+  ('empty', '00000000-0000-0000-0000-000000001104'),
+  ('undated', '00000000-0000-0000-0000-000000001106');
 CREATE FUNCTION pg_temp.fixture_user(p_name text) RETURNS uuid LANGUAGE sql AS $$
   SELECT user_id FROM backfill_fixture WHERE name = p_name;
 $$;
@@ -48,12 +49,14 @@ UPDATE public.user_progress SET
     WHEN pg_temp.fixture_user('missing') THEN '{"level":20}'::jsonb
     WHEN pg_temp.fixture_user('placeholder') THEN '{"level":30}'::jsonb
     WHEN pg_temp.fixture_user('normalized') THEN '{"level":40}'::jsonb
+    WHEN pg_temp.fixture_user('undated') THEN '{"level":10}'::jsonb
     ELSE '{}'::jsonb END,
   pve_data = CASE user_id
     WHEN pg_temp.fixture_user('missing') THEN '{"level":5}'::jsonb
     ELSE '{}'::jsonb END,
   created_at = now() - interval '2 years',
-  updated_at = now() - interval '1 year'
+  updated_at = CASE WHEN user_id = pg_temp.fixture_user('undated') THEN NULL
+    ELSE now() - interval '1 year' END
 WHERE user_id IN (SELECT user_id FROM backfill_fixture);
 ALTER TABLE public.user_progress ENABLE TRIGGER sync_legacy_user_progress_modes;
 ALTER TABLE public.user_progress ENABLE TRIGGER set_user_progress_updated_at;
@@ -75,7 +78,7 @@ CREATE TEMP TABLE retention_before AS
 SELECT r.*, private.account_retention_deadline(r.user_id) AS deadline
 FROM private.account_retention r WHERE r.user_id IN (SELECT user_id FROM backfill_fixture);
 
-SELECT is(pg_temp.remaining(), 3::bigint, 'gate counts both legacy-only modes and the placeholder');
+SELECT is(pg_temp.remaining(), 4::bigint, 'gate counts legacy-only modes and the placeholder');
 
 -- A range that meets a lock must roll back completely and succeed when retried.
 CREATE FUNCTION pg_temp.simulate_lock_timeout() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -89,7 +92,7 @@ SELECT throws_ok('SELECT pg_temp.backfill()', '55P03', NULL, 'a lock failure abo
 SELECT is(pg_temp.mode_row('missing', 'pvp'), NULL, 'an aborted range keeps none of its inserts');
 DROP TRIGGER simulate_lock_timeout ON public.user_game_mode_progress;
 
-SELECT is(pg_temp.backfill(), 3::bigint, 'retry inserts both missing modes and repairs the placeholder');
+SELECT is(pg_temp.backfill(), 4::bigint, 'retry inserts missing modes and repairs the placeholder');
 SELECT is(pg_temp.remaining(), 0::bigint, 'completion gate reaches zero');
 SELECT is(pg_temp.backfill(), 0::bigint, 'a completed range is a no-op');
 SELECT ok(NOT private.mode_progress_backfill_active(), 'the backfill flag is restored on return');
@@ -102,6 +105,9 @@ SELECT is((pg_temp.mode_row('missing', 'pvp')).updated_at,
   (SELECT updated_at FROM public.user_progress WHERE user_id = pg_temp.fixture_user('missing')),
   'new rows keep the legacy timestamp');
 SELECT is((pg_temp.mode_row('missing', 'pvp')).progress_updated_at, NULL, 'new rows record unknown freshness');
+SELECT is((pg_temp.mode_row('undated', 'pvp')).updated_at,
+  (SELECT created_at FROM auth.users WHERE id = pg_temp.fixture_user('undated')),
+  'an undated legacy row falls back to account creation, not the backfill time');
 
 SELECT is((pg_temp.mode_row('placeholder', 'pvp')).progress_data->'level', '30'::jsonb, 'repairs a placeholder');
 SELECT ok((pg_temp.mode_row('placeholder', 'pvp')).profile_public, 'repair preserves explicit sharing');
