@@ -124,6 +124,7 @@
     { label: t('common.team'), to: '/team' },
     { label: t('common.supporter'), to: '/supporter' },
     { label: t('navigation_drawer.resources'), to: '/resources' },
+    { label: t('footer.links.org_vs_io'), to: '/resources/tarkovtracker_org_vs_io' },
     { label: t('common.credits'), to: '/credits' },
     { label: t('page.changelog.title'), to: '/changelog' },
   ]);

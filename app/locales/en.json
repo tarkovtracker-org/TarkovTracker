@@ -1778,6 +1778,9 @@
       "explore": "Explore",
       "project": "Project",
       "legal": "Legal"
+    },
+    "links": {
+      "org_vs_io": ".org vs .io"
     }
   },
   "navigation_drawer": {
