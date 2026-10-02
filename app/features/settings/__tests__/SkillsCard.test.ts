@@ -6,25 +6,13 @@ import { createI18n } from 'vue-i18n';
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import SkillsCard from '@/features/settings/SkillsCard.vue';
 import { MAX_SKILL_LEVEL } from '@/utils/constants';
+import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: {
-    en: {},
-    cs: {},
-    de: {},
-    es: {},
-    fr: {},
-    it: {},
-    ru: {},
-    uk: {},
-    zh: {},
-    ko: {},
-    pl: {},
-    pt: {},
-  },
+  messages: createTestLocaleMessages(),
 });
 vi.mock('@/composables/useSkillCalculation');
 vi.mock('@/stores/usePreferences', () => ({

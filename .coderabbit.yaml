@@ -11,9 +11,15 @@ reviews:
     ignore_title_keywords:
       - 'Crowdin'
   path_filters:
+    - '!app/locales/cs.json'
     - '!app/locales/de.json'
     - '!app/locales/es.json'
     - '!app/locales/fr.json'
+    - '!app/locales/it.json'
+    - '!app/locales/ja.json'
+    - '!app/locales/ko.json'
+    - '!app/locales/pl.json'
+    - '!app/locales/pt.json'
     - '!app/locales/ru.json'
     - '!app/locales/uk.json'
     - '!app/locales/zh.json'
