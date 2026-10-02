@@ -1,20 +1,17 @@
 <template>
-  <div class="flex h-52 items-center justify-center text-center">
-    <UCard
-      class="text-surface-50 w-full max-w-xl border border-white/10 bg-transparent"
-      :ui="{ body: 'p-6' }"
-    >
-      {{ $t('page.not_found.not_found_description') }}
-    </UCard>
+  <div class="px-4 py-6 sm:px-6">
+    <div class="mx-auto w-full max-w-6xl">
+      <PageHeader
+        :title="t('common.page_not_found')"
+        :description="t('page.not_found.not_found_description')"
+      />
+    </div>
   </div>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   const { t } = useI18n({ useScope: 'global' });
   definePageMeta({
     layout: 'default',
-  });
-  useSeoMeta({
-    title: t('common.page_not_found'),
-    robots: 'noindex, nofollow',
   });
 </script>

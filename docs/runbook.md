@@ -151,8 +151,11 @@ The steps below are therefore mostly verification. The manual commands are a fal
 integration fails or is unavailable, not the normal path.
 
 1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
-2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
-   Functions daily quota is exhausted.
+2. Confirm the Pages project remains **fail open** so prerendered public documents and finite
+   client documents still serve if the Functions daily quota is exhausted. Dynamic `/profile/*`,
+   `/api/*`, and `/overlay/*` paths require available Functions capacity; missing static paths must
+   return HTTP 404. Verify the document inventory and routing described in
+   [Public rendering and discovery](architecture.md#public-rendering-and-discovery).
 3. **Verify DB migrations applied.** The Supabase integration applies pending migrations on merge.
    Confirm rather than assume:
 

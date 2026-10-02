@@ -1,30 +1,21 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
-            {{ t('common.storyline', 'Storyline') }}
-          </h1>
-          <p class="text-surface-400 mt-1 text-sm">
-            {{ t('page.storyline.subtitle') }}
-          </p>
+      <slot name="header" />
+      <div v-if="totalChapters > 0" class="flex items-center gap-3">
+        <div class="bg-surface-800/60 h-2 flex-1 overflow-hidden rounded-full">
+          <div
+            class="h-full rounded-full transition-[width] duration-300"
+            :class="completedChapters >= totalChapters ? 'bg-success-500/70' : 'bg-primary-500/70'"
+            :style="{ width: `${(completedChapters / totalChapters) * 100}%` }"
+          ></div>
         </div>
-        <div v-if="totalChapters > 0" class="text-right">
-          <div class="text-surface-100 text-lg font-bold">
+        <span class="text-surface-400 shrink-0 text-xs tabular-nums">
+          <span class="text-surface-100 font-semibold">
             {{ completedChapters }}/{{ totalChapters }}
-          </div>
-          <div class="text-surface-400 text-xs">
-            {{ t('page.storyline.chapters_complete') }}
-          </div>
-        </div>
-      </div>
-      <div v-if="totalChapters > 0" class="bg-surface-800/60 h-2 overflow-hidden rounded-full">
-        <div
-          class="h-full rounded-full transition-[width] duration-300"
-          :class="completedChapters >= totalChapters ? 'bg-success-500/70' : 'bg-primary-500/70'"
-          :style="{ width: `${(completedChapters / totalChapters) * 100}%` }"
-        ></div>
+          </span>
+          {{ t('page.storyline.chapters_complete') }}
+        </span>
       </div>
       <UAlert
         icon="i-mdi-hammer-wrench"
@@ -58,15 +49,6 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { toggleStoryChapterWithLinearObjectives } from '@/utils/storylineObjectives';
   const { t } = useI18n({ useScope: 'global' });
-  definePageMeta({
-    layout: 'default',
-  });
-  useSeoMeta({
-    title: () => t('common.storyline', 'Storyline'),
-    description: () => t('page.storyline.subtitle'),
-    ogTitle: () => t('common.storyline', 'Storyline'),
-    ogDescription: () => t('page.storyline.subtitle'),
-  });
   const tarkovStore = useTarkovStore();
   const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters({
     completedObjectiveIds: (chapterId) =>

@@ -206,14 +206,6 @@
   let loginPageUnmounted = false;
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });
-  useSeoMeta({
-    title: () => t('common.login', 'Login'),
-    description: () =>
-      t(
-        'page.login.meta_description',
-        'Sign in to TarkovTracker to sync your progress across devices and collaborate with your team.'
-      ),
-  });
   const { showErrorToast, showSuccessToast } = useDiagnosticToast();
   const buildCallbackUrl = () => {
     const config = useRuntimeConfig();

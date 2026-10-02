@@ -76,7 +76,7 @@ offline mode with localStorage only — auth, sync, realtime, and team features 
 > `SUPABASE_URL` and `SUPABASE_ANON_KEY` are required for login/sync. Everything else is optional and
 > documented in [`docs/architecture.md`](docs/architecture.md).
 
-**Tech stack:** Nuxt 4 (SPA, `ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia,
+**Tech stack:** Nuxt 4 (prerendered public pages, client-side progression), Vue 3 Composition API, TypeScript strict, Pinia,
 Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 
 ### Common commands

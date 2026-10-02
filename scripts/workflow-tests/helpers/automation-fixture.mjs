@@ -65,7 +65,7 @@ if (args[0] === 'run' && args[1] === 'list') {
   const ref = args[args.indexOf('--branch') + 1];
   const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
   const dispatched = events.filter((event) => event.type === 'dispatch' && event.ref === ref).length;
-  console.log(p.DISPATCH_MISSING === 'true' ? 0 : dispatched);
+  console.log(String(p.DISPATCH_MISSING === 'true' ? 0 : dispatched));
   process.exit(0);
 }
 if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'ci.yml') {

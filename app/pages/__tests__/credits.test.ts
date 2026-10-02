@@ -30,11 +30,12 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('credits page', () => {
-  it('renders every static section and configures localized metadata', async () => {
+  it('renders every static section with client-only contributors', async () => {
     const { default: CreditsPage } = await import('@/pages/credits.vue');
     const wrapper = mount(CreditsPage, {
       global: {
         stubs: {
+          ClientOnly: { template: '<div><slot /></div>' },
           ContributorsList: { template: '<div data-testid="contributors" />' },
           CreditMemberList: {
             props: ['members'],
@@ -53,24 +54,14 @@ describe('credits page', () => {
     expect(sections[1]?.classes()).not.toContain('md:col-span-2');
     expect(wrapper.find('[data-testid="contributors"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('page.credits.sections.original_creator');
-    expect(seoMeta).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: expect.any(Object),
-        title: expect.any(Object),
-      })
-    );
-    const metadata = seoMeta.mock.calls[0]?.[0];
-    expect(metadata.title.value).toBe('common.credits');
-    expect(metadata.description.value).toBe(
-      'Meet the beta testers and open source contributors behind Tarkov Tracker.'
-    );
-    expect(metadata.ogUrl).toBeUndefined();
+    expect(seoMeta).not.toHaveBeenCalled();
   });
   it('links to the about page for the team directory', async () => {
     const { default: CreditsPage } = await import('@/pages/credits.vue');
     const wrapper = mount(CreditsPage, {
       global: {
         stubs: {
+          ClientOnly: { template: '<div><slot /></div>' },
           ContributorsList: { template: '<div />' },
           CreditMemberList: { template: '<ul />' },
           NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },

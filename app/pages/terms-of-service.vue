@@ -1,12 +1,9 @@
 <script setup lang="ts">
   import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
   const { getScrollContainer } = useScrollRoot();
-  useSeoMeta({
-    title: 'Terms of Service',
-    description: 'TarkovTracker terms of service and usage guidelines.',
-  });
   const lastUpdated = 'September 29, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
@@ -86,7 +83,7 @@
   });
 </script>
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-4">
+  <div class="mx-auto w-full max-w-7xl px-4 py-6">
     <div class="flex flex-col items-start xl:flex-row xl:gap-2">
       <!-- Spacer for fixed sidebar -->
       <div class="hidden w-75 shrink-0 xl:block"></div>
@@ -115,21 +112,13 @@
         </UCard>
       </aside>
       <section class="w-full min-w-0 xl:flex-1">
-        <UCard
-          class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 light:prose-headings:text-primary-800 light:prose-strong:text-surface-50 max-w-none"
-        >
-          <div class="terms-content space-y-12 [&>section]:scroll-mt-28">
-            <div
-              id="top"
-              class="border-surface-700/50 mb-8 flex items-center justify-between border-b pb-4"
-            >
-              <p
-                class="text-primary-400 light:text-primary-700 mb-0 text-sm tracking-[0.2em] uppercase"
-              >
-                Legal Document
-              </p>
-              <p class="text-surface-400 mb-0 text-sm">Last Updated: {{ lastUpdated }}</p>
-            </div>
+        <PageHeader
+          :title="t('common.terms_of_service')"
+          :description="`Last Updated: ${lastUpdated}`"
+          class="mb-4"
+        />
+        <UCard class="wrap-break-word">
+          <div class="space-y-12 [&>section]:scroll-mt-28">
             <!-- 1. ACCEPTANCE OF TERMS -->
             <section id="acceptance">
               <h2 class="mb-3 text-2xl font-bold">1. Acceptance of Terms</h2>

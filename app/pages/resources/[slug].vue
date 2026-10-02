@@ -50,16 +50,21 @@
   import ResourceGuideToc, {
     type ResourceGuideTocItem,
   } from '@/features/resources/ResourceGuideToc.vue';
-  import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
-  const runtimeConfig = useRuntimeConfig();
-  const siteUrl = resolveCanonicalSiteUrl(runtimeConfig.public.appUrl);
   const slug = computed(() => {
     const param = route.params.slug;
     return (Array.isArray(param) ? param[0] : param) ?? '';
   });
   const resource = computed(() => getResourceBySlug(slug.value));
+  if (!resource.value?.hasGuide) {
+    throw createError({ statusCode: 404, statusMessage: 'Guide not found' });
+  }
+  watch(resource, (guide) => {
+    if (!guide?.hasGuide) {
+      showError(createError({ statusCode: 404, statusMessage: 'Guide not found' }));
+    }
+  });
   const guideTitle = computed(() => t(`page.resources.items.${slug.value}.name`, slug.value));
   const shortDescription = computed(() => t(`page.resources.items.${slug.value}.description`, ''));
   const overviewText = computed(() =>
@@ -155,28 +160,4 @@
   });
   watch(tocItems, () => nextTick(updateActiveSection));
   definePageMeta({ layout: 'default' });
-  const seoTitle = computed(() =>
-    resource.value?.hasGuide
-      ? t(
-          'page.resources.guide_title_template',
-          { name: guideTitle.value },
-          `${guideTitle.value} Guide`
-        )
-      : t('page.resources.title', 'Resources & Guides')
-  );
-  const canonicalUrl = computed(() => `${siteUrl}/resources/${slug.value}`);
-  const shouldIndexGuide = computed(() => resource.value?.hasGuide === true);
-  useSeoMeta({
-    title: seoTitle,
-    description: overviewText,
-    ogTitle: seoTitle,
-    ogDescription: overviewText,
-    ogUrl: computed(() => (shouldIndexGuide.value ? canonicalUrl.value : undefined)),
-    twitterTitle: seoTitle,
-    twitterDescription: overviewText,
-    robots: computed(() => (shouldIndexGuide.value ? 'index, follow' : 'noindex, nofollow')),
-  });
-  useHead(() => ({
-    link: shouldIndexGuide.value ? [{ rel: 'canonical', href: canonicalUrl.value }] : [],
-  }));
 </script>

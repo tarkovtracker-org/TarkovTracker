@@ -118,7 +118,9 @@ test('exchanges the service token once and sends only the session afterwards', a
     assert.ok(calls[0].options.signal instanceof AbortSignal);
     assert.equal(response.status(), 200);
     assert.deepEqual(await response.json(), { data: true });
+    assert.equal(await response.text(), '{"data":true}');
     await response.dispose();
+    await assert.rejects(response.text(), /Preview response body is unavailable/);
     await assert.rejects(response.json(), /Preview response JSON is unavailable or invalid/);
     assert.equal(cookies.length, 1);
     assert.equal(cookies[0].domain, 'preview.example');

@@ -90,10 +90,14 @@ function cancelPreviewResponse(response) {
   }
 }
 function bufferedPreviewResponse(status, text) {
-  // The smoke assertions use only status and JSON. Buffer within the request deadline so
+  // Smoke assertions inspect status, JSON, and initial HTML. Buffer within the request deadline so
   // response parsing and disposal cannot expose transport errors after this helper returns.
   return {
     status: () => status,
+    text: async () => {
+      if (text === null) throw new Error('Preview response body is unavailable.');
+      return text;
+    },
     json: async () => {
       try {
         if (text === null) throw new Error();

@@ -179,5 +179,10 @@ export default withNuxt(
       '@typescript-eslint/no-unused-vars': 'off',
       'vue/no-unused-vars': 'error',
     },
+  },
+  {
+    // The route registry is also loaded by Nuxt's Node config before @ aliases exist.
+    files: ['app/utils/routeSeo.ts'],
+    rules: { 'import-x/no-relative-parent-imports': 'off' },
   }
 );

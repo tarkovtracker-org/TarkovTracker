@@ -746,7 +746,6 @@
     "changelog": {
       "title": "Changelog",
       "description": "View the latest updates and changes to TarkovTracker.",
-      "back": "Back to Dashboard",
       "loading": "Loading changelog...",
       "error": "Unable to load changelog.",
       "empty": "No changelog entries yet.",
@@ -797,7 +796,6 @@
       "route_unlock_reward": "Reward: {name}"
     },
     "kappa": {
-      "title": "Kappa & Lightkeeper Tracker",
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
       "row": {
         "level_met_aria": "Required level {required}, you are level {current}",
@@ -1218,7 +1216,6 @@
       }
     },
     "needed_items": {
-      "meta_description": "View all items needed for your active quests and hideout upgrades. Filter by quest, craft, and find-in-raid requirements.",
       "loading": "Loading task and hideout data",
       "search_placeholder": "Search items, tasks, or hideout stations...",
       "items": "items",
@@ -1309,9 +1306,6 @@
       }
     },
     "team": {
-      "meta": {
-        "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
-      },
       "page_description": "Invite teammates, choose which team progress you see, and track together.",
       "invite": {
         "title": "Invite link",
@@ -1357,7 +1351,6 @@
       },
       "card": {
         "manageteam": {
-          "title": "Team Members",
           "membercard": {
             "this_is_you": "(This is you)",
             "owner": "Owner",
@@ -1371,11 +1364,7 @@
             "remove_member": "Remove {name} from team"
           }
         },
-        "teamoptions": {
-          "title": "Team Integration Options"
-        },
         "myteam": {
-          "title": "My Team",
           "create_new_team": "Create a new team",
           "create_team_success": "Successfully created a new team.",
           "create_team_error": "Failed to create a new team.",
@@ -1410,12 +1399,10 @@
         "contributions": "{count} contribution | {count} contributions",
         "total": "{count} contributor | {count} contributors"
       },
-      "description": "Meet the beta testers and open source contributors behind Tarkov Tracker.",
       "team_link": "Maintained by the TarkovTracker team — meet them on the About page"
     },
     "about": {
       "title": "About TarkovTracker",
-      "description": "Meet the team that maintains TarkovTracker.org, the partners behind its game data, and how to get help from the community.",
       "intro": "TarkovTracker is a free, open source progress tracker for Escape from Tarkov. It keeps your quest and storyline progress, hideout upgrades, and item requirements in one place, and stays current with community-maintained game data. The project is run by a small volunteer team with help from open source contributors.",
       "team": {
         "summary": "TarkovTracker.org is maintained by a small volunteer team. The people below keep the site running and support the Discord community.",
@@ -1462,12 +1449,9 @@
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "Signed in",
       "success_description": "Signed in with {provider}.",
-      "login_options": "Login options",
-      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
+      "login_options": "Login options"
     },
     "profile": {
-      "title": "User Profile",
-      "meta_description": "Share your progression story with level, achievements, task completion, and timeline insights for PvP or PvE.",
       "shared_player": "Shared Player",
       "shared_view": "Shared View",
       "loading_shared_profile": "Loading shared profile...",
@@ -1600,7 +1584,6 @@
       "on_this_page": "On this page",
       "compatibility_label": "Compatibility",
       "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
-      "guide_title_template": "{name} Guide",
       "meta": {
         "official_guide": "Official guide",
         "maintained_by_team": "Maintained by the TarkovTracker.org team",
@@ -1764,7 +1747,6 @@
       "official_guide_label": "TarkovTracker.org Guide"
     },
     "account_retention": {
-      "title": "Account retention and service availability",
       "scope": "These rules apply to routine account deletion for inactivity while TarkovTracker operates. They define when an account may become eligible for cleanup, not a scheduled deletion date.",
       "standard": "No qualifying support: an account may be deleted after six consecutive months without recorded account activity.",
       "previous_supporter": "Previous supporter: an account with a qualifying contribution recorded against it, including a one-time contribution or previous subscription, may become eligible for deletion one year after the later of its last recorded account activity and its most recent recorded contribution.",
@@ -1796,6 +1778,9 @@
       "explore": "Explore",
       "project": "Project",
       "legal": "Legal"
+    },
+    "links": {
+      "org_vs_io": ".org vs .io"
     }
   },
   "navigation_drawer": {
@@ -1805,15 +1790,10 @@
     "brand_name": "TarkovTracker.org",
     "login": "Log In",
     "logout": "Log Out",
-    "ratscanner": "Rat Scanner",
-    "tarkovguru": "Tarkov Guru",
-    "tarkovmonitor": "Tarkov Monitor",
     "resources": "Resources",
     "profile": "Profile",
     "section_navigation": "Navigation",
-    "section_external": "External Tools",
     "account_menu": "Account menu",
-    "edition_label": "Edition",
     "mode_auto": "Auto",
     "auto_level_enabled": "Automatic level calculation is enabled",
     "level_display_auto": "Level {level} (automatic calculation enabled)",
@@ -1824,7 +1804,6 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "{name} Profile {mode}",
     "season_short": "S{season}"
   },
   "streamer_tools": {
@@ -1951,40 +1930,6 @@
       "data": "Data",
       "account": "Account",
       "tools_integrations": "Tools & Integrations"
-    },
-    "tab_seo": {
-      "progression": {
-        "title": "Progression Settings",
-        "description": "Manage TarkovTracker progression, display names, experience, and skills."
-      },
-      "prestige": {
-        "title": "Prestige Settings",
-        "description": "Review and manage TarkovTracker prestige tracking."
-      },
-      "preferences": {
-        "title": "Preferences",
-        "description": "Customize TarkovTracker display, privacy, task, and map preferences."
-      },
-      "account": {
-        "title": "Account",
-        "description": "Manage your TarkovTracker account options, sharing visibility, and data controls."
-      },
-      "imports": {
-        "title": "Import Settings",
-        "description": "Import TarkovTracker progress from Tarkov.dev profiles and EFT game logs."
-      },
-      "backup_restore": {
-        "title": "Backup & Restore",
-        "description": "Export or restore TarkovTracker progress data and support snapshots."
-      },
-      "api": {
-        "title": "API Settings",
-        "description": "Manage TarkovTracker API tokens and account integrations."
-      },
-      "streamer_tools": {
-        "title": "Streamer Tools",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
-      }
     },
     "account": {
       "begin_deletion": "Begin Account Deletion"
@@ -2552,7 +2497,6 @@
   },
   "oauth": {
     "consent": {
-      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Loading...",
       "error": "{error}",
@@ -2601,5 +2545,132 @@
     "no_prestige": "No Prestige",
     "prestige_n": "Prestige {n}"
   },
-  "generic": {}
+  "generic": {},
+  "seo": {
+    "site_name": "TarkovTracker",
+    "application_description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",
+    "routes": {
+      "home": {
+        "title": "Escape from Tarkov Progress Tracker · TarkovTracker.org",
+        "description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",
+        "heading": "Escape from Tarkov Progress Tracker"
+      },
+      "tasks": {
+        "title": "Tarkov Quest Tracker · TarkovTracker.org",
+        "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal."
+      },
+      "hideout": {
+        "title": "Tarkov Hideout Tracker · TarkovTracker.org",
+        "description": "Plan hideout upgrades and track module requirements and construction progress."
+      },
+      "needed_items": {
+        "title": "Tarkov Needed Items Tracker · TarkovTracker.org",
+        "description": "Find the items you still need for quests and hideout upgrades in one list."
+      },
+      "kappa": {
+        "title": "Kappa & Lightkeeper Tracker · TarkovTracker.org",
+        "description": "Track Kappa and Lightkeeper quest requirements and your remaining progression."
+      },
+      "storyline": {
+        "title": "Tarkov Storyline Tracker · TarkovTracker.org",
+        "description": "Follow Escape from Tarkov storyline quests and track your progression."
+      },
+      "resources": {
+        "title": "Escape from Tarkov Tools and Guides",
+        "description": "Explore community tools and guides for TarkovTracker, TarkovMonitor, RatScanner, and Tarkov.dev."
+      },
+      "about": {
+        "title": "About TarkovTracker",
+        "description": "Learn about TarkovTracker and its community project for tracking Escape from Tarkov progression."
+      },
+      "credits": {
+        "title": "TarkovTracker Credits",
+        "description": "Meet the contributors and community projects behind TarkovTracker."
+      },
+      "changelog": {
+        "title": "TarkovTracker Changelog",
+        "description": "Read the latest TarkovTracker releases, improvements, and fixes."
+      },
+      "supporter": {
+        "title": "Support TarkovTracker.org",
+        "description": "Help fund hosting and development. Explore supporter tiers and ways to contribute."
+      },
+      "privacy": {
+        "title": "TarkovTracker Privacy Policy",
+        "description": "Read how TarkovTracker handles account information and progression data."
+      },
+      "terms_of_service": {
+        "title": "TarkovTracker Terms of Service",
+        "description": "Read the terms governing your use of TarkovTracker."
+      },
+      "tarkovtracker_org_vs_io": {
+        "title": "TarkovTracker.org and TarkovTracker.io Guide",
+        "description": "Understand the differences between TarkovTracker.org and TarkovTracker.io and how to get started."
+      },
+      "tarkovmonitor": {
+        "title": "TarkovMonitor Setup Guide",
+        "description": "Install TarkovMonitor and connect it to TarkovTracker to synchronize raid and quest progress."
+      },
+      "ratscanner": {
+        "title": "RatScanner Setup Guide",
+        "description": "Install RatScanner and connect item scanning with your TarkovTracker progression."
+      },
+      "tarkovdev": {
+        "title": "Tarkov.dev Data Guide",
+        "description": "Learn how Tarkov.dev JSON data feeds support Escape from Tarkov tools and progression tracking."
+      },
+      "cultistcircle": {
+        "title": "Cultist Circle Calculator Guide",
+        "description": "Learn how to use the Cultist Circle calculator to explore sacrifice recipes and rewards."
+      },
+      "settings": {
+        "title": "Settings · TarkovTracker.org",
+        "description": "Manage your TarkovTracker preferences, imports, backups, and integrations."
+      },
+      "progression": {
+        "title": "Progression Settings · TarkovTracker.org",
+        "description": "Manage your TarkovTracker level, skills, and progression settings."
+      },
+      "prestige": {
+        "title": "Prestige Settings · TarkovTracker.org",
+        "description": "Manage your TarkovTracker prestige progression."
+      },
+      "preferences": {
+        "title": "Preferences · TarkovTracker.org",
+        "description": "Customize your TarkovTracker language, appearance, and tracking preferences."
+      },
+      "account": {
+        "title": "Account · TarkovTracker.org",
+        "description": "Manage your TarkovTracker account and connected services."
+      },
+      "team": {
+        "title": "Team · TarkovTracker.org",
+        "description": "Manage your TarkovTracker team and shared progression."
+      },
+      "admin": {
+        "title": "Administration · TarkovTracker.org",
+        "description": "TarkovTracker administration controls."
+      },
+      "profile": {
+        "title": "Player Profile · TarkovTracker.org",
+        "description": "View a TarkovTracker player profile and shared progression."
+      },
+      "login": {
+        "title": "Sign In · TarkovTracker.org",
+        "description": "Sign in to TarkovTracker to sync progression and collaborate with your team."
+      },
+      "auth_callback": {
+        "title": "Sign In Callback · TarkovTracker.org",
+        "description": "Complete your TarkovTracker sign-in."
+      },
+      "oauth_consent": {
+        "title": "Authorize Application · TarkovTracker.org",
+        "description": "Review an application's request to access your TarkovTracker account."
+      },
+      "not_found": {
+        "title": "Page Not Found",
+        "description": "The requested TarkovTracker page could not be found."
+      }
+    }
+  }
 }

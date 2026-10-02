@@ -8,14 +8,10 @@
       Skip to main content
     </a>
     <!-- Navigation Drawer (fixed) -->
-    <NavDrawer />
-    <!-- Application Bar (fixed header) -->
-    <AppBar
-      class="transition-all duration-300 ease-in-out"
-      :style="{
-        left: mainMarginLeft,
-      }"
-    />
+    <ClientOnly>
+      <NavDrawer />
+      <AppBar class="transition-all duration-300 ease-in-out" :style="{ left: mainMarginLeft }" />
+    </ClientOnly>
     <!-- Main content area -->
     <main
       id="main-content"
@@ -29,15 +25,13 @@
         <slot />
       </div>
     </main>
-    <AnalyticsConsentBanner
-      :style="{
-        left: mainMarginLeft,
-        width: `calc(100% - ${mainMarginLeft})`,
-      }"
-    />
-    <PromotedTwitchEmbed />
-    <!-- Back to top button -->
-    <BackToTop />
+    <ClientOnly>
+      <AnalyticsConsentBanner
+        :style="{ left: mainMarginLeft, width: `calc(100% - ${mainMarginLeft})` }"
+      />
+      <PromotedTwitchEmbed />
+      <BackToTop />
+    </ClientOnly>
     <!-- Footer pinned to bottom when content is short -->
     <AppFooter
       class="shrink-0"
@@ -67,13 +61,16 @@
   const appStore = useAppStore();
   const { belowMd } = useSharedBreakpoints();
   const { usesWindowScroll } = useScrollRoot();
+  const isMounted = ref(false);
+  onMounted(() => {
+    isMounted.value = true;
+  });
+  const drawerExpanded = computed(() =>
+    belowMd.value ? appStore.mobileDrawerExpanded : !appStore.drawerRail
+  );
   const mainMarginLeft = computed(() => {
-    if (belowMd.value) {
-      return appStore.mobileDrawerExpanded
-        ? SHELL_DRAWER_EXPANDED_WIDTH
-        : SHELL_DRAWER_COLLAPSED_WIDTH;
-    }
-    return appStore.drawerRail ? SHELL_DRAWER_COLLAPSED_WIDTH : SHELL_DRAWER_EXPANDED_WIDTH;
+    if (!isMounted.value) return 'var(--shell-w)';
+    return drawerExpanded.value ? SHELL_DRAWER_EXPANDED_WIDTH : SHELL_DRAWER_COLLAPSED_WIDTH;
   });
   useHead(
     computed(() => ({
