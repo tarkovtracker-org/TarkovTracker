@@ -85,6 +85,25 @@ const snapshot = (
   ...clocks,
 });
 describe('account recovery copies', () => {
+  it.each([
+    ['taskCompletions', true],
+    ['taskCompletions', { complete: true }],
+    ['taskCompletions', { complete: true, failed: false }],
+    ['taskObjectives', { count: 3 }],
+    ['hideoutParts', { count: 3 }],
+  ])('retains identical historical bytes with legacy %s %j', (field, value) => {
+    const state = historicalState();
+    const raw = JSON.stringify({
+      _userId: 'user-1',
+      _timestamp: 500,
+      data: { ...state, pvp: { ...state.pvp, [field as string]: { t: value } } },
+    });
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    expect(saveAccountRecoveryCopy(raw, 'user-2')).toBe(false);
+  });
   it('preserves unchanged historical bytes for every mode and rejects a different owner', () => {
     const state = historicalState();
     state.pve.taskAvailability = state.pvp.taskAvailability;
@@ -374,6 +393,29 @@ describe('account recovery copies', () => {
     expect(selected?.state.pvp.level).toBe(9);
     expect(selected?.modeTimestamps?.pvp).toBe(100);
   });
+  it.each([1, 3])(
+    'does not promote an untouched level %i mode using another mode edit time',
+    (level) => {
+      const saved = structuredClone(defaultState);
+      saved.pve.level = 9;
+      saved.pve.displayName = 'Other tab';
+      saved.pve.pmcFaction = 'BEAR';
+      saved.pve.xpOffset = 1234;
+      saved.pve.skillOffsets = { endurance: 3 };
+      const newerStorage = snapshot(100, saved, { modeTimestamps: { pve: 100 } });
+      const memory = structuredClone(defaultState);
+      memory.pvp.level = 42;
+      memory.pve.level = level;
+      const handoff = {
+        ...snapshot(200, memory, { modeTimestamps: { pvp: 200, pve: 0 } }),
+        isSessionHandoff: true,
+      };
+      const selected = selectFreshestOwnerProgressSnapshot(null, newerStorage, handoff);
+      expect(selected?.state.pvp.level).toBe(42);
+      expect(selected?.state.pve).toEqual(saved.pve);
+      expect(selected?.modeTimestamps?.pve).toBe(100);
+    }
+  );
   it('orders an unknown mode clock by its copy write time without inventing a clock', () => {
     const named = (displayName: string) => ({
       ...structuredClone(defaultState),

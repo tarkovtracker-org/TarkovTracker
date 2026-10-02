@@ -15,6 +15,44 @@ import { gitExecutable } from '../ci/validation-tools.mjs';
 const cli = resolve('scripts/ci/validate-changes.mjs');
 const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
 const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
+test('CI efficiency matrix preserves selected jobs and a resolving aggregate', () => {
+  const cases = [
+    { paths: ['docs/topic.md'], jobs: reducedDocsJobs },
+    { paths: ['supabase/AGENTS.md'], jobs: reducedDocsJobs },
+    { paths: ['docs/generate.mjs'], jobs: fullJobs },
+    { paths: ['docs/config.json'], jobs: fullJobs },
+    { paths: ['scripts/docs/generate.mjs'], jobs: fullJobs },
+    { paths: ['app/components/Example.vue'], jobs: fullJobs },
+    { paths: ['shared/example.ts'], jobs: fullJobs },
+    { paths: ['pnpm-lock.yaml'], jobs: fullJobs },
+    { paths: ['package.json'], jobs: fullJobs },
+    { paths: ['.github/actions/setup-project/action.yml'], jobs: fullJobs },
+    { paths: ['.github/workflows/security.yml'], jobs: fullJobs },
+    { paths: ['supabase/functions/example/index.ts'], jobs: fullJobs },
+    { paths: ['supabase/migrations/example.sql'], jobs: fullJobs },
+    { paths: ['tests/example.test.ts'], jobs: fullJobs },
+    { paths: ['app/locales/en.json'], jobs: fullJobs },
+    { paths: ['app/locales/fr.json'], jobs: reducedPreviewJobs },
+    { paths: ['docs/topic.md', 'app/example.ts'], jobs: fullJobs },
+    { paths: parseNameStatus('R100\0app/example.ts\0docs/example.md\0'), jobs: fullJobs },
+    { paths: parseNameStatus('D\0docs/deleted.md\0'), jobs: reducedDocsJobs },
+    { paths: parseNameStatus('D\0shared/deleted.ts\0'), jobs: fullJobs },
+    { paths: ['unknown/path'], jobs: fullJobs },
+    { paths: [], jobs: fullJobs },
+  ];
+  for (const { paths, jobs } of cases) {
+    const plan = classifyPaths(paths);
+    assert.deepEqual(plan.jobs, jobs, paths.join());
+    const needs = {
+      changes: { result: 'success' },
+      ...Object.fromEntries(
+        fullJobs.map((job) => [job, { result: jobs.includes(job) ? 'success' : 'skipped' }])
+      ),
+    };
+    assert.deepEqual(aggregateResults(plan, needs), [], paths.join());
+    assertSelectedJobFailures(plan, needs);
+  }
+});
 test('only explicit documentation and translation paths receive reduced validation', () => {
   for (const paths of [
     ['README.md'],

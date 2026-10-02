@@ -7,6 +7,7 @@ import { createApp, nextTick } from 'vue';
 import { defaultState } from '@/stores/progressState';
 import {
   isAccountRecoveryRetentionBlocked,
+  readAccountRecoveryCopy,
   resetAccountRecoveryRetentionBlock,
 } from '@/stores/tarkov/accountRecovery';
 import {
@@ -907,6 +908,62 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(useSupabaseSyncMock).not.toHaveBeenCalled();
   });
+  it.each(['pvp', 'pve'] as const)(
+    'reconciles owned historical %s confirmations alongside a memory-only handoff',
+    async (mode) => {
+      const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+      const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
+        await import('@/stores/tarkov/progressSaveStatus');
+      const confirmations = Object.fromEntries(
+        Array.from({ length: 66 }, (_, i) => [
+          `s${i + 1}`,
+          { requirements: 'r'.repeat(4000), timestamp: i + 200 },
+        ])
+      );
+      seedOwnedEnvelope('user-1', {
+        pvp: progressWithLevel(5),
+        pve: progressWithLevel(3),
+        [mode]: { ...progressWithLevel(5), taskAvailability: confirmations },
+      });
+      single
+        .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+        .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+      await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+      resetTarkovSync('initial sync failed');
+      markCloudSyncUnavailable(async () => false);
+      recordLocalSave(false, 'quota');
+      useTarkovStore().$patch((state) => {
+        state[mode].level = 42;
+      });
+      const untouched = mode === 'pvp' ? 'pve' : 'pvp';
+      modeProgressResult.data = [
+        {
+          game_mode: mode,
+          season_number: 0,
+          progress_data: {
+            ...progressWithLevel(5),
+            taskAvailability: { s1: { requirements: 'old', timestamp: 0 } },
+          },
+          progress_updated_at: sessionClock(-60_000),
+        },
+        {
+          game_mode: untouched,
+          season_number: 0,
+          progress_data: progressWithLevel(9),
+          progress_updated_at: sessionClock(60_000),
+        },
+      ];
+      single.mockResolvedValue({ data: createRemoteRow(), error: null });
+      preserveUnsavedSessionProgress('user-1');
+      await initializeTarkovSync();
+      expect(useTarkovStore()[mode].level).toBe(42);
+      expect(useTarkovStore()[untouched].level).toBe(9);
+      expect(useTarkovStore()[mode].taskAvailability).not.toHaveProperty('s1');
+      expect(Object.keys(useTarkovStore()[mode].taskAvailability ?? {})).toHaveLength(65);
+      recordLocalSave(true);
+      resetCloudSaveStatus();
+    }
+  );
   it('keeps memory-only edits when a failed initialization is retried', async () => {
     const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
     const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
@@ -998,6 +1055,123 @@ describe('useTarkov sync integration', () => {
     expect(useTarkovStore().pvp.level).toBe(42);
     expect(useTarkovStore().pve.level).toBe(9);
     recordLocalSave(true);
+    resetCloudSaveStatus();
+  });
+  it.each(['owned', 'empty', 'legacy'])(
+    'keeps retry clocks with %s storage when another tab saves before a memory-only edit',
+    async (initialStorage) => {
+      const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+      const {
+        recordLocalSave,
+        markCloudSyncUnavailable,
+        resetCloudSaveStatus,
+        progressSaveStatus,
+      } = await import('@/stores/tarkov/progressSaveStatus');
+      const baseline = {
+        pvp: progressWithLevel(5),
+        pve: progressWithLevel(3),
+        gameEdition: 1,
+      };
+      if (initialStorage === 'owned') seedOwnedEnvelope('user-1', baseline);
+      if (initialStorage === 'legacy') {
+        const legacy = structuredClone(defaultState);
+        legacy.pvp.level = 5;
+        legacy.pve.level = 3;
+        localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(legacy));
+      }
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      single
+        .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+        .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+      await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+      if (initialStorage === 'empty') {
+        expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+        expect(readAccountRecoveryCopy('user-1')).toBeNull();
+      }
+      resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: 'user-1' });
+      markCloudSyncUnavailable(async () => false);
+      const newer = {
+        ...baseline,
+        gameEdition: 2,
+        pve: {
+          ...baseline.pve,
+          displayName: 'Other tab',
+          pmcFaction: 'BEAR' as const,
+          xpOffset: 1234,
+          skillOffsets: { endurance: 3 },
+        },
+      };
+      seedOwnedEnvelope('user-1', newer, Date.now() - 1000);
+      const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+      });
+      useTarkovStore().$patch((state) => {
+        state.pvp.level = 42;
+      });
+      await nextTick();
+      expect(progressSaveStatus.local).toBe('failed');
+      expect(progressSaveStatus.localFailure).toBe('quota');
+      setItem.mockRestore();
+      single.mockResolvedValue({ data: createRemoteRow(), error: null });
+      preserveUnsavedSessionProgress('user-1');
+      preserveUnsavedSessionProgress('user-1');
+      await initializeTarkovSync();
+      expect(useTarkovStore().pvp.level).toBe(42);
+      expect(useTarkovStore().gameEdition).toBe(2);
+      expect(useTarkovStore().pve).toMatchObject(newer.pve);
+      recordLocalSave(true);
+      resetCloudSaveStatus();
+    }
+  );
+  it('keeps newer other-tab values saved while the first cloud read is pending', async () => {
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const { markCloudSyncUnavailable, progressSaveStatus, resetCloudSaveStatus } =
+      await import('@/stores/tarkov/progressSaveStatus');
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const deferred = createDeferredRead();
+    const failedRead = { data: null, error: { message: 'offline' } };
+    single.mockImplementationOnce(() => deferred.promise).mockResolvedValue(failedRead);
+    const startup = initializeTarkovSync();
+    const failure = expect(startup).rejects.toThrow('Supabase initial load failed');
+    await waitForBackgroundTasks();
+    expect(single).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    const newer = {
+      gameEdition: 2,
+      pve: {
+        ...progressWithLevel(9),
+        displayName: 'Other tab during read',
+        pmcFaction: 'BEAR' as const,
+        xpOffset: 1234,
+        skillOffsets: { endurance: 3 },
+      },
+    };
+    seedOwnedEnvelope('user-1', newer, Date.now() - 1000);
+    deferred.resolve(failedRead);
+    await failure;
+    resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: 'user-1' });
+    markCloudSyncUnavailable(async () => false);
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+    });
+    useTarkovStore().$patch((state) => {
+      state.pvp.level = 42;
+    });
+    await nextTick();
+    expect(progressSaveStatus.local).toBe('failed');
+    expect(progressSaveStatus.localFailure).toBe('quota');
+    setItem.mockRestore();
+    single.mockResolvedValue({ data: createRemoteRow(), error: null });
+    preserveUnsavedSessionProgress('user-1');
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.level).toBe(42);
+    expect(useTarkovStore().gameEdition).toBe(2);
+    expect(useTarkovStore().pve).toMatchObject(newer.pve);
     resetCloudSaveStatus();
   });
   it('does not replace the store from memory for another account or without unsaved edits', async () => {

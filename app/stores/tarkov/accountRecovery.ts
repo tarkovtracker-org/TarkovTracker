@@ -100,7 +100,7 @@ type ModeCandidate = {
   progress: UserProgressData;
   confirmations: ConfirmationMap;
   clock: number;
-  /** Orders equal-epoch copies; an unknown (zero) mode clock falls back to the copy's write time. */
+  /** Session handoffs use mode clocks; other unknown clocks use the copy's write time. */
   order: number;
   seasonNumber: number | null;
 };
@@ -112,7 +112,7 @@ const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): M
       snapshot.confirmationCandidates?.[mode] ?? snapshot.state[mode].taskAvailability
     ),
     clock,
-    order: clock || validClock(snapshot.timestamp),
+    order: snapshot.isSessionHandoff ? clock : clock || validClock(snapshot.timestamp),
     seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
   };
 };
@@ -322,6 +322,9 @@ export const saveAccountRecoveryCopy = (raw: string | null, ownerId: string | nu
     setActiveProgressWritesBlocked(true);
     return false;
   }
+  // Identical validated owner bytes already retain every field; composing them can
+  // normalize legacy task timestamps and falsely classify unchanged history as divergent.
+  if (current.raw === raw) return persistRecoveryValue(ownerId, raw, raw, false);
   const snapshots = [
     ...(current.raw === null
       ? []

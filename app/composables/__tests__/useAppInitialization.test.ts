@@ -468,7 +468,9 @@ describe('useAppInitialization locale setup', () => {
       const wrapper = await mountWithComposable();
       await vi.advanceTimersByTimeAsync(0);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
-      expect(mockResetTarkovSync).toHaveBeenCalledWith('initial sync failed');
+      expect(mockResetTarkovSync).toHaveBeenCalledWith('initial sync failed', {
+        preserveStorageBaselineForUserId: 'user-1',
+      });
       expect(mockActivityLogMigrateLegacyManualEntries).not.toHaveBeenCalled();
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);

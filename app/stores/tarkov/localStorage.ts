@@ -22,6 +22,7 @@ export type PersistedProgressSnapshot = {
   modeTimestamps?: Partial<Record<GameMode, number>>;
   /** Count-bounded evidence for reconciliation only; never serialized or applied to Pinia. */
   confirmationCandidates?: Partial<Record<GameMode, ConfirmationMap>>;
+  isSessionHandoff?: boolean;
   /** Original season attached to the seasonal payload before migration/sanitization. */
   seasonalSourceSeasonNumber?: number;
 };
@@ -140,6 +141,20 @@ export const createProgressStorageSerializer = (
     });
   };
   return {
+    retainBaseline: (userId: string, state: UserState) => {
+      if (previous?.storedUserId === userId) return;
+      previous = {
+        ...cloneStateSnapshot({
+          ...(readPrevious(userId) ?? {
+            state,
+            timestamp: 0,
+            hadDeprecatedProgressData: false,
+          }),
+          confirmationCandidates: undefined,
+        }),
+        storedUserId: userId,
+      };
+    },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {
       previous = snapshot
         ? cloneStateSnapshot({ ...snapshot, confirmationCandidates: undefined })

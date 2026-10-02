@@ -67,7 +67,9 @@ a source's first 1,000 cannot enter the union's first 1,000 when per-task timest
 Snapshot candidates never enter applied state, serialization, or acknowledgement baselines.
 Before replacing oversized owned active data, the retention guard preserves its unchanged bytes
 in the existing owner-scoped recovery slot. Recovery saving may retain one unchanged historical
-payload; it never synthesizes or accumulates new overflow. Divergent sources that cannot be
+payload; it never synthesizes or accumulates new overflow. Saving identical validated owner bytes
+is idempotent, including legacy progress fields that composition would otherwise normalize.
+Divergent sources that cannot be
 represented by one original leave both existing copies untouched and block destructive writes.
 The matching owner may still reconcile those copies. A confirmed startup merge/upload releases
 the historical barrier, and the existing acknowledgement flow retires the recovery copy.

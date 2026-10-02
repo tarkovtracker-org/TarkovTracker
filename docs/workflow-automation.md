@@ -59,6 +59,30 @@ second request because a polling window expired. Batch corrections before reques
 Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
 exits nonzero. A successful exit confirms review completion, not merge readiness.
 
+Authorized `--request` invocations also collapse original review commands after a verified eyes
+reaction from `chatgpt-codex-connector[bot]` or explicit matching code-review completion. This
+uses GraphQL `minimizeComment` with `RESOLVED` and the original node ID; findings and result
+comments remain visible. Summary-only completion with unknown findings does not authorize
+cleanup. Cosmetic failures warn without changing guard decisions, locks, quiet periods or
+completion evidence. Plain status/wait invocations remain read-only. Add `--collapse-requests`
+when authorized to clean up existing manually posted commands while observing status.
+
+After an authorized request's polling window ends, continue this command-cleanup workflow with
+`node scripts/codex-review/codex-review.mjs <PR> --collapse-requests --wait-seconds 600`.
+Omit `--request`: continuation observes the existing review and collapses commands acknowledged
+or completed later without requesting another review. This also covers eligible manually posted
+commands, which do not need a wrapper marker. Use plain `--wait-seconds 600` for intentionally
+read-only inspection; it does not collapse late acknowledgements or completion.
+
+GitHub's [issue_comment activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issue_comment)
+do not include reactions, so cleanup uses the existing bounded polling loop rather than inventing
+a reaction event. Commands posted outside that loop, or acknowledged after it ends, require a
+later authorized cleanup invocation. No new background workflow, credential or permission is
+added. A per-invocation cache removes repeat cleanup calls after success. The
+[cleanup regression benchmark](../scripts/codex-review/codex-review-collapse-tests.mjs)
+owns the API budget and local compute measurements. Network latency and token savings are
+unmeasured.
+
 The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
 code reviews for the current commit. Security-review completion alone is not code-review
 completion. A report's top-level security heading or dedicated leading marker identifies a security report; quoted
@@ -171,8 +195,11 @@ rebuilds and never reuses Lighthouse output. Missing or expired artifacts requir
 Candidate builds receive no deployment credentials; the manifest is a set of claims that the
 trusted preview controller verifies (see §8).
 
-The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
-installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
+The shared setup action always uses `.nvmrc` and the full `packageManager` pin. By default it also
+restores the pnpm cache and performs a frozen installation; `install-dependencies: false` skips
+those two steps. Non-scheduled Security Scan calls use this runtime-only setup because their
+audits read an isolated manifest and lockfile; the weekly outdated check retains installation.
+Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
 When automation files change it also runs pinned, checksum-verified release binaries of `actionlint`
 (syntax, expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and
@@ -575,6 +602,8 @@ availability is advisory and can fail for reasons unrelated to the change.
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
+Ordinary same-repository ready PRs request previews automatically after current successful PR CI.
+Drafts pause; marking ready or reopening reuses already-passed CI without another build.
 Maintainers and administrators can comment `/preview` once to enable previews for a PR, including
 fork PRs. The current revision is requested immediately if CI is ready; otherwise the next
 successful CI run requests it. Later revisions refresh automatically after successful CI.
@@ -598,12 +627,17 @@ enabled opt-in stays in control; resuming always happens with a fresh command fr
 maintainer. Manual `workflow_dispatch` previews on the trusted default branch own their
 authorization directly: they carry no standing command authority and cannot be revoked by a later
 stop, while requests bound through `request_comment_id` are re-verified before upload.
+Readiness dispatches carry explicit policy provenance and the exact CI attempt; they recheck
+stop state, readiness, current head/base/main and current successful CI immediately before upload.
+Accepted original commands are collapsed with `minimizeComment` (`RESOLVED`); cosmetic API failures
+do not fail previews. Stop receipts are preserved. Repeated enable commands retain an original
+live grant, but any intervening accepted stop revokes that queued grant even after a resume.
 Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
 revision, but does not add a second automatic dispatcher.
 Enabling auto-merge also requests previews when no explicit preview command overrides it.
 The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
 it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
-and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and fork approval requests. Manual commands use that same lookup. Failed or cancelled dispatches remain retryable. Manual `/preview`
 and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
 this optional request path. Automatic events do not upload artifacts themselves.
 
@@ -617,7 +651,7 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [previews spec](systems/previews.md).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `reopened`, `auto_merge_enabled`,
 `closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
 state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment

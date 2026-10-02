@@ -72,7 +72,13 @@ test('preview controller runs trusted code only and isolates credentials per job
   for (const job of ['deploy', 'smoke'])
     assert.doesNotMatch(permissionsBlock(jobBlock(workflow, job), '    '), /statuses: write/);
   assert.doesNotMatch(workflow, /contents: write|pull-requests: write|id-token: write/);
-  const events = ['ready_for_review', 'converted_to_draft', 'auto_merge_enabled', 'closed'];
+  const events = [
+    'ready_for_review',
+    'converted_to_draft',
+    'reopened',
+    'auto_merge_enabled',
+    'closed',
+  ];
   assert.match(
     workflowEvent(stateWorkflow, 'pull_request_target'),
     new RegExp(`types: \\[${events.join(', ')}\\]`)

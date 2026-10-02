@@ -9,7 +9,7 @@ contribution workflow overview (issues, branches, labels, project board), see
 
 ### Prerequisites
 
-- **Node.js** >= 24.19.0
+- **Node.js** at the version in [`.nvmrc`](../.nvmrc) (`fnm use` / `nvm use`)
 - **pnpm** 11.14.0 (via Corepack; matches `packageManager` in `package.json`)
 - **Git**
 
@@ -78,6 +78,10 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 - Reference issue numbers when applicable and keep commits focused and atomic.
 
 ## Pull request process
+
+For automatic ready-PR previews, draft pauses, stop commands and fork approvals, see the
+[preview system spec](systems/previews.md). Mark an ordinary same-repository PR ready after
+validation; successful current CI requests its preview without another command.
 
 ### Branching strategy
 
