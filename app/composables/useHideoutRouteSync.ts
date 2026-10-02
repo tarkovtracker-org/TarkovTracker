@@ -14,13 +14,7 @@ export function useHideoutRouteSync() {
   );
   return useRouteFilters<HideoutRouteParams>({
     configs: {
-      view: {
-        key: 'view',
-        default: 'available',
-        validate: isValidHideoutView,
-        serialize: (v) => (v === 'available' ? undefined : v),
-        deserialize: (v) => v,
-      },
+      view: { default: 'available', validate: isValidHideoutView },
     },
     onRouteToStore: (values) => {
       if (values.view !== hideoutPrimaryView.value) {
