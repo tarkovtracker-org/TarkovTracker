@@ -5,12 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { gitExecutable } from './validation-tools.mjs';
 let root;
 const environment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
 const git = (...args) =>
-  execFileSync('/usr/bin/git', ['-C', root, ...args], {
+  execFileSync(gitExecutable(), ['-C', root, ...args], {
     env: environment,
     encoding: 'utf8',
   }).trim();
