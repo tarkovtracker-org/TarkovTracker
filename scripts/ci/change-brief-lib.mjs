@@ -124,7 +124,7 @@ const scopedRules = [
   {
     prefix: 'workers/api-gateway/',
     check:
-      'workers/api-gateway/AGENTS.md checks (types:check, typecheck, validate:openapi, test:api-gateway)',
+      'workers/api-gateway/AGENTS.md checks: pnpm --filter api-gateway run types:check; pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run; focused tests: pnpm run test:api-gateway',
   },
   { prefix: 'supabase/', check: 'supabase/AGENTS.md checks (supabase:check)' },
 ];
@@ -232,6 +232,7 @@ const docTerms = (analyses) =>
 /** Docs that cite a target path or a backticked target name, as file:line anchors. */
 function owningDocs(io, analyses) {
   const terms = docTerms(analyses).flatMap((term) => ['-e', term]);
+  if (!terms.length) return [];
   const anchors = new Map();
   for (const line of io.grepLines(['-n', '-F', ...terms], docSpecs)) {
     const [file, number] = line.split(':');

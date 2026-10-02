@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   buildBrief,
   isTestPath,
@@ -243,6 +243,20 @@ describe('validationFor', () => {
     expect(commands).toContain('pnpm run i18n:check');
     expect(commands).toContain('pnpm run test:workflow');
   });
+  it('includes the exact gateway contract checks for targets and affected consumers', () => {
+    const required = [
+      'pnpm --filter api-gateway run types:check',
+      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run',
+    ];
+    const gateway = 'workers/api-gateway/src/utils/gameMode.ts';
+    for (const [paths, affected] of [
+      [[gateway], [gateway]],
+      [['shared/utils/seasonNumber.ts'], ['shared/utils/seasonNumber.ts', gateway]],
+    ]) {
+      const checks = validationFor(paths, affected).scoped.join('\n');
+      for (const command of required) expect(checks).toContain(command);
+    }
+  });
 });
 describe('buildBrief', () => {
   it('finds lazy-only templates in PascalCase and kebab-case', async () => {
@@ -365,6 +379,21 @@ describe('buildBrief', () => {
     expect(brief.validation.full).toBe(false);
     expect(renderBrief(brief)).toContain('# Change brief (vs origin/main)');
   });
+  it.each(['docs/api.md', 'app/locales/de.json'])(
+    'does not search for owning docs without code targets in a %s diff',
+    async (changedPath) => {
+      const io = fakeIo({ grepLines: ['docs/unrelated.md:12:*.md'] });
+      const brief = await buildBrief(io, {
+        targets: [],
+        changedPaths: [changedPath],
+        base: 'origin/main',
+      });
+      expect(brief.docs).toEqual([]);
+      expect(
+        io.calls.filter((call) => call.kind === 'lines' && call.specs.includes('*.md'))
+      ).toEqual([]);
+    }
+  );
   it('renders capped lists and always states the graph-wide blind spots', async () => {
     const consumers = Array.from({ length: 15 }, (_, index) => `app/features/f${index}.vue`);
     const io = fakeIo({ reports: { 'shared/utils/seasonNumber.ts': trace(consumers) } });
