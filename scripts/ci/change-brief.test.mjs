@@ -317,6 +317,72 @@ describe('validationFor', () => {
   });
 });
 describe('buildBrief', () => {
+  it('propagates deduplicated literal owners into scope and real test candidates', async () => {
+    const target = 'shared/utils/apiTaskUpdates.ts';
+    for (const [owner, scope, runnable] of [
+      ['supabase/migrations/mirror.sql', 'supabase/AGENTS.md', false],
+      ['workers/api-gateway/tooling.config.ts', 'workers/api-gateway/AGENTS.md', false],
+      ['scripts/workflow-tests/source-check.mjs', null, true],
+      ['scripts/ci/source.test.mjs', null, true],
+      ['scripts/workflow-tests/helpers/source-check.mjs', null, false],
+    ]) {
+      const line = `${owner}: '${target}'`;
+      const io = fakeIo({ reports: { [target]: trace([]) }, grepLines: [line, line] });
+      io.instructionFiles = () => [
+        'AGENTS.md',
+        'supabase/AGENTS.md',
+        'workers/api-gateway/AGENTS.md',
+      ];
+      const brief = await buildBrief(io, { targets: [{ file: target }] });
+      expect(brief.pathReferences).toEqual([{ file: owner, references: target }]);
+      if (scope) {
+        expect(brief.instructions.filter((file) => file === scope)).toHaveLength(1);
+        expect(brief.validation.scoped).toHaveLength(1);
+      }
+      expect(brief.tests.commands).toEqual(runnable ? testCommands([owner]) : []);
+    }
+  });
+  it('reports the literal-search cap without dropping graph-derived scope', async () => {
+    const target = 'app/utils/constants.ts';
+    const transitive = Array.from({ length: 80 }, (_, index) => `app/utils/consumer${index}.ts`);
+    transitive.push('workers/api-gateway/src/handlers/team.ts');
+    const io = fakeIo({ reports: { [target]: trace([], transitive) } });
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.uncertainty.join('\n')).toMatch(/Path-reference search limited.*60/);
+    const search = io.calls.find(
+      (call) => call.kind === 'lines' && call.specs.includes('package.json')
+    );
+    expect(search.args.filter((arg) => arg === '-e')).toHaveLength(60);
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+  });
+  it('does not issue an unpatterned literal or doc search for an empty request', async () => {
+    const io = fakeIo();
+    const brief = await buildBrief(io, { targets: [] });
+    expect(brief.pathReferences).toEqual([]);
+    expect(brief.docs).toEqual([]);
+    expect(io.calls.filter((call) => call.kind === 'lines')).toEqual([]);
+  });
+  it('searches executable TypeScript configs for literal constraints outside the import graph', async () => {
+    const target = 'app/stores/utils/gameMode.ts';
+    const io = fakeIo({ reports: { [target]: trace([]) } });
+    io.grepLines = (args, specs) =>
+      specs.includes('*.config.ts') ? [`vitest.config.ts: '${target}': { 100: true }`] : [];
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.pathReferences).toEqual([{ file: 'vitest.config.ts', references: target }]);
+  });
+  it('adds scoped instructions and checks for non-graph SQL reference consumers', async () => {
+    const target = 'shared/utils/apiTaskUpdates.ts';
+    const owner = 'supabase/migrations/20260930150000_cap_api_update_task_lists.sql';
+    const io = fakeIo({
+      reports: { [target]: trace([]) },
+      grepLines: [`${owner}: -- mirrors ${target}`],
+    });
+    io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.pathReferences).toEqual([{ file: owner, references: target }]);
+    expect(brief.instructions).toContain('supabase/AGENTS.md');
+    expect(brief.validation.scoped).toContain('supabase/AGENTS.md checks (supabase:check)');
+  });
   it('keeps scoped validation complete and deduplicated for graph chains, test consumers, and cycles', async () => {
     const seed = 'app/utils/constants.ts';
     const gateway = 'workers/api-gateway/src/handlers/team.ts';

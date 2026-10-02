@@ -46,6 +46,9 @@ Candidate test entries are JSON records with `executable` and `args`, including 
 Directly targeted tests and existing tests in the diff are included even when they have no importers.
 Runnable candidates follow the runner's filename patterns; helpers are traced to their test consumers.
 Scoped instructions and checks include direct and transitive dependents, including test consumers.
+Discovered literal references in executable configs, workflows, SQL, and file-reading tests also
+contribute scope and runnable test candidates. This matches repository-relative path strings;
+computed references and relative fragments still require confirmation.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;
@@ -73,7 +76,8 @@ path mappings from the [brief model](../scripts/ci/change-brief-lib.mjs). Confir
 `AGENTS.md` contract for differently named account/team/token code; path mappings do not prove
 semantic coverage. Generated declarations are checked
 for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
-Path-reference seeds are limited to 60; some rendered lists remain uncapped. Model tests inject
+Path-reference seeds are limited to 60 affected paths; truncation is reported as uncertainty.
+Some rendered lists remain uncapped. Model tests inject
 I/O. CLI regressions exercise operand handling against a checkout; they do not establish
 generated-declaration freshness or complete Fallow coverage.
 

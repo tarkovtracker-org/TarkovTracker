@@ -5,7 +5,7 @@ const codePattern = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testPattern =
   /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
 const gatewayTestPattern = /^workers\/api-gateway\/src\/(?:.*\/)?__tests__\/.*\.test\.ts$/;
-// Non-JavaScript files that load scripts or reference modules by path (workflows, config, SQL).
+// Literal references outside import edges, including executable config and file-reading tests.
 const pathReferenceSpecs = [
   '.github/',
   '.husky/',
@@ -13,6 +13,22 @@ const pathReferenceSpecs = [
   '*.yml',
   '*.yaml',
   '*.toml',
+  '*.config.js',
+  '*.config.mjs',
+  '*.config.cjs',
+  '*.config.ts',
+  '*.config.mts',
+  '*.config.cts',
+  '*.config.json',
+  'tsconfig*.json',
+  'jsconfig*.json',
+  '.prettierrc',
+  '.prettierignore',
+  '.fallowrc.json',
+  '*.test.*',
+  '*.spec.*',
+  'scripts/workflow-tests/',
+  'scripts/codex-review/*-tests.mjs',
   'supabase/*.sql',
 ];
 // Markdown that can own behavior. `.cubic/` and the changelog are not sources (root AGENTS.md).
@@ -20,6 +36,7 @@ const docSpecs = ['*.md', ':!.cubic/', ':!CHANGELOG.md', ':!app/locales/'];
 const codeSearchSpecs = ['app', 'shared', 'workers/api-gateway/src', 'tests', 'scripts'];
 const maxListed = 12;
 const maxBroaderTests = 25;
+const maxReferenceSeeds = 60;
 const alwaysOutsideGraph =
   'Never in any graph: runtime string lookups (i18n keys, Supabase RPC/table names, KV keys, upstream field names).';
 export const isCodePath = (path) => codePattern.test(path);
@@ -247,6 +264,7 @@ const referencePair = (line, paths) => {
 };
 /** Path-literal references from workflows, config, and SQL, which are outside any import graph. */
 function pathReferences(io, paths) {
+  if (!paths.length) return [];
   const lines = io.grepLines(['-F', ...paths.flatMap((path) => ['-e', path])], pathReferenceSpecs);
   const pairs = lines.map((line) => referencePair(line, paths)).filter(Boolean);
   const keyed = new Map(pairs.map((pair) => [`${pair.file} -> ${pair.references}`, pair]));
@@ -315,9 +333,8 @@ function summarizeAnalysis({ target, importers, textOnly, exports, transitive })
 export async function buildBrief(io, { targets, changedPaths = [], base }) {
   const generated = io.generated();
   const analyses = await io.map(targets, (target) => analyzeTarget(io, target, generated));
-  const consumers = unique(analyses.flatMap((analysis) => analysis.importers.filter(isSourcePath)));
   const seeds = unique([...changedPaths, ...targets.map((target) => target.file)]);
-  const touched = unique([
+  const graphTouched = unique([
     ...seeds,
     ...analyses.flatMap(({ importers, transitive, textOnly }) => [
       ...importers,
@@ -325,7 +342,16 @@ export async function buildBrief(io, { targets, changedPaths = [], base }) {
       ...textOnly,
     ]),
   ]);
-  const tests = candidateTests(io, analyses, seeds);
+  const references = pathReferences(io, graphTouched.slice(0, maxReferenceSeeds));
+  const referenceOwners = references.map(({ file }) => file);
+  const touched = unique([...graphTouched, ...referenceOwners]);
+  const tests = candidateTests(io, analyses, unique([...seeds, ...referenceOwners]));
+  const referenceNotes =
+    graphTouched.length > maxReferenceSeeds
+      ? [
+          `Path-reference search limited to the first ${maxReferenceSeeds} affected paths; confirm remaining literal consumers manually.`,
+        ]
+      : [];
   return {
     base,
     unanalyzedChanges: without(
@@ -333,7 +359,7 @@ export async function buildBrief(io, { targets, changedPaths = [], base }) {
       targets.map((target) => target.file)
     ),
     targets: analyses.map(summarizeAnalysis),
-    pathReferences: pathReferences(io, unique([...seeds, ...consumers]).slice(0, 60)),
+    pathReferences: references,
     docs: owningDocs(io, analyses),
     instructions: scopedInstructions(touched, io.instructionFiles()),
     tests: {
@@ -345,6 +371,7 @@ export async function buildBrief(io, { targets, changedPaths = [], base }) {
     uncertainty: unique([
       ...analyses.flatMap((analysis) => analysis.uncertainty),
       ...degradedNotes(analyses, touched),
+      ...referenceNotes,
     ]),
   };
 }
