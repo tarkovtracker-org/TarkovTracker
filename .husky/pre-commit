@@ -1,2 +1,6 @@
 #!/bin/sh
+if [ ! -f .nuxt/eslint.config.mjs ]; then
+  echo "pre-commit: regenerating .nuxt for ESLint (NODE_ENV=development nuxt prepare)"
+  NODE_ENV=development pnpm exec nuxt prepare >/dev/null || exit 1
+fi
 pnpm exec lint-staged
