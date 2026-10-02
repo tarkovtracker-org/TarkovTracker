@@ -77,6 +77,11 @@ const failures = [
     { en: { ...EN, orphan_key: 'Old' } },
     /orphan_key is not used in app\/; remove it/,
   ],
+  [
+    'unused en keys whose leaf name appears elsewhere',
+    { en: { ...EN, common: { orphan_key: 'Old' } }, usage: `${USAGE} const id = 'orphan_key';` },
+    /common\.orphan_key is not used in app\/; remove it/,
+  ],
 ];
 for (const [name, fixture, pattern] of failures) {
   test(`i18n fails on ${name}`, (t) => {

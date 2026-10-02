@@ -157,12 +157,7 @@ function hasDynamicParent(parts, source) {
   return false;
 }
 function mayBeReferenced(key, source) {
-  const parts = key.split('.');
-  const leaf = parts.at(-1);
-  if (source.includes(key) || source.includes(`'${leaf}'`) || source.includes(`${leaf}:`)) {
-    return true;
-  }
-  return hasDynamicParent(parts, source);
+  return source.includes(key) || hasDynamicParent(key.split('.'), source);
 }
 function checkUnusedKeys(sourceKeys, errors) {
   const source = readSource();
