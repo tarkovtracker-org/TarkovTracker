@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { isSecurity } from './codex-review-state.mjs';
 const BOT = 'chatgpt-codex-connector[bot]';
 const FULL_SHA = /^[0-9a-f]{40}$/;
@@ -110,6 +110,23 @@ function newReceipt(context, inputs) {
   verifyInterval(context, receipt, run);
   return receipt;
 }
+/** Publish complete JSON atomically without replacing any existing receipt. */
+export function publishReceipt(path, receipt) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, `${JSON.stringify(receipt)}\n`, { flag: 'wx', mode: 0o600 });
+    linkSync(temporary, path);
+  } finally {
+    removeTemporary(temporary);
+  }
+}
+function removeTemporary(path) {
+  try {
+    unlinkSync(path);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
 /** Explicit historical disposition never establishes review completion for a new head. */
 export function applyRequestDispositions(context, inputs) {
   const directory = join(context.stateDirectory, 'dispositions');
@@ -124,10 +141,9 @@ export function applyRequestDispositions(context, inputs) {
   ) {
     const receipt = newReceipt(context, inputs);
     mkdirSync(directory, { recursive: true });
-    writeFileSync(
+    publishReceipt(
       join(directory, `${prefix(context.repo, context.pr)}${receipt.commentId}.json`),
-      `${JSON.stringify(receipt)}\n`,
-      { flag: 'wx', mode: 0o600 }
+      receipt
     );
     receipts.push(receipt);
   }

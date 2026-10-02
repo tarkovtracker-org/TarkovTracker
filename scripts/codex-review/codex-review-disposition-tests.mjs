@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { applyRequestDispositions } from './codex-review-disposition.mjs';
+import { applyRequestDispositions, publishReceipt } from './codex-review-disposition.mjs';
 import { classifyState } from './codex-review-state.mjs';
 import { parseArgs } from './codex-review.mjs';
 const sha = '1111111111111111111111111111111111111111';
@@ -141,6 +141,16 @@ test('edited or removed request invalidates a persisted disposition', (t) => {
       applyRequestDispositions({ ...context, retireRequest: undefined }, { ...inputs(), comments })
     );
   }
+});
+test('receipt publication is complete, restricted, exclusive and cleans temporary files', (t) => {
+  const context = fixture(t);
+  const path = join(context.stateDirectory, 'receipt.json');
+  publishReceipt(path, { original: true });
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
+  assert.equal(statSync(path).mode & 0o777, 0o600);
+  assert.throws(() => publishReceipt(path, { replacement: true }), { code: 'EEXIST' });
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
+  assert.deepEqual(readdirSync(context.stateDirectory), ['receipt.json']);
 });
 test('disposition flags require complete evidence and cannot combine with a request', () => {
   assert.throws(() => parseArgs(['44', '--retire-request', '10']));
