@@ -1,5 +1,6 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import { useXpCalculation } from '@/composables/useXpCalculation';
+import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { isGameMode, type GameMode } from '@/utils/constants';
@@ -13,6 +14,7 @@ import {
   resolveTarkovDevProfileSource,
   type TarkovDevProfileSource,
 } from '@/utils/tarkovDevProfileSource';
+import { getCurrentSupabaseUserId } from '@/utils/userScopedStorage';
 export type ImportState = 'idle' | 'loading' | 'preview' | 'success' | 'error';
 export type ImportErrorCode =
   | 'cooldown_active'
@@ -20,8 +22,11 @@ export type ImportErrorCode =
   | 'profile_not_generated'
   | 'rate_limited'
   | 'verification_failed'
-  | 'fetch_failed';
+  | 'fetch_failed'
+  | 'tarkov_uid_conflict'
+  | 'save_failed';
 export interface UseTarkovDevImportReturn {
+  isImporting: Ref<boolean>;
   importState: Ref<ImportState>;
   previewData: Ref<TarkovDevImportResult | null>;
   importError: Ref<string | null>;
@@ -65,13 +70,41 @@ function readNumericField(data: Record<string, unknown> | null, key: string): nu
   const value = data?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+type CodedImportError = { code: ImportErrorCode; meta: Record<string, number> | null };
+const readErrorCode = (data: Record<string, unknown> | null): string | null =>
+  typeof data?.code === 'string' ? data.code : null;
+const toMinutes = (seconds: number): number => Math.max(1, Math.ceil(seconds / 60));
+type ProfileUrlErrorRule = (
+  code: string | null,
+  data: Record<string, unknown> | null
+) => CodedImportError | null;
+const PROFILE_URL_ERROR_RULES: Record<string, ProfileUrlErrorRule> = {
+  '422': (code, data) =>
+    code === 'profile_stale'
+      ? { code: 'profile_stale', meta: { days: readNumericField(data, 'ageDays') ?? 0 } }
+      : null,
+  '404': () => ({ code: 'profile_not_generated', meta: null }),
+  '429': (_code, data) => ({
+    code: 'rate_limited',
+    meta: { minutes: toMinutes(readNumericField(data, 'retryAfterSeconds') ?? 60) },
+  }),
+  '403': (code) =>
+    code === 'turnstile_failed' ? { code: 'verification_failed', meta: null } : null,
+};
+function classifyProfileUrlError(error: unknown): CodedImportError {
+  const data = readErrorData(error);
+  const rule = PROFILE_URL_ERROR_RULES[String(readErrorStatus(error))];
+  return rule?.(readErrorCode(data), data) ?? { code: 'fetch_failed', meta: null };
+}
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
+  const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const runtimeConfig = useRuntimeConfig();
   const { setTotalSkillLevel } = useSkillCalculation();
   const { setTotalXP } = useXpCalculation();
   const importState = ref<ImportState>('idle');
+  const isImporting = ref(false);
   const previewData = ref<TarkovDevImportResult | null>(null);
   const importError = ref<string | null>(null);
   const importErrorCode = ref<ImportErrorCode | null>(null);
@@ -122,30 +155,8 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     return true;
   }
   function applyProfileUrlError(error: unknown): void {
-    const status = readErrorStatus(error);
-    const data = readErrorData(error);
-    const code = typeof data?.code === 'string' ? data.code : null;
-    if (status === 422 && code === 'profile_stale') {
-      const ageDays = readNumericField(data, 'ageDays') ?? 0;
-      setCodedError(GENERIC_FETCH_ERROR, 'profile_stale', { days: ageDays });
-      return;
-    }
-    if (status === 404) {
-      setCodedError(GENERIC_FETCH_ERROR, 'profile_not_generated', null);
-      return;
-    }
-    if (status === 429) {
-      const retryAfterSeconds = readNumericField(data, 'retryAfterSeconds') ?? 60;
-      setCodedError(GENERIC_FETCH_ERROR, 'rate_limited', {
-        minutes: Math.max(1, Math.ceil(retryAfterSeconds / 60)),
-      });
-      return;
-    }
-    if (status === 403 && code === 'turnstile_failed') {
-      setCodedError(GENERIC_FETCH_ERROR, 'verification_failed', null);
-      return;
-    }
-    setCodedError(GENERIC_FETCH_ERROR, 'fetch_failed', null);
+    const { code, meta } = classifyProfileUrlError(error);
+    setCodedError(GENERIC_FETCH_ERROR, code, meta);
   }
   async function parseFile(file: File): Promise<void> {
     const requestId = ++profileUrlRequestId;
@@ -166,6 +177,62 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       logger.error('[TarkovDevImport] Parse error:', e);
     }
   }
+  const isCurrentRequest = (requestId: number): boolean => requestId === profileUrlRequestId;
+  function rejectProfileUrl(
+    requestId: number,
+    message: string,
+    code: ImportErrorCode | null,
+    meta: Record<string, number> | null
+  ): null {
+    if (isCurrentRequest(requestId)) setCodedError(message, code, meta);
+    return null;
+  }
+  function getCooldownMinutes(source: TarkovDevProfileSource): number {
+    const remainingMs = getImportCooldownRemainingMs(
+      source.tarkovUid,
+      source.mode ?? 'pvp',
+      cooldownMs
+    );
+    return remainingMs > 0 ? Math.max(1, Math.ceil(remainingMs / MINUTE_MS)) : 0;
+  }
+  function fetchProfileJson(
+    source: TarkovDevProfileSource,
+    options: TarkovDevProfileFetchOptions
+  ): Promise<unknown> {
+    const wantsFresh = options.fresh === true || staleRetryJsonUrl === source.profileJsonUrl;
+    return $fetch<unknown>('/api/tarkov-dev/profile', {
+      query: {
+        url: source.profileJsonUrl,
+        ...(wantsFresh ? { fresh: '1' } : {}),
+      },
+      ...(options.turnstileToken
+        ? { headers: { 'x-turnstile-token': options.turnstileToken } }
+        : {}),
+      retry: 0,
+    });
+  }
+  function acceptProfileJson(
+    requestId: number,
+    source: TarkovDevProfileSource,
+    json: unknown
+  ): TarkovDevProfileSource | null {
+    if (!isCurrentRequest(requestId)) return null;
+    staleRetryJsonUrl = null;
+    if (!applyProfilePayload(json)) return null;
+    lastFetchedSource = source;
+    return source;
+  }
+  function failProfileFetch(
+    requestId: number,
+    source: TarkovDevProfileSource,
+    error: unknown
+  ): null {
+    if (!isCurrentRequest(requestId)) return null;
+    applyProfileUrlError(error);
+    if (importErrorCode.value === 'profile_stale') staleRetryJsonUrl = source.profileJsonUrl;
+    logger.error('[TarkovDevImport] Profile URL fetch error:', error);
+    return null;
+  }
   async function parseProfileUrl(
     profileUrl: string,
     options: TarkovDevProfileFetchOptions = {}
@@ -175,107 +242,119 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     importErrorCode.value = null;
     importErrorMeta.value = null;
     const source = resolveTarkovDevProfileSource(profileUrl);
-    if (!source.ok) {
-      if (requestId !== profileUrlRequestId) return null;
-      setCodedError(source.error, null, null);
-      return null;
-    }
-    const cooldownMode = source.data.mode ?? 'pvp';
-    const cooldownRemainingMs = getImportCooldownRemainingMs(
-      source.data.tarkovUid,
-      cooldownMode,
-      cooldownMs
-    );
-    if (cooldownRemainingMs > 0) {
-      if (requestId !== profileUrlRequestId) return null;
-      setCodedError(GENERIC_FETCH_ERROR, 'cooldown_active', {
-        minutes: Math.max(1, Math.ceil(cooldownRemainingMs / MINUTE_MS)),
-      });
-      return null;
+    if (!source.ok) return rejectProfileUrl(requestId, source.error, null, null);
+    const minutes = getCooldownMinutes(source.data);
+    if (minutes > 0) {
+      return rejectProfileUrl(requestId, GENERIC_FETCH_ERROR, 'cooldown_active', { minutes });
     }
     importState.value = 'loading';
     previewData.value = null;
-    const wantsFresh = options.fresh === true || staleRetryJsonUrl === source.data.profileJsonUrl;
     try {
-      const json = await $fetch<unknown>('/api/tarkov-dev/profile', {
-        query: {
-          url: source.data.profileJsonUrl,
-          ...(wantsFresh ? { fresh: '1' } : {}),
-        },
-        ...(options.turnstileToken
-          ? { headers: { 'x-turnstile-token': options.turnstileToken } }
-          : {}),
-        retry: 0,
-      });
-      if (requestId !== profileUrlRequestId) return null;
-      staleRetryJsonUrl = null;
-      if (!applyProfilePayload(json)) return null;
-      lastFetchedSource = source.data;
-      return source.data;
+      const json = await fetchProfileJson(source.data, options);
+      return acceptProfileJson(requestId, source.data, json);
     } catch (e) {
-      if (requestId !== profileUrlRequestId) return null;
-      applyProfileUrlError(e);
-      if (importErrorCode.value === 'profile_stale') {
-        staleRetryJsonUrl = source.data.profileJsonUrl;
-      }
-      logger.error('[TarkovDevImport] Profile URL fetch error:', e);
-      return null;
+      return failProfileFetch(requestId, source.data, e);
+    }
+  }
+  function deriveLevel(totalXP: number): number {
+    const levels = metadataStore.playerLevels;
+    for (let i = levels.length - 1; i >= 0; i--) {
+      const level = levels[i];
+      if (level && totalXP >= level.exp) return level.level;
+    }
+    return 1;
+  }
+  function applyImportData(data: TarkovDevImportResult, editionOverride?: number | null): void {
+    tarkovStore.setTarkovUid(data.tarkovUid);
+    tarkovStore.setPMCFaction(data.pmcFaction);
+    tarkovStore.setDisplayName(data.displayName);
+    tarkovStore.setPrestigeLevel(data.prestigeLevel);
+    setTotalXP(data.totalXP);
+    tarkovStore.setLevel(deriveLevel(data.totalXP));
+    for (const [skillId, level] of Object.entries(data.skills)) {
+      setTotalSkillLevel(skillId, level);
+    }
+    const edition = editionOverride ?? data.gameEditionGuess;
+    if (typeof edition === 'number') tarkovStore.setGameEdition(edition);
+  }
+  /** Saves the applied import and reports why the cloud did not accept it, if it did not. */
+  async function saveImport(tarkovUid: number): Promise<ImportErrorCode | null> {
+    if (!(await tarkovStore.saveProgressNow())) return 'save_failed';
+    return tarkovStore.getTarkovUid() === tarkovUid ? null : 'tarkov_uid_conflict';
+  }
+  function recordUrlImportCooldown(tarkovUid: number): void {
+    const source = lastFetchedSource;
+    if (source?.tarkovUid !== tarkovUid) return;
+    recordImportCompletion(tarkovUid, source.mode ?? 'pvp', cooldownMs);
+  }
+  async function runImport(
+    data: TarkovDevImportResult,
+    isCurrent: () => boolean,
+    editionOverride?: number | null
+  ): Promise<void> {
+    if (!isCurrent()) return;
+    applyImportData(data, editionOverride);
+    const saveError = await saveImport(data.tarkovUid);
+    if (!isCurrent()) return;
+    if (saveError) {
+      setCodedError('Failed to save import data', saveError, null);
+      return;
+    }
+    recordUrlImportCooldown(data.tarkovUid);
+    importState.value = 'success';
+  }
+  async function restoreGameMode(mode: GameMode): Promise<void> {
+    try {
+      await tarkovStore.switchGameMode(mode);
+    } catch (e) {
+      logger.error('[TarkovDevImport] Failed to restore original game mode:', e);
+    }
+  }
+  async function importIntoMode(
+    data: TarkovDevImportResult,
+    targetMode: GameMode,
+    isCurrent: () => boolean,
+    ownsSession: () => boolean,
+    editionOverride?: number | null
+  ): Promise<void> {
+    const originalMode = tarkovStore.getCurrentGameMode();
+    if (targetMode === originalMode) return runImport(data, isCurrent, editionOverride);
+    try {
+      await tarkovStore.switchGameMode(targetMode);
+      await runImport(data, isCurrent, editionOverride);
+    } finally {
+      if (ownsSession()) await restoreGameMode(originalMode);
     }
   }
   async function confirmImport(
     targetMode: GameMode,
     editionOverride?: number | null
   ): Promise<void> {
-    if (!previewData.value) return;
-    if (!isGameMode(targetMode)) return;
     const data = previewData.value;
-    const originalMode = tarkovStore.getCurrentGameMode();
-    const shouldRestoreMode = targetMode !== originalMode;
+    if (isImporting.value) return;
+    if (!data || !isGameMode(targetMode)) return;
+    const requestId = profileUrlRequestId;
+    const ownerId = getCurrentSupabaseUserId();
+    const ownsGeneration = captureStartupOwnership();
+    const ownsSession = () =>
+      ownsGeneration() &&
+      getCurrentSupabaseUserId() === ownerId &&
+      $supabase.user.loggedIn === (ownerId !== null);
+    const isCurrent = () => ownsSession() && isCurrentRequest(requestId);
+    isImporting.value = true;
     try {
-      if (shouldRestoreMode) {
-        await tarkovStore.switchGameMode(targetMode);
-      }
-      tarkovStore.setTarkovUid(data.tarkovUid);
-      tarkovStore.setPMCFaction(data.pmcFaction);
-      tarkovStore.setDisplayName(data.displayName);
-      tarkovStore.setPrestigeLevel(data.prestigeLevel);
-      const levels = metadataStore.playerLevels;
-      let derivedLevel = 1;
-      for (let i = levels.length - 1; i >= 0; i--) {
-        const level = levels[i];
-        if (level && data.totalXP >= level.exp) {
-          derivedLevel = level.level;
-          break;
-        }
-      }
-      setTotalXP(data.totalXP);
-      tarkovStore.setLevel(derivedLevel);
-      for (const [skillId, level] of Object.entries(data.skills)) {
-        setTotalSkillLevel(skillId, level);
-      }
-      const edition = editionOverride ?? data.gameEditionGuess;
-      if (edition !== null && edition !== undefined) {
-        tarkovStore.setGameEdition(edition);
-      }
-      if (lastFetchedSource && lastFetchedSource.tarkovUid === data.tarkovUid) {
-        recordImportCompletion(data.tarkovUid, lastFetchedSource.mode ?? 'pvp', cooldownMs);
-      }
-      importState.value = 'success';
+      await importIntoMode(data, targetMode, isCurrent, ownsSession, editionOverride);
     } catch (e) {
+      if (!isCurrent()) return;
       importState.value = 'error';
       importError.value = 'Failed to apply import data';
       logger.error('[TarkovDevImport] Import error:', e);
     } finally {
-      if (shouldRestoreMode) {
-        try {
-          await tarkovStore.switchGameMode(originalMode);
-        } catch (e) {
-          logger.error('[TarkovDevImport] Failed to restore original game mode:', e);
-        }
-      }
+      isImporting.value = false;
     }
   }
   return {
+    isImporting,
     importState,
     previewData,
     importError,
