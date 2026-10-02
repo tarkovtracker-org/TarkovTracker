@@ -8,6 +8,10 @@ import {
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  taskAvailabilityCandidates,
+  type ConfirmationMap,
+} from '@/utils/taskAvailabilityConfirmation';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type PersistedProgressSnapshot = {
   hadDeprecatedProgressData: boolean;
@@ -16,6 +20,8 @@ export type PersistedProgressSnapshot = {
   timestamp: number | null;
   metadataTimestamp?: number;
   modeTimestamps?: Partial<Record<GameMode, number>>;
+  /** Count-bounded evidence for reconciliation only; never serialized or applied to Pinia. */
+  confirmationCandidates?: Partial<Record<GameMode, ConfirmationMap>>;
   isSessionHandoff?: boolean;
   /** Original season attached to the seasonal payload before migration/sanitization. */
   seasonalSourceSeasonNumber?: number;
@@ -138,18 +144,21 @@ export const createProgressStorageSerializer = (
     retainBaseline: (userId: string, state: UserState) => {
       if (previous?.storedUserId === userId) return;
       previous = {
-        ...cloneStateSnapshot(
-          readPrevious(userId) ?? {
+        ...cloneStateSnapshot({
+          ...(readPrevious(userId) ?? {
             state,
             timestamp: 0,
             hadDeprecatedProgressData: false,
-          }
-        ),
+          }),
+          confirmationCandidates: undefined,
+        }),
         storedUserId: userId,
       };
     },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {
-      previous = snapshot ? cloneStateSnapshot(snapshot) : null;
+      previous = snapshot
+        ? cloneStateSnapshot({ ...snapshot, confirmationCandidates: undefined })
+        : null;
     },
     serialize,
     acceptRemote: (snapshot: RemoteProgressSnapshot) => {
@@ -203,7 +212,11 @@ export const isLocalStorageInaccessible = (): boolean => {
 };
 type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
 let activeProgressWritesBlocked = false;
-type ActiveProgressRetentionGuard = (current: string | null, next: string | null) => boolean;
+type ActiveProgressRetentionGuard = (
+  current: string | null,
+  next: string | null,
+  cloudHeld?: boolean
+) => boolean;
 let activeProgressRetentionGuard: ActiveProgressRetentionGuard = (current) => !current;
 export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
   activeProgressWritesBlocked = blocked;
@@ -211,13 +224,13 @@ export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
 export const setActiveProgressRetentionGuard = (guard: ActiveProgressRetentionGuard): void => {
   activeProgressRetentionGuard = guard;
 };
-const writeStorageItem = (key: string, value: string): StorageWriteResult => {
+const writeStorageItem = (key: string, value: string, cloudHeld = false): StorageWriteResult => {
   if (typeof window === 'undefined') return { ok: false, error: null };
   try {
     if (key === STORAGE_KEYS.progress) {
       if (
         activeProgressWritesBlocked ||
-        !activeProgressRetentionGuard(localStorage.getItem(key), value)
+        !activeProgressRetentionGuard(localStorage.getItem(key), value, cloudHeld)
       ) {
         return {
           ok: false,
@@ -349,7 +362,7 @@ export const quarantineAndRemoveUnparseableActiveProgress = (
  * Only this confirmation may be described to the player as a local save.
  */
 export const persistActiveProgressValue = (value: string, cloudHeld = false): boolean => {
-  const result = writeStorageItem(STORAGE_KEYS.progress, value);
+  const result = writeStorageItem(STORAGE_KEYS.progress, value, cloudHeld);
   if (result.ok) recordLocalSave(true);
   else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
   return result.ok;
@@ -401,6 +414,30 @@ export const clearActiveProgressStorage = (resetOwner?: string | null) => {
   safeRemoveItem(STORAGE_KEYS.progress, explicitOwner);
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
 };
+const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;
+const legacyModeEvidence = (data: Record<string, unknown>, mode: GameMode): unknown => {
+  if (hasCompleteModes(data)) return undefined;
+  const legacyMode = data.currentGameMode === 'seasonal' ? 'seasonal' : 'pvp';
+  return mode === legacyMode ? data : undefined;
+};
+const rawStructuredModeEvidence = (data: Record<string, unknown>, mode: GameMode): unknown => {
+  if (!('currentGameMode' in data)) return mode === 'pvp' ? data : undefined;
+  return mode in data ? data[mode] : legacyModeEvidence(data, mode);
+};
+const rawModeEvidence = (data: unknown, mode: GameMode): unknown =>
+  isRecord(data) ? rawStructuredModeEvidence(data, mode) : undefined;
+const modeConfirmationCandidates = (data: unknown, mode: GameMode): ConfirmationMap => {
+  const progress = rawModeEvidence(data, mode);
+  return taskAvailabilityCandidates(isRecord(progress) ? progress.taskAvailability : undefined);
+};
+const persistedModeEvidence = (data: UserState) => {
+  return {
+    state: sanitizeOwnedUserState(migrateToGameModeStructure(data)),
+    confirmationCandidates: Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [mode, modeConfirmationCandidates(data, mode)])
+    ),
+  };
+};
 export const parsePersistedProgressState = (
   rawValue: string | null | undefined,
   userId: string | null
@@ -416,7 +453,7 @@ export const parsePersistedProgressState = (
     }
     return {
       hadDeprecatedProgressData,
-      state: sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data)),
+      ...persistedModeEvidence(wrapped.data),
       storedUserId: wrapped._userId,
       timestamp: wrapped._timestamp ?? null,
       metadataTimestamp: wrapped._metadataTimestamp,
@@ -428,7 +465,7 @@ export const parsePersistedProgressState = (
     const parsed = JSON.parse(rawValue) as UserState;
     return {
       hadDeprecatedProgressData: hasDeprecatedTarkovDevProfileData(parsed),
-      state: sanitizeOwnedUserState(migrateToGameModeStructure(parsed)),
+      ...persistedModeEvidence(parsed),
       storedUserId: null,
       timestamp: null,
       seasonalSourceSeasonNumber: parsed.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,

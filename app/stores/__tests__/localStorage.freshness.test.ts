@@ -10,6 +10,24 @@ import { resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 describe('local mode freshness', () => {
+  it('strips reconciliation evidence before cloning a retained baseline', () => {
+    const state = structuredClone(defaultState);
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+    const serializer = createProgressStorageSerializer(() => ({
+      state,
+      timestamp: 10,
+      storedUserId: 'user-1',
+      hadDeprecatedProgressData: false,
+      confirmationCandidates: { pvp: { task: { requirements: 'historical', timestamp: 1 } } },
+    }));
+    serializer.retainBaseline('user-1', state);
+    expect(clone.mock.calls[0]![0]).toHaveProperty('confirmationCandidates', undefined);
+    clone.mockRestore();
+    state.pvp.level = 42;
+    const saved = JSON.parse(serializer.serialize(state, 'user-1', 30));
+    expect(saved._modeTimestamps).toEqual({ pvp: 30, pve: 10, seasonal: 10 });
+    expect(saved).not.toHaveProperty('confirmationCandidates');
+  });
   it('retains the same-account baseline across repeated failures and isolates other accounts', () => {
     const state = structuredClone(defaultState);
     const readPrevious = vi.fn((userId: string | null) => ({

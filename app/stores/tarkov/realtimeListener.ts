@@ -49,6 +49,7 @@ import {
   REALTIME_SUBSCRIPTION_TIMEOUT_MS,
 } from '@/utils/realtimeChannel';
 import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
 const mayHaveUnacknowledgedLocalChanges = (): boolean =>
@@ -91,6 +92,8 @@ type RealtimeModeProgress = {
   progress: UserProgressData;
   updateTime: number;
   progressTime: number;
+  /** Raw candidates live only for this merge; applied and acknowledged state stay bounded. */
+  taskAvailability: UserProgressData['taskAvailability'];
 };
 type LegacyProgressMetadata = {
   current_game_mode?: string;
@@ -150,6 +153,7 @@ const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null 
   return {
     mode: row.game_mode,
     progress: sanitizeOwnedProgressData(row.progress_data),
+    taskAvailability: (row.progress_data as UserProgressData).taskAvailability,
     updateTime: parseRealtimeUpdateTime(row.updated_at),
     progressTime: parseProgressTime(row.progress_updated_at),
   };
@@ -489,6 +493,12 @@ async function runSetupRealtimeListener(
       return;
     }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
+    if (toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)) {
+      merged.taskAvailability = mergeTaskAvailability(
+        localState[mode].taskAvailability,
+        remote.taskAvailability
+      );
+    }
     const nextProgress = reconcile(
       { [mode]: remoteProgress },
       { [mode]: merged },
