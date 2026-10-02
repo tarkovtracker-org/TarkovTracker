@@ -55,9 +55,11 @@ function fixture(t, { selectedRun = run, interval = [run] } = {}) {
     evidenceRun: 20,
     runGh: (args) => {
       assert.ok(!args.includes('--method'), 'disposition must not mutate GitHub');
-      return JSON.stringify(
-        args.at(-1).includes('?') ? [{ workflow_runs: interval }] : selectedRun
-      );
+      if (args.at(-1).includes('?')) {
+        assert.ok(!args.at(-1).includes('branch='), 'branch renames cannot narrow the evidence');
+        return JSON.stringify([{ workflow_runs: interval }]);
+      }
+      return JSON.stringify(selectedRun);
     },
   };
 }
@@ -85,6 +87,7 @@ test('missing, forged, earlier or wrong-SHA completion cannot retire a request',
     { ...review, commit_id: head },
     { ...review, submitted_at: '2026-10-02T01:03:00Z' },
     { ...review, body: '### Codex Security Review\nNo issues.' },
+    { ...review, body: '<!-- codex-security-review-finding:v1 -->\n### Codex Review\nNo issues.' },
     { ...review, state: 'PENDING' },
   ]) {
     const evidence = { ...inputs(), reviews: candidate ? [candidate] : [] };
@@ -109,6 +112,22 @@ test('wrong repository, fork, PR, revision or later run cannot establish request
 test('intervening PR-head evidence fails closed', (t) => {
   const context = fixture(t, { interval: [run, { ...run, head_sha: head }] });
   assert.throws(() => applyRequestDispositions(context, inputs()), /ambiguous/);
+});
+test('unassociated and renamed-branch intervening heads remain ambiguous', (t) => {
+  for (const change of [
+    { pull_requests: [] },
+    { pull_requests: undefined },
+    { head_branch: 'renamed-topic' },
+  ]) {
+    const context = fixture(t, { interval: [run, { ...run, head_sha: head, ...change }] });
+    assert.throws(() => applyRequestDispositions(context, inputs()), /ambiguous/);
+  }
+});
+test('identified runs for other pull requests do not prevent disposition', (t) => {
+  const context = fixture(t, {
+    interval: [run, { ...run, head_sha: head, pull_requests: [{ number: 45 }] }],
+  });
+  assert.doesNotThrow(() => applyRequestDispositions(context, inputs()));
 });
 test('edited or removed request invalidates a persisted disposition', (t) => {
   const context = fixture(t);

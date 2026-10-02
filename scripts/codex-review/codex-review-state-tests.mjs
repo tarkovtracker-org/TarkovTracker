@@ -35,14 +35,12 @@ const summary = (sha) => ({
   user: { login: 'chatgpt-codex-connector[bot]' },
   body: `<!-- codex-pull-request-review-summary -->\n| **Code Review** | ✅ **Completed** <relative-time datetime="2026-09-27T02:00:00Z">done</relative-time> | \`${sha}\` | Manual |`,
 });
-test('a near-simultaneous summary retains the explicit result, but a later review stays unknown', () => {
-  const clean = reviewComment(head, '2026-09-27T01:59:58Z');
-  assert.equal(classifyState(inputs({ comments: [clean, summary(head)] }), now).result, 'clean');
-  const oldClean = reviewComment(head, '2026-09-27T01:55:00Z');
-  assert.equal(
-    classifyState(inputs({ comments: [oldClean, summary(head)] }), now).result,
-    'unknown'
-  );
+test('a newer summary never borrows an earlier explicit same-SHA result', () => {
+  const clean = reviewComment(head, '2026-09-27T01:59:40Z');
+  const requested = request('2026-09-27T01:59:50Z', head);
+  const state = classifyState(inputs({ comments: [clean, requested, summary(head)] }), now);
+  assert.equal(state.status, 'complete');
+  assert.equal(state.result, 'unknown');
 });
 test('quoted security headings do not hide exact-head code-review completion', () => {
   const comment = reviewComment(head);

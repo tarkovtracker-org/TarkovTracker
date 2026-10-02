@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { isSecurity } from './codex-review-state.mjs';
 const BOT = 'chatgpt-codex-connector[bot]';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const associations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
@@ -26,12 +27,14 @@ function originalRequest(comment) {
   ].every(Boolean);
 }
 function completedReview(review, sha, requestedAt) {
+  const body = review.body ?? '';
   return [
     review.user?.login === BOT,
     review.user?.type === 'Bot',
     review.state !== 'PENDING',
     review.commit_id === sha,
-    /^#{1,3}\s+.*Codex Review/im.test(review.body ?? ''),
+    /^#{1,3}\s+.*Codex Review/im.test(body),
+    !isSecurity(body),
     Date.parse(review.submitted_at) >= requestedAt,
   ].every(Boolean);
 }
@@ -79,19 +82,19 @@ function validateCompletion(reviews, receipt) {
     );
 }
 function verifyInterval(context, receipt, run) {
-  const endpoint = `repos/${context.repo}/actions/runs?event=pull_request&branch=${encodeURIComponent(run.head_branch)}&created=${encodeURIComponent(`${run.created_at}..${receipt.createdAt}`)}&per_page=100`;
+  const endpoint = `repos/${context.repo}/actions/runs?event=pull_request&created=${encodeURIComponent(`${run.created_at}..${receipt.createdAt}`)}&per_page=100`;
   const pages = JSON.parse(context.runGh(['api', '--paginate', '--slurp', endpoint]));
   const differentHead = pages
     .flatMap((page) => page.workflow_runs ?? [])
-    .some(
-      (item) =>
-        item.head_sha !== receipt.sha &&
-        item.pull_requests?.some((pull) => pull.number === context.pr)
-    );
+    .some((item) => item.head_sha !== receipt.sha && mayBelongToPull(item, context.pr));
   if (differentHead)
     throw new Error(
       'Historical request revision is ambiguous: another PR head was observed before the request'
     );
+}
+function mayBelongToPull(run, pr) {
+  if (!Array.isArray(run.pull_requests)) return true;
+  return run.pull_requests.length === 0 || run.pull_requests.some((pull) => pull.number === pr);
 }
 function newReceipt(context, inputs) {
   const comment = inputs.comments.find((item) => item.id === context.retireRequest);

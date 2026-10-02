@@ -79,9 +79,9 @@ commit completion can retire the local intent; absence of that evidence remains 
 SHA-marked requests for older commits do not block the current commit, while unmarked requests
 require a completion of the current commit at or after the request time. Equality is accepted
 because GitHub timestamps have second precision and exact-commit completion is reusable;
-bot activity still marked running continues to block a new request. An explicit code-result comment
-and its summary posted within a minute retain the explicit result; a later summary-only completion
-remains unknown.
+bot activity still marked running continues to block a new request. A newer summary-only completion
+remains unknown even when an earlier explicit result exists for the same SHA; completion does not
+establish clean findings, which must be verified from the actual review output.
 
 ### Historical untagged requests
 
@@ -96,8 +96,9 @@ node scripts/codex-review/codex-review.mjs <PR> \
 
 The guard verifies an unchanged trusted command, authenticated later formal code-review completion
 for that exact SHA, and a same-repository PR Actions run created before the command. It exhausts
-run pagination for the interval between that run and the command and rejects evidence of another
-PR head. Missing or ambiguous evidence fails closed. This does not support fork requests or infer
+run pagination for the interval between that run and the command without a branch filter, so branch
+renames cannot hide evidence. Another PR head or a different-head run with missing PR association
+fails closed; an explicitly identified unrelated PR does not block disposition. This does not support fork requests or infer
 a SHA from commit author dates. It cannot run with `--request`.
 
 A mode-0600 receipt in the Git common directory records the command ID, original body hash/time,

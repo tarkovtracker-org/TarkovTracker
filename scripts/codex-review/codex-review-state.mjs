@@ -9,7 +9,7 @@ const unknown = (reason) => ({ kind: 'unknown', reason });
 const status = (value, reason) => ({ status: value, reason });
 const isCodex = (item) => item.user?.login === BOT;
 const bodyOf = (item) => item.body ?? '';
-const isSecurity = (body) =>
+export const isSecurity = (body) =>
   /^(?:<!-- codex-security-review-finding:v1 -->|#{1,3}[ \t]+[^\r\n]*Codex Security Review\b)/i.test(
     body.trimStart()
   );
@@ -268,23 +268,11 @@ function lastActivityAt(context) {
   const updatedAt = Date.parse(context.pull.updated_at);
   return Number.isFinite(updatedAt) ? Math.max(updatedAt, context.createdAt) : context.createdAt;
 }
-function latestCompletion(completed, headSha) {
-  const current = completed.filter((item) => item.sha === headSha).sort((a, b) => b.at - a.at);
-  const latest = current[0];
-  if (latest?.result !== 'unknown') return latest;
-  // A summary posted seconds after the explicit result adds no findings information.
-  const explicit = current.find((item) => item.result !== 'unknown');
-  return explicitSummaryResult(latest, explicit);
-}
-function explicitSummaryResult(latest, explicit) {
-  if (!explicit) return latest;
-  return latest.at - explicit.at < 60_000 ? explicit : latest;
-}
 function buildContext(inputs, now, headSha) {
   const { comments = [], reviews = [], intents = [], requestedReviewers = {} } = inputs;
   const activities = collectActivities(comments, reviews, inputs.resolvedShas);
   const completed = activities.filter((item) => item.kind === 'complete');
-  const current = latestCompletion(completed, headSha);
+  const current = completed.filter((item) => item.sha === headSha).sort((a, b) => b.at - a.at)[0];
   const requests = [
     ...comments.filter(isRequest).map((item) => requestRecord(item, inputs.resolvedShas)),
     ...intents.map(intentRecord),
