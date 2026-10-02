@@ -3,13 +3,14 @@
 Requests or waits for a Codex PR review without duplicate posts. Agents use it as described in
 [`AGENTS.md`](../../AGENTS.md); never post raw `@codex review` comments instead.
 
-| File                        | What it does                                                      | Run by                   |
-| --------------------------- | ----------------------------------------------------------------- | ------------------------ |
-| `codex-review.mjs`          | Command-line entry: `node scripts/codex-review/codex-review.mjs`. | agents, by hand          |
-| `codex-review-state.mjs`    | Reads a PR's review state from GitHub.                            | `codex-review.mjs`       |
-| `codex-review-lock.mjs`     | Lock so two runs cannot request the same review.                  | `codex-review.mjs`       |
-| `codex-review-collapse.mjs` | Collapses acknowledged or completed review commands.              | `codex-review.mjs`       |
-| `*-tests.mjs`               | `node --test` tests for the files above.                          | `pnpm run test:workflow` |
+| File                           | What it does                                                      | Run by                   |
+| ------------------------------ | ----------------------------------------------------------------- | ------------------------ |
+| `codex-review.mjs`             | Command-line entry: `node scripts/codex-review/codex-review.mjs`. | agents, by hand          |
+| `codex-review-state.mjs`       | Reads a PR's review state from GitHub.                            | `codex-review.mjs`       |
+| `codex-review-lock.mjs`        | Lock so two runs cannot request the same review.                  | `codex-review.mjs`       |
+| `codex-review-collapse.mjs`    | Collapses acknowledged or completed review commands.              | `codex-review.mjs`       |
+| `codex-review-disposition.mjs` | Verifies explicit dispositions of historical untagged requests.   | `codex-review.mjs`       |
+| `*-tests.mjs`                  | `node --test` tests for the files above.                          | `pnpm run test:workflow` |
 
 ## Guard behavior
 
@@ -78,7 +79,33 @@ commit completion can retire the local intent; absence of that evidence remains 
 SHA-marked requests for older commits do not block the current commit, while unmarked requests
 require a completion of the current commit at or after the request time. Equality is accepted
 because GitHub timestamps have second precision and exact-commit completion is reusable;
-bot activity still marked running continues to block a new request.
+bot activity still marked running continues to block a new request. An explicit code-result comment
+and its summary posted within a minute retain the explicit result; a later summary-only completion
+remains unknown.
+
+### Historical untagged requests
+
+An old untagged request can otherwise block every new head (#1038). Disposition is explicit and
+separate from requesting a review:
+
+```bash
+node scripts/codex-review/codex-review.mjs <PR> \
+  --retire-request <original-comment-id> --request-sha <full-request-time-sha> \
+  --evidence-run <pull-request-run-id>
+```
+
+The guard verifies an unchanged trusted command, authenticated later formal code-review completion
+for that exact SHA, and a same-repository PR Actions run created before the command. It exhausts
+run pagination for the interval between that run and the command and rejects evidence of another
+PR head. Missing or ambiguous evidence fails closed. This does not support fork requests or infer
+a SHA from commit author dates. It cannot run with `--request`.
+
+A mode-0600 receipt in the Git common directory records the command ID, original body hash/time,
+SHA and run ID. Subsequent observations revalidate the GitHub evidence; editing or deleting the
+command invalidates the receipt. No GitHub evidence is edited or removed. The receipt scopes only
+that historical request, never establishes current-head completion, and leaves current pending
+requests, intents and running activity authoritative. After successful disposition, use the normal
+separate guarded request command for the new head.
 
 The helper recovers a request lock only when complete owner metadata identifies this host and
 a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed

@@ -7,6 +7,7 @@ import { parseArgs as parseOptions } from 'node:util';
 import { acquireLock, releaseLock } from './codex-review-lock.mjs';
 import { classifyState, evidenceShas } from './codex-review-state.mjs';
 import { collapseReviewCommands } from './codex-review-collapse.mjs';
+import { applyRequestDispositions } from './codex-review-disposition.mjs';
 export { classifyState } from './codex-review-state.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const POLL_INTERVAL_MS = 30_000;
@@ -67,10 +68,18 @@ function fetchState(context) {
     'requested reviewers'
   );
   const resolvedShas = resolveEvidence(prefix, evidenceShas(comments, reviews), runGh);
+  const inputs = applyRequestDispositions(context, {
+    pull,
+    comments,
+    reviews,
+    requestedReviewers,
+    intents,
+    resolvedShas,
+  });
   const { pull: refreshed, serverTime } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const changed = changedSnapshot(pull, refreshed);
   if (changed) return changed;
-  const inputs = { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas };
+  inputs.pull = refreshed;
   if (context.collapseRequests) collapseReviewCommands(context, inputs);
   return classifyState(inputs, serverTime);
 }
@@ -143,7 +152,7 @@ function persistIntent(directory, repo, pr, sha, createdAt, requestedAt = null) 
   return path;
 }
 function usage() {
-  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--collapse-requests] [--wait-seconds N]';
+  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--collapse-requests] [--wait-seconds N] [--retire-request COMMENT_ID --request-sha SHA --evidence-run RUN_ID]';
 }
 function validateWait(waitSeconds) {
   if (!Number.isSafeInteger(waitSeconds) || waitSeconds < 0 || waitSeconds > 3600) {
@@ -168,6 +177,9 @@ export function parseArgs(argv) {
       request: { type: 'boolean', default: false },
       'collapse-requests': { type: 'boolean', default: false },
       'wait-seconds': { type: 'string', default: '0' },
+      'retire-request': { type: 'string' },
+      'request-sha': { type: 'string' },
+      'evidence-run': { type: 'string' },
     },
   });
   const waitSeconds = Number(values['wait-seconds']);
@@ -179,7 +191,25 @@ export function parseArgs(argv) {
     repo: values.repo ?? null,
     waitSeconds,
     pr: validatePr(positionals),
+    ...dispositionOptions(values),
   };
+}
+function dispositionOptions(values) {
+  const fields = [values['retire-request'], values['request-sha'], values['evidence-run']];
+  if (fields.every((value) => value === undefined)) return {};
+  if (!fields.every(Boolean))
+    throw new Error('Historical disposition needs all three evidence options');
+  if (values.request) throw new Error('Historical disposition cannot post a review');
+  return validatedDisposition(fields);
+}
+function validatedDisposition(fields) {
+  const retireRequest = Number(fields[0]);
+  const evidenceRun = Number(fields[2]);
+  const identifiers = [retireRequest, evidenceRun];
+  if (!identifiers.every((value) => Number.isSafeInteger(value) && value > 0))
+    throw new Error('Historical disposition IDs must be positive safe integers');
+  if (!/^[0-9a-f]{40}$/.test(fields[1])) throw new Error('Historical disposition needs a full SHA');
+  return { retireRequest, requestSha: fields[1], evidenceRun };
 }
 function commandRepo(runGh) {
   const value = runGh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']).trim();
