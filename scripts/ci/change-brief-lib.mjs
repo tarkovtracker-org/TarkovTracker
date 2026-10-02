@@ -66,11 +66,34 @@ const ancestorInstructions = (path) =>
     .split('/')
     .slice(0, -1)
     .map((_, index, parts) => `${parts.slice(0, index + 1).join('/')}/AGENTS.md`);
-/** Root AGENTS.md plus every scoped AGENTS.md on the ancestor chain of the given paths. */
+// Root AGENTS.md assigns Supabase rules by lifecycle/DB responsibility as well as ancestry.
+// These explicit repository mappings are conservative; differently named code needs confirmation.
+const semanticInstructionScopes = [
+  {
+    instruction: 'supabase/AGENTS.md',
+    patterns: [
+      /^app\/server\/api\/(?:account|team|tokens?)(?:\/|$)/,
+      /^app\/features\/(?:team\/|settings\/(?:__tests__\/)?ApiToken)/,
+      /^app\/pages\/(?:(?:account|team)\.|auth\/|oauth\/|__tests__\/(?:account|team|auth-callback)\.)/,
+      /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/)?(?:__tests__\/)?(?:useTeam|useApiToken|accountRecovery|teamMemberships|team\.|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
+      /^shared\/(?:utils|types)\/(?:__tests__\/)?(?:account|team|token|supabase|oauth|auth(?:[./]|[A-Z]))/,
+      /\.sql$/,
+      /^scripts\/ops\/prod-db(?:[./]|$)/,
+    ],
+  },
+];
+/** Root instructions, ancestor contracts, and known semantic lifecycle/DB scopes. */
 export function scopedInstructions(paths, instructionFiles) {
   const available = new Set(instructionFiles);
   const scoped = paths.flatMap(ancestorInstructions).filter((path) => available.has(path));
-  return unique(['AGENTS.md', ...scoped]);
+  const semantic = semanticInstructionScopes
+    .filter(
+      ({ instruction, patterns }) =>
+        available.has(instruction) &&
+        paths.some((path) => patterns.some((pattern) => pattern.test(path)))
+    )
+    .map(({ instruction }) => instruction);
+  return unique(['AGENTS.md', ...scoped, ...semantic]);
 }
 const runnerFor = (path) => {
   if (path.startsWith('workers/api-gateway/')) return 'gateway';
@@ -254,9 +277,9 @@ const nearbyTests = (analyses, testFiles) =>
       .flatMap(ownersOf)
       .flatMap((owner) => testFiles.filter((file) => besideOwner(file, owner)))
   );
-/** Tests that import or text-match a target, sit beside a target or consumer, or reach it transitively. */
-function candidateTests(io, analyses) {
-  const direct = directTests(analyses);
+/** Changed/targeted tests plus tests that import, text-match, neighbor, or transitively reach targets. */
+function candidateTests(io, analyses, seeds) {
+  const direct = unique([...seeds.filter(isTestPath), ...directTests(analyses)]);
   const nearby = without(nearbyTests(analyses, io.listFiles().filter(isTestPath)), direct);
   const reached = unique(analyses.flatMap((analysis) => analysis.transitive)).filter(isTestPath);
   return {
@@ -293,7 +316,7 @@ export async function buildBrief(io, { targets, changedPaths = [], base }) {
     ...consumers,
     ...analyses.flatMap((analysis) => analysis.textOnly),
   ]);
-  const tests = candidateTests(io, analyses);
+  const tests = candidateTests(io, analyses, seeds);
   return {
     base,
     unanalyzedChanges: without(
@@ -346,7 +369,7 @@ const testLines = (tests) => [
     ? ['Executable/argv records (JSON data; do not paste into a shell or join arguments):']
     : []),
   ...tests.commands.map(commandRecord),
-  `${tests.direct.length} import or text-match a target; ${tests.nearby.length} sit beside a target or consumer`,
+  `${tests.direct.length} are targeted/changed tests or import/text-match a target; ${tests.nearby.length} sit beside a target or consumer`,
   ...broaderTests(tests),
 ];
 const selectionLine = (validation) =>

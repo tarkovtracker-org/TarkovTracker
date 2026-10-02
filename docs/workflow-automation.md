@@ -41,6 +41,7 @@ consumers, owning docs, scoped instructions, candidate tests grouped by runner, 
 checks.
 
 Candidate test entries are JSON records with `executable` and `args`, including in text output.
+Directly targeted tests and tests in the diff are included even when they have no importers.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;
@@ -63,7 +64,10 @@ Its Uncertainty section names what it cannot prove:
 - Runtime string lookups are never in any graph: i18n keys, Supabase RPC and table names, KV
   keys, and upstream field names.
 
-Coverage limits: scoped instructions come from tracked files; generated declarations are checked
+Coverage limits: scoped instructions come from tracked files and include known lifecycle/DB
+path mappings from the [brief model](../scripts/ci/change-brief-lib.mjs). Confirm the root
+`AGENTS.md` contract for differently named account/team/token code; path mappings do not prove
+semantic coverage. Generated declarations are checked
 for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
 Path-reference seeds are limited to 60; some rendered lists remain uncapped. Unit tests inject
 I/O, so they do not by themselves verify Git, generated declarations, or Fallow at runtime.

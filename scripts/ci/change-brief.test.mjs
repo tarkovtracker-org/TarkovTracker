@@ -124,6 +124,29 @@ describe('path helpers', () => {
       )
     ).toEqual(['AGENTS.md', 'workers/api-gateway/AGENTS.md']);
   });
+  it('includes Supabase instructions for lifecycle and database paths outside its directory', () => {
+    for (const path of [
+      'app/server/api/account/activity.post.ts',
+      'app/server/api/team/members.ts',
+      'app/features/settings/ApiTokens.vue',
+      'app/stores/tarkov/accountRecovery.ts',
+      'app/stores/useTeamStore.ts',
+      'app/utils/tokenFunctionFallback.ts',
+      'app/pages/auth/callback.vue',
+      'shared/sql/cleanup.sql',
+      'scripts/ops/prod-db/cli.mjs',
+    ]) {
+      expect(scopedInstructions([path], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+        'supabase/AGENTS.md'
+      );
+    }
+    expect(
+      scopedInstructions(['app/features/about/teamMembers.ts'], ['supabase/AGENTS.md'])
+    ).toEqual(['AGENTS.md']);
+    expect(scopedInstructions(['app/server/api/team/members.ts'], ['AGENTS.md'])).toEqual([
+      'AGENTS.md',
+    ]);
+  });
   it('groups tests into one command per runner', () => {
     expect(
       testCommands([
@@ -259,6 +282,25 @@ describe('validationFor', () => {
   });
 });
 describe('buildBrief', () => {
+  it('includes test targets and changed tests in candidate commands across all runners', async () => {
+    for (const file of [
+      'app/utils/__tests__/example.test.ts',
+      'workers/api-gateway/src/__tests__/example.test.ts',
+      'scripts/workflow-tests/example.mjs',
+      'supabase/functions/_shared/example.deno.test.ts',
+    ]) {
+      for (const input of [
+        { targets: [{ file }] },
+        { targets: [{ file }], changedPaths: [file], base: 'origin/main' },
+        { targets: [], changedPaths: [file], base: 'origin/main' },
+      ]) {
+        const io = fakeIo({ reports: { [file]: trace([]) } });
+        const brief = await buildBrief(io, input);
+        expect(brief.tests.direct).toEqual([file]);
+        expect(brief.tests.commands).toEqual(testCommands([file]));
+      }
+    }
+  });
   it('finds lazy-only templates in PascalCase and kebab-case', async () => {
     const io = fakeIo({ reports: { 'app/components/ui/GameItem.vue': trace([]) } });
     const templates = new Map([
