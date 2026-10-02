@@ -188,7 +188,8 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 ## AI Review Bots
 
 The root `AGENTS.md` owns review requirements. See
-[workflow automation](../../docs/workflow-automation.md#push-cadence) for batching and reviewer usage.
+[workflow automation](../../docs/workflow-automation.md#push-cadence) for batching and freshness
+reruns.
 Dashboard settings must be verified separately; checked-in documentation does not prove them.
 
 ## Commands

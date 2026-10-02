@@ -1,7 +1,7 @@
 # TarkovTracker — Code Review Policy
 
-Repo-specific review policy loaded by the `review-production` skill.
-Its validation commands and risk areas override the skill's defaults.
+Repo-specific review policy loaded by the `review-production` skill and by CodeRabbit
+(`.coderabbit.yaml` knowledge base). Its validation commands and risk areas override skill defaults.
 
 ## Table of Contents
 
@@ -13,11 +13,10 @@ Its validation commands and risk areas override the skill's defaults.
 
 ## Validation Commands
 
-Use the validation requirements in the root `AGENTS.md` and the commands in `package.json`.
-Run focused checks while correcting the change, then the required checks once the diff stabilizes.
-A READY verdict requires applicable validation and independent review where the root policy requires it.
-Record the validated commit, dirty worktree state, commands, and results. Unavailable checks or reviews
-remain incomplete; they do not count as passing. Do not rerun checks for unchanged validated inputs.
+Use the validation and review requirements in the root `AGENTS.md` and the commands in
+`package.json`. A READY verdict requires applicable validation and any independent review the root
+policy requires. Unavailable checks or reviews remain incomplete, not passing. Do not rerun checks
+for unchanged validated inputs; a conflict-free update from the base leaves the PR diff unchanged.
 
 Supabase Edge Functions use Deno; preserve the dedicated Deno tests and database validation rather
 than assuming the root Vitest suite covers them. Applied migrations remain immutable.
