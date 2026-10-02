@@ -11,40 +11,44 @@ import {
   sanitizeTaskAvailabilityMap,
 } from '@/utils/taskAvailabilityConfirmation';
 describe('task availability confirmations', () => {
-  it('matches unbounded winners in 400 deterministic ordered three-source compositions', () => {
-    let seed = 1008;
-    const random = () => {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      return seed;
-    };
-    const oracleMerge = (a: ConfirmationMap, b: ConfirmationMap) => {
-      const result = { ...a };
-      for (const [id, value] of Object.entries(b)) {
-        if (!result[id] || value.timestamp >= result[id]!.timestamp) result[id] = value;
-      }
-      return result;
-    };
-    for (let trial = 0; trial < 200; trial++) {
-      const sources = Array.from({ length: 3 }, () => {
-        const map: ConfirmationMap = {};
-        for (let i = 0; i < 1800; i++) {
-          const id = `s${String(random() % 2600).padStart(4, '0')}`;
-          map[id] = { timestamp: random() % 31, requirements: 'x'.repeat(random() % 4097) };
+  // Keep all 400 ordered comparisons, with a bounded per-test workload under sharded coverage.
+  it.each(Array.from({ length: 10 }, (_, batch) => batch))(
+    'matches unbounded winners in deterministic three-source batch %s',
+    (batch) => {
+      let seed = 1008 + batch;
+      const random = () => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return seed;
+      };
+      const oracleMerge = (a: ConfirmationMap, b: ConfirmationMap) => {
+        const result = { ...a };
+        for (const [id, value] of Object.entries(b)) {
+          if (!result[id] || value.timestamp >= result[id]!.timestamp) result[id] = value;
         }
-        return map;
-      });
-      for (const inputs of [sources, [...sources].reverse()]) {
-        const oracle = inputs.reduce(oracleMerge, {});
-        const candidates = inputs.reduce(mergeTaskAvailabilityCandidates, {});
-        expect(candidates).toEqual(taskAvailabilityCandidates(oracle));
-        expect(sanitizeTaskAvailabilityMap(candidates)).toEqual(
-          sanitizeTaskAvailabilityMap(oracle)
-        );
-        expect(mergeTaskAvailabilityCandidates(candidates, candidates)).toEqual(candidates);
-        expect(Object.keys(candidates).length).toBeLessThanOrEqual(1000);
+        return result;
+      };
+      for (let trial = 0; trial < 20; trial++) {
+        const sources = Array.from({ length: 3 }, () => {
+          const map: ConfirmationMap = {};
+          for (let i = 0; i < 1800; i++) {
+            const id = `s${String(random() % 2600).padStart(4, '0')}`;
+            map[id] = { timestamp: random() % 31, requirements: 'x'.repeat(random() % 4097) };
+          }
+          return map;
+        });
+        for (const inputs of [sources, [...sources].reverse()]) {
+          const oracle = inputs.reduce(oracleMerge, {});
+          const candidates = inputs.reduce(mergeTaskAvailabilityCandidates, {});
+          expect(candidates).toEqual(taskAvailabilityCandidates(oracle));
+          expect(sanitizeTaskAvailabilityMap(candidates)).toEqual(
+            sanitizeTaskAvailabilityMap(oracle)
+          );
+          expect(mergeTaskAvailabilityCandidates(candidates, candidates)).toEqual(candidates);
+          expect(Object.keys(candidates).length).toBeLessThanOrEqual(1000);
+        }
       }
     }
-  }, 30000);
+  );
   it('bounds retained candidate count and field sizes before final UTF-8 byte eviction', () => {
     const requirements = '😀'.repeat(4096);
     const source = Object.fromEntries(
