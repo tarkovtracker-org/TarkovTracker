@@ -171,8 +171,11 @@ rebuilds and never reuses Lighthouse output. Missing or expired artifacts requir
 Candidate builds receive no deployment credentials; the manifest is a set of claims that the
 trusted preview controller verifies (see §8).
 
-The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
-installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
+The shared setup action always uses `.nvmrc` and the full `packageManager` pin. By default it also
+restores the pnpm cache and performs a frozen installation; `install-dependencies: false` skips
+those two steps. Non-scheduled Security Scan calls use this runtime-only setup because their
+audits read an isolated manifest and lockfile; the weekly outdated check retains installation.
+Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
 When automation files change it also runs pinned, checksum-verified release binaries of `actionlint`
 (syntax, expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and

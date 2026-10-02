@@ -22,6 +22,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          # Audits consume the isolated manifest/lockfile below, not node_modules. The weekly
+          # outdated check retains the installed workspace; every security scan still runs.
+          install-dependencies: ${{ github.event_name == 'schedule' }}
       - name: Prepare pnpm audit workspace
         id: prepare-audit
         run: |
