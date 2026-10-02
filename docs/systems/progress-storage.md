@@ -118,9 +118,14 @@ Teams, save status and recovery, and progress imports build on this storage; see
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
 - `supabase/migrations/20260830130000_harden_client_progress_access.sql` — authenticated progress
   sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
-- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
-  revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
-  depend on running it; see the Database Migrations section of `docs/runbook.md`
+- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — original
+  backfill helper, superseded by `20261002090000`
+- `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` — current
+  revoked one-range backfill helper and its completion gate `private.unmaterialized_mode_progress`.
+  While its transaction-local `tarkovtracker.mode_progress_backfill` flag is set, the prepare trigger
+  keeps source timestamps and records unknown freshness, and `track_account_mutation` records no
+  activity. Correctness does not depend on running it until the legacy fallbacks are removed (#1028);
+  see _Normalized PvP/PvE progress backfill_ in `docs/runbook.md`
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
   unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
@@ -166,7 +171,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
   preference is logged and treated as "not shared"; it never discards normalized visibility that
   loaded successfully. Optional operational backfill only fills rows whose `progress_data` carries no
   `level`, so it cannot overwrite a write that landed first and never changes `profile_public` on an
-  existing row.
+  existing row. Missing rows use `ON CONFLICT DO NOTHING`; materialized rows are skipped without
+  row locks, while placeholder repairs lock and recheck the level after any concurrent write. It
+  never counts as account activity for inactivity cleanup. The fallbacks stay until the gate reports
+  zero rows for both modes.
 - `merge_progress_data` seeds an unmaterialized persistent row from its legacy column inside the same
   `FOR UPDATE` lock before merging. Its original seed is an `INSERT ... ON CONFLICT DO NOTHING`, which
   only fires when no row exists, so a placeholder row created by the visibility RPC or the legacy

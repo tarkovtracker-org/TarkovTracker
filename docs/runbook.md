@@ -528,6 +528,44 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
+### Normalized PvP/PvE progress backfill (#1028)
+
+`20261002090000_side_effect_free_mode_progress_backfill.sql` ships the helper only; running it is
+separately approved operational maintenance under the rules above. The helper writes only rows whose
+legacy payload has a numeric level while the normalized row is missing or has none. It never locks
+or rewrites materialized rows; repairing a placeholder takes its row lock. It keeps source timestamps,
+records unknown freshness, and records no
+account activity, so retention deadlines and pending inactivity deletions are unchanged.
+
+1. Measure remaining work per range with the completion gate (read-only):
+
+   ```sql
+   SELECT game_mode, count(*) FROM private.unmaterialized_mode_progress(
+     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000')
+   GROUP BY game_mode;
+   ```
+
+2. Run one range per SQL Editor operation so each commits on its own. Start with a two-hex-digit
+   range (`00…`–`01…`) to measure duration, then widen only while it stays well under the timeout.
+   The last range passes `NULL` as the upper bound.
+
+   ```sql
+   BEGIN;
+   SET LOCAL statement_timeout = '60s';
+   SELECT private.backfill_game_mode_progress_range(
+     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000');
+   COMMIT;
+   ```
+
+   The transaction-local timeout cannot leak into later maintenance. The helper sets
+   `lock_timeout = '2s'`; a range that meets a live write fails and rolls back whole. If an error
+   leaves the session in an aborted transaction, run `ROLLBACK;` before retrying. Re-run the range
+   later; completed rows are no-ops.
+
+3. Record each completed range in the change log and stop on rising latency, CPU, lock waits, or
+   I/O pressure.
+4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
+
 ### Manual activity history rollout
 
 Apply `20260910050000_add_manual_activity_history_to_progress` and
@@ -650,6 +688,45 @@ in the same integration run against the merge commit — there is no manual SQL 
   `20260926090000` applied remotely (no blank REMOTE rows) and the `team-kick` function shows a
   new version in the Supabase dashboard. A blank REMOTE row is the pending case; the fallback is
   the manual `db push` block in "Deployment", not a hand-written apply of the migration.
+
+### Durable leave and kick cooldown rollout (#1031)
+
+Migration `20261002080000_durable_team_cooldowns.sql` adds private cooldown storage and
+deletion-preservation triggers, and replaces `leave_team` and `kick_team` in place. It performs no
+bulk backfill or existing-row rewrite. The RPC signatures, service-role grants, and Edge Function
+result contracts stay compatible; no frontend, gateway, or Edge Function redeploy is required.
+The cooldown and legacy-event trust rules belong to [the team system](systems/teams.md).
+
+Before merge, collect the migration-history and preflight evidence above, inspect deployed RPC
+definitions/grants, event provenance and cascade constraints, and the indexes used by legacy
+lookups. Assess an `incomplete` preflight explicitly: function bodies and triggers are unsupported
+by the classifier, and their runtime `INSERT`/`DELETE` statements are not migration-time rewrites.
+Confirm the new private objects are absent and only this migration is pending for this PR. Keep
+`20261002080000` ahead of the `20261002090000` progress-backfill migration in the release order.
+
+After merge and explicit deployment authorization:
+
+1. Repeat target identity, history, blocking/long-running-session checks, and the CLI dry-run from
+   the merged revision. Apply only the expected migration set, in timestamp order.
+2. Apply through the normal transactional migration runner. `lock_timeout = '5s'` bounds lock
+   acquisition, including trigger installation on `teams`/`team_events`;
+   `statement_timeout = '30s'` bounds each statement. If any statement fails, roll back the whole
+   migration and verify it remains pending before retrying at a quieter time. Do not apply the file
+   as separately committed SQL Editor statements or repair the migration ledger to force success.
+3. Verify the ledger, both enabled preservation triggers, private-table RLS/client denial, and
+   unchanged RPC signatures/service-role execution grants. Inspect blocking and error rates again.
+4. With disposable test accounts, verify leave → disband → join another same-mode team → leave
+   returns 429. Verify kick → disband/recreate → kick also returns 429; a missing target returns
+   404 without spending the cooldown. Confirm another mode remains independent and a successful
+   action is allowed after five minutes. Remove test teams through the owner disband function.
+
+There is no down migration. A failed transactional apply leaves the previous schema and RPCs
+intact. After a successful apply, recover with a separately reviewed, authorized forward migration
+that corrects the affected helper, trigger, or RPC while retaining cooldown rows and compatible
+grants. A frontend rollback cannot undo this database change. Do not drop the durable table,
+disable preservation, restore event-only cooldowns, or rewrite applied migration history as routine
+rollback: those actions can erase active windows or reopen the disband bypass. Re-run the database
+regressions and deployment postchecks against any recovery migration before declaring recovery.
 
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 

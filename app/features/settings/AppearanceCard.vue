@@ -4,7 +4,7 @@
     icon-color="primary"
     highlight-color="primary"
     :fill-height="false"
-    :title="$t('settings.appearance.title', 'Appearance')"
+    :title="$t('common.appearance', 'Appearance')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
