@@ -81,7 +81,9 @@ function validateUneditedCommand(context, command) {
   const response = JSON.parse(
     context.runGh(['api', 'graphql', '-f', `query=${query}`, '-f', `id=${command.node_id}`])
   );
-  const node = response.data?.node ?? {};
+  validateEditMetadata(response.data?.node ?? {}, command);
+}
+function validateEditMetadata(node, command) {
   const matches = [
     node.id === command.node_id,
     node.body === command.body,
