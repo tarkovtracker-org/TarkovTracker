@@ -334,7 +334,6 @@
     "pmc_extract": "PMC Extract",
     "scav_extract": "Scav Extract",
     "dashboard": "Dashboard",
-    "meet_the_fence_reputation_requirement_required": "Meet the Fence reputation requirement ({required}).",
     "objectives": "Objectives",
     "kappa_tasks": "Kappa Tasks",
     "getting_started": "Getting Started",
@@ -368,7 +367,6 @@
     "login": "Login",
     "overview": "Overview",
     "api_documentation": "API documentation",
-    "tarkov_changes": "Tarkov Changes",
     "api": "API",
     "game_settings": "Game Settings",
     "custom_scale": "Custom Scale",
@@ -2606,7 +2604,6 @@
     "elite_level": "ELITE Level"
   },
   "game_settings": {
-    "toggle_game_mode_label": "Toggle game mode",
     "select_game_mode_label": "Select game mode",
     "select_faction_label": "Select faction",
     "season_ends_in": "Season {season} ends in {days}d {hours}h {minutes}m",

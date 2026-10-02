@@ -45,7 +45,10 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 - **Add an API endpoint:** create the route in `app/server/api/` and add types in `app/types/`.
 - **Add translations:** add snake_case keys to `app/locales/en.json` **only**, then run
   `pnpm run i18n:check`. Use `$t('key.path', 'Fallback')`. Crowdin propagates the other locales —
-  never edit them by hand.
+  never edit them by hand. Remove a key from `en.json` when its last usage goes; the check fails on
+  keys with no possible reference in `app/` and on broken locales (invalid JSON or message syntax,
+  unknown placeholders, structure mismatches). Untranslated keys fall back to English and never
+  fail it.
 - **Tarkov.dev import/linking:** follow the rules in [`./architecture.md`](./architecture.md)
   (persist only `tarkovUid`; the import destination mode is chosen at import time, not stored).
 
