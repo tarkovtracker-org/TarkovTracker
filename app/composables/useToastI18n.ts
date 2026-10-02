@@ -9,6 +9,7 @@ export interface UseToastI18nReturn {
   showLocalIgnored: (reason: LocalIgnoredReason) => void;
   showLoadFailed: () => void;
   showProgressMerged: (count: number) => void;
+  showTarkovUidConflict: (uid: number) => void;
 }
 export const useToastI18n = (translate?: ToastTranslate): UseToastI18nReturn => {
   const toast = useSafeToast();
@@ -63,11 +64,20 @@ export const useToastI18n = (translate?: ToastTranslate): UseToastI18nReturn => 
       duration: 5000,
     });
   };
+  const showTarkovUidConflict = (uid: number) => {
+    toast?.add({
+      title: t('toast.tarkov_uid_conflict.title'),
+      description: t('toast.tarkov_uid_conflict.description', { uid }),
+      color: 'error',
+      duration: LOAD_FAILED_TOAST_DURATION,
+    });
+  };
   return {
     showApiUpdated,
     showHideoutUpdated,
     showLocalIgnored,
     showLoadFailed,
     showProgressMerged,
+    showTarkovUidConflict,
   };
 };
