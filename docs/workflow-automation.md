@@ -71,11 +71,10 @@ GitHub's [issue_comment activity types](https://docs.github.com/en/actions/refer
 do not include reactions, so cleanup uses the existing bounded polling loop rather than inventing
 a reaction event. Commands posted outside that loop, or acknowledged after it ends, require a
 later authorized cleanup invocation. No new background workflow, credential or permission is
-added. Each pending request without eyes/completion adds zero calls; acknowledgement adds one
-reaction listing, one minimized-state query and at most one mutation; explicit completion needs
-only the query and mutation. A per-invocation cache removes repeat cleanup calls after success.
-The mock regression benchmark measures these counts and local compute overhead; network
-latency and token savings are unmeasured.
+added. A per-invocation cache removes repeat cleanup calls after success. The
+[cleanup regression benchmark](../scripts/codex-review/codex-review-collapse-tests.mjs)
+owns the API budget and local compute measurements. Network latency and token savings are
+unmeasured.
 
 The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
 code reviews for the current commit. Security-review completion alone is not code-review
