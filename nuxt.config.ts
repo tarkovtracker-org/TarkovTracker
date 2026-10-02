@@ -107,6 +107,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   telemetry: false,
   ssr: true,
+  experimental: {
+    payloadExtraction: false,
+  },
   srcDir: 'app',
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {

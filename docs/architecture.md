@@ -16,6 +16,9 @@ TarkovTracker uses prerendered public documents and a client-side application fo
 [`nuxt.config.ts`](../nuxt.config.ts) enables rendering but defaults application routes to
 client rendering. The explicit public inventory in [`routeSeo.ts`](../app/utils/routeSeo.ts)
 opts into prerendering; link crawling is disabled and missing required documents fail the build.
+Payload extraction is off: prerendered documents inline their Nuxt payload because
+`_payload.json` URLs match the client-rendered catch-all and would return HTML; a document that
+references one fails the build.
 Public route entrypoints in `app/features/seo-pages/` pass the shared `PageHeader` into each
 client-only tracker module's `header` slot and render the same header in a matching container as the
 prerendered fallback, so each page keeps one `h1` in one position. The `pages:extend` hook maps those
