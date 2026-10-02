@@ -1,4 +1,5 @@
 import { ARTIFACT_NAME, CI_WORKFLOW_PATH, PRODUCTION_BRANCH, STATUS_CONTEXT } from './profile.mjs';
+import { previewGrant } from './request-authorization.mjs';
 // GitHub Actions app id: only check runs and statuses created by Actions count as CI evidence.
 const ACTIONS_APP_ID = 15368;
 const CI_WORKFLOW_FILE = 'ci.yml';
@@ -144,10 +145,17 @@ function matchesPreviewRequest(run, decision) {
     run.path === '.github/workflows/preview.yml',
     run.event === 'workflow_dispatch',
     run.head_branch === PRODUCTION_BRANCH,
-    run.display_title === `Preview CI ${decision.runId}`,
+    matchesRequestBinding(run, decision),
     Date.parse(run.created_at) >= Date.parse(decision.runCompletedAt),
     run.status !== 'completed',
   ].every(Boolean);
+}
+function matchesRequestBinding(run, decision) {
+  const request = previewGrant(decision.previewRequest);
+  const binding = request ? String(request.commentId) : '0';
+  if (run.display_title === `Preview CI ${decision.runId} request ${binding}`) return true;
+  // Legacy unbound dispatches can still be reused. A command-bound run needs explicit provenance.
+  return binding === '0' && run.display_title === `Preview CI ${decision.runId}`;
 }
 /** Active dispatches include queued runs and fork runs awaiting environment approval. */
 async function previewRequestInFlight(github, repo, decision) {
@@ -186,7 +194,8 @@ export async function requestPreviewDispatch(github, repo, decision) {
 }
 function previewDispatchInputs(runId, request, authorization, attempt) {
   const inputs = { run_id: String(runId) };
-  if (request) inputs.request_comment_id = String(request.commentId);
+  const grant = previewGrant(request);
+  if (grant) inputs.request_comment_id = String(grant.commentId);
   if (authorization === 'readiness') inputs.authorization = 'readiness';
   if (attempt) inputs.ci_attempt = String(attempt);
   return inputs;

@@ -792,7 +792,10 @@ function hasPreviewIntent(context, state) {
   ].every(Boolean);
 }
 function isPreviewRefreshEvent(context) {
-  return context.eventName === 'workflow_run' || context.payload.action === 'ready_for_review';
+  return (
+    context.eventName === 'workflow_run' ||
+    ['ready_for_review', 'reopened'].includes(context.payload.action)
+  );
 }
 function requestedPreview(decision) {
   return {

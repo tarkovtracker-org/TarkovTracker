@@ -614,6 +614,21 @@ test('ready and reopen reuse passed CI; readiness provenance survives the dispat
     });
   }
 });
+test('reopen refreshes a standing command for same-repository and protected fork previews', async (t) => {
+  for (const full_name of [REPO_NAME, FORK_NAME]) {
+    const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name } } });
+    const run = runFixture({ head_repository: { full_name }, head_branch: 'feature' });
+    const result = await plan(t, pullTargetContext(pull, 'reopened'), {
+      pull,
+      run,
+      comments: [previewRequestComment()],
+    });
+    assert.equal(result.decision.action, 'request');
+    assert.equal(result.state.dispatches[0].inputs.request_comment_id, '1');
+    assert.equal(result.decision.environment, ENVIRONMENTS.internal);
+    assert.equal(result.decision.fork, full_name === FORK_NAME);
+  }
+});
 test(
   'benchmark readiness lifecycle against verified main',
   { skip: !process.env.PREVIEW_BASELINE_ROOT },

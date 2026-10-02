@@ -131,7 +131,7 @@ test('repeated accepted commands preserve active CI previews and terminal failur
     path: '.github/workflows/preview.yml',
     event: 'workflow_dispatch',
     head_branch: 'main',
-    display_title: `Preview CI ${RUN_ID}`,
+    display_title: `Preview CI ${RUN_ID} request 1`,
     created_at: '2026-09-27T00:00:01Z',
     status: 'in_progress',
   };
@@ -170,7 +170,7 @@ test(
         path: '.github/workflows/preview.yml',
         event: 'workflow_dispatch',
         head_branch: 'main',
-        display_title: `Preview CI ${RUN_ID}`,
+        display_title: `Preview CI ${RUN_ID} request 1`,
         created_at: '2026-09-27T00:00:01Z',
         status: 'in_progress',
       });
@@ -230,6 +230,53 @@ test('repeated enable commands preserve a bound grant but stop then resume revok
   assert.equal((await readPreviewRequest(github, REPO, 42, 1)).commentId, 1);
   enabled.splice(1, 1, comment(2, '/preview stop'), comment(3));
   assert.equal((await readPreviewRequest(github, REPO, 42, 1)).enabled, false);
+});
+test('stop then resume replaces an active dispatch bound to the revoked grant', async () => {
+  const f = fixture({
+    comments: [comment(1), comment(2, '/preview stop'), comment(3)],
+    payload: { comment: comment(3) },
+    previewRuns: [
+      {
+        path: '.github/workflows/preview.yml',
+        event: 'workflow_dispatch',
+        head_branch: 'main',
+        display_title: `Preview CI ${RUN_ID} request 1`,
+        created_at: '2026-09-27T00:00:01Z',
+        status: 'in_progress',
+      },
+    ],
+  });
+  await requestPreviewFromComment(f);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].inputs.request_comment_id, '3');
+  assert.equal((await readPreviewRequest(f.github, REPO, 42, 1)).enabled, false);
+});
+test('legacy command dispatches and lost original grants cannot suppress a new command', async () => {
+  for (const original of [
+    null,
+    comment(1, '/preview', { lastEditedAt: PREVIEW_OPT_IN_START }),
+    comment(1, '/preview', { user: { type: 'User', login: 'former' } }),
+  ]) {
+    const f = fixture({
+      comments: [original, comment(2)].filter(Boolean),
+      payload: { comment: comment(2) },
+      previewRuns: [
+        {
+          path: '.github/workflows/preview.yml',
+          event: 'workflow_dispatch',
+          head_branch: 'main',
+          display_title: `Preview CI ${RUN_ID}`,
+          created_at: '2026-09-27T00:00:01Z',
+          status: 'in_progress',
+        },
+      ],
+    });
+    f.github.rest.repos.getCollaboratorPermissionLevel = async ({ username }) => ({
+      data: { role_name: username === 'former' ? 'read' : 'maintain' },
+    });
+    await requestPreviewFromComment(f);
+    assert.equal(f.calls[0].inputs.request_comment_id, '2');
+  }
 });
 test('only exact new PR comments from the actor may request a preview', async () => {
   for (const payload of [

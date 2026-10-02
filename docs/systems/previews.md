@@ -14,7 +14,9 @@ workflow handles CI completion and metadata events; ordinary pushes wait for CI.
 finishes the status may be absent, or pending if a metadata event has already run. Main-push
 CI completions do not start a state job. The deployment workflow remains dispatch-only.
 Queued, running, and approval-waiting requests from the trusted `main` preview workflow are
-reused when their run ID matches and they were created after that CI attempt completed; completed failed or cancelled requests can be retried.
+reused when their run ID and continuous command grant match and they were created after that CI
+attempt completed; completed failed or cancelled requests can be retried. A stop followed by an
+enable gets a fresh dispatch binding, so revoked work cannot suppress the resumed preview.
 State events serialize within their concurrency group instead of cancelling a dispatching job.
 Manual commands use the same active-run lookup. Repeating an enable command preserves a still-live
 original grant; any accepted stop after that grant revokes it even after another enable command.
