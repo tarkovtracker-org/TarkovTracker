@@ -220,4 +220,56 @@ describe('useTaskRouteSync', () => {
     expect(setTaskMapView).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('preserves pending trader query until traders load', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'trader-2' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    expect(setTaskTraderView).not.toHaveBeenCalled();
+    expect(routeState.query.trader).toBe('trader-2');
+    expect(loggerMock.debug).toHaveBeenCalledWith(
+      '[useTaskRouteSync] Delaying trader sync until traders loaded.'
+    );
+    traders.value = [
+      { id: 'trader-1', name: 'Trader One' } as Trader,
+      { id: 'trader-2', name: 'Trader Two' } as Trader,
+    ];
+    await nextTick();
+    await flushRouteSync();
+    expect(setTaskTraderView).toHaveBeenCalledWith('trader-2');
+    expect(routeState.query.trader).toBe('trader-2');
+    wrapper.unmount();
+  });
+  it('applies a pending non-first map query once maps load', async () => {
+    applyRouteQuery({ view: 'maps', map: 'map-2' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    maps.value = [
+      { id: 'map-1', name: 'Map One' } as TarkovMap,
+      { id: 'map-2', name: 'Map Two' } as TarkovMap,
+    ];
+    await nextTick();
+    await flushRouteSync();
+    expect(setTaskMapView).toHaveBeenCalledTimes(1);
+    expect(setTaskMapView).toHaveBeenCalledWith('map-2');
+    expect(routeState.query.map).toBe('map-2');
+    wrapper.unmount();
+  });
 });

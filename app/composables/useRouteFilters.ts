@@ -25,6 +25,7 @@ export type UseRouteFiltersOptions<TMap extends Record<string, unknown>> = {
   onRouteToStore: (values: TMap) => void;
   onStoreToRoute: () => Partial<TMap>;
   watchSources: WatchSource[];
+  reapplyRouteOn?: WatchSource[];
 };
 export type UseRouteFiltersReturn = {
   isSyncingFromRoute: Ref<boolean>;
@@ -132,7 +133,7 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
   options: UseRouteFiltersOptions<TMap>
 ): UseRouteFiltersReturn {
   const route = useRoute();
-  const { onRouteToStore, onStoreToRoute, watchSources } = options;
+  const { onRouteToStore, onStoreToRoute, watchSources, reapplyRouteOn = [] } = options;
   const configs = resolveConfigs(options.configs);
   const isSyncingFromRoute = ref(false);
   const isSyncingToRoute = ref(false);
@@ -159,6 +160,7 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
     debouncedSync.run,
     { immediate: true }
   );
+  if (reapplyRouteOn.length > 0) watch(reapplyRouteOn, debouncedSync.run);
   if (watchSources.length > 0) {
     watch(
       watchSources,

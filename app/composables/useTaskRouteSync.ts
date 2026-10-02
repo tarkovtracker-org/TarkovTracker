@@ -152,8 +152,7 @@ export function useTaskRouteSync({
       getTaskTraderView,
       getTaskSortMode,
       getTaskSortDirection,
-      () => maps.value.length,
-      () => traders.value.length,
     ],
+    reapplyRouteOn: [() => maps.value.length, () => traders.value.length],
   });
 }
