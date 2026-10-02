@@ -1,0 +1,853 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  buildBrief,
+  isTestPath,
+  kebabCase,
+  parseAutoImportMap,
+  parseComponentMap,
+  renderBrief,
+  scopedInstructions,
+  testCommands,
+  validationFor,
+} from './change-brief-lib.mjs';
+const componentsDts = [
+  `export const GameItem: typeof import("../app/components/ui/GameItem.vue")['default']`,
+  `export const LazyGameItem: LazyComponent<typeof import("../app/components/ui/GameItem.vue")['default']>`,
+  `export const NeededItemRow: typeof import("../app/features/neededitems/NeededItemRow.vue")['default']`,
+].join('\n');
+const importsDts = [
+  `export { useWikiLink } from '../app/composables/useWikiLink';`,
+  `export { ACTIVE_SEASON, GAME_MODES as MODES } from '../app/utils/constants';`,
+  `export { useNuxtApp } from '#app/nuxt';`,
+].join('\n');
+const trace = (importedBy, transitive = [], exports = []) => ({
+  evidence: {
+    trace_file: { data: { imported_by: importedBy, exports: exports.map((name) => ({ name })) } },
+    trace_export: {
+      data: {
+        direct_references: importedBy.map((from_file) => ({ from_file, kind: 'named import' })),
+      },
+    },
+    impact_closure: { data: { affected_not_shown: transitive } },
+    dead_code: {
+      data: {
+        workspace_diagnostics: [
+          {
+            path: 'supabase/functions',
+            degrades_analysis: true,
+            message: 'undeclared workspace',
+          },
+        ],
+      },
+    },
+  },
+});
+const files = [
+  'AGENTS.md',
+  'workers/api-gateway/AGENTS.md',
+  'app/components/ui/GameItem.vue',
+  'app/components/ui/__tests__/GameItem.test.ts',
+  'app/features/hideout/HideoutRequirement.vue',
+  'app/features/neededitems/NeededItemRow.vue',
+  'app/features/neededitems/__tests__/NeededItemRow.test.ts',
+  'app/features/hideout/__tests__/HideoutRequirement.test.ts',
+  'app/pages/__tests__/hideout.page.test.ts',
+  'shared/utils/seasonNumber.ts',
+  'workers/api-gateway/src/utils/gameMode.ts',
+  'workers/api-gateway/src/__tests__/gameMode.test.ts',
+];
+const fakeIo = ({ reports = {}, grepFiles = [], grepLines = [], generated = true } = {}) => {
+  const calls = [];
+  return {
+    calls,
+    inspect: async (target) =>
+      reports[target.file] || {
+        error: true,
+        message: `file '${target.file}' not found in module graph`,
+      },
+    map: (items, task) => Promise.all(items.map(task)),
+    generated: () =>
+      generated
+        ? {
+            present: true,
+            components: parseComponentMap(componentsDts),
+            autoImports: parseAutoImportMap(importsDts),
+          }
+        : { present: false, components: null, autoImports: null },
+    grepFiles: (args, specs) => {
+      calls.push({ kind: 'files', args, specs });
+      return grepFiles;
+    },
+    grepLines: (args, specs) => {
+      calls.push({ kind: 'lines', args, specs });
+      const docs = specs.includes('*.md');
+      return grepLines.filter((line) => line.includes('.md:') === docs);
+    },
+    listFiles: () => files,
+    instructionFiles: () => files.filter((path) => path.endsWith('AGENTS.md')),
+  };
+};
+describe('generated Nuxt declarations', () => {
+  it('maps component files to registered and lazy names', () => {
+    const map = parseComponentMap(componentsDts);
+    expect(map.get('app/components/ui/GameItem.vue')).toEqual(['GameItem', 'LazyGameItem']);
+    expect(map.get('app/features/neededitems/NeededItemRow.vue')).toEqual(['NeededItemRow']);
+  });
+  it('maps auto-import modules to exposed names and ignores framework modules', () => {
+    const map = parseAutoImportMap(importsDts);
+    expect(map.get('app/composables/useWikiLink')).toEqual(['useWikiLink']);
+    expect(map.get('app/utils/constants')).toEqual(['ACTIVE_SEASON', 'MODES']);
+    expect([...map.keys()].some((key) => key.includes('#app'))).toBe(false);
+  });
+  it('kebab-cases component names for template matching', () => {
+    expect(kebabCase('GameItem')).toBe('game-item');
+    expect(kebabCase('UIButton')).toBe('ui-button');
+  });
+});
+describe('path helpers', () => {
+  it.each([
+    'app/server/utils/adminSupabase.ts',
+    'app/server/utils/supporterCustomerLookup.ts',
+    'app/server/utils/__tests__/supporterCustomerLookup.test.ts',
+    'app/server/utils/gameModeSeason.ts',
+    'app/server/utils/__tests__/gameModeSeason.test.ts',
+    'app/server/api/admin/supporter.post.ts',
+    'app/server/api/admin/__tests__/api-usage.test.ts',
+    'app/server/api/profile/[userId]/[mode].get.ts',
+    'app/server/api/profile/__tests__/shared-profile.test.ts',
+    'app/server/api/stripe/checkout.post.ts',
+    'app/server/api/stripe/__tests__/portal.test.ts',
+    'app/server/api/twitch/config.get.ts',
+    'app/server/api/twitch/__tests__/config.test.ts',
+    'app/server/api/tarkov/cache-meta.get.ts',
+    'app/server/api/tarkov/__tests__/handlers.test.ts',
+    'app/server/middleware/api-protection.ts',
+    'app/server/middleware/__tests__/api-protection.test.ts',
+  ])('includes production database scope for the tracked server path %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+      'supabase/AGENTS.md'
+    );
+  });
+  it.each([
+    'app/server/api/tarkov/tasks-core.get.ts',
+    'app/server/api/tarkov/items.get.ts',
+    'app/server/api/twitch/live.get.ts',
+    'app/server/utils/overlayCounters.ts',
+  ])('keeps non-database server paths outside semantic database scope: %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toEqual(['AGENTS.md']);
+  });
+  it.each([
+    'app/composables/api/useEdgeFunctions.ts',
+    'app/composables/__tests__/useEdgeFunctions.test.ts',
+    'app/composables/useSignOut.ts',
+    'app/composables/__tests__/useSignOut.ownerGuard.test.ts',
+    'app/composables/supabase/useSupabaseListener.ts',
+    'app/composables/__tests__/useSupabaseListener.test.ts',
+    'app/composables/supabase/useSupabaseSync.ts',
+    'app/composables/__tests__/useSupabaseSync.test.ts',
+    'app/stores/__tests__/teamChannelController.test.ts',
+    'app/stores/__tests__/teammate_flow.test.ts',
+  ])('includes lifecycle scope for the tracked helper or test %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+      'supabase/AGENTS.md'
+    );
+  });
+  it.each([
+    'DeviceDataCard.vue',
+    '__tests__/DeviceDataCard.test.ts',
+    'AccountDeletionCard.vue',
+    '__tests__/AccountDeletionCard.test.ts',
+    '__tests__/AccountDeletionCard.deviceRemoval.test.ts',
+    'ApiTokens.vue',
+    'ApiTokensCard.vue',
+    '__tests__/ApiTokens.test.ts',
+    '__tests__/ApiTokensCard.test.ts',
+  ])('includes lifecycle instructions for the tracked settings file %s', (file) => {
+    expect(
+      scopedInstructions([`app/features/settings/${file}`], ['AGENTS.md', 'supabase/AGENTS.md'])
+    ).toContain('supabase/AGENTS.md');
+  });
+  it.each([
+    ['supabase/functions/example/index.ts', false],
+    ['supabase/functions/_shared/example.deno.test.ts', false],
+    ['supabase/functions/_shared/example.ts', false],
+    ['supabase/config.toml', false],
+    ['supabase/migrations/example.sql', true],
+    ['supabase/tests/example.sql', true],
+    ['shared/sql/example.sql', true],
+  ])('limits database replay to SQL validation for %s', (file, expected) => {
+    expect(
+      validationFor([file]).scoped.includes('supabase/AGENTS.md checks (supabase:check)')
+    ).toBe(expected);
+  });
+  it('matches the actual root, gateway, Deno, and workflow runner naming rules', () => {
+    for (const [file, expected] of [
+      ['app/utils/example.test.tsx', true],
+      ['app/utils/example.spec.cts', true],
+      ['app/utils/__tests__/Helper.vue', false],
+      ['workers/api-gateway/src/handlers/__tests__/nested/example.test.ts', true],
+      ['workers/api-gateway/src/__tests__/example.test.tsx', false],
+      ['workers/api-gateway/src/utils/example.test.ts', false],
+      ['supabase/functions/_shared/example.deno.test.ts', true],
+      ['supabase/functions/_shared/fixtures.ts', false],
+      ['scripts/workflow-tests/security.mjs', true],
+      ['scripts/workflow-tests/helpers/security.mjs', false],
+      ['scripts/codex-review/codex-review-tests.mjs', true],
+      ['scripts/codex-review/helpers/fixture-tests.mjs', false],
+    ]) {
+      expect(isTestPath(file), file).toBe(expected);
+    }
+  });
+  it('classifies test files across runners', () => {
+    expect(isTestPath('app/components/ui/__tests__/GameItem.test.ts')).toBe(true);
+    expect(isTestPath('scripts/workflow-tests/validation.mjs')).toBe(true);
+    expect(isTestPath('scripts/codex-review/codex-review-tests.mjs')).toBe(true);
+    expect(isTestPath('scripts/workflow-tests/README.md')).toBe(false);
+    expect(isTestPath('app/components/ui/GameItem.vue')).toBe(false);
+  });
+  it('excludes helper modules and files outside runner filename patterns', () => {
+    for (const file of [
+      'workers/api-gateway/src/__tests__/cloudflare-workers.ts',
+      'workers/api-gateway/src/__tests__/example.spec.ts',
+      'workers/api-gateway/src/utils/example.test.ts',
+      'app/utils/__tests__/fixtures.ts',
+      'scripts/workflow-tests/helpers/workflow-blocks.mjs',
+      'app/utils/example-tests.mjs',
+    ]) {
+      expect(isTestPath(file)).toBe(false);
+    }
+    expect(isTestPath('app/utils/example.spec.ts')).toBe(true);
+  });
+  it('collects AGENTS.md files on each ancestor chain', () => {
+    expect(
+      scopedInstructions(
+        ['workers/api-gateway/src/utils/gameMode.ts', 'app/utils/x.ts'],
+        ['AGENTS.md', 'workers/api-gateway/AGENTS.md', 'supabase/AGENTS.md']
+      )
+    ).toEqual(['AGENTS.md', 'workers/api-gateway/AGENTS.md']);
+  });
+  it('includes Supabase instructions for lifecycle and database paths outside its directory', () => {
+    for (const path of [
+      'app/server/api/account/activity.post.ts',
+      'app/server/api/team/members.ts',
+      'app/features/settings/ApiTokens.vue',
+      'app/features/settings/AccountDeletionCard.vue',
+      'app/features/settings/__tests__/AccountDeletionCard.deviceRemoval.test.ts',
+      'app/pages/settings.vue',
+      'app/stores/tarkov/deviceData.ts',
+      'app/stores/tarkov/accountRecovery.ts',
+      'app/stores/useTeamStore.ts',
+      'app/utils/tokenFunctionFallback.ts',
+      'app/pages/auth/callback.vue',
+      'shared/sql/cleanup.sql',
+      'scripts/ops/prod-db/cli.mjs',
+    ]) {
+      expect(scopedInstructions([path], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+        'supabase/AGENTS.md'
+      );
+    }
+    expect(
+      scopedInstructions(['app/features/about/teamMembers.ts'], ['supabase/AGENTS.md'])
+    ).toEqual(['AGENTS.md']);
+    expect(scopedInstructions(['app/server/api/team/members.ts'], ['AGENTS.md'])).toEqual([
+      'AGENTS.md',
+    ]);
+  });
+  it('groups tests into one command per runner', () => {
+    expect(
+      testCommands([
+        'app/a.test.ts',
+        'workers/api-gateway/src/__tests__/b.test.ts',
+        'scripts/workflow-tests/c.mjs',
+        'supabase/functions/_shared/d.deno.test.ts',
+        'scripts/ci/e.test.mjs',
+      ])
+    ).toEqual([
+      {
+        executable: 'pnpm',
+        args: ['exec', 'vitest', 'run', './app/a.test.ts', './scripts/ci/e.test.mjs'],
+      },
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './src/__tests__/b.test.ts',
+        ],
+      },
+      { executable: 'node', args: ['--test', '--', './scripts/workflow-tests/c.mjs'] },
+      { executable: 'deno', args: ['test', './supabase/functions/_shared/d.deno.test.ts'] },
+    ]);
+  });
+  it('preserves inert filenames as separate arguments instead of shell text', () => {
+    const paths = [
+      'app/space name.test.ts',
+      "app/single'quote.test.ts",
+      'app/double"quote.test.ts',
+      'app/$(inert).test.ts',
+      'app/semi;and&pipe|.test.ts',
+      '-leading.test.ts',
+    ];
+    expect(testCommands(paths)).toEqual([
+      { executable: 'pnpm', args: ['exec', 'vitest', 'run', ...paths.map((path) => `./${path}`)] },
+    ]);
+    for (const prefix of [
+      'workers/api-gateway/',
+      'scripts/workflow-tests/',
+      'supabase/functions/',
+    ]) {
+      const filename = "space 'quote' $(inert);&-file";
+      const extension = prefix === 'supabase/functions/' ? '.deno.test.ts' : '.test.mjs';
+      const [command] = testCommands([`${prefix}${filename}${extension}`]);
+      const operand = prefix === 'workers/api-gateway/' ? '' : prefix;
+      expect(command.args.at(-1)).toBe(`./${operand}${filename}${extension}`);
+      expect(typeof command.executable).toBe('string');
+    }
+  });
+  it('keeps Deno file selection before its script-argument delimiter', () => {
+    const [command] = testCommands(['-selected space.deno.test.ts']);
+    expect(command).toEqual({
+      executable: 'deno',
+      args: ['test', './-selected space.deno.test.ts'],
+    });
+  });
+  it.skipIf(!process.env.DENO_EXECUTABLE)('runs only the selected Deno fixture', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'change-brief-deno-'));
+    const selected = '-selected space.deno.test.ts';
+    const other = 'other.deno.test.ts';
+    writeFileSync(
+      join(cwd, selected),
+      'Deno.test("selected", () => { if (Deno.args.length) throw new Error("unexpected script args"); });'
+    );
+    writeFileSync(
+      join(cwd, other),
+      'Deno.test("unselected", () => { throw new Error("unselected file ran"); });'
+    );
+    try {
+      const [command] = testCommands([selected]);
+      const output = execFileSync(process.env.DENO_EXECUTABLE, command.args, {
+        cwd,
+        encoding: 'utf8',
+        shell: false,
+        timeout: 10000,
+      });
+      expect(output).toContain('1 passed');
+      expect(output).not.toContain('unselected');
+    } finally {
+      unlinkSync(join(cwd, selected));
+      unlinkSync(join(cwd, other));
+      rmdirSync(cwd);
+    }
+  });
+});
+describe('validationFor', () => {
+  it('keeps the full required checks for executable changes', () => {
+    const validation = validationFor(['app/components/ui/GameItem.vue']);
+    expect(validation.full).toBe(true);
+    expect(validation.previewRequired).toBe(true);
+    expect(validation.commands).toEqual([
+      'pnpm run lint',
+      'pnpm run typecheck',
+      'pnpm run lint:fallow',
+      'pnpm run format:check',
+    ]);
+  });
+  it('selects typecheck for every TypeScript extension', () => {
+    for (const path of ['app/a.tsx', 'shared/b.mts', 'shared/c.cts']) {
+      expect(validationFor([path]).commands).toContain('pnpm run typecheck');
+    }
+    expect(validationFor(['scripts/ci/x.mjs']).commands).not.toContain('pnpm run typecheck');
+  });
+  it('selects reduced checks for documentation and adds scoped checks for affected areas', () => {
+    const validation = validationFor(['docs/api.md'], ['docs/api.md', 'supabase/migrations/x.sql']);
+    expect(validation.full).toBe(false);
+    expect(validation.commands).toEqual(['pnpm run format:check']);
+    expect(validation.scoped).toEqual(['supabase/AGENTS.md checks (supabase:check)']);
+  });
+  it('selects locale and workflow checks from the classifier', () => {
+    const commands = validationFor(['app/locales/en.json', '.github/workflows/ci.yml']).commands;
+    expect(commands).toContain('pnpm run i18n:check');
+    expect(commands).toContain('pnpm run test:workflow');
+  });
+  it('includes the exact gateway contract checks for targets and affected consumers', () => {
+    const required = [
+      'pnpm --filter api-gateway run types:check',
+      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run',
+    ];
+    const gateway = 'workers/api-gateway/src/utils/gameMode.ts';
+    for (const [paths, affected] of [
+      [[gateway], [gateway]],
+      [['shared/utils/seasonNumber.ts'], ['shared/utils/seasonNumber.ts', gateway]],
+    ]) {
+      const checks = validationFor(paths, affected).scoped.join('\n');
+      for (const command of required) expect(checks).toContain(command);
+    }
+  });
+});
+describe('buildBrief', () => {
+  it('propagates deduplicated literal owners into scope and real test candidates', async () => {
+    const target = 'shared/utils/apiTaskUpdates.ts';
+    for (const [owner, scope, runnable] of [
+      ['supabase/migrations/mirror.sql', 'supabase/AGENTS.md', false],
+      ['workers/api-gateway/tooling.config.ts', 'workers/api-gateway/AGENTS.md', false],
+      ['scripts/workflow-tests/source-check.mjs', null, true],
+      ['scripts/ci/source.test.mjs', null, true],
+      ['scripts/workflow-tests/helpers/source-check.mjs', null, false],
+    ]) {
+      const line = `${owner}: '${target}'`;
+      const io = fakeIo({ reports: { [target]: trace([]) }, grepLines: [line, line] });
+      io.instructionFiles = () => [
+        'AGENTS.md',
+        'supabase/AGENTS.md',
+        'workers/api-gateway/AGENTS.md',
+      ];
+      const brief = await buildBrief(io, { targets: [{ file: target }] });
+      expect(brief.pathReferences).toEqual([{ file: owner, references: target }]);
+      if (scope) {
+        expect(brief.instructions.filter((file) => file === scope)).toHaveLength(1);
+        expect(brief.validation.scoped).toHaveLength(1);
+      }
+      expect(brief.tests.commands).toEqual(runnable ? testCommands([owner]) : []);
+    }
+  });
+  it('reports the literal-search cap without dropping graph-derived scope', async () => {
+    const target = 'app/utils/constants.ts';
+    const transitive = Array.from({ length: 80 }, (_, index) => `app/utils/consumer${index}.ts`);
+    transitive.push('workers/api-gateway/src/handlers/team.ts');
+    const io = fakeIo({ reports: { [target]: trace([], transitive) } });
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.uncertainty.join('\n')).toMatch(/Path-reference search limited.*60/);
+    const search = io.calls.find(
+      (call) => call.kind === 'lines' && call.specs.includes('package.json')
+    );
+    expect(search.args.filter((arg) => arg === '-e')).toHaveLength(60);
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+  });
+  it('does not issue an unpatterned literal or doc search for an empty request', async () => {
+    const io = fakeIo();
+    const brief = await buildBrief(io, { targets: [] });
+    expect(brief.pathReferences).toEqual([]);
+    expect(brief.docs).toEqual([]);
+    expect(io.calls.filter((call) => call.kind === 'lines')).toEqual([]);
+  });
+  it('searches executable TypeScript configs for literal constraints outside the import graph', async () => {
+    const target = 'app/stores/utils/gameMode.ts';
+    const io = fakeIo({ reports: { [target]: trace([]) } });
+    io.grepLines = (args, specs) =>
+      specs.includes('*.config.ts') ? [`vitest.config.ts: '${target}': { 100: true }`] : [];
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.pathReferences).toEqual([{ file: 'vitest.config.ts', references: target }]);
+  });
+  it('adds scoped instructions and checks for non-graph SQL reference consumers', async () => {
+    const target = 'shared/utils/apiTaskUpdates.ts';
+    const owner = 'supabase/migrations/20260930150000_cap_api_update_task_lists.sql';
+    const io = fakeIo({
+      reports: { [target]: trace([]) },
+      grepLines: [`${owner}: -- mirrors ${target}`],
+    });
+    io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+    const brief = await buildBrief(io, { targets: [{ file: target }] });
+    expect(brief.pathReferences).toEqual([{ file: owner, references: target }]);
+    expect(brief.instructions).toContain('supabase/AGENTS.md');
+    expect(brief.validation.scoped).toContain('supabase/AGENTS.md checks (supabase:check)');
+  });
+  it('keeps scoped validation complete and deduplicated for graph chains, test consumers, and cycles', async () => {
+    const seed = 'app/utils/constants.ts';
+    const gateway = 'workers/api-gateway/src/handlers/team.ts';
+    const gatewayTest = 'workers/api-gateway/src/__tests__/team.test.ts';
+    for (const [direct, transitive] of [
+      [[gateway], []],
+      [['app/utils/modeProgressFallback.ts'], [gateway]],
+      [[gatewayTest], []],
+      [
+        [gateway, seed],
+        [seed, gateway, gatewayTest, seed],
+      ],
+    ]) {
+      const io = fakeIo({ reports: { [seed]: trace(direct, transitive) } });
+      const brief = await buildBrief(io, { targets: [{ file: seed }] });
+      expect(
+        brief.instructions.filter((file) => file === 'workers/api-gateway/AGENTS.md')
+      ).toHaveLength(1);
+      expect(brief.validation.scoped).toHaveLength(1);
+      expect(brief.validation.scoped[0]).toContain(
+        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+      );
+    }
+  });
+  it('retains scope checks and explicit uncertainty when a graph target is missing', async () => {
+    const missing = 'workers/api-gateway/src/utils/missing.ts';
+    const brief = await buildBrief(fakeIo(), { targets: [{ file: missing }] });
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain('--dry-run');
+    expect(
+      brief.uncertainty.some((note) => note.includes(`Fallow could not analyze ${missing}`))
+    ).toBe(true);
+    expect(brief.tests.commands).toEqual([]);
+  });
+  it('omits missing tests from direct, nearby, and transitive candidates', async () => {
+    const source = 'app/components/ui/GameItem.vue';
+    const direct = 'app/components/ui/__tests__/GameItem.test.ts';
+    const transitive = 'app/pages/__tests__/missing.page.test.ts';
+    const io = fakeIo({ reports: { [source]: trace([direct], [transitive]) } });
+    io.fileExists = (file) => ![direct, transitive].includes(file);
+    const brief = await buildBrief(io, { targets: [{ file: source }] });
+    expect(brief.tests.direct).toEqual([]);
+    expect(brief.tests.nearby).toEqual([]);
+    expect(brief.tests.transitive).toEqual([]);
+    expect(brief.tests.commands).toEqual([]);
+    expect(brief.tests.broaderCommands).toEqual([]);
+  });
+  it('adds instructions and required checks for transitive gateway consumers', async () => {
+    const io = fakeIo({
+      reports: {
+        'app/utils/constants.ts': trace(
+          ['app/utils/modeProgressFallback.ts'],
+          ['workers/api-gateway/src/handlers/team.ts']
+        ),
+      },
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/constants.ts' }] });
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain(
+      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+    );
+  });
+  it('finds real test consumers of a targeted gateway helper without running the helper', async () => {
+    const helper = 'workers/api-gateway/src/__tests__/cloudflare-workers.ts';
+    const consumer = 'workers/api-gateway/src/__tests__/example.test.ts';
+    const io = fakeIo({ reports: { [helper]: trace([consumer]) } });
+    const brief = await buildBrief(io, { targets: [{ file: helper }], changedPaths: [helper] });
+    expect(brief.tests.direct).toEqual([consumer]);
+    expect(brief.tests.commands).toEqual(testCommands([consumer]));
+  });
+  it('does not recommend running a test deleted by the diff', async () => {
+    const io = fakeIo();
+    io.fileExists = () => false;
+    const brief = await buildBrief(io, {
+      targets: [],
+      changedPaths: ['app/utils/__tests__/removed.test.ts'],
+      base: 'origin/main',
+    });
+    expect(brief.tests.commands).toEqual([]);
+    expect(brief.unanalyzedChanges).toEqual(['app/utils/__tests__/removed.test.ts']);
+  });
+  it('includes test targets and changed tests in candidate commands across all runners', async () => {
+    for (const file of [
+      'app/utils/__tests__/example.test.ts',
+      'workers/api-gateway/src/__tests__/example.test.ts',
+      'scripts/workflow-tests/example.mjs',
+      'supabase/functions/_shared/example.deno.test.ts',
+    ]) {
+      for (const input of [
+        { targets: [{ file }] },
+        { targets: [{ file }], changedPaths: [file], base: 'origin/main' },
+        { targets: [], changedPaths: [file], base: 'origin/main' },
+      ]) {
+        const io = fakeIo({ reports: { [file]: trace([]) } });
+        const brief = await buildBrief(io, input);
+        expect(brief.tests.direct).toEqual([file]);
+        expect(brief.tests.commands).toEqual(testCommands([file]));
+      }
+    }
+  });
+  it('finds lazy-only templates in PascalCase and kebab-case', async () => {
+    const io = fakeIo({ reports: { 'app/components/ui/GameItem.vue': trace([]) } });
+    const templates = new Map([
+      ['app/pages/lazy.vue', '<LazyGameItem />'],
+      ['app/pages/kebab.vue', '<lazy-game-item />'],
+      ['app/pages/unrelated.vue', '<OtherComponent />'],
+    ]);
+    io.grepFiles = (args) => {
+      const pattern = new RegExp(`\\b(?:${args[2]})\\b`);
+      return [...templates].filter(([, text]) => pattern.test(text)).map(([file]) => file);
+    };
+    const brief = await buildBrief(io, { targets: [{ file: 'app/components/ui/GameItem.vue' }] });
+    expect(brief.targets[0].textOnlyConsumers).toEqual([
+      'app/pages/lazy.vue',
+      'app/pages/kebab.vue',
+    ]);
+    expect(renderBrief(brief)).toContain('UNVERIFIED');
+    expect(brief.uncertainty[0]).toMatch(/component auto-registration.*Confirm each/);
+  });
+  it('adds component consumers Fallow cannot see and labels them unverified', async () => {
+    const io = fakeIo({
+      reports: {
+        'app/components/ui/GameItem.vue': trace(
+          [
+            'app/features/hideout/HideoutRequirement.vue',
+            'app/components/ui/__tests__/GameItem.test.ts',
+          ],
+          ['app/pages/__tests__/hideout.page.test.ts']
+        ),
+      },
+      grepFiles: [
+        'app/components/ui/GameItem.vue',
+        'app/features/hideout/HideoutRequirement.vue',
+        'app/features/neededitems/NeededItemRow.vue',
+      ],
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/components/ui/GameItem.vue' }] });
+    const [target] = brief.targets;
+    expect(target.consumers).toEqual(['app/features/hideout/HideoutRequirement.vue']);
+    expect(target.textOnlyConsumers).toEqual(['app/features/neededitems/NeededItemRow.vue']);
+    expect(io.calls.find((call) => call.kind === 'files').args).toEqual([
+      '-w',
+      '-E',
+      'GameItem|LazyGameItem|game-item|lazy-game-item',
+    ]);
+    expect(brief.uncertainty[0]).toMatch(/component auto-registration.*Confirm each/);
+    expect(brief.tests.direct).toEqual(['app/components/ui/__tests__/GameItem.test.ts']);
+    expect(brief.tests.nearby).toEqual([
+      'app/features/hideout/__tests__/HideoutRequirement.test.ts',
+      'app/features/neededitems/__tests__/NeededItemRow.test.ts',
+    ]);
+    expect(brief.tests.transitive).toEqual(['app/pages/__tests__/hideout.page.test.ts']);
+  });
+  it.each([1, 3, 12, 13, 20])('preserves all %i owning-doc anchors in JSON', async (count) => {
+    const lines = Array.from({ length: count }, (_, index) => index + 10);
+    const io = fakeIo({
+      reports: { 'app/utils/example.ts': trace([]) },
+      grepLines: lines.map((line) => `docs/api.md:${line}:app/utils/example.ts`),
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/example.ts' }] });
+    expect(JSON.parse(JSON.stringify(brief)).docs).toEqual([{ file: 'docs/api.md', lines }]);
+    const text = renderBrief(brief);
+    expect(text).toContain(`docs/api.md:${lines.slice(0, 12).join(',')}`);
+    if (count > 12) expect(text).toContain(`${count - 12} more (--format json)`);
+  });
+  it('caps owning documents only in text and deduplicates their complete anchors', async () => {
+    const docs = Array.from({ length: 13 }, (_, index) => ({
+      file: `docs/example-${index}.md`,
+      lines: [10],
+    }));
+    const matches = docs.map(({ file }) => `${file}:10:app/utils/example.ts`);
+    const io = fakeIo({
+      reports: { 'app/utils/example.ts': trace([]) },
+      grepLines: [...matches, ...matches],
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/example.ts' }] });
+    expect(brief.docs).toEqual(docs);
+    const text = renderBrief(brief);
+    expect(text).toContain('docs/example-11.md:10');
+    expect(text).not.toContain('docs/example-12.md:10');
+    expect(text).toContain('1 more (--format json)');
+  });
+  it('keeps selected Edge Function tests on Deno without database replay', async () => {
+    const file = 'supabase/functions/_shared/example.deno.test.ts';
+    const io = fakeIo({ reports: { [file]: trace([]) } });
+    io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+    const brief = await buildBrief(io, { targets: [{ file }] });
+    expect(brief.instructions).toContain('supabase/AGENTS.md');
+    expect(brief.tests.commands).toEqual(testCommands([file]));
+    expect(brief.tests.commands[0].executable).toBe('deno');
+    expect(brief.validation.scoped).toEqual([]);
+  });
+  it.each(['index', 'main', 'mod'])(
+    'uses path-only doc ownership for the generic %s entrypoint',
+    async (name) => {
+      const file = `supabase/functions/team-create/${name}.ts`;
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.grepLines = (args, specs) => {
+        if (!specs.includes('*.md')) return [];
+        const marker = String.fromCharCode(96);
+        const genericTerm = marker + name + marker;
+        const exactPath = args.includes(file) ? [`docs/team.md:20:${file}`] : [];
+        return args.includes(genericTerm)
+          ? [...exactPath, 'docs/unrelated.md:10:unrelated field']
+          : exactPath;
+      };
+      const brief = await buildBrief(io, { targets: [{ file }] });
+      expect(brief.docs).toEqual([{ file: 'docs/team.md', lines: [20] }]);
+    }
+  );
+  it.each(['target', 'diff', 'target-and-diff'])(
+    'includes device-data lifecycle scope for a %s request',
+    async (mode) => {
+      const file = 'app/features/settings/__tests__/DeviceDataCard.test.ts';
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+      const brief = await buildBrief(io, {
+        targets: mode === 'diff' ? [] : [{ file }],
+        changedPaths: mode === 'target' ? [] : [file],
+      });
+      expect(brief.instructions).toContain('supabase/AGENTS.md');
+      expect(brief.tests.direct).toEqual([file]);
+    }
+  );
+  it.each(['target', 'diff', 'target-and-diff'])(
+    'includes Edge Function lifecycle scope for a %s request',
+    async (mode) => {
+      const file = 'app/composables/__tests__/useEdgeFunctions.test.ts';
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+      const brief = await buildBrief(io, {
+        targets: mode === 'diff' ? [] : [{ file }],
+        changedPaths: mode === 'target' ? [] : [file],
+      });
+      expect(brief.instructions).toContain('supabase/AGENTS.md');
+      expect(brief.tests.direct).toEqual([file]);
+    }
+  );
+  it.each(['team', 'auth', 'constants', 'types', 'user', 'task'])(
+    'uses path-only doc ownership for the %s module',
+    async (name) => {
+      const file = `app/types/${name}.ts`;
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.grepLines = (args, specs) => {
+        if (!specs.includes('*.md')) return [];
+        const marker = String.fromCharCode(96);
+        return args.includes(marker + name + marker)
+          ? ['docs/contributing.md:75:unrelated commit scope']
+          : [];
+      };
+      const brief = await buildBrief(io, { targets: [{ file }] });
+      expect(brief.docs).toEqual([]);
+    }
+  );
+  it.each([false, true])(
+    'finds nearby tests of template-only consumers (deleted=%s)',
+    async (deleted) => {
+      const source = 'app/components/ui/GameItem.vue';
+      const consumer = 'app/features/hideout/HideoutHelpDemoCard.vue';
+      const test = 'app/features/hideout/__tests__/HideoutHelpDemoCard.test.ts';
+      const io = fakeIo({
+        reports: { [source]: trace([]) },
+        grepFiles: [source, consumer, consumer],
+      });
+      io.listFiles = () => [test];
+      io.fileExists = (file) => file !== test || !deleted;
+      const brief = await buildBrief(io, { targets: [{ file: source }] });
+      expect(brief.tests.nearby).toEqual(deleted ? [] : [test]);
+      expect(brief.tests.commands).toEqual(deleted ? [] : testCommands([test]));
+    }
+  );
+  it('reports symbol direct consumers, scoped instructions, and path references', async () => {
+    const io = fakeIo({
+      reports: {
+        'shared/utils/seasonNumber.ts': trace(
+          ['workers/api-gateway/src/utils/gameMode.ts'],
+          ['workers/api-gateway/src/__tests__/gameMode.test.ts']
+        ),
+      },
+      grepLines: [
+        '.github/workflows/ci.yml:          node shared/utils/seasonNumber.ts',
+        'docs/systems/progress-storage.md:146:  (`shared/utils/seasonNumber.ts`)',
+      ],
+    });
+    const brief = await buildBrief(io, {
+      targets: [{ file: 'shared/utils/seasonNumber.ts', symbol: 'isSeasonNumber' }],
+    });
+    expect(brief.targets[0].target).toBe('shared/utils/seasonNumber.ts:isSeasonNumber');
+    expect(brief.targets[0].consumers).toEqual(['workers/api-gateway/src/utils/gameMode.ts']);
+    expect(brief.instructions).toEqual(['AGENTS.md', 'workers/api-gateway/AGENTS.md']);
+    expect(brief.pathReferences).toEqual([
+      { file: '.github/workflows/ci.yml', references: 'shared/utils/seasonNumber.ts' },
+    ]);
+    expect(brief.docs).toEqual([{ file: 'docs/systems/progress-storage.md', lines: [146] }]);
+    expect(brief.tests.commands).toEqual([]);
+    expect(brief.tests.broaderCommands).toEqual([
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './src/__tests__/gameMode.test.ts',
+        ],
+      },
+    ]);
+    const text = renderBrief(brief);
+    expect(text).toContain('Executable/argv records (JSON data; do not paste into a shell');
+    expect(text).toContain(JSON.stringify(brief.tests.broaderCommands[0]));
+    expect(brief.validation.scoped[0]).toMatch(/^workers\/api-gateway\/AGENTS\.md checks/);
+    expect(brief.uncertainty).toEqual([]);
+  });
+  it('surfaces Fallow failures, missing generated types, and relevant degraded analysis', async () => {
+    const io = fakeIo({
+      generated: false,
+      reports: { 'supabase/functions/x/index.ts': trace([]) },
+    });
+    const brief = await buildBrief(io, {
+      targets: [{ file: 'app/missing.ts' }, { file: 'supabase/functions/x/index.ts' }],
+    });
+    expect(brief.uncertainty).toEqual([
+      "Fallow could not analyze app/missing.ts: file 'app/missing.ts' not found in module graph",
+      'Missing .nuxt/*.d.ts: run `pnpm exec nuxt prepare`; auto-import and component checks were skipped.',
+      'Fallow analysis degraded for supabase/functions: undeclared workspace',
+    ]);
+  });
+  it('lists changed non-code paths and plans validation for the whole diff', async () => {
+    const io = fakeIo();
+    const brief = await buildBrief(io, {
+      targets: [],
+      changedPaths: ['docs/api.md', 'app/locales/de.json'],
+      base: 'origin/main',
+    });
+    expect(brief.unanalyzedChanges).toEqual(['docs/api.md', 'app/locales/de.json']);
+    expect(brief.validation.full).toBe(false);
+    expect(renderBrief(brief)).toContain('# Change brief (vs origin/main)');
+  });
+  it.each(['docs/api.md', 'app/locales/de.json'])(
+    'does not search for owning docs without code targets in a %s diff',
+    async (changedPath) => {
+      const io = fakeIo({ grepLines: ['docs/unrelated.md:12:*.md'] });
+      const brief = await buildBrief(io, {
+        targets: [],
+        changedPaths: [changedPath],
+        base: 'origin/main',
+      });
+      expect(brief.docs).toEqual([]);
+      expect(
+        io.calls.filter((call) => call.kind === 'lines' && call.specs.includes('*.md'))
+      ).toEqual([]);
+    }
+  );
+  it('renders capped lists and always states the graph-wide blind spots', async () => {
+    const consumers = Array.from({ length: 15 }, (_, index) => `app/features/f${index}.vue`);
+    const io = fakeIo({ reports: { 'shared/utils/seasonNumber.ts': trace(consumers) } });
+    const text = renderBrief(
+      await buildBrief(io, { targets: [{ file: 'shared/utils/seasonNumber.ts' }] })
+    );
+    expect(text).toContain('consumers (Fallow graph, 15)');
+    expect(text).toContain('… 3 more (--format json)');
+    expect(text).not.toContain('app/features/f14.vue');
+    expect(text).toMatch(/Never in any graph: runtime string lookups/);
+    expect(text).toContain('Advisory only: CI and AGENTS.md remain authoritative.');
+  });
+});
+describe('CLI repository-relative operands', () => {
+  it('normalizes dot prefixes, parent segments, and Windows separators for files and symbols', () => {
+    const file = 'workers/api-gateway/src/utils/gameMode.ts';
+    for (const args of [
+      ['--file', `./${file}`],
+      ['--symbol', `./${file}:getGameModeSeasonNumber`],
+      ['--file', file.replaceAll('/', '\\')],
+      ['--file', 'workers/api-gateway/src/../src/utils/gameMode.ts'],
+      ['--file', resolve(file)],
+    ]) {
+      const output = execFileSync(
+        process.execPath,
+        ['scripts/ci/change-brief.mjs', ...args, '--format', 'json'],
+        { encoding: 'utf8', shell: false, timeout: 20000 }
+      );
+      const brief = JSON.parse(output);
+      expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+      expect(brief.validation.scoped.join('\n')).toContain(
+        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+      );
+      expect(brief.targets[0].target).toBe(
+        args[0] === '--symbol' ? `${file}:getGameModeSeasonNumber` : file
+      );
+    }
+  });
+});

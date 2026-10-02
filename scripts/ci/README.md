@@ -8,6 +8,8 @@ CI job planning, result gates, and GitHub automation helpers used by the workflo
 | `validate-changes.mjs`        | Decides which CI jobs a change needs and runs them locally or in CI.   | `validate:changes`, `ci.yml`                 |
 | `validation-plan.mjs`         | Rules mapping changed files to CI jobs; aggregates job results.        | `validate-changes.mjs`, `preview/`           |
 | `validation-tools.mjs`        | Resolves trusted absolute paths for `git` and `pnpm`.                  | `validate-changes.mjs`, `preview/`           |
+| `change-brief.mjs`            | Pre-edit brief: consumers, owning docs, scoped rules, tests, checks.   | `brief`; see `workflow-automation.md`        |
+| `change-brief-lib.mjs`        | Pure briefing model for `change-brief.mjs`; I/O is injected.           | `change-brief.mjs`                           |
 | `check-ci-result.mjs`         | Final CI gate: fails if any job the plan selected did not pass.        | `ci.yml`                                     |
 | `report-dispatched-ci.mjs`    | Publishes the gate result as a commit status for dispatched CI runs.   | `ci.yml`                                     |
 | `github-ci-gate.sh`           | Shared shell helpers that check `main`'s ruleset and CI state.         | `crowdin-pr.sh`, `release/release-commit.sh` |
