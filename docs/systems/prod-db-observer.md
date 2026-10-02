@@ -51,7 +51,10 @@ flowchart LR
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
    operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
-   report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
+   report. Agents collect and assess evidence directly under the runbook; operator-provided records
+   and human review are not mandatory. Authenticated MCP catalog SELECTs and CLI dry-runs may
+   supplement the observer without granting it write access. Unsupported or ambiguous syntax fails
+   closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
    when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
    `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, reserved keywords are rejected as
@@ -87,9 +90,10 @@ flowchart LR
 
 ### Invariants
 
-- Production inspection must use a dedicated database observer identity with no write or DDL
-  privileges. Service-role, postgres-admin, migration, and Management API credentials are never
-  accepted as observer credentials.
+- Observer inspection must use a dedicated identity with no write or DDL privileges. Service-role,
+  postgres-admin, migration, and Management API credentials are never accepted as observer
+  credentials. The runbook permits authenticated MCP catalog SELECTs and CLI dry-runs as separate
+  evidence sources; these do not authorize remote writes.
 - `PROD_DB_URL` uses a TLS-protected direct connection or session-mode pooler with
   `sslmode=verify-full`; the transaction pooler is
   unsupported because session-level settings are not safe as a security boundary there. The
@@ -140,5 +144,5 @@ flowchart LR
 - The report names the project it observed (`project_ref`, `null` for a local target), so a
   comparison run against the wrong project is detectable. A primary target whose host and observer
   username identify no project fails instead of reporting a nameless comparison. The observer does
-  not infer the expected project from application configuration; confirming the identity is the
-  operator's step.
+  not infer the expected project from application configuration; the agent confirms the identity
+  against authenticated project metadata before using the evidence.

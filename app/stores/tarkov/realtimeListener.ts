@@ -12,6 +12,7 @@ import {
   progressStorageSerializer,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
+import { isAcknowledgedMetadataEcho } from '@/stores/tarkov/metadataEchoes';
 import {
   coerceGameMode,
   hasRetainableModeProgress,
@@ -96,6 +97,7 @@ type RealtimeModeProgress = {
   taskAvailability: UserProgressData['taskAvailability'];
 };
 type LegacyProgressMetadata = {
+  metadata_write_id?: string | null;
   current_game_mode?: string;
   game_edition?: number;
   tarkov_uid?: number | null;
@@ -436,12 +438,11 @@ async function runSetupRealtimeListener(
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (
     payload: { new: unknown; old: unknown },
-    reconcile = captureRemoteMerge()
+    reconcile?: RemoteStateMerge
   ) => {
     if (!isCurrentRealtimeUser()) return;
     const remoteData = payload.new as LegacyProgressMetadata;
     const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
-    if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
     const remoteState = buildLegacyMetadataState(remoteData, localState);
     const remoteMetadata = {
@@ -449,7 +450,11 @@ async function runSetupRealtimeListener(
       gameEdition: remoteState.gameEdition,
       tarkovUid: remoteState.tarkovUid,
     };
-    const metadata = reconcile(remoteMetadata);
+    // Even an acknowledged echo advances the watermark so older foreign metadata stays rejected.
+    if (!acceptLegacyMetadataUpdate(updateTime)) return;
+    // Retired writes must not reconcile, persist freshness, or patch the acknowledged state.
+    if (isAcknowledgedMetadataEcho(remoteData.metadata_write_id, remoteMetadata)) return;
+    const metadata = (reconcile ?? captureRemoteMerge())(remoteMetadata);
     const nextState = { ...localState, ...metadata } as UserState;
     progressStorageSerializer.acceptRemote({
       state: localState,
@@ -459,7 +464,11 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {},
       metadataTimestamp: updateTime,
     });
-    noteRemoteProgressApplied({ remote: remoteMetadata, applied: metadata });
+    noteRemoteProgressApplied({
+      remote: remoteMetadata,
+      applied: metadata,
+      metadataWriteId: remoteData.metadata_write_id,
+    });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {

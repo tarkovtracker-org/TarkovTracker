@@ -1,11 +1,21 @@
 import { deepEqual } from '@/stores/tarkov/deepEqual';
+import {
+  clearMetadataEchoes,
+  isAcknowledgedMetadataEcho,
+  readMetadataWriteId,
+  recordMetadataEcho,
+} from '@/stores/tarkov/metadataEchoes';
 import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
 export type ProgressSyncSnapshot = Partial<
   Pick<UserState, GameMode | 'currentGameMode' | 'gameEdition' | 'tarkovUid'>
 >;
-type RemoteProgressUpdate = { remote: ProgressSyncSnapshot; applied: ProgressSyncSnapshot };
+type RemoteProgressUpdate = {
+  remote: ProgressSyncSnapshot;
+  applied: ProgressSyncSnapshot;
+  metadataWriteId?: unknown;
+};
 /**
  * Per-mode progress the server is known to hold for one account: loaded at startup or
  * acknowledged by a sync. A sync sends only modes that differ, so unchanged modes are never
@@ -15,7 +25,15 @@ let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
 let ownerEpoch = 0;
-type PendingWrite = { expected: ProgressSyncSnapshot | null; disturbed: boolean };
+let acknowledgedUid: number | null | undefined;
+let acknowledgedMetadataWriteId: string | null = null;
+type PendingWrite = {
+  expected: ProgressSyncSnapshot | null;
+  previousUid: number | null | undefined;
+  uidSettled: boolean;
+  disturbed: boolean;
+  provisionalWriteIds: Set<string>;
+};
 /** Each queued or dispatched write keeps its own expected-echo scope until it settles. */
 const pendingWrites = new Set<PendingWrite>();
 const toWire = (progress: UserProgressData): UserProgressData =>
@@ -25,7 +43,10 @@ export const clearAcknowledgedModes = (): void => {
   ownerEpoch += 1;
   ownerId = null;
   acknowledged = {};
+  acknowledgedUid = undefined;
+  acknowledgedMetadataWriteId = null;
   pendingWrites.clear();
+  clearMetadataEchoes();
 };
 /** Replacing another owner's baseline invalidates that owner's in-flight acknowledgements. */
 const claimOwner = (userId: string): void => {
@@ -34,10 +55,22 @@ const claimOwner = (userId: string): void => {
   ownerEpoch += 1;
   ownerId = userId;
   acknowledged = {};
+  acknowledgedUid = undefined;
+  acknowledgedMetadataWriteId = null;
+  pendingWrites.clear();
+  clearMetadataEchoes();
 };
 /** Records modes the server holds for `userId`; another owner's baseline is replaced. */
-export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
+export const recordAcknowledgedModes = (
+  userId: string,
+  modes: ModeProgressMap,
+  metadata?: Pick<UserState, 'tarkovUid'>
+): void => {
   claimOwner(userId);
+  if (metadata) {
+    acknowledgedUid = metadata.tarkovUid;
+    acknowledgedMetadataWriteId = null;
+  }
   for (const mode of GAME_MODE_VALUES) {
     const progress = modes[mode];
     if (progress) acknowledged[mode] = toWire(progress);
@@ -60,11 +93,20 @@ const matchesWithinScope = (
   );
 const coversScope = (expected: ProgressSyncSnapshot, snapshot: ProgressSyncSnapshot): boolean =>
   Object.keys(snapshot).every((key) => Object.hasOwn(expected, key));
+/** The RPC writes metadata with the stored UID before attempting the requested link. */
+const withoutInterimUid = (
+  write: PendingWrite,
+  snapshot: ProgressSyncSnapshot
+): ProgressSyncSnapshot => {
+  if (write.uidSettled) return snapshot;
+  if (write.previousUid === undefined || snapshot.tarkovUid !== write.previousUid) return snapshot;
+  return { ...snapshot, tarkovUid: write.expected?.tarkovUid };
+};
 /** Updates that match a write's values, or touch only keys it does not write, leave it current. */
 const isCompatible = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
   write.expected !== null &&
-  matchesWithinScope(write.expected, update.remote) &&
-  matchesWithinScope(write.expected, update.applied);
+  matchesWithinScope(write.expected, withoutInterimUid(write, update.remote)) &&
+  matchesWithinScope(write.expected, withoutInterimUid(write, update.applied));
 /** An exact echo of any pending write carries no foreign state, so it disturbs no queued write. */
 const isEcho = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
   write.expected !== null &&
@@ -88,12 +130,49 @@ const narrowScope = (
   );
 /** Echoes of pending writes and updates outside a write's scope do not supersede it. */
 export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
+  if (update && isAcknowledgedMetadataEcho(update.metadataWriteId, update.remote, update.applied))
+    return;
+  if (update?.remote.tarkovUid !== undefined) {
+    acknowledgedUid = update.remote.tarkovUid;
+    acknowledgedMetadataWriteId = readMetadataWriteId(update.metadataWriteId);
+  }
   const writes = [...pendingWrites];
+  for (const write of writes) {
+    recordProvisionalUidEcho(write, update);
+    if (update?.remote.tarkovUid === write.expected?.tarkovUid) write.uidSettled = true;
+  }
   if (update && writes.some((write) => isEcho(write, update))) return;
   for (const write of writes) {
     if (!update || !isCompatible(write, update)) write.disturbed = true;
   }
 };
+const isProvisionalUidEcho = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
+  update.remote.tarkovUid !== write.expected?.tarkovUid && isEcho(write, update);
+const retainProvisionalWriteId = (write: PendingWrite, id: string | null): void => {
+  if (!id) return;
+  if (write.provisionalWriteIds.size >= 16) {
+    write.disturbed = true;
+    return;
+  }
+  write.provisionalWriteIds.add(id);
+};
+const recordProvisionalUidEcho = (write: PendingWrite, update?: RemoteProgressUpdate): void => {
+  if (!update || !isProvisionalUidEcho(write, update)) return;
+  retainProvisionalWriteId(write, readMetadataWriteId(update.metadataWriteId));
+};
+const applyUidOutcome = (write: PendingWrite, uid: number | null, id: string | null): void => {
+  write.uidSettled = true;
+  if (!write.expected) return;
+  write.expected.tarkovUid = uid;
+  if ([...write.provisionalWriteIds].some((seen) => seen !== id)) write.disturbed = true;
+};
+const matchesAcknowledgedTransaction = (id: string | null, owned: boolean): boolean =>
+  owned && id !== null && id === acknowledgedMetadataWriteId;
+const shouldRefreshAcknowledgedUid = (
+  id: string | null,
+  owned: boolean,
+  undisturbed: boolean
+): boolean => undisturbed || matchesAcknowledgedTransaction(id, owned);
 /**
  * Starts a multi-request sync and supersedes any older one still in flight. `isCurrent` turns false
  * once a newer sync starts, the baseline is cleared or claimed by another account, or Realtime
@@ -105,7 +184,10 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
   generation += 1;
   const write: PendingWrite = {
     expected: expected ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot) : null,
+    previousUid: acknowledgedUid,
+    uidSettled: false,
     disturbed: false,
+    provisionalWriteIds: new Set(),
   };
   pendingWrites.add(write);
   const started = { generation, ownerEpoch };
@@ -113,10 +195,26 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
   const isCurrent = (): boolean => generation === started.generation && isUndisturbed();
   return {
     isCurrent,
+    isOwned: (): boolean => ownerEpoch === started.ownerEpoch,
+    acceptUid: (uid: number | null, writeId?: unknown): void => {
+      const id = readMetadataWriteId(writeId);
+      applyUidOutcome(write, uid, id);
+      if (ownerEpoch === started.ownerEpoch && write.expected)
+        recordMetadataEcho(id, write.expected, write.previousUid);
+      if (shouldRefreshAcknowledgedUid(id, ownerEpoch === started.ownerEpoch, isUndisturbed()))
+        acknowledgedUid = uid;
+    },
+    beginBatch: (): void => {
+      write.previousUid = acknowledgedUid;
+      write.uidSettled = false;
+      write.provisionalWriteIds.clear();
+    },
     acknowledge: (modes: ModeProgressMap): void => {
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
     },
     scope: (modes: ModeProgressMap): void => {
+      write.previousUid = acknowledgedUid;
+      write.uidSettled = false;
       if (write.expected) write.expected = narrowScope(write.expected, modes);
     },
     /**

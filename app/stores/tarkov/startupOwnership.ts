@@ -6,6 +6,11 @@ export const invalidateStartupOwnership = (): void => {
 };
 /** Pair this generation guard with the live identity check before resuming startup effects. */
 export const beginStartupOwnership = (): StartupOwnershipGuard => {
-  const generation = ++startupGeneration;
+  invalidateStartupOwnership();
+  return captureStartupOwnership();
+};
+/** Captures the current session without claiming a new startup. */
+export const captureStartupOwnership = (): StartupOwnershipGuard => {
+  const generation = startupGeneration;
   return () => startupGeneration === generation;
 };

@@ -25,16 +25,21 @@ Full procedure: `docs/runbook.md#database-migrations`.
   individually.
 - After `git fetch`, `git diff --name-status origin/main...HEAD -- supabase/migrations` must list
   only added files, timestamped after the latest migration on `origin/main`.
-- Edit, rename, or consolidate an unmerged migration only with operator evidence that it is
+- Edit, rename, or consolidate an unmerged migration only with verified evidence that it is
   unapplied to every shared environment; matching timestamps do not prove matching SQL or schema.
 - Never put bulk data rewrites in migrations. Ship schema separately and make reads tolerate missing
   rows.
 
 ## Production database
 
-Use the read-only `scripts/ops/prod-db` observer (`docs/runbook.md#production-database-observer`,
-`docs/systems/prod-db-observer.md`) with a dedicated observer role; never supply `service_role`,
-`postgres`, migration, or Management API credentials.
+Prefer the read-only `scripts/ops/prod-db` observer (`docs/runbook.md#production-database-observer`,
+`docs/systems/prod-db-observer.md`) with a dedicated observer role; never supply privileged credentials
+as observer credentials. Agents collect migration evidence directly; operator-provided records and
+human review are not mandatory. Authenticated Supabase MCP may supply project identity, migration
+history and bounded catalog-only SELECT queries for dependencies, function contracts, grants and
+triggers. CLI migration lists and `db push --dry-run --skip-vault` are authorized read-only checks;
+use the observer connection when possible. Follow the target verification, secret handling and
+assessment requirements in the runbook. No remote mutation is authorized by an inspection request.
 
 ## Account lifecycle
 
