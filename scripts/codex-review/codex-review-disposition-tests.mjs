@@ -18,6 +18,7 @@ const sha = '1111111111111111111111111111111111111111';
 const head = '2222222222222222222222222222222222222222';
 const command = {
   id: 10,
+  node_id: 'IC_original',
   body: '@codex review',
   created_at: '2026-10-02T01:05:00Z',
   user: { login: 'maintainer', type: 'User' },
@@ -51,7 +52,7 @@ const inputs = () => ({
   comments: [command],
   reviews: [review],
 });
-function fixture(t, { selectedRun = run, interval = [run] } = {}) {
+function fixture(t, { selectedRun = run, interval = [run], lastEditedAt = null } = {}) {
   const stateDirectory = mkdtempSync(join(tmpdir(), 'codex-disposition-'));
   t.after(() => rmSync(stateDirectory, { recursive: true, force: true }));
   return {
@@ -63,6 +64,17 @@ function fixture(t, { selectedRun = run, interval = [run] } = {}) {
     evidenceRun: 20,
     runGh: (args) => {
       assert.ok(!args.includes('--method'), 'disposition must not mutate GitHub');
+      if (args.includes('graphql'))
+        return JSON.stringify({
+          data: {
+            node: {
+              id: command.node_id,
+              body: command.body,
+              createdAt: command.created_at,
+              lastEditedAt,
+            },
+          },
+        });
       if (args.at(-1).includes('?')) {
         assert.ok(!args.at(-1).includes('branch='), 'branch renames cannot narrow the evidence');
         return JSON.stringify([{ workflow_runs: interval }]);
@@ -137,6 +149,10 @@ test('identified runs for other pull requests do not prevent disposition', (t) =
   });
   assert.doesNotThrow(() => applyRequestDispositions(context, inputs()));
 });
+test('a command edited into place after creation cannot use earlier completion', (t) => {
+  const context = fixture(t, { lastEditedAt: '2026-10-02T01:07:00Z' });
+  assert.throws(() => applyRequestDispositions(context, inputs()), /edited/);
+});
 test('edited or removed request invalidates a persisted disposition', (t) => {
   const context = fixture(t);
   applyRequestDispositions(context, inputs());
@@ -162,7 +178,12 @@ test('receipt publication is complete, restricted, exclusive and cleans temporar
     closeSync(descriptor);
   }
   assert.throws(() => publishReceipt(path, { replacement: true }), { code: 'EEXIST' });
-  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
+  const retained = openSync(path, 'r');
+  try {
+    assert.deepEqual(JSON.parse(readFileSync(retained, 'utf8')), { original: true });
+  } finally {
+    closeSync(retained);
+  }
   assert.deepEqual(readdirSync(context.stateDirectory), ['receipt.json']);
 });
 test('disposition flags require complete evidence and cannot combine with a request', () => {

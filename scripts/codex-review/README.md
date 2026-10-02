@@ -94,7 +94,8 @@ node scripts/codex-review/codex-review.mjs <PR> \
   --evidence-run <pull-request-run-id>
 ```
 
-The guard verifies an unchanged trusted command, authenticated later formal code-review completion
+The guard verifies an unchanged trusted command, with GraphQL `lastEditedAt: null` to reject commands
+edited into place after creation (REST `updated_at` can change for reactions), authenticated later formal code-review completion
 for that exact SHA, and a same-repository PR Actions run created before the command. It exhausts
 run pagination for the interval between that run and the command without a branch filter, so branch
 renames cannot hide evidence. Another PR head or a different-head run with missing PR association

@@ -53,7 +53,8 @@ function validateRun(run, context, receipt) {
 }
 function validateReceipt(context, inputs, receipt) {
   if (!FULL_SHA.test(receipt.sha ?? '')) throw new Error('Historical request needs a full SHA');
-  validateCommand(inputs.comments, receipt);
+  const command = validateCommand(inputs.comments, receipt);
+  validateUneditedCommand(context, command);
   validateCompletion(inputs.reviews, receipt);
   const run = JSON.parse(
     context.runGh(['api', `repos/${context.repo}/actions/runs/${receipt.runId}`])
@@ -72,6 +73,23 @@ function validateCommand(comments, receipt) {
   ];
   if (!matches.every(Boolean))
     throw new Error('Historical request no longer matches its disposition receipt');
+  return comment;
+}
+function validateUneditedCommand(context, command) {
+  if (!command.node_id) throw new Error('Historical request has no GitHub node identity');
+  const query = 'query($id:ID!){node(id:$id){... on IssueComment{id body createdAt lastEditedAt}}}';
+  const response = JSON.parse(
+    context.runGh(['api', 'graphql', '-f', `query=${query}`, '-f', `id=${command.node_id}`])
+  );
+  const node = response.data?.node ?? {};
+  const matches = [
+    node.id === command.node_id,
+    node.body === command.body,
+    node.createdAt === command.created_at,
+    node.lastEditedAt === null,
+  ];
+  if (!matches.every(Boolean))
+    throw new Error('Historical request is edited or its live edit metadata is unavailable');
 }
 function validateCompletion(reviews, receipt) {
   if (
