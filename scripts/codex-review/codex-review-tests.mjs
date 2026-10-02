@@ -86,9 +86,51 @@ test('parses bounded CLI arguments and rejects invalid wait durations', () => {
       repo: 'tarkovtracker-org/TarkovTracker',
       request: true,
       waitSeconds: 600,
+      collapseRequests: false,
     }
   );
   assert.throws(() => parseArgs(['944', '--wait-seconds', '-1']));
+  assert.equal(parseArgs(['944', '--collapse-requests']).collapseRequests, true);
+});
+test('plain observation stays read-only and authorized cleanup leaves guard completion unchanged', async () => {
+  const command = {
+    ...request('2026-09-27T01:00:00Z', head),
+    id: 1,
+    node_id: 'IC_command',
+    user: { login: 'DysektAI', type: 'User' },
+  };
+  const completed = {
+    ...cleanComment(),
+    user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+  };
+  const routes = emptyApiRoutes({
+    commentsResponse: [command, completed].map(JSON.stringify).join('\n'),
+  });
+  const root = mkdtempSync(join(tmpdir(), 'codex-collapse-observe-'));
+  let mutations = 0;
+  const ordinaryGh = mockGh(routes);
+  const runGh = (args) => {
+    if (!args.includes('graphql')) return ordinaryGh(args);
+    if (args.some((arg) => arg.includes('mutation'))) {
+      mutations += 1;
+      return JSON.stringify({
+        data: { minimizeComment: { minimizedComment: { isMinimized: true } } },
+      });
+    }
+    return JSON.stringify({ data: { node: { isMinimized: false } } });
+  };
+  const deps = { runGh, gitCommonDir: root, now: () => now };
+  try {
+    const options = { pr: 44, repo: 'example/repo', waitSeconds: 0 };
+    const plain = await runGuard(options, deps);
+    assert.equal(mutations, 0);
+    const cleaned = await runGuard({ ...options, collapseRequests: true }, deps);
+    assert.deepEqual(cleaned, plain);
+    assert.equal(mutations, 1);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 test('recognizes the Code Review summary row and ignores security completion', () => {
   const state = classifyState(
