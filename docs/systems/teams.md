@@ -123,4 +123,6 @@ path.
   or backfilling history during migration. This covers actions committed by the previous RPC bodies
   around deployment, including disband and kicked-target account cleanup; a later forward migration
   may remove the legacy handoff once old RPC calls and their windows have drained. Rows are removed
-  only with the Auth user; the table has RLS enabled and no client grants.
+  only with the Auth user; the table has RLS enabled and no client grants. Deployment prerequisites,
+  postchecks, and forward-migration recovery are in the
+  [durable cooldown rollout runbook](../runbook.md#durable-leave-and-kick-cooldown-rollout-1031).
