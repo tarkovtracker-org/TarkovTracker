@@ -79,7 +79,7 @@ describe('AdminSupporterAccessCard', () => {
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',
-        description: 'admin.supporter_override_failed_description',
+        description: 'admin.error.supporter_update_failed',
       })
     );
   });

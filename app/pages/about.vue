@@ -15,7 +15,7 @@
         aria-labelledby="about-team-heading"
       >
         <h2 id="about-team-heading" class="text-surface-50 text-xl font-semibold">
-          {{ t('page.about.team.heading') }}
+          {{ t('common.team') }}
         </h2>
         <p class="text-surface-400 mt-2 max-w-2xl text-sm leading-relaxed">
           {{ t('page.about.team.summary') }}

@@ -3,7 +3,7 @@
     <div class="mx-auto w-full max-w-7xl space-y-8">
       <header class="space-y-2">
         <h1 class="text-surface-100 text-2xl font-bold sm:text-3xl">
-          {{ $t('page.team.page_title') }}
+          {{ $t('common.team') }}
         </h1>
         <p class="text-surface-400 max-w-2xl text-sm leading-6 sm:text-base">
           {{ $t('page.team.page_description') }}

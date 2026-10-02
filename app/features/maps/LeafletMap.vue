@@ -393,7 +393,7 @@
                         <p
                           class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
                         >
-                          {{ t('maps.help.groups.floors') }}
+                          {{ t('maps.floors') }}
                         </p>
                         <i18n-t
                           keypath="maps.help.cycle_floors"
@@ -823,7 +823,7 @@
       },
       {
         key: 'team',
-        label: t('maps.legend.team'),
+        label: t('common.team'),
         color: mapColors.value.TEAM_OBJECTIVE,
         isOn: mapShowTeamObjectives.value,
         toggle: () => {

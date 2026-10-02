@@ -158,7 +158,7 @@
     if (!$supabase.user.loggedIn) {
       toast.add({
         title: t('admin.unauthorized_title'),
-        description: t('admin.permission_denied'),
+        description: t('admin.error.admin_privileges_required'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -194,7 +194,7 @@
     if (!$supabase.user.loggedIn) {
       toast.add({
         title: t('admin.unauthorized_title'),
-        description: t('admin.permission_denied'),
+        description: t('admin.error.admin_privileges_required'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });

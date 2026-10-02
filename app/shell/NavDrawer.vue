@@ -71,7 +71,7 @@
         <div class="bg-surface-800 mx-3 my-2 h-px" />
         <div v-if="!isCollapsed" class="px-4 py-1">
           <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('navigation_drawer.section_more') }}
+            {{ t('common.more') }}
           </h3>
         </div>
         <ul class="flex flex-col gap-0.5 px-1 pb-2">
