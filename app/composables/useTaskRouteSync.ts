@@ -7,6 +7,7 @@ import { logger } from '@/utils/logger';
 import { getQueryString } from '@/utils/routeHelpers';
 import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
 import type { Ref } from '#imports';
+import type { FilterParamConfigs } from '@/composables/useRouteFilters';
 import type { TarkovMap, Trader } from '@/types/tarkov';
 import type { TaskPrimaryView } from '@/types/taskFilter';
 import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
@@ -42,6 +43,65 @@ type TaskRouteParams = {
   sort: string;
   sortDir: string;
 };
+type PreferencesStore = ReturnType<typeof usePreferencesStore>;
+const TASK_ROUTE_CONFIGS: FilterParamConfigs<TaskRouteParams> = {
+  view: { default: 'all', validate: isValidPrimaryView },
+  status: { default: 'available', validate: isValidSecondaryView },
+  map: { default: 'all', validate: () => true },
+  trader: { default: 'all', validate: () => true },
+  sort: { default: 'impact', validate: isValidSortMode },
+  sortDir: { default: 'desc', validate: isValidSortDirection },
+};
+const isTraderView = (view: string) => view === 'traders' || view === 'graph';
+const setIfChanged = <T extends string>(
+  next: T | undefined,
+  current: T,
+  set: (value: T) => void
+) => {
+  if (next && next !== current) set(next);
+};
+const resolveTraderIdFromRoute = (traders: Trader[], traderParam: string) =>
+  traders.some((t) => t.id === traderParam) ? traderParam : traders[0]?.id;
+const syncViewsFromRoute = (store: PreferencesStore, values: TaskRouteParams) => {
+  const targetView = values.view as TaskPrimaryView;
+  setIfChanged(targetView, store.getTaskPrimaryView, (v) => store.setTaskPrimaryView(v));
+  if (targetView === 'graph') return;
+  setIfChanged(values.status, store.getTaskSecondaryView, (v) => store.setTaskSecondaryView(v));
+};
+const syncMapFromRoute = (store: PreferencesStore, maps: TarkovMap[], values: TaskRouteParams) => {
+  if (values.view !== 'maps') return;
+  if (maps.length === 0) {
+    logger.debug('[useTaskRouteSync] Delaying map sync until maps loaded.');
+    return;
+  }
+  const mapId = resolveMapIdFromRoute(maps, values.map);
+  setIfChanged(mapId, store.getTaskMapView, (v) => store.setTaskMapView(v));
+};
+const syncTraderFromRoute = (
+  store: PreferencesStore,
+  traders: Trader[],
+  values: TaskRouteParams
+) => {
+  if (!isTraderView(values.view)) return;
+  if (traders.length === 0) {
+    logger.debug('[useTaskRouteSync] Delaying trader sync until traders loaded.');
+    return;
+  }
+  const traderId = resolveTraderIdFromRoute(traders, values.trader);
+  setIfChanged(traderId, store.getTaskTraderView, (v) => store.setTaskTraderView(v));
+};
+const syncSortFromRoute = (store: PreferencesStore, values: TaskRouteParams) => {
+  setIfChanged(values.sort as TaskSortMode, store.getTaskSortMode, (v) => store.setTaskSortMode(v));
+  setIfChanged(values.sortDir as TaskSortDirection, store.getTaskSortDirection, (v) =>
+    store.setTaskSortDirection(v)
+  );
+};
+const pendingRouteParam = (
+  isActive: boolean,
+  isLoading: boolean,
+  routeValue: string | undefined,
+  storeValue: string
+) => (isActive && isLoading && routeValue ? routeValue : storeValue);
 export function useTaskRouteSync({
   maps,
   traders,
@@ -57,70 +117,30 @@ export function useTaskRouteSync({
     getTaskSortDirection,
   } = storeToRefs(preferencesStore);
   return useRouteFilters<TaskRouteParams>({
-    configs: {
-      view: { default: 'all', validate: isValidPrimaryView },
-      status: { default: 'available', validate: isValidSecondaryView },
-      map: { default: 'all', validate: () => true },
-      trader: { default: 'all', validate: () => true },
-      sort: { default: 'impact', validate: isValidSortMode },
-      sortDir: { default: 'desc', validate: isValidSortDirection },
-    },
+    configs: TASK_ROUTE_CONFIGS,
     onRouteToStore: (values) => {
-      const targetView = values.view as TaskPrimaryView;
-      if (targetView !== preferencesStore.getTaskPrimaryView) {
-        preferencesStore.setTaskPrimaryView(targetView);
-      }
-      if (targetView !== 'graph' && values.status !== preferencesStore.getTaskSecondaryView) {
-        preferencesStore.setTaskSecondaryView(values.status);
-      }
-      if (targetView === 'maps') {
-        if (maps.value.length === 0) {
-          logger.debug('[useTaskRouteSync] Delaying map sync until maps loaded.');
-        } else {
-          const mapId = resolveMapIdFromRoute(maps.value, values.map);
-          if (mapId && mapId !== preferencesStore.getTaskMapView) {
-            preferencesStore.setTaskMapView(mapId);
-          }
-        }
-      }
-      if (targetView === 'traders' || targetView === 'graph') {
-        if (traders.value.length === 0) {
-          logger.debug('[useTaskRouteSync] Delaying trader sync until traders loaded.');
-        } else {
-          const firstTraderId = traders.value[0]?.id;
-          const traderId = traders.value.some((t) => t.id === values.trader)
-            ? values.trader
-            : firstTraderId;
-          if (traderId && traderId !== preferencesStore.getTaskTraderView) {
-            preferencesStore.setTaskTraderView(traderId);
-          }
-        }
-      }
-      if (values.sort !== preferencesStore.getTaskSortMode) {
-        preferencesStore.setTaskSortMode(values.sort as TaskSortMode);
-      }
-      if (values.sortDir !== preferencesStore.getTaskSortDirection) {
-        preferencesStore.setTaskSortDirection(values.sortDir as TaskSortDirection);
-      }
+      syncViewsFromRoute(preferencesStore, values);
+      syncMapFromRoute(preferencesStore, maps.value, values);
+      syncTraderFromRoute(preferencesStore, traders.value, values);
+      syncSortFromRoute(preferencesStore, values);
     },
     onStoreToRoute: () => {
       const primaryView = getTaskPrimaryView.value;
-      const secondaryView = getTaskSecondaryViewForPrimaryView(
-        primaryView,
-        getTaskSecondaryView.value
-      );
-      const routeMap = getQueryString(route.query.map);
-      const routeTrader = getQueryString(route.query.trader);
-      const shouldDelayMap = primaryView === 'maps' && maps.value.length === 0 && !!routeMap;
-      const shouldDelayTrader =
-        (primaryView === 'traders' || primaryView === 'graph') &&
-        traders.value.length === 0 &&
-        !!routeTrader;
       return {
         view: primaryView,
-        status: secondaryView,
-        map: shouldDelayMap ? routeMap : getTaskMapView.value,
-        trader: shouldDelayTrader ? routeTrader : getTaskTraderView.value,
+        status: getTaskSecondaryViewForPrimaryView(primaryView, getTaskSecondaryView.value),
+        map: pendingRouteParam(
+          primaryView === 'maps',
+          maps.value.length === 0,
+          getQueryString(route.query.map),
+          getTaskMapView.value
+        ),
+        trader: pendingRouteParam(
+          isTraderView(primaryView),
+          traders.value.length === 0,
+          getQueryString(route.query.trader),
+          getTaskTraderView.value
+        ),
         sort: getTaskSortMode.value,
         sortDir: getTaskSortDirection.value,
       };
@@ -132,8 +152,7 @@ export function useTaskRouteSync({
       getTaskTraderView,
       getTaskSortMode,
       getTaskSortDirection,
-      () => maps.value.length,
-      () => traders.value.length,
     ],
+    reapplyRouteOn: [() => maps.value.length, () => traders.value.length],
   });
 }

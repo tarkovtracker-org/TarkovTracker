@@ -159,4 +159,25 @@ describe('useRouteFilters', () => {
     expect(routeState.query.page).toBeUndefined();
     wrapper.unmount();
   });
+  it('re-applies the current route to the store when reapplyRouteOn sources change', async () => {
+    applyRouteQuery({ view: 'maps' });
+    const store = { view: 'all' };
+    const onRouteToStore = vi.fn((values: { view: string }) => {
+      store.view = values.view;
+    });
+    const loaded = ref(false);
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onRouteToStore,
+      onStoreToRoute: () => ({ view: store.view }),
+      reapplyRouteOn: [loaded],
+    });
+    expect(onRouteToStore).toHaveBeenCalledTimes(1);
+    loaded.value = true;
+    await flushRouteSync();
+    expect(onRouteToStore).toHaveBeenCalledTimes(2);
+    expect(onRouteToStore).toHaveBeenLastCalledWith({ view: 'maps' });
+    expect(push).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
 });
