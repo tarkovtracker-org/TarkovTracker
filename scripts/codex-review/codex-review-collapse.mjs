@@ -60,7 +60,9 @@ function minimizationSucceeded(response) {
 }
 function minimize(context, nodeId) {
   const minimized = graphql(context.runGh, MINIMIZE, nodeId);
-  if (minimizationSucceeded(minimized)) context.minimizedNodes.add(nodeId);
+  if (!minimizationSucceeded(minimized))
+    throw new Error('GitHub did not confirm comment minimization.');
+  context.minimizedNodes.add(nodeId);
 }
 /** Cosmetic cleanup only; no edits/deletions, review requests, guard state or findings changes. */
 export function collapseReviewCommands(context, inputs) {

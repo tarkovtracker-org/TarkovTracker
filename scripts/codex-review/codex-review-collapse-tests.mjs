@@ -39,7 +39,9 @@ function graphqlResponse(args, options) {
     assert.ok(args.includes('id=IC_original'));
     assert.ok(args.some((arg) => arg.includes('classifier: RESOLVED')));
     return JSON.stringify({
-      data: { minimizeComment: { minimizedComment: { isMinimized: true } } },
+      data: {
+        minimizeComment: { minimizedComment: options.mutationResult ?? { isMinimized: true } },
+      },
     });
   }
   return JSON.stringify({ data: { node: { isMinimized: options.minimized ?? false } } });
@@ -134,6 +136,17 @@ test('already-minimized commands cache that state and cosmetic failures never th
   const failed = fixture({ comments: [completion()], fail: true });
   collapseReviewCommands(failed.context, failed.inputs);
   assert.equal(failed.warnings.length, 1);
+});
+test('non-successful mutation payloads warn, remain cosmetic, and are not cached', () => {
+  for (const mutationResult of [{ isMinimized: false }, {}]) {
+    const f = fixture({ comments: [completion()], mutationResult });
+    assert.doesNotThrow(() => collapseReviewCommands(f.context, f.inputs));
+    assert.match(f.warnings[0], /did not confirm comment minimization/);
+    assert.equal(f.context.minimizedNodes.size, 0);
+    collapseReviewCommands(f.context, f.inputs);
+    assert.equal(f.warnings.length, 2);
+    assert.equal(mutations(f.calls).length, 2);
+  }
 });
 test('cleanup proof: pending zero calls, acknowledgement three, completion two, repeat zero', () => {
   for (const [label, options, expected] of [
