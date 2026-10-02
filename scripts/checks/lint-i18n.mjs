@@ -14,7 +14,7 @@ const SNAKE_CASE_RE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
 const KEY_TOKEN_RE = /[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*/g;
 const TEMPLATE_KEY_RE = /`([a-z][\w.]*\$\{[^`]*)`/g;
 const INTERPOLATION_RE = /\$\{[^}]*\}/;
-const PLACEHOLDER_RE = /\{\s*([\w.]+)\s*\}/g;
+const compiledMessages = new Map();
 function loadEnabledLocales() {
   const raw = readFileSync(LOCALES_UTILS_PATH, 'utf-8');
   const match = raw.match(/SUPPORTED_LOCALES\s*=\s*\[([\s\S]*?)\]/);
@@ -30,19 +30,20 @@ function isNestedObject(value) {
 function flatten(obj, prefix = '', result = {}) {
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
+    result[path] = value;
     if (isNestedObject(value)) {
       flatten(value, path, result);
-    } else {
-      result[path] = value;
     }
   }
   return result;
 }
 function loadLocale(code, errors) {
   try {
-    return flatten(
-      JSON.parse(readFileSync(join(LOCALES_DIR, `${code}${LOCALE_EXTENSION}`), 'utf-8'))
+    const messages = JSON.parse(
+      readFileSync(join(LOCALES_DIR, `${code}${LOCALE_EXTENSION}`), 'utf-8')
     );
+    if (!isNestedObject(messages)) throw new Error('locale root must be an object');
+    return flatten(messages);
   } catch (error) {
     errors.push(`${code}${LOCALE_EXTENSION}: invalid JSON (${error.message})`);
     return null;
@@ -74,41 +75,51 @@ function checkSnakeCase(sourceKeys, errors) {
     }
   }
 }
-function placeholdersOf(message) {
-  return new Set([...String(message).matchAll(PLACEHOLDER_RE)].map((match) => match[1]));
+function interpolationKeys(node) {
+  // The compiler's Named (4) and List (5) nodes are interpolation, not literal brace text.
+  if (node.type === 4) return [node.key];
+  if (node.type === 5) return [String(node.index)];
+  return [node.body, node.cases, node.items, node.key]
+    .flat()
+    .filter(isNestedObject)
+    .flatMap(interpolationKeys);
 }
-function syntaxError(message) {
+function linkedKeys(node) {
+  if (node.type === 7) return [node.value];
+  return [node.body, node.cases, node.items, node.key]
+    .flat()
+    .filter(isNestedObject)
+    .flatMap(linkedKeys);
+}
+function compileMessage(message) {
+  if (compiledMessages.has(message)) return compiledMessages.get(message);
   let error = null;
-  baseCompile(message, {
+  const { ast } = baseCompile(message, {
     onError: (compileError) => {
       error ??= compileError;
     },
   });
-  return error;
-}
-function groupsOf(keys) {
-  return new Set(
-    keys.flatMap((key) =>
-      key
-        .split('.')
-        .slice(0, -1)
-        .map((_, i, parts) => parts.slice(0, i + 1).join('.'))
-    )
-  );
+  const result = { error, placeholders: new Set(interpolationKeys(ast)), links: linkedKeys(ast) };
+  compiledMessages.set(message, result);
+  return result;
 }
 function structureError(key, reference) {
-  const parent = key.split('.').slice(0, -1).join('.');
-  if (reference.groups.has(key)) {
-    return `${key} is a message but ${SOURCE_LOCALE} has a group of keys there`;
-  }
-  return parent && Object.hasOwn(reference.messages, parent)
-    ? `${key} nests under ${parent}, which is a message in ${SOURCE_LOCALE}`
-    : null;
+  const parts = key.split('.').slice(0, -1);
+  const parent = parts
+    .map((_, i) => parts.slice(0, i + 1).join('.'))
+    .find(
+      (path) => Object.hasOwn(reference.messages, path) && !isNestedObject(reference.messages[path])
+    );
+  return parent ? `${key} nests under ${parent}, which is a message in ${SOURCE_LOCALE}` : null;
+}
+function valueKind(value) {
+  return isNestedObject(value) ? 'group' : 'message';
 }
 function typeError(key, value, reference) {
+  if (!Object.hasOwn(reference.messages, key)) return null;
   const expected = reference.messages[key];
-  return expected !== undefined && typeof value !== typeof expected
-    ? `${key} is a ${typeof value} but ${SOURCE_LOCALE} has a ${typeof expected}`
+  return valueKind(value) !== valueKind(expected)
+    ? `${key} is a ${valueKind(value)} but ${SOURCE_LOCALE} has a ${valueKind(expected)} there`
     : null;
 }
 function shapeError(key, value, reference) {
@@ -119,18 +130,21 @@ function placeholderError(key, value, reference) {
   if (typeof sourceMessage !== 'string') {
     return null;
   }
-  const expected = placeholdersOf(sourceMessage);
-  const unknown = [...placeholdersOf(value)].filter((name) => !expected.has(name));
+  const expected = compileMessage(sourceMessage).placeholders;
+  const unknown = [...compileMessage(value).placeholders].filter((name) => !expected.has(name));
   return unknown.length > 0 ? `${key} uses unknown placeholder(s) {${unknown.join('}, {')}}` : null;
+}
+function stringMessageErrors(key, value, reference) {
+  const syntax = compileMessage(value).error;
+  const errors = syntax ? [`${key} has invalid message syntax: ${syntax.message}`] : [];
+  return [...errors, placeholderError(key, value, reference)].filter(Boolean);
 }
 function messageErrors(key, value, reference) {
   const shape = shapeError(key, value, reference);
-  if (shape || typeof value !== 'string') {
-    return [shape].filter(Boolean);
-  }
-  const syntax = syntaxError(value);
-  const errors = syntax ? [`${key} has invalid message syntax: ${syntax.message}`] : [];
-  return [...errors, placeholderError(key, value, reference)].filter(Boolean);
+  if (shape) return [shape];
+  if (isNestedObject(value)) return [];
+  if (typeof value !== 'string') return [`${key} must be a string message or a group`];
+  return stringMessageErrors(key, value, reference);
 }
 function checkLocale(code, messages, reference, errors) {
   for (const [key, value] of Object.entries(messages)) {
@@ -167,8 +181,13 @@ function indexSource(text) {
 function mayBeReferenced(key, source) {
   return source.tokens.has(key) || source.patterns.some((pattern) => pattern.test(key));
 }
-function checkUnusedKeys(sourceKeys, errors) {
-  const source = indexSource(readSource());
+function checkUnusedKeys(messages, errors) {
+  const sourceKeys = Object.keys(messages).filter((key) => !isNestedObject(messages[key]));
+  const links = sourceKeys
+    .map((key) => messages[key])
+    .filter((value) => typeof value === 'string')
+    .flatMap((value) => compileMessage(value).links);
+  const source = indexSource(`${readSource()}\n${links.join('\n')}`);
   for (const key of sourceKeys) {
     if (!mayBeReferenced(key, source)) {
       errors.push(`${SOURCE_LOCALE}${LOCALE_EXTENSION}: ${key} is not used in app/; remove it`);
@@ -176,10 +195,9 @@ function checkUnusedKeys(sourceKeys, errors) {
   }
 }
 function checkSource(source, errors) {
-  const sourceKeys = Object.keys(source);
-  checkSnakeCase(sourceKeys, errors);
-  checkUnusedKeys(sourceKeys, errors);
-  return { messages: source, groups: groupsOf(sourceKeys) };
+  checkSnakeCase(Object.keys(source), errors);
+  checkUnusedKeys(source, errors);
+  return { messages: source };
 }
 function collectErrors() {
   const errors = [];

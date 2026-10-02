@@ -47,6 +47,14 @@ for (const target of ['deleted', 'renamed']) {
 }
 const failures = [
   ['invalid JSON', { raw: { de: '{"greeting": ' } }, /de\.json: invalid JSON/],
+  ['non-object locale root', { locales: { de: [] } }, /de\.json:.*object/],
+  ['null message', { locales: { de: { greeting: null } } }, /greeting.*message/],
+  ['empty group replacing a message', { locales: { de: { greeting: {} } } }, /greeting.*message/],
+  [
+    'deeply nested group replacing a message',
+    { locales: { de: { greeting: { nested: { message: 'Hallo' } } } } },
+    /greeting.*message/,
+  ],
   [
     'non-snake_case keys',
     { en: { ...EN, BadKey: 'x' }, usage: `${USAGE} t('BadKey');` },
@@ -66,6 +74,16 @@ const failures = [
     'renamed placeholders',
     { locales: { de: { greeting: 'Hallo {nom}' } } },
     /greeting uses unknown placeholder\(s\) \{nom\}/,
+  ],
+  [
+    'hyphenated unknown placeholders',
+    { locales: { de: { greeting: 'Hallo {user-name}' } } },
+    /unknown placeholder\(s\) \{user-name\}/,
+  ],
+  [
+    'dollar-sign unknown placeholders',
+    { locales: { de: { greeting: 'Hallo {name$}' } } },
+    /unknown placeholder\(s\) \{name\$\}/,
   ],
   [
     'a message where en has a group',
@@ -95,6 +113,25 @@ for (const [name, fixture, pattern] of failures) {
     assert.match(result.stderr, pattern);
   });
 }
+test('i18n accepts literal braces without treating their text as placeholders', (t) => {
+  const result = runFixture(t, { locales: { de: { greeting: "Hallo {name} {'{'}text{'}'}" } } });
+  assert.equal(result.status, 0, result.stderr);
+});
+test('i18n preserves keys referenced by linked English messages', (t) => {
+  const result = runFixture(t, {
+    en: { greeting: '@:menu.title', menu: { title: 'Menu' } },
+    usage: "t('greeting');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
+test('i18n accepts supported hyphenated and list placeholders', (t) => {
+  const result = runFixture(t, {
+    en: { greeting: 'Hello {user-name} {0}' },
+    locales: { de: { greeting: 'Hallo {0} {user-name}' } },
+    usage: "t('greeting');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
 test('i18n treats keys under a dynamic prefix as used', (t) => {
   const en = { ...EN, status: { open: 'Open', done: 'Done' } };
   const result = runFixture(t, { en, usage: `${USAGE} t(\`status.\${value}\`);` });
