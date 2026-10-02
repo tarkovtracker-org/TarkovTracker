@@ -450,10 +450,10 @@ async function runSetupRealtimeListener(
       gameEdition: remoteState.gameEdition,
       tarkovUid: remoteState.tarkovUid,
     };
-    // Retired writes can arrive after HTTP has advanced the controller's baseline. Ignore their
-    // exact metadata tuples before capture/reconciliation, freshness persistence, or store effects.
-    if (isAcknowledgedMetadataEcho(remoteData.metadata_write_id, remoteMetadata)) return;
+    // Even an acknowledged echo advances the watermark so older foreign metadata stays rejected.
     if (!acceptLegacyMetadataUpdate(updateTime)) return;
+    // Retired writes must not reconcile, persist freshness, or patch the acknowledged state.
+    if (isAcknowledgedMetadataEcho(remoteData.metadata_write_id, remoteMetadata)) return;
     const metadata = (reconcile ?? captureRemoteMerge())(remoteMetadata);
     const nextState = { ...localState, ...metadata } as UserState;
     progressStorageSerializer.acceptRemote({

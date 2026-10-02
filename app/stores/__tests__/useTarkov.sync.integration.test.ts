@@ -677,6 +677,22 @@ describe('useTarkov sync integration', () => {
         });
         expect(store.tarkovUid).toBe(expectedUid);
       }
+      // The acknowledged echo still fences an older transaction with different metadata.
+      getRealtimeCallback()?.({
+        new: {
+          ...createRemoteRow({
+            current_game_mode: 'pve',
+            game_edition: 2,
+            tarkov_uid: 66,
+            updated_at: new Date(Date.now() - 1000).toISOString(),
+          }),
+          metadata_write_id: 'older-foreign',
+        },
+        old: null,
+      });
+      expect(store.tarkovUid).toBe(expectedUid);
+      expect(store.currentGameMode).toBe('pvp');
+      expect(store.gameEdition).toBe(1);
       expect(capture).not.toHaveBeenCalled();
       expect(patches).not.toHaveBeenCalled();
       expect(serializer).not.toHaveBeenCalled();

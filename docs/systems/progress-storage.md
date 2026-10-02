@@ -70,7 +70,10 @@ flowchart LR
    (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
    resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
    from a client built before the cap), the database keeps the larger stored count.
-3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
+3. Realtime listens to both the account row and normalized rows. Recognized account metadata
+   echoes advance the listener's timestamp watermark before being discarded, so older metadata
+   cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
+   A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
    uses one private `team:<id>` channel for membership changes and multiplexed normalized progress
