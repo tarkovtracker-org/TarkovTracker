@@ -8,9 +8,12 @@ const LOCALES_DIR = join(APP_DIR, 'locales');
 const LOCALES_UTILS_PATH = join(APP_DIR, 'utils', 'locales.ts');
 const SOURCE_LOCALE = 'en';
 const LOCALE_EXTENSION = '.json';
-const SOURCE_FILE_RE = /\.(vue|ts|tsx|js|mjs)$/;
+const SOURCE_FILE_RE = /\.(vue|ts|tsx|js|mjs|json)$/;
 const SKIPPED_SOURCE_PATH_RE = /(^|\/)(__tests__|locales)(\/|$)|\.test\.[a-z]+$/;
 const SNAKE_CASE_RE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
+const KEY_TOKEN_RE = /[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*/g;
+const TEMPLATE_KEY_RE = /`([a-z][\w.]*\$\{[^`]*)`/g;
+const INTERPOLATION_RE = /\$\{[^}]*\}/;
 const PLACEHOLDER_RE = /\{\s*([\w.]+)\s*\}/g;
 function loadEnabledLocales() {
   const raw = readFileSync(LOCALES_UTILS_PATH, 'utf-8');
@@ -147,20 +150,25 @@ function readSource() {
     .map((path) => readFileSync(path, 'utf-8'))
     .join('\n');
 }
-function hasDynamicParent(parts, source) {
-  for (let length = parts.length - 1; length > 0; length -= 1) {
-    const parent = parts.slice(0, length).join('.');
-    if (source.includes(`${parent}.\${`) || source.includes(`'${parent}'`)) {
-      return true;
-    }
-  }
-  return false;
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function templatePattern(template) {
+  const pattern = template.split(INTERPOLATION_RE).map(escapeRegExp).join('[\\w.]+');
+  return new RegExp(`^${pattern}$`);
+}
+function indexSource(text) {
+  const templates = [...text.matchAll(TEMPLATE_KEY_RE)].map((match) => match[1]);
+  return {
+    tokens: new Set(text.match(KEY_TOKEN_RE)),
+    patterns: [...new Set(templates)].map(templatePattern),
+  };
 }
 function mayBeReferenced(key, source) {
-  return source.includes(key) || hasDynamicParent(key.split('.'), source);
+  return source.tokens.has(key) || source.patterns.some((pattern) => pattern.test(key));
 }
 function checkUnusedKeys(sourceKeys, errors) {
-  const source = readSource();
+  const source = indexSource(readSource());
   for (const key of sourceKeys) {
     if (!mayBeReferenced(key, source)) {
       errors.push(`${SOURCE_LOCALE}${LOCALE_EXTENSION}: ${key} is not used in app/; remove it`);

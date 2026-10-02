@@ -82,6 +82,11 @@ const failures = [
     { en: { ...EN, common: { orphan_key: 'Old' } }, usage: `${USAGE} const id = 'orphan_key';` },
     /common\.orphan_key is not used in app\/; remove it/,
   ],
+  [
+    'unused en keys that prefix a used key',
+    { en: { ...EN, menu: { title: 'Menu', title_hint: 'Hint' } }, usage: "t('menu.title_hint');" },
+    /menu\.title is not used in app\/; remove it/,
+  ],
 ];
 for (const [name, fixture, pattern] of failures) {
   test(`i18n fails on ${name}`, (t) => {

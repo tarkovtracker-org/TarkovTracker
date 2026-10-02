@@ -61,7 +61,6 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
@@ -78,8 +77,7 @@
     "twitch_config_saved_with_warning_description": "The config was saved, but cached visitors may still see the previous value.",
     "twitch_config_failed_description": "Could not update Twitch config.",
     "twitch_config_load_failed_title": "Twitch config unavailable",
-    "twitch_config_load_failed_description": "Could not load the current Twitch config.",
-    "twitch_config_login_required": "You must be signed in to update Twitch config."
+    "twitch_config_load_failed_description": "Could not load the current Twitch config."
   },
   "alerts": {
     "no_map_data": "No map data available for this selection."
@@ -650,12 +648,7 @@
           "default": "{task} is the clearest immediate win on your dashboard.",
           "filter_hidden_one": "Your current filters hide 1 available task.",
           "filter_hidden_other": "Your current filters hide {count} available tasks.",
-          "blocked_level_one": "{task} is your closest unlock, but you still need 1 more level.",
-          "blocked_level_other": "{task} is your closest unlock, but you still need {count} more levels.",
           "blocked_requirement": "{task} is blocked by its requirements.",
-          "blocked_prerequisite": "{task} is close, but it is still gated by prerequisite tasks.",
-          "blocked_fence": "{task} is waiting on Fence reputation.",
-          "blocked_trader_unlock": "{task} is locked behind another trader unlock task.",
           "complete": "You have finished every visible task in this dashboard scope."
         },
         "stat": {
@@ -692,12 +685,6 @@
           "kappa_other": "Best special-chain progress: advances Kappa with {count} objectives left.",
           "lightkeeper_one": "Best special-chain progress: advances Lightkeeper with 1 objective left.",
           "lightkeeper_other": "Best special-chain progress: advances Lightkeeper with {count} objectives left.",
-          "blocked_level_one": "Closest unlock: only 1 level away.",
-          "blocked_level_other": "Closest unlock: only {count} levels away.",
-          "blocked_prerequisite_one": "Smallest blocker set: 1 prerequisite task left.",
-          "blocked_prerequisite_other": "Smallest blocker set: {count} prerequisite tasks left.",
-          "blocked_fence": "Closest reputation gate: {count} Fence rep away.",
-          "blocked_trader_unlock": "Trader gate first: complete {task} to unlock {trader}.",
           "filters_one": "No visible options: 1 available task is hidden by your filters.",
           "filters_other": "No visible options: {count} available tasks are hidden by your filters.",
           "complete": "No visible work remains in this dashboard scope."
@@ -707,10 +694,6 @@
           "ready_other": "Ready now. {count} objectives left.",
           "ready_no_objectives": "Ready now.",
           "filters": "Adjust your task filters to reveal the hidden options.",
-          "level_one": "Reach level {required} (1 more level to go).",
-          "level_other": "Reach level {required} ({count} more levels to go).",
-          "prerequisite": "Complete {tasks}.",
-          "trader_unlock": "Complete {task} to unlock {trader}.",
           "complete": "No blockers. Nothing visible is left undone."
         },
         "badge": {
@@ -1199,7 +1182,6 @@
       }
     },
     "hideout": {
-      "summary": "Track station upgrades, blockers, and what is ready to build next.",
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
@@ -1384,7 +1366,6 @@
       "card": {
         "manageteam": {
           "title": "Team Members",
-          "no_members": "No members in this team yet! Invite them using the link above.",
           "membercard": {
             "this_is_you": "(This is you)",
             "owner": "Owner",
@@ -1399,34 +1380,20 @@
           }
         },
         "teamoptions": {
-          "title": "Team Integration Options",
-          "section_items": "Items",
-          "toggle_tasks": "Hide team members' tasks",
-          "toggle_items": "Hide team members' needed items",
-          "toggle_non_fir": "Hide non-FIR needed items",
-          "toggle_hideout": "Hide hideout needed items",
-          "toggle_maps": "Hide team members' map objectives"
+          "title": "Team Integration Options"
         },
         "myteam": {
           "title": "My Team",
           "create_new_team": "Create a new team",
-          "disband_team": "Disband team",
-          "leave_team": "Leave team",
           "create_team_success": "Successfully created a new team.",
           "create_team_error": "Failed to create a new team.",
           "create_team_error_ui_update": "Team state did not refresh. Please reload to see your team or try again.",
           "leave_team_success": "Successfully left your team.",
           "leave_team_error": "Failed to leave your team.",
           "already_in_team": "You are already in a {mode} team. Leave your current team first.",
-          "url_copied": "URL copied to clipboard",
-          "copy_url_failed": "Failed to copy URL to clipboard",
           "no_team": "You are not currently in a team.",
           "login_required": "Log in to create a team or manage your team invite link.",
-          "team_invite_url_label": "Team Invite URL",
-          "copy_link": "Copy",
-          "link_hidden_message": "Click 'Show' to reveal your team invite link",
-          "user_not_authenticated": "User not authenticated.",
-          "leave_team_error_unexpected": "Unexpected error leaving team."
+          "user_not_authenticated": "User not authenticated."
         },
         "teaminvite": {
           "description": "You have received an invite to a TarkovTracker team",
@@ -1868,9 +1835,6 @@
   },
   "profile": {
     "title_with_mode": "{name} Profile {mode}",
-    "mode_pvp": "PVP",
-    "mode_pve": "PVE",
-    "mode_seasonal_pvp": "SEASONAL PVP",
     "season_short": "S{season}"
   },
   "streamer_tools": {
@@ -2033,9 +1997,6 @@
         "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
-    "density": {
-      "comfortable": "Comfortable"
-    },
     "account": {
       "begin_deletion": "Begin Account Deletion"
     },
@@ -2087,7 +2048,6 @@
         }
       },
       "links": {
-        "title": "Wiki Links",
         "antifandom": "Use antifandom.com",
         "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
       }
@@ -2152,7 +2112,6 @@
       "import_target_pvp": "PvP Only",
       "import_target_pve": "PvE Only",
       "import_target_all": "All Available",
-      "seasonal_import_locked": "Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
       "import_error_title": "Backup Import Failed",
@@ -2275,8 +2234,6 @@
       "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {
-      "pvp_only_title": "Prestige Is PvP Only",
-      "pvp_only": "Escape from Tarkov prestige currently exists only for PvP profiles. Switch your active tracker mode to PvP to manage prestige and archived runs.",
       "persistent_mode_unsupported_title": "Prestige Unavailable",
       "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
       "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
@@ -2442,9 +2399,6 @@
       "import_unknown_to_mode": "Import Unknown Mode Events To",
       "import_unknown_to_mode_hint": "Known PvP, PvE, and Seasonal events are routed automatically. Choose the destination only for unresolved events; Seasonal requires dates within the active season.",
       "auto_mode_hint": "Known modes are routed automatically. Logs restore recorded quest states; they cannot reconstruct missing history, item handovers, XP, skills, or hideout progress.",
-      "mode_summary_pvp": "PvP (auto)",
-      "mode_summary_pve": "PvE (auto)",
-      "mode_summary_both": "PvP + PvE (auto)",
       "success_title": "EFT Logs Imported",
       "success_description": "Processed {complete_count} completed, {active_count} active, and {failed_count} failed quest states from game logs. Existing completed tasks are preserved.",
       "error_title": "EFT Logs Import Failed",
