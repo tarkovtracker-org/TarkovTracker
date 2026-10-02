@@ -153,19 +153,29 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
     onRouteToStore(values);
     isSyncingFromRoute.value = false;
   };
-  const debouncedSync = createDebounced(syncStateFromRoute, 200);
+  let isReapplyPending = false;
+  const debouncedSync = createDebounced(() => {
+    const wasReapplyPending = isReapplyPending;
+    isReapplyPending = false;
+    syncStateFromRoute();
+    if (wasReapplyPending) syncStoreToRoute();
+  }, 200);
+  const reapplyRoute = () => {
+    isReapplyPending = true;
+    debouncedSync.run();
+  };
   onBeforeUnmount(debouncedSync.cancel);
   watch(
     Object.values(configs).map((config) => () => route.query[config.key]),
     debouncedSync.run,
     { immediate: true }
   );
-  if (reapplyRouteOn.length > 0) watch(reapplyRouteOn, debouncedSync.run);
+  if (reapplyRouteOn.length > 0) watch(reapplyRouteOn, reapplyRoute);
   if (watchSources.length > 0) {
     watch(
       watchSources,
       () => {
-        if (!isSyncingFromRoute.value) syncStoreToRoute();
+        if (!isSyncingFromRoute.value && !isReapplyPending) syncStoreToRoute();
       },
       { flush: 'post' }
     );

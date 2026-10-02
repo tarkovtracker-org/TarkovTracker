@@ -161,12 +161,15 @@ describe('useRouteFilters', () => {
   });
   it('re-applies the current route to the store when reapplyRouteOn sources change', async () => {
     applyRouteQuery({ view: 'maps' });
-    const onRouteToStore = vi.fn();
+    const store = { view: 'all' };
+    const onRouteToStore = vi.fn((values: { view: string }) => {
+      store.view = values.view;
+    });
     const loaded = ref(false);
     const wrapper = await mountFilters({
       configs: { view: viewConfig },
       onRouteToStore,
-      onStoreToRoute: () => ({ view: 'all' }),
+      onStoreToRoute: () => ({ view: store.view }),
       reapplyRouteOn: [loaded],
     });
     expect(onRouteToStore).toHaveBeenCalledTimes(1);
