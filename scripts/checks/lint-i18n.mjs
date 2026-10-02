@@ -134,14 +134,17 @@ function placeholderError(key, value, reference) {
   const unknown = [...compileMessage(value).placeholders].filter((name) => !expected.has(name));
   return unknown.length > 0 ? `${key} uses unknown placeholder(s) {${unknown.join('}, {')}}` : null;
 }
+function stringMessageErrors(key, value, reference) {
+  const syntax = compileMessage(value).error;
+  const errors = syntax ? [`${key} has invalid message syntax: ${syntax.message}`] : [];
+  return [...errors, placeholderError(key, value, reference)].filter(Boolean);
+}
 function messageErrors(key, value, reference) {
   const shape = shapeError(key, value, reference);
   if (shape) return [shape];
   if (isNestedObject(value)) return [];
   if (typeof value !== 'string') return [`${key} must be a string message or a group`];
-  const syntax = compileMessage(value).error;
-  const errors = syntax ? [`${key} has invalid message syntax: ${syntax.message}`] : [];
-  return [...errors, placeholderError(key, value, reference)].filter(Boolean);
+  return stringMessageErrors(key, value, reference);
 }
 function checkLocale(code, messages, reference, errors) {
   for (const [key, value] of Object.entries(messages)) {
