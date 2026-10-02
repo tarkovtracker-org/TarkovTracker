@@ -242,8 +242,9 @@ The mock API count increases from 189 to 274 across those 21 commands, and from 
 one ready event, including the new exact-attempt checks and existing active-run lookup.
 Command minimization adds one cosmetic GraphQL mutation per accepted command. In 20 local
 Linux/Node 24 samples, median ready-controller overhead was below one millisecond in both
-versions (main 0.764 ms, candidate 0.663 ms); mock calls exclude network latency. These counts
-demonstrate fewer dispatches and commands, not elapsed CI or token savings. Actions event
+versions (main 0.655 ms, candidate 0.506 ms in the final recorded sample); mock calls exclude network latency. These counts
+demonstrate fewer dispatches and commands for sequential events after an active run is visible,
+not exactly-once delivery, elapsed CI or token savings. Actions event
 delivery and run-list visibility can still race; concurrency and upload freshness checks remain
 the final controls. A post-merge canary is needed to prove live readiness and comment collapse.
 
