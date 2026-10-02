@@ -13,23 +13,20 @@ CREATE TABLE private.team_action_cooldowns (
 ALTER TABLE private.team_action_cooldowns ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.team_action_cooldowns FROM PUBLIC, anon, authenticated;
 
--- Carry cooldowns that are active at deploy time; older events can no longer block.
-INSERT INTO private.team_action_cooldowns(user_id, game_mode, action, last_at)
-SELECT e.initiated_by, t.game_mode,
-  CASE e.event_type WHEN 'member_left' THEN 'leave' ELSE 'kick' END, max(e.created_at)
-FROM public.team_events e JOIN public.teams t ON t.id = e.team_id
-WHERE e.event_type IN ('member_left', 'member_kicked') AND e.server_verified
-  AND (e.event_type = 'member_kicked' OR e.target_user = e.initiated_by)
-  AND e.created_at BETWEEN clock_timestamp() - INTERVAL '5 minutes' AND clock_timestamp()
-GROUP BY 1, 2, 3
-ON CONFLICT DO NOTHING;
-
 -- Checks and advances the caller's cooldown in one statement. Callers invoke it in the same
 -- transaction as the membership change, so any later failure also discards the advance.
+-- Transitional: leaves/kicks committed by the previous RPC bodies (before or while this
+-- migration applies) wrote only team_events, so verified events in the window still block.
 CREATE FUNCTION private.claim_team_action_cooldown(p_user_id uuid, p_mode text, p_action text)
 RETURNS boolean LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE v_now timestamptz := clock_timestamp();
 BEGIN
+  IF EXISTS (SELECT 1 FROM public.team_events e JOIN public.teams t ON t.id = e.team_id
+    WHERE e.event_type = CASE p_action WHEN 'leave' THEN 'member_left' ELSE 'member_kicked' END
+      AND e.initiated_by = p_user_id AND e.server_verified AND t.game_mode = p_mode
+      AND (p_action = 'kick' OR e.target_user = p_user_id)
+      AND e.created_at BETWEEN v_now - INTERVAL '5 minutes' AND v_now)
+  THEN RETURN FALSE; END IF;
   INSERT INTO private.team_action_cooldowns AS c(user_id, game_mode, action, last_at)
   VALUES (p_user_id, p_mode, p_action, v_now)
   ON CONFLICT (user_id, game_mode, action) DO UPDATE SET last_at = EXCLUDED.last_at

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(33);
+SELECT plan(36);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000921','leave-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000922','leave-member@example.invalid');
@@ -25,6 +25,10 @@ SELECT is(CASE mode WHEN 'pvp' THEN s.pvp_team_id WHEN 'pve' THEN s.pve_team_id 
  new_id,mode||' newer join pointer survives') FROM leave_teams CROSS JOIN public.user_system s
 WHERE s.user_id='00000000-0000-0000-0000-000000000922';
 SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'cooldown',mode||' cooldown crosses teams') FROM leave_teams;
+-- Transitional: verified events written by the previous RPC bodies still block.
+UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes' WHERE user_id='00000000-0000-0000-0000-000000000922';
+SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'cooldown',mode||' legacy events still block') FROM leave_teams;
+UPDATE private.team_action_cooldowns SET last_at=clock_timestamp() WHERE user_id='00000000-0000-0000-0000-000000000922';
 -- Disbanding the left team cascades its events but must not erase the durable cooldown (#646).
 SELECT ok(public.disband_team(old_id,'00000000-0000-0000-0000-000000000921'),mode||' owner disbands') FROM leave_teams;
 SELECT is((SELECT count(*)::integer FROM public.team_events WHERE initiated_by='00000000-0000-0000-0000-000000000922'),0,'disband cascades leave events');
@@ -48,6 +52,7 @@ UPDATE private.team_action_cooldowns SET last_at=now()+interval '1 year'
 WHERE user_id='00000000-0000-0000-0000-000000000922';
 SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'left',mode||' ignores future cooldown') FROM leave_teams;
 -- A cooldown in one mode never blocks another mode.
+UPDATE public.team_events SET server_verified=FALSE WHERE initiated_by='00000000-0000-0000-0000-000000000922';
 INSERT INTO public.team_memberships(team_id,user_id,role,game_mode)
 SELECT new_id,'00000000-0000-0000-0000-000000000922','member',mode FROM leave_teams;
 UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes'

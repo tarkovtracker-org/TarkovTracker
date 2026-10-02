@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(45);
+SELECT plan(48);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000951','kick-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000952','kick-member@example.invalid'),
@@ -27,10 +27,16 @@ SELECT team_id,'00000000-0000-0000-0000-000000000952'::uuid,'member',mode FROM k
 SELECT is(public.kick_team(team_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000952'),
  'cooldown',mode||' cooldown blocks immediate re-kick') FROM kick_teams;
 
+-- Transitional: verified events written by the previous RPC bodies still block.
+UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes' WHERE user_id='00000000-0000-0000-0000-000000000951';
+SELECT is(public.kick_team(team_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000952'),
+ 'cooldown',mode||' legacy events still block') FROM kick_teams;
+
 -- Event failure after the DELETE must roll the whole kick back (the #864 regression).
 -- Expire the earlier cooldown first so the kick reaches the event INSERT,
 -- then fail every event insert. The authority trigger is AFTER, so the failing trigger
 -- must also be AFTER to abort the statement whose failure rolls the kick back.
+UPDATE public.team_events SET server_verified=FALSE WHERE initiated_by='00000000-0000-0000-0000-000000000951';
 UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes'
  WHERE user_id='00000000-0000-0000-0000-000000000951';
 CREATE FUNCTION pg_temp.fail_kick_event() RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -51,6 +57,7 @@ SELECT is(public.kick_team(team_id,'00000000-0000-0000-0000-000000000951','00000
  'kicked',mode||' expired cooldown permits kick') FROM kick_teams;
 
 -- Future timestamps are not cooldown evidence; re-add the member first.
+UPDATE public.team_events SET server_verified=FALSE WHERE initiated_by='00000000-0000-0000-0000-000000000951';
 UPDATE private.team_action_cooldowns SET last_at=now()+interval '1 year'
  WHERE user_id='00000000-0000-0000-0000-000000000951';
 INSERT INTO public.team_memberships(team_id,user_id,role,game_mode)
@@ -60,6 +67,7 @@ SELECT is(public.kick_team(team_id,'00000000-0000-0000-0000-000000000951','00000
  'kicked',mode||' ignores future cooldown history') FROM kick_teams;
 
 -- Expire the fresh cooldown for the remaining classification checks.
+UPDATE public.team_events SET server_verified=FALSE WHERE initiated_by='00000000-0000-0000-0000-000000000951';
 UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes'
  WHERE user_id='00000000-0000-0000-0000-000000000951';
 SELECT is(public.kick_team(team_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000951'),

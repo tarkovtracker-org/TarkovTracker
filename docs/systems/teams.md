@@ -85,7 +85,7 @@ path.
   rate-limit consumer of `team_events` must filter on `server_verified = true`, scope the query to
   events the caller initiated, and bound `created_at` at or below the current time.** Reading the
   preserved history without those filters lets a caller evade or extend a cooldown using a row
-  forged before containment. No current RPC reads `team_events` for cooldowns; a new consumer
+  forged before containment. The transitional legacy read in `private.claim_team_action_cooldown` is the current consumer; a new consumer
   inherits the same requirement, and deleting the untrusted rows is not a substitute because the
   filter is what makes the contract durable.
 - `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
@@ -114,5 +114,8 @@ path.
   action (kick rows key the initiating owner). Disband cascades `team_events` but not this table,
   so disbanding and recreating a team cannot bypass either five-minute window. Each RPC claims the
   cooldown with one conditional upsert in its own transaction: a rejected, failed or rolled-back
-  action never advances it, and a `last_at` in the future is treated as expired. Rows are removed
+  action never advances it, and a `last_at` in the future is treated as expired. The claim also
+  refuses while a verified `member_left`/`member_kicked` event from the window exists, so actions
+  committed by the previous RPC bodies around deployment still count; a later forward migration
+  may drop that read. Rows are removed
   only with the Auth user; the table has RLS enabled and no client grants.
