@@ -28,6 +28,74 @@ commit, dirty worktree state, commands, and results in the PR summary. Invalidat
 when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
 style suggestions.
 
+### Discovery brief
+
+Before editing, `pnpm run brief` answers "what uses this, what owns it, and what must I run?"
+in one call. Point it at a target with `--file <path>` or `--symbol <file:export>` (both
+repeatable), or at a diff with `--base <ref>`, which briefs the local changes against the merge
+base. Add `--format json` for the uncapped lists.
+Explicit file operands resolve inside the repository; dot segments, Windows separators, and
+absolute paths within the checkout are normalized before scope and runner selection.
+It combines `fallow inspect` (import graph, symbol references, transitive impact), the
+generated `.nuxt/components.d.ts` and `.nuxt/imports.d.ts`, path-literal references in workflows
+and config, doc anchors, scoped `AGENTS.md` files, and the CI path classifier. The output lists
+consumers, owning docs, scoped instructions, candidate tests grouped by runner, and the required
+checks.
+
+Candidate test entries are JSON records with `executable` and `args`, including in text output.
+Directly targeted tests and existing tests in the diff are included even when they have no importers.
+Runnable candidates follow the runner's filename patterns; helpers are traced to their test consumers.
+Scoped instructions and checks include direct and transitive dependents, including test consumers.
+Discovered literal references in executable configs, workflows, SQL, and file-reading tests also
+contribute scope and runnable test candidates. This matches repository-relative path strings;
+computed references and relative fragments still require confirmation.
+Database replay is required for affected SQL paths; Edge Function tests use Deno without an
+automatic database replay. JSON retains every owning-doc anchor. Text caps documents and anchors
+at twelve entries, marking omitted entries and directing readers to JSON for the complete list.
+Owning docs match full target paths to avoid unrelated name references; unqualified name-only
+references still require manual confirmation. Nearby tests include template-only source consumers.
+They are data to review, not shell commands to paste or concatenate. Pass arguments separately
+to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
+platform-specific launcher. Relative file operands start with `./` to avoid runner options;
+Node also receives `--`. Deno keeps file operands before its `--` script-argument delimiter;
+Vitest keeps its positional file filters. No tests are executed
+by the brief. This preserves spaces, quotes, and shell metacharacters without choosing POSIX,
+PowerShell, or cmd quoting rules.
+
+The Deno selection regression can also run against the CI-pinned binary by setting
+`DENO_EXECUTABLE` to its absolute path when running `scripts/ci/change-brief.test.mjs`.
+It uses two inert fixtures and verifies that only the requested file runs with no script arguments;
+without that environment value, the runtime regression is explicitly skipped.
+
+The brief is advisory. It does not replace any required check, and CI stays authoritative.
+Its Uncertainty section names what it cannot prove:
+
+- Fallow does not see Vue template usage of auto-registered components, so the brief adds those
+  consumers from a name text match and labels them UNVERIFIED.
+- Auto-imports are reported only where text hits appear that Fallow missed.
+- Runtime string lookups are never in any graph: i18n keys, Supabase RPC and table names, KV
+  keys, and upstream field names.
+
+Coverage limits: scoped instructions come from tracked files and include known lifecycle/DB
+path mappings from the [brief model](../scripts/ci/change-brief-lib.mjs). Confirm the root
+`AGENTS.md` contract for differently named account/team/token code; path mappings do not prove
+semantic coverage. Generated declarations are checked
+for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
+Path-reference seeds are limited to 60 affected paths; truncation is reported as uncertainty.
+Some rendered lists remain uncapped. Model tests inject
+I/O. CLI regressions exercise operand handling against a checkout; they do not establish
+generated-declaration freshness or complete Fallow coverage.
+
+The brief was benchmarked on three past fixes: season validation (`f2ad088f`), a
+component/composable change (`a9828505`), and preview tooling (`1676ddda`). In each, it surfaced
+every file the real fix touched or re-tested that consumes a starting file, along with the owning
+doc and the scoped `AGENTS.md`: 5/5, 11/11, and 6/6. A scripted grep-and-read proxy of the
+previous workflow used 23–31 tool calls and returned 68–93 KB. With confirmation reads excluded,
+it still used 4–6 calls and 8–12 KB. That proxy missed the gateway `AGENTS.md` and a consumer's
+test. The brief took one call, under 1.2 s, and returned 1.7–3.8 KB. Fallow alone missed four of
+the component's consumers; the generated-declaration match recovered them. These numbers measure
+discovery context, not end-to-end task time.
+
 ### Push cadence
 
 The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
