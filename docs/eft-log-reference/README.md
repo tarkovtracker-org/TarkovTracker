@@ -28,6 +28,43 @@ the root `.gitignore` for the raw-log exclusions.
 - **"What is this log line / field?"** → Dictionary [Part 2](./eft-log-event-dictionary.md#part-2--a-z-event-dictionary-by-channel), or the full per-channel catalogue in the reference.
 - **"Can logs answer this?"** → Dictionary [Part 3](./eft-log-event-dictionary.md#part-3--what-the-logs-cannot-answer-do-not-automate-off-these) before building anything on log data.
 
+## Import resource budgets
+
+Browser imports use a selection-wide budget owned by
+[`eftLogImportBudget.ts`](../../app/utils/eftLogImportBudget.ts), shared by raw files and all ZIP
+members. Actual expanded bytes are charged before decoding; ZIP size declarations are only a
+format check. Events (including duplicates) and explicit/legacy mode signals are charged before
+retention. Retained strings are copied so short substrings cannot pin whole decoded batches. Identity,
+ordering, raw counters, and later version/mode reconciliation remain intact.
+No partial preview or progress import is returned when a budget is exceeded. Select fewer recent
+sessions or extract only relevant logs to retry.
+
+The defaults permit 1 GiB of selected supported input and 1 GiB of actual expanded log bytes,
+100,000 retained evidence items, 16 Mi characters of retained event strings, 8,192 selected
+files plus archive entries (including ignored entries), and 1 Mi characters of aggregate names.
+These are availability ceilings, not measured browser heap guarantees. The byte ceiling preserves
+the existing 513 MiB raw-streaming and 33 MiB ZIP regressions; the entry allowance is several
+times the reference corpus's 1,121 files. The reference does not establish a maximum legitimate
+event count, so the separate evidence ceilings deliberately reject unusually dense histories
+rather than allow unlimited objects/strings. Splitting such histories into recent-session imports
+is the practical tradeoff. No per-log 32 MiB cap is restored.
+
+ZIP compressed inflation slices are 1 KiB to keep the unavoidable synchronous DEFLATE allocation
+before an output callback around a MiB rather than tens of MiB. Filesystem reads and progress
+updates use 256 KiB chunks independently; actual expanded output is charged before entering a
+reusable 256 KiB decoding/parser buffer. This avoids rescanning/copying an unfinished record for
+every small compressed slice. The buffer is released at member completion. Inflation yields to
+UI work after a slice whenever expanded work reaches 256 KiB, and checks cancellation before
+each slice; a single inflation burst can exceed that yield threshold. The existing 8 Mi-character
+unfinished-record ceiling remains a separate guard.
+
+Budget checks cannot preempt fflate inside a slice. Ignored entries are never inflated. Selected
+input bytes and entry counts also bound work on archives dominated by irrelevant members.
+Cancellation/error paths terminate active members and discard local evidence. Tests use small
+generated fixtures and internal lowered budgets, never crash/OOM payloads. Instrumented stored-ZIP
+fixtures count boundary-search characters and filesystem/progress calls independently of timing;
+compressed fixtures verify the 1 KiB inflation and 256 KiB decoded-batch bounds.
+
 ## Refreshing the docs
 
 The docs track a snapshot of a log corpus; new game versions can add or change events. Re-run the

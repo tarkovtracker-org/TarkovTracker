@@ -9,7 +9,7 @@ contribution workflow overview (issues, branches, labels, project board), see
 
 ### Prerequisites
 
-- **Node.js** >= 24.19.0
+- **Node.js** at the version in [`.nvmrc`](../.nvmrc) (`fnm use` / `nvm use`)
 - **pnpm** 11.14.0 (via Corepack; matches `packageManager` in `package.json`)
 - **Git**
 
@@ -79,6 +79,10 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 
 ## Pull request process
 
+For automatic ready-PR previews, draft pauses, stop commands and fork approvals, see the
+[preview system spec](systems/previews.md). Mark an ordinary same-repository PR ready after
+validation; successful current CI requests its preview without another command.
+
 ### Branching strategy
 
 Create a branch named with a type prefix and a short description:
@@ -139,15 +143,13 @@ asks for the following sections. Complete every section:
   effect, not the implementation. Notes from contributors without write access are not published
   automatically; a maintainer adds them to the release.
 - **Changes** — a list of the key changes made.
-- **Type of Change** — mark the relevant option(s): bug fix, new feature, enhancement, refactoring,
-  documentation update, dependency update, or other.
-- **Area(s) Affected** — mark all that apply: Frontend, Backend, Tasks/Quests, Team Features,
-  Hideout, Maps, Traders, API, i18n/Translations, or Other.
 - **Related Issues** — link related issues using keywords (`Fixes #123`, `Closes #456`,
   `Related to #789`).
 - **Testing** — mark how you tested (locally, production-like environment, unit tests, manual) and
   describe your test plan.
 - **Screenshots/Videos** — add screenshots or videos for UI changes.
+- **Documentation impact** — select whether behavior changed and whether docs were updated or a
+  follow-up issue tracks them; tick the documents reviewed.
 - **Checklist** — confirm your code follows conventions, you self-reviewed, documentation is updated,
   no new warnings/errors, tests pass, and breaking changes are checked.
 - **Additional Notes** — anything reviewers should know.
@@ -162,8 +164,8 @@ asks for the following sections. Complete every section:
 5. Your contribution deploys once merged and appears in the next release (with its release note
    under Highlights)!
 
-> The full review gate (including rate-limit handling and out-of-scope deferrals) is in
-> [`../AGENTS.md`](../AGENTS.md) under "Review".
+> The full review gate, including rate-limit handling, is in [`../AGENTS.md`](../AGENTS.md) under
+> "Workflow and review".
 
 For finding and claiming work, see
 [`../.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) ("How to Find and Claim Work").

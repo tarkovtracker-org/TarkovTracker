@@ -193,6 +193,32 @@ function outstanding(requests, completed, headSha) {
     (request) => !completed.some((item) => finishesRequest(item, request, headSha))
   );
 }
+/** Original command comments with corresponding authenticated code-review completion. */
+export function completedReviewRequests(inputs) {
+  const activities = collectActivities(
+    inputs.comments.filter(authenticatedBot),
+    inputs.reviews.filter(authenticatedBot),
+    inputs.resolvedShas
+  );
+  const completed = activities.filter(
+    (item) => item.kind === 'complete' && item.result !== 'unknown'
+  );
+  return inputs.comments
+    .filter(isRequest)
+    .filter((comment) => requestHasCompletion(comment, completed, inputs));
+}
+function requestHasCompletion(comment, completed, inputs) {
+  const request = requestRecord(comment, inputs.resolvedShas);
+  if (request.invalidSha) return false;
+  return completed.some((item) => finishesRequest(item, request, inputs.pull.head.sha));
+}
+function authenticatedBot(item) {
+  const user = item.user ?? {};
+  return user.login === BOT && user.type === 'Bot';
+}
+export function reviewRequestComments(comments) {
+  return comments.filter(isRequest);
+}
 function blocksCurrent(request, headSha) {
   return !request.sha || request.sha === headSha;
 }

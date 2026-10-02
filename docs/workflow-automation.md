@@ -13,108 +13,109 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- CodeRabbit is the routine reviewer; Codex is reserved for requested fallback or risky pre-merge reviews. The policy adopted on 2026-09-29 calls for disabling Codex automatic reviews in the dashboard. Verify that setting separately; repository configuration does not prove dashboard state.
+- CodeRabbit as the routine reviewer; Codex only on request (see Reviewer settings below)
 
 ## Agent validation and review
 
-`package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
-path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
-[`code-review.md`](./code-review.md) supplements that contract with risk areas, without requiring
-the full suite for unrelated changes. Worktree setup and the shared CI setup action use `scripts/setup/ensure-pnpm.sh` to
-verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
+`package.json` defines commands; the root `AGENTS.md` (Validation, Workflow and review) and the
+path-scoped `AGENTS.md` files own required validation and review.
+[`code-review.md`](./code-review.md) adds risk areas without requiring the full suite for unrelated changes. Worktree setup and the
+shared CI setup action use `scripts/setup/ensure-pnpm.sh` to verify pnpm against `packageManager`,
+preparing its complete integrity-qualified pin even when the installed version matches.
 
-Run focused checks while implementing, then required checks after the diff stabilizes. Record the
-commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
-when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
-style suggestions.
+### Discovery brief
+
+Before editing, `pnpm run brief` answers "what uses this, what owns it, and what must I run?"
+in one call. Point it at a target with `--file <path>` or `--symbol <file:export>` (both
+repeatable), or at a diff with `--base <ref>`, which briefs the local changes against the merge
+base. Add `--format json` for the uncapped lists.
+Explicit file operands resolve inside the repository; dot segments, Windows separators, and
+absolute paths within the checkout are normalized before scope and runner selection.
+It combines `fallow inspect` (import graph, symbol references, transitive impact), the
+generated `.nuxt/components.d.ts` and `.nuxt/imports.d.ts`, path-literal references in workflows
+and config, doc anchors, scoped `AGENTS.md` files, and the CI path classifier. The output lists
+consumers, owning docs, scoped instructions, candidate tests grouped by runner, and the required
+checks.
+
+Candidate test entries are JSON records with `executable` and `args`, including in text output.
+Directly targeted tests and existing tests in the diff are included even when they have no importers.
+Runnable candidates follow the runner's filename patterns; helpers are traced to their test consumers.
+Scoped instructions and checks include direct and transitive dependents, including test consumers.
+Discovered literal references in executable configs, workflows, SQL, and file-reading tests also
+contribute scope and runnable test candidates. This matches repository-relative path strings;
+computed references and relative fragments still require confirmation.
+Database replay is required for affected SQL paths; Edge Function tests use Deno without an
+automatic database replay. JSON retains every owning-doc anchor. Text caps documents and anchors
+at twelve entries, marking omitted entries and directing readers to JSON for the complete list.
+Owning docs match full target paths to avoid unrelated name references; unqualified name-only
+references still require manual confirmation. Nearby tests include template-only source consumers.
+They are data to review, not shell commands to paste or concatenate. Pass arguments separately
+to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
+platform-specific launcher. Relative file operands start with `./` to avoid runner options;
+Node also receives `--`. Deno keeps file operands before its `--` script-argument delimiter;
+Vitest keeps its positional file filters. No tests are executed
+by the brief. This preserves spaces, quotes, and shell metacharacters without choosing POSIX,
+PowerShell, or cmd quoting rules.
+
+The Deno selection regression can also run against the CI-pinned binary by setting
+`DENO_EXECUTABLE` to its absolute path when running `scripts/ci/change-brief.test.mjs`.
+It uses two inert fixtures and verifies that only the requested file runs with no script arguments;
+without that environment value, the runtime regression is explicitly skipped.
+
+The brief is advisory. It does not replace any required check, and CI stays authoritative.
+Its Uncertainty section names what it cannot prove:
+
+- Fallow does not see Vue template usage of auto-registered components, so the brief adds those
+  consumers from a name text match and labels them UNVERIFIED.
+- Auto-imports are reported only where text hits appear that Fallow missed.
+- Runtime string lookups are never in any graph: i18n keys, Supabase RPC and table names, KV
+  keys, and upstream field names.
+
+Coverage limits: scoped instructions come from tracked files and include known lifecycle/DB
+path mappings from the [brief model](../scripts/ci/change-brief-lib.mjs). Confirm the root
+`AGENTS.md` contract for differently named account/team/token code; path mappings do not prove
+semantic coverage. Generated declarations are checked
+for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
+Path-reference seeds are limited to 60 affected paths; truncation is reported as uncertainty.
+Some rendered lists remain uncapped. Model tests inject
+I/O. CLI regressions exercise operand handling against a checkout; they do not establish
+generated-declaration freshness or complete Fallow coverage.
+
+The brief was benchmarked on three past fixes: season validation (`f2ad088f`), a
+component/composable change (`a9828505`), and preview tooling (`1676ddda`). In each, it surfaced
+every file the real fix touched or re-tested that consumes a starting file, along with the owning
+doc and the scoped `AGENTS.md`: 5/5, 11/11, and 6/6. A scripted grep-and-read proxy of the
+previous workflow used 23–31 tool calls and returned 68–93 KB. With confirmation reads excluded,
+it still used 4–6 calls and 8–12 KB. That proxy missed the gateway `AGENTS.md` and a consumer's
+test. The brief took one call, under 1.2 s, and returned 1.7–3.8 KB. Fallow alone missed four of
+the component's consumers; the generated-declaration match recovered them. These numbers measure
+discovery context, not end-to-end task time.
 
 ### Push cadence
 
-The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
-then validate the stabilized diff, run one local review for executable changes when available,
-address validated findings together, and push one batch. Address a whole PR review round before
-pushing the next correction batch. Reuse evidence for unchanged inputs; substantial new behavior
-or unresolved significant findings warrant another review.
+Batching pushes and requesting Codex only exceptionally keep reviewer allowances in budget: PR #965
+reportedly drew over 20 Codex reviews across about 45 pushes. CodeRabbit CLI and PR reviews have
+separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
-The maintainer reported that PR #965 received over 20 Codex reviews across about 45 pushes and
-consumed about 40% of a weekly Codex allowance. These are reported estimates, not a verified usage
-measurement. Batching pushes and requesting Codex only exceptionally aim to reduce that usage.
-
-CodeRabbit CLI and PR reviews have separate rolling allowances; both are limited. See
-[CodeRabbit's current limits](https://docs.coderabbit.ai/management/plans). Rate limits allow continued
-implementation, local commits, and useful validated batch pushes, with missing review recorded as
-incomplete. Required review still gates merge; do not enable paid over-limit reviews without approval.
-
-TarkovTracker disables CodeRabbit automatic incremental reviews in `.coderabbit.yaml`. After
-substantial follow-up changes, request `@coderabbitai review` before merge unless recorded local or
-independent review covers the final changes. Record the reviewed base and head, and assess later
-changes rather than relying on an earlier green check. Codex requests use the guard below.
+Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
+branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
+`CI Result` and `Preview Result` on the new head. Reuse review evidence for an unchanged diff after
+assessing integration with changed base code; a conflict-free merge alone does not establish that
+validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
+re-review triggers. Do not pause other merges for freshness. Repo auto-merge is disabled, so a
+maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
 
 ### Codex request deduplication and waiting
 
-Agents must use `node scripts/codex-review/codex-review.mjs <PR> --wait-seconds 600` to inspect and wait for
-reviews. Add `--request` only when authorized to post a review request. Use `--repo owner/name`
-when the PR belongs to another repository. Do not post raw `@codex review` comments or issue a
-second request because a polling window expired. Batch corrections before requesting a review.
-Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
-exits nonzero. A successful exit confirms review completion, not merge readiness.
-
-The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
-code reviews for the current commit. Security-review completion alone is not code-review
-completion. A report's top-level security heading or dedicated leading marker identifies a security report; quoted
-security headings inside a code review do not exclude that review. Completion requires an exact full commit identity: abbreviated bot evidence is
-resolved through GitHub's commit endpoint, and ambiguous or unavailable resolution fails closed.
-The PR head, base branch, base SHA, and eligibility are refreshed after collecting evidence;
-head or base changes during collection fail closed. Completion reuse only establishes a review
-for the head commit, not coverage of the current base or diff. After retargeting, independently
-review the current diff through the production-readiness gate before merging. A completed code review can contain findings; the normal feedback-resolution gate
-still applies. Unknown or unavailable status must be reported as incomplete, never treated as
-permission to retry. An unreviewed PR must be quiet for five minutes after creation or its latest
-update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
-This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
-missing or invalid server time fails closed. Only a literal first-line `@codex review` command
-from a GitHub `OWNER`, `MEMBER`, or `COLLABORATOR` association counts as request evidence;
-prose mentions, fenced examples, indented code, and outsider markers do not. This trusts GitHub's
-association metadata for coordination; it does not grant permission to post a request. Running
-bot activity remains authoritative regardless of who triggered it.
-
-Request invocations share a lock and durable intent in the Git common directory across local
-worktrees. Repository identity is case-insensitive, including previously saved intents under a
-different casing. Intent is saved before posting, so an ambiguous network failure cannot cause the next
-invocation to blindly post again. Inspect GitHub and the recorded intent before manual recovery;
-agents must not delete the guard state to force another request.
-
-A successful post records GitHub's request timestamp, so request/completion ordering never
-compares the local clock with the server clock. When delivery is uncertain, a matching current
-commit completion can retire the local intent; absence of that evidence remains pending.
-SHA-marked requests for older commits do not block the current commit, while unmarked requests
-require a completion of the current commit at or after the request time. Equality is accepted
-because GitHub timestamps have second precision and exact-commit completion is reusable;
-bot activity still marked running continues to block a new request.
-
-The helper recovers a request lock only when complete owner metadata identifies this host and
-a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed
-metadata, and an interrupted recovery remain blocked. Lock age never authorizes removal.
-For a lock left between directory creation and metadata writing (or an interrupted recovery),
-an operator must inspect the lock, running processes and GitHub request evidence, ensure no
-request invocation can run concurrently, and remove only the confirmed orphaned lock directory
-or its `.recovery` sibling. Preserve all intent files and rerun read-only inspection before an
-authorized request. Agents must report this condition for operator recovery rather than deleting
-uncertain state themselves.
-
-This is a cooperative agent guard, not a GitHub-wide restriction: unrelated clones, other machines,
-and callers that bypass the helper do not share the local lock. Existing GitHub requests are still
-checked, but GitHub comment creation has no atomic deduplication key. A server-side single request
-owner would be needed to eliminate that cross-machine race. The helper itself neither merges PRs
-nor resolves findings.
-
-GitHub also offers no atomic head condition on comment creation: a push after the final PR read
-can race the POST. The request marker records the observed head; it does not pin the revision the
-bot ultimately reviews. Always inspect fresh exact-head completion and checks before merging.
+`scripts/codex-review/codex-review.mjs` deduplicates Codex review requests across local worktrees
+and waits for exact-commit completion. Usage rules live in the root `AGENTS.md`; guard semantics,
+lock recovery, and command cleanup live in
+[`scripts/codex-review/README.md`](../scripts/codex-review/README.md).
 
 ### Reviewer settings: external verification pending
 
-1. Verify automatic Codex reviews are disabled in the repository/dashboard settings.
+1. Verify automatic Codex reviews are disabled in the repository/dashboard settings (policy
+   adopted 2026-09-29; repository configuration does not prove dashboard state).
 2. Keep automatic initial CodeRabbit reviews enabled and incremental reviews disabled as configured
    in `.coderabbit.yaml`. Verify exclusions on translation-only and mixed translation/code PRs.
 3. Retain manual reviewer access. Record representative PR links and observed dashboard settings;
@@ -171,8 +172,11 @@ rebuilds and never reuses Lighthouse output. Missing or expired artifacts requir
 Candidate builds receive no deployment credentials; the manifest is a set of claims that the
 trusted preview controller verifies (see §8).
 
-The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
-installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
+The shared setup action always uses `.nvmrc` and the full `packageManager` pin. By default it also
+restores the pnpm cache and performs a frozen installation; `install-dependencies: false` skips
+those two steps. Non-scheduled Security Scan calls use this runtime-only setup because their
+audits read an isolated manifest and lockfile; the weekly outdated check retains installation.
+Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
 When automation files change it also runs pinned, checksum-verified release binaries of `actionlint`
 (syntax, expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and
@@ -575,6 +579,8 @@ availability is advisory and can fail for reasons unrelated to the change.
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
+Ordinary same-repository ready PRs request previews automatically after current successful PR CI.
+Drafts pause; marking ready or reopening reuses already-passed CI without another build.
 Maintainers and administrators can comment `/preview` once to enable previews for a PR, including
 fork PRs. The current revision is requested immediately if CI is ready; otherwise the next
 successful CI run requests it. Later revisions refresh automatically after successful CI.
@@ -598,12 +604,17 @@ enabled opt-in stays in control; resuming always happens with a fresh command fr
 maintainer. Manual `workflow_dispatch` previews on the trusted default branch own their
 authorization directly: they carry no standing command authority and cannot be revoked by a later
 stop, while requests bound through `request_comment_id` are re-verified before upload.
+Readiness dispatches carry explicit policy provenance and the exact CI attempt; they recheck
+stop state, readiness, current head/base/main and current successful CI immediately before upload.
+Accepted original commands are collapsed with `minimizeComment` (`RESOLVED`); cosmetic API failures
+do not fail previews. Stop receipts are preserved. Repeated enable commands retain an original
+live grant, but any intervening accepted stop revokes that queued grant even after a resume.
 Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
 revision, but does not add a second automatic dispatcher.
 Enabling auto-merge also requests previews when no explicit preview command overrides it.
 The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
 it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
-and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and fork approval requests. Manual commands use that same lookup. Failed or cancelled dispatches remain retryable. Manual `/preview`
 and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
 this optional request path. Automatic events do not upload artifacts themselves.
 
@@ -617,7 +628,7 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [previews spec](systems/previews.md).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `reopened`, `auto_merge_enabled`,
 `closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
 state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
@@ -843,6 +854,8 @@ impossible, format staged paths yourself before committing (for example
 
 **pre-commit (`.husky/pre-commit`):**
 
+- Regenerates `.nuxt` in development mode when `.nuxt/eslint.config.mjs` is missing
+  (a plain `postinstall` `nuxt prepare` omits `@nuxt/eslint` output)
 - Runs `lint-staged` for fast, targeted formatting and linting
 
 **commit-msg (`.husky/commit-msg`):**

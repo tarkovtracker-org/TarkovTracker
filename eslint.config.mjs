@@ -114,7 +114,6 @@ export default withNuxt(
       // Block parent relative imports (use @/ aliases instead)
       'import-x/no-relative-parent-imports': 'error',
       // Import order: builtin → external → internal → parent → sibling → index → object → type
-      // (Keep in sync with CLAUDE.md, AGENTS.md, GEMINI.md)
       'import-x/order': [
         'warn',
         {

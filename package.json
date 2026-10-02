@@ -76,13 +76,14 @@
     "wrangler": "^4.126.0"
   },
   "engines": {
-    "node": ">=24.19.0",
+    "node": ">=24.21.0",
     "pnpm": ">=10.34.5 <12"
   },
   "name": "tarkovtracker-nuxt",
   "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85",
   "private": true,
   "scripts": {
+    "brief": "node scripts/ci/change-brief.mjs",
     "build": "nuxt build",
     "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",

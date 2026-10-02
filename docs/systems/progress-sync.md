@@ -32,6 +32,17 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
+  Startup captures this tab's serializer baseline before awaiting cloud reads; failed initialization
+  retains it for the same account. Retrying compares memory-only edits with that baseline rather than
+  treating another tab's newer envelope as the source of this tab's stale values. Session transitions
+  still clear the baseline. If no owned persisted baseline exists, this tab retains its current
+  state under that account with unknown (zero) clocks. Only subsequent edits advance them; a later
+  shared-storage write cannot become this tab's comparison baseline. An accepted unwrapped legacy
+  baseline is scoped internally to the current account after local ownership checks, so later
+  serialization does not reload shared storage because its old wrapper lacked an owner.
+  When composing copies, session handoffs use each mode's clock directly, including zero, instead
+  of borrowing another mode's edit time from the envelope. Other copies with unknown mode clocks
+  keep the existing write-time fallback. The handoff marker is in memory only, not a persisted field.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
