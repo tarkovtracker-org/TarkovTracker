@@ -85,11 +85,13 @@ runner consumption or use summed parallel jobs as wall-clock savings.
 
 ## Prioritized tranche and acceptance
 
-Baseline initial queue delay was 3–4 seconds. Security Scan logs for #1005 and baseline
-main confirm package-cache hits on the same lockfile key; their installs still took
-16.1 and 16.9 seconds and restored 1,482 packages. Cache behavior for the other four
-samples was not individually inspected. Thus this opportunity exists even with a warm
-package cache; cold-cache savings are not measured.
+Baseline initial queue delay was 3-4 seconds. All six Security Scan logs confirm warm
+package-cache hits on the same lockfile key; their installs still took 15.1-17.6 seconds.
+Node 24.19.0 and integrity-pinned pnpm 11.14.0 are common to all nine observations.
+Four baselines and all three candidates use Ubuntu image `20260927.320.1`; the older
+two baselines use `20260920.314.1`. The same-image baseline subset retains the full
+sample's medians. Hosted runner hardware was not fixed or randomized. Thus this opportunity
+exists with a warm cache; cold-cache savings and a fleet-level effect are not measured.
 
 1. Remove unnecessary cache restoration and frozen workspace installation from non-scheduled
    Security Scan setup. Audit commands already copy only package.json and pnpm-lock.yaml to
