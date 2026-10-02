@@ -17,6 +17,14 @@ on:
         description: Command authorizing this automatic request; omit for a manual preview.
         required: false
         type: string
+      authorization:
+        description: Readiness policy provenance; omit for independently authorized dispatches.
+        required: false
+        type: string
+      ci_attempt:
+        description: Exact CI attempt selected by the trusted requester.
+        required: false
+        type: string
 # Repeated requests for the same CI run replace an older attempt. Late results are also rejected
 # by revision checks.
 concurrency:
@@ -57,6 +65,8 @@ jobs:
         env:
           RUN_ID_INPUT: ${{ inputs.run_id }}
           REQUEST_COMMENT_ID_INPUT: ${{ inputs.request_comment_id }}
+          AUTHORIZATION_INPUT: ${{ inputs.authorization }}
+          CI_ATTEMPT_INPUT: ${{ inputs.ci_attempt }}
         with:
           script: |
             const { planPreview } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
@@ -64,7 +74,7 @@ jobs:
               github,
               context,
               core,
-              inputs: { run_id: process.env.RUN_ID_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT },
+              inputs: { run_id: process.env.RUN_ID_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
               workspace: process.env.RUNNER_TEMP,
             });
             core.setOutput('decision', JSON.stringify(decision));

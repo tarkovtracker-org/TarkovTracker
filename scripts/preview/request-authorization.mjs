@@ -245,7 +245,7 @@ async function effectiveCommand(github, repo, comment, permissions, comments, ed
  * later successful revisions refresh automatically. A later /preview stop revokes that intent.
  * Exhaust pagination before choosing a command; a newer stop must never be hidden by a page cap.
  */
-export async function readPreviewRequest(github, repo, pullRequest) {
+export async function readPreviewRequest(github, repo, pullRequest, boundCommentId = null) {
   // Commands predating rollout activation used the one-revision contract and must never become
   // standing grants. Unset configuration falls back to the contract start; malformed values fail.
   const enabledAt = previewRolloutStart();
@@ -259,6 +259,7 @@ export async function readPreviewRequest(github, repo, pullRequest) {
   assertMatchingCommentSnapshots(comments, editTimes);
   const commands = comments
     .filter((comment) => originalCommand(comment, enabledAt, editTimes))
+    .filter((comment) => retainedForBinding(comment, boundCommentId))
     .toSorted((a, b) => b.id - a.id);
   const permissions = new Map();
   for (const comment of commands) {
@@ -271,4 +272,12 @@ export async function readPreviewRequest(github, repo, pullRequest) {
     };
   }
   return null;
+}
+function retainedForBinding(comment, boundCommentId) {
+  // Repeated enables preserve the original grant; any later accepted stop remains a barrier.
+  return (
+    !boundCommentId ||
+    comment.id === boundCommentId ||
+    (comment.id > boundCommentId && previewCommand(comment.body) === false)
+  );
 }

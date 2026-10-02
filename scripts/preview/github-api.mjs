@@ -176,12 +176,19 @@ export async function requestPreviewDispatch(github, repo, decision) {
     ...repo,
     workflow_id: PREVIEW_WORKFLOW_FILE,
     ref: PRODUCTION_BRANCH,
-    inputs: previewDispatchInputs(decision.runId, decision.previewRequest),
+    inputs: previewDispatchInputs(
+      decision.runId,
+      decision.previewRequest,
+      decision.previewAuthorization,
+      decision.runAttempt
+    ),
   });
 }
-export function previewDispatchInputs(runId, request) {
+function previewDispatchInputs(runId, request, authorization, attempt) {
   const inputs = { run_id: String(runId) };
   if (request) inputs.request_comment_id = String(request.commentId);
+  if (authorization === 'readiness') inputs.authorization = 'readiness';
+  if (attempt) inputs.ci_attempt = String(attempt);
   return inputs;
 }
 function truncateDescription(description) {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { extractZip, listZipEntries, zipEntryErrors } from '../preview/archive.mjs';
 import {
@@ -32,6 +33,7 @@ import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readines
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 import { buildZip } from './helpers/zip.mjs';
+import { countApiCalls } from './helpers/api-count.mjs';
 const sha = (letter) => letter.repeat(40);
 const HEAD = sha('a');
 const BASE = sha('b');
@@ -233,6 +235,7 @@ function pullFixture(overrides = {}) {
     number: 42,
     state: 'open',
     draft: false,
+    user: { id: 123, type: 'User' },
     head: { sha: HEAD, ref: 'feature', repo: { full_name: REPO_NAME } },
     base: { sha: BASE, ref: 'main' },
     merge_commit_sha: MERGE,
@@ -411,6 +414,7 @@ function actionEndpoints(state, zipEntries, options) {
       },
       listWorkflowRunArtifacts: 'artifacts',
       listJobsForWorkflowRun: 'jobs',
+      listJobsForWorkflowRunAttempt: 'ciJobs',
       downloadArtifact: async () => {
         const zip = state.archive ?? buildZip(zipEntries());
         // Octokit returns an exact ArrayBuffer, not Node's pooled backing store.
@@ -445,6 +449,17 @@ async function paginatedEndpoints(state, endpoint, params, options) {
     artifacts: () =>
       params.run_id === state.previousRun.id ? state.previousArtifacts : state.artifacts,
     jobs: () => state.previousJobs,
+    ciJobs: () =>
+      options.ciJobs ?? [
+        {
+          name: 'CI Result',
+          run_id: state.run.id,
+          run_attempt: state.run.run_attempt,
+          head_sha: state.run.head_sha,
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
     listFiles: () => state.files,
     pulls: () => listPulls(state, params),
     comments: () => state.comments,
@@ -566,11 +581,12 @@ const statusStates = (statuses) =>
 /* ------------------------------------------------------------------------------------------ */
 /* Controller: planning                                                                        */
 /* ------------------------------------------------------------------------------------------ */
-test('a validated same-repository pull request waits for an explicit preview request', async (t) => {
+test('a validated ready same-repository pull requests a preview without a command', async (t) => {
   const { decision, state, manifest } = await plan(t, workflowRunContext());
-  assert.equal(decision.action, 'wait');
+  assert.equal(decision.action, 'request');
   assert.equal(decision.state, 'pending');
-  assert.match(decision.description, /Comment \/preview/);
+  assert.equal(decision.previewAuthorization, 'readiness');
+  assert.equal(state.dispatches.length, 1);
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.fork, false);
   assert.equal(decision.digest, manifest.digest);
@@ -581,6 +597,180 @@ test('a validated same-repository pull request waits for an explicit preview req
   assert.deepEqual(statusStates(state.statuses), ['a:pending']);
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
+});
+test('ready and reopen reuse passed CI; readiness provenance survives the dispatch boundary', async (t) => {
+  for (const action of ['ready_for_review', 'reopened']) {
+    const requested = await plan(t, pullTargetContext(pullFixture(), action));
+    assert.equal(requested.decision.action, 'request');
+    const inputs = requested.state.dispatches[0].inputs;
+    assert.deepEqual(inputs, { run_id: '900', authorization: 'readiness', ci_attempt: '1' });
+    const deployed = await plan(t, workflowDispatchContext(), { inputs });
+    assert.equal(deployed.decision.previewAuthorization, 'readiness');
+    assert.equal(deployed.decision.action, 'deploy');
+    await verifyForDeploy({
+      ...deployed,
+      context: workflowDispatchContext(),
+      destination: join(tempDir(t), 'ready'),
+    });
+  }
+});
+test(
+  'benchmark readiness lifecycle against verified main',
+  { skip: !process.env.PREVIEW_BASELINE_ROOT },
+  async (t) => {
+    const baseline = await import(
+      pathToFileURL(join(process.env.PREVIEW_BASELINE_ROOT, 'scripts/preview/controller.mjs'))
+    );
+    for (const [label, planner] of [
+      ['main', baseline.planPreview],
+      ['candidate', planPreview],
+    ]) {
+      const times = [];
+      let dispatches;
+      let apiCalls;
+      for (let sample = 0; sample < 20; sample += 1) {
+        const f = fakeGithub(t);
+        const counts = countApiCalls(f.github);
+        const start = performance.now();
+        await planner({
+          github: f.github,
+          context: pullTargetContext(pullFixture(), 'ready_for_review'),
+          core: fakeCore(),
+          workspace: tempDir(t),
+        });
+        times.push(performance.now() - start);
+        dispatches = f.state.dispatches.length;
+        apiCalls = counts.total;
+      }
+      times.sort((a, b) => a - b);
+      console.log(
+        JSON.stringify({
+          benchmark: 'ready-with-passed-CI',
+          version: label,
+          samples: 20,
+          commands: 0,
+          previewDispatches: dispatches,
+          extraCiBuildRequests: 0,
+          apiCallsPerEvent: apiCalls,
+          medianControllerMs: Number(times[10].toFixed(3)),
+          p95ControllerMs: Number(times[18].toFixed(3)),
+        })
+      );
+    }
+  }
+);
+test('readiness dispatch cannot bypass stop, draft, fork or missing attempt provenance', async (t) => {
+  const inputs = { run_id: '900', authorization: 'readiness', ci_attempt: '1' };
+  for (const options of [
+    { comments: [previewRequestComment(2, '/preview stop')] },
+    { pull: { draft: true } },
+    { pull: { head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } } },
+    { inputs: { ...inputs, ci_attempt: '' } },
+    { inputs: { ...inputs, ci_attempt: '2' } },
+  ]) {
+    const result = await plan(t, workflowDispatchContext(), { inputs, ...options });
+    assert.notEqual(result.decision.action, 'deploy');
+  }
+});
+test('readiness revalidates revocation and exact CI head/base immediately before upload', async (t) => {
+  for (const mutate of [
+    (s) => s.comments.push(previewRequestComment(2, '/preview stop')),
+    (s) => {
+      s.pull.draft = true;
+    },
+    (s) => {
+      s.pull.state = 'closed';
+    },
+    (s) => {
+      s.pull.head.sha = sha('e');
+    },
+    (s) => {
+      s.pull.base.sha = sha('e');
+    },
+    (s) => {
+      s.mainSha = sha('e');
+    },
+    (s) => {
+      s.run.run_attempt = 2;
+    },
+    (s) => {
+      s.run.conclusion = 'failure';
+    },
+    (s) => {
+      s.check.conclusion = 'failure';
+    },
+  ]) {
+    const f = await plan(t, workflowDispatchContext(), {
+      inputs: { run_id: '900', authorization: 'readiness', ci_attempt: '1' },
+    });
+    mutate(f.state);
+    await assert.rejects(
+      verifyForDeploy({
+        ...f,
+        context: workflowDispatchContext(),
+        destination: join(tempDir(t), 'revoked'),
+      })
+    );
+  }
+});
+test('readiness leaves automation owners and non-deployable paths unchanged', async (t) => {
+  for (const user of [
+    { id: 49699333, type: 'Bot' },
+    { id: 99, type: 'Bot' },
+  ]) {
+    const result = await plan(t, workflowRunContext(), { pull: { user } });
+    assert.equal(result.state.dispatches.length, 0);
+  }
+  for (const branch of ['locales', 'wip/release-1.2.3-123-1']) {
+    const result = await plan(t, workflowRunContext(runFixture({ head_branch: branch })), {
+      pull: { head: { sha: HEAD, ref: branch, repo: { full_name: REPO_NAME } } },
+      run: { head_branch: branch },
+    });
+    assert.equal(result.state.dispatches.length, 0);
+  }
+  const docs = await plan(t, workflowRunContext(), {
+    files: [{ filename: 'docs/contributing.md' }],
+  });
+  assert.equal(docs.decision.action, 'skip');
+  assert.equal(docs.state.dispatches.length, 0);
+});
+test('readiness refuses stale PR CI snapshots and unrelated attempt jobs', async (t) => {
+  const stale = await plan(t, workflowRunContext(), {
+    run: {
+      pull_requests: [{ number: 42, head: { sha: HEAD }, base: { sha: sha('f') } }],
+    },
+  });
+  assert.equal(stale.decision.action, 'wait');
+  assert.equal(stale.state.dispatches.length, 0);
+  const unrelated = await plan(t, workflowRunContext(), {
+    ciJobs: [
+      {
+        name: 'CI Result',
+        run_id: 901,
+        run_attempt: 1,
+        head_sha: HEAD,
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ],
+  });
+  assert.equal(unrelated.decision.action, 'wait');
+});
+test('a repeated command leaves the original queued grant valid until a stop barrier', async (t) => {
+  const f = await plan(t, workflowDispatchContext(), {
+    comments: [previewRequestComment(), previewRequestComment(2)],
+    inputs: { run_id: '900', request_comment_id: '1' },
+  });
+  assert.equal(f.decision.action, 'deploy');
+  f.state.comments.push(previewRequestComment(3, '/preview stop'), previewRequestComment(4));
+  await assert.rejects(
+    verifyForDeploy({
+      ...f,
+      context: workflowDispatchContext(),
+      destination: join(tempDir(t), 'stop-then-resume'),
+    }),
+    /revoked or superseded/
+  );
 });
 test('auto-merge requests one trusted dispatch after CI instead of uploading', async (t) => {
   const autoMerge = { auto_merge: { enabled_by: { login: 'maintainer' }, merge_method: 'squash' } };
@@ -593,7 +783,7 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: '900' },
+      inputs: { run_id: '900', authorization: 'readiness', ci_attempt: '1' },
     },
   ]);
   // The pending status is published before the dispatch so the dispatched run supersedes it.
@@ -603,7 +793,7 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   });
   assert.equal(enabled.decision.action, 'request');
   assert.equal(enabled.state.dispatches.length, 1);
-  assert.equal(enabled.decision.previewAuthorization, 'dispatch');
+  assert.equal(enabled.decision.previewAuthorization, 'readiness');
   assert.equal(enabled.decision.previewRequest, null);
   // CI still running: nothing to request yet; the CI completion event requests it later.
   const running = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
@@ -612,11 +802,10 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   });
   assert.equal(running.decision.action, 'wait');
   assert.deepEqual(running.state.dispatches, []);
-  // Without auto-merge, ordinary revisions keep waiting and never dispatch.
+  // Readiness needs no merge intent.
   const ordinary = await plan(t, workflowRunContext());
-  assert.equal(ordinary.decision.action, 'wait');
-  assert.match(ordinary.decision.description, /Comment \/preview/);
-  assert.deepEqual(ordinary.state.dispatches, []);
+  assert.equal(ordinary.decision.action, 'request');
+  assert.equal(ordinary.state.dispatches.length, 1);
 });
 test('auto-merge preserves active previews and retries completed attempts', async (t) => {
   const request = {
@@ -722,7 +911,7 @@ test('an unrelated branch sharing the head SHA does not supersede this PR', asyn
     run,
     latestRuns: [runFixture({ id: 901, head_branch: 'another-branch' }), run],
   });
-  assert.equal(decision.action, 'wait');
+  assert.equal(decision.action, 'request');
   assert.deepEqual(statusStates(state.statuses), ['a:pending']);
 });
 test('an explicit dispatch deploys only after rechecking the validated CI run', async (t) => {
@@ -941,7 +1130,7 @@ test('drafts, non-deployable scope and production runs never deploy', async (t) 
   const renamed = await plan(t, workflowRunContext(), {
     files: [{ filename: 'docs/a.md', previous_filename: 'app/a.ts' }],
   });
-  assert.equal(renamed.decision.action, 'wait');
+  assert.equal(renamed.decision.action, 'request');
   const main = await plan(
     t,
     workflowRunContext(runFixture({ head_branch: 'main', event: 'push' }))
@@ -990,6 +1179,7 @@ test('head movement, base movement, stale attempts and superseded runs cannot de
   assert.match(baseMoved.decision.description, /checkedOutSha/);
   const baseShaMoved = await plan(t, workflowRunContext(), {
     pull: pullFixture({ base: { sha: sha('f'), ref: 'main' } }),
+    comments: [previewRequestComment()],
   });
   assert.equal(baseShaMoved.decision.action, 'fail');
   assert.match(baseShaMoved.decision.description, /baseSha/);
@@ -997,7 +1187,7 @@ test('head movement, base movement, stale attempts and superseded runs cannot de
     pull: pullFixture({ merge_commit_sha: null }),
     readyMergeAfter: 2,
   });
-  assert.equal(recomputing.decision.action, 'wait');
+  assert.equal(recomputing.decision.action, 'request');
   assert.deepEqual(statusStates(recomputing.state.statuses), ['a:pending']);
   const staleAttempt = await plan(t, workflowRunContext(runFixture({ run_attempt: 2 })), {
     run: { run_attempt: 2 },
@@ -1116,7 +1306,7 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
         },
       ],
     });
-    assert.equal(untrusted.decision.action, 'wait');
+    assert.equal(untrusted.decision.action, 'request');
   }
   const otherProfile = await plan(t, workflowRunContext(), {
     previewStatuses: [
@@ -1128,7 +1318,7 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
       },
     ],
   });
-  assert.equal(otherProfile.decision.action, 'wait');
+  assert.equal(otherProfile.decision.action, 'request');
   const otherDigest = await plan(t, workflowRunContext(), {
     previewStatuses: [
       {
@@ -1139,11 +1329,11 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
       },
     ],
   });
-  assert.equal(otherDigest.decision.action, 'wait');
+  assert.equal(otherDigest.decision.action, 'request');
 });
 test('metadata events keep previews pending; ready-for-review reuses CI and close is ignored', async (t) => {
   const ready = await plan(t, pullTargetContext(pullFixture(), 'ready_for_review'));
-  assert.equal(ready.decision.action, 'wait');
+  assert.equal(ready.decision.action, 'request');
   assert.equal(ready.decision.runId, 900);
   const noRun = await plan(t, pullTargetContext(pullFixture(), 'opened'), { noRuns: true });
   assert.equal(noRun.decision.action, 'wait');
