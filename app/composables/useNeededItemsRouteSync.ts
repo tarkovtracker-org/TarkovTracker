@@ -27,27 +27,9 @@ export function useNeededItemsRouteSync({
   const { getNeededItemsSortBy, getNeededItemsSortDirection } = storeToRefs(preferencesStore);
   return useRouteFilters<NeededItemsRouteParams>({
     configs: {
-      type: {
-        key: 'type',
-        default: 'all',
-        validate: isValidNeededItemsFilterType,
-        serialize: (v) => (v === 'all' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      sort: {
-        key: 'sort',
-        default: 'priority',
-        validate: isValidNeededItemsSortBy,
-        serialize: (v) => (v === 'priority' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      sortDir: {
-        key: 'sortDir',
-        default: 'desc',
-        validate: isValidNeededItemsSortDirection,
-        serialize: (v) => (v === 'desc' ? undefined : v),
-        deserialize: (v) => v,
-      },
+      type: { default: 'all', validate: isValidNeededItemsFilterType },
+      sort: { default: 'priority', validate: isValidNeededItemsSortBy },
+      sortDir: { default: 'desc', validate: isValidNeededItemsSortDirection },
     },
     onRouteToStore: (values) => {
       const targetFilter = values.type as NeededItemsFilterType;
