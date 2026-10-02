@@ -945,6 +945,8 @@ impossible, format staged paths yourself before committing (for example
 
 **pre-commit (`.husky/pre-commit`):**
 
+- Regenerates `.nuxt` in development mode when `.nuxt/eslint.config.mjs` is missing
+  (a plain `postinstall` `nuxt prepare` omits `@nuxt/eslint` output)
 - Runs `lint-staged` for fast, targeted formatting and linting
 
 **commit-msg (`.husky/commit-msg`):**
