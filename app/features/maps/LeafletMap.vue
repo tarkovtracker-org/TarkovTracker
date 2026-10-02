@@ -393,7 +393,7 @@
                         <p
                           class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
                         >
-                          {{ t('maps.floors') }}
+                          {{ t('maps.help.groups.floors') }}
                         </p>
                         <i18n-t
                           keypath="maps.help.cycle_floors"

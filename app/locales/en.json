@@ -577,6 +577,7 @@
       "title": "Map controls",
       "groups": {
         "navigate": "Navigate",
+        "floors": "Floors",
         "interact": "Interact",
         "view": "View"
       },
