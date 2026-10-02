@@ -271,13 +271,8 @@ function pathReferences(io, paths) {
   const keyed = new Map(pairs.map((pair) => [`${pair.file} -> ${pair.references}`, pair]));
   return [...keyed.values()];
 }
-// Generic entrypoint names also occur as unrelated field names; their full paths remain searchable.
-const genericDocTerms = new Set(['`index`', '`main`', '`mod`']);
-const docTerms = (analyses) =>
-  unique(
-    analyses.flatMap(({ target }) => [target.file, `\`${target.symbol || stem(target.file)}\``])
-  ).filter((term) => !genericDocTerms.has(term));
-/** Docs that cite a target path or a non-generic backticked name, as file:line anchors. */
+const docTerms = (analyses) => unique(analyses.map(({ target }) => target.file));
+/** Docs that cite a full target path, as file:line anchors. */
 function owningDocs(io, analyses) {
   const terms = docTerms(analyses).flatMap((term) => ['-e', term]);
   if (!terms.length) return [];
@@ -291,7 +286,10 @@ function owningDocs(io, analyses) {
 const besideOwner = (file, owner) =>
   [directory(owner), `${directory(owner)}/__tests__`].includes(directory(file)) &&
   stem(file).startsWith(`${stem(owner)}.`);
-const ownersOf = (analysis) => [analysis.target.file, ...analysis.importers.filter(isSourcePath)];
+const ownersOf = (analysis) => [
+  analysis.target.file,
+  ...unique([...analysis.importers, ...analysis.textOnly]).filter(isSourcePath),
+];
 const directTests = (analyses) =>
   unique(analyses.flatMap((analysis) => [...analysis.importers, ...analysis.textOnly])).filter(
     isTestPath

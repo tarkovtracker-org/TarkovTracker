@@ -576,6 +576,7 @@ describe('buildBrief', () => {
     expect(brief.tests.direct).toEqual(['app/components/ui/__tests__/GameItem.test.ts']);
     expect(brief.tests.nearby).toEqual([
       'app/features/hideout/__tests__/HideoutRequirement.test.ts',
+      'app/features/neededitems/__tests__/NeededItemRow.test.ts',
     ]);
     expect(brief.tests.transitive).toEqual(['app/pages/__tests__/hideout.page.test.ts']);
   });
@@ -662,6 +663,39 @@ describe('buildBrief', () => {
       });
       expect(brief.instructions).toContain('supabase/AGENTS.md');
       expect(brief.tests.direct).toEqual([file]);
+    }
+  );
+  it.each(['team', 'auth', 'constants', 'types', 'user', 'task'])(
+    'uses path-only doc ownership for the %s module',
+    async (name) => {
+      const file = `app/types/${name}.ts`;
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.grepLines = (args, specs) => {
+        if (!specs.includes('*.md')) return [];
+        const marker = String.fromCharCode(96);
+        return args.includes(marker + name + marker)
+          ? ['docs/contributing.md:75:unrelated commit scope']
+          : [];
+      };
+      const brief = await buildBrief(io, { targets: [{ file }] });
+      expect(brief.docs).toEqual([]);
+    }
+  );
+  it.each([false, true])(
+    'finds nearby tests of template-only consumers (deleted=%s)',
+    async (deleted) => {
+      const source = 'app/components/ui/GameItem.vue';
+      const consumer = 'app/features/hideout/HideoutHelpDemoCard.vue';
+      const test = 'app/features/hideout/__tests__/HideoutHelpDemoCard.test.ts';
+      const io = fakeIo({
+        reports: { [source]: trace([]) },
+        grepFiles: [source, consumer, consumer],
+      });
+      io.listFiles = () => [test];
+      io.fileExists = (file) => file !== test || !deleted;
+      const brief = await buildBrief(io, { targets: [{ file: source }] });
+      expect(brief.tests.nearby).toEqual(deleted ? [] : [test]);
+      expect(brief.tests.commands).toEqual(deleted ? [] : testCommands([test]));
     }
   );
   it('reports symbol direct consumers, scoped instructions, and path references', async () => {
