@@ -1,7 +1,9 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, reactive } from 'vue';
+import { defineComponent, h, nextTick, reactive, ref } from 'vue';
+import type { UseRouteFiltersOptions } from '@/composables/useRouteFilters';
+import type { Ref } from 'vue';
 type QueryRecord = Record<string, string | undefined>;
 const routeState = reactive({
   query: reactive<QueryRecord>({}),
@@ -38,6 +40,29 @@ const flushRouteSync = async () => {
   await vi.advanceTimersByTimeAsync(250);
   await nextTick();
 };
+const viewConfig = {
+  default: 'all',
+  validate: (v: string) => ['all', 'maps'].includes(v),
+};
+const mountFilters = async <TMap extends Record<string, unknown>>(
+  options: Partial<UseRouteFiltersOptions<TMap>> & Pick<UseRouteFiltersOptions<TMap>, 'configs'>
+) => {
+  const { useRouteFilters } = await import('@/composables/useRouteFilters');
+  const TestHarness = defineComponent({
+    setup() {
+      useRouteFilters<TMap>({
+        onRouteToStore: vi.fn(),
+        onStoreToRoute: () => ({}),
+        watchSources: [],
+        ...options,
+      });
+      return () => h('div');
+    },
+  });
+  const wrapper = mount(TestHarness);
+  await flushRouteSync();
+  return wrapper;
+};
 describe('useRouteFilters', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -49,29 +74,11 @@ describe('useRouteFilters', () => {
   });
   it('populates URL from store values when no query params present on init', async () => {
     const onRouteToStore = vi.fn();
-    const onStoreToRoute = vi.fn(() => ({ view: 'maps' }));
-    const { useRouteFilters } = await import('@/composables/useRouteFilters');
-    const TestHarness = defineComponent({
-      setup() {
-        useRouteFilters({
-          configs: {
-            view: {
-              key: 'view',
-              default: 'all',
-              validate: (v: string) => ['all', 'maps'].includes(v),
-              serialize: (v: string) => (v === 'all' ? undefined : v),
-              deserialize: (v: string) => v,
-            },
-          },
-          onRouteToStore,
-          onStoreToRoute,
-          watchSources: [],
-        });
-        return () => h('div');
-      },
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onRouteToStore,
+      onStoreToRoute: () => ({ view: 'maps' }),
     });
-    const wrapper = mount(TestHarness);
-    await flushRouteSync();
     expect(replace).toHaveBeenCalled();
     expect(routeState.query.view).toBe('maps');
     expect(onRouteToStore).not.toHaveBeenCalled();
@@ -80,59 +87,76 @@ describe('useRouteFilters', () => {
   it('deserializes URL params into store on init when params present', async () => {
     applyRouteQuery({ view: 'maps' });
     const onRouteToStore = vi.fn();
-    const onStoreToRoute = vi.fn(() => ({ view: 'all' }));
-    const { useRouteFilters } = await import('@/composables/useRouteFilters');
-    const TestHarness = defineComponent({
-      setup() {
-        useRouteFilters({
-          configs: {
-            view: {
-              key: 'view',
-              default: 'all',
-              validate: (v: string) => ['all', 'maps'].includes(v),
-              serialize: (v: string) => (v === 'all' ? undefined : v),
-              deserialize: (v: string) => v,
-            },
-          },
-          onRouteToStore,
-          onStoreToRoute,
-          watchSources: [],
-        });
-        return () => h('div');
-      },
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onRouteToStore,
+      onStoreToRoute: () => ({ view: 'all' }),
     });
-    const wrapper = mount(TestHarness);
-    await flushRouteSync();
     expect(onRouteToStore).toHaveBeenCalledWith({ view: 'maps' });
     wrapper.unmount();
   });
   it('ignores invalid URL params and falls back to defaults', async () => {
     applyRouteQuery({ view: 'INVALID' });
     const onRouteToStore = vi.fn();
-    const onStoreToRoute = vi.fn(() => ({ view: 'all' }));
-    const { useRouteFilters } = await import('@/composables/useRouteFilters');
-    const TestHarness = defineComponent({
-      setup() {
-        useRouteFilters({
-          configs: {
-            view: {
-              key: 'view',
-              default: 'all',
-              validate: (v: string) => ['all', 'maps'].includes(v),
-              serialize: (v: string) => (v === 'all' ? undefined : v),
-              deserialize: (v: string) => v,
-            },
-          },
-          onRouteToStore,
-          onStoreToRoute,
-          watchSources: [],
-        });
-        return () => h('div');
-      },
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onRouteToStore,
+      onStoreToRoute: () => ({ view: 'all' }),
     });
-    const wrapper = mount(TestHarness);
-    await flushRouteSync();
     expect(onRouteToStore).toHaveBeenCalledWith({ view: 'all' });
+    wrapper.unmount();
+  });
+  it('omits default values from the URL and preserves unrelated query params', async () => {
+    applyRouteQuery({ other: 'keep' });
+    const view: Ref<string> = ref('maps');
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onStoreToRoute: () => ({ view: view.value }),
+      watchSources: [view],
+    });
+    expect(routeState.query).toMatchObject({ view: 'maps', other: 'keep' });
+    view.value = 'all';
+    await flushRouteSync();
+    expect(push).toHaveBeenLastCalledWith({ query: { other: 'keep', view: undefined } });
+    expect(routeState.query.view).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('uses an explicit key override for reading and writing the URL', async () => {
+    applyRouteQuery({ sortDir: 'maps' });
+    const onRouteToStore = vi.fn();
+    const wrapper = await mountFilters({
+      configs: { direction: { ...viewConfig, key: 'sortDir' } },
+      onRouteToStore,
+      onStoreToRoute: () => ({ direction: 'all' }),
+    });
+    expect(onRouteToStore).toHaveBeenCalledWith({ direction: 'maps' });
+    expect(routeState.query.direction).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('applies custom serialize and deserialize while still omitting the default', async () => {
+    applyRouteQuery({ page: 'p3' });
+    const onRouteToStore = vi.fn();
+    const page: Ref<number> = ref(3);
+    const wrapper = await mountFilters<{ page: number }>({
+      configs: {
+        page: {
+          default: 1,
+          validate: (v) => /^p\d+$/.test(v),
+          serialize: (v) => `p${v}`,
+          deserialize: (v) => Number(v.slice(1)),
+        },
+      },
+      onRouteToStore,
+      onStoreToRoute: () => ({ page: page.value }),
+      watchSources: [page],
+    });
+    expect(onRouteToStore).toHaveBeenCalledWith({ page: 3 });
+    page.value = 5;
+    await flushRouteSync();
+    expect(routeState.query.page).toBe('p5');
+    page.value = 1;
+    await flushRouteSync();
+    expect(routeState.query.page).toBeUndefined();
     wrapper.unmount();
   });
 });

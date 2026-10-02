@@ -2,15 +2,26 @@ import { logger } from '@/utils/logger';
 import { getQueryString, normalizeQuery } from '@/utils/routeHelpers';
 import type { WatchSource } from 'vue';
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
-export type FilterParamConfig<T> = {
-  key: string;
-  default: T;
-  validate: (raw: string) => boolean;
+type FilterParamCodec<T> = {
   serialize: (value: T) => string | undefined;
   deserialize: (raw: string) => T;
 };
+type FilterParamBase<T> = {
+  key?: string;
+  default: T;
+  validate: (raw: string) => boolean;
+};
+export type FilterParamConfig<T> = FilterParamBase<T> &
+  ([T] extends [string] ? Partial<FilterParamCodec<T>> : FilterParamCodec<T>);
+type ResolvedFilterParamConfig<T> = Required<FilterParamBase<T>> & FilterParamCodec<T>;
+type FilterParamConfigs<TMap extends Record<string, unknown>> = {
+  [K in keyof TMap]: FilterParamConfig<TMap[K]>;
+};
+type ResolvedFilterParamConfigs<TMap extends Record<string, unknown>> = {
+  [K in keyof TMap]: ResolvedFilterParamConfig<TMap[K]>;
+};
 export type UseRouteFiltersOptions<TMap extends Record<string, unknown>> = {
-  configs: { [K in keyof TMap]: FilterParamConfig<TMap[K]> };
+  configs: FilterParamConfigs<TMap>;
   onRouteToStore: (values: TMap) => void;
   onStoreToRoute: () => Partial<TMap>;
   watchSources: WatchSource[];
@@ -19,9 +30,36 @@ export type UseRouteFiltersReturn = {
   isSyncingFromRoute: Ref<boolean>;
   isSyncingToRoute: Ref<boolean>;
 };
+const identity = <T>(raw: string): T => raw as T;
+const withDefaultOmitted =
+  <T>(defaultValue: T, serialize: (value: T) => string | undefined) =>
+  (value: T): string | undefined =>
+    value === defaultValue ? undefined : serialize(value);
+const resolveFilterParamConfig = <T>(
+  name: string,
+  config: FilterParamConfig<T>
+): ResolvedFilterParamConfig<T> => {
+  const codec = config as FilterParamBase<T> & Partial<FilterParamCodec<T>>;
+  return {
+    key: codec.key ?? name,
+    default: codec.default,
+    validate: codec.validate,
+    serialize: withDefaultOmitted(codec.default, codec.serialize ?? String),
+    deserialize: codec.deserialize ?? identity<T>,
+  };
+};
+const resolveConfigs = <TMap extends Record<string, unknown>>(
+  configs: FilterParamConfigs<TMap>
+): ResolvedFilterParamConfigs<TMap> => {
+  const resolved = {} as ResolvedFilterParamConfigs<TMap>;
+  for (const name of Object.keys(configs) as (keyof TMap & string)[]) {
+    resolved[name] = resolveFilterParamConfig(name, configs[name]);
+  }
+  return resolved;
+};
 const buildQuery = <TMap extends Record<string, unknown>>(
   currentQuery: LocationQuery,
-  configs: UseRouteFiltersOptions<TMap>['configs'],
+  configs: ResolvedFilterParamConfigs<TMap>,
   values: Partial<TMap>
 ): LocationQueryRaw => {
   const nextQuery: LocationQueryRaw = { ...currentQuery };
@@ -38,7 +76,7 @@ const buildQuery = <TMap extends Record<string, unknown>>(
 };
 const parseQuery = <TMap extends Record<string, unknown>>(
   query: LocationQuery,
-  configs: UseRouteFiltersOptions<TMap>['configs']
+  configs: ResolvedFilterParamConfigs<TMap>
 ): { values: TMap; hasAnyParam: boolean } => {
   let hasAnyParam = false;
   const values = {} as TMap;
@@ -61,7 +99,8 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
 ): UseRouteFiltersReturn {
   const route = useRoute();
   const router = useRouter();
-  const { configs, onRouteToStore, onStoreToRoute, watchSources } = options;
+  const { onRouteToStore, onStoreToRoute, watchSources } = options;
+  const configs = resolveConfigs(options.configs);
   const isSyncingFromRoute = ref(false);
   const isSyncingToRoute = ref(false);
   const hasInitialized = ref(false);

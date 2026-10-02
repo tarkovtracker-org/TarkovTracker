@@ -58,48 +58,12 @@ export function useTaskRouteSync({
   } = storeToRefs(preferencesStore);
   return useRouteFilters<TaskRouteParams>({
     configs: {
-      view: {
-        key: 'view',
-        default: 'all',
-        validate: isValidPrimaryView,
-        serialize: (v) => (v === 'all' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      status: {
-        key: 'status',
-        default: 'available',
-        validate: isValidSecondaryView,
-        serialize: (v) => (v === 'available' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      map: {
-        key: 'map',
-        default: 'all',
-        validate: () => true,
-        serialize: (v) => (v === 'all' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      trader: {
-        key: 'trader',
-        default: 'all',
-        validate: () => true,
-        serialize: (v) => (v === 'all' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      sort: {
-        key: 'sort',
-        default: 'impact',
-        validate: isValidSortMode,
-        serialize: (v) => (v === 'impact' ? undefined : v),
-        deserialize: (v) => v,
-      },
-      sortDir: {
-        key: 'sortDir',
-        default: 'desc',
-        validate: isValidSortDirection,
-        serialize: (v) => (v === 'desc' ? undefined : v),
-        deserialize: (v) => v,
-      },
+      view: { default: 'all', validate: isValidPrimaryView },
+      status: { default: 'available', validate: isValidSecondaryView },
+      map: { default: 'all', validate: () => true },
+      trader: { default: 'all', validate: () => true },
+      sort: { default: 'impact', validate: isValidSortMode },
+      sortDir: { default: 'desc', validate: isValidSortDirection },
     },
     onRouteToStore: (values) => {
       const targetView = values.view as TaskPrimaryView;
