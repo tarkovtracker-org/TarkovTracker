@@ -166,11 +166,14 @@ const validationRules = [
 ];
 const scopedRules = [
   {
-    prefix: 'workers/api-gateway/',
+    applies: (paths) => touchesPrefix(paths, 'workers/api-gateway/'),
     check:
       'workers/api-gateway/AGENTS.md checks: pnpm --filter api-gateway run types:check; pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run; focused tests: pnpm run test:api-gateway',
   },
-  { prefix: 'supabase/', check: 'supabase/AGENTS.md checks (supabase:check)' },
+  {
+    applies: (paths) => paths.some((path) => path.endsWith('.sql')),
+    check: 'supabase/AGENTS.md checks (supabase:check)',
+  },
 ];
 const touchesPrefix = (paths, prefix) => paths.some((path) => path.startsWith(prefix));
 /** Required local validation for changing `paths`; `affected` adds scoped checks for consumers. */
@@ -183,9 +186,7 @@ export function validationFor(paths, affected = paths) {
     commands: validationRules
       .filter((rule) => rule.applies(plan, paths))
       .map((rule) => rule.command),
-    scoped: scopedRules
-      .filter((rule) => touchesPrefix(affected, rule.prefix))
-      .map((rule) => rule.check),
+    scoped: scopedRules.filter((rule) => rule.applies(affected)).map((rule) => rule.check),
   };
 }
 const evidence = (report, key) => (report.evidence || {})[key]?.data || {};
@@ -283,7 +284,7 @@ function owningDocs(io, analyses) {
     const [file, number] = line.split(':');
     append(anchors, file, [Number(number)]);
   }
-  return [...anchors].map(([file, lines]) => ({ file, lines: lines.slice(0, 3) }));
+  return [...anchors].map(([file, lines]) => ({ file, lines: unique(lines) }));
 }
 const besideOwner = (file, owner) =>
   [directory(owner), `${directory(owner)}/__tests__`].includes(directory(file)) &&
@@ -428,8 +429,8 @@ export function renderBrief(brief) {
       listed(brief.pathReferences.map(({ file, references }) => `${file} -> ${references}`))
     ),
     ...section(
-      'Owning docs (read only these lines)',
-      brief.docs.map(({ file, lines }) => `${file}:${lines.join(',')}`)
+      'Owning docs (read these anchors; full list: --format json)',
+      listed(brief.docs.map(({ file, lines }) => `${file}:${listed(lines).join(',')}`))
     ),
     ...section('Scoped instructions', brief.instructions),
     ...section('Candidate tests', testLines(brief.tests)),

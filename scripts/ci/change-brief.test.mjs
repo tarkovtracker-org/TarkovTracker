@@ -109,6 +109,19 @@ describe('generated Nuxt declarations', () => {
   });
 });
 describe('path helpers', () => {
+  it.each([
+    ['supabase/functions/example/index.ts', false],
+    ['supabase/functions/_shared/example.deno.test.ts', false],
+    ['supabase/functions/_shared/example.ts', false],
+    ['supabase/config.toml', false],
+    ['supabase/migrations/example.sql', true],
+    ['supabase/tests/example.sql', true],
+    ['shared/sql/example.sql', true],
+  ])('limits database replay to SQL validation for %s', (file, expected) => {
+    expect(
+      validationFor([file]).scoped.includes('supabase/AGENTS.md checks (supabase:check)')
+    ).toBe(expected);
+  });
   it('matches the actual root, gateway, Deno, and workflow runner naming rules', () => {
     for (const [file, expected] of [
       ['app/utils/example.test.tsx', true],
@@ -535,7 +548,46 @@ describe('buildBrief', () => {
     ]);
     expect(brief.tests.transitive).toEqual(['app/pages/__tests__/hideout.page.test.ts']);
   });
-  it('reports a symbol’s direct consumers, scoped instructions, and path references', async () => {
+  it.each([1, 3, 12, 13, 20])('preserves all %i owning-doc anchors in JSON', async (count) => {
+    const lines = Array.from({ length: count }, (_, index) => index + 10);
+    const io = fakeIo({
+      reports: { 'app/utils/example.ts': trace([]) },
+      grepLines: lines.map((line) => `docs/api.md:${line}:app/utils/example.ts`),
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/example.ts' }] });
+    expect(JSON.parse(JSON.stringify(brief)).docs).toEqual([{ file: 'docs/api.md', lines }]);
+    const text = renderBrief(brief);
+    expect(text).toContain(`docs/api.md:${lines.slice(0, 12).join(',')}`);
+    if (count > 12) expect(text).toContain(`${count - 12} more (--format json)`);
+  });
+  it('caps owning documents only in text and deduplicates their complete anchors', async () => {
+    const docs = Array.from({ length: 13 }, (_, index) => ({
+      file: `docs/example-${index}.md`,
+      lines: [10],
+    }));
+    const matches = docs.map(({ file }) => `${file}:10:app/utils/example.ts`);
+    const io = fakeIo({
+      reports: { 'app/utils/example.ts': trace([]) },
+      grepLines: [...matches, ...matches],
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/example.ts' }] });
+    expect(brief.docs).toEqual(docs);
+    const text = renderBrief(brief);
+    expect(text).toContain('docs/example-11.md:10');
+    expect(text).not.toContain('docs/example-12.md:10');
+    expect(text).toContain('1 more (--format json)');
+  });
+  it('keeps selected Edge Function tests on Deno without database replay', async () => {
+    const file = 'supabase/functions/_shared/example.deno.test.ts';
+    const io = fakeIo({ reports: { [file]: trace([]) } });
+    io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+    const brief = await buildBrief(io, { targets: [{ file }] });
+    expect(brief.instructions).toContain('supabase/AGENTS.md');
+    expect(brief.tests.commands).toEqual(testCommands([file]));
+    expect(brief.tests.commands[0].executable).toBe('deno');
+    expect(brief.validation.scoped).toEqual([]);
+  });
+  it('reports symbol direct consumers, scoped instructions, and path references', async () => {
     const io = fakeIo({
       reports: {
         'shared/utils/seasonNumber.ts': trace(

@@ -49,6 +49,9 @@ Scoped instructions and checks include direct and transitive dependents, includi
 Discovered literal references in executable configs, workflows, SQL, and file-reading tests also
 contribute scope and runnable test candidates. This matches repository-relative path strings;
 computed references and relative fragments still require confirmation.
+Database replay is required for affected SQL paths; Edge Function tests use Deno without an
+automatic database replay. JSON retains every owning-doc anchor. Text caps documents and anchors
+at twelve entries, marking omitted entries and directing readers to JSON for the complete list.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;
