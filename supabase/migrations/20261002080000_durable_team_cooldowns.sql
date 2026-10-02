@@ -30,11 +30,45 @@ BEGIN
   INSERT INTO private.team_action_cooldowns AS c(user_id, game_mode, action, last_at)
   VALUES (p_user_id, p_mode, p_action, v_now)
   ON CONFLICT (user_id, game_mode, action) DO UPDATE SET last_at = EXCLUDED.last_at
-  WHERE c.last_at NOT BETWEEN v_now - INTERVAL '5 minutes' AND v_now;
+  -- A conflicting row may have committed after v_now while this statement waited.
+  -- Compare future timestamps with the live clock, not the pre-wait snapshot time.
+  WHERE c.last_at < v_now - INTERVAL '5 minutes' OR c.last_at > clock_timestamp();
   RETURN FOUND;
 END;
 $$;
 REVOKE ALL ON FUNCTION private.claim_team_action_cooldown(uuid, text, text) FROM PUBLIC, anon, authenticated;
+
+-- Preserve legacy-only evidence lazily when it would disappear, without a migration backfill.
+-- The team trigger runs before its row and mode disappear; the event trigger also covers
+-- account cleanup deleting a kicked target's history while the initiating owner still exists.
+CREATE FUNCTION private.preserve_team_action_cooldowns()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' SET lock_timeout = '5s' AS $$
+DECLARE v_team_id uuid; v_mode text; v_now timestamptz := clock_timestamp();
+BEGIN
+  IF TG_TABLE_NAME = 'teams' THEN v_team_id := OLD.id;
+  ELSE v_team_id := OLD.team_id; END IF;
+  SELECT game_mode INTO v_mode FROM public.teams WHERE id = v_team_id;
+  IF NOT FOUND THEN RETURN OLD; END IF;
+  INSERT INTO private.team_action_cooldowns AS c(user_id, game_mode, action, last_at)
+  SELECT e.initiated_by, v_mode,
+    CASE e.event_type WHEN 'member_left' THEN 'leave' ELSE 'kick' END, max(e.created_at)
+  FROM public.team_events e JOIN auth.users u ON u.id = e.initiated_by
+  WHERE e.team_id = v_team_id AND (TG_TABLE_NAME = 'teams' OR e.id = OLD.id)
+    AND e.server_verified AND e.event_type IN ('member_left', 'member_kicked')
+    AND (e.event_type = 'member_kicked' OR e.target_user = e.initiated_by)
+    AND e.created_at BETWEEN v_now - INTERVAL '5 minutes' AND v_now
+  GROUP BY e.initiated_by, e.event_type
+  ORDER BY e.initiated_by, e.event_type
+  ON CONFLICT (user_id, game_mode, action) DO UPDATE SET last_at = EXCLUDED.last_at
+  WHERE c.last_at < EXCLUDED.last_at OR c.last_at > clock_timestamp();
+  RETURN OLD;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.preserve_team_action_cooldowns() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER preserve_team_cooldowns_before_disband BEFORE DELETE ON public.teams
+  FOR EACH ROW EXECUTE FUNCTION private.preserve_team_action_cooldowns();
+CREATE TRIGGER preserve_team_cooldowns_before_event_delete BEFORE DELETE ON public.team_events
+  FOR EACH ROW EXECUTE FUNCTION private.preserve_team_action_cooldowns();
 
 -- Same signature, lock order, results and grants as 20260912085904; only the cooldown source changes.
 CREATE OR REPLACE FUNCTION public.leave_team(p_team_id UUID, p_user_id UUID)

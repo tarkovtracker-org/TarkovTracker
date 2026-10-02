@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(36);
+SELECT plan(37);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000921','leave-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000922','leave-member@example.invalid');
@@ -28,9 +28,12 @@ SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'cool
 -- Transitional: verified events written by the previous RPC bodies still block.
 UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes' WHERE user_id='00000000-0000-0000-0000-000000000922';
 SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'cooldown',mode||' legacy events still block') FROM leave_teams;
-UPDATE private.team_action_cooldowns SET last_at=clock_timestamp() WHERE user_id='00000000-0000-0000-0000-000000000922';
--- Disbanding the left team cascades its events but must not erase the durable cooldown (#646).
+-- Model legacy-only leaves committed by the previous RPC bodies around deployment.
+DELETE FROM private.team_action_cooldowns WHERE user_id='00000000-0000-0000-0000-000000000922';
+-- Disbanding the left team must preserve even legacy-only cooldowns before events cascade (#646).
 SELECT ok(public.disband_team(old_id,'00000000-0000-0000-0000-000000000921'),mode||' owner disbands') FROM leave_teams;
+SELECT is(count(*)::integer,3,'disband preserves legacy-only leave cooldowns') FROM private.team_action_cooldowns
+WHERE user_id='00000000-0000-0000-0000-000000000922' AND action='leave';
 SELECT is((SELECT count(*)::integer FROM public.team_events WHERE initiated_by='00000000-0000-0000-0000-000000000922'),0,'disband cascades leave events');
 SELECT is(public.leave_team(new_id,'00000000-0000-0000-0000-000000000922'),'cooldown',mode||' cooldown survives disband') FROM leave_teams;
 -- An expired cooldown permits leave, but a failed leave must not advance it.

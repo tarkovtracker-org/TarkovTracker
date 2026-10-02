@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(48);
+SELECT plan(52);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000951','kick-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000952','kick-member@example.invalid'),
@@ -99,7 +99,11 @@ SELECT first_id,'00000000-0000-0000-0000-000000000951'::uuid,'owner',mode FROM k
 UNION ALL SELECT first_id,'00000000-0000-0000-0000-000000000952'::uuid,'member',mode FROM kick_rebuilt;
 SELECT is(public.kick_team(first_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000952'),
  'kicked',mode||' kick before disband succeeds') FROM kick_rebuilt;
+-- Model kicks committed by the previous RPC bodies: no durable rows exist yet.
+DELETE FROM private.team_action_cooldowns WHERE user_id='00000000-0000-0000-0000-000000000951';
 SELECT ok(public.disband_team(first_id,'00000000-0000-0000-0000-000000000951'),mode||' owner disbands') FROM kick_rebuilt;
+SELECT is(count(*)::integer,3,'disband preserves legacy-only kick cooldowns') FROM private.team_action_cooldowns
+ WHERE user_id='00000000-0000-0000-0000-000000000951' AND action='kick';
 INSERT INTO public.team_memberships(team_id,user_id,role,game_mode)
 SELECT second_id,'00000000-0000-0000-0000-000000000951'::uuid,'owner',mode FROM kick_rebuilt
 UNION ALL SELECT second_id,'00000000-0000-0000-0000-000000000952'::uuid,'member',mode FROM kick_rebuilt;
@@ -111,6 +115,18 @@ UPDATE private.team_action_cooldowns SET last_at=now()-interval '10 minutes'
  WHERE user_id='00000000-0000-0000-0000-000000000951' AND game_mode<>'pvp';
 SELECT is(public.kick_team(second_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000952'),
  CASE mode WHEN 'pvp' THEN 'cooldown' ELSE 'kicked' END,mode||' cooldown is mode isolated') FROM kick_rebuilt;
+
+-- Account cleanup removes a deleted target's events, but must preserve the owner's legacy kick.
+-- PvP was blocked in the mode-isolation probe; give it equivalent legacy-only history.
+INSERT INTO public.team_events(team_id,event_type,target_user,initiated_by)
+SELECT second_id,'member_kicked','00000000-0000-0000-0000-000000000952',
+ '00000000-0000-0000-0000-000000000951' FROM kick_rebuilt WHERE mode='pvp';
+DELETE FROM private.team_action_cooldowns WHERE user_id='00000000-0000-0000-0000-000000000951';
+DELETE FROM public.team_events WHERE target_user='00000000-0000-0000-0000-000000000952';
+INSERT INTO public.team_memberships(team_id,user_id,role,game_mode)
+SELECT second_id,'00000000-0000-0000-0000-000000000953'::uuid,'member',mode FROM kick_rebuilt;
+SELECT is(public.kick_team(second_id,'00000000-0000-0000-0000-000000000951','00000000-0000-0000-0000-000000000953'),
+ 'cooldown',mode||' target event cleanup preserves legacy kick cooldown') FROM kick_rebuilt;
 
 -- Ordinary clients cannot execute the service-role-only RPC.
 SET LOCAL ROLE authenticated;
