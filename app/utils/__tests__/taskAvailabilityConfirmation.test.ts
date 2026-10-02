@@ -5,9 +5,87 @@ import {
   isAvailabilityConfirmed,
   nextClock,
   mergeTaskAvailability,
+  mergeTaskAvailabilityCandidates,
+  taskAvailabilityCandidates,
+  type ConfirmationMap,
   sanitizeTaskAvailabilityMap,
 } from '@/utils/taskAvailabilityConfirmation';
 describe('task availability confirmations', () => {
+  it('matches unbounded winners in 400 deterministic ordered three-source compositions', () => {
+    let seed = 1008;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed;
+    };
+    const oracleMerge = (a: ConfirmationMap, b: ConfirmationMap) => {
+      const result = { ...a };
+      for (const [id, value] of Object.entries(b)) {
+        if (!result[id] || value.timestamp >= result[id]!.timestamp) result[id] = value;
+      }
+      return result;
+    };
+    for (let trial = 0; trial < 200; trial++) {
+      const sources = Array.from({ length: 3 }, () => {
+        const map: ConfirmationMap = {};
+        for (let i = 0; i < 1800; i++) {
+          const id = `s${String(random() % 2600).padStart(4, '0')}`;
+          map[id] = { timestamp: random() % 31, requirements: 'x'.repeat(random() % 4097) };
+        }
+        return map;
+      });
+      for (const inputs of [sources, [...sources].reverse()]) {
+        const oracle = inputs.reduce(oracleMerge, {});
+        const candidates = inputs.reduce(mergeTaskAvailabilityCandidates, {});
+        expect(candidates).toEqual(taskAvailabilityCandidates(oracle));
+        expect(sanitizeTaskAvailabilityMap(candidates)).toEqual(
+          sanitizeTaskAvailabilityMap(oracle)
+        );
+        expect(mergeTaskAvailabilityCandidates(candidates, candidates)).toEqual(candidates);
+        expect(Object.keys(candidates).length).toBeLessThanOrEqual(1000);
+      }
+    }
+  }, 30000);
+  it('bounds retained candidate count and field sizes before final UTF-8 byte eviction', () => {
+    const requirements = '😀'.repeat(4096);
+    const source = Object.fromEntries(
+      Array.from({ length: 5000 }, (_, i) => [
+        `t${String(i).padStart(4, '0')}`,
+        { requirements, timestamp: i },
+      ])
+    );
+    const candidates = taskAvailabilityCandidates(source);
+    expect(Object.keys(candidates)).toHaveLength(1000);
+    expect(candidates).toHaveProperty('t4000');
+    expect(candidates).not.toHaveProperty('t3999');
+    expect(Object.keys(sanitizeTaskAvailabilityMap(candidates))).toHaveLength(15);
+    expect(
+      taskAvailabilityCandidates({
+        tooLong: { requirements: `${requirements}x`, timestamp: 1 },
+        ['x'.repeat(65)]: { requirements: '', timestamp: 1 },
+        invalidClock: { requirements: '', timestamp: Infinity },
+        nul: { requirements: '\u0000', timestamp: 1 },
+        ['bad\u0000id']: { requirements: '', timestamp: 1 },
+      })
+    ).toEqual({});
+  });
+  it('keeps PostgreSQL C-collation tie order and handles prototype-named task IDs safely', () => {
+    const source = Object.fromEntries([
+      ['😀', { requirements: '', timestamp: 1 }],
+      ['\uFFFD', { requirements: '', timestamp: 1 }],
+      ['constructor', { requirements: 'ctor', timestamp: 1 }],
+      ['__proto__', { requirements: 'proto', timestamp: 1 }],
+    ]);
+    expect(Object.keys(taskAvailabilityCandidates(source))).toEqual([
+      '__proto__',
+      'constructor',
+      '\uFFFD',
+      '😀',
+    ]);
+    expect(mergeTaskAvailability({}, source)).toEqual(source);
+    expect(Object.hasOwn(mergeTaskAvailability(source, {}), '__proto__')).toBe(true);
+    const inherited = Object.create({ ghost: { requirements: '', timestamp: 2 } });
+    expect(taskAvailabilityCandidates(inherited)).toEqual({});
+  });
   it('selects duplicate winners before byte eviction, without resurrecting older values', () => {
     const remote = Object.fromEntries(
       Array.from({ length: 66 }, (_, i) => [

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(19);
+SELECT plan(22);
 
 SELECT is(
   public.sanitize_user_progress_mode_data(
@@ -232,6 +232,61 @@ SELECT ok(
     ) AS result
   ),
   'a new confirmation evicts the oldest once the map is full'
+);
+
+CREATE TEMP VIEW confirmation_upload_roundtrip AS
+WITH source AS (
+  SELECT jsonb_object_agg('s' || n, jsonb_build_object(
+    'requirements', repeat('r', 4000), 'timestamp', 199 + n
+  )) AS local_map
+  FROM generate_series(1, 66) AS n
+), fixture AS (
+  SELECT local_map, '{"s1":{"requirements":"old","timestamp":0}}'::jsonb AS remote_map
+  FROM source
+), resolved AS (
+  SELECT *, public.merge_task_availability(local_map, remote_map) AS result_map FROM fixture
+)
+SELECT result_map,
+  public.merge_manual_activity_progress(
+    jsonb_build_object('taskAvailability', remote_map),
+    jsonb_build_object('taskAvailability', result_map)
+  )->'taskAvailability' AS naive_upload,
+  public.merge_manual_activity_progress(
+    public.merge_manual_activity_progress(
+      jsonb_build_object('taskAvailability', remote_map),
+      '{"taskAvailability":{"s1":{"requirements":"","timestamp":200}}}'::jsonb
+    ),
+    jsonb_build_object('taskAvailability', result_map)
+  )->'taskAvailability' AS bounded_eviction_pass
+FROM resolved;
+
+SELECT is(
+  (SELECT naive_upload->'s1'->>'requirements' FROM confirmation_upload_roundtrip),
+  'old',
+  'an omitted key is not a deletion in the union RPC; a bounded upload alone resurrects the old value'
+);
+SELECT ok(
+  (
+    SELECT NOT result_map ? 's1'
+      AND bounded_eviction_pass->'s1'->>'requirements' = ''
+      AND (SELECT count(*) FROM jsonb_each(bounded_eviction_pass)) <= 1000
+      AND (SELECT sum(octet_length(key) + octet_length(value->>'requirements'))
+           FROM jsonb_each(bounded_eviction_pass)) <= 262144
+    FROM confirmation_upload_roundtrip
+  ),
+  'a bounded clear pass prevents resurrection without increasing the persisted limits'
+);
+SELECT ok(
+  (
+    SELECT result ? '�' AND NOT result ? '😀'
+    FROM (
+      SELECT public.merge_task_availability(NULL,
+        jsonb_object_agg('t' || n, '{"requirements":"","timestamp":1}'::jsonb)
+        || '{"�":{"requirements":"","timestamp":1},"😀":{"requirements":"","timestamp":1}}'::jsonb
+      ) AS result FROM generate_series(1, 999) AS n
+    ) AS fixture
+  ),
+  'equal timestamp count eviction uses Unicode code-point order, matching client C-collation order'
 );
 
 SELECT * FROM finish();

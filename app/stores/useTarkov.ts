@@ -694,7 +694,7 @@ const selectStartupSnapshot = (userId: string, toastI18n: ReturnType<typeof useT
   // A new sign-in ends any device-data removal requested for the previous session.
   clearDeviceDataRemoval();
   clearIncompleteDeviceDataRemoval(userId);
-  if (!retryBlockedAccountRecoveryRetention() || !preserveForeignActiveCopy(userId)) {
+  if (!retryBlockedAccountRecoveryRetention(userId) || !preserveForeignActiveCopy(userId)) {
     failBlockedRetention(toastI18n);
   }
   const snapshot = selectFreshestOwnerProgressSnapshot(

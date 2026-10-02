@@ -60,8 +60,28 @@ Every merge selects per-task timestamp winners before applying the
 [map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
 so same-epoch writes cannot grow it past the sync payload limit or restore an older duplicate
 when a newer winner is evicted.
-Startup and reconnect merges compare against the raw historical row before eviction; only the
-bounded result is applied. Standalone backup imports still sanitize and bound each imported map.
+Startup and reconnect merges compare against historical candidates before byte eviction; only the
+bounded result is applied. Owned local snapshots carry field-valid candidates limited to 1,000
+entries per mode through same-epoch composition. Their count bound is compositional: entries below
+a source's first 1,000 cannot enter the union's first 1,000 when per-task timestamps only advance.
+Snapshot candidates never enter applied state, serialization, or acknowledgement baselines.
+Before replacing oversized owned active data, the retention guard preserves its unchanged bytes
+in the existing owner-scoped recovery slot. Recovery saving may retain one unchanged historical
+payload; it never synthesizes or accumulates new overflow. Divergent sources that cannot be
+represented by one original leave both existing copies untouched and block destructive writes.
+The matching owner may still reconcile those copies. A confirmed startup merge/upload releases
+the historical barrier, and the existing acknowledgement flow retires the recovery copy.
+The sync RPC unions confirmations, so omitting an evicted newer winner alone could restore an older
+server value. Same-epoch startup reconciliation first uploads an eviction pass using the existing
+empty-requirement clear tombstones, then the final bounded state. Each pass stays field-, count-,
+byte-, and RPC-payload-bounded; no raw candidates are sent. Eviction clears use the largest known
+local/remote confirmation clock, so they cannot replace a concurrent newer confirmation. A failed
+or superseded pass leaves original recovery evidence pending. The server may retain bounded clear
+tombstones in addition to the client's selected confirmations; they never count as availability.
+Quota or storage failures preserve the originals and surface the existing failed-save warning.
+Standalone backup imports still sanitize and bound each imported map. Task-ID tie ordering follows
+PostgreSQL's C collation, including supplementary Unicode code points; NUL and lone surrogates are
+rejected before they can prevent JSONB persistence.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
 bypass an explicit known unmet account value, malformed requirements, or independent

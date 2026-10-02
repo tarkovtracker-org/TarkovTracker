@@ -22,6 +22,12 @@ import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  mergeTaskAvailabilityCandidates,
+  sanitizeTaskAvailabilityMap,
+  taskAvailabilityCandidates,
+  type ConfirmationMap,
+} from '@/utils/taskAvailabilityConfirmation';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 /**
  * Account recovery copies (see `CONTEXT.md`): locally saved progress retained for its
@@ -30,6 +36,7 @@ import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 const recoveryKey = (userId: string): string => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
 let retentionFailure = false;
 let blockedAccountOwner: string | null = null;
+let historicalRetentionOwner: string | null = null;
 const isOwnedBy = (raw: string, ownerId: string): boolean =>
   parseUserScopedStorage<unknown>(raw)?._userId === ownerId;
 const writeRecoveryCopy = (ownerId: string, raw: string): boolean => {
@@ -91,6 +98,7 @@ const latestSnapshotByClock = (
   );
 type ModeCandidate = {
   progress: UserProgressData;
+  confirmations: ConfirmationMap;
   clock: number;
   /** Orders equal-epoch copies; an unknown (zero) mode clock falls back to the copy's write time. */
   order: number;
@@ -100,6 +108,9 @@ const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): M
   const clock = snapshotModeClock(snapshot, mode);
   return {
     progress: snapshot.state[mode],
+    confirmations: taskAvailabilityCandidates(
+      snapshot.confirmationCandidates?.[mode] ?? snapshot.state[mode].taskAvailability
+    ),
     clock,
     order: clock || validClock(snapshot.timestamp),
     seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
@@ -127,8 +138,12 @@ const archiveDisplacedMode = (
 const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
   const [older, newer] = right.order >= left.order ? [left, right] : [right, left];
   const progress = mergePreferringSingleValues(older.progress, newer.progress);
+  const confirmations = mergeTaskAvailabilityCandidates(older.confirmations, newer.confirmations);
+  progress.taskAvailability = sanitizeTaskAvailabilityMap(confirmations);
   const olderAlone = mergePreferringSingleValues(older.progress, older.progress);
-  return { ...(deepEqual(progress, olderAlone) ? older : newer), progress };
+  const unchanged =
+    deepEqual(progress, olderAlone) && deepEqual(confirmations, older.confirmations);
+  return { ...(unchanged ? older : newer), progress, confirmations };
 };
 const preferModeCandidate = (
   winner: ModeCandidate,
@@ -167,6 +182,7 @@ const composeOwnerSnapshots = (
   const metadataWinner = latestSnapshotByClock(snapshots, snapshotMetadataClock);
   const state = cloneStateSnapshot(metadataWinner.state);
   const modeTimestamps: Partial<Record<GameMode, number>> = {};
+  const confirmationCandidates: Partial<Record<GameMode, ConfirmationMap>> = {};
   for (const mode of GAME_MODE_VALUES) {
     const candidates = mode === 'seasonal' ? currentSeasonSnapshots(snapshots) : snapshots;
     const winner = candidates.length ? newestModeCandidate(candidates, ownerId, mode) : null;
@@ -177,6 +193,7 @@ const composeOwnerSnapshots = (
     }
     if (!winner) return null;
     state[mode] = cloneStateSnapshot(winner.progress);
+    confirmationCandidates[mode] = winner.confirmations;
     modeTimestamps[mode] = winner.clock;
   }
   state.seasonalSeasonNumber = ACTIVE_SEASON_NUMBER;
@@ -189,6 +206,7 @@ const composeOwnerSnapshots = (
     timestamp,
     metadataTimestamp: snapshotMetadataClock(metadataWinner),
     modeTimestamps,
+    confirmationCandidates,
     seasonalSourceSeasonNumber: ACTIVE_SEASON_NUMBER,
   };
 };
@@ -211,6 +229,85 @@ const readRecoveryStorage = (ownerId: string): { ok: boolean; raw: string | null
     logger.error('[AccountRecovery] Could not read the account recovery copy', error);
     return { ok: false, raw: null };
   }
+};
+/** Only historical byte overflow needs unchanged retention; malformed/count-evicted entries do not. */
+const hasHistoricalConfirmationOverflow = (snapshot: PersistedProgressSnapshot): boolean =>
+  GAME_MODE_VALUES.filter(
+    (mode) => mode !== 'seasonal' || isCurrentSeasonalSnapshot(snapshot)
+  ).some(
+    (mode) =>
+      !deepEqual(
+        snapshot.confirmationCandidates?.[mode] ?? {},
+        snapshot.state[mode].taskAvailability ?? {}
+      )
+  );
+const sameSnapshotClocks = (
+  source: PersistedProgressSnapshot,
+  composed: PersistedProgressSnapshot
+): boolean =>
+  validClock(source.timestamp) === validClock(composed.timestamp) &&
+  snapshotMetadataClock(source) === snapshotMetadataClock(composed) &&
+  GAME_MODE_VALUES.every(
+    (mode) => snapshotModeClock(source, mode) === snapshotModeClock(composed, mode)
+  );
+const representsComposedSnapshot = (
+  source: PersistedProgressSnapshot,
+  composed: PersistedProgressSnapshot
+): boolean =>
+  deepEqual(source.state, composed.state) &&
+  deepEqual(source.confirmationCandidates, composed.confirmationCandidates) &&
+  sameSnapshotClocks(source, composed);
+const originalRecoveryValue = (
+  snapshots: PersistedProgressSnapshot[],
+  values: string[],
+  composed: PersistedProgressSnapshot
+): string | null => {
+  const index = snapshots.findIndex((snapshot) => representsComposedSnapshot(snapshot, composed));
+  return index < 0 ? null : values[index]!;
+};
+const blockHistoricalRetention = (ownerId: string): void => {
+  blockAccountRecoveryRetentionForOwner(ownerId);
+  historicalRetentionOwner = ownerId;
+  setActiveProgressWritesBlocked(true);
+};
+const boundedRecoveryValue = (composed: PersistedProgressSnapshot, ownerId: string): string =>
+  JSON.stringify({
+    _timestamp: composed.timestamp,
+    _metadataTimestamp: composed.metadataTimestamp,
+    _modeTimestamps: composed.modeTimestamps,
+    _userId: ownerId,
+    data: composed.state,
+  });
+const retainedRecoveryValue = (
+  snapshots: PersistedProgressSnapshot[],
+  values: string[],
+  composed: PersistedProgressSnapshot,
+  ownerId: string
+): string | null => {
+  if (!hasHistoricalConfirmationOverflow(composed)) return boundedRecoveryValue(composed, ownerId);
+  // One existing slot may hold one unchanged historical payload, never synthesized overflow.
+  // Divergent sources requiring more evidence leave both existing originals untouched.
+  const original = originalRecoveryValue(snapshots, values, composed);
+  if (original === null) blockHistoricalRetention(ownerId);
+  return original;
+};
+const persistRecoveryValue = (
+  ownerId: string,
+  current: string | null,
+  encoded: string,
+  historical: boolean
+): boolean => {
+  const retained = current === encoded || writeRecoveryCopy(ownerId, encoded);
+  if (retained) {
+    clearBlockedAccountRecoveryRetention(ownerId);
+    return true;
+  }
+  if (historical) blockHistoricalRetention(ownerId);
+  else {
+    blockAccountRecoveryRetentionForOwner(ownerId);
+    setActiveProgressWritesBlocked(true);
+  }
+  return false;
 };
 /**
  * Retains `raw` as `ownerId`'s recovery copy. Returns `true` only when the newest
@@ -240,24 +337,46 @@ export const saveAccountRecoveryCopy = (raw: string | null, ownerId: string | nu
   }
   const composed = composeOwnerSnapshots(snapshots, ownerId);
   if (!composed) return false;
-  const encoded = JSON.stringify({
-    _timestamp: composed.timestamp,
-    _metadataTimestamp: composed.metadataTimestamp,
-    _modeTimestamps: composed.modeTimestamps,
-    _userId: ownerId,
-    data: composed.state,
-  });
-  const retained = current.raw === encoded || writeRecoveryCopy(ownerId, encoded);
-  if (!retained) {
-    blockAccountRecoveryRetentionForOwner(ownerId);
-    setActiveProgressWritesBlocked(true);
-  } else if (blockedAccountOwner === ownerId) {
-    clearBlockedAccountRecoveryRetention(ownerId);
-  }
-  return retained;
+  const encoded = retainedRecoveryValue(
+    snapshots,
+    current.raw === null ? [raw] : [current.raw, raw],
+    composed,
+    ownerId
+  );
+  if (encoded === null) return false;
+  return persistRecoveryValue(
+    ownerId,
+    current.raw,
+    encoded,
+    hasHistoricalConfirmationOverflow(composed)
+  );
 };
-export const retryBlockedAccountRecoveryRetention = (): boolean => {
+const readOwnedHistoricalSources = (
+  ownerId: string
+): (PersistedProgressSnapshot | null)[] | null => {
+  try {
+    const active = localStorage.getItem(STORAGE_KEYS.progress);
+    const recovery = readRecoveryStorage(ownerId);
+    if (!recovery.ok) return null;
+    const values = [active, recovery.raw].filter((raw): raw is string => raw !== null);
+    const snapshots = values.map((raw) => parsePersistedProgressState(raw, ownerId));
+    return snapshots.some((snapshot) => snapshot === null) ? null : snapshots;
+  } catch {
+    return null;
+  }
+};
+const resumeOwnedHistoricalReconciliation = (ownerId: string): boolean => {
+  const snapshots = readOwnedHistoricalSources(ownerId);
+  if (!snapshots?.some((snapshot) => snapshot && hasHistoricalConfirmationOverflow(snapshot)))
+    return false;
+  clearBlockedAccountRecoveryRetention(ownerId);
+  return true;
+};
+export const retryBlockedAccountRecoveryRetention = (reconcilingOwner?: string): boolean => {
   if (!blockedAccountOwner) return true;
+  if (reconcilingOwner === historicalRetentionOwner && reconcilingOwner === blockedAccountOwner) {
+    return resumeOwnedHistoricalReconciliation(reconcilingOwner);
+  }
   const active = safeGetItem(STORAGE_KEYS.progress);
   if (active && isOwnedBy(active, blockedAccountOwner)) {
     return saveAccountRecoveryCopy(active, blockedAccountOwner);
@@ -272,10 +391,12 @@ export const markAccountRecoveryRetentionBlocked = (): void => {
   retentionFailure = true;
 };
 export const blockAccountRecoveryRetentionForOwner = (ownerId: string): void => {
+  historicalRetentionOwner = null;
   retentionFailure = true;
   blockedAccountOwner = ownerId;
 };
 export const resetAccountRecoveryRetentionBlock = (): void => {
+  historicalRetentionOwner = null;
   retentionFailure = false;
   blockedAccountOwner = null;
 };
@@ -284,7 +405,12 @@ export const clearBlockedAccountRecoveryRetention = (ownerId: string): void => {
   if (blockedAccountOwner !== ownerId) return;
   retentionFailure = false;
   blockedAccountOwner = null;
+  historicalRetentionOwner = null;
   setActiveProgressWritesBlocked(false);
+};
+/** A proven startup merge/upload releases only this owner's historical-retention barrier. */
+export const acknowledgeHistoricalReconciliation = (ownerId: string): void => {
+  if (historicalRetentionOwner === ownerId) clearBlockedAccountRecoveryRetention(ownerId);
 };
 export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapshot | null => {
   const { ok, raw } = readRecoveryStorage(userId);
@@ -353,12 +479,27 @@ export const preserveForeignActiveCopy = (userId: string | null): boolean => {
   if (!retained) retentionFailure = true;
   return retained;
 };
-const retainParseableActiveProgress = (current: string, next: string | null): boolean => {
+const needsHistoricalRetention = (current: string, ownerId: string): boolean => {
+  const snapshot = parsePersistedProgressState(current, ownerId);
+  return snapshot !== null && hasHistoricalConfirmationOverflow(snapshot);
+};
+const canReplaceOwnActiveProgress = (
+  current: string,
+  ownerId: string,
+  cloudHeld: boolean
+): boolean => cloudHeld || !needsHistoricalRetention(current, ownerId);
+const retainParseableActiveProgress = (
+  current: string,
+  next: string | null,
+  cloudHeld = false
+): boolean => {
   const currentEnvelope = parseUserScopedStorage<unknown>(current);
   if (!currentEnvelope) return true;
   const ownerId = currentEnvelope._userId;
   const nextOwnerId = next ? (parseUserScopedStorage<unknown>(next)?._userId ?? null) : null;
-  if (!ownerId || ownerId === nextOwnerId) return true;
+  if (!ownerId) return true;
+  if (ownerId === nextOwnerId && canReplaceOwnActiveProgress(current, ownerId, cloudHeld))
+    return true;
   const retained = saveAccountRecoveryCopy(current, ownerId);
   if (!retained) {
     retentionFailure = true;
@@ -367,11 +508,15 @@ const retainParseableActiveProgress = (current: string, next: string | null): bo
   }
   return retained;
 };
-const retainActiveProgressBeforeChange = (current: string | null, next: string | null): boolean => {
+const retainActiveProgressBeforeChange = (
+  current: string | null,
+  next: string | null,
+  cloudHeld = false
+): boolean => {
   if (!current) return true;
   if (isUnparseableProgressStorageValue(current)) {
     return preserveUnparseableActiveProgress(current);
   }
-  return retainParseableActiveProgress(current, next);
+  return retainParseableActiveProgress(current, next, cloudHeld);
 };
 setActiveProgressRetentionGuard(retainActiveProgressBeforeChange);
