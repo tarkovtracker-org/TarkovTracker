@@ -255,6 +255,29 @@ describe('account recovery copies', () => {
     expect(selected?.state.pvp.level).toBe(9);
     expect(selected?.modeTimestamps?.pvp).toBe(100);
   });
+  it.each([1, 3])(
+    'does not promote an untouched level %i mode using another mode edit time',
+    (level) => {
+      const saved = structuredClone(defaultState);
+      saved.pve.level = 9;
+      saved.pve.displayName = 'Other tab';
+      saved.pve.pmcFaction = 'BEAR';
+      saved.pve.xpOffset = 1234;
+      saved.pve.skillOffsets = { endurance: 3 };
+      const newerStorage = snapshot(100, saved, { modeTimestamps: { pve: 100 } });
+      const memory = structuredClone(defaultState);
+      memory.pvp.level = 42;
+      memory.pve.level = level;
+      const handoff = {
+        ...snapshot(200, memory, { modeTimestamps: { pvp: 200, pve: 0 } }),
+        isSessionHandoff: true,
+      };
+      const selected = selectFreshestOwnerProgressSnapshot(null, newerStorage, handoff);
+      expect(selected?.state.pvp.level).toBe(42);
+      expect(selected?.state.pve).toEqual(saved.pve);
+      expect(selected?.modeTimestamps?.pve).toBe(100);
+    }
+  );
   it('orders an unknown mode clock by its copy write time without inventing a clock', () => {
     const named = (displayName: string) => ({
       ...structuredClone(defaultState),
