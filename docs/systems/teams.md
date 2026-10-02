@@ -25,6 +25,8 @@ path.
 - `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
   disband RPC and grants
 - `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
+- `supabase/migrations/20261002080000_durable_team_cooldowns.sql` — durable leave/kick cooldown
+  state and the `leave_team`/`kick_team` RPCs that claim it
 - `supabase/functions/team-create/index.ts`, `supabase/functions/_shared/team-create-error.ts` —
   authenticated team creation and database membership-conflict classification
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -83,16 +85,18 @@ path.
   rate-limit consumer of `team_events` must filter on `server_verified = true`, scope the query to
   events the caller initiated, and bound `created_at` at or below the current time.** Reading the
   preserved history without those filters lets a caller evade or extend a cooldown using a row
-  forged before containment. `team-leave` and `team-kick` are the current consumers; a new consumer
-  inherits the same requirement, and deleting the untrusted rows is not a substitute because the
-  filter is what makes the contract durable.
+  forged before containment. The transitional legacy read in `private.claim_team_action_cooldown`
+  and the deletion-preservation triggers are the current consumers; a new consumer inherits the
+  same requirement, and deleting the untrusted rows is not a substitute because the filter is
+  what makes the contract durable.
 - `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
   never an identity from the request body. Membership removal, conditional pointer maintenance,
   and trusted event insertion commit together. The handler performs no later table write, so a
   newer join cannot be overwritten by an old leave response.
 - `team-kick` calls the service-only `public.kick_team` RPC the same way: ownership validation,
-  the verified-event cooldown check, membership deletion, and the trusted `member_kicked` event
-  commit or roll back together. An event failure can no longer return success with a warning,
+  the target membership check, the cooldown claim, membership deletion, and the trusted
+  `member_kicked` event commit or roll back together. A missing target returns `not_member`
+  before the cooldown is claimed. An event failure can no longer return success with a warning,
   which would have left a removed member without audit history and let the next kick pass the
   cooldown immediately. The handler keeps the legacy failure contract (`not_found`/`not_member`
   → 404, `not_owner` → 403, `self` → 400, `cooldown` → 429); the RPC collapses a non-owner
@@ -107,5 +111,18 @@ path.
   grants. The handler retries the whole leave transaction at most three times, with 50/100 ms
   delays, only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
   `Retry-After: 1`; business results and ambiguous transport failures are not retried.
-- Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
-  deletes the associated events. They are not durable cooldown evidence after team deletion.
+- Leave and kick cooldowns live in `private.team_action_cooldowns`, one row per user, mode and
+  action (kick rows key the initiating owner). Disband cascades `team_events` but not this table,
+  so disbanding and recreating a team cannot bypass either five-minute window. Each RPC claims the
+  cooldown with one conditional upsert in its own transaction: a rejected, failed or rolled-back
+  action never advances it, and a `last_at` in the future is treated as expired. Conflicting claims
+  compare the upper timestamp bound with the live clock after any row-lock wait, so a concurrent
+  claim is not mistaken for future history. The claim also refuses while a verified
+  `member_left`/`member_kicked` event from the window exists. Before team or event deletion, triggers
+  preserve that legacy-only evidence using the original event time, without extending the window
+  or backfilling history during migration. This covers actions committed by the previous RPC bodies
+  around deployment, including disband and kicked-target account cleanup; a later forward migration
+  may remove the legacy handoff once old RPC calls and their windows have drained. Rows are removed
+  only with the Auth user; the table has RLS enabled and no client grants. Deployment prerequisites,
+  postchecks, and forward-migration recovery are in the
+  [durable cooldown rollout runbook](../runbook.md#durable-leave-and-kick-cooldown-rollout-1031).
