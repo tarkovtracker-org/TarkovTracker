@@ -550,13 +550,17 @@ account activity, so retention deadlines and pending inactivity deletions are un
    The last range passes `NULL` as the upper bound.
 
    ```sql
-   SET statement_timeout = '60s';
+   BEGIN;
+   SET LOCAL statement_timeout = '60s';
    SELECT private.backfill_game_mode_progress_range(
      '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000');
+   COMMIT;
    ```
 
-   The helper sets `lock_timeout = '2s'`; a range that meets a live write fails and rolls back
-   whole. Re-run it later; completed rows are no-ops.
+   The transaction-local timeout cannot leak into later maintenance. The helper sets
+   `lock_timeout = '2s'`; a range that meets a live write fails and rolls back whole. If an error
+   leaves the session in an aborted transaction, run `ROLLBACK;` before retrying. Re-run the range
+   later; completed rows are no-ops.
 
 3. Record each completed range in the change log and stop on rising latency, CPU, lock waits, or
    I/O pressure.
