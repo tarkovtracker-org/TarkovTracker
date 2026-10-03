@@ -71,6 +71,27 @@ test('direct /tasks navigation renders usable application content', async ({ pag
   expect(new URL(page.url()).origin).toBe(origin);
   await expectUsableApplication(page, record);
 });
+test.describe('Needed Items source tabs', () => {
+  test.use({ locale: 'en-US' });
+  test('keep their names below and above the sm breakpoint', async ({ page }) => {
+    const record = observe(page);
+    await page.setViewportSize({ width: 400, height: 800 });
+    const response = await page.goto(`${origin}/needed-items`, { waitUntil: 'networkidle' });
+    expect(response?.status()).toBe(200);
+    await expectUsableApplication(page, record);
+    const tablist = page.getByRole('tablist').first();
+    for (const width of [333, 400, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const label of ['All', 'Tasks', 'Hideout']) {
+        await expect(
+          tablist.getByRole('tab', { name: new RegExp(`^${label}\\s+\\d+$`, 'i') }),
+          `${label} tab name at ${width}px`
+        ).toBeVisible();
+      }
+    }
+    await expectUsableApplication(page, record);
+  });
+});
 test('cache-meta returns the anonymous fallback shape', async ({ request }) => {
   const response = await previewGet(request, `${origin}/api/tarkov/cache-meta`, origin);
   expect(response.status()).toBe(200);
