@@ -44,10 +44,9 @@ Authentication-required areas include `/account`, `/profile`, `/team`, `/setting
 
 ## Data and integration
 
-- [Tarkov.dev JSON feeds](https://json.tarkov.dev/): Public game-data integration source.
 - [Progression API](https://api.tarkovtracker.org/): Supported integration API for progression.
 
-Game data comes from [Tarkov.dev JSON feeds](https://json.tarkov.dev/). Internal `/api/tarkov/*` routes are not a supported integration API; use `json.tarkov.dev` for game-data integrations. The supported progression API is [api.tarkovtracker.org](https://api.tarkovtracker.org/).
+Game data comes from the public Tarkov.dev JSON feeds. Internal `/api/tarkov/*` routes are not a supported integration API; use `json.tarkov.dev` for game-data integrations. The supported progression API is [api.tarkovtracker.org](https://api.tarkovtracker.org/).
 
 Crawl directives and canonical discovery are available in [robots.txt](https://tarkovtracker.org/robots.txt) and [sitemap.xml](https://tarkovtracker.org/sitemap.xml).
 

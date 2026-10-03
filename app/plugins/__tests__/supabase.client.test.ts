@@ -771,6 +771,7 @@ describe('supabase plugin', () => {
       rpc: (fn: string) => Promise<{ data: null; error: null }>;
       auth: {
         getSession: () => Promise<{ data: { session: null }; error: null }>;
+        getUser: () => Promise<{ data: { user: null }; error: null }>;
         exchangeCodeForSession: () => Promise<{ error: Error }>;
       };
     };
@@ -781,6 +782,10 @@ describe('supabase plugin', () => {
     await expect(stubClient.rpc('noop')).resolves.toEqual({ data: null, error: null });
     await expect(stubClient.auth.getSession()).resolves.toEqual({
       data: { session: null },
+      error: null,
+    });
+    await expect(stubClient.auth.getUser()).resolves.toEqual({
+      data: { user: null },
       error: null,
     });
     const exchangeResult = await stubClient.auth.exchangeCodeForSession();

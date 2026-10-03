@@ -49,6 +49,11 @@ const assertDocumentRendering = (html: string, route: string): void => {
   requireToken(html, `name="robots" content="${robots}"`, 'indexing directive', route);
   assertImagePolicy(html, route);
 };
+const assertInlinePayload = (html: string, route: string): void => {
+  if (/<(?:link|script)\b[^>]*_payload\.json/.test(html)) {
+    throw new Error(`[SEO] Prerendered payload must be inline: ${route}`);
+  }
+};
 const assertSitemap = (directory: string): void => {
   const sitemap = readFileSync(resolve(directory, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]).sort();
@@ -80,6 +85,7 @@ export const assertPrerenderedDocuments = (directory: string): void => {
     const html = readDocument(directory, route);
     assertDocumentMetadata(html, route);
     assertDocumentRendering(html, route);
+    assertInlinePayload(html, route);
   }
   const notFound = readFileSync(resolve(directory, '404.html'), 'utf8');
   requireToken(

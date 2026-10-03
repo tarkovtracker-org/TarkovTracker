@@ -132,4 +132,13 @@ describe('public/llms.txt', () => {
       }
     }
   });
+  it('never links the json.tarkov.dev root, which has no index page', () => {
+    const rootLinks = [...llmsTxt.matchAll(/\]\(([^)\s]+)/g)]
+      .map((match) => match[1])
+      .filter((href) => {
+        const url = new URL(href);
+        return url.hostname === 'json.tarkov.dev' && url.pathname === '/';
+      });
+    expect(rootLinks).toEqual([]);
+  });
 });
