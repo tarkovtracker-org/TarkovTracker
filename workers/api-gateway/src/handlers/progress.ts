@@ -1,5 +1,5 @@
 import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
-import { applyTaskTransition } from '@shared/utils/taskTransitions';
+import { setTaskState } from '@shared/utils/taskTransitions';
 import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
@@ -34,21 +34,6 @@ interface ProgressMergePayload {
   taskCompletions?: Record<string, TaskCompletion>;
   taskObjectives?: Record<string, Record<string, unknown>>;
   set?: Record<string, unknown>;
-}
-function snapshotCompletions(taskCompletions: Record<string, TaskCompletion>): Map<string, string> {
-  return new Map(Object.entries(taskCompletions).map(([id, value]) => [id, JSON.stringify(value)]));
-}
-function diffCompletions(
-  taskCompletions: Record<string, TaskCompletion>,
-  before: Map<string, string>
-): Record<string, TaskCompletion> {
-  const changed: Record<string, TaskCompletion> = {};
-  for (const [id, value] of Object.entries(taskCompletions)) {
-    if (before.get(id) !== JSON.stringify(value)) {
-      changed[id] = value;
-    }
-  }
-  return changed;
 }
 /**
  * Persist a partial progress update atomically via the merge_progress_data
@@ -398,16 +383,9 @@ export async function handleUpdateTask(
   const dataField = getProgressDataField(gameMode);
   const currentData = await fetchCurrentProgressData(env, token.user_id, gameMode);
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
-  const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
-  const tasks = await getTasks(gameMode);
-  applyTaskTransition(
-    taskCompletions,
-    tasks,
-    { taskId, state },
-    { timestamp: updateTime, updates: updateMap }
-  );
-  const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
+  setTaskState(taskCompletions, taskId, state, { timestamp: updateTime, updates: updateMap });
+  const changedCompletions = { [taskId]: taskCompletions[taskId] };
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
     set.lastApiUpdate = buildApiUpdateMeta(orderRequestedFirst(updateMap, [taskId]), updateTime);
@@ -435,19 +413,16 @@ export async function handleUpdateTasks(
   // Fetch current data
   const currentData = await fetchCurrentProgressData(env, token.user_id, gameMode);
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
-  const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
-  const explicitTaskIds = new Set(updates.map((update) => update.id));
-  const tasks = await getTasks(gameMode);
   for (const update of updates) {
-    applyTaskTransition(
-      taskCompletions,
-      tasks,
-      { taskId: update.id, state: update.state },
-      { timestamp: updateTime, updates: updateMap, protectedTaskIds: explicitTaskIds }
-    );
+    setTaskState(taskCompletions, update.id, update.state, {
+      timestamp: updateTime,
+      updates: updateMap,
+    });
   }
-  const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
+  const changedCompletions = Object.fromEntries(
+    [...new Set(updates.map((update) => update.id))].map((id) => [id, taskCompletions[id]])
+  );
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
     set.lastApiUpdate = buildApiUpdateMeta(

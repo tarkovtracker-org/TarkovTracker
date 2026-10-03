@@ -71,4 +71,11 @@ describe('story gate repair', () => {
     expect(mark?.complete).toBe(true);
     expect(mark?.timestamp).toBeGreaterThan(ahead);
   });
+  it('records the story objective of an accepted task', () => {
+    const pvp = progress({
+      taskCompletions: { fil: { complete: false, failed: false, active: true } },
+    });
+    expect(repairCompletedProgress({ pvp }, [gated('fil')])).toBe(1);
+    expect(pvp.storyChapters.tour?.objectives?.talk?.complete).toBe(true);
+  });
 });

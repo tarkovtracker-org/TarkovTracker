@@ -230,6 +230,9 @@ const normalizeTaskCompletionEntry = (
     complete: completion.complete === true,
     failed: completion.failed === true,
   };
+  if (typeof completion.active === 'boolean') {
+    normalized.active = completion.active;
+  }
   if (typeof completion.timestamp === 'number') {
     normalized.timestamp = completion.timestamp;
   }
@@ -334,6 +337,15 @@ export const mergeManualActivityHistory = (
     ]),
   };
 };
+/**
+ * A newer legacy entry without `active` must not inherit the older entry's flag: a terminal entry
+ * clears it, and an open entry leaves acceptance unknown.
+ */
+const reconcileInheritedActive = (merged: TaskCompletion, base: TaskCompletion): void => {
+  if (typeof base.active === 'boolean' || typeof merged.active !== 'boolean') return;
+  if (base.complete === true || base.failed === true) merged.active = false;
+  else delete merged.active;
+};
 export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined,
@@ -377,6 +389,7 @@ export function mergeProgressData(
     const base = remoteTs >= localTs ? normalizedRemote : normalizedLocal;
     const other = remoteTs >= localTs ? normalizedLocal : normalizedRemote;
     const merged = { ...other, ...base };
+    reconcileInheritedActive(merged, base);
     const newerExplicitlySetsFalse =
       Object.prototype.hasOwnProperty.call(base, 'complete') && base.complete === false;
     if ((normalizedLocal.complete || normalizedRemote.complete) && !newerExplicitlySetsFalse) {

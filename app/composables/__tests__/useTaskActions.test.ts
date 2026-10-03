@@ -20,6 +20,7 @@ const createTarkovStore = (options: {
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
+    setTaskActive: vi.fn(),
     confirmTaskAvailability: vi.fn(),
     isStoryObjectiveComplete: vi.fn((chapterId: string, objectiveId: string) =>
       (options.completeStoryObjectives ?? []).includes(`${chapterId}/${objectiveId}`)
@@ -140,6 +141,15 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('accepts an available task as explicitly active', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskActive();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('task-active');
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'active', taskId: 'task-active' })
+    );
+  });
   it('confirms only the selected server-gated task without inventing counter contributors', async () => {
     const task: Task = {
       id: 'gated',
@@ -255,6 +265,18 @@ describe('useTaskActions', () => {
         objective: { id: 'talk-to-therapist' },
       },
     ],
+  });
+  it('records the story objectives an accepted task implies for undo', async () => {
+    const task = tourGated('first-in-line');
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskActive();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk-to-therapist');
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'active',
+        recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk-to-therapist' }],
+      })
+    );
   });
   it.each(['markTaskComplete', 'markTaskFailed'] as const)(
     '%s records the story objective the task was gated on',

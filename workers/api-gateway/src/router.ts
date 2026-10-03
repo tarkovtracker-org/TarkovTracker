@@ -22,7 +22,7 @@ import {
 } from './responses';
 import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './utils/userAgent';
 import type { BatchTaskUpdate, Env, Permission, TaskState } from './types';
-const TASK_STATES = new Set<TaskState>(['completed', 'uncompleted', 'failed']);
+const TASK_STATES = new Set<TaskState>(['active', 'completed', 'uncompleted', 'failed']);
 const API_HOST_PREFIXES = ['/api/v2', '/api', '/v2'] as const;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 function isLoopbackHost(hostname: string): boolean {
@@ -311,7 +311,7 @@ async function routeTask(context: RouteContext): Promise<Response | null> {
   if (!isTaskState(body.state)) {
     const value = formatInvalidState(body.state);
     return errorResponse(
-      'Invalid state "' + value + '" (must be completed, uncompleted, or failed)',
+      'Invalid state "' + value + '" (must be active, completed, uncompleted, or failed)',
       400,
       context.origin,
       context.reqOrigin,

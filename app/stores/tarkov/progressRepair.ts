@@ -42,6 +42,7 @@ function markTaskFailed(modeData: UserProgressData, taskId: string, tasks: TaskL
   const completion = (completionsOf(modeData)[taskId] ??= {});
   completion.complete = true;
   completion.failed = true;
+  completion.active = false;
   completion.manual = completion.manual === true;
   completion.timestamp ??= Date.now();
   resetTaskObjectives(modeData, tasks.get(taskId));
@@ -56,6 +57,7 @@ function markTaskUncompleted(modeData: UserProgressData, taskId: string, tasks: 
   Object.assign(completion, {
     complete: false,
     failed: false,
+    active: false,
     manual: false,
     timestamp: now,
   });

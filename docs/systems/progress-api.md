@@ -76,17 +76,25 @@ sequenceDiagram
    failures remain uncached and retryable, with the existing 30-second fetch timeout.
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
-   algorithm the app uses) and game-edition hideout auto-completes.
+   algorithm the app uses) and game-edition hideout auto-completes. Task progress includes `active`
+   when the stored JSONB value
+   explicitly contains a boolean. Legacy terminal rows that omit it are normalized to `false`,
+   while ambiguous incomplete omission remains observable as unknown.
    Gateway task catalogs are frozen and registered with a prepared dependency graph once per catalog
    snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
    state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.
-7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
+7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
+   `uncompleted`. They persist canonical `complete`/`failed`/`active` triples only for task IDs
+   explicitly supplied by the caller. Auto-unlocked successors with no stored progress stay absent;
+   client availability derives from task requirements and current progress. The gateway does not
+   issue implicit successor writes that could overwrite concurrent or explicit progress.
+8. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
    `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
    accepts gzip; an explicit `gzip;q=0` is honored as a rejection, `identity;q=0` bypasses the
    size threshold, and a client that refuses every available coding gets `406`.
-8. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
+9. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
    throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
 
 ### Files
@@ -107,8 +115,8 @@ sequenceDiagram
   app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/requirementStatus.ts` — runtime-independent task-requirement status predicates,
   shared by invalidation, app task actions, failed-state repair, and the Worker
-- `shared/utils/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
-  lock/unlock) used by Worker task writes
+- `shared/utils/taskTransitions.ts` — runtime-independent explicit task-state writes (canonical
+  `complete`/`failed`/`active` triples, requested task IDs only) used by Worker task writes
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs
@@ -143,6 +151,16 @@ sequenceDiagram
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
   never hide a change that came from task metadata or invalidation rather than the user's row.
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
+- Ordinary-task acceptance is explicit. `active` is encoded as `{ complete: false, failed: false,
+active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
+  legacy incomplete task rows means unknown and is never inferred or mass-backfilled; a terminal
+  completed or failed row is inactive by definition and is normalized to `active: false`.
+- Auto-unlocked successors with no stored progress stay absent and their availability is derived
+  from task requirements and current progress. The gateway writes only explicitly requested task
+  IDs, so no implicit successor update can overwrite concurrent or explicit progress. An active
+  prerequisite is satisfied by an explicit active task or a task that has since completed when the
+  task has an `active` field. Legacy rows without `active` retain the client unlockable prerequisite
+  fallback described under Task availability below.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
   so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
   or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents

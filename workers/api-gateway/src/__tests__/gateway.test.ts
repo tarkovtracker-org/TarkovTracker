@@ -94,6 +94,13 @@ type BaseFetchMockOptions = {
   teamMembers?: string[];
   missingProgressUserIds?: string[];
 };
+const tasksWithRequirement = (status: string[]) => [
+  { id: 'task-main', taskRequirements: [] },
+  {
+    id: 'task-dependent',
+    taskRequirements: [{ task: 'task-main', status }],
+  },
+];
 const createBaseFetchMock = ({
   onMerge,
   mergeResult,
@@ -537,52 +544,166 @@ describe('api-gateway', () => {
     expect(retryAfter).toBeGreaterThan(0);
     expect(retryAfter).toBeLessThanOrEqual(31);
   });
-  it('updates dependent tasks for single update', async () => {
+  it.each([
+    ['single completed prerequisite', 'complete', '/progress/task/task-main', 'completed'],
+    ['batch accepted prerequisite', 'active', '/progress/tasks', 'active'],
+  ])(
+    'does not persist an unrequested successor when a %s unlocks it',
+    async (_label, requiredState, path, state) => {
+      let mergePayload: MergeRpcPayload | null = null;
+      const fetchMock = createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: tasksWithRequirement([requiredState]),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const body = path === '/progress/tasks' ? [{ id: 'task-main', state }] : { state };
+      const res = await worker.fetch(
+        buildRequest(path, {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(body),
+        }),
+        BASE_ENV
+      );
+      expect(res.status).toBe(200);
+      expect(mergePayload).not.toBeNull();
+      const payload = mergePayload as unknown as MergeRpcPayload;
+      expect(payload.p_task_completions).toHaveProperty('task-main');
+      expect(payload.p_task_completions).not.toHaveProperty('task-dependent');
+      expect(payload.p_set?.lastApiUpdate).toMatchObject({
+        tasks: [{ id: 'task-main', state }],
+      });
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('json.tarkov.dev'))).toBe(
+        false
+      );
+    }
+  );
+  it('writes the canonical active state for a single task update', async () => {
     let mergePayload: MergeRpcPayload | null = null;
-    const fetchMock = createBaseFetchMock({
-      onMerge: (payload) => {
-        mergePayload = payload;
-      },
-      tasks: [
-        {
-          id: 'task-main',
-          name: 'Main Task',
-          factionName: 'Any',
-          objectives: [],
-          taskRequirements: [],
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
         },
-        {
-          id: 'task-dependent',
-          name: 'Dependent Task',
-          factionName: 'Any',
-          objectives: [],
-          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
-        },
-      ],
+        tasks: [
+          {
+            id: 'task-main',
+            name: 'Main Task',
+            factionName: 'Any',
+            objectives: [],
+            taskRequirements: [],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(postTaskRequest('task-main', { state: 'active' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_task_completions?.['task-main']).toMatchObject({
+      active: true,
+      complete: false,
+      failed: false,
     });
-    vi.stubGlobal('fetch', fetchMock);
+    expect(payload.p_set?.lastApiUpdate).toMatchObject({
+      tasks: [{ id: 'task-main', state: 'active' }],
+    });
+  });
+  it.each([
+    ['single', '/progress/task/task-main'],
+    ['batch', '/progress/tasks'],
+  ] as const)('preserves an active successor on a repeated active %s update', async (_, path) => {
+    let mergePayload: MergeRpcPayload | null = null;
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: tasksWithRequirement(['active']),
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: {
+            taskCompletions: {
+              'task-main': { active: true, complete: false, failed: false, timestamp: 1 },
+              'task-dependent': { active: true, complete: false, failed: false, timestamp: 2 },
+            },
+          },
+          pve_data: null,
+        },
+      })
+    );
+    const body =
+      path === '/progress/tasks' ? [{ id: 'task-main', state: 'active' }] : { state: 'active' };
     const res = await worker.fetch(
-      buildRequest('/progress/task/task-main', {
+      buildRequest(path, {
         method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
+        headers: AUTH_HEADERS,
+        body: JSON.stringify(body),
       }),
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(mergePayload).not.toBeNull();
     const payload = mergePayload as unknown as MergeRpcPayload;
-    expect(payload.p_field).toBe('pvp_data');
-    const taskCompletions = payload.p_task_completions as Record<
-      string,
-      { complete?: boolean; failed?: boolean; timestamp?: number }
-    > | null;
-    expect(taskCompletions?.['task-main']?.complete).toBe(true);
-    expect(taskCompletions?.['task-main']?.failed).toBe(false);
-    expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
-    expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
-    expect(payload.p_set?.lastApiUpdate).toBeDefined();
+    expect(payload.p_task_completions?.['task-dependent']).toBeUndefined();
   });
+  it.each([
+    ['completed', 'single', '/progress/task/task-main'],
+    ['failed', 'single', '/progress/task/task-main'],
+    ['completed', 'batch', '/progress/tasks'],
+    ['failed', 'batch', '/progress/tasks'],
+  ] as const)(
+    'preserves a %s successor during an active-to-completed %s update',
+    async (successorState, pathKind, path) => {
+      let mergePayload: MergeRpcPayload | null = null;
+      const successor =
+        successorState === 'completed'
+          ? { active: false, complete: true, failed: false, timestamp: 2 }
+          : { active: false, complete: true, failed: true, timestamp: 2 };
+      vi.stubGlobal(
+        'fetch',
+        createBaseFetchMock({
+          onMerge: (payload) => {
+            mergePayload = payload;
+          },
+          tasks: [
+            { id: 'task-main', taskRequirements: [] },
+            {
+              id: 'task-dependent',
+              taskRequirements: [{ task: 'task-main', status: ['active'] }],
+            },
+          ],
+          userProgress: {
+            user_id: 'user-1',
+            game_edition: 1,
+            pvp_data: {
+              taskCompletions: {
+                'task-main': { active: true, complete: false, failed: false, timestamp: 1 },
+                'task-dependent': successor,
+              },
+            },
+            pve_data: null,
+          },
+        })
+      );
+      const body =
+        pathKind === 'batch' ? [{ id: 'task-main', state: 'completed' }] : { state: 'completed' };
+      const res = await worker.fetch(
+        buildRequest(path, {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(body),
+        }),
+        BASE_ENV
+      );
+      expect(res.status).toBe(200);
+      const payload = mergePayload as unknown as MergeRpcPayload;
+      expect(payload.p_task_completions?.['task-dependent']).toBeUndefined();
+    }
+  );
   it('skips lastApiUpdate for idempotent single task updates', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
@@ -640,7 +761,7 @@ describe('api-gateway', () => {
           name: 'Dependent Task',
           factionName: 'Any',
           objectives: [],
-          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
+          taskRequirements: [{ task: 'task-main', status: ['active'] }],
         },
       ],
     });
@@ -650,8 +771,8 @@ describe('api-gateway', () => {
         method: 'POST',
         headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
         body: JSON.stringify([
-          { id: 'task-main', state: 'completed' },
-          { id: 'task-dependent', state: 'completed' },
+          { id: 'task-main', state: 'active' },
+          { id: 'task-dependent', state: 'active' },
         ]),
       }),
       BASE_ENV
@@ -661,14 +782,16 @@ describe('api-gateway', () => {
     const payload = mergePayload as unknown as MergeRpcPayload;
     const taskCompletions = payload.p_task_completions as Record<
       string,
-      { complete?: boolean; failed?: boolean; timestamp?: number }
+      { active?: boolean; complete?: boolean; failed?: boolean; timestamp?: number }
     > | null;
-    expect(taskCompletions?.['task-main']?.complete).toBe(true);
+    expect(taskCompletions?.['task-main']?.complete).toBe(false);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
-    expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
+    expect(taskCompletions?.['task-main']?.active).toBe(true);
+    expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+    expect(taskCompletions?.['task-dependent']?.active).toBe(true);
   });
-  it('lists explicit batch tasks before cascaded dependents in lastApiUpdate', async () => {
+  it('lists only explicitly requested batch tasks and preserves dependent progress', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const task = (id: string, requires?: string) => ({
       id,
@@ -709,9 +832,9 @@ describe('api-gateway', () => {
     expect(lastApiUpdate.tasks).toEqual([
       { id: 'task-a', state: 'completed' },
       { id: 'task-b', state: 'completed' },
-      { id: 'task-dependent', state: 'uncompleted' },
     ]);
     expect(lastApiUpdate.taskCount).toBeUndefined();
+    expect(payload.p_task_completions).not.toHaveProperty('task-dependent');
   });
   it('caps lastApiUpdate tasks and records the total count', async () => {
     let mergePayload: MergeRpcPayload | null = null;
@@ -906,7 +1029,11 @@ describe('api-gateway', () => {
               displayName: 'Tester',
               xpOffset: 0,
               taskObjectives: { 'obj-1': { complete: false, count: 0, timestamp: 1 } },
-              taskCompletions: { 'task-1': { complete: true, failed: false, timestamp: 1 } },
+              taskCompletions: {
+                'task-1': { complete: true, failed: false, timestamp: 1 },
+                'task-2': { active: true, complete: false, failed: false, timestamp: 2 },
+                'task-3': { active: true, complete: true, failed: true, timestamp: 3 },
+              },
               hideoutParts: { 'part-1': { complete: false, count: 0 } },
               hideoutModules: { 'module-1': { complete: false } },
               traders: {},
@@ -929,6 +1056,20 @@ describe('api-gateway', () => {
                 name: 'Task One',
                 factionName: 'Any',
                 objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
+                taskRequirements: [],
+              },
+              'task-2': {
+                id: 'task-2',
+                name: 'Task Two',
+                factionName: 'Any',
+                objectives: [],
+                taskRequirements: [],
+              },
+              'task-3': {
+                id: 'task-3',
+                name: 'Task Three',
+                factionName: 'Any',
+                objectives: [],
                 taskRequirements: [],
               },
             },
@@ -975,7 +1116,17 @@ describe('api-gateway', () => {
     expect(body.data.userId).toBe('user-1');
     const task = body.data.tasksProgress[0] as Record<string, unknown>;
     expect('failed' in task).toBe(false);
+    expect(task.active).toBe(false);
     expect('invalid' in task).toBe(false);
+    const activeTask = body.data.tasksProgress.find(({ id }) => id === 'task-2');
+    expect(activeTask).toMatchObject({ active: true, complete: false, id: 'task-2' });
+    const failedTask = body.data.tasksProgress.find(({ id }) => id === 'task-3');
+    expect(failedTask).toMatchObject({
+      active: false,
+      complete: false,
+      failed: true,
+      id: 'task-3',
+    });
     const objective = body.data.taskObjectivesProgress[0] as Record<string, unknown>;
     expect('count' in objective).toBe(false);
     expect('invalid' in objective).toBe(false);
@@ -1016,7 +1167,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      'Invalid state "foo" (must be completed, uncompleted, or failed)'
+      'Invalid state "foo" (must be active, completed, uncompleted, or failed)'
     );
   });
   it('rejects POST /progress/task when state is not a string', async () => {
@@ -1025,7 +1176,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      'Invalid state "123" (must be completed, uncompleted, or failed)'
+      'Invalid state "123" (must be active, completed, uncompleted, or failed)'
     );
   });
   it.each([
@@ -1037,7 +1188,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      `Invalid state "${display}" (must be completed, uncompleted, or failed)`
+      `Invalid state "${display}" (must be active, completed, uncompleted, or failed)`
     );
     expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');

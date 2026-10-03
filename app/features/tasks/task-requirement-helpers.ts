@@ -37,17 +37,27 @@ export const getCurrentTaskStatusForRequirement = (
   if (isUnlockable) return 'available';
   return 'not_started';
 };
+const hasExplicitAcceptance = (completion: RawTaskCompletion): boolean =>
+  typeof completion === 'object' && completion !== null && Object.hasOwn(completion, 'active');
+const acceptsActiveRequirement = (completion: RawTaskCompletion): boolean =>
+  isTaskActive(completion) || isTaskComplete(completion);
+const rejectsActiveRequirement = (completion: RawTaskCompletion): boolean =>
+  isTaskFailed(completion) || hasExplicitAcceptance(completion);
+const activeRequirementMet = (completion: RawTaskCompletion, isUnlockable: boolean): boolean => {
+  if (acceptsActiveRequirement(completion)) return true;
+  if (rejectsActiveRequirement(completion)) return false;
+  return isUnlockable;
+};
+const requirementChecks = {
+  completed: isTaskComplete,
+  failed: isTaskFailed,
+  active: activeRequirementMet,
+};
 export const isTaskRequirementSatisfied = (
   statuses: string[] | undefined,
   completion: RawTaskCompletion,
   isUnlockable = false
-): boolean => {
-  const requiredStatuses = getRequiredTaskStatuses(statuses);
-  if (requiredStatuses.includes('completed') && isTaskComplete(completion)) return true;
-  if (requiredStatuses.includes('failed') && isTaskFailed(completion)) return true;
-  if (requiredStatuses.includes('active')) {
-    if (isTaskActive(completion) || isTaskComplete(completion)) return true;
-    if (isUnlockable) return true;
-  }
-  return false;
-};
+): boolean =>
+  getRequiredTaskStatuses(statuses).some((status) =>
+    requirementChecks[status](completion, isUnlockable)
+  );

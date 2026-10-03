@@ -443,8 +443,18 @@ describe('Shared Profile API', () => {
         modeProgressResponse({
           level: 33,
           taskCompletions: {
-            '597a0f5686f774273b74f676': { complete: false, failed: false },
-            '597a160786f77477531d39d2': { complete: true, failed: false, timestamp: 2000 },
+            '597a0f5686f774273b74f676': {
+              active: true,
+              complete: false,
+              failed: false,
+            },
+            '597a160786f77477531d39d2': {
+              active: false,
+              complete: true,
+              failed: false,
+              timestamp: 2000,
+            },
+            legacy: { complete: false, failed: false },
           },
         })
       )
@@ -482,9 +492,10 @@ describe('Shared Profile API', () => {
     expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
-      '597a0f5686f774273b74f676': { complete: true, failed: true },
-      '597a160786f77477531d39d2': { complete: true, failed: false },
+      '597a0f5686f774273b74f676': { active: false, complete: true, failed: true },
+      '597a160786f77477531d39d2': { active: false, complete: true, failed: false },
     });
+    expect(result.data?.taskCompletions?.legacy).not.toHaveProperty('active');
   });
   it('uses the configured Tarkov JSON base for failure metadata', async () => {
     runtimeConfig.tarkovJsonBaseUrl = 'https://json-mirror.example';
@@ -522,6 +533,31 @@ describe('Shared Profile API', () => {
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
     expect(result.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
+  });
+  it('preserves active API task updates and drops unsupported update states', async () => {
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(
+        modeProgressResponse({
+          level: 24,
+          lastApiUpdate: {
+            id: 'update-1',
+            at: 1000,
+            source: 'api',
+            tasks: [
+              { id: 'task-active', state: 'active' },
+              { id: 'task-invalid', state: 'queued' },
+            ],
+          },
+        })
+      )
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result.data?.lastApiUpdate).toMatchObject({
+      id: 'update-1',
+      tasks: [{ id: 'task-active', state: 'active' }],
+    });
   });
   it('hides display name for public pvp profile when privacy mode is enabled', async () => {
     mockFetch

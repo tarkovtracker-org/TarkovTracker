@@ -210,7 +210,7 @@ const applyStartedImports = (
   for (const taskId of startedTaskIds) {
     const flags = getCompletionFlags(completions[taskId]);
     if (!shouldStartImportedTask(completedTaskIds.has(taskId), flags)) continue;
-    store.setTaskUncompleted(taskId);
+    store.setTaskActive(taskId);
     // The game only lets a task start once its start gates are met, so an imported start records
     // its story objectives and confirms its gate signature (after the status write, so it counts).
     const task = tasksMap.get(taskId) ?? { id: taskId };

@@ -423,6 +423,7 @@
   );
   const legendItems = computed(() => [
     { label: t('common.completed'), colorClass: 'bg-success-500' },
+    { label: t('common.active'), colorClass: 'bg-primary-500' },
     { label: t('common.available'), colorClass: 'bg-info-500' },
     { label: t('common.locked'), colorClass: 'bg-surface-500' },
     { label: t('common.failed'), colorClass: 'bg-error-500' },
@@ -434,6 +435,8 @@
     switch (node.data?.status) {
       case 'completed':
         return 'var(--color-success-500)';
+      case 'active':
+        return 'var(--color-primary-500)';
       case 'available':
         return 'var(--color-info-500)';
       case 'failed':

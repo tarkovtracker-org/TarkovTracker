@@ -17,6 +17,8 @@
     switch (props.data.status) {
       case 'completed':
         return 'border-success-500/60 bg-success-500/10';
+      case 'active':
+        return 'border-primary-500/60 bg-primary-500/10';
       case 'available':
         return 'border-info-500/60 bg-info-500/10';
       case 'failed':
