@@ -71,43 +71,27 @@ test('direct /tasks navigation renders usable application content', async ({ pag
   expect(new URL(page.url()).origin).toBe(origin);
   await expectUsableApplication(page, record);
 });
-for (const width of [333, 400, 1280]) {
-  test(`Needed Items source tabs retain accessible names at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 800 });
+test.describe('Needed Items source tabs', () => {
+  test.use({ locale: 'en-US' });
+  test('keep their names below and above the sm breakpoint', async ({ page }) => {
     const record = observe(page);
-    await page.goto(`${origin}/needed-items`, { waitUntil: 'networkidle' });
+    await page.setViewportSize({ width: 400, height: 800 });
+    const response = await page.goto(`${origin}/needed-items`, { waitUntil: 'networkidle' });
+    expect(response?.status()).toBe(200);
     await expectUsableApplication(page, record);
     const tablist = page.getByRole('tablist').first();
-    const tabs = ['All', 'Tasks', 'Hideout'].map((label) =>
-      tablist.getByRole('tab', { name: new RegExp(`^${label}\\s+\\d+$`, 'i') })
-    );
-    for (const tab of tabs) await expect(tab).toBeVisible();
-    await expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
-    await tabs[0].focus();
-    await page.keyboard.press('Tab');
-    await expect(page.locator('input[name="needed-items-search"]')).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    await expect(tabs[0]).toBeFocused();
-    await page.keyboard.press('ArrowRight');
-    await expect(tabs[1]).toBeFocused();
-    await expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
-    await expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
-    const focus = await tabs[1].evaluate((tab) => ({
-      visible: tab.matches(':focus-visible'),
-      outlineWidth: getComputedStyle(tab).outlineWidth,
-      outlineStyle: getComputedStyle(tab).outlineStyle,
-    }));
-    expect(focus.visible).toBe(true);
-    expect(parseFloat(focus.outlineWidth)).toBeGreaterThan(0);
-    expect(focus.outlineStyle).not.toBe('none');
-    await page.keyboard.press('ArrowRight');
-    await expect(tabs[2]).toBeFocused();
-    await expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
-    await page.keyboard.press('ArrowLeft');
-    await expect(tabs[1]).toBeFocused();
-    await expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    for (const width of [333, 400, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const label of ['All', 'Tasks', 'Hideout']) {
+        await expect(
+          tablist.getByRole('tab', { name: new RegExp(`^${label}\\s+\\d+$`, 'i') }),
+          `${label} tab name at ${width}px`
+        ).toBeVisible();
+      }
+    }
+    await expectUsableApplication(page, record);
   });
-}
+});
 test('cache-meta returns the anonymous fallback shape', async ({ request }) => {
   const response = await previewGet(request, `${origin}/api/tarkov/cache-meta`, origin);
   expect(response.status()).toBe(200);

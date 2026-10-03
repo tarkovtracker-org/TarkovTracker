@@ -19,9 +19,7 @@
     >
       <template #default="{ item }">
         <div class="flex items-center">
-          <span
-            class="sr-only text-[clamp(0.625rem,2vw,0.875rem)] uppercase sm:not-sr-only sm:inline"
-          >
+          <span class="sr-only text-[clamp(0.625rem,2vw,0.875rem)] uppercase sm:not-sr-only">
             {{ item.label }}
           </span>
           <span
