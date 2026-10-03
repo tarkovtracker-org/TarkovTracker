@@ -74,6 +74,47 @@ const createDefaultGlobal = () => ({
   },
 });
 describe('NeededItemsFilterBar', () => {
+  it('keeps localized source labels accessible with zero and changing counts', async () => {
+    const NeededItemsFilterBar = await setup();
+    const filterTabs = [
+      { label: 'Alle', value: 'all' as const, icon: 'i-mdi-clipboard-list', count: 0 },
+      {
+        label: 'Aufgaben',
+        value: 'tasks' as const,
+        icon: 'i-mdi-checkbox-marked-circle-outline',
+        count: 0,
+      },
+      { label: 'Versteck', value: 'hideout' as const, icon: 'i-mdi-home', count: 0 },
+    ];
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...createDefaultProps(), filterTabs },
+      global: createDefaultGlobal(),
+    });
+    const tabs = wrapper.find('[data-variant]').findAll('button');
+    for (const [index, tab] of tabs.entries()) {
+      const label = tab.find('span');
+      expect(label.text()).toBe(filterTabs[index]?.label);
+      expect(label.classes()).toContain('sr-only');
+      expect(label.classes()).toContain('sm:not-sr-only');
+      expect(label.classes()).not.toContain('hidden');
+      expect(tab.findAll('span').map((span) => span.text())).toEqual([
+        filterTabs[index]?.label,
+        '0',
+      ]);
+    }
+    await wrapper.setProps({
+      filterTabs: filterTabs.map((tab, index) => ({ ...tab, count: index + 1 })),
+    });
+    for (const [index, tab] of tabs.entries()) {
+      expect(tab.findAll('span').map((span) => span.text())).toEqual([
+        filterTabs[index]?.label,
+        String(index + 1),
+      ]);
+      expect(tab.findAll('.sr-only')).toHaveLength(1);
+    }
+    await tabs[1]?.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toEqual([['tasks']]);
+  });
   it('emits update:search after setting input value', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
