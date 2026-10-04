@@ -189,10 +189,7 @@ export function applyRequestDispositions(context, inputs) {
     const run = validateReceipt(context, inputs, receipt);
     verifyInterval(context, receipt, run);
   }
-  if (
-    context.retireRequest &&
-    !receipts.some((receipt) => receipt.commentId === context.retireRequest)
-  ) {
+  if (!receipts.some((receipt) => receipt.commentId === context.retireRequest)) {
     const receipt = newReceipt(context, inputs);
     mkdirSync(directory, { recursive: true });
     publishReceipt(
