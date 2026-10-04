@@ -6,12 +6,14 @@ test.beforeEach(async ({ page, request }) => {
   await protectPreviewBrowser(page, request, origin);
 });
 async function expectHitTarget(control) {
-  await control.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await expect(control).toBeVisible();
   await expect
     .poll(
-      async () =>
-        control.evaluate((element) => {
+      async () => {
+        // Late layout shifts (map tiles, task cards) can move the control under the fixed app bar
+        // after a single scroll, so re-center before every hit-test sample.
+        await control.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        return control.evaluate((element) => {
           const rect = element.getBoundingClientRect();
           return (
             rect.left >= 0 &&
@@ -25,7 +27,8 @@ async function expectHitTarget(control) {
               )
             )
           );
-        }),
+        });
+      },
       { message: (await control.getAttribute('aria-label')) || (await control.textContent()) }
     )
     .toBe(true);

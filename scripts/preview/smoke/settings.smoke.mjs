@@ -46,12 +46,16 @@ test('Progression controls fit narrow cards and support pointer and keyboard inp
     [400, 609],
     [1280, 761],
   ]) {
+    const option = (name) => page.getByRole('option', { name, exact: true });
     await page.setViewportSize({ width, height });
     await expectPointerTarget(edition);
     await edition.click();
-    await page.getByRole('option', { name: 'Edge of Darkness + Unheard', exact: true }).click();
+    await option('Edge of Darkness + Unheard').click();
     const label = edition.locator('span.justify-self-start');
     await expect(label).toHaveText('Edge of Darkness + Unheard');
+    // The closing popup's focus trap returns focus to the trigger. Keys sent before that land on
+    // the departing option instead, so wait for the popup to finish closing first.
+    await expect(page.getByRole('listbox')).toBeHidden();
     expect(
       await label.evaluate((element) => {
         const rect = element.getBoundingClientRect();
@@ -70,8 +74,11 @@ test('Progression controls fit narrow cards and support pointer and keyboard inp
       `edition label and chevron fit at ${width}px`
     ).toBe(true);
     await edition.focus();
+    await expect(edition).toBeFocused();
     await page.keyboard.press('Enter');
+    await expect(option('Edge of Darkness + Unheard')).toHaveAttribute('data-highlighted', '');
     await page.keyboard.press('Home');
+    await expect(option('Standard')).toHaveAttribute('data-highlighted', '');
     await page.keyboard.press('Enter');
     await expect(edition).toContainText('Standard');
     await expect(page.getByRole('listbox')).toBeHidden();
