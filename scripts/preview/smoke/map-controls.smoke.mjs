@@ -72,13 +72,22 @@ async function checkFloors(page, surface) {
     await floor.click();
     await expect(floor).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(layerState).not.toBe(previousLayers);
-    await floor.focus();
+    // Keep the keyboard target distinct from this and the next pointer selection.
+    const keyboardName = floorNames[(floorNames.indexOf(name) + 2) % floorNames.length];
+    const keyboardFloor = surface.getByRole('button', { name: keyboardName, exact: true });
+    await expect(keyboardFloor).toHaveAttribute('aria-pressed', 'false');
+    const pointerSelectedLayers = await layerState();
+    await keyboardFloor.focus();
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
-    await expect(floor).toBeFocused();
-    expect(await floor.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none');
+    await expect(keyboardFloor).toBeFocused();
+    expect(await keyboardFloor.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      'none'
+    );
     await page.keyboard.press('Enter');
-    await expect(floor).toHaveAttribute('aria-pressed', 'true');
+    await expect(keyboardFloor).toHaveAttribute('aria-pressed', 'true');
+    await expect(floor).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(layerState).not.toBe(pointerSelectedLayers);
   }
   await checkToolbar(page, toolbar);
 }
