@@ -47,14 +47,9 @@ path.
 - Team actions and invite links are unavailable until the active team row has loaded and its ID
   matches the mode-specific system-store team ID; stale owner or join-code state is never combined
   with another team's ID.
-- Teammate summaries normally come from `team_member_mode_summary`. When a persistent normalized row
-  is missing or its summary has no level, `app/server/api/team/members.ts` loads that member's legacy
-  progress server-side and returns only the derived display name, level, and completed-task count;
-  progress blobs never reach the client in the team-members payload. That fallback is best-effort — a
-  failed or timed-out legacy read is logged and the endpoint still returns the members it resolved.
-  It requires the service-role key: `user_progress` is owner-only, so a caller-JWT read returns at
-  most the caller's own row and never a teammate's. The route logs and skips the fallback when the key
-  is absent instead of issuing a request that cannot return teammate rows.
+- Teammate summaries come from `team_member_mode_summary` only. Missing normalized summaries do not
+  trigger legacy progress reads. The team-members endpoint returns only derived display name, level,
+  and completed-task count; progress blobs never reach the client in that payload.
 - The team channel is private. Realtime authorizes a private join from `realtime.messages` RLS, and a
   read permission alone is enough to join, so the only policy is a read policy scoped to `team:<id>`
   for members of that team. No client write policy exists: the channel carries authoritative Postgres
@@ -70,11 +65,10 @@ path.
   `CLOSED` before the first join still fails that join. Five consecutive failures
   tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
   rejoin loop with a bounded retry cycle.
-- New clients read teammate progress from mode rows. When a persistent normalized row is missing or
-  carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's
-  authorized mode column; the raw `user_progress` teammate policy is not used. Account-wide metadata
-  for new clients is exposed through the authenticated team-members endpoint after explicit
-  membership validation.
+- Clients hydrate teammate progress only from materialized normalized rows in the authorized mode
+  and active season. Missing or placeholder rows never invoke `get_teammate_legacy_progress` or
+  overwrite hydrated progress. A failed reconnect read retains the previous snapshot. Account-wide
+  metadata remains exposed through the authenticated team-members endpoint after membership validation.
 - `public.team_events` is server-authored only. `anon` and `authenticated` hold no table or
   column-level `INSERT`, a restrictive policy denies client inserts even if a grant is later
   inherited, and only `service_role` may insert. A `BEFORE INSERT` trigger stamps `server_verified`

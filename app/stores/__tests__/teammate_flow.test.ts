@@ -92,22 +92,32 @@ describe('teammate store hydration and lifetime', () => {
     });
     expect(mocks.replay).toHaveBeenCalled();
   });
-  it('uses persistent legacy progress only when normalized data is missing', async () => {
+  it('keeps defaults and does not request legacy progress when normalized rows are missing', async () => {
     mocks.rpc.mockResolvedValue({ data: { level: 37 }, error: null });
     await addMember('pve');
-    expect(flow.teammateStores.value.other?.$state.pve.level).toBe(37);
-    expect(mocks.rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
-      p_user_id: 'other',
-      p_game_mode: 'pve',
-    });
+    expect(flow.teammateStores.value.other?.$state.pve.level).toBe(1);
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it('does not overwrite materialized normalized progress with legacy data', async () => {
-    mocks.eq.mockResolvedValue({ data: [row(25)], error: null });
+  it('hydrates only valid normalized mode and season rows', async () => {
+    mocks.eq.mockResolvedValue({
+      data: [
+        row(50, 'arena'),
+        row(50, 'pvp', 1),
+        row(50, 'seasonal', ACTIVE_SEASON_NUMBER - 1),
+        row(25, 'pve'),
+      ],
+      error: null,
+    });
     mocks.rpc.mockResolvedValue({ data: { level: 50 }, error: null });
     await addMember();
-    expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(25);
+    expect(flow.teammateStores.value.other?.$state).toMatchObject({
+      pvp: { level: 1 },
+      pve: { level: 25 },
+      seasonal: { level: 1 },
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it('retains hydrated progress when a reconnect placeholder has a failed legacy fallback', async () => {
+  it('retains hydrated progress when reconnect returns a placeholder or no rows', async () => {
     mocks.eq.mockResolvedValue({
       data: [{ ...row(25), progress_data: { level: 25, pmcFaction: 'BEAR', xpOffset: 450 } }],
       error: null,
@@ -116,40 +126,46 @@ describe('teammate store hydration and lifetime', () => {
     const teammate = flow.teammateStores.value.other!;
     const previous = JSON.parse(JSON.stringify(teammate.$state.pvp));
     const placeholder = { ...row(1), progress_data: {} };
+    mocks.rpc.mockResolvedValue({ data: { level: 50 }, error: null });
     mocks.eq.mockResolvedValue({ data: [placeholder], error: null });
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'temporarily unavailable' } });
     window.dispatchEvent(new Event('teammate-progress-reconnected'));
     await flushPromises();
-    expect(mocks.rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
-      p_user_id: 'other',
-      p_game_mode: 'pvp',
-    });
     expect(teammate.$state.pvp).toEqual(previous);
     emitProgress(placeholder);
     expect(teammate.$state.pvp).toEqual(previous);
-    mocks.rpc.mockResolvedValue({ data: { level: 31, pmcFaction: 'BEAR' }, error: null });
+    mocks.eq.mockResolvedValue({ data: [], error: null });
     window.dispatchEvent(new Event('teammate-progress-reconnected'));
     await flushPromises();
-    expect(teammate.$state.pvp.level).toBe(31);
+    expect(teammate.$state.pvp).toEqual(previous);
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it('does not let a live placeholder suppress an outstanding usable legacy read', async () => {
-    const legacy = Promise.withResolvers<{ data: { level: number }; error: null }>();
-    mocks.eq.mockResolvedValue({ data: [{ ...row(1), progress_data: {} }], error: null });
-    mocks.rpc.mockReturnValue(legacy.promise);
+  it.each(['error', 'rejection'])(
+    'retains existing progress when a reconnect read fails with %s',
+    async (failure) => {
+      mocks.eq.mockResolvedValue({ data: [row(25)], error: null });
+      await addMember();
+      const teammate = flow.teammateStores.value.other!;
+      const previous = JSON.parse(JSON.stringify(teammate.$state.pvp));
+      const error = new Error('temporarily unavailable');
+      if (failure === 'error') mocks.eq.mockResolvedValue({ data: [row(50)], error });
+      else mocks.eq.mockRejectedValue(error);
+      const replayCount = mocks.replay.mock.calls.length;
+      window.dispatchEvent(new Event('teammate-progress-reconnected'));
+      await flushPromises();
+      expect(teammate.$state.pvp).toEqual(previous);
+      expect(mocks.replay).toHaveBeenCalledTimes(replayCount);
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    }
+  );
+  it('does not let a live placeholder suppress an outstanding normalized read', async () => {
+    const pending = Promise.withResolvers<{ data: ReturnType<typeof row>[]; error: null }>();
+    mocks.eq.mockReturnValue(pending.promise);
     await addMember();
     emitProgress({ ...row(1), progress_data: {} });
-    legacy.resolve({ data: { level: 37 }, error: null });
+    pending.resolve({ data: [row(37)], error: null });
     await flushPromises();
     expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(37);
-  });
-  it('never uses persistent legacy fallback for a Seasonal teammate', async () => {
-    mocks.eq.mockResolvedValue({
-      data: [row(20, 'seasonal', ACTIVE_SEASON_NUMBER - 1)],
-      error: null,
-    });
-    await addMember('seasonal');
     expect(mocks.rpc).not.toHaveBeenCalled();
-    expect(flow.teammateStores.value.other?.$state.seasonal.level).toBe(1);
   });
   it('ignores events for a different user, invalid mode, or wrong season', async () => {
     await addMember();

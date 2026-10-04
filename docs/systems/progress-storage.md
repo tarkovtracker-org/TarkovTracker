@@ -24,10 +24,9 @@ flowchart LR
 
 ### Flow
 
-1. Startup reads account metadata and legacy PvP/PvE from `user_progress`, then reads normalized
-   rows and prefers the normalized active row for each mode. An account with no normalized row falls
-   back to the legacy PvP/PvE JSON, so the normalized table can be populated lazily or backfilled
-   after the schema ships.
+1. Startup reads account metadata from `user_progress` and progress only from normalized rows.
+   Missing or unmaterialized rows do not cause legacy JSON reads. Owned local recovery copies still
+   reconcile with cloud state under the existing ownership, reset-epoch, and per-mode clock rules.
 2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
@@ -162,19 +161,17 @@ Teams, save status and recovery, and progress imports build on this storage; see
   the RPC's `SMALLINT` only as a JSON number that is a positive integer
   (`shared/utils/seasonNumber.ts`); strings, booleans, arrays, objects, null, zero, negatives and
   fractions are rejected without coercion and fail closed.
-- A missing or unmaterialized normalized persistent-mode row is never treated as absent progress: own
-  and teammate hydration, shared profiles and overlays, team summaries, and public progress/team API
-  reads fall back to `user_progress`; sharing falls back to the legacy preference. A row counts as
-  unmaterialized when its `progress_data` carries no numeric `level`, which is the same test the
-  optional operational backfill uses. Seasonal never falls back to persistent PvP. A materialized
-  normalized row always wins, and writes populate it lazily. A failure reading the legacy sharing
-  preference is logged and treated as "not shared"; it never discards normalized visibility that
-  loaded successfully. Optional operational backfill only fills rows whose `progress_data` carries no
-  `level`, so it cannot overwrite a write that landed first and never changes `profile_public` on an
-  existing row. Missing rows use `ON CONFLICT DO NOTHING`; materialized rows are skipped without
-  row locks, while placeholder repairs lock and recheck the level after any concurrent write. It
-  never counts as account activity for inactivity cleanup. The fallbacks stay until the gate reports
-  zero rows for both modes.
+- Own and teammate hydration, shared profiles and overlays, team summaries, and public progress/team
+  API reads use normalized rows only. A materialized row carries a finite numeric `level`; missing
+  and placeholder rows provide no remote progress. A missing normalized profile row remains private,
+  regardless of legacy sharing preferences. Visibility on an existing normalized row remains authoritative.
+  The production completion gate was verified zero across all 16 UUID ranges for PvP and PvE on
+  2026-10-04 before removing database reader fallbacks (#1028).
+- The operational backfill only fills rows whose normalized progress has no numeric `level`; it
+  cannot overwrite an already materialized row or change its visibility. Missing rows use
+  `ON CONFLICT DO NOTHING`; placeholder repairs lock and recheck after concurrent writes. It preserves
+  source timestamps and records no account activity. Schema rollout and data completion are separate
+  checks; see the runbook for bounded verification.
 - `merge_progress_data` seeds an unmaterialized persistent row from its legacy column inside the same
   `FOR UPDATE` lock before merging. Its original seed is an `INSERT ... ON CONFLICT DO NOTHING`, which
   only fires when no row exists, so a placeholder row created by the visibility RPC or the legacy
@@ -194,10 +191,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
   mutations of team, membership, legacy progress, and normalized progress tables are revoked.
   Teammate reads require a shared team in the same game mode; cross-mode teammates and outsiders
   cannot read a row.
-- Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
-  Shared-profile, gateway, and teammate reads request legacy progress only when their existing
-  fallback rules require it. Public visibility and team authorization still precede fallback use.
-  This reduces Supabase transfer; gateway response ETags alone do not avoid upstream reads.
+- Startup fetches account metadata and normalized modes without selecting legacy mode columns.
+  Shared-profile, gateway, and teammate reads never request legacy progress. Public visibility and
+  team authorization still precede normalized reads. Database compatibility writers remain for older
+  clients until the separately reviewed dual-write retirement deploys.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
@@ -221,11 +218,11 @@ Teams, save status and recovery, and progress imports build on this storage; see
   and teammate/public API projections never include them.
 - Manual histories merge during preferred-snapshot startup as well as realtime reconciliation.
   History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
-  persists the mutation that created the subscription, including post-load legacy adoption. Initial
+  persists the mutation that created the subscription, including post-load local recovery adoption. Initial
   saves retry once after a failure, retain pending state, and stop retrying after a session change.
   A failed authenticated initial sync retries within the same session on a bounded 30-second cycle
   (five attempts, first failure and exhaustion toast, intermediate failures log a warning) so the
-  deferred legacy adoption is not stranded until the next login. Each failed attempt first tears
+  local recovery adoption is not stranded until the next login. Each failed attempt first tears
   down the partially initialized sync controller and realtime listener (`resetTarkovSync`) so the
   retry rebuilds from a clean slate instead of skipping listener setup; stale-session failures
   skip both teardown and retry. Identity changes cancel the pending retry and reset the attempt

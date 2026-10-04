@@ -2,15 +2,13 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import {
-  applyLegacyPersistentProgressResult,
   applyTeammateProgressEvent,
   buildMemberProgressFilter,
-  fetchLegacyTeammateProgress,
   resolveTeammateIdentity,
   useTeamStore,
   useTeamStoreWithSupabase,
 } from '@/stores/useTeamStore';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
 const { mockGetTeamMembers, mockUseSupabaseListener } = vi.hoisted(() => ({
@@ -1069,49 +1067,5 @@ describe('Teammate progress helpers', () => {
   it('omits the progress filter when no valid members are present', () => {
     expect(buildMemberProgressFilter(null)).toBeUndefined();
     expect(buildMemberProgressFilter(['not-a-uuid'])).toBeUndefined();
-  });
-  it('applies a legacy progress result only when it is usable', () => {
-    const applyProgress = vi.fn();
-    const appliedModes = new Set<GameMode>();
-    applyLegacyPersistentProgressResult(
-      { data: { level: 12 }, error: null },
-      appliedModes,
-      'teammate-1',
-      GAME_MODES.PVP,
-      applyProgress
-    );
-    expect(applyProgress).toHaveBeenCalledWith(GAME_MODES.PVP, { level: 12 });
-    appliedModes.add(GAME_MODES.PVE);
-    applyLegacyPersistentProgressResult(
-      { data: { level: 20 }, error: null },
-      appliedModes,
-      'teammate-1',
-      GAME_MODES.PVE,
-      applyProgress
-    );
-    expect(applyProgress).toHaveBeenCalledTimes(1);
-    applyLegacyPersistentProgressResult(
-      { data: null, error: new Error('denied') },
-      appliedModes,
-      'teammate-1',
-      GAME_MODES.PVP,
-      applyProgress
-    );
-    expect(applyProgress).toHaveBeenCalledTimes(1);
-  });
-  it('uses the teammate RPC for persistent modes and skips Seasonal', async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { level: 12 }, error: null });
-    const client = { rpc };
-    await expect(
-      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.PVP)
-    ).resolves.toEqual({ data: { level: 12 }, error: null });
-    expect(rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
-      p_game_mode: GAME_MODES.PVP,
-      p_user_id: 'teammate-1',
-    });
-    await expect(
-      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.SEASONAL)
-    ).resolves.toEqual({ data: null, error: null });
-    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

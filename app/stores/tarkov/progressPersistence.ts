@@ -15,7 +15,7 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
+import { hasMaterializedProgress } from '@/utils/modeProgress';
 import { isRecord, sanitizeTarkovUid } from '@/utils/progressSanitizers';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 type SupabaseError = { code?: string; message: string };

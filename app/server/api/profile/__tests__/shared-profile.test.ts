@@ -83,6 +83,7 @@ describe('Shared Profile API', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch as typeof fetch);
     vi.clearAllMocks();
+    mockFetch.mockReset();
     runtimeConfig.apiProtection.trustProxy = false;
     runtimeConfig.sharedProfileCacheTtlMs = 5000;
     runtimeConfig.sharedProfileRateLimitPerMinute = 120;
@@ -318,60 +319,27 @@ describe('Shared Profile API', () => {
       restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
     ).toBe('user_id,game_edition');
   });
-  it.each(['network', 'json'])('normalizes deferred legacy %s failures to 502', async (failure) => {
+  it('keeps missing normalized profiles private despite legacy sharing preferences', async () => {
     mockFetch
-      .mockResolvedValueOnce(progressResponse(3))
+      .mockResolvedValueOnce(progressResponse(3, { pvp_data: { level: 39 } }))
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
-      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
-    if (failure === 'network') mockFetch.mockRejectedValueOnce(new Error('offline'));
-    else
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('invalid json');
-        },
-      });
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 502 });
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 403 });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
-  it.each(['missing', 'placeholder'])(
-    'loads deferred legacy data for a %s normalized row',
-    async (kind) => {
-      mockFetch
-        .mockResolvedValueOnce(progressResponse(3))
-        .mockResolvedValueOnce(
-          kind === 'missing'
-            ? { ok: true, json: async () => [] }
-            : modeProgressResponse({ taskCompletions: {} }, true)
-        )
-        .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ pvp_data: { displayName: 'LegacyPlayer', level: 39 } }],
-        });
-      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-      expect(await handler(mockEvent as H3Event)).toMatchObject({
-        data: { displayName: 'LegacyPlayer', level: 39 },
-        gameEdition: 3,
-        mode: 'pvp',
-        visibility: 'public',
-      });
-    }
-  );
-  it.each(['http', 'abort', 'timeout'])('normalizes deferred legacy %s errors', async (failure) => {
+  it('returns empty progress for public normalized placeholders without reading legacy data', async () => {
     mockFetch
-      .mockResolvedValueOnce(progressResponse(3))
-      .mockResolvedValueOnce({ ok: true, json: async () => [] })
-      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
-    if (failure === 'http') mockFetch.mockResolvedValueOnce({ ok: false });
-    else
-      mockFetch.mockRejectedValueOnce(
-        failure === 'abort' ? createAbortError() : { statusCode: 504 }
-      );
+      .mockResolvedValueOnce(progressResponse(3, { pvp_data: { level: 39 } }))
+      .mockResolvedValueOnce(
+        modeProgressResponse({ displayName: 'Placeholder', taskCompletions: {} })
+      )
+      .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
-      statusCode: failure === 'http' ? 502 : 504,
-    });
+    expect(await handler(mockEvent as H3Event)).toMatchObject({ data: {}, gameEdition: 3 });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
   it('loads Seasonal profiles from the active season row', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {

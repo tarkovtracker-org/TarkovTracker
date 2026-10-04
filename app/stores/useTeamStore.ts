@@ -10,7 +10,7 @@ import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgressFallback';
+import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgress';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import {
   createChannelReleaseLatch,
@@ -104,35 +104,6 @@ export const buildMemberProgressFilter = (
   );
   return memberIds.length > 0 ? `user_id=in.(${memberIds.join(',')})` : undefined;
 };
-export const applyLegacyPersistentProgressResult = (
-  result: { data: unknown; error: unknown },
-  appliedModes: Set<GameMode>,
-  teammateId: string,
-  mode: GameMode,
-  applyProgress: (mode: GameMode, progress: unknown) => void
-): void => {
-  if (result.error) {
-    logTeammateModeProgressHydrationFailure(result.error, teammateId);
-    return;
-  }
-  if (appliedModes.has(mode)) return;
-  if (result.data !== null) applyProgress(mode, result.data);
-};
-export const fetchLegacyTeammateProgress = async (
-  client: Pick<SupabaseClient, 'rpc'>,
-  teammateId: string,
-  mode: GameMode
-): Promise<{ data: unknown; error: unknown }> => {
-  if (mode === GAME_MODES.SEASONAL) return { data: null, error: null };
-  return client.rpc('get_teammate_legacy_progress', {
-    p_game_mode: mode,
-    p_user_id: teammateId,
-  });
-};
-const resolveTeammateLegacyMode = (
-  memberProfile: MemberProfile | undefined,
-  currentMode: GameMode
-): GameMode => memberProfile?.gameMode ?? currentMode;
 export type TeammateIdentity = {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -830,7 +801,7 @@ export function useTeammateStores() {
         const expectedSeason = getGameModeSeasonNumber(mode);
         if (row.season_number !== expectedSeason) return null;
         // Visibility can create a row without progress. Keep the last usable
-        // snapshot and let legacy hydration recover, even after a live event.
+        // snapshot, even after a live event.
         if (!hasMaterializedProgress(row.progress_data)) return null;
         applyProgressData(mode, row.progress_data, authoritative);
         return mode;
@@ -842,17 +813,6 @@ export function useTeammateStores() {
           applyModeProgress(row);
         });
       };
-      const legacyMode = resolveTeammateLegacyMode(memberProfile, getCurrentGameMode());
-      const applyLegacyModeProgress = (legacyRow: { data: unknown; error: unknown }) => {
-        if (!isHydrationActive()) return;
-        applyLegacyPersistentProgressResult(
-          legacyRow,
-          appliedModes,
-          teammateId,
-          legacyMode,
-          applyProgressData
-        );
-      };
       const replayHydratedProgressMetadata = () => {
         if (!isHydrationActive()) return;
         replayProgressMetadataMigration();
@@ -860,32 +820,7 @@ export function useTeammateStores() {
       let hydrationRequest = 0;
       const hydrationIsStale = (request: number): boolean =>
         !isHydrationActive() || request !== hydrationRequest;
-      /**
-       * A season-0 row is the materialized copy of legacy progress. Without one,
-       * the legacy per-mode column on `user_progress` is still authoritative.
-       */
-      const hasMaterializedLegacyRow = (
-        rows: Array<Record<string, unknown>> | null | undefined
-      ): boolean =>
-        (rows ?? []).some(
-          (row) =>
-            row.game_mode === legacyMode &&
-            row.season_number === 0 &&
-            hasMaterializedProgress(row.progress_data)
-        );
-      const readLegacyTeammateProgress = async (
-        rows: Array<Record<string, unknown>> | null | undefined
-      ): Promise<{ data: unknown; error: unknown }> =>
-        hasMaterializedLegacyRow(rows)
-          ? { data: null, error: null }
-          : await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode);
-      /**
-       * Reads the teammate's materialized mode rows, plus the legacy column when
-       * no materialized copy exists.
-       *
-       * @returns `null` when the request went stale or the read failed; a failed
-       *   read has already been reported.
-       */
+      /** Reads normalized rows, reporting failures without changing existing progress. */
       const readTeammateProgressRows = async (request: number) => {
         const modeRows = await $supabase.client
           .from('user_game_mode_progress')
@@ -896,10 +831,7 @@ export function useTeammateStores() {
           logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
           return null;
         }
-        return {
-          legacyRow: await readLegacyTeammateProgress(modeRows.data),
-          modeRows: modeRows.data,
-        };
+        return modeRows.data;
       };
       const hydrateModeProgress = async () => {
         const request = ++hydrationRequest;
@@ -907,8 +839,7 @@ export function useTeammateStores() {
         try {
           const rows = await readTeammateProgressRows(request);
           if (!rows || hydrationIsStale(request)) return;
-          applyModeProgressRows(rows.modeRows);
-          applyLegacyModeProgress(rows.legacyRow);
+          applyModeProgressRows(rows);
           replayHydratedProgressMetadata();
         } catch (error) {
           logTeammateModeProgressHydrationFailure(error, teammateId);

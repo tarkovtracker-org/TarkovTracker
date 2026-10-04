@@ -21,11 +21,7 @@ import {
 } from '@/server/utils/sharedEdgeStore';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
-import {
-  getLegacyModeProgressField,
-  hasMaterializedProgress,
-  resolveModeProgressData,
-} from '@/utils/modeProgressFallback';
+import { hasMaterializedProgress } from '@/utils/modeProgress';
 import {
   isRecord,
   sanitizeDisplayName,
@@ -60,14 +56,10 @@ type JsonTaskFailureMetadata = {
   failConditions?: JsonFailCondition[] | null;
 };
 type PreferencesRow = {
-  profile_share_pve_public?: boolean | null;
-  profile_share_pvp_public?: boolean | null;
   streamer_mode?: boolean | null;
 };
 type ProgressRow = {
   game_edition?: number | null;
-  pve_data?: unknown | null;
-  pvp_data?: unknown | null;
   user_id: string;
 };
 type ModeProgressRow = {
@@ -640,7 +632,6 @@ export default defineEventHandler(async (event) => {
   let progressResponse: Response;
   let modeProgressResponse: Response;
   let preferencesResponse: Response;
-  const legacyProgressField = getLegacyModeProgressField(mode);
   const progressSelect = 'user_id,game_edition';
   try {
     [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
@@ -648,9 +639,7 @@ export default defineEventHandler(async (event) => {
       restFetch(
         `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${seasonNumber}&limit=1`
       ),
-      restFetch(
-        `user_preferences?select=streamer_mode,profile_share_pvp_public,profile_share_pve_public&user_id=eq.${userId}&limit=1`
-      ),
+      restFetch(`user_preferences?select=streamer_mode&user_id=eq.${userId}&limit=1`),
     ]);
   } catch (error) {
     resourcesController.abort();
@@ -688,38 +677,13 @@ export default defineEventHandler(async (event) => {
     });
   }
   const isOwner = requesterUserId === userId;
-  const legacyModePublic =
-    mode === 'pvp'
-      ? preferencesRow?.profile_share_pvp_public === true
-      : mode === 'pve'
-        ? preferencesRow?.profile_share_pve_public === true
-        : false;
-  const isModePublic = modeProgressRow ? modeProgressRow.profile_public === true : legacyModePublic;
+  const isModePublic = modeProgressRow?.profile_public === true;
   if (!isOwner && !isModePublic) {
     throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
   }
-  if (legacyProgressField && !hasMaterializedProgress(modeProgressRow?.progress_data)) {
-    try {
-      const response = await restFetch(
-        `user_progress?select=${legacyProgressField}&user_id=eq.${userId}&limit=1`
-      );
-      if (!response.ok)
-        throw createError({ statusCode: 502, statusMessage: 'Failed to load legacy profile data' });
-      const rows = (await response.json()) as ProgressRow[];
-      progressRow[legacyProgressField] = rows[0]?.[legacyProgressField];
-    } catch (error) {
-      resourcesController.abort();
-      if (Object(error).statusCode === 504 || isAbortError(error)) {
-        throw createError({
-          statusCode: 504,
-          statusMessage: 'Timed out while loading shared profile data',
-        });
-      }
-      logger.error('Failed to load legacy profile resources', { error, userId });
-      throw createError({ statusCode: 502, statusMessage: 'Failed to load legacy profile data' });
-    }
-  }
-  const profileData = resolveModeProgressData(mode, modeProgressRow?.progress_data, progressRow);
+  const profileData = hasMaterializedProgress(modeProgressRow?.progress_data)
+    ? modeProgressRow?.progress_data
+    : null;
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;
   const sanitizedData = sanitizeProgressPayload(profileData, {
     includeDisplayName: !hideDisplayName,
