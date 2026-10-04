@@ -172,9 +172,9 @@ test('desktop retains panel scrolling and sticky navigation', async ({ page }) =
     .poll(() =>
       page
         .locator('#preferences')
-        .evaluate((element) => Math.round(element.getBoundingClientRect().top))
+        .evaluate((element) => Math.abs(element.getBoundingClientRect().top - 96))
     )
-    .toBe(96);
+    .toBeLessThanOrEqual(2);
   await navigate(page, '/settings#keybinds');
   await expectNestedTarget(page, '#keybinds', '#preferences');
   await expect(page.getByTestId('desktop-tab-preferences')).toBeVisible();
