@@ -20,6 +20,8 @@ describe('validatePrTitle', () => {
     ['fix:missing space', /must look like/],
     ['fix(): empty scope', /must look like/],
     ['enhance(ui): unknown type', /Unknown type "enhance"/],
+    // A `wip` title would land on main unchanged, so it is not an allowed type.
+    ['wip: half-finished work', /Unknown type "wip"/],
     ['Fix: uppercase type', /must look like/],
     // semantic-release's angular parser cannot read `!`, so the change would not release.
     ['feat(tasks)!: drop the legacy filter', /must look like/],

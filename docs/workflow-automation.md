@@ -892,6 +892,10 @@ Only the type prefix is enforced. CI checks the **PR title** (`.github/workflows
 `scripts/checks/check-pr-title.mjs`), because squash merges turn it into the commit on `main`;
 editing the title re-runs the check. Branch commits are not checked in CI.
 
+The repository allows squash merges only. The squash commit title is the PR title (GitHub appends
+`(#N)`, which release highlights use to find the PR's `## Release note`), and the squash commit
+body is blank.
+
 **Types:** listed with their release impact in `scripts/checks/commit-types.mjs`. Do not use the
 `!` breaking-change marker; the angular release parser cannot read it.
 
