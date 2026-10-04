@@ -18,8 +18,9 @@ async function expectPointerTarget(control) {
     expect(bounds.control.bottom).toBeLessThanOrEqual(bounds.card.bottom);
   }).toPass({ timeout: 5000 });
   await expect
-    .poll(async () =>
-      control.evaluate((element) => {
+    .poll(async () => {
+      await control.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      return control.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return (
           rect.left >= 0 &&
@@ -28,14 +29,14 @@ async function expectPointerTarget(control) {
             document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
           )
         );
-      })
-    )
+      });
+    })
     .toBe(true);
 }
 test('Progression controls fit narrow cards and support pointer and keyboard input', async ({
   page,
 }) => {
-  await page.goto(`${origin}/settings#progression`);
+  await page.goto(`${origin}/settings#progression`, { waitUntil: 'networkidle' });
   const edition = page.locator('#settings-game-edition-input');
   await expect(edition).toContainText('Standard');
   for (const [width, height] of [
@@ -75,6 +76,9 @@ test('Progression controls fit narrow cards and support pointer and keyboard inp
     await expect(edition).toContainText('Standard');
     await expect(page.getByRole('listbox')).toBeHidden();
     await expect(edition).toBeFocused();
+    expect(await edition.evaluate((element) => getComputedStyle(element).boxShadow)).toMatch(
+      /0px 0px 0px 4px/
+    );
     const skills = page.locator('#skills');
     for (const name of ['In-Game', 'Priority']) {
       const button = skills.getByRole('button', { name, exact: true });
@@ -87,6 +91,9 @@ test('Progression controls fit narrow cards and support pointer and keyboard inp
       await page.keyboard.press('Shift+Tab');
       await expect(button).toBeFocused();
       await page.keyboard.press('Enter');
+      expect(await button.evaluate((element) => getComputedStyle(element).boxShadow)).toMatch(
+        /0px 0px 0px 4px/
+      );
     }
   }
 });

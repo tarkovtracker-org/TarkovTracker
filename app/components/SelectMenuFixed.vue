@@ -51,7 +51,7 @@
     }, '');
   };
   const defaultUi = {
-    base: 'bg-surface-900 min-w-0 max-w-full border border-surface-700 rounded-md px-3 py-2 ring-0 outline-none',
+    base: 'bg-surface-900 min-w-0 max-w-full border border-surface-700 rounded-md px-3 py-2 ring-0 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900',
     leading: 'shrink-0 text-surface-300',
     trailing: 'shrink-0 text-surface-400',
     value: 'text-surface-100',
