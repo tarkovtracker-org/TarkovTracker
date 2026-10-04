@@ -1,6 +1,6 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
 const { mockFns, mockState } = vi.hoisted(() => ({
@@ -182,6 +182,9 @@ const configureMockState = (
   mockState.routePath = options.routePath ?? '/settings';
 };
 describe('settings page', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   beforeEach(() => {
     configureMockState();
     vi.clearAllMocks();
@@ -190,6 +193,42 @@ describe('settings page', () => {
     stubs: defaultGlobalStubs,
     mocks: { $t: (key: string) => key },
   };
+  it.each([
+    { hash: '#preferences', mobile: true, expected: 'tab' },
+    { hash: '#settings-preferences', mobile: true, expected: 'tab' },
+    { hash: '#preferences', mobile: false, expected: 'panel' },
+    { hash: '#skills', mobile: true, expected: 'panel' },
+    { hash: '#settings-skills', mobile: true, expected: 'panel' },
+    { hash: '#keybinds', mobile: true, expected: 'panel' },
+  ])('scrolls $hash to $expected when mobile=$mobile', async ({ hash, mobile, expected }) => {
+    configureMockState({ routeHash: hash });
+    const tab = document.createElement('button');
+    tab.setAttribute('role', 'tab');
+    const panel = document.createElement('section');
+    const scrollTab = vi.fn();
+    const scrollPanel = vi.fn();
+    tab.scrollIntoView = scrollTab;
+    panel.scrollIntoView = scrollPanel;
+    vi.spyOn(tab, 'getClientRects').mockReturnValue({ length: mobile ? 1 : 0 } as DOMRectList);
+    const querySelector = document.querySelector.bind(document);
+    vi.spyOn(document, 'querySelector').mockImplementation((selector) =>
+      selector === '#settings-tabs [role="tab"][data-state="active"]'
+        ? tab
+        : querySelector(selector)
+    );
+    vi.spyOn(document, 'getElementById').mockReturnValue(panel);
+    const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
+    await nextTick();
+    const selectedScroll = expected === 'tab' ? scrollTab : scrollPanel;
+    const otherScroll = expected === 'tab' ? scrollPanel : scrollTab;
+    expect(selectedScroll).toHaveBeenCalledWith({
+      behavior: expected === 'tab' ? 'instant' : 'smooth',
+      block: 'start',
+      inline: 'nearest',
+    });
+    expect(otherScroll).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('renders settings layout', async () => {
     const wrapper = await mountSuspended(SettingsPage, {
       global: globalConfig,
