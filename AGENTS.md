@@ -1,7 +1,10 @@
 # TarkovTracker — Agent Instructions
 
 Repository contract for coding agents. Executable config (`package.json`, `nuxt.config.ts`,
-`tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it.
+`tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Cloud agents and
+contributors may not load shared global rules, so two baselines stay here: preserve existing
+worktree changes, and get explicit authorization before production deploys, destructive actions,
+and merges.
 
 ## Project map
 
@@ -65,9 +68,9 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 
 ## Workflow and review
 
-- Ready same-repository PRs get previews automatically after CI; post `/preview` only for forks or
-  after `/preview stop` ([preview spec](docs/systems/previews.md)). Keep workflow access checks,
-  artifact validation, and fork protections.
+- Open, ready same-repository PRs targeting `main` get previews automatically after CI; post
+  `/preview` only for forks or after `/preview stop` ([preview spec](docs/systems/previews.md)).
+  Keep workflow access checks, artifact validation, and fork protections.
 - Translations are reviewed like docs. The local CodeRabbit review for executable changes is
   `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`).
 - The `Main CI freshness` ruleset blocks merging a behind branch; update it
