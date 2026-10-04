@@ -12,16 +12,16 @@
             <!-- Default header with icon and title -->
             <div
               v-if="props.title || props.icon"
-              class="flex items-center justify-between pb-2 text-xl"
+              class="flex flex-wrap items-center justify-between gap-y-2 pb-2 text-xl"
               :class="headerClasses"
             >
               <!-- Left side content (icon and title) -->
-              <div class="flex items-center gap-3">
+              <div class="flex min-w-0 items-center gap-3">
                 <!-- Icon or Image -->
                 <span
                   v-if="props.icon || props.avatar"
                   :class="highlightClasses"
-                  class="inline-block rounded-br-lg px-3 py-1 shadow-lg"
+                  class="inline-block shrink-0 rounded-br-lg px-3 py-1 shadow-lg"
                 >
                   <NuxtImg
                     v-if="props.avatar"
@@ -42,7 +42,7 @@
                 <!-- Title -->
                 <span
                   v-if="props.title"
-                  class="inline-block px-2 text-left leading-6"
+                  class="inline-block min-w-0 px-2 text-left leading-6 break-words"
                   :class="titleClasses"
                 >
                   {{ props.title }}
@@ -51,7 +51,7 @@
               <!-- Right side content -->
               <div
                 v-if="$slots['title-right'] || props.subtitle"
-                class="flex items-center gap-2 pr-4 text-right"
+                class="flex max-w-full flex-wrap items-center gap-2 px-4 text-right"
               >
                 <slot name="title-right">
                   <span v-if="props.subtitle" class="text-surface-300 text-xs">

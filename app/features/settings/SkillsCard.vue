@@ -9,7 +9,7 @@
       title-classes="text-lg font-semibold"
     >
       <template #title-right>
-        <div class="flex items-center gap-1">
+        <div class="flex flex-wrap items-center gap-1">
           <UButton
             size="xs"
             :label="$t('common.priority')"
