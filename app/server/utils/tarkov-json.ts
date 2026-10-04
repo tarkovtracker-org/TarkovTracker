@@ -1161,8 +1161,12 @@ export function adaptPrestigeResponse(
   };
 }
 export function createTarkovJsonBootstrapFetcher(options: TarkovJsonOptions) {
+  // Player levels are numeric, so only the base envelope is needed; skipping the language
+  // envelopes saves two multi-megabyte upstream subrequests per cache miss.
   return async () =>
-    adaptBootstrapResponse(await fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options));
+    adaptBootstrapResponse(
+      (await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options)).data
+    );
 }
 export function createTarkovJsonItemsFetcher(
   options: TarkovJsonOptions,

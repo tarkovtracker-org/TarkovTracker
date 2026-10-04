@@ -396,6 +396,40 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
+  it('revalidates a cached scope once per session without a cache bust', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'pve';
+    store.languageCode = 'de';
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({
+      editions: [createEdition('cached-edition', 1, 'Cached Edition')],
+      storyChapters: [createStoryChapter('cached-chapter', 1, 'Cached Chapter')],
+    });
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const fetchMock = vi.fn().mockResolvedValue({
+      data: {
+        editions: [createEdition('fresh-edition', 2, 'Fresh Edition')],
+        storyChapters: [createStoryChapter('fresh-chapter', 2, 'Fresh Chapter')],
+      },
+    });
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.fetchEditionsData();
+    await flushPromises();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/editions', {
+      query: { lang: 'de', gameMode: 'pve' },
+    });
+    // Switching away and back serves the cache again without another request.
+    store.languageCode = 'en';
+    await store.fetchEditionsData();
+    await flushPromises();
+    store.languageCode = 'de';
+    await store.fetchEditionsData();
+    await flushPromises();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/tarkov/editions', {
+      query: { lang: 'en', gameMode: 'pve' },
+    });
+  });
   it('requests and caches the current mode/language catalog', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'pve';
