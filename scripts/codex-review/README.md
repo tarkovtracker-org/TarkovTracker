@@ -78,7 +78,17 @@ commit completion can retire the local intent; absence of that evidence remains 
 SHA-marked requests for older commits do not block the current commit, while unmarked requests
 require a completion of the current commit at or after the request time. Equality is accepted
 because GitHub timestamps have second precision and exact-commit completion is reusable;
-bot activity still marked running continues to block a new request.
+bot activity still marked running continues to block a new request. A newer summary-only completion
+remains unknown even when an earlier explicit result exists for the same SHA; completion does not
+establish clean findings, which must be verified from the actual review output.
+
+### Historical untagged requests
+
+An unmarked request blocks every new head until Codex completes a review of the current head
+(#1038). No supported disposition exists: Actions runs cannot prove which head an unmarked request
+targeted, because a push with a workflow skip instruction changes the head without a run. Do not
+edit, delete, or repost the request, or remove guard state, to bypass the block. Use another
+independent review provider for the current head, as `AGENTS.md` allows.
 
 The helper recovers a request lock only when complete owner metadata identifies this host and
 a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed
