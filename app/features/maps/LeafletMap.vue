@@ -2,7 +2,7 @@
   <div
     ref="mapSurfaceRef"
     tabindex="0"
-    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 relative isolate w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 @container relative isolate w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     :class="{ 'flex h-full min-h-0 flex-col': props.fill }"
     @pointerdown.capture="focusMapSurface"
   >
@@ -63,7 +63,7 @@
           </div>
         </AppTooltip>
         <div
-          class="bg-surface-850/95 pointer-events-auto ml-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg"
+          class="bg-surface-850/95 pointer-events-auto order-first ml-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg @min-[30rem]:order-last"
           data-testid="map-toolbar"
         >
           <div class="flex flex-wrap items-center gap-1">

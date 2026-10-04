@@ -96,8 +96,14 @@ test('Ground Zero floors and toolbar remain operable in normal and fullscreen ma
     .getByTestId('map-first-use-hint')
     .getByRole('button', { name: 'Got it', exact: true })
     .click();
-  for (const width of [320, 333, 390, 400, 1280]) {
-    await page.setViewportSize({ width, height: 761 });
+  for (const [width, height] of [
+    [320, 568],
+    [333, 507],
+    [390, 844],
+    [400, 609],
+    [1280, 761],
+  ]) {
+    await page.setViewportSize({ width, height });
     await checkFloors(page, inline);
     const fullscreenToggle = inline.getByTestId('map-fullscreen-toggle');
     await expectHitTarget(fullscreenToggle);
@@ -111,5 +117,12 @@ test('Ground Zero floors and toolbar remain operable in normal and fullscreen ma
   await page.getByRole('button', { name: /^Woods(?:\s*\d+)?$/ }).click();
   await expect(inline.getByRole('button', { name: 'Garage', exact: true })).toHaveCount(0);
   await expect(inline.locator('.leaflet-image-layer')).toBeVisible();
-  await checkToolbar(page, inline.getByTestId('map-toolbar'));
+  for (const [width, height] of [
+    [333, 507],
+    [400, 609],
+    [1280, 761],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await checkToolbar(page, inline.getByTestId('map-toolbar'));
+  }
 });
