@@ -29,7 +29,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
   unit tests, and a workerd smoke using the production Wrangler configuration)
 
 Heavy jobs run in parallel after classification; systems drift runs independently.
-Lighthouse scope detection runs independently of PR metadata installation and commitlint.
+Lighthouse scope detection runs independently of PR metadata.
 
 ### Crowdin Sync (`.github/crowdin.yml`)
 
@@ -131,10 +131,17 @@ every commit since the previous tag; conventional commits outside internal scope
 whether a version is warranted (`scripts/release/release-scope.mjs`). Publication is serialized without
 cancelling an active release. See `docs/workflow-automation.md` for details.
 
+### PR Title (`pr-title.yml`)
+
+**Trigger:** PR opened/edited/updated/reopened
+**Jobs:** `PR Title` — requires a conventional type prefix (`scripts/checks/check-pr-title.mjs`).
+Squash merges make the title the commit on `main`, so this is the only commit-format check in CI;
+edit the title to re-run it.
+
 ### PR Checks (`pr-checks.yml`)
 
 **Trigger:** PR opened/updated/reopened
-**Jobs:** `PR Meta` (labels, size, commit validation), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
+**Jobs:** `PR Meta` (labels, size), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
 so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
