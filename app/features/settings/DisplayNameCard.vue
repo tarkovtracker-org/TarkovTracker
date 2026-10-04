@@ -100,6 +100,7 @@
             v-model="selectedGameEdition"
             :items="gameEditionOptions"
             value-key="value"
+            class="w-full"
           >
             <template #leading>
               <UIcon name="i-mdi-gift-open" class="text-surface-300 h-4 w-4" />
