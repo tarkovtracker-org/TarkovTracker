@@ -1,9 +1,10 @@
 # TarkovTracker — Agent Instructions
 
 Repository contract for coding agents. Executable config (`package.json`, `nuxt.config.ts`,
-`tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Verify current
-files and worktree state before claims or edits; keep changes narrow and preserve workflow
-boundaries and user changes.
+`tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Cloud agents and
+contributors may not load shared global rules, so two baselines stay here: preserve existing
+worktree changes, and get explicit authorization before production deploys, destructive actions,
+and merges.
 
 ## Project map
 
@@ -24,15 +25,13 @@ boundaries and user changes.
 - Brief `pnpm run brief --file <path>` (`--symbol <file:export>`, `--base <ref>`): consumers, docs,
   tests, and checks before editing; advisory, read its Uncertainty section
 
-Prefer the single-file Vitest command from `package.json`; run the full suite only when executable
-or test logic changes make it relevant. Vitest auto-selects its failures-only `agent` reporter
+Vitest auto-selects its failures-only `agent` reporter
 under coding agents (`AI_AGENT=<name>` opts others in; `--reporter=default` restores per-file
 output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures still print in full.
 
 ## Validation
 
-- Run the smallest relevant check before finishing and report what passed or failed. TypeScript
-  changes: typecheck. Code changes: lint. Locale changes: `pnpm run i18n:check`. API gateway
+- TypeScript changes: typecheck. Code changes: lint. Locale changes: `pnpm run i18n:check`. API gateway
   changes: also the checks in `workers/api-gateway/AGENTS.md`.
 - Formatting is enforced by the hook and CI `format:check`; do not run the broad format command
   unless the hook was bypassed.
@@ -69,22 +68,12 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 
 ## Workflow and review
 
-- Implementation work authorizes committing and pushing in-scope topic-branch changes, opening or
-  updating the PR, and running previews and smoke tests through the trusted workflows. Ready
-  same-repository PRs get previews automatically after CI; post `/preview` only for forks or after
-  `/preview stop` ([preview spec](docs/systems/previews.md)). Keep workflow access checks, artifact
-  validation, and fork protections. Production deploys, destructive actions, and merges need
-  explicit authorization.
-- Fix small issues in files the change already touches; track larger unrelated work in an issue.
-- Docs, translations, and formatting: self-review plus deterministic checks. Executable changes:
-  one local `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`) once
-  the diff stabilizes, before opening the PR or marking it ready. Fix validated findings together;
-  optional suggestions stay optional. If review is unavailable or rate-limited, note it in the PR
-  and continue; never enable paid over-limit reviews without authorization.
-- Push validated work when useful; batch fixes for one review round into one push when practical.
-- Reuse reviews when a base update leaves the reviewed diff unchanged; verify the diff and assess
-  integration with changed base code even after a conflict-free update. Rerun validation whose
-  inputs changed. The `Main CI freshness` ruleset blocks merging a behind branch; update it
+- Open, ready same-repository PRs targeting `main` get previews automatically after CI; post
+  `/preview` only for forks or after `/preview stop` ([preview spec](docs/systems/previews.md)).
+  Keep workflow access checks, artifact validation, and fork protections.
+- Translations are reviewed like docs. The local CodeRabbit review for executable changes is
+  `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`).
+- The `Main CI freshness` ruleset blocks merging a behind branch; update it
   (`gh pr update-branch <PR>`) and CI and applicable previews rerun on the new head. Request
   `@coderabbitai review` for substantial diff changes, hand-resolved conflicts, or unresolved
   integration risks (incremental reviews are off). Do not pause other merges for freshness.
@@ -94,15 +83,12 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   bypass the guard; never run Codex reviews locally. Pending or unknown review is incomplete.
 - Auth, billing, migrations, and database or Durable Object concurrency control (locks, claims,
   fencing) need one independent review before merge: Codex, another provider, or a human.
-- Merge gate: required checks green, every review thread dispositioned (fixed, rejected with reason,
-  or tracked issue), and the latest review covers the current PR diff. The PR body lists the
-  validation commands and results.
-- Production-readiness and security reviews are read-only; risk areas and severity live in
-  `docs/code-review.md`.
+- The PR body lists the validation commands and results.
+- Review risk areas and severity live in `docs/code-review.md`.
 
 ## Docs
 
 Code and executable config outrank this file; this file outranks `docs/`. Docs may lag, so verify
-against code before changing behavior. Find the owning doc in `docs/README.md`, read only the needed
-section (`grep -n '^#' <file>`), and link owners instead of restating them. Generated files,
-Crowdin-owned locales, migration history, and `.cubic/` are not sources.
+against code before changing behavior. Find the owning doc in `docs/README.md` and link owners
+instead of restating them. Generated files, Crowdin-owned locales, migration history, and `.cubic/`
+are not sources.
