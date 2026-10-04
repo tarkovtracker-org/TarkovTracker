@@ -118,7 +118,7 @@ function verifyInterval(context, receipt, run) {
   // A push can skip every pull_request workflow. Even a complete interval cannot
   // prove which head an untagged command requested; old receipts share this gap.
   throw new Error(
-    'Historical request-time head cannot be verified from Actions runs; the untagged request remains pending'
+    'Historical request-time head cannot be verified from Actions runs; the untagged request is unchanged'
   );
 }
 function readIntervalRuns(pages, runId) {
@@ -180,6 +180,9 @@ function removeTemporary(path) {
 }
 /** Explicit historical disposition never establishes review completion for a new head. */
 export function applyRequestDispositions(context, inputs) {
+  // Observation uses raw GitHub evidence, never unproven historical receipts.
+  // A genuine later review of the current head can still complete the request.
+  if (!context.retireRequest) return inputs;
   const directory = join(context.stateDirectory, 'dispositions');
   const receipts = readReceipts(directory, context.repo, context.pr);
   for (const receipt of receipts) {

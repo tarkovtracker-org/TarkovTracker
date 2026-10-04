@@ -117,12 +117,31 @@ test('a legacy receipt cannot retire a request after a workflow-skipped push', (
   const context = fixture(t);
   seedReceipt(context);
   const original = inputs();
-  assert.throws(
-    () => applyRequestDispositions({ ...context, retireRequest: undefined }, original),
-    /request-time head/
+  assert.throws(() => applyRequestDispositions(context, original), /request-time head/);
+  const observed = applyRequestDispositions(
+    {
+      ...context,
+      retireRequest: undefined,
+      runGh: () => assert.fail('ordinary observation must not validate or trust legacy receipts'),
+    },
+    original
   );
+  assert.equal(observed, original);
   assert.equal(original.comments[0].body, '@codex review');
   assert.equal(classifyState(original, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
+});
+test('a legacy receipt does not block genuine later exact-current-head completion', (t) => {
+  const context = fixture(t);
+  seedReceipt(context);
+  const original = inputs();
+  original.reviews.push({
+    ...review,
+    commit_id: head,
+    submitted_at: '2026-10-02T01:09:00Z',
+  });
+  const observed = applyRequestDispositions({ ...context, retireRequest: undefined }, original);
+  assert.equal(observed.comments[0].body, '@codex review', 'legacy receipt is not applied');
+  assert.equal(classifyState(observed, Date.parse('2026-10-02T02:00:00Z')).status, 'complete');
 });
 test('Actions evidence alone cannot retire even an apparently completed historical request', (t) => {
   const context = fixture(t);
@@ -240,10 +259,7 @@ test('a persisted disposition is rejected when its live workflow search becomes 
   const context = fixture(t, { intervalPages });
   seedReceipt(context);
   intervalPages[0].total_count = 1001;
-  assert.throws(
-    () => applyRequestDispositions({ ...context, retireRequest: undefined }, inputs()),
-    /workflow-run interval/
-  );
+  assert.throws(() => applyRequestDispositions(context, inputs()), /workflow-run interval/);
   assert.equal(readdirSync(join(context.stateDirectory, 'dispositions')).length, 1);
 });
 test('a command edited into place after creation cannot use earlier completion', (t) => {
@@ -258,9 +274,7 @@ test('edited or removed request invalidates a persisted disposition', (t) => {
     [{ ...command, body: '@codex review changed' }],
     [{ ...command, created_at: '2026-10-02T01:04:00Z' }],
   ]) {
-    assert.throws(() =>
-      applyRequestDispositions({ ...context, retireRequest: undefined }, { ...inputs(), comments })
-    );
+    assert.throws(() => applyRequestDispositions(context, { ...inputs(), comments }));
   }
 });
 test('receipt publication is restricted to its owner', (t) => {

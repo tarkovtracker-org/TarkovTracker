@@ -98,12 +98,14 @@ Historical disposition currently fails closed: Actions runs cannot verify the he
 untagged request was posted. A push using a workflow skip instruction can change the PR head
 without creating an intervening run. A late review of the older SHA cannot distinguish this
 case from a completed historical request. Even complete, uncapped run pagination is insufficient.
-The command above therefore exits nonzero, leaves the request pending, and publishes no receipt.
+The command above therefore exits nonzero, preserves the original request, and publishes no receipt.
 Reliable independent request-time head evidence is required before retirement can be enabled.
 
-Existing receipts are also rejected on every observation, including receipts created by earlier
-versions with apparently complete Actions evidence. Preserve them and the original commands;
-do not delete guard state or post another request to bypass the failure. The guard still validates
+Existing receipts cannot authorize retirement, including receipts created by earlier versions with
+apparently complete Actions evidence. Ordinary observation ignores these receipts and classifies
+the raw GitHub evidence: an unanswered untagged request remains pending, while a genuine later
+review of the exact current head can still establish completion. Preserve receipts and original commands;
+do not delete guard state or post another request to bypass the failure. Explicit retirement still validates
 command identity/edit metadata, authenticated exact-SHA review completion, and run provenance
 and pagination, but passing those checks does not establish the request-time head. No GitHub
 evidence is edited or removed. This restriction does not change ordinary SHA-marked requests,
