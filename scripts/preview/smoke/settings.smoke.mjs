@@ -7,6 +7,14 @@ test.beforeEach(async ({ page, request }) => {
 async function expectPointerTarget(control) {
   await control.scrollIntoViewIfNeeded();
   await expect(control).toBeVisible();
+  const bounds = await control.evaluate((element) => ({
+    control: element.getBoundingClientRect().toJSON(),
+    card: element.closest('.overflow-hidden.rounded-lg').getBoundingClientRect().toJSON(),
+  }));
+  expect(bounds.control.left).toBeGreaterThanOrEqual(bounds.card.left);
+  expect(bounds.control.right).toBeLessThanOrEqual(bounds.card.right);
+  expect(bounds.control.top).toBeGreaterThanOrEqual(bounds.card.top);
+  expect(bounds.control.bottom).toBeLessThanOrEqual(bounds.card.bottom);
   expect(
     await control.evaluate((element) => {
       const rect = element.getBoundingClientRect();
