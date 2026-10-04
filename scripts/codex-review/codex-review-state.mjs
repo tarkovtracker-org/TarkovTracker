@@ -9,7 +9,7 @@ const unknown = (reason) => ({ kind: 'unknown', reason });
 const status = (value, reason) => ({ status: value, reason });
 const isCodex = (item) => item.user?.login === BOT;
 const bodyOf = (item) => item.body ?? '';
-export const isSecurity = (body) =>
+const isSecurity = (body) =>
   /^(?:<!-- codex-security-review-finding:v1 -->|#{1,3}[ \t]+[^\r\n]*Codex Security Review\b)/i.test(
     body.trimStart()
   );

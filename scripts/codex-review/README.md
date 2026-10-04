@@ -3,14 +3,13 @@
 Requests or waits for a Codex PR review without duplicate posts. Agents use it as described in
 [`AGENTS.md`](../../AGENTS.md); never post raw `@codex review` comments instead.
 
-| File                           | What it does                                                      | Run by                   |
-| ------------------------------ | ----------------------------------------------------------------- | ------------------------ |
-| `codex-review.mjs`             | Command-line entry: `node scripts/codex-review/codex-review.mjs`. | agents, by hand          |
-| `codex-review-state.mjs`       | Reads a PR's review state from GitHub.                            | `codex-review.mjs`       |
-| `codex-review-lock.mjs`        | Lock so two runs cannot request the same review.                  | `codex-review.mjs`       |
-| `codex-review-collapse.mjs`    | Collapses acknowledged or completed review commands.              | `codex-review.mjs`       |
-| `codex-review-disposition.mjs` | Verifies explicit dispositions of historical untagged requests.   | `codex-review.mjs`       |
-| `*-tests.mjs`                  | `node --test` tests for the files above.                          | `pnpm run test:workflow` |
+| File                        | What it does                                                      | Run by                   |
+| --------------------------- | ----------------------------------------------------------------- | ------------------------ |
+| `codex-review.mjs`          | Command-line entry: `node scripts/codex-review/codex-review.mjs`. | agents, by hand          |
+| `codex-review-state.mjs`    | Reads a PR's review state from GitHub.                            | `codex-review.mjs`       |
+| `codex-review-lock.mjs`     | Lock so two runs cannot request the same review.                  | `codex-review.mjs`       |
+| `codex-review-collapse.mjs` | Collapses acknowledged or completed review commands.              | `codex-review.mjs`       |
+| `*-tests.mjs`               | `node --test` tests for the files above.                          | `pnpm run test:workflow` |
 
 ## Guard behavior
 
@@ -85,32 +84,11 @@ establish clean findings, which must be verified from the actual review output.
 
 ### Historical untagged requests
 
-An old untagged request can otherwise block every new head (#1038). Disposition is explicit and
-separate from requesting a review:
-
-```bash
-node scripts/codex-review/codex-review.mjs <PR> \
-  --retire-request <original-comment-id> --request-sha <full-request-time-sha> \
-  --evidence-run <pull-request-run-id>
-```
-
-Historical disposition currently fails closed: Actions runs cannot verify the head when an
-untagged request was posted. A push using a workflow skip instruction can change the PR head
-without creating an intervening run. A late review of the older SHA cannot distinguish this
-case from a completed historical request. Even complete, uncapped run pagination is insufficient.
-The command above therefore exits nonzero, preserves the original request, and publishes no receipt.
-Reliable independent request-time head evidence is required before retirement can be enabled.
-
-Existing receipts cannot authorize retirement, including receipts created by earlier versions with
-apparently complete Actions evidence. Ordinary observation ignores these receipts and classifies
-the raw GitHub evidence: an unanswered untagged request remains pending, while a genuine later
-review of the exact current head can still establish completion. Preserve receipts and original commands;
-do not delete guard state or post another request to bypass the failure. Explicit retirement still validates
-command identity/edit metadata, authenticated exact-SHA review completion, and run provenance
-and pagination, but passing those checks does not establish the request-time head. No GitHub
-evidence is edited or removed. This restriction does not change ordinary SHA-marked requests,
-current-head completion, pending requests, intents, or running activity. It cannot run with
-`--request`.
+An unmarked request blocks every new head until Codex completes a review of the current head
+(#1038). No supported disposition exists: Actions runs cannot prove which head an unmarked request
+targeted, because a push with a workflow skip instruction changes the head without a run. Do not
+edit, delete, or repost the request, or remove guard state, to bypass the block. Use another
+independent review provider for the current head, as `AGENTS.md` allows.
 
 The helper recovers a request lock only when complete owner metadata identifies this host and
 a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed
