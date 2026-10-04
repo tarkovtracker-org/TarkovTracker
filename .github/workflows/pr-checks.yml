@@ -16,10 +16,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    # PR title format is checked by `pr-title.yml`, which also re-runs when the title is edited.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - name: Auto-label PR
         if: github.event.pull_request.head.repo.full_name == github.repository
@@ -75,12 +75,6 @@ jobs:
               issue_number: context.issue.number,
               labels: [label],
             });
-      - uses: ./.github/actions/setup-project
-      - name: Validate commit messages
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
   lighthouse-scope:
     name: Lighthouse scope
     runs-on: ubuntu-latest

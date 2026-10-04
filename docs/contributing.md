@@ -71,14 +71,17 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 
 ### Commit conventions
 
-- Follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`. The
-  commit-msg hook runs commitlint locally and CI re-checks every commit.
-- Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`,
-  `revert`, `wip`.
-- Use an allowed scope from `commitlint.config.js` (e.g. `app`, `ui`, `api`, `tasks`, `team`,
-  `i18n`, `docs`) or omit the scope if none fits — do not invent scopes.
-- Keep the subject imperative and not ALL-CAPS; header max 100 chars.
-- Reference issue numbers when applicable and keep commits focused and atomic.
+- PR titles and commit headers start with a [Conventional Commits](https://www.conventionalcommits.org/)
+  type: `type: summary` or `type(scope): summary`. That prefix is the only rule.
+- PRs are squash-merged, so the **PR title** becomes the commit on `main` that drives releases. CI
+  checks only the PR title (`PR Title` workflow); fix a failure by editing the title — no rewording
+  or force-pushing. The local commit-msg hook checks the same prefix on branch commits.
+- Allowed types and their release impact are listed in
+  [`scripts/checks/commit-types.mjs`](../scripts/checks/commit-types.mjs). Do not use the `!`
+  breaking-change marker; the release parser cannot read it.
+- Scopes are free-form. Internal scopes such as `ci`, `deps`, `docs`, `preview` or `no-release`
+  never trigger a release (`scripts/release/release-scope.mjs`).
+- Length, casing and body formatting are not enforced.
 
 ## Pull request process
 
@@ -127,8 +130,8 @@ changes may be requested to be split or closed.
 
 ### PR requirements
 
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g.
-  `feat(tasks): add objective filter`) — enforced by commitlint on commit messages
+- PR title starts with a conventional type (e.g. `feat(tasks): add objective filter`) — checked by
+  the `PR Title` workflow
 - All template sections completed
 - Linked to related issue(s)
 - Passes all CI checks
