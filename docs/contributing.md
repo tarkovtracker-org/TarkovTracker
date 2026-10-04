@@ -76,9 +76,9 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 - PRs are squash-merged, so the **PR title** becomes the commit on `main` that drives releases. CI
   checks only the PR title (`PR Title` workflow); fix a failure by editing the title — no rewording
   or force-pushing. The local commit-msg hook checks the same prefix on branch commits.
-- Allowed types live in `scripts/checks/commit-types.mjs`: `feat`, `fix`, `perf`, `revert`,
-  `refactor`, `docs`, `test`, `style`, `build`, `ci`, `chore`, `wip`. `feat` releases a minor
-  version; `fix`, `perf` and `revert` release a patch.
+- Allowed types and their release impact are listed in
+  [`scripts/checks/commit-types.mjs`](../scripts/checks/commit-types.mjs). Do not use the `!`
+  breaking-change marker; the release parser cannot read it.
 - Scopes are free-form. Internal scopes such as `ci`, `deps`, `docs`, `preview` or `no-release`
   never trigger a release (`scripts/release/release-scope.mjs`).
 - Length, casing and body formatting are not enforced.

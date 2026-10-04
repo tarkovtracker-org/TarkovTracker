@@ -8,7 +8,6 @@ describe('validatePrTitle', () => {
     'build(deps-dev): bump vitest',
     'chore(i18n): update translations from Crowdin',
     'fix(no-release): internal tweak',
-    'feat(tasks)!: drop the legacy filter',
     'docs(systems): document the endpoint table with a very long subject that goes well past one hundred characters total',
     'fix: Capitalized subject is fine.',
     'Revert "fix(app): stop repeating requests"',
@@ -22,6 +21,8 @@ describe('validatePrTitle', () => {
     ['fix(): empty scope', /must look like/],
     ['enhance(ui): unknown type', /Unknown type "enhance"/],
     ['Fix: uppercase type', /must look like/],
+    // semantic-release's angular parser cannot read `!`, so the change would not release.
+    ['feat(tasks)!: drop the legacy filter', /must look like/],
   ])('rejects %j', (title, reason) => {
     expect(validatePrTitle(title)).toMatch(reason);
   });

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Checks that a PR title starts with an allowed conventional type: `type(scope)!: subject`.
+// Checks that a PR title starts with an allowed conventional type: `type(scope): subject`.
 // PRs are squash-merged, so the title becomes the commit on `main` that semantic-release reads.
 // Types come from `commit-types.mjs`; scope, length and wording are deliberately free-form.
 import { pathToFileURL } from 'node:url';
 import { COMMIT_TYPES } from './commit-types.mjs';
 export const ALLOWED_TYPES = COMMIT_TYPES;
-const HEADER = /^(?<type>[a-z]+)(?:\((?<scope>[^()\s][^()]*)\))?!?: \S/;
+// No `!` marker: the angular preset's headerPattern cannot parse it, so the release would be skipped.
+const HEADER = /^(?<type>[a-z]+)(?:\((?<scope>[^()\s][^()]*)\))?: \S/;
 // GitHub's "Revert" button produces `Revert "<original title>"`.
 const GITHUB_REVERT = /^Revert ".+"$/;
 /** Ordered checks: the first rule whose test fails supplies the error. */

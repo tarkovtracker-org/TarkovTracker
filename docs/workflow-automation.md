@@ -892,10 +892,8 @@ Only the type prefix is enforced. CI checks the **PR title** (`.github/workflows
 `scripts/checks/check-pr-title.mjs`), because squash merges turn it into the commit on `main`;
 editing the title re-runs the check. Branch commits are not checked in CI.
 
-**Types** (`scripts/checks/commit-types.mjs`): feat, fix, perf, revert, refactor, docs, test, style,
-build, ci, chore, wip. `feat` → minor release; `fix`, `perf`, `revert` → patch release.
-
-_Note: `wip` is a project-specific extension and is not part of the Conventional Commits spec._
+**Types:** listed with their release impact in `scripts/checks/commit-types.mjs`. Do not use the
+`!` breaking-change marker; the angular release parser cannot read it.
 
 **Scopes:** free-form. Internal scopes listed in `scripts/release/release-scope.mjs` (for example
 `ci`, `deps`, `docs`, `preview`, `no-release`) never trigger a release.
