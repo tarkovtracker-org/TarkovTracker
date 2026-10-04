@@ -1,5 +1,6 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
@@ -570,6 +571,29 @@ describe('settings page', () => {
         hash: '#api',
         query: {},
       });
+    });
+    it('supersedes an in-flight tab navigation when returning to the current hash', async () => {
+      configureMockState({ routeHash: '#backup-restore' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      mockFns.routerReplace.mockClear();
+      let settleAccount = () => {};
+      mockFns.routerReplace.mockImplementationOnce(
+        () => new Promise<void>((resolve) => (settleAccount = resolve))
+      );
+      await wrapper.get('[data-testid="tab-account"]').trigger('click');
+      // The route still reports #backup-restore while the #account replace is pending.
+      await wrapper.get('[data-testid="tab-backup-restore"]').trigger('click');
+      expect(mockFns.routerReplace).toHaveBeenNthCalledWith(1, { hash: '#account', query: {} });
+      expect(mockFns.routerReplace).toHaveBeenNthCalledWith(2, {
+        hash: '#backup-restore',
+        query: {},
+      });
+      settleAccount();
+      await flushPromises();
+      await wrapper.get('[data-testid="tab-backup-restore"]').trigger('click');
+      expect(mockFns.routerReplace).toHaveBeenCalledTimes(2);
     });
     it('preserves state for previously visited tab panels after switching', async () => {
       const wrapper = await mountSuspended(SettingsPage, {
