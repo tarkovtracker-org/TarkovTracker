@@ -434,16 +434,12 @@ describe('settings page', () => {
         query: {},
       });
     });
-    it('marks settings control routes as noindex', async () => {
+    it('leaves settings route metadata to the central route metadata', async () => {
       configureMockState({ routePath: '/progression' });
       await mountSuspended(SettingsPage, {
         global: globalConfig,
       });
-      expect(mockFns.seoMeta).toHaveBeenCalledWith(
-        expect.objectContaining({
-          robots: 'noindex, nofollow',
-        })
-      );
+      expect(mockFns.seoMeta).not.toHaveBeenCalled();
     });
     it('keeps legacy skill deep links on the progression tab', async () => {
       configureMockState({ routeHash: '#settings-skills' });

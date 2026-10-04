@@ -1639,12 +1639,4 @@
   const onTabChange = (val: string | number) => {
     selectedTabIndex.value = Number(val);
   };
-  useSeoMeta({
-    title: () => `${t('page.profile.title', 'User Profile')} | ${modeLabel.value}`,
-    description: () =>
-      t(
-        'page.profile.meta_description',
-        'Share your progression story with level, achievements, task completion, and timeline insights for PvP or PvE.'
-      ),
-  });
 </script>

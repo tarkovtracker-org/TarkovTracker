@@ -9,7 +9,44 @@ Quoting: quote in TOML, unquoted in .env/.dev.vars unless dotenv requires it.
 
 ## Overview
 
-TarkovTracker is a sophisticated single-page application (SPA) for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.
+TarkovTracker uses prerendered public documents and a client-side application for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.
+
+## Public rendering and discovery
+
+[`nuxt.config.ts`](../nuxt.config.ts) enables rendering but defaults application routes to
+client rendering. The explicit public inventory in [`routeSeo.ts`](../app/utils/routeSeo.ts)
+opts into prerendering; link crawling is disabled and missing required documents fail the build.
+Payload extraction is off: prerendered documents inline their Nuxt payload because
+`_payload.json` URLs match the client-rendered catch-all and would return HTML; a required public
+or client document that references one fails the build.
+Public route entrypoints in `app/features/seo-pages/` pass the shared `PageHeader` into each
+client-only tracker module's `header` slot and render the same header in a matching container as the
+prerendered fallback, so each page keeps one `h1` in one position. The `pages:extend` hook maps those
+routes to wrappers while preserving the existing modules in `app/pages/`.
+Resource guides render their full article. Navigation, personal state, supporter checkout,
+changelog requests, and application initialization run only in the browser. English HTML hydrates
+before saved/browser locale selection; initialization mounts once per application.
+
+The same registry owns canonical `.org` URLs, indexing directives, descriptions, social tags,
+structured data, and sitemap membership. Filter queries and fragments never enter canonicals.
+Finite settings/account/auth/team/admin/profile shells contain initial `noindex`; robots.txt allows
+crawlers to read that directive while excluding API and overlay paths. A bounded profile Function
+validates UUID/mode paths and reads the static profile shell without querying a database.
+`index.html` stays the prerendered homepage; top-level `404.html` gives unknown paths and invalid
+resource slugs real 404 responses. Legacy aliases remain HTTP 301 redirects.
+
+Application link previews are text-only `summary` cards. Guides also default to text-only. To select
+an image, set `guide.shareImage` in [`resourceData.ts`](../app/features/resources/resourceData.ts)
+with `src`, the asset's actual `width` and `height`, and an `altKey` pointing to English copy in
+`app/locales/en.json`. Use a representative guide asset; logos, article images, and video thumbnails
+are never selected automatically. Replace those fields to change the selection, or remove
+`shareImage` to disable it. Only explicitly selected images receive `summary_large_image` cards.
+
+Search Console indexing/canonical evidence and fresh Discord embeds require access to those
+services. Capture a 28-day query/page baseline before release; after release submit the registry's
+sitemap and inspect home, tasks, Kappa, and representative guides. Compare results at 4, 8, and
+12 weeks across tracker, quests/hideout/items, Kappa/Lightkeeper, and game-mode query groups.
+Ranking causes and improvements must be measured separately from these rendering fixes.
 
 ## Technology Stack
 
@@ -478,8 +515,8 @@ Build command: pnpm run build
 Build output: dist
 Root directory: /
 Node.js version: 24.x
-# Pages Functions only handle /api/* and /overlay/*; the build promotes Nuxt's
-# 200.html SPA fallback to index.html so Pages serves all app routes statically.
+# Pages Functions handle only /api/*, /overlay/*, and bounded /profile/* paths.
+# Public pages and finite private shells are static; 404.html prevents SPA catch-all responses.
 # Optional build-tool pin (Pages build image). Detection also works from
 # pnpm-lock.yaml + packageManager without this env var.
 # PNPM_VERSION: 10.34.5

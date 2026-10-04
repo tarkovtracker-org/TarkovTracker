@@ -190,6 +190,10 @@ const buildStubClient = (): SupabaseClient => {
         logger.debug('[Supabase Stub] auth.getSession called in offline mode');
         return { data: { session: null }, error: null };
       },
+      async getUser() {
+        logger.debug('[Supabase Stub] auth.getUser called in offline mode');
+        return { data: { user: null }, error: null };
+      },
       async exchangeCodeForSession() {
         logger.debug('[Supabase Stub] auth.exchangeCodeForSession called in offline mode');
         return {

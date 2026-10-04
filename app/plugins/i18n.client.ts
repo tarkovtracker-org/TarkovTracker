@@ -58,7 +58,7 @@ export default defineNuxtPlugin({
   dependsOn: ['supabase'],
   enforce: 'post',
   parallel: true,
-  async setup(nuxtApp) {
+  setup(nuxtApp) {
     const i18n = (nuxtApp as { $i18n?: I18n | Composer }).$i18n;
     const supabase = (nuxtApp as { $supabase?: BootstrapSupabaseContext }).$supabase;
     if (!i18n) {
@@ -66,14 +66,18 @@ export default defineNuxtPlugin({
       markI18nReady();
       return;
     }
-    const initialLocale = getInitialLocale(supabase);
-    try {
-      if (!(await setI18nLocale(i18n, initialLocale))) {
-        logger.warn('[i18n] Failed to set locale on i18n instance; skipping locale init.');
-      }
-    } catch (error) {
-      logger.warn('[i18n] Failed to initialize locale on i18n instance:', error);
-    }
+    // Public documents hydrate in English. Locale loading starts after mount without
+    // holding up Supabase or the rest of the client plugin pipeline.
     markI18nReady();
+    const initializeLocale = async () => {
+      try {
+        if (!(await setI18nLocale(i18n, getInitialLocale(supabase)))) {
+          logger.warn('[i18n] Failed to set locale on i18n instance; skipping locale init.');
+        }
+      } catch (error) {
+        logger.warn('[i18n] Failed to initialize locale on i18n instance:', error);
+      }
+    };
+    nuxtApp.hook('app:mounted', initializeLocale);
   },
 });

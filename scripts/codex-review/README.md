@@ -94,23 +94,21 @@ node scripts/codex-review/codex-review.mjs <PR> \
   --evidence-run <pull-request-run-id>
 ```
 
-The guard verifies an unchanged trusted command, with GraphQL `lastEditedAt: null` to reject commands
-edited into place after creation (REST `updated_at` can change for reactions), authenticated later formal code-review completion
-for that exact SHA, and a same-repository PR Actions run created strictly before the command
-(same-second run timestamps are ambiguous). It exhausts
-run pagination for the interval between that run and the command without a branch filter, so branch
-renames cannot hide evidence. Searches reaching GitHub's 1,000-result limit, missing or inconsistent
-counts, incomplete pages, duplicate runs, or a missing selected evidence run fail closed, including
-when revalidating an existing receipt. Another PR head or a different-head run with missing PR association
-fails closed; an explicitly identified unrelated PR does not block disposition. This does not support fork requests or infer
-a SHA from commit author dates. It cannot run with `--request`.
+Historical disposition currently fails closed: Actions runs cannot verify the head when an
+untagged request was posted. A push using a workflow skip instruction can change the PR head
+without creating an intervening run. A late review of the older SHA cannot distinguish this
+case from a completed historical request. Even complete, uncapped run pagination is insufficient.
+The command above therefore exits nonzero, leaves the request pending, and publishes no receipt.
+Reliable independent request-time head evidence is required before retirement can be enabled.
 
-A mode-0600 receipt in the Git common directory records the command ID, original body hash/time,
-SHA and run ID. Subsequent observations revalidate the GitHub evidence; editing or deleting the
-command invalidates the receipt. No GitHub evidence is edited or removed. The receipt scopes only
-that historical request, never establishes current-head completion, and leaves current pending
-requests, intents and running activity authoritative. After successful disposition, use the normal
-separate guarded request command for the new head.
+Existing receipts are also rejected on every observation, including receipts created by earlier
+versions with apparently complete Actions evidence. Preserve them and the original commands;
+do not delete guard state or post another request to bypass the failure. The guard still validates
+command identity/edit metadata, authenticated exact-SHA review completion, and run provenance
+and pagination, but passing those checks does not establish the request-time head. No GitHub
+evidence is edited or removed. This restriction does not change ordinary SHA-marked requests,
+current-head completion, pending requests, intents, or running activity. It cannot run with
+`--request`.
 
 The helper recovers a request lock only when complete owner metadata identifies this host and
 a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed

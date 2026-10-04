@@ -79,32 +79,9 @@ describe('about page', () => {
     expect(partnerCards.length).toBeGreaterThan(0);
     expect(wrapper.findAll('[data-testid="help-links"]')).toHaveLength(1);
   });
-  it('configures localized metadata and accurate Organization JSON-LD', async () => {
+  it('leaves metadata ownership to the central route metadata', async () => {
     await mountAbout();
-    expect(seoMeta).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: expect.any(Object),
-        description: expect.any(Object),
-      })
-    );
-    const metadata = seoMeta.mock.calls[0]?.[0];
-    expect(metadata.title.value).toBe('page.about.title');
-    const headConfig = head.mock.calls[0]?.[0]();
-    expect(headConfig.link).toBeUndefined();
-    expect(metadata.ogUrl).toBeUndefined();
-    expect(metadata.description.value).toBe('page.about.description');
-    const jsonLdScript = headConfig.script?.find(
-      (entry: { type?: string }) => entry.type === 'application/ld+json'
-    );
-    expect(jsonLdScript).toBeDefined();
-    const organization = JSON.parse(jsonLdScript.innerHTML);
-    expect(organization['@type']).toBe('Organization');
-    expect(organization.url).toBe('https://tarkovtracker.org');
-    expect(organization.member).toEqual(
-      ['DysektAI', 'Niv', 'Chica', 'Adealia', 'Dio', 'MrBreachie'].map((name) => ({
-        '@type': 'Person',
-        name,
-      }))
-    );
+    expect(seoMeta).not.toHaveBeenCalled();
+    expect(head).not.toHaveBeenCalled();
   });
 });

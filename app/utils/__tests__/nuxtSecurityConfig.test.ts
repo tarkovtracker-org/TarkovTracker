@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +7,6 @@ import {
   pagesHeadersPreventFraming,
   buildContentSecurityPolicyRouteRules,
   DEFAULT_NITRO_PRESET,
-  promoteSpaFallback,
   resolveNitroPreset,
 } from '@/utils/nuxtSecurityConfig';
 describe('nuxtSecurityConfig', () => {
@@ -15,32 +14,12 @@ describe('nuxtSecurityConfig', () => {
     expect(resolveNitroPreset()).toBe(DEFAULT_NITRO_PRESET);
     expect(resolveNitroPreset('node-server')).toBe('node-server');
   });
-  it('promotes the SPA fallback to the static Pages entrypoint', () => {
-    const publicDir = mkdtempSync(join(tmpdir(), 'tarkovtracker-spa-'));
-    try {
-      writeFileSync(join(publicDir, '200.html'), '<main>SPA</main>');
-      promoteSpaFallback(publicDir);
-      expect(readFileSync(join(publicDir, 'index.html'), 'utf8')).toBe('<main>SPA</main>');
-      expect(existsSync(join(publicDir, '200.html'))).toBe(false);
-    } finally {
-      rmSync(publicDir, { force: true, recursive: true });
-    }
-  });
-  it('leaves an existing SPA entrypoint untouched when no fallback exists', () => {
-    const publicDir = mkdtempSync(join(tmpdir(), 'tarkovtracker-spa-'));
-    try {
-      writeFileSync(join(publicDir, 'index.html'), '<main>SPA</main>');
-      promoteSpaFallback(publicDir);
-      expect(readFileSync(join(publicDir, 'index.html'), 'utf8')).toBe('<main>SPA</main>');
-    } finally {
-      rmSync(publicDir, { force: true, recursive: true });
-    }
-  });
   it('rejects a catch-all Pages Functions build', () => {
     const outputDir = mkdtempSync(join(tmpdir(), 'tarkovtracker-pages-'));
     try {
       writeFileSync(join(outputDir, '_routes.json'), JSON.stringify({ include: ['/*'] }));
-      writeFileSync(join(outputDir, 'index.html'), '<main>SPA</main>');
+      writeFileSync(join(outputDir, 'index.html'), '<main>Public homepage</main>');
+      writeFileSync(join(outputDir, '404.html'), '<h1>Not found</h1>');
       expect(() => assertCloudflarePagesOutput(outputDir, ['/api/*', '/overlay/*'])).toThrow(
         'Unexpected Cloudflare Pages routes'
       );
@@ -48,14 +27,15 @@ describe('nuxtSecurityConfig', () => {
       rmSync(outputDir, { force: true, recursive: true });
     }
   });
-  it('accepts the static SPA Pages output', () => {
+  it('accepts the public Pages documents', () => {
     const outputDir = mkdtempSync(join(tmpdir(), 'tarkovtracker-pages-'));
     try {
       writeFileSync(
         join(outputDir, '_routes.json'),
         JSON.stringify({ include: ['/api/*', '/overlay/*'] })
       );
-      writeFileSync(join(outputDir, 'index.html'), '<main>SPA</main>');
+      writeFileSync(join(outputDir, 'index.html'), '<main>Public homepage</main>');
+      writeFileSync(join(outputDir, '404.html'), '<h1>Not found</h1>');
       writeFileSync(
         join(outputDir, '_headers'),
         "/*\n  Content-Security-Policy: frame-ancestors 'self'\n"
@@ -72,7 +52,8 @@ describe('nuxtSecurityConfig', () => {
         join(outputDir, '_routes.json'),
         JSON.stringify({ include: ['/api/*', '/overlay/*'] })
       );
-      writeFileSync(join(outputDir, 'index.html'), '<main>SPA</main>');
+      writeFileSync(join(outputDir, 'index.html'), '<main>Public homepage</main>');
+      writeFileSync(join(outputDir, '404.html'), '<h1>Not found</h1>');
       writeFileSync(
         join(outputDir, '_headers'),
         '/*\n  Content-Security-Policy: frame-ancestors *\n'

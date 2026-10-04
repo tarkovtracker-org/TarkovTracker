@@ -2,6 +2,7 @@
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350">
+        <slot name="header" />
         <NeededItemsFilterBar
           v-model="activeFilter"
           v-model:search="search"
@@ -214,9 +215,6 @@
   const NeededItemsSettingsDrawer = defineAsyncComponent(
     () => import('@/features/neededitems/NeededItemsSettingsDrawer.vue')
   );
-  definePageMeta({
-    usesWindowScroll: true,
-  });
   const { t } = useI18n({ useScope: 'global' });
   const { trackNeededItemsView } = useProductAnalytics();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('needed_items');
@@ -231,10 +229,6 @@
   } = usePageSideRailState({
     helpOpen: isHelpOpen,
     settingsOpen: isSettingsDrawerOpen,
-  });
-  useSeoMeta({
-    title: () => t('common.needed_items'),
-    description: () => t('page.needed_items.meta_description'),
   });
   const props = withDefaults(
     defineProps<{

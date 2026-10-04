@@ -17,23 +17,18 @@
           @click.stop="changeNavigationDrawer"
         />
       </AppTooltip>
-      <!-- Center: Page Title & Omnibar Search -->
-      <span class="flex min-w-0 flex-1 items-center gap-4">
-        <span
-          class="light:text-surface-50 hidden truncate text-base leading-none font-semibold text-white md:inline"
-        >
-          {{ pageTitle }}
-        </span>
+      <!-- Center: Omnibar Search -->
+      <span class="flex min-w-0 flex-1 items-center">
         <button
           type="button"
-          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-full max-w-xs cursor-pointer items-center justify-between rounded-lg border px-3 text-left transition-colors"
+          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-full max-w-xs min-w-0 cursor-pointer items-center justify-between rounded-lg border px-3 text-left transition-colors"
           :aria-label="t('omnibar.open_aria', 'Open global search')"
           :aria-keyshortcuts="omnibarAriaKeyshortcuts"
           @click="openOmnibar"
         >
-          <span class="text-surface-400 flex items-center gap-2 text-xs">
-            <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4" />
-            {{ t('omnibar.trigger_label', 'Search...') }}
+          <span class="text-surface-400 flex min-w-0 items-center gap-2 text-xs">
+            <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4 shrink-0" />
+            <span class="truncate">{{ t('omnibar.trigger_label', 'Search...') }}</span>
           </span>
           <span class="hidden items-center gap-0.5 sm:flex">
             <template v-for="(part, index) in omnibarShortcutParts" :key="index">
@@ -214,13 +209,12 @@
   import { useSignOut } from '@/composables/useSignOut';
   import { useSupporter } from '@/composables/useSupporter';
   import { useTheme } from '@/composables/useTheme';
-  import { getResourceBySlug } from '@/features/resources/resourceData';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, isGameMode } from '@/utils/constants';
+  import { GAME_MODES } from '@/utils/constants';
   import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
   import { logger } from '@/utils/logger';
   import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
@@ -328,7 +322,6 @@
     }
   });
   const skillCalculation = useSkillCalculation();
-  const route = useRoute();
   const { $supabase } = useNuxtApp();
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
   const avatarSrc = computed(() => {
@@ -437,122 +430,6 @@
   const NAV_BAR_ICON = 'i-mdi-menu-open';
   const { loading: dataLoading, hideoutLoading } = storeToRefs(metadataStore);
   const dataError = ref(false);
-  const normalizeRouteParam = (value: unknown): string | null => {
-    if (Array.isArray(value)) {
-      return normalizeRouteParam(value[0]);
-    }
-    if (typeof value !== 'string') {
-      return null;
-    }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  };
-  const profileRouteName = computed(() => {
-    const rawRouteName = String(route.name || 'index');
-    const normalizedRouteName = rawRouteName.split('___')[0] || rawRouteName;
-    return normalizedRouteName.replaceAll('-', '_');
-  });
-  const profileRouteMode = computed(() => {
-    const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
-    const mode = normalizeRouteParam(routeParams.mode)?.toLowerCase();
-    if (isGameMode(mode)) return mode;
-    return tarkovStore.getCurrentGameMode();
-  });
-  const profileRouteTitle = computed(() => {
-    if (profileRouteName.value !== 'profile_userId_mode') {
-      return null;
-    }
-    const modeLabel =
-      profileRouteMode.value === GAME_MODES.PVE
-        ? t('common.pve', 'PVE')
-        : profileRouteMode.value === GAME_MODES.SEASONAL
-          ? t('common.seasonal_pvp', 'SEASONAL PVP')
-          : t('common.pvp', 'PVP');
-    const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
-    const routeUserId = normalizeRouteParam(routeParams.userId);
-    const currentUserId = normalizeRouteParam($supabase.user?.id ?? null);
-    const isOwnProfileRoute =
-      typeof routeUserId === 'string' &&
-      typeof currentUserId === 'string' &&
-      routeUserId === currentUserId;
-    if (isOwnProfileRoute) {
-      if (preferencesStore.getStreamerMode) {
-        return t('profile.title_with_mode', { name: t('app_bar.hidden_label'), mode: modeLabel });
-      }
-      const modeDisplayName = tarkovStore.getModeDisplayName(profileRouteMode.value)?.trim() ?? '';
-      if (modeDisplayName) {
-        return t('profile.title_with_mode', { name: modeDisplayName, mode: modeLabel });
-      }
-      const ownDisplayName = tarkovStore.getDisplayName()?.trim();
-      if (ownDisplayName) {
-        return t('profile.title_with_mode', { name: ownDisplayName, mode: modeLabel });
-      }
-      const accountName = ($supabase.user.displayName || $supabase.user.username || '').trim();
-      if (accountName) {
-        return t('profile.title_with_mode', { name: accountName, mode: modeLabel });
-      }
-      return t('profile.title_with_mode', { name: t('app_bar.user_label'), mode: modeLabel });
-    }
-    if (routeUserId) {
-      return t('profile.title_with_mode', { name: routeUserId, mode: modeLabel });
-    }
-    return t('profile.title_with_mode', {
-      name: t('page.profile.shared_player'),
-      mode: modeLabel,
-    });
-  });
-  const pageTitle = computed(() => {
-    if (profileRouteTitle.value) {
-      return profileRouteTitle.value;
-    }
-    const routeName = profileRouteName.value;
-    if (routeName === 'resources_slug') {
-      const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
-      const resourceSlug = normalizeRouteParam(routeParams.slug);
-      if (resourceSlug) {
-        const resource = getResourceBySlug(resourceSlug);
-        const itemNameKey = `page.resources.items.${resourceSlug}.name`;
-        if (resource?.hasGuide && te(itemNameKey)) {
-          const resourceName = t(itemNameKey);
-          return t(
-            'page.resources.guide_title_template',
-            { name: resourceName },
-            `${resourceName} Guide`
-          );
-        }
-      }
-      return t('page.resources.title', 'Resources & Guides');
-    }
-    const commonTitles: Partial<Record<string, readonly [string, string]>> = {
-      credits: ['common.credits', 'Credits'],
-      hideout: ['common.hideout', 'Hideout'],
-      kappa: ['common.kappa_lightkeeper', 'Kappa & Lightkeeper'],
-      needed_items: ['common.needed_items', 'Needed Items'],
-      settings: ['common.settings', 'Settings'],
-      storyline: ['common.storyline', 'Storyline'],
-      tasks: ['common.tasks', 'Tasks'],
-      team: ['common.team', 'Team'],
-    };
-    const commonTitle = commonTitles[routeName];
-    if (commonTitle) {
-      return t(...commonTitle);
-    }
-    const titleKeys = [
-      `page.${routeName}.appbar_title`,
-      `page.${routeName}.title`,
-      `page.${routeName}.meta.title`,
-      routeName === 'admin' ? 'common.admin_panel' : '',
-      `navigation_drawer.${routeName}`,
-    ];
-    const titleKey = titleKeys.find((key) => key && te(key));
-    if (titleKey) {
-      return t(titleKey);
-    }
-    return routeName
-      .split('_')
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
-  });
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && appStore.mobileDrawerExpanded && mdAndDown.value) {
       event.preventDefault();

@@ -2,6 +2,7 @@
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350">
+        <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
           <TaskFilterBar
@@ -571,19 +572,11 @@
     TaskPrimaryView,
     TaskSecondaryView,
   } from '@/types/taskFilter';
-  definePageMeta({
-    usesWindowScroll: true,
-  });
   const LeafletMapComponent = defineAsyncComponent(() => import('@/features/maps/LeafletMap.vue'));
   const TaskGraphView = defineAsyncComponent(() => import('@/features/tasks/TaskGraphView.vue'));
   const TaskSettingsDrawer = defineAsyncComponent(
     () => import('@/features/tasks/TaskSettingsDrawer.vue')
   );
-  useSeoMeta({
-    title: 'Tasks',
-    description:
-      'Track your Escape from Tarkov quest progress. View quest objectives, rewards, and dependencies for both PVP and PVE game modes.',
-  });
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const {

@@ -4,6 +4,7 @@ import {
   closeSync,
   fstatSync,
   mkdtempSync,
+  mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -11,6 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { applyRequestDispositions, publishReceipt } from './codex-review-disposition.mjs';
 import { classifyState } from './codex-review-state.mjs';
 import { parseArgs } from './codex-review.mjs';
@@ -91,22 +93,44 @@ function fixture(
     },
   };
 }
-test('verified historical request permits one fresh head request, never marks that head reviewed', (t) => {
+function seedReceipt(context) {
+  const directory = join(context.stateDirectory, 'dispositions');
+  mkdirSync(directory, { recursive: true });
+  publishReceipt(join(directory, 'example_repo-44-10.json'), {
+    commentId: command.id,
+    sha,
+    runId: run.id,
+    createdAt: command.created_at,
+    bodyHash: createHash('sha256').update(command.body).digest('hex'),
+  });
+}
+test('a workflow-skipped push before an untagged request cannot publish a receipt', (t) => {
+  // A runs at 01:04, B is pushed with [skip ci] at 01:04:30, the command is
+  // posted at B at 01:05, and A receives a late review at 01:06. Actions only sees A.
   const context = fixture(t);
   const original = inputs();
+  assert.throws(() => applyRequestDispositions(context, original), /request-time head/);
+  assert.deepEqual(readdirSync(context.stateDirectory), []);
   assert.equal(classifyState(original, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
-  const scoped = applyRequestDispositions(context, original);
-  assert.equal(classifyState(scoped, Date.parse('2026-10-02T02:00:00Z')).status, 'unreviewed');
-  assert.equal(original.comments[0].body, '@codex review', 'original evidence is not edited');
-  assert.equal(readdirSync(join(context.stateDirectory, 'dispositions')).length, 1);
-  const observed = applyRequestDispositions({ ...context, retireRequest: undefined }, original);
-  assert.deepEqual(observed, scoped, 'receipt can be reused by ordinary observation');
-  observed.comments.push({
-    ...command,
-    id: 11,
-    body: `@codex review\n<!-- codex-review-request:${head} -->`,
-  });
-  assert.equal(classifyState(observed, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
+});
+test('a legacy receipt cannot retire a request after a workflow-skipped push', (t) => {
+  const context = fixture(t);
+  seedReceipt(context);
+  const original = inputs();
+  assert.throws(
+    () => applyRequestDispositions({ ...context, retireRequest: undefined }, original),
+    /request-time head/
+  );
+  assert.equal(original.comments[0].body, '@codex review');
+  assert.equal(classifyState(original, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
+});
+test('Actions evidence alone cannot retire even an apparently completed historical request', (t) => {
+  const context = fixture(t);
+  const original = inputs();
+  assert.throws(() => applyRequestDispositions(context, original), /request-time head/);
+  assert.equal(original.comments[0].body, '@codex review');
+  assert.deepEqual(readdirSync(context.stateDirectory), []);
+  assert.equal(classifyState(original, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
 });
 test('missing, forged, earlier or wrong-SHA completion cannot retire a request', (t) => {
   for (const candidate of [
@@ -152,11 +176,11 @@ test('unassociated and renamed-branch intervening heads remain ambiguous', (t) =
     assert.throws(() => applyRequestDispositions(context, inputs()), /ambiguous/);
   }
 });
-test('identified runs for other pull requests do not prevent disposition', (t) => {
+test('identified runs for other pull requests do not prove the request-time head', (t) => {
   const context = fixture(t, {
     interval: [run, { ...run, id: 21, head_sha: head, pull_requests: [{ number: 45 }] }],
   });
-  assert.doesNotThrow(() => applyRequestDispositions(context, inputs()));
+  assert.throws(() => applyRequestDispositions(context, inputs()), /request-time head/);
 });
 test('capped or incomplete workflow searches cannot publish a disposition', (t) => {
   const runs = Array.from({ length: 1000 }, (_, index) => ({ ...run, id: run.id + index }));
@@ -200,18 +224,21 @@ test('inconsistent counts, duplicate runs or a missing evidence run fail closed'
     assert.deepEqual(readdirSync(context.stateDirectory), []);
   }
 });
-test('complete multi-page intervals below the search limit permit disposition', (t) => {
+test('complete multi-page intervals below the search limit still lack request-time head proof', (t) => {
   const runs = Array.from({ length: 999 }, (_, index) => ({ ...run, id: run.id + index }));
   const intervalPages = Array.from({ length: 10 }, (_, index) => ({
     total_count: runs.length,
     workflow_runs: runs.slice(index * 100, (index + 1) * 100),
   }));
-  assert.doesNotThrow(() => applyRequestDispositions(fixture(t, { intervalPages }), inputs()));
+  assert.throws(
+    () => applyRequestDispositions(fixture(t, { intervalPages }), inputs()),
+    /request-time head/
+  );
 });
 test('a persisted disposition is rejected when its live workflow search becomes incomplete', (t) => {
   const intervalPages = [{ total_count: 1, workflow_runs: [run] }];
   const context = fixture(t, { intervalPages });
-  applyRequestDispositions(context, inputs());
+  seedReceipt(context);
   intervalPages[0].total_count = 1001;
   assert.throws(
     () => applyRequestDispositions({ ...context, retireRequest: undefined }, inputs()),
@@ -225,7 +252,7 @@ test('a command edited into place after creation cannot use earlier completion',
 });
 test('edited or removed request invalidates a persisted disposition', (t) => {
   const context = fixture(t);
-  applyRequestDispositions(context, inputs());
+  seedReceipt(context);
   for (const comments of [
     [],
     [{ ...command, body: '@codex review changed' }],

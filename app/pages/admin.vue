@@ -1,15 +1,11 @@
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { logger } from '@/utils/logger';
   definePageMeta({
     middleware: ['admin'],
   });
   const { t } = useI18n({ useScope: 'global' });
-  const metaTitle = computed(() => t('common.admin_panel'));
-  useSeoMeta({
-    title: metaTitle,
-    robots: 'noindex, nofollow',
-  });
   const { $supabase } = useNuxtApp();
   const router = useRouter();
   const { systemStore, hasInitiallyLoaded, loadError } = useSystemStoreWithSupabase();
@@ -53,6 +49,7 @@
   </div>
   <div v-else-if="systemStore.isAdmin" class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350 space-y-6">
+      <PageHeader :title="t('common.admin_panel')" />
       <UAlert
         icon="i-mdi-alert"
         color="warning"

@@ -47,7 +47,7 @@ are forgeable by write collaborators, so the evidence binds to the controller ru
 `workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
 succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
 
-Cloudflare Pages serves static SPA responses outside the Pages Function routes, so runtime route
+Cloudflare Pages serves prerendered public documents and finite client shells outside the Pages Function routes, so runtime route
 rules alone cannot provide browser response headers for those documents. Keep the static
 `public/_headers` frame-ancestor policy in the uploaded build output alongside the runtime app
 CSP; `frame-src` remains an independent directive for permitted embedded content. The build-time
@@ -179,9 +179,10 @@ GitHub has computed the test merge; other pending reasons are left alone.
 - Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
   `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
-  the served manifest, usable `/` and `/tasks` content, loaded assets, the anonymous
-  `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser
-  requests to Supabase, Stripe, or analytics hosts. Persistent failure blocks merging.
+  the served manifest, usable `/` and `/tasks` content, Needed Items source tabs named `All`,
+  `Tasks`, and `Hideout` with their counts at 333, 400, and 1280 px (`en-US`), loaded assets, the
+  anonymous `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no
+  browser requests to Supabase, Stripe, or analytics hosts. Persistent failure blocks merging.
 - Reporting failures fail the controller so automation cannot promote the commit. Deployment and
   smoke evidence artifacts are retained for 30 days. An unexpected controller error re-identifies
   the current PR or standalone branch before publishing failure; the CI run's PR base snapshot must

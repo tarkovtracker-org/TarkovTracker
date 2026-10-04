@@ -136,9 +136,11 @@ fallback for older or unknown errors. Upstream purge details remain in server lo
 
 ## Boot-time asset-failure recovery
 
-**Summary**: When a hashed chunk or the entry module fails to load — typically a stale
-`/_nuxt/*` request answered by the Cloudflare Pages SPA fallback (`HTTP 200`, `text/html`, cached 5
-hours) during a rolling deploy — the app recovers automatically. Recovery runs in two layers that
+**Summary**: When a hashed chunk or the entry module fails to load — for example, a stale
+`/_nuxt/*` URL returning HTTP 404 during a rolling deploy — the app recovers automatically.
+Missing assets return a real 404 under the
+[public document routing model](../architecture.md#public-rendering-and-discovery).
+Recovery runs in two layers that
 share one retry budget: a pre-boot inline script for entry-module failures (the bundle never
 boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
 boot.

@@ -115,6 +115,11 @@ function verifyInterval(context, receipt, run) {
     throw new Error(
       'Historical request revision is ambiguous: another PR head was observed before the request'
     );
+  // A push can skip every pull_request workflow. Even a complete interval cannot
+  // prove which head an untagged command requested; old receipts share this gap.
+  throw new Error(
+    'Historical request-time head cannot be verified from Actions runs; the untagged request remains pending'
+  );
 }
 function readIntervalRuns(pages, runId) {
   if (!Array.isArray(pages)) throw new Error(INCOMPLETE_INTERVAL);

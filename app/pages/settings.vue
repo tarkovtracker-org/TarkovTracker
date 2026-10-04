@@ -2,21 +2,11 @@
   <div class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350">
       <div class="mx-auto max-w-290 space-y-4 lg:space-y-0">
-        <div class="flex items-center justify-between pb-4">
-          <div>
-            <h1 class="text-surface-100 text-xl font-bold">
-              {{ $t('common.settings', 'Settings') }}
-            </h1>
-            <p class="text-surface-400 mt-1 text-sm">
-              {{
-                $t(
-                  'settings.page_description',
-                  'Manage your account, game progression, and application preferences.'
-                )
-              }}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          :title="$t('common.settings')"
+          :description="$t('settings.page_description')"
+          class="pb-4"
+        />
         <UTabs
           :items="settingsTabItems"
           :model-value="activeTab"
@@ -177,6 +167,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
@@ -270,16 +261,6 @@
     '#settings-skills': 'skills',
   };
   const legacyAccountHashes = new Set(['#settings-account']);
-  const settingsSeoKeys: Record<SettingsTabId, string> = {
-    progression: 'progression',
-    prestige: 'prestige',
-    preferences: 'preferences',
-    account: 'account',
-    imports: 'imports',
-    'backup-restore': 'backup_restore',
-    api: 'api',
-    'streamer-tools': 'streamer_tools',
-  };
   const dataManagementSession = useDataManagementSession();
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
@@ -309,18 +290,6 @@
     return canonicalizeTab(resolved);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
-  const settingsSeo = computed(() => {
-    const seoKey = settingsSeoKeys[activeTab.value];
-    return {
-      title: t(`settings.tab_seo.${seoKey}.title`),
-      description: t(`settings.tab_seo.${seoKey}.description`),
-    };
-  });
-  useSeoMeta({
-    title: computed(() => settingsSeo.value.title),
-    description: computed(() => settingsSeo.value.description),
-    robots: 'noindex, nofollow',
-  });
   const settingsTabLabels = computed<Record<SettingsTabId, string>>(() => ({
     progression: t('settings.tabs.progression'),
     prestige: t('common.prestige'),

@@ -191,7 +191,9 @@ panels, and `rounded-lg` only where Nuxt UI or an existing pattern already does.
 
 Use Nuxt UI components first for standard controls: `UButton`, `UInput`, `UAlert`, `USelectMenu`,
 `UDropdownMenu`, and related primitives. Prefer shared local components like `GenericCard`,
-`AppTooltip`, and existing feature cards before creating new visual primitives.
+`AppTooltip`, and existing feature cards before creating new visual primitives. Page titles use
+`PageHeader` (one `h1`, optional description and actions) at the top of the page content column;
+the app bar does not repeat the page title.
 
 For icon-only actions, use an icon and an accessible label. Do not use text-only rounded rectangles
 when a standard icon button is clearer.

@@ -9,9 +9,10 @@ import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
   assertCloudflarePagesOutput,
   buildContentSecurityPolicyRouteRules,
-  promoteSpaFallback,
   resolveNitroPreset,
 } from './app/utils/nuxtSecurityConfig';
+import { assertPrerenderedDocuments } from './app/utils/prerenderOutput';
+import { CLIENT_DOCUMENT_ROUTES, PUBLIC_SEO_ROUTES } from './app/utils/routeSeo';
 import {
   GITHUB_IMAGE_DOMAINS,
   resolveClientLogSinkUrl,
@@ -102,32 +103,13 @@ const cspRouteRules = buildContentSecurityPolicyRouteRules({
   supabaseUrl: PUBLIC_SUPABASE_URL,
   turnstileSiteKey: TURNSTILE_SITE_KEY || TARKOV_ACCESS_SITE_KEY,
 });
-const webApplicationSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'Tarkov Tracker',
-  alternateName: 'TarkovTracker',
-  url: 'https://tarkovtracker.org',
-  applicationCategory: 'GameApplication',
-  operatingSystem: 'Web',
-  description:
-    'Tarkov Tracker helps you track Escape from Tarkov quest progress, storyline, hideout upgrades, and needed items.',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
-  author: {
-    '@type': 'Organization',
-    name: 'Tarkov Tracker',
-    url: 'https://tarkovtracker.org',
-  },
-  sameAs: ['https://github.com/tarkovtracker-org/TarkovTracker'],
-};
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   telemetry: false,
-  ssr: false,
+  ssr: true,
+  experimental: {
+    payloadExtraction: false,
+  },
   srcDir: 'app',
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
@@ -249,10 +231,16 @@ export default defineNuxtConfig({
       pages: {
         defaultRoutes: false,
         routes: {
-          include: ['/api/*', '/overlay/*'],
+          include: ['/api/*', '/overlay/*', '/profile/*'],
           exclude: [],
         },
       },
+    },
+    prerender: {
+      routes: [...PUBLIC_SEO_ROUTES, ...CLIENT_DOCUMENT_ROUTES, '/200.html', '/404.html'],
+      crawlLinks: false,
+      autoSubfolderIndex: false,
+      failOnError: true,
     },
     hooks: {
       async compiled(nitro) {
@@ -289,7 +277,16 @@ export default defineNuxtConfig({
   routeRules: {
     '/neededitems': { redirect: { to: '/needed-items', statusCode: 301 } },
     '/streamer-tools': { redirect: { to: '/settings#streamer-tools', statusCode: 301 } },
-    '/200.html': { prerender: true },
+    // Most application routes stay client-rendered; public documents opt into SSR.
+    '/**': { ...cspRouteRules['/**'], ssr: false },
+    ...Object.fromEntries(
+      PUBLIC_SEO_ROUTES.map((route) => [route, { ssr: true, prerender: true }])
+    ),
+    ...Object.fromEntries(
+      CLIENT_DOCUMENT_ROUTES.map((route) => [route, { ssr: false, prerender: true }])
+    ),
+    '/200.html': { ssr: false, prerender: true },
+    '/404.html': { ssr: false, prerender: true },
     // Explicit long-term caching for build assets
     '/_nuxt/**': {
       headers: { 'cache-control': 'public,max-age=31536000,immutable' },
@@ -297,14 +294,13 @@ export default defineNuxtConfig({
     '/_fonts/**': {
       headers: { 'cache-control': 'public,max-age=31536000,immutable' },
     },
-    ...cspRouteRules,
+    '/overlay/kappa/**': cspRouteRules['/overlay/kappa/**'],
   },
   app: {
     baseURL: '/',
     buildAssetsDir: '/_nuxt/',
     head: {
-      titleTemplate: '%s | Tarkov Tracker',
-      title: 'Escape from Tarkov Quest, Hideout, and Item Tracker',
+      link: [{ rel: 'icon', href: '/favicon.ico', sizes: 'any' }],
       style: [
         {
           textContent: [
@@ -362,52 +358,11 @@ export default defineNuxtConfig({
             '}catch(e){}',
           ].join(''),
         },
-        {
-          type: 'application/ld+json',
-          textContent: JSON.stringify(webApplicationSchema),
-        },
       ],
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'robots', content: 'index, follow, max-image-preview:large' },
-        {
-          name: 'description',
-          content:
-            'Tarkov Tracker helps you track Escape from Tarkov quest progress, storyline, hideout upgrades, and needed items. Plan raids, share progression with your team, and stay ready for wipe updates.',
-        },
-        {
-          name: 'keywords',
-          content:
-            'tarkov tracker, tarkov quest tracker, escape from tarkov tasks, eft hideout tracker, eft needed items',
-        },
         { name: 'theme-color', content: '#c8a882' },
-        // OpenGraph tags
-        { property: 'og:site_name', content: 'Tarkov Tracker' },
-        { property: 'og:type', content: 'website' },
-        { property: 'og:title', content: 'Tarkov Tracker - Escape from Tarkov Progress Tracker' },
-        {
-          property: 'og:description',
-          content:
-            'Tarkov Tracker helps you track Escape from Tarkov quest progress, storyline, hideout upgrades, and needed items. Plan raids, share progression with your team, and stay ready for wipe updates.',
-        },
-        {
-          property: 'og:image',
-          content: 'https://tarkovtracker.org/img/logos/tarkovtrackerlogo-light.webp',
-        },
-        { property: 'og:url', content: 'https://tarkovtracker.org' },
-        // Twitter Card tags
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:title', content: 'Tarkov Tracker - Escape from Tarkov Progress Tracker' },
-        {
-          name: 'twitter:description',
-          content:
-            'Tarkov Tracker helps you track Escape from Tarkov quest progress, storyline, hideout upgrades, and needed items. Plan raids, share progression with your team, and stay ready for wipe updates.',
-        },
-        {
-          name: 'twitter:image',
-          content: 'https://tarkovtracker.org/img/logos/tarkovtrackerlogo-light.webp',
-        },
       ],
     },
   },
@@ -454,21 +409,10 @@ export default defineNuxtConfig({
       { label: 'URL', width: '65%' },
       { label: 'Last Modified', select: 'sitemap:lastmod', width: '25%' },
     ],
-    exclude: [
-      '/account',
-      '/admin',
-      '/auth/**',
-      '/login',
-      '/not-found',
-      '/oauth/**',
-      '/profile',
-      '/settings',
-      '/team',
-    ],
-    defaults: {
-      changefreq: 'weekly',
-      priority: 0.8,
-    },
+    excludeAppSources: true,
+    autoLastmod: false,
+    discoverImages: false,
+    urls: PUBLIC_SEO_ROUTES,
   },
   i18n: {
     bundle: {
@@ -481,23 +425,48 @@ export default defineNuxtConfig({
     },
     strategy: 'no_prefix',
     defaultLocale: 'en',
+    detectBrowserLanguage: false,
     restructureDir: 'app',
     langDir: 'locales',
     locales: SUPPORTED_LOCALES.map((code) => ({ code, file: `${code}.json` })),
     vueI18n: 'i18n.config.ts',
   },
   hooks: {
+    // Tracker modules keep their client state; route entrypoints render public summaries.
+    'pages:extend': (pages) => {
+      const wrappers: Record<string, string> = {
+        '/': 'index',
+        '/tasks': 'tasks',
+        '/hideout': 'hideout',
+        '/needed-items': 'needed-items',
+        '/kappa': 'kappa',
+        '/storyline': 'storyline',
+        '/changelog': 'changelog',
+      };
+      for (const page of pages) {
+        const wrapper = wrappers[page.path];
+        if (wrapper) page.file = resolve(appDir, 'features/seo-pages', `${wrapper}.vue`);
+      }
+    },
     'nitro:init': (nitro) => {
       if (!String(nitro.options.preset || '').includes('cloudflare')) {
         return;
       }
       nitro.hooks.hook('compiled', () => {
-        promoteSpaFallback(nitro.options.output.publicDir);
         writeFileSync(
           resolve(nitro.options.output.dir, '_routes.json'),
-          JSON.stringify({ version: 1, include: ['/api/*', '/overlay/*'], exclude: [] }, null, 2)
+          JSON.stringify(
+            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*'], exclude: [] },
+            null,
+            2
+          )
         );
-        assertCloudflarePagesOutput(nitro.options.output.dir, ['/api/*', '/overlay/*']);
+        assertCloudflarePagesOutput(nitro.options.output.dir, [
+          '/api/*',
+          '/overlay/*',
+          '/profile/*',
+        ]);
+        assertPrerenderedDocuments(nitro.options.output.publicDir);
       });
     },
     'imports:extend': (imports: Array<{ as?: string; from?: string; name: string }>) => {
@@ -532,7 +501,9 @@ export default defineNuxtConfig({
   },
   icon: {
     clientBundle: {
-      scan: true,
+      scan: {
+        globInclude: ['**/*.{vue,jsx,tsx,md,mdc,mdx,yml,yaml}', 'app/**/*.ts'],
+      },
     },
   },
   // Pin Nuxt UI to its dark alias block regardless of OS preference. The app's

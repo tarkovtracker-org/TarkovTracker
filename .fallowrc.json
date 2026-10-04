@@ -22,7 +22,9 @@
     "scripts/preview/verify-deployment.mjs",
     "scripts/preview/controller.mjs",
     "scripts/preview/smoke/playwright.config.mjs",
-    "scripts/preview/smoke/*.smoke.mjs"
+    "scripts/preview/smoke/*.smoke.mjs",
+    "app/server/plugins/**/*.ts",
+    "app/features/seo-pages/*.vue"
   ],
   "ignoreDependencies": [
     "shared",

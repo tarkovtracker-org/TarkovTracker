@@ -1,7 +1,8 @@
 <template>
   <div class="min-h-full overflow-x-hidden">
-    <div class="px-3 py-5 sm:px-5 sm:py-6">
+    <div class="px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
+        <slot name="header" />
         <div class="flex flex-col gap-4">
           <div class="flex justify-center">
             <div
@@ -251,11 +252,6 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import type { HideoutStation } from '@/types/tarkov';
-  useSeoMeta({
-    title: 'Hideout',
-    description:
-      'Track your hideout module upgrades and requirements. See what items you need to complete each station upgrade.',
-  });
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );

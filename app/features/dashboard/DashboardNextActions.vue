@@ -14,7 +14,7 @@
       class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
     ></div>
     <div
-      class="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:p-6"
+      class="relative grid grid-cols-1 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:p-6"
     >
       <div class="space-y-4">
         <NuxtLink
