@@ -523,8 +523,7 @@ Enhanced PR validation:
 
 **Jobs:**
 
-- `PR Meta` - auto-label based on file changes, PR size classification (S/M/L/XL/XXL), and
-  commit message validation
+- `PR Meta` - auto-label based on file changes and PR size classification (S/M/L/XL/XXL)
 - `Lighthouse scope` - decides whether the Lighthouse audit is relevant
 - `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `.github/lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
@@ -881,24 +880,25 @@ impossible, format staged paths yourself before committing (for example
 
 **commit-msg (`.husky/commit-msg`):**
 
-- Validates commit messages via commitlint
-- Enforces conventional commit format
+- Runs commitlint, which only checks for an allowed conventional type prefix
 
 ### Commit Message Format
 
 ```text
 <type>(<scope>): <subject>
-
-[optional body]
-
-[optional footer]
 ```
 
-**Types:** feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, wip
+Only the type prefix is enforced. CI checks the **PR title** (`.github/workflows/pr-title.yml` →
+`scripts/checks/check-pr-title.mjs`), because squash merges turn it into the commit on `main`;
+editing the title re-runs the check. Branch commits are not checked in CI.
+
+**Types** (`scripts/checks/commit-types.mjs`): feat, fix, perf, revert, refactor, docs, test, style,
+build, ci, chore, wip. `feat` → minor release; `fix`, `perf`, `revert` → patch release.
 
 _Note: `wip` is a project-specific extension and is not part of the Conventional Commits spec._
 
-**Scopes:** app, workers, api, ui, tasks, hideout, maps, team, settings, admin, i18n, deps, config, ci, test, docs, release
+**Scopes:** free-form. Internal scopes listed in `scripts/release/release-scope.mjs` (for example
+`ci`, `deps`, `docs`, `preview`, `no-release`) never trigger a release.
 
 **Examples:**
 
@@ -1142,7 +1142,8 @@ pnpm run lint:fix
 
 - `.github/workflows/*.yml` - GitHub Actions workflows
 - `.husky/*` - Git hooks
-- `commitlint.config.js` - Commit message rules
+- `commitlint.config.js` - Commit header rules (type prefix only)
+- `scripts/checks/commit-types.mjs` - Allowed conventional types (PR title and commits)
 - `.github/dependabot.yml` - Dependabot update config
 - `.releaserc.json` - Semantic release config
 

@@ -58,7 +58,7 @@ instead of restating it.
 - [`/DESIGN.md`](../DESIGN.md) — design contract (validate with `pnpm run design:lint`).
 
 > To avoid drift, each fact has a single owner: agent conventions and required validation live in
-> `AGENTS.md` (plus path-scoped `AGENTS.md` files); commit scopes live in `commitlint.config.js`;
+> `AGENTS.md` (plus path-scoped `AGENTS.md` files); commit types live in `scripts/checks/commit-types.mjs`;
 > the environment-variable map lives in `architecture.md` (`runbook.md` links to it for ops); API
 > details live in `api.md`; rate-limit ownership lives in `rate-limiting.md`; plain-language system
 > specs (caching, data fetching, overlay, precompute) live in `systems/`. Other documents link to
