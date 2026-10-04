@@ -365,12 +365,25 @@
     }
     return document.getElementById(targetId);
   };
-  const scrollTarget = (element: Element) => {
-    element.scrollIntoView({
+  const scrollTarget = (element: Element, hash: string) => {
+    const isTab = element.getAttribute('role') === 'tab';
+    const options: ScrollIntoViewOptions = {
       // Settle horizontal tab movement before Nuxt's subsequent panel scroll.
-      behavior: element.getAttribute('role') === 'tab' ? 'instant' : 'smooth',
+      behavior: isTab ? 'instant' : 'smooth',
       block: 'start',
       inline: 'nearest',
+    };
+    element.scrollIntoView(options);
+    if (!isTab) {
+      return;
+    }
+    // An instant scroll issued while an earlier smooth panel scroll is still animating does not
+    // fully cancel it in Chromium: the stale animation applies one more frame and leaves the tab
+    // strip under the app bar. Re-assert the position once that frame has run.
+    requestAnimationFrame(() => {
+      if (hash === route.hash && element.isConnected) {
+        element.scrollIntoView(options);
+      }
     });
   };
   const scrollToHashTarget = async (hash: string) => {
@@ -384,7 +397,7 @@
     const targetId = hashTargetIds[hash] ?? hash.replace(/^#/, '');
     const targetElement = resolveScrollTarget(targetId);
     if (targetElement) {
-      scrollTarget(targetElement);
+      scrollTarget(targetElement, hash);
     }
   };
   const hiddenPrestigeTarget = (
