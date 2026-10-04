@@ -40,10 +40,12 @@ before returning it.
 | `/api/tarkov/overlay-status`   | Last complete fleet manifest | no-store   | no           | metadata |
 | `/api/tarkov/map-spawns`       | Map spawn points             | 12h        | no           | no       |
 | `/api/tarkov/cache-meta`       | Cache purge status           | 5m edge    | no           | no       |
+| `/api/tarkov/access-check`     | Browser clearance probe      | no-store   | no           | no       |
 
 Task, hideout, item and prestige endpoints consume overlays. The editions endpoint projects
 editions, story chapters and Seasonal perks from the same validated loader. Bootstrap and
-map-spawns remain upstream-only; cache-meta and overlay-status expose operational metadata.
+map-spawns remain upstream-only; cache-meta, overlay-status and
+[`access-check`](../../app/server/api/tarkov/access-check.get.ts) are operational routes.
 
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](./overlay-and-precompute.md#precompute-workflow).
