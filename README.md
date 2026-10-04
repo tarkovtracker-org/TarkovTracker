@@ -1,7 +1,23 @@
 # TarkovTracker
 
-[![Crowdin](https://badges.crowdin.net/tarkovtrackerorg/localized.svg)](https://crowdin.com/project/tarkovtrackerorg)
-[![codecov](https://codecov.io/gh/tarkovtracker-org/TarkovTracker/graph/badge.svg)](https://codecov.io/gh/tarkovtracker-org/TarkovTracker)
+[![CI][ci-badge]][ci-link]
+[![Coverage][coverage-badge]][coverage-link]
+[![Latest release][release-badge]][release-link]
+[![License: GPL-3.0][license-badge]](LICENSE.md)
+[![Translated][crowdin-badge]][crowdin-link]
+[![Discord][discord-badge]][discord-link]
+
+[ci-badge]: https://github.com/tarkovtracker-org/TarkovTracker/actions/workflows/ci.yml/badge.svg?branch=main
+[ci-link]: https://github.com/tarkovtracker-org/TarkovTracker/actions/workflows/ci.yml?query=branch%3Amain
+[coverage-badge]: https://codecov.io/gh/tarkovtracker-org/TarkovTracker/graph/badge.svg
+[coverage-link]: https://codecov.io/gh/tarkovtracker-org/TarkovTracker
+[release-badge]: https://img.shields.io/github/v/release/tarkovtracker-org/TarkovTracker?label=release
+[release-link]: https://github.com/tarkovtracker-org/TarkovTracker/releases/latest
+[license-badge]: https://img.shields.io/github/license/tarkovtracker-org/TarkovTracker
+[crowdin-badge]: https://badges.crowdin.net/tarkovtrackerorg/localized.svg
+[crowdin-link]: https://translate.tarkovtracker.org
+[discord-badge]: https://img.shields.io/discord/1433379620648124451?label=discord&logo=discord&logoColor=white&color=5865F2
+[discord-link]: https://discord.gg/M8nBgA2sT6
 
 TarkovTracker tracks Escape from Tarkov tasks, hideout upgrades, required items, levels, and team
 progress separately for PvP and PvE.
@@ -36,10 +52,12 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 - **Use API tokens** — programmatically read your progress via the public API
 - **Back up your data** — server-side storage protects against browser data loss
 
-> **Signing in:** If you have local progress and create a new account, that progress uploads to
-> your account on first login. Returning users (same browser, same account) get a merge of local
-> and cloud progress. If you sign into an existing account from a new browser that already has
-> cloud progress, the cloud data takes precedence — your local guest progress is not merged.
+> [!NOTE]
+> **What happens to local progress when you sign in:**
+>
+> - **New account:** your local progress is uploaded on first login.
+> - **Same browser, same account:** local and cloud progress are merged.
+> - **Existing account on a new browser:** cloud progress wins; local guest progress is not merged.
 
 ### Getting help
 
@@ -47,8 +65,9 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 - **Found a security issue?** See [`SECURITY.md`](SECURITY.md) for how to report it privately.
 - **Community:** Join us on [Discord](https://discord.gg/M8nBgA2sT6).
 - **Translations:** Help translate at
-  [translate.tarkovtracker.org](https://translate.tarkovtracker.org). Supported languages:
-  English, German, Spanish, French, Russian, Ukrainian, and Chinese.
+  [translate.tarkovtracker.org](https://translate.tarkovtracker.org). Available in English,
+  Chinese, Czech, French, German, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish,
+  and Ukrainian.
 
 ---
 
@@ -76,8 +95,8 @@ offline mode with localStorage only — auth, sync, realtime, and team features 
 > `SUPABASE_URL` and `SUPABASE_ANON_KEY` are required for login/sync. Everything else is optional and
 > documented in [`docs/architecture.md`](docs/architecture.md).
 
-**Tech stack:** Nuxt 4 (prerendered public pages, client-side progression), Vue 3 Composition API, TypeScript strict, Pinia,
-Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
+**Tech stack:** Nuxt 4 (prerendered public pages, client-side progression), Vue 3 Composition
+API, TypeScript (strict), Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 
 ### Common commands
 
@@ -105,11 +124,10 @@ feature. PRs that bundle unrelated changes may be asked to split or be closed.
 - **[Label system](.github/LABELS.md)** — issue types, scope, priority, ownership, and status.
 - **[Project board](.github/PROJECT_BOARD.md)** — how issues move from backlog to done.
 
-> New to the codebase? Start with
-> [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) for the development workflow and PR process.
-> When available, issues labeled
+> [!TIP]
+> New to the codebase? Look for issues labeled
 > [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
-> are scoped for newcomers.
+> — they are scoped for newcomers.
 
 ### Documentation
 
