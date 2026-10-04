@@ -1,66 +1,38 @@
-import {
-  applyTaskTransition,
-  type TransitionCompletion,
-  type TransitionTask,
-  type TransitionTaskState,
-} from '@shared/utils/taskTransitions';
+import { setTaskState, type TransitionTaskState } from '@shared/utils/taskTransitions';
 import { describe, expect, it } from 'vitest';
-const tasks: TransitionTask[] = [
-  { id: 'root' },
-  { id: 'other' },
-  {
-    id: 'dependent',
-    taskRequirements: [
-      { task: { id: 'root' }, status: ['complete'] },
-      { task: { id: 'other' }, status: ['complete'] },
-    ],
-  },
-  { id: 'branch', taskRequirements: [{ task: { id: 'root' }, status: ['failed'] }] },
-];
 const run = (
-  completions: Record<string, TransitionCompletion>,
+  completions: Record<string, { complete?: boolean; failed?: boolean; active?: boolean }>,
   taskId: string,
-  state: TransitionTaskState,
-  protectedTaskIds?: Set<string>
+  state: TransitionTaskState
 ) => {
   const updates = new Map<string, TransitionTaskState>();
-  applyTaskTransition(
-    completions,
-    tasks,
-    { taskId, state },
-    { timestamp: 5, updates, protectedTaskIds }
-  );
+  setTaskState(completions, taskId, state, { timestamp: 5, updates });
   return updates;
 };
-describe('applyTaskTransition', () => {
-  it('locks complete-dependents when a prerequisite leaves completed', () => {
-    const completions = {
-      root: { complete: true, failed: false },
-      dependent: { complete: true, failed: false },
-    };
-    const updates = run(completions, 'root', 'failed');
-    expect(completions.root).toEqual({ complete: true, failed: true, timestamp: 5 });
-    expect(completions.dependent).toEqual({ complete: false, failed: false, timestamp: 5 });
-    expect([...updates]).toEqual([
-      ['root', 'failed'],
-      ['dependent', 'uncompleted'],
-    ]);
+describe('setTaskState', () => {
+  it.each([
+    ['active', { complete: false, failed: false, active: true, timestamp: 5 }],
+    ['completed', { complete: true, failed: false, active: false, timestamp: 5 }],
+    ['failed', { complete: true, failed: true, active: false, timestamp: 5 }],
+    ['uncompleted', { complete: false, failed: false, active: false, timestamp: 5 }],
+  ] as const)('writes the canonical %s triple', (state, expected) => {
+    const completions = {};
+    const updates = run(completions, 'task', state);
+    expect(completions).toEqual({ task: expected });
+    expect([...updates]).toEqual(state === 'uncompleted' ? [] : [['task', state]]);
   });
-  it('leaves dependents alone until every requirement is met', () => {
-    const completions: Record<string, TransitionCompletion> = {
-      dependent: { complete: true, failed: false },
-    };
-    run(completions, 'root', 'completed');
+  it('clears active when an accepted task completes', () => {
+    const completions = { task: { complete: false, failed: false, active: true } };
+    expect([...run(completions, 'task', 'completed')]).toEqual([['task', 'completed']]);
+    expect(completions.task.active).toBe(false);
+  });
+  it('records no update when the state is unchanged', () => {
+    const completions = { task: { complete: false, failed: false, active: true } };
+    expect(run(completions, 'task', 'active').size).toBe(0);
+  });
+  it('writes only the requested task', () => {
+    const completions = { dependent: { complete: true, failed: false } };
+    run(completions, 'root', 'uncompleted');
     expect(completions.dependent).toEqual({ complete: true, failed: false });
-    completions.other = { complete: true, failed: false };
-    run(completions, 'root', 'completed');
-    expect(completions.dependent).toEqual({ complete: false, failed: false, timestamp: 5 });
-  });
-  it('ignores failed-status requirements and protected tasks', () => {
-    const completions = { branch: { complete: true, failed: false } };
-    const updates = run(completions, 'root', 'uncompleted', new Set(['dependent']));
-    expect(completions).not.toHaveProperty('dependent');
-    expect(completions.branch).toEqual({ complete: true, failed: false });
-    expect(updates.size).toBe(0);
   });
 });

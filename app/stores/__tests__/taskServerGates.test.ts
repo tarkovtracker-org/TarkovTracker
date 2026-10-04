@@ -368,4 +368,17 @@ describe('registry-derived counters', () => {
       'global_variable_unknown'
     );
   });
+  it('treats an accepted task as having met its confirmable server gates', () => {
+    const dialogue: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    expect(evaluate(dialogue).available).toBe(false);
+    const accepted = { target: { complete: false, failed: false, active: true, timestamp: 2_000 } };
+    expect(evaluate(dialogue, { completions: accepted }).available).toBe(true);
+    expect(evaluate(gate(), { completions: accepted }).available).toBe(true);
+    expect(
+      evaluate(gate(), { completions: accepted, globalVariables: { counter: 1 } }).available
+    ).toBe(false);
+  });
 });

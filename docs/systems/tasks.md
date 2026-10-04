@@ -54,7 +54,9 @@ another device set. `requirements` is the exact normalized gate signature (the `
 excluded from it), and a clear is an empty string kept as a tombstone. Sync merges the map per task by
 the confirmation's own timestamp. A confirmation counts only while its signature matches and it is
 not older than the task's status timestamp, so a later reset, completion, failure or progress repair
-on any device retires it without rewriting the map. The row sanitizer preserves the key (migration
+on any device retires it without rewriting the map. An explicitly accepted (`active`) task counts as
+having met its supported server gates without a confirmation, because the game only allows accepting
+a task once they are met; accepting also records the story objectives the task implies. The row sanitizer preserves the key (migration
 `20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
 Every merge selects per-task timestamp winners before applying the
 [map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
@@ -163,8 +165,9 @@ successful task and objective data with an error indicator. Profiles prefer the 
 editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
 remain fatal.
 Completed and failed tasks are terminal.
-The existing acceptance-unknown interpretation is retained; this does not introduce #715's
-explicit Accept workflow.
+The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
+Legacy rows without an `active` key retain the unlockable prerequisite fallback. Task cards use
+the same fallback when explaining prerequisite status, without labeling unknown tasks Active.
 
 Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
@@ -200,6 +203,8 @@ Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profil
 not import quest completions and therefore has no trader/task backfill path.
 
 ### Invariants
+
+- Undoing completion or failure restores whether the task was accepted before that action.
 
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.

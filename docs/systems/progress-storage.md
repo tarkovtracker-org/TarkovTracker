@@ -61,7 +61,11 @@ flowchart LR
    reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
-   reads resolve the active Seasonal number through the database before selecting a row. Persisted
+   reads resolve the active Seasonal number through the database before selecting a row. Task
+   completions live in these JSONB blobs; the optional `active` boolean is preserved by local
+   persistence, merges, realtime, team and sharing transforms. Missing legacy incomplete values
+   remain missing, while terminal complete or failed rows are normalized to `active: false`.
+   Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
    Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
@@ -200,12 +204,21 @@ Teams, save status and recovery, and progress imports build on this storage; see
   This reduces Supabase transfer; gateway response ETags alone do not avoid upstream reads.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
+- Task-completion sanitizers and timestamp merges preserve explicit `active: true` and
+  `active: false` without manufacturing the property on legacy incomplete entries. No migration or
+  bulk rewrite backfills ambiguous rows.
+- Full-mode saves from older clients retain an existing acceptance flag when their nonterminal
+  task entry omits `active` and has the same timestamp. Older legacy entries retain the newer
+  stored task status and timestamp. Newer legacy status writes and
+  progress reset epochs keep their precedence; legacy-only entries remain unknown.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in [EFT log import](./imports.md#eft-log-import); unresolved-mode events require an explicit destination choice.
+- Task acceptance records the manual activity action `active`; the database entry sanitizer
+  preserves it through sync so acceptance history survives reloads and other devices.
 - Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
   next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
   lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by

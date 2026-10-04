@@ -5,6 +5,7 @@ import type { UserProgressData } from '@/stores/progressState';
 import type { Task } from '@/types/tarkov';
 const createTarkovStore = (options: {
   isTaskComplete?: (taskId: string) => boolean;
+  isTaskActive?: (taskId: string) => boolean;
   progressData?: Partial<UserProgressData>;
   objectiveCounts?: Record<string, number>;
   playerLevel?: number;
@@ -13,6 +14,8 @@ const createTarkovStore = (options: {
   const manualActivityHistory: unknown[] = [];
   return {
     setTaskComplete: vi.fn(),
+    setTaskActive: vi.fn(),
+    isTaskActive: vi.fn((taskId: string) => options.isTaskActive?.(taskId) ?? false),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
     setTaskObjectiveComplete: vi.fn(),
@@ -61,6 +64,57 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it('records and reverses accepting a task', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+    stop();
+  });
+  it('releases the story objectives an undone acceptance recorded', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+      recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk' }],
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setStoryObjectiveUncomplete).toHaveBeenCalledWith('tour', 'talk');
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)('restores acceptance when undoing %s', async (action) => {
+    const task: Task = { id: 'accepted', name: 'Accepted task' };
+    const { notification, tarkovStore, stop } = await setup([task], {
+      isTaskActive: () => true,
+    });
+    notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+    tarkovStore.isTaskActive.mockReturnValue(false);
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)(
+    'keeps a neutral task neutral when undoing %s',
+    async (action) => {
+      const task: Task = { id: 'neutral', name: 'Neutral task' };
+      const { notification, tarkovStore, stop } = await setup([task]);
+      notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+      await notification.undoLastAction();
+      expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+      expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+      stop();
+    }
+  );
   it('does not fail already completed alternatives when undoing uncomplete', async () => {
     const task: Task = {
       id: 'task-main',
@@ -83,7 +137,7 @@ describe('useTaskNotification', () => {
       taskName: 'Main Task',
       statusKey: 'page.tasks.questcard.status_uncomplete',
     });
-    notification.undoLastAction();
+    await notification.undoLastAction();
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('task-main');
     expect(tarkovStore.setTaskFailed).not.toHaveBeenCalledWith('task-alt-done');
     expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalledWith('obj-alt-done');

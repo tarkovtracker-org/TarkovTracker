@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, isRef, reactive, ref } from 'vue';
+import { TASK_STATE } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 type QueryRecord = Record<string, string | string[] | undefined>;
 const routeState = reactive({
@@ -59,6 +60,7 @@ const setTaskSecondaryView = vi.fn((value: string) => {
 });
 const tasksCompletions = ref<Record<string, Record<string, boolean>>>({});
 const tasksFailed = ref<Record<string, Record<string, boolean>>>({});
+const tasksState = ref<Record<string, string>>({});
 const unlockedTasks = ref<Record<string, Record<string, boolean>>>({});
 const trackFocusedTaskVisible = vi.fn();
 describe('useTaskDeepLink', () => {
@@ -77,6 +79,7 @@ describe('useTaskDeepLink', () => {
     preferenceState.taskSecondaryView = 'all';
     tasksCompletions.value = {};
     tasksFailed.value = {};
+    tasksState.value = {};
     unlockedTasks.value = {};
     vi.doMock('pinia', async () => {
       const actual = await vi.importActual<typeof import('pinia')>('pinia');
@@ -133,6 +136,7 @@ describe('useTaskDeepLink', () => {
       useProgressStore: () => ({
         tasksCompletions,
         tasksFailed,
+        tasksState,
         unlockedTasks,
       }),
     }));
@@ -205,6 +209,44 @@ describe('useTaskDeepLink', () => {
     expect(taskElement.scrollIntoView).toHaveBeenCalled();
     expect(trackFocusedTaskVisible).toHaveBeenCalledWith('task-visible');
     expect(replace).toHaveBeenCalledWith({ query: {} });
+  });
+  it('selects the active secondary view for an explicitly active task', async () => {
+    metadataTasks.value = [{ id: 'task-active', name: 'Active Task', requiredKeys: [] }];
+    tasksState.value = { 'task-active': TASK_STATE.ACTIVE };
+    preferenceState.taskSecondaryView = 'completed';
+    applyRouteQuery({ task: 'task-active' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-task-active';
+    taskElement.scrollIntoView = vi.fn();
+    document.body.appendChild(taskElement);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      searchQuery: ref(''),
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('active');
+    expect(taskDeepLink.pinnedTaskId.value).toBe('task-active');
+  });
+  it('keeps a legacy unlocked task in the available view when it has no active state', async () => {
+    metadataTasks.value = [{ id: 'task-legacy-available', name: 'Legacy Task', requiredKeys: [] }];
+    unlockedTasks.value = { 'task-legacy-available': { self: true } };
+    preferenceState.taskSecondaryView = 'locked';
+    applyRouteQuery({ task: 'task-legacy-available' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-task-legacy-available';
+    taskElement.scrollIntoView = vi.fn();
+    document.body.appendChild(taskElement);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      searchQuery: ref(''),
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('available');
+    expect(taskDeepLink.pinnedTaskId.value).toBe('task-legacy-available');
   });
   it('waits for the task element to mount before clearing the deep-link query', async () => {
     vi.useFakeTimers();

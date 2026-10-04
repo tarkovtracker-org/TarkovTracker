@@ -62,6 +62,58 @@ describe('progressState getters task completion compatibility', () => {
     expect(getters.isTaskComplete(state)('task-1')).toBe(false);
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
   });
+  it('reads active completions and defaults missing or explicitly false flags to inactive', () => {
+    const activeState = createStateWithTaskCompletion({
+      active: true,
+      complete: false,
+      failed: false,
+    });
+    const inactiveState = createStateWithTaskCompletion({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+    const legacyState = createStateWithTaskCompletion({ complete: false, failed: false });
+    expect(getters.isTaskActive(activeState)('task-1')).toBe(true);
+    expect(getters.isTaskActive(inactiveState)('task-1')).toBe(false);
+    expect(getters.isTaskActive(legacyState)('task-1')).toBe(false);
+  });
+});
+describe('progressState task lifecycle', () => {
+  it('writes canonical active, completed, failed, and neutral states', () => {
+    const state = createBaseState();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
+    try {
+      actions.setTaskActive.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toEqual({
+        active: true,
+        complete: false,
+        failed: false,
+        manual: false,
+        timestamp: 5000,
+      });
+      actions.setTaskComplete.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: false,
+      });
+      actions.setTaskFailed.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: true,
+      });
+      actions.setTaskUncompleted.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: false,
+        failed: false,
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });
 describe('task availability confirmations', () => {
   it('confirms and clears without touching task status or objectives', () => {

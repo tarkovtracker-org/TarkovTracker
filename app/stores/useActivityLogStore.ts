@@ -22,6 +22,7 @@ interface ActivityLogEntry {
   source: 'api' | 'manual';
   type: 'task' | 'hideout' | 'item' | 'system';
   action:
+    | 'active'
     | 'complete'
     | 'uncomplete'
     | 'fail'
