@@ -402,19 +402,34 @@
     }
     return null;
   };
+  // Hash of the latest tab-initiated navigation that has not settled yet.
+  let pendingTabHash: string | null = null;
+  const replaceTabHash = async (hash: string) => {
+    pendingTabHash = hash;
+    try {
+      await router.replace({
+        hash,
+        query: route.query,
+      });
+    } finally {
+      if (pendingTabHash === hash) {
+        pendingTabHash = null;
+      }
+    }
+  };
   const onTabChange = (value: string | number) => {
     if (!isSettingsTabId(value)) {
       return;
     }
     activeTab.value = value;
     const nextHash = settingsTabHashes[value];
-    if (route.hash === nextHash) {
+    // An earlier tab's replace can still be in flight and would land after this selection,
+    // so only skip when the route already matches and nothing is pending. Replacing with the
+    // current hash supersedes (cancels) the in-flight navigation.
+    if (route.hash === nextHash && pendingTabHash === null) {
       return;
     }
-    void router.replace({
-      hash: nextHash,
-      query: route.query,
-    });
+    void replaceTabHash(nextHash);
   };
   watch(
     showPrestigeTab,
