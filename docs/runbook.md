@@ -235,6 +235,51 @@ again. Manual role sync removes stale tier roles, preserves the base Supporter r
 paid support history, and reports a join-server warning when the Discord account is not a member of
 the configured guild.
 
+## Reusable production QA accounts
+
+Two ordinary test identities in production project `knptqelvsodccnoehmbj` are retained between
+authorized smoke tests:
+
+- **Owner:** `production-smoke-owner@tests.tarkovtracker.invalid`, user ID
+  `663b3094-f3bd-41aa-81c7-b50a801d2ba1`.
+- **Member:** `production-smoke-member@tests.tarkovtracker.invalid`, user ID
+  `d5004745-9d38-4b5f-8da4-1f3abca83907`.
+
+Their trusted Auth `app_metadata` has `production_smoke: true`,
+`production_smoke_label: "owner"` or `"member"`, and
+`production_smoke_project: "knptqelvsodccnoehmbj"`. Verify the project, exact user IDs, emails,
+markers, ordinary `authenticated` role, and absence of super-admin status before issuing a session.
+These markers identify fixtures; they grant no application privileges or billing benefits.
+
+Generated credentials are encrypted in the Supabase Vault secret
+`tarkovtracker.production-smoke.accounts`. Access it only through an already authorized operational
+connection. Do not print decrypted values or put them in Git, tool output, process arguments, or
+browser storage. Verify `anon` and `authenticated` have neither Vault schema usage nor SELECT on
+`vault.secrets` or `vault.decrypted_secrets`; never grant browser access to the secret.
+
+Production email/password sign-in is disabled. To test the existing OAuth-only application without
+changing Auth providers or sending email, an authorized server-side Auth administrator can issue
+`auth.admin.generateLink({ type: 'magiclink', email })` for the verified fixture, then exchange the
+returned `properties.hashed_token` with `auth.verifyOtp({ token_hash, type: 'magiclink' })`. Verify
+the returned user's ID, trusted markers, and role again. Keep generated links and OTP material
+private and short-lived. Only the resulting ordinary user session belongs in an isolated test
+browser; privileged keys stay outside the browser. See the official
+[generateLink](https://supabase.com/docs/reference/javascript/auth-admin-generatelink) and
+[verifyOtp](https://supabase.com/docs/reference/javascript/auth-verifyotp) contracts.
+
+Run saves, reloads, disconnected edits, imports, team/profile reads, and API checks against these
+identities through normal application, RPC, and Edge Function paths. Use temporary teams and API
+tokens; after testing, leave as the member, disband as the owner, revoke every test token, restore
+private profile visibility, sign out test sessions, and remove local session/credential files.
+Retain both accounts and the encrypted Vault record. This fixture does not authorize deployments,
+migrations, or writes to other accounts.
+
+The accounts follow the ordinary [inactivity policy](./account-retention.md). Successful sign-in
+and authenticated testing renew their activity; keeping the fixture does not exempt it from
+inactivity cleanup. Reuse it within the six-month inactivity period rather than granting supporter,
+Storage, or administrator privileges to bypass retention. Credentials can be rotated through an
+authorized operation without changing account IDs.
+
 ## Known Benign Database Signals
 
 These show up in Supabase logs / query performance and are expected. Do not treat as incidents.
