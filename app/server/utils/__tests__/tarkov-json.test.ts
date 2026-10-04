@@ -11,6 +11,7 @@ import {
   adaptTaskRewardsResponse,
   adaptTasksCoreResponse,
   fetchTarkovJsonEndpoint,
+  createTarkovJsonBootstrapFetcher,
   createTarkovJsonPrestigeFetcher,
 } from '@/server/utils/tarkov-json';
 type TestJsonFetcher = <T = unknown>(
@@ -33,6 +34,19 @@ describe('default fetch budget', () => {
     const perLegMs = DEFAULT_MAX_RETRIES * DEFAULT_TIMEOUT_MS + backoffPerLeg;
     const worstCaseMs = perLegMs * 2;
     expect(worstCaseMs).toBeLessThan(100_000);
+  });
+});
+describe('createTarkovJsonBootstrapFetcher', () => {
+  it('reads player levels from the base envelope without fetching language envelopes', async () => {
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/pve/items': {
+        data: { items: {}, playerLevels: [{ level: 1, exp: 0 }] },
+        translations: ['$.data.items.*.name'],
+      },
+    });
+    const result = await createTarkovJsonBootstrapFetcher({ deps: { fetcher }, gameMode: 'pve' })();
+    expect(result.data.playerLevels).toEqual([{ level: 1, exp: 0 }]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 describe('fetchTarkovJsonEndpoint', () => {
