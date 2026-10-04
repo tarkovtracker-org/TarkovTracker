@@ -8,6 +8,7 @@
           class="pb-4"
         />
         <UTabs
+          id="settings-tabs"
           :items="settingsTabItems"
           :model-value="activeTab"
           :content="false"
@@ -58,11 +59,12 @@
             </div>
           </aside>
           <div class="min-w-0">
+            <!-- Mobile offsets protect the tab strip during Nuxt's own panel hash scrolling. -->
             <section
               v-if="visitedTabs.progression"
               v-show="activeTab === 'progression'"
               id="progression"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('settings.tabs.progression')"
             >
@@ -75,7 +77,7 @@
               v-if="visitedTabs.prestige && showPrestigeTab"
               v-show="activeTab === 'prestige'"
               id="prestige"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.prestige')"
             >
@@ -85,7 +87,7 @@
               v-if="visitedTabs.preferences"
               v-show="activeTab === 'preferences'"
               id="preferences"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.preferences')"
             >
@@ -101,7 +103,7 @@
               v-if="visitedTabs.account"
               v-show="activeTab === 'account'"
               id="account"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.account')"
             >
@@ -123,7 +125,7 @@
               v-if="visitedTabs.imports"
               v-show="activeTab === 'imports'"
               id="imports"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('settings.tabs.imports')"
             >
@@ -133,7 +135,7 @@
               v-if="visitedTabs['backup-restore']"
               v-show="activeTab === 'backup-restore'"
               id="backup-restore"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.backup_restore')"
             >
@@ -144,7 +146,7 @@
               v-if="visitedTabs.api"
               v-show="activeTab === 'api'"
               id="api"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.api')"
             >
@@ -154,7 +156,7 @@
               v-if="visitedTabs['streamer-tools']"
               v-show="activeTab === 'streamer-tools'"
               id="streamer-tools"
-              class="scroll-mt-24 space-y-4"
+              class="scroll-mt-40 space-y-4 lg:scroll-mt-24"
               role="tabpanel"
               :aria-label="$t('common.streamer_tools')"
             >
@@ -350,26 +352,40 @@
     list: 'bg-surface-900 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 p-2 shadow-sm',
     indicator: 'hidden',
     trigger:
-      'text-surface-300 data-[state=active]:bg-surface-800 data-[state=active]:text-white light:data-[state=active]:text-surface-50 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+      'text-surface-300 data-[state=active]:bg-surface-800 data-[state=active]:text-white light:data-[state=active]:text-surface-50 flex shrink-0 scroll-mx-2 scroll-mt-24 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
     leadingIcon: 'h-4 w-4',
   };
+  const resolveScrollTarget = (targetId: string): Element | null => {
+    if (isSettingsTabId(targetId)) {
+      const mobileTab = document.querySelector('#settings-tabs [role="tab"][data-state="active"]');
+      // Keep the mobile navigation above the panel visible below the fixed app bar.
+      if (mobileTab?.getClientRects().length) {
+        return mobileTab;
+      }
+    }
+    return document.getElementById(targetId);
+  };
+  const scrollTarget = (element: Element) => {
+    element.scrollIntoView({
+      // Settle horizontal tab movement before Nuxt's subsequent panel scroll.
+      behavior: element.getAttribute('role') === 'tab' ? 'instant' : 'smooth',
+      block: 'start',
+      inline: 'nearest',
+    });
+  };
   const scrollToHashTarget = async (hash: string) => {
-    if (!import.meta.client || !hash) {
+    if (!import.meta.client) {
       return;
     }
     await nextTick();
-    const targetId = hashTargetIds[hash] ?? (hash.startsWith('#') ? hash.slice(1) : hash);
-    if (!targetId) {
+    if (hash !== route.hash) {
       return;
     }
-    const targetElement = document.getElementById(targetId);
-    if (!targetElement || typeof targetElement.scrollIntoView !== 'function') {
-      return;
+    const targetId = hashTargetIds[hash] ?? hash.replace(/^#/, '');
+    const targetElement = resolveScrollTarget(targetId);
+    if (targetElement) {
+      scrollTarget(targetElement);
     }
-    targetElement.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
   };
   const hiddenPrestigeTarget = (
     path: string,
