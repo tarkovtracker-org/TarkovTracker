@@ -25,378 +25,311 @@
       </p>
     </div>
     <template v-else>
-      <AppTooltip
-        v-if="hasMultipleFloors"
-        :text="t('maps.tooltips.switch_floor')"
-        :content="{ side: 'right' }"
+      <div
+        class="pointer-events-none absolute inset-x-2 top-2 z-1000 flex flex-wrap items-start justify-between gap-2"
       >
-        <div
-          class="bg-surface-850/95 absolute top-2 left-2 z-1000 flex flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg"
+        <AppTooltip
+          v-if="hasMultipleFloors"
+          :text="t('maps.tooltips.switch_floor')"
+          :content="{ side: 'right' }"
         >
-          <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
-            {{ t('maps.floors') }}
-          </span>
-          <div class="flex flex-col-reverse gap-0.5">
-            <button
-              v-for="floor in floors"
-              :key="floor"
-              type="button"
-              :aria-pressed="floor === selectedFloor"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="
-                floor === selectedFloor
-                  ? 'bg-primary-500/15 text-surface-50'
-                  : 'text-surface-300/65 hover:text-surface-100 hover:bg-white/5'
-              "
-              @click="setFloor(floor)"
-            >
-              <span
-                v-if="floor === selectedFloor"
-                class="bg-primary-400 absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full"
-              />
-              {{ floor.replace(/_/g, ' ') }}
-            </button>
-          </div>
-        </div>
-      </AppTooltip>
-      <div
-        v-if="isLoading"
-        class="bg-surface-900/50 absolute inset-0 z-1001 flex items-center justify-center"
-      >
-        <UIcon name="i-mdi-loading" class="text-surface-200 h-8 w-8 animate-spin" />
-      </div>
-      <div
-        class="bg-surface-850/95 absolute top-2 right-2 z-1000 flex flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg"
-      >
-        <div class="flex items-center gap-1">
-          <button
-            v-if="props.showExtractToggle"
-            type="button"
-            :aria-pressed="showPmcExtracts"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            :class="showPmcExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-            @click="showPmcExtracts = !showPmcExtracts"
+          <div
+            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg"
           >
-            <UIcon name="i-mdi-shield-account-outline" class="h-4 w-4 shrink-0" />
-            <span class="whitespace-nowrap">{{ t('maps.factions.pmc') }}</span>
-          </button>
-          <button
-            v-if="props.showExtractToggle"
-            type="button"
-            :aria-pressed="showScavExtracts"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            :class="showScavExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-            @click="showScavExtracts = !showScavExtracts"
-          >
-            <UIcon name="i-mdi-skull-outline" class="h-4 w-4 shrink-0" />
-            <span class="whitespace-nowrap">{{ t('common.scav') }}</span>
-          </button>
-          <button
-            v-if="props.showSpawnToggle && hasPmcSpawns"
-            type="button"
-            :aria-pressed="showPmcSpawns"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            :class="showPmcSpawns ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-            @click="showPmcSpawns = !showPmcSpawns"
-          >
-            <UIcon name="i-mdi-crosshairs-gps" class="h-4 w-4 shrink-0" />
-            <span class="whitespace-nowrap">{{ t('maps.layers.pmc_spawns') }}</span>
-          </button>
-        </div>
-        <div class="mx-1 h-6 w-px bg-white/10" />
-        <div class="flex items-center gap-1">
-          <AppTooltip
-            :text="t('settings.interface.maps.colors.title')"
-            :disabled="mapColorsOpen"
-            :content="{ side: 'bottom' }"
-          >
-            <UPopover
-              v-model:open="mapColorsOpen"
-              arrow
-              :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-              @update:open="onPopoverOpenChange('colors', $event)"
-            >
+            <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
+              {{ t('maps.floors') }}
+            </span>
+            <div class="flex flex-col-reverse gap-0.5">
               <button
-                :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
+                v-for="floor in floors"
+                :key="floor"
                 type="button"
-                :aria-label="t('settings.interface.maps.colors.title')"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                :aria-pressed="floor === selectedFloor"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 :class="
-                  mapColorsOpen
-                    ? MAP_BUTTON_ACTIVE_CLASS
-                    : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                  floor === selectedFloor
+                    ? 'bg-primary-500/15 text-surface-50'
+                    : 'text-surface-300/65 hover:text-surface-100 hover:bg-white/5'
                 "
-              >
-                <UIcon name="i-mdi-palette" class="h-4 w-4" />
-              </button>
-              <template #content>
-                <div class="w-80 space-y-3 p-3 md:w-96">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="space-y-0.5">
-                      <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                        {{ t('settings.interface.maps.colors.title') }}
-                      </p>
-                      <p class="text-surface-400 text-xs">
-                        {{ t('settings.interface.maps.colors.description') }}
-                      </p>
-                    </div>
-                    <UButton
-                      color="neutral"
-                      size="xs"
-                      variant="ghost"
-                      @click="preferencesStore.resetMapMarkerColors()"
-                    >
-                      {{ t('common.reset') }}
-                    </UButton>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <label
-                      v-for="option in mapColorOptions"
-                      :key="option.key"
-                      class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
-                    >
-                      <span class="flex min-w-0 items-center gap-2">
-                        <span
-                          class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
-                          :style="{ backgroundColor: mapColors[option.key] }"
-                        />
-                        <span class="text-surface-200 text-[11px] font-medium">
-                          {{ option.label }}
-                        </span>
-                      </span>
-                      <input
-                        :aria-label="option.label"
-                        :value="mapColors[option.key]"
-                        type="color"
-                        class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
-                        @input="onMapColorInput(option.key, $event)"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </template>
-            </UPopover>
-          </AppTooltip>
-          <AppTooltip
-            :text="t('maps.map_settings')"
-            :disabled="mapSettingsOpen"
-            :content="{ side: 'bottom' }"
-          >
-            <UPopover
-              v-model:open="mapSettingsOpen"
-              arrow
-              :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-              @update:open="onPopoverOpenChange('settings', $event)"
-            >
-              <button
-                :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
-                type="button"
-                :aria-label="t('maps.map_settings')"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :class="
-                  mapSettingsOpen
-                    ? MAP_BUTTON_ACTIVE_CLASS
-                    : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                "
-              >
-                <UIcon name="i-mdi-cog" class="h-4 w-4" />
-              </button>
-              <template #content>
-                <div class="w-56 space-y-2 p-3">
-                  <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                    {{ t('maps.map_settings') }}
-                  </p>
-                  <div class="space-y-2">
-                    <div class="space-y-1">
-                      <div
-                        class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                      >
-                        <span>{{ t('common.zoom_speed') }}</span>
-                        <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
-                      </div>
-                      <input
-                        v-model.number="mapZoomSpeed"
-                        type="range"
-                        :min="ZOOM_SPEED_MIN"
-                        :max="ZOOM_SPEED_MAX"
-                        step="0.1"
-                        class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                        :aria-label="t('common.zoom_speed')"
-                      />
-                    </div>
-                    <div class="space-y-1">
-                      <div
-                        class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                      >
-                        <span>{{ t('common.pan_speed') }}</span>
-                        <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
-                      </div>
-                      <input
-                        v-model.number="mapPanSpeed"
-                        type="range"
-                        :min="PAN_SPEED_MIN"
-                        :max="PAN_SPEED_MAX"
-                        step="0.1"
-                        class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                        :aria-label="t('common.pan_speed')"
-                      />
-                    </div>
-                    <div class="space-y-1">
-                      <div
-                        class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                      >
-                        <span>{{ t('common.zone_opacity') }}</span>
-                        <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
-                      </div>
-                      <input
-                        v-model.number="mapZoneOpacity"
-                        type="range"
-                        :min="ZONE_OPACITY_MIN"
-                        :max="ZONE_OPACITY_MAX"
-                        step="0.01"
-                        class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                        :aria-label="t('common.zone_opacity')"
-                      />
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="text-surface-400 text-[10px] font-semibold uppercase">
-                        {{ t('maps.tooltip_density') }}
-                      </span>
-                      <button
-                        type="button"
-                        class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
-                        :class="
-                          mapTooltipDensity === 'compact'
-                            ? 'bg-surface-600 text-surface-100'
-                            : 'bg-surface-800 text-surface-400 hover:text-surface-200'
-                        "
-                        :aria-label="t('maps.aria.tooltip_density')"
-                        @click="
-                          mapTooltipDensity =
-                            mapTooltipDensity === 'compact' ? 'default' : 'compact'
-                        "
-                      >
-                        {{
-                          mapTooltipDensity === 'compact'
-                            ? t('common.compact')
-                            : t('common.default')
-                        }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </UPopover>
-          </AppTooltip>
-          <AppTooltip
-            :text="t('maps.help.title')"
-            :disabled="mapHelpOpen"
-            :content="{ side: 'bottom' }"
-          >
-            <UPopover
-              v-model:open="mapHelpOpen"
-              arrow
-              :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-              @update:open="onPopoverOpenChange('help', $event)"
-            >
-              <button
-                :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
-                type="button"
-                data-testid="map-help-toggle"
-                :aria-label="t('maps.help.title')"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :class="
-                  mapHelpOpen
-                    ? MAP_BUTTON_ACTIVE_CLASS
-                    : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                "
+                @click="setFloor(floor)"
               >
                 <span
-                  v-if="!mapHelpSeen"
-                  data-testid="map-help-unseen-dot"
-                  class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
+                  v-if="floor === selectedFloor"
+                  class="bg-primary-400 absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full"
                 />
-                <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
+                {{ floor.replace(/_/g, ' ') }}
               </button>
-              <template #content>
-                <div class="w-80 space-y-2.5 p-3">
-                  <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                    {{ t('maps.help.title') }}
-                  </p>
-                  <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                    <div class="space-y-1">
-                      <p class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase">
-                        {{ t('maps.help.groups.navigate') }}
-                      </p>
-                      <i18n-t
-                        keypath="maps.help.pan"
-                        tag="p"
-                        scope="global"
-                        class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+            </div>
+          </div>
+        </AppTooltip>
+        <div
+          class="bg-surface-850/95 pointer-events-auto ml-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg"
+          data-testid="map-toolbar"
+        >
+          <div class="flex flex-wrap items-center gap-1">
+            <button
+              v-if="props.showExtractToggle"
+              type="button"
+              :aria-pressed="showPmcExtracts"
+              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :class="showPmcExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
+              @click="showPmcExtracts = !showPmcExtracts"
+            >
+              <UIcon name="i-mdi-shield-account-outline" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap">{{ t('maps.factions.pmc') }}</span>
+            </button>
+            <button
+              v-if="props.showExtractToggle"
+              type="button"
+              :aria-pressed="showScavExtracts"
+              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :class="showScavExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
+              @click="showScavExtracts = !showScavExtracts"
+            >
+              <UIcon name="i-mdi-skull-outline" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap">{{ t('common.scav') }}</span>
+            </button>
+            <button
+              v-if="props.showSpawnToggle && hasPmcSpawns"
+              type="button"
+              :aria-pressed="showPmcSpawns"
+              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :class="showPmcSpawns ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
+              @click="showPmcSpawns = !showPmcSpawns"
+            >
+              <UIcon name="i-mdi-crosshairs-gps" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap">{{ t('maps.layers.pmc_spawns') }}</span>
+            </button>
+          </div>
+          <div class="mx-1 h-6 w-px bg-white/10" />
+          <div class="flex items-center gap-1">
+            <AppTooltip
+              :text="t('settings.interface.maps.colors.title')"
+              :disabled="mapColorsOpen"
+              :content="{ side: 'bottom' }"
+            >
+              <UPopover
+                v-model:open="mapColorsOpen"
+                arrow
+                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                @update:open="onPopoverOpenChange('colors', $event)"
+              >
+                <button
+                  :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
+                  type="button"
+                  :aria-label="t('settings.interface.maps.colors.title')"
+                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  :class="
+                    mapColorsOpen
+                      ? MAP_BUTTON_ACTIVE_CLASS
+                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                  "
+                >
+                  <UIcon name="i-mdi-palette" class="h-4 w-4" />
+                </button>
+                <template #content>
+                  <div class="w-80 space-y-3 p-3 md:w-96">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="space-y-0.5">
+                        <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                          {{ t('settings.interface.maps.colors.title') }}
+                        </p>
+                        <p class="text-surface-400 text-xs">
+                          {{ t('settings.interface.maps.colors.description') }}
+                        </p>
+                      </div>
+                      <UButton
+                        color="neutral"
+                        size="xs"
+                        variant="ghost"
+                        @click="preferencesStore.resetMapMarkerColors()"
                       >
-                        <template #keys>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'WASD' }}
-                          </kbd>
-                          <span>/</span>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ '←↑↓→' }}
-                          </kbd>
-                        </template>
-                      </i18n-t>
-                      <i18n-t
-                        keypath="maps.help.zoom"
-                        tag="p"
-                        scope="global"
-                        class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                      >
-                        <template #keys>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'Shift' }}
-                          </kbd>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'Scroll' }}
-                          </kbd>
-                          <span>/</span>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'Q/E' }}
-                          </kbd>
-                        </template>
-                      </i18n-t>
-                      <i18n-t
-                        keypath="maps.help.reset"
-                        tag="p"
-                        scope="global"
-                        class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                      >
-                        <template #key>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'R' }}
-                          </kbd>
-                        </template>
-                      </i18n-t>
+                        {{ t('common.reset') }}
+                      </UButton>
                     </div>
-                    <div class="space-y-1">
-                      <div v-if="hasMultipleFloors" class="space-y-1">
+                    <div class="grid grid-cols-2 gap-2">
+                      <label
+                        v-for="option in mapColorOptions"
+                        :key="option.key"
+                        class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span
+                            class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
+                            :style="{ backgroundColor: mapColors[option.key] }"
+                          />
+                          <span class="text-surface-200 text-[11px] font-medium">
+                            {{ option.label }}
+                          </span>
+                        </span>
+                        <input
+                          :aria-label="option.label"
+                          :value="mapColors[option.key]"
+                          type="color"
+                          class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
+                          @input="onMapColorInput(option.key, $event)"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </template>
+              </UPopover>
+            </AppTooltip>
+            <AppTooltip
+              :text="t('maps.map_settings')"
+              :disabled="mapSettingsOpen"
+              :content="{ side: 'bottom' }"
+            >
+              <UPopover
+                v-model:open="mapSettingsOpen"
+                arrow
+                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                @update:open="onPopoverOpenChange('settings', $event)"
+              >
+                <button
+                  :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
+                  type="button"
+                  :aria-label="t('maps.map_settings')"
+                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  :class="
+                    mapSettingsOpen
+                      ? MAP_BUTTON_ACTIVE_CLASS
+                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                  "
+                >
+                  <UIcon name="i-mdi-cog" class="h-4 w-4" />
+                </button>
+                <template #content>
+                  <div class="w-56 space-y-2 p-3">
+                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                      {{ t('maps.map_settings') }}
+                    </p>
+                    <div class="space-y-2">
+                      <div class="space-y-1">
+                        <div
+                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                        >
+                          <span>{{ t('common.zoom_speed') }}</span>
+                          <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
+                        </div>
+                        <input
+                          v-model.number="mapZoomSpeed"
+                          type="range"
+                          :min="ZOOM_SPEED_MIN"
+                          :max="ZOOM_SPEED_MAX"
+                          step="0.1"
+                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                          :aria-label="t('common.zoom_speed')"
+                        />
+                      </div>
+                      <div class="space-y-1">
+                        <div
+                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                        >
+                          <span>{{ t('common.pan_speed') }}</span>
+                          <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
+                        </div>
+                        <input
+                          v-model.number="mapPanSpeed"
+                          type="range"
+                          :min="PAN_SPEED_MIN"
+                          :max="PAN_SPEED_MAX"
+                          step="0.1"
+                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                          :aria-label="t('common.pan_speed')"
+                        />
+                      </div>
+                      <div class="space-y-1">
+                        <div
+                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                        >
+                          <span>{{ t('common.zone_opacity') }}</span>
+                          <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
+                        </div>
+                        <input
+                          v-model.number="mapZoneOpacity"
+                          type="range"
+                          :min="ZONE_OPACITY_MIN"
+                          :max="ZONE_OPACITY_MAX"
+                          step="0.01"
+                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                          :aria-label="t('common.zone_opacity')"
+                        />
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="text-surface-400 text-[10px] font-semibold uppercase">
+                          {{ t('maps.tooltip_density') }}
+                        </span>
+                        <button
+                          type="button"
+                          class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
+                          :class="
+                            mapTooltipDensity === 'compact'
+                              ? 'bg-surface-600 text-surface-100'
+                              : 'bg-surface-800 text-surface-400 hover:text-surface-200'
+                          "
+                          :aria-label="t('maps.aria.tooltip_density')"
+                          @click="
+                            mapTooltipDensity =
+                              mapTooltipDensity === 'compact' ? 'default' : 'compact'
+                          "
+                        >
+                          {{
+                            mapTooltipDensity === 'compact'
+                              ? t('common.compact')
+                              : t('common.default')
+                          }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </UPopover>
+            </AppTooltip>
+            <AppTooltip
+              :text="t('maps.help.title')"
+              :disabled="mapHelpOpen"
+              :content="{ side: 'bottom' }"
+            >
+              <UPopover
+                v-model:open="mapHelpOpen"
+                arrow
+                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                @update:open="onPopoverOpenChange('help', $event)"
+              >
+                <button
+                  :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
+                  type="button"
+                  data-testid="map-help-toggle"
+                  :aria-label="t('maps.help.title')"
+                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  :class="
+                    mapHelpOpen
+                      ? MAP_BUTTON_ACTIVE_CLASS
+                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                  "
+                >
+                  <span
+                    v-if="!mapHelpSeen"
+                    data-testid="map-help-unseen-dot"
+                    class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
+                  />
+                  <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
+                </button>
+                <template #content>
+                  <div class="w-80 space-y-2.5 p-3">
+                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                      {{ t('maps.help.title') }}
+                    </p>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                      <div class="space-y-1">
                         <p
                           class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
                         >
-                          {{ t('maps.help.groups.floors') }}
+                          {{ t('maps.help.groups.navigate') }}
                         </p>
                         <i18n-t
-                          keypath="maps.help.cycle_floors"
+                          keypath="maps.help.pan"
                           tag="p"
                           scope="global"
                           class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
@@ -405,59 +338,135 @@
                             <kbd
                               class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                             >
-                              {{ 'Ctrl' }}
+                              {{ 'WASD' }}
+                            </kbd>
+                            <span>/</span>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              {{ '←↑↓→' }}
+                            </kbd>
+                          </template>
+                        </i18n-t>
+                        <i18n-t
+                          keypath="maps.help.zoom"
+                          tag="p"
+                          scope="global"
+                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                        >
+                          <template #keys>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              {{ 'Shift' }}
                             </kbd>
                             <kbd
                               class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                             >
                               {{ 'Scroll' }}
                             </kbd>
+                            <span>/</span>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              {{ 'Q/E' }}
+                            </kbd>
                           </template>
                         </i18n-t>
-                        <p class="text-surface-400 text-[11px]">
-                          {{ t('maps.help.floor_panel') }}
+                        <i18n-t
+                          keypath="maps.help.reset"
+                          tag="p"
+                          scope="global"
+                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                        >
+                          <template #key>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              {{ 'R' }}
+                            </kbd>
+                          </template>
+                        </i18n-t>
+                      </div>
+                      <div class="space-y-1">
+                        <div v-if="hasMultipleFloors" class="space-y-1">
+                          <p
+                            class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                          >
+                            {{ t('maps.help.groups.floors') }}
+                          </p>
+                          <i18n-t
+                            keypath="maps.help.cycle_floors"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #keys>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Ctrl' }}
+                              </kbd>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Scroll' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <p class="text-surface-400 text-[11px]">
+                            {{ t('maps.help.floor_panel') }}
+                          </p>
+                        </div>
+                        <p
+                          class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
+                        >
+                          {{ t('maps.help.groups.interact') }}
+                        </p>
+                        <i18n-t
+                          keypath="maps.help.click_at_cursor"
+                          tag="p"
+                          scope="global"
+                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                        >
+                          <template #key>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              {{ 'F' }}
+                            </kbd>
+                          </template>
+                        </i18n-t>
+                        <p class="text-surface-300 text-[11px]">
+                          {{ t('maps.help.click_marker') }}
                         </p>
                       </div>
-                      <p
-                        class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
-                      >
-                        {{ t('maps.help.groups.interact') }}
-                      </p>
-                      <i18n-t
-                        keypath="maps.help.click_at_cursor"
-                        tag="p"
-                        scope="global"
-                        class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                      >
-                        <template #key>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            {{ 'F' }}
-                          </kbd>
-                        </template>
-                      </i18n-t>
-                      <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.help.click_marker') }}
-                      </p>
-                    </div>
-                    <div class="col-span-2 space-y-1">
-                      <p class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase">
-                        {{ t('maps.help.groups.view') }}
-                      </p>
-                      <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.help.fullscreen') }}
-                      </p>
-                      <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.help.resize') }}
-                      </p>
+                      <div class="col-span-2 space-y-1">
+                        <p
+                          class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                        >
+                          {{ t('maps.help.groups.view') }}
+                        </p>
+                        <p class="text-surface-300 text-[11px]">
+                          {{ t('maps.help.fullscreen') }}
+                        </p>
+                        <p class="text-surface-300 text-[11px]">
+                          {{ t('maps.help.resize') }}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </template>
-            </UPopover>
-          </AppTooltip>
+                </template>
+              </UPopover>
+            </AppTooltip>
+          </div>
         </div>
+      </div>
+      <div
+        v-if="isLoading"
+        class="bg-surface-900/50 absolute inset-0 z-1001 flex items-center justify-center"
+      >
+        <UIcon name="i-mdi-loading" class="text-surface-200 h-8 w-8 animate-spin" />
       </div>
       <div class="relative" :class="{ 'min-h-0 flex-1': props.fill }">
         <div
