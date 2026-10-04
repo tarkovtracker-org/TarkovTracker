@@ -15,5 +15,4 @@ export const COMMIT_TYPES = Object.freeze([
   'build',
   'ci',
   'chore',
-  'wip',
 ]);
