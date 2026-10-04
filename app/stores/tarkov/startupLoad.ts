@@ -34,7 +34,6 @@ import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeGameEdition,
@@ -78,8 +77,6 @@ type UserProgressRow = {
   current_game_mode: string | null;
   game_edition: number | null;
   tarkov_uid: number | null;
-  pvp_data?: UserProgressData | null;
-  pve_data?: UserProgressData | null;
   updated_at: string | null;
 };
 type QueryError = { code?: string; message?: string } | null;
@@ -269,25 +266,6 @@ const fetchModeProgress = (ctx: StartupLoadContext) =>
     hasError,
     'Retrying normalized mode progress load'
   );
-/** Read legacy account-row payloads only for modes without normalized progress. */
-const withLegacyPayloads = async (
-  ctx: StartupLoadContext,
-  row: UserProgressRow,
-  modes: ModeProgressResult
-): Promise<UserProgressRow | null> => {
-  const missing = (['pvp', 'pve'] as const)
-    .filter((mode) => modes.data[mode] == null)
-    .map((mode) => `${mode}_data`);
-  if (missing.length === 0) return row;
-  const legacy = await retryLoad(ctx, () => selectAccountRow(ctx, missing.join(',')), hasError);
-  if (legacy.error) return null;
-  return { ...row, ...(legacy.data as unknown as Partial<UserProgressRow>) };
-};
-const remoteModePayloads = (row: UserProgressRow | null, modes: ModeProgressResult) => ({
-  pvp: modes.data.pvp ?? row?.pvp_data,
-  pve: modes.data.pve ?? row?.pve_data,
-  seasonal: modes.data.seasonal,
-});
 const toRemoteState = (
   row: UserProgressRow | null,
   modes: ModeProgressResult
@@ -297,7 +275,7 @@ const toRemoteState = (
     currentGameMode: coerceGameMode(row?.current_game_mode),
     gameEdition: sanitizeGameEdition(row?.game_edition),
     tarkovUid: sanitizeTarkovUid(row?.tarkov_uid),
-    ...remoteModePayloads(row, modes),
+    ...modes.data,
   } as UserState);
 };
 /**
@@ -306,13 +284,12 @@ const toRemoteState = (
  */
 const acknowledgeRemoteModes = (
   userId: string,
-  row: UserProgressRow | null,
   modes: ModeProgressResult,
   state: UserState | null
 ): void => {
   clearAcknowledgedModes();
   if (!state) return;
-  const payloads = remoteModePayloads(row, modes);
+  const payloads = modes.data;
   const clean = GAME_MODE_VALUES.filter(
     (mode) => !hasDeprecatedTarkovDevProfileData(payloads[mode])
   );
@@ -335,10 +312,9 @@ const loadRemoteProgress = async (ctx: StartupLoadContext): Promise<RemoteLoad> 
     logger.error('[TarkovStore] Could not load normalized mode progress', modes.error);
     return { ok: false };
   }
-  const row = account.row ? await withLegacyPayloads(ctx, account.row, modes) : null;
-  if (account.row && !row) return { ok: false };
+  const row = account.row;
   const state = toRemoteState(row, modes);
-  acknowledgeRemoteModes(ctx.userId, row, modes, state);
+  acknowledgeRemoteModes(ctx.userId, modes, state);
   return { ok: true, hadRemoteData: Boolean(account.row), remote: state && { row, modes, state } };
 };
 const progressScore = (state: UserState): number =>
@@ -360,20 +336,11 @@ const modeScore = (mode: UserProgressData | undefined): number => {
 };
 const accountUpdatedAt = (row: UserProgressRow | null): number =>
   row?.updated_at ? Date.parse(row.updated_at) : 0;
-/**
- * Account metadata and each mode have independent freshness. Only a payload actually read from
- * the legacy account row inherits that row's clock; a historical normalized row stays unknown.
- */
+/** Account metadata and normalized modes retain independent freshness, including unknown clocks. */
 const remoteFreshness = ({ row, modes }: RemoteProgress) => {
   const updatedAt = accountUpdatedAt(row);
   const metadataUpdatedAt = Number.isFinite(updatedAt) ? updatedAt || null : null;
-  const byMode = { ...modes.updatedAtByMode };
-  for (const mode of ['pvp', 'pve'] as const) {
-    const fromLegacyRow =
-      modes.data[mode] == null && hasMaterializedProgress(row?.[`${mode}_data`]);
-    if (metadataUpdatedAt !== null && fromLegacyRow) byMode[mode] = metadataUpdatedAt;
-  }
-  return { metadataUpdatedAt, byMode };
+  return { metadataUpdatedAt, byMode: { ...modes.updatedAtByMode } };
 };
 const perMode = <T>(read: (mode: GameMode) => T): Record<GameMode, T> =>
   Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, read(mode)])) as Record<GameMode, T>;
@@ -418,7 +385,7 @@ const mergeHistoricalConfirmations = (
   remote: RemoteProgress,
   resolved: UserState
 ): UserState => {
-  const payloads = remoteModePayloads(remote.row, remote.modes);
+  const payloads = remote.modes.data;
   for (const mode of GAME_MODE_VALUES) {
     if (toProgressEpoch(local.state[mode]) !== toProgressEpoch(remote.state[mode])) continue;
     resolved[mode].taskAvailability = mergeTaskAvailability(
@@ -518,7 +485,7 @@ const startupEvictionPass = (
   remote: RemoteProgress,
   resolved: UserState
 ): UserState | null => {
-  const payloads = remoteModePayloads(remote.row, remote.modes);
+  const payloads = remote.modes.data;
   const cleared = cloneStateSnapshot(resolved);
   let needed = false;
   for (const mode of GAME_MODE_VALUES) {
@@ -540,7 +507,7 @@ const uploadReconciledProgress = async (
   return upload(ctx, resolved, failure);
 };
 const remoteHadDeprecatedData = (remote: RemoteProgress): boolean =>
-  hasDeprecatedTarkovDevProfileData(remoteModePayloads(remote.row, remote.modes));
+  hasDeprecatedTarkovDevProfileData(remote.modes.data);
 /** Merge this user's own local progress with remote; upload when the result differs. */
 const mergeWithRemote = async (
   ctx: StartupLoadContext,

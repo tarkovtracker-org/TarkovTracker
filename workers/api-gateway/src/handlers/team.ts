@@ -1,8 +1,4 @@
-import {
-  getLegacyModeProgressField,
-  hasMaterializedProgress,
-  resolveModeProgressData,
-} from '../../../../app/utils/modeProgressFallback';
+import { hasMaterializedProgress } from '../../../../app/utils/modeProgress';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
@@ -22,8 +18,6 @@ type ProgressRow = {
 };
 type EditionRow = {
   game_edition: number | null;
-  pve_data?: UserProgressModeRow['progress_data'];
-  pvp_data?: UserProgressModeRow['progress_data'];
   user_id: string;
 };
 // Team progress response format (matching RatScanner expectations)
@@ -38,32 +32,6 @@ const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
-const loadMissingLegacyProgress = async (
-  env: Env,
-  gameMode: GameMode,
-  userIds: string[],
-  progressRows: ProgressRow[],
-  editionRows: EditionRow[]
-): Promise<void> => {
-  const field = getLegacyModeProgressField(gameMode);
-  if (!field) return;
-  const missing = userIds.filter(
-    (id) => !hasMaterializedProgress(progressRows.find((row) => row.user_id === id)?.progress_data)
-  );
-  if (missing.length === 0) return;
-  const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${missing.join(',')})&select=user_id,${field}`,
-    { headers: getServiceHeaders(env) }
-  );
-  if (!response.ok) throw new Error('Failed to fetch legacy team progress');
-  const rows = (await response.json()) as Omit<EditionRow, 'game_edition'>[];
-  for (const row of rows) {
-    const metadata = editionRows.find((entry) => entry.user_id === row.user_id);
-    if (metadata) metadata[field] = row[field];
-    // An account can appear between the metadata and fallback requests.
-    else editionRows.push({ ...row, game_edition: null });
-  }
-};
 const buildProgressResponse = (
   self: string,
   data: ProgressResponseData[]
@@ -87,12 +55,13 @@ const fetchUserModeRow = async (
   if (!progressResponse.ok || !editionResponse.ok) throw new Error('Failed to fetch user progress');
   const progressRows = (await progressResponse.json()) as ProgressRow[];
   const editionRows = (await editionResponse.json()) as EditionRow[];
-  await loadMissingLegacyProgress(env, gameMode, [userId], progressRows, editionRows);
   const editionRow = editionRows[0];
   return {
     user_id: progressRows[0]?.user_id ?? userId,
     game_edition: editionRow?.game_edition ?? 1,
-    progress_data: resolveModeProgressData(gameMode, progressRows[0]?.progress_data, editionRow),
+    progress_data: hasMaterializedProgress(progressRows[0]?.progress_data)
+      ? progressRows[0]!.progress_data
+      : null,
   };
 };
 const transformUserModeRow = async (
@@ -240,7 +209,6 @@ export async function handleGetTeamProgress(
   }
   const progressRows = (await progressRes.json()) as ProgressRow[];
   const editionRows = (await editionsRes.json()) as EditionRow[];
-  await loadMissingLegacyProgress(env, gameMode, memberIds, progressRows, editionRows);
   // Step 4: Fetch task and hideout data (cached)
   const [tasks, hideoutStations] = await Promise.all([
     getTasks(gameMode),
@@ -254,7 +222,9 @@ export async function handleGetTeamProgress(
       const row: UserProgressModeRow = {
         user_id: memberId,
         game_edition: editionRow?.game_edition ?? 1,
-        progress_data: resolveModeProgressData(gameMode, progressRow?.progress_data, editionRow),
+        progress_data: hasMaterializedProgress(progressRow?.progress_data)
+          ? progressRow!.progress_data
+          : null,
       };
       return buildProgressData(env, row, memberId, tasks, hideoutStations);
     })

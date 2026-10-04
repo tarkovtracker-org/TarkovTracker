@@ -9,7 +9,7 @@ import {
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
+import { hasMaterializedProgress } from '@/utils/modeProgress';
 import {
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,

@@ -347,8 +347,8 @@ describe('Team Members API', () => {
       });
     });
   });
-  describe('Profile fallback handling', () => {
-    it('returns a partial team response when the legacy fallback fetch throws', async () => {
+  describe('Normalized profile handling', () => {
+    it('returns a partial team response without querying legacy progress', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce(membershipResponse('pvp'))
@@ -361,7 +361,7 @@ describe('Team Members API', () => {
       expect(result.members).toEqual(['11111111-1111-4111-8111-111111111111']);
       expect(result.profiles).toEqual({});
     });
-    it('falls back to legacy progress when the summary row has no level', async () => {
+    it('keeps unknown summary values when only legacy progress has a level', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce({
@@ -403,11 +403,11 @@ describe('Team Members API', () => {
       const { default: handler } = await import('@/server/api/team/members');
       const result = await handler(mockEvent as H3Event);
       expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
-        displayName: 'Placeholder Recovered',
+        displayName: null,
         gameEdition: 3,
         gameMode: 'pvp',
-        level: 21,
-        tasksCompleted: 1,
+        level: null,
+        tasksCompleted: 0,
       });
     });
     it('skips the legacy fallback instead of querying user_progress without a service key', async () => {
@@ -446,7 +446,7 @@ describe('Team Members API', () => {
       );
       expect(legacyCalls).toEqual([]);
     });
-    it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
+    it('omits profiles when normalized summaries are missing despite legacy progress', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce(membershipResponse('pvp'))
@@ -472,13 +472,8 @@ describe('Team Members API', () => {
         });
       const { default: handler } = await import('@/server/api/team/members');
       const result = await handler(mockEvent as H3Event);
-      expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
-        displayName: 'Legacy Teammate',
-        gameEdition: 3,
-        gameMode: 'pvp',
-        level: 34,
-        tasksCompleted: 1,
-      });
+      expect(result.profiles).toEqual({});
+      expect(mockFetch).toHaveBeenCalledTimes(4);
     });
     it('reads the season-aware summary view instead of progress blobs', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });

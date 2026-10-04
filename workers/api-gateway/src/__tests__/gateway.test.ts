@@ -178,8 +178,10 @@ const createBaseFetchMock = ({
       }
       const modeField =
         gameMode === 'pve' ? 'pve_data' : gameMode === 'seasonal' ? 'seasonal_data' : 'pvp_data';
-      const sourceProgress = userProgress.progress_data ??
-        userProgress[modeField] ?? { taskCompletions: {} };
+      const sourceProgress = userProgress.progress_data ?? {
+        level: 1,
+        ...((userProgress[modeField] as Record<string, unknown> | null) ?? {}),
+      };
       return jsonResponse(
         requestedUserIds
           .filter((userId) => !missingProgressUserIds.includes(userId))
@@ -1245,7 +1247,7 @@ describe('api-gateway', () => {
       expect(metadataRequest?.searchParams.get('select')).toBe(expectedMetadataSelect);
     }
   );
-  it('falls back to legacy persistent progress when the normalized row is missing', async () => {
+  it('defaults missing normalized progress without reading legacy progress', async () => {
     const fetchMock = createBaseFetchMock({
       gameMode: 'pvp',
       missingProgressUserIds: ['user-1'],
@@ -1263,12 +1265,11 @@ describe('api-gateway', () => {
       data: { displayName: string; gameEdition: number; playerLevel: number };
     };
     expect(body.data).toMatchObject({
-      displayName: 'Legacy Player',
       gameEdition: 3,
-      playerLevel: 37,
+      playerLevel: 1,
     });
   });
-  it('seeds the first write from legacy progress when the normalized row is unmaterialized', async () => {
+  it('does not use legacy progress as the task transition diff base', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const mergeStore: { data: Record<string, unknown> } = { data: { taskCompletions: {} } };
     const fetchMock = createBaseFetchMock({
@@ -1318,8 +1319,12 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     const payload = mergePayload as unknown as MergeRpcPayload;
-    // The legacy snapshot is the diff base, so an already-complete task is a no-op.
-    expect(payload.p_set?.lastApiUpdate).toBeUndefined();
+    // A legacy completion must not suppress a new normalized task transition.
+    expect(payload.p_task_completions?.['task-main']).toMatchObject({ complete: true });
+    expect(payload.p_set?.lastApiUpdate).toBeDefined();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('select=pvp_data'))).toBe(
+      false
+    );
     // The RPC seeds the unmaterialized row from the legacy column, so nothing is lost.
     expect(mergeStore.data).toMatchObject({
       displayName: 'Legacy Player',
@@ -1332,7 +1337,7 @@ describe('api-gateway', () => {
     expect(storedCompletions['task-main']?.complete).toBe(true);
     expect(storedCompletions['task-other']?.complete).toBe(true);
   });
-  it('reads legacy progress for an unmaterialized normalized row', async () => {
+  it('defaults unmaterialized normalized progress without reading legacy progress', async () => {
     const fetchMock = createBaseFetchMock({
       gameMode: 'pvp',
       permissions: ['GP'],
@@ -1347,7 +1352,10 @@ describe('api-gateway', () => {
     const res = await worker.fetch(progressRequest('pvp'), BASE_ENV);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { playerLevel: number } };
-    expect(body.data.playerLevel).toBe(37);
+    expect(body.data.playerLevel).toBe(1);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('select=pvp_data'))).toBe(
+      false
+    );
   });
   it('retains account edition when a team member has no active mode progress row', async () => {
     const fetchMock = createBaseFetchMock({
@@ -1366,7 +1374,7 @@ describe('api-gateway', () => {
     expect(byUser.get('user-1')).toBe(4);
     expect(byUser.get('user-2')).toBe(4);
   });
-  it('falls back to legacy persistent progress for team members missing normalized rows', async () => {
+  it('defaults missing normalized team progress without reading legacy progress', async () => {
     const fetchMock = createBaseFetchMock({
       gameMode: 'pve',
       missingProgressUserIds: ['user-2'],
@@ -1386,13 +1394,15 @@ describe('api-gateway', () => {
       data: Array<{ displayName: string; playerLevel: number; userId: string }>;
     };
     expect(body.data.find((entry) => entry.userId === 'user-2')).toMatchObject({
-      displayName: 'Legacy Teammate',
-      playerLevel: 31,
+      playerLevel: 1,
     });
     const editionRequest = fetchMock.mock.calls
       .map((call) => new URL(String(call[0])))
       .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
     expect(editionRequest?.searchParams.get('select')).toBe('user_id,game_edition');
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/rest/v1/user_progress'))
+    ).toHaveLength(1);
   });
   it.each([
     ['pvp', 'user_id,game_edition'],
@@ -1414,6 +1424,35 @@ describe('api-gateway', () => {
         .map((call) => new URL(String(call[0])))
         .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
       expect(editionRequest?.searchParams.get('select')).toBe(expectedEditionSelect);
+    }
+  );
+  it.each(['pvp', 'pve'] as const)(
+    'defaults legacy-only solo team progress for %s',
+    async (mode) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: null,
+        missingProgressUserIds: ['user-1'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 5,
+          pvp_data: { level: 42, displayName: 'Legacy Solo' },
+          pve_data: { level: 42, displayName: 'Legacy Solo' },
+        },
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const response = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        data: Array<{ playerLevel: number; gameEdition: number }>;
+      };
+      expect(body.data).toEqual([expect.objectContaining({ playerLevel: 1, gameEdition: 5 })]);
+      const metadataRequests = fetchMock.mock.calls
+        .map(([url]) => new URL(String(url)))
+        .filter((url) => url.pathname.endsWith('/rest/v1/user_progress'));
+      expect(metadataRequests).toHaveLength(1);
+      expect(metadataRequests[0]?.searchParams.get('select')).toBe('user_id,game_edition');
     }
   );
   it('retains account edition in solo fallback without an active mode progress row', async () => {

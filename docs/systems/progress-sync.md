@@ -224,8 +224,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
   freshness. Known local mode clocks preserve offline scalar edits while entry timestamps and reset
   epochs still reconcile progress. With both mode clocks unknown, remote scalar fields win;
-  progress scores from unrelated modes cannot choose them. Only progress actually read from a
-  legacy row uses that row's clock.
+  progress scores from unrelated modes cannot choose them. Database legacy mode payloads are no longer read; missing normalized modes never borrow
+  the account metadata clock.
   During the additive freshness-column rollout, startup and reconnect reads retry once without
   `progress_updated_at` only when PostgreSQL/PostgREST reports that column missing. Those rows
   retain unknown mode freshness; account timestamps never substitute for it. Other errors and
@@ -256,8 +256,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   stores during reconnect; it fires only after the replacement joins. Leaving all teams or disposing
   the controller clears that intent.
   A superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
-  normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
-  Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
+  normalized reconnect progress. Normalized reads retain startup retries and API error mapping.
+  Unmaterialized normalized rows are absent for startup progress and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
   Save acknowledgements advance only their changed paths, preserving unrelated remote values
   accepted while the save was queued or in flight. Pending captures track intervening accepted remote
@@ -265,7 +265,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   Domain merges do not acknowledge unsaved local fields. A newer remote reset invalidates older
   save acknowledgements for that mode; a newer local reset stays pending until its save succeeds.
   Owner and teammate reconnect/live mode hydration ignore unmaterialized placeholder rows.
-  Teammates retain previously hydrated progress if the legacy fallback read fails.
+  Teammates retain previously hydrated progress if the normalized snapshot read fails.
   Realtime SDK callbacks forward only their payload to reconciliation handlers; transport message
   references must never be interpreted as snapshot reconciliation functions.
   Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
