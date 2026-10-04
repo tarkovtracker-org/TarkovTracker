@@ -218,15 +218,27 @@ describe('settings page', () => {
         : querySelector(selector)
     );
     vi.spyOn(document, 'getElementById').mockReturnValue(panel);
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
     const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
     await nextTick();
     const selectedScroll = expected === 'tab' ? scrollTab : scrollPanel;
     const otherScroll = expected === 'tab' ? scrollPanel : scrollTab;
-    expect(selectedScroll).toHaveBeenCalledWith({
+    const options = {
       behavior: expected === 'tab' ? 'instant' : 'smooth',
       block: 'start',
       inline: 'nearest',
-    });
+    };
+    expect(selectedScroll).toHaveBeenCalledWith(options);
+    expect(selectedScroll).toHaveBeenCalledTimes(1);
+    // Only the instant tab scroll is re-asserted after an interrupted smooth scroll's last frame.
+    vi.spyOn(tab, 'isConnected', 'get').mockReturnValue(true);
+    frames.splice(0).forEach((callback) => callback(0));
+    expect(selectedScroll).toHaveBeenCalledTimes(expected === 'tab' ? 2 : 1);
+    expect(selectedScroll).toHaveBeenLastCalledWith(options);
     expect(otherScroll).not.toHaveBeenCalled();
     wrapper.unmount();
   });
