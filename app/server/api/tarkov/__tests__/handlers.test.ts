@@ -150,16 +150,13 @@ describe('Tarkov API handlers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-  it('builds expected cache key for bootstrap', async () => {
+  it('builds a language-independent cache key for bootstrap', async () => {
     const { default: handler } = await import('@/server/api/tarkov/bootstrap.get');
     await handler(event);
-    expect(mockCreateTarkovJsonBootstrapFetcher).toHaveBeenCalledWith({
-      gameMode: 'regular',
-      lang: 'en',
-    });
+    expect(mockCreateTarkovJsonBootstrapFetcher).toHaveBeenCalledWith({ gameMode: 'regular' });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'bootstrap-json-v1-en-regular',
+      'bootstrap-json-v2-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }

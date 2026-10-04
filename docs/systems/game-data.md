@@ -28,7 +28,7 @@ before returning it.
 
 | Endpoint                       | Purpose                      | Cache TTL  | Precomputed? | Overlay? |
 | ------------------------------ | ---------------------------- | ---------- | ------------ | -------- |
-| `/api/tarkov/bootstrap`        | Player levels                | 12h        | no           | no       |
+| `/api/tarkov/bootstrap`        | Player levels (no `lang`)    | 12h        | no           | no       |
 | `/api/tarkov/tasks-core`       | Tasks, maps, traders         | 12h        | **yes**      | yes      |
 | `/api/tarkov/tasks-objectives` | Task objectives              | 12h        | no           | yes      |
 | `/api/tarkov/tasks-rewards`    | Task rewards                 | 12h        | no           | yes      |
@@ -316,6 +316,10 @@ flowchart TD
   and the routes that deliberately bypass the cache layers (`editions`, `overlay-status`) do not set
   it either — the invariant covers the `edgeCache` success paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
+  The exception is data with no translatable text: `bootstrap` (player levels) is keyed by game mode
+  only, ignores `lang`, and reads just the base `items` envelope. The client likewise requests the
+  other mode's objective counts (for PvP/PvE count differences) in English and keeps one
+  IndexedDB entry per mode, because counts do not vary by language.
 - Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
   `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
 - Only final-payload routes may request response mode. Fresh and stale hits must retain the same
