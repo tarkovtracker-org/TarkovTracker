@@ -25,7 +25,9 @@ boundaries and user changes.
   tests, and checks before editing; advisory, read its Uncertainty section
 
 Prefer the single-file Vitest command from `package.json`; run the full suite only when executable
-or test logic changes make it relevant.
+or test logic changes make it relevant. Vitest auto-selects its failures-only `agent` reporter
+under coding agents (`AI_AGENT=<name>` opts others in; `--reporter=default` restores per-file
+output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures still print in full.
 
 ## Validation
 

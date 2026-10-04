@@ -36,7 +36,8 @@ export default defineVitestConfig({
     testTimeout: 30000,
     hookTimeout: 60000,
     watch: false,
-    reporters: process.env.CI ? ciReporters : ['default'],
+    // Locally, Vitest picks `agent` under coding agents (failures only) and `default` otherwise.
+    reporters: process.env.CI ? ciReporters : undefined,
     outputFile: 'test-report.junit.xml',
     passWithNoTests: false,
     coverage: {
