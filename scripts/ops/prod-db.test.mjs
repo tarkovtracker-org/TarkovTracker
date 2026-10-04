@@ -140,6 +140,7 @@ function run(args, extraEnv = {}, executable = script) {
     cwd: root,
     env: testEnvironment(extraEnv),
     encoding: 'utf8',
+    stdio: 'pipe',
   });
 }
 function writeFixture(source) {
@@ -611,6 +612,7 @@ describe('prod-db canary', () => {
             {
               env: testEnvironment({ FAKE_SUPABASE_REMOTE_VERSIONS: '20260101000000' }),
               encoding: 'utf8',
+              stdio: 'pipe',
             }
           )
         ).toThrow('duplicate migration versions (20260101000000)');

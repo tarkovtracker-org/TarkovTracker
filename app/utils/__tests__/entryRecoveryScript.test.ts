@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// @vitest-environment-options {"settings":{"handleDisabledFileLoadingAsSuccess":true}}
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ENTRY_RECOVERY_SCRIPT } from '@/utils/entryRecoveryScript';
 const RETRY_KEY = 'tt:auto-reload-on-asset-error';
