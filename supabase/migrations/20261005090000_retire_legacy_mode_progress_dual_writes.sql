@@ -16,6 +16,11 @@
 --   writer are dropped, so a legacy column write can no longer reach normalized progress.
 -- Signatures, grants and return contracts are unchanged for rolling clients and the deployed
 -- Worker. pvp_data / pve_data remain in place (frozen) until Phase 4 drops them.
+--
+-- Irreversible: there is no down migration. Once deployed the legacy columns go stale, so a revert
+-- must not reinstate sync_legacy_user_progress_modes or the legacy-writing function bodies; that
+-- would let frozen legacy data overwrite newer normalized progress. Fix forward, or first re-sync
+-- the legacy columns from normalized rows in a separately reviewed migration. Requires #1087.
 
 CREATE OR REPLACE FUNCTION public.sync_user_game_mode_progress(
   p_current_game_mode text,
