@@ -119,14 +119,34 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys everything automatically. Three integrations do the work — none of them
-GitHub Actions — and each surfaces as a check on the merge commit:
+Merging to `main` deploys automatically. Three integrations do the work — none of them GitHub
+Actions — and each surfaces as a check on the merge commit when it runs:
 
 | What                                 | Mechanism                    | Check on the merge commit     |
 | ------------------------------------ | ---------------------------- | ----------------------------- |
 | Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
 | `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
 | DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+
+The Worker build is path-filtered. Its `Deploy default branch` trigger builds `main` only when a
+push changes a file under its build watch path `workers/api-gateway/**`, or when Cloudflare skips
+[watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
+(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch path gets no
+Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
+not a broken integration. The Worker bundle also compiles code outside its directory. Its complete
+source inputs, kept in sync with the code by `scripts/workflow-tests/worker-build-inputs.mjs`:
+
+<!-- api-gateway-build-inputs:start -->
+
+- `workers/api-gateway/**` — watched by the trigger
+- `shared/**` — **not** watched
+- `app/utils/modeProgress.ts` — **not** watched
+
+<!-- api-gateway-build-inputs:end -->
+
+A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
+the previous Worker build. Until the trigger also watches those paths, treat that merge as needing a
+Worker build of its exact SHA; starting one is a production deployment and needs authorization.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -203,8 +223,10 @@ integration fails or is unavailable, not the normal path.
    merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
-5. Confirm the `Cloudflare Pages`, `Workers Builds: api-gateway` and `Supabase Preview` checks all
-   succeeded on the merge commit.
+5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
+   the push changed `workers/api-gateway/**`, also confirm `Workers Builds: api-gateway` succeeded
+   on it; if it changed only an unwatched [Worker build input](#deployment), no check appears and
+   the Worker still needs a build. An unchanged `/health` response proves neither case.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the
    Supabase dashboard. Manual fallback:
