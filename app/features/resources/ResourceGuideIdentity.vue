@@ -18,7 +18,7 @@
           {{ guideLabel }}
         </p>
         <h1
-          class="light:text-surface-50 mt-1 text-2xl font-bold tracking-wide text-white sm:text-3xl"
+          class="light:text-surface-50 mt-1 text-xl font-bold tracking-wide wrap-break-word text-white sm:text-3xl"
         >
           {{ title }}
         </h1>
