@@ -1,9 +1,9 @@
 {
   "admin": {
-    "verifying_access": "Verifying admin access...",
-    "error_title": "Connection Error",
-    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
-    "no_reference": "N/A",
+    "verifying_access": "Проверка прав администратора...",
+    "error_title": "Ошибка соединения",
+    "load_error_description": "Не удалось загрузить данные администратора. Обновите страницу или обратитесь в поддержку. Код: {reference}",
+    "no_reference": "Н/Д",
     "error": {
       "cache_purge_failed": "Не удалось очистить кэш. Пожалуйста, попробуйте еще раз.",
       "invalid_purge_type": "Выберите правильный тип очистки кэша.",
@@ -21,51 +21,48 @@
       "supporter_update_failed": "Не удалось обновить доступ к поддержке.",
       "twitch_config_update_failed": "Не удалось обновить конфигурацию Twitch."
     },
-    "access_warning_title": "Admin Access",
-    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
+    "access_warning_title": "Доступ администратора",
+    "access_warning_description": "Действия здесь применяются ко всем пользователям. Вы вошли как {user}.",
     "cache_management_title": "Управление кешированием",
-    "last_purge_description": "Last purge: {type} at {timestamp}",
-    "tarkov_data_cache_label": "Tarkov Data Cache",
-    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
-    "purge_game_data_button": "Purge Game Data",
-    "full_cache_purge_label": "Full Cache Purge",
-    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
-    "purge_everything_button": "Purge Everything",
-    "cache_behavior_title": "Cache Behavior",
-    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
-    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
-    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
-    "confirm_purge_button": "Confirm Purge",
-    "all_cache_label": "All Cache",
-    "tarkov_data_label": "Tarkov Data",
-    "unauthorized_title": "Unauthorized",
-    "admin_privileges_required": "Admin privileges required for this action.",
-    "permission_denied": "You do not have permission to perform this action.",
-    "cache_purged_title": "Cache Purged",
-    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
-    "full_cache_purged_title": "Full Cache Purged",
-    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
-    "purge_failed_title": "Purge Failed",
-    "purge_failed_description": "Failed to purge cache",
-    "audit_log_title": "Admin Audit Log",
-    "refresh_button": "Refresh",
+    "last_purge_description": "Последняя очистка: {type} в {timestamp}",
+    "tarkov_data_cache_label": "Кэш данных Tarkov",
+    "tarkov_data_cache_description": "Очищает кэшированные игровые данные (задания, убежище, предметы). Пользователи получат свежие данные через API tarkov.dev.",
+    "purge_game_data_button": "Очистить игровые данные",
+    "full_cache_purge_label": "Полная очистка кэша",
+    "full_cache_purge_description": "Очищает ВСЁ кэшированное содержимое, включая статические ресурсы. Используйте редко — это повышает нагрузку на исходный сервер.",
+    "purge_everything_button": "Очистить всё",
+    "cache_behavior_title": "Поведение кэша",
+    "cache_info_description": "После очистки следующий запрос любого пользователя запустит получение свежих данных с tarkov.dev. Затем новые данные будут кэшироваться для всех пользователей.",
+    "confirm_full_cache_purge_title": "Подтвердите полную очистку кэша",
+    "confirm_full_cache_purge_description": "Будет очищено ВСЁ кэшированное содержимое Cloudflare, включая статические ресурсы, шрифты и пакеты JavaScript. Это может временно увеличить время загрузки для всех пользователей.",
+    "confirm_purge_button": "Подтвердить очистку",
+    "all_cache_label": "Весь кэш",
+    "tarkov_data_label": "Данные Tarkov",
+    "unauthorized_title": "Нет авторизации",
+    "admin_privileges_required": "Для этого действия требуются права администратора.",
+    "cache_purged_title": "Кэш очищен",
+    "tarkov_cache_purged_description": "Кэш данных Tarkov очищен. Пользователи получат свежие данные.",
+    "full_cache_purged_title": "Полная очистка кэша выполнена",
+    "full_cache_purged_description": "Всё кэшированное содержимое удалено из Cloudflare.",
+    "purge_failed_title": "Не удалось очистить кэш",
+    "purge_failed_description": "Не удалось очистить кэш",
+    "audit_log_title": "Журнал действий администратора",
+    "refresh_button": "Обновить",
     "audit_log_login_required": "Неавторизовано: Войдите, чтобы продолжить.",
     "audit_log_admin_required": "Неавторизовано: привилегии администратора, необходимые для просмотра журналов аудита.",
     "audit_log_table_not_found": "Таблица журнала аудита не найдена.",
     "audit_log_table_not_found_description": "Выполните миграцию SQL для создания admin_audit_log.",
-    "audit_log_fetch_failed": "Failed to fetch audit logs",
-    "no_actions_recorded": "No admin actions recorded yet",
-    "audit_log_by": "by",
+    "audit_log_fetch_failed": "Не удалось получить журнал действий",
+    "no_actions_recorded": "Действия администраторов ещё не зафиксированы",
+    "audit_log_by": "Автор",
     "supporter_override_title": "Доступ ",
-    "supporter_override_description": "Set a user's supporter state for production testing without creating a Stripe payment.",
+    "supporter_override_description": "Задайте статус сторонника для пользователя, чтобы протестировать рабочую среду без создания платежа в Stripe.",
     "supporter_target_user_label": "ID пользователя",
-    "supporter_target_user_placeholder": "Supabase auth user UUID",
+    "supporter_target_user_placeholder": "UUID пользователя Supabase Auth",
     "supporter_tier_label": "Уровень",
-    "supporter_override_login_required": "Вы должны войти в систему, чтобы обновить доступ к поддержке.",
-    "supporter_override_saved_title": "Supporter access updated",
-    "supporter_override_enabled_description": "Enabled {tier} supporter access.",
-    "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_description": "Could not update supporter access.",
+    "supporter_override_saved_title": "Доступ сторонника обновлён",
+    "supporter_override_enabled_description": "Включён доступ сторонника уровня {tier}.",
+    "supporter_override_disabled_description": "Доступ активного сторонника отключён.",
     "twitch_config_title": "Поток Twitch",
     "twitch_config_description": "Установите Twitch канал, продвигаемый в углу сайта. Посетители забирают изменения в течение нескольких минут.",
     "twitch_channel_label": "Канал",
@@ -76,10 +73,8 @@
     "twitch_config_saved_description": "Повышенный поток теперь {channel}.",
     "twitch_config_saved_with_warning_title": "Twitch конфигурация сохранена",
     "twitch_config_saved_with_warning_description": "Конфигурация сохранена, но кэшированные посетители все еще видят предыдущее значение.",
-    "twitch_config_failed_description": "Не удалось обновить конфигурацию Twitch.",
     "twitch_config_load_failed_title": "Настройки Twitch недоступны",
-    "twitch_config_load_failed_description": "Не удалось загрузить текущую конфигурацию Twitch.",
-    "twitch_config_login_required": "Вы должны войти для обновления Twitch конфигурации."
+    "twitch_config_load_failed_description": "Не удалось загрузить текущую конфигурацию Twitch."
   },
   "alerts": {
     "no_map_data": "Для этого выбора нет данных карты."
@@ -95,12 +90,12 @@
     "hidden_label": "Скрыто",
     "user_label": "Пользователь",
     "user_avatar_alt": "Аватар пользователя",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
-    "help_community_aria": "Help & community",
+    "supporter_badge_aria": "Управление подпиской сторонника ({tier})",
+    "help_community_aria": "Помощь и сообщество",
     "community_section": "Сообщество",
     "keyboard_shortcuts": "Быстрые клавиши",
-    "report_problem": "Report a problem",
-    "login_aria": "Log in to your account",
+    "report_problem": "Сообщить о проблеме",
+    "login_aria": "Войти в аккаунт",
     "switch_to_light_theme": "Включить светлую тему",
     "switch_to_dark_theme": "Переключиться на темную тему"
   },
@@ -139,12 +134,12 @@
     "retry_succeeded": "Ваши изменения сохранены в облаке. Вы можете безопасно выйти из игры."
   },
   "omnibar": {
-    "title": "Search",
-    "description": "Search tasks, needed items, and hideout stations",
+    "title": "Поиск",
+    "description": "Поиск заданий, нужных предметов и станций убежища",
     "trigger_label": "Поиск...",
-    "open_aria": "Open global search",
-    "aria_label": "Global search",
-    "placeholder": "Search tasks, needed items, hideout...",
+    "open_aria": "Открыть глобальный поиск",
+    "aria_label": "Глобальный поиск",
+    "placeholder": "Поиск заданий, нужных предметов, станций убежища...",
     "hint_min_chars": "Введите по крайней мере 2 символа для поиска...",
     "no_results": "Ничего не найдено по запросу \"{query}\".",
     "group_tasks": "Задачи / Квесты",
@@ -154,31 +149,31 @@
     "unread_indicator": "У вас есть непрочитанные действия",
     "mark_read": "Пометить как прочитанное",
     "clear": "Очистить",
-    "empty": "No activity recorded yet.",
-    "badge_api": "API Sync",
-    "api_synced": "API Progress Synced",
+    "empty": "Активность пока не зафиксирована.",
+    "badge_api": "Синхронизация API",
+    "api_synced": "Прогресс синхронизирован через API",
     "more_count": "+ещё {count}",
     "entry": {
       "completed": "Выполненное задание: {name}",
       "uncompleted": "Невыполненное задание: {name}",
       "failed": "Проваленная задача: {name}",
       "reset_failed": "Сбросить проваленную задачу {name}",
-      "available": "Unlocked Task: {name}",
-      "undo_completed": "Undid Task Completion: {name}",
-      "undo_uncompleted": "Undid Task Uncompletion: {name}",
-      "undo_reset_failed": "Undid Reset Failed Task: {name}",
-      "undo_failed": "Undid Task Failure: {name}"
+      "available": "Задание открыто: {name}",
+      "undo_completed": "Выполнение задания отменено: {name}",
+      "undo_uncompleted": "Отметка о невыполнении задания отменена: {name}",
+      "undo_reset_failed": "Сброс статуса «Провалено» для задания отменён: {name}",
+      "undo_failed": "Статус «Провалено» для задания отменён: {name}"
     }
   },
   "promoted_stream": {
-    "close": "Close stream",
-    "expand": "Open stream",
-    "open_channel": "Go to Twitch channel",
-    "player_title": "{streamer} Twitch stream",
-    "region_label": "Promoted Twitch stream for {streamer}",
-    "reopen": "Reopen stream",
+    "close": "Закрыть трансляцию",
+    "expand": "Открыть трансляцию",
+    "open_channel": "Перейти на канал Twitch",
+    "player_title": "Трансляция {streamer} в Twitch",
+    "region_label": "Рекламная трансляция Twitch: {streamer}",
+    "reopen": "Открыть трансляцию",
     "shrink": "Сжать стрим",
-    "title": "{streamer} live"
+    "title": "{streamer} в эфире"
   },
   "buttons": {},
   "errors": {
@@ -216,6 +211,7 @@
         "plural": "Задачи обновлены"
       },
       "state": {
+        "active": "активный",
         "completed": "выполнена",
         "failed": "провалена",
         "uncompleted": "не выполнена"
@@ -231,6 +227,10 @@
     "progress_merged": {
       "title": "Облачный прогресс синхронизирован",
       "description": "Синхронизирован прогресс из другой вкладки/устройства и объединено {count} локальных различий."
+    },
+    "tarkov_uid_conflict": {
+      "title": "Tarkov профиль не связан",
+      "description": "Tarkov UID {uid} уже связан с другим аккаунтом TarkovTracker, поэтому он не был связан с этим аккаунтом. Ваш прогресс по-прежнему сохранен. Отсоедините его от другого аккаунта или импортируйте свой собственный профиль."
     },
     "load_failed": {
       "title": "Не удалось загрузить прогресс",
@@ -249,10 +249,10 @@
       "description": "Не удалось скопировать \"{value}\" в буфер обмена."
     },
     "action_undone": {
-      "title": "Undid action: {description}"
+      "title": "Действие отменено: {description}"
     },
     "action_undo_failed": {
-      "title": "Failed to undo action: {description}"
+      "title": "Не удалось отменить действие: {description}"
     }
   },
   "common": {
@@ -307,7 +307,6 @@
     "support": "Поддержка",
     "privacy_policy": "Политика конфиденциальности",
     "terms_of_service": "Условия предоставления услуг",
-    "tarkov_dev": "Tarkov.dev",
     "streamer_tools": "Инструменты \"Стример\"",
     "prestige": "Prestige",
     "backup_restore": "Резервное копирование и восстановление",
@@ -329,7 +328,6 @@
     "pmc_extract": "Извлечь PMC",
     "scav_extract": "Экстракт Scav",
     "dashboard": "Панель",
-    "meet_the_fence_reputation_requirement_required": "Соответствие требованиям для репутации Fence ({required}).",
     "objectives": "Цели",
     "kappa_tasks": "Каппа",
     "getting_started": "Начало работы",
@@ -363,7 +361,6 @@
     "login": "Логин",
     "overview": "Общий обзор",
     "api_documentation": "Документация по API",
-    "tarkov_changes": "Tarkov Изменения",
     "api": "API",
     "game_settings": "Настройки игры",
     "custom_scale": "Пользовательский масштаб",
@@ -390,7 +387,7 @@
       "page_guide_unavailable": "Для этой страницы гид пока недоступен. Используйте онбординг.",
       "onboarding": "Онбординг для новых пользователей",
       "onboarding_description": "Начните с импортов, затем завершите базовую настройку и проверьте задания.",
-      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
+      "keyboard_shortcuts_error": "Не удалось открыть сочетания клавиш. Повторите попытку."
     },
     "onboarding": {
       "title": "Начало настройки",
@@ -564,7 +561,6 @@
     "legend": {
       "regular": "Обычный",
       "pinned": "Прикреплено",
-      "team": "Команда",
       "shared_extract": "Общий выход (любая фракция)",
       "coop_extract": "Совместный выход (ЧВК + Дикий)"
     },
@@ -610,7 +606,7 @@
       "complete": "Завершить цель",
       "uncomplete": "Отменить завершение цели",
       "objective_unavailable": "Цель недоступна.",
-      "stacked_objectives": "{count} objectives here"
+      "stacked_objectives": "Целей здесь: {count}"
     }
   },
   "page": {
@@ -648,12 +644,7 @@
           "default": "{task} — самый очевидный быстрый прогресс на вашей панели.",
           "filter_hidden_one": "Текущие фильтры скрывают 1 доступное задание.",
           "filter_hidden_other": "Текущие фильтры скрывают {count} доступных заданий.",
-          "blocked_level_one": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё 1 уровня.",
-          "blocked_level_other": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё {count} уровней.",
           "blocked_requirement": "{task} заблокирован по его требованиям.",
-          "blocked_prerequisite": "{task} близко, но всё ещё заблокировано предыдущими заданиями.",
-          "blocked_fence": "{task} ждёт репутацию Скупщика.",
-          "blocked_trader_unlock": "{task} заблокировано другой задачей на разблокировку торговца.",
           "complete": "Вы завершили все видимые задания в этой области панели."
         },
         "stat": {
@@ -690,12 +681,6 @@
           "kappa_other": "Лучший прогресс по особой цепочке: продвигает Каппу, осталось {count} целей.",
           "lightkeeper_one": "Лучший прогресс по особой цепочке: продвигает Смотрителя маяка, осталась 1 цель.",
           "lightkeeper_other": "Лучший прогресс по особой цепочке: продвигает Смотрителя маяка, осталось {count} целей.",
-          "blocked_level_one": "Ближайшая разблокировка: не хватает всего 1 уровня.",
-          "blocked_level_other": "Ближайшая разблокировка: не хватает всего {count} уровней.",
-          "blocked_prerequisite_one": "Минимальный набор блокеров: осталось 1 предыдущее задание.",
-          "blocked_prerequisite_other": "Минимальный набор блокеров: осталось {count} предыдущих заданий.",
-          "blocked_fence": "Ближайший репутационный барьер: не хватает {count} репутации Fence.",
-          "blocked_trader_unlock": "Сначала торговец: выполните {task}, чтобы открыть {trader}.",
           "filters_one": "Нет видимых вариантов: 1 доступное задание скрыто вашими фильтрами.",
           "filters_other": "Нет видимых вариантов: {count} доступных заданий скрыты вашими фильтрами.",
           "complete": "В этой области панели не осталось видимой работы."
@@ -705,10 +690,6 @@
           "ready_other": "Готово сейчас. Осталось {count} целей.",
           "ready_no_objectives": "Готово сейчас.",
           "filters": "Измените фильтры заданий, чтобы показать скрытые варианты.",
-          "level_one": "Достигните уровня {required} (остался 1 уровень).",
-          "level_other": "Достигните уровня {required} (осталось {count} уровней).",
-          "prerequisite": "Выполните {tasks}.",
-          "trader_unlock": "Выполните {task}, чтобы открыть {trader}.",
           "complete": "Блокеров нет. Всё видимое уже выполнено."
         },
         "badge": {
@@ -730,8 +711,8 @@
         "filtered_warning_tooltip": "Эти показатели учитывают ваши фильтры заданий (Каппа, Смотритель маяка и обычные задания)."
       },
       "progress_card": {
-        "view_details": "View details for {label}",
-        "progress_label": "{label} progress"
+        "view_details": "Подробнее о {label}",
+        "progress_label": "{label}: прогресс"
       },
       "milestones": {
         "title": "Ключевые этапы",
@@ -755,17 +736,16 @@
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Карма Дикого",
         "unlock_required": "Требуется разблокировка:",
-        "locked_summary": "{count} traders locked",
+        "locked_summary": "Заблокировано торговцев: {count}",
         "sort": {
-          "aria_label": "Sort traders",
-          "direction_aria_label": "Toggle sort direction"
+          "aria_label": "Сортировать торговцев",
+          "direction_aria_label": "Изменить направление сортировки"
         }
       }
     },
     "changelog": {
       "title": "История изменений",
       "description": "Просматривайте последние обновления и изменения TarkovTracker.",
-      "back": "Назад к панели управления",
       "loading": "Загрузка истории изменений...",
       "error": "Не удалось загрузить историю изменений.",
       "empty": "Пока нет записей истории изменений.",
@@ -786,7 +766,7 @@
       "wip_description": "Эта функция всё ещё находится в разработке. По мере того как мы продолжаем структурировать данные, контент и функциональность будут расширяться и дорабатываться. Спасибо за терпение!",
       "no_data": "Нет данных по сюжетным главам.",
       "mark_incomplete": "Отметить как невыполнено",
-      "endings": "Endings",
+      "endings": "Концовки",
       "ending_progress": "{completed}/{total} известные задачи",
       "ending_evidence_pending": "Нет целей, сопоставленных с этой целью.",
       "partial_data": "Частичные данные",
@@ -800,122 +780,129 @@
       "stale_progress_other": "{count} сохранил целевые отметки больше не совпадают с текущими данными истории и нуждается в повторной проверке.",
       "route_choice": "Выбор пути",
       "route_chosen": "Путь выбран",
-      "route_blocks": "Blocks: {objectives}",
-      "route_blocked_by": "Blocked by: {objectives}",
-      "route_decision": "Decision {index}",
+      "route_blocks": "Блоки: {objectives}",
+      "route_blocked_by": "Заблокировано: {objectives}",
+      "route_decision": "Решение {index}",
       "route_choose_one": "Выберите один",
-      "route_required_steps": "Required steps",
+      "route_required_steps": "Обязательные шаги",
       "route_optional_steps": "Необязательные шаги",
-      "route_selected_hint": "This route is active.",
+      "route_selected_hint": "Этот маршрут активен.",
       "route_switch_hint": "Чтобы изменить путь, сначала снимите галочку с выбранного пути.",
-      "route_unlocks_here": "Unlocks here",
-      "route_unlocks_chapter": "Chapter unlocks",
-      "route_unlocks_estimated": "Estimated timing",
-      "route_unlock_map": "Map: {name}",
-      "route_unlock_trader": "Trader: {name}",
-      "route_unlock_reward": "Reward: {name}"
+      "route_unlocks_here": "Открывается здесь",
+      "route_unlocks_chapter": "Открытие глав",
+      "route_unlocks_estimated": "Ориентировочное время",
+      "route_unlock_map": "Карта: {name}",
+      "route_unlock_trader": "Торговец: {name}",
+      "route_unlock_reward": "Награда: {name}"
     },
     "kappa": {
-      "title": "Трекер Каппы и Смотрителя",
       "subtitle": "Отслеживайте ваш прогресс в направлении квестов на Каппа контейнер и Смотрителя.",
       "row": {
-        "level_met_aria": "Required level {required}, you are level {current}",
-        "level_unmet_aria": "Requires level {required}, you are level {current}",
-        "level_title": "Required level {required} (you are {current})",
-        "level_summary": "Lv {required} (you {current})",
+        "level_met_aria": "Требование уровня {required} выполнено — ваш уровень {current}",
+        "level_unmet_aria": "Требуется уровень {required}, а ваш уровень — {current}",
+        "level_title": "Требуется уровень {required} (ваш уровень — {current})",
+        "level_summary": "Lv {required} (ваш — {current})",
         "trader_level": "{trader} Lv{level}",
-        "action_uncomplete": "Mark uncomplete",
-        "action_reset_failed": "Reset failed",
-        "locked_by": "Requires: {task}"
+        "action_uncomplete": "Снять отметку о выполнении",
+        "action_reset_failed": "Сбросить статус «Провалено»",
+        "locked_by": "Требуется: {task}"
       },
-      "empty": "No tasks for this list yet.",
+      "empty": "В этом списке пока нет заданий.",
       "summary": {
-        "complete": "complete",
-        "final_goal": "Final Kappa Goal"
+        "complete": "выполнено",
+        "final_goal": "Финальная цель Kappa"
       },
       "trader_selector": {
-        "label": "Select Trader"
+        "label": "Выбор торговца"
       },
       "trader": {
-        "other": "Other"
+        "other": "Другой"
       }
     },
     "supporter": {
-      "title": "Support TarkovTracker",
+      "title": "Поддержать TarkovTracker",
       "subtitle": "Помогите работать с сайтом. Каждый вклад направлен непосредственно на хостинг, разработку и поддержание света.",
       "billing_monthly": "Ежемесячно",
       "billing_6month": "6 месяцев",
       "billing_yearly": "Ежегодно",
       "most_popular": "Популярное",
-      "tier_cta": "Subscribe",
-      "tier_login_cta": "Log in to subscribe",
-      "tier_change_cta": "Change plan in billing portal",
-      "current_tier_badge": "Current tier",
+      "tier_cta": "Оформить подписку",
+      "tier_login_cta": "Войдите, чтобы оформить подписку",
+      "tier_change_cta": "Изменить план в биллинг-портале",
+      "current_tier_badge": "Текущий уровень",
       "tier_scav_name": "Скет",
-      "tier_scav_tagline": "Just trying to get by",
-      "tier_timmy_name": "Timmy",
-      "tier_timmy_tagline": "Learning the ropes",
-      "tier_chad_name": "Chad",
-      "tier_chad_tagline": "True veteran supporter",
-      "perk_badge": "Supporter badge",
-      "perk_discord": "Supporter role in Discord (link your account and join our server)",
-      "perk_tier_role": "{tier} Tier role in Discord",
-      "perk_early_access": "Early access to new features",
-      "perk_priority_support": "Priority support",
-      "perk_feature_voting": "Feature voting priority",
-      "one_time_title": "One-Time Contribution",
-      "one_time_subtitle": "Prefer not to subscribe? Send a one-time gift from {min}.",
-      "one_time_cover_fees": "Cover Stripe fees",
-      "one_time_fee_amount": "{fees} in fees",
-      "one_time_amount_field_label": "Contribution amount",
-      "one_time_min_error": "{min} minimum",
-      "one_time_invalid_error": "Enter a valid amount",
-      "one_time_max_error": "{max} maximum",
-      "one_time_give_cta": "Give {total}",
-      "one_time_login_cta": "Log in to contribute",
-      "one_time_net_note": "{net} reaches us after fees",
-      "one_time_perks_heading": "Includes supporter perks",
-      "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
-      "perk_api_rate_limit": "Higher daily API read and write quotas",
-      "perk_data_retention": "Longer retention if inactive accounts are purged, while supporter status is active",
-      "login_required_warning": "You must be logged in to receive supporter perks.",
-      "price_to_us": "Goes to us",
-      "price_per_month_suffix": "/mo",
-      "price_stripe_fees": "Stripe fees",
-      "billed_every_label": "Billed every {label}",
-      "savings_note": "You save {amount} vs. monthly",
-      "kofi_deprecation_title": "Ko-fi (backup option)",
-      "kofi_deprecation_detail": "Subscriptions and one-time contributions above now run through Stripe, which means lower fees and more of your support reaches us directly. Ko-fi stays available as a backup for one-time tips only.",
-      "alt_payments_title": "More Payment Methods Coming Soon",
-      "alt_payments_coming_soon": "We're working on adding additional payment options so everyone can contribute in the way that works best for them.",
-      "alt_payment_crypto": "Crypto",
-      "alt_payment_gift_cards": "Gift Cards",
-      "alt_payments_more": "& More",
-      "checkout_error_title": "Checkout failed",
-      "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment.",
-      "manage_subscription_cta": "Manage subscription",
-      "upgrade_cta": "Pick a tier",
-      "portal_error_title": "Could not open billing portal",
-      "portal_error_generic": "We could not open the billing portal. Please try again.",
-      "status_active_subscription": "Active subscription",
-      "status_active_one_time": "Active supporter",
-      "status_past_due": "Payment past due",
-      "status_cancelled": "Subscription cancelled",
-      "status_expired": "Subscription expired",
-      "status_inactive": "Inactive supporter",
-      "status_summary_inactive": "Support has lapsed. Pick a tier below to renew perks.",
-      "status_summary_renews": "Renews on {date}. You can change tier or cancel anytime.",
-      "status_summary_cancelled_until": "Access continues until {date}. It ends after that.",
-      "status_summary_subscription": "Thanks for keeping the lights on. Manage billing anytime.",
-      "status_summary_one_time": "Thanks for the one-time contribution.",
-      "status_summary_one_time_until": "Perks active until {date}.",
-      "thanks_subscription_title": "Welcome aboard!",
-      "thanks_subscription_description": "Your subscription is being activated. Your tier badge will appear shortly.",
-      "thanks_one_time_title": "Thanks for your support!",
-      "thanks_one_time_description": "Your contribution went through. It may take a moment to reflect on your account.",
-      "one_time_amount_label": "One-time contribution amount in USD",
-      "billing_6month_interval": "6 months",
-      "billing_yearly_interval": "year"
+      "tier_scav_tagline": "Просто свожу концы с концами",
+      "tier_timmy_name": "Тимми",
+      "tier_timmy_tagline": "Осваиваюсь",
+      "tier_chad_name": "Чад",
+      "tier_chad_tagline": "Настоящий ветеран поддержки",
+      "perk_badge": "Значок сторонника",
+      "perk_discord": "Роль сторонника в Discord (привяжите аккаунт и присоединяйтесь к нашему серверу)",
+      "perk_tier_role": "Роль уровня {tier} в Discord",
+      "perk_early_access": "Ранний доступ к новым функциям",
+      "perk_priority_support": "Приоритетная поддержка",
+      "perk_feature_voting": "Приоритетное участие в голосовании за новые функции",
+      "one_time_title": "Разовый взнос",
+      "one_time_subtitle": "Не хотите оформлять подписку? Отправьте разовый взнос от {min}.",
+      "one_time_cover_fees": "Покрыть комиссии Stripe",
+      "one_time_fee_amount": "Комиссия: {fees}",
+      "one_time_amount_field_label": "Сумма взноса",
+      "one_time_min_error": "Минимум: {min}",
+      "one_time_invalid_error": "Введите корректную сумму",
+      "one_time_max_error": "Максимум: {max}",
+      "one_time_give_cta": "Оплатить {total}",
+      "one_time_login_cta": "Войдите, чтобы внести взнос",
+      "one_time_net_note": "После вычета комиссий нам поступит {net}.",
+      "one_time_perks_heading": "Включает льготы сторонника",
+      "one_time_fee_transparency": "Комиссии Stripe (2,9% + $0.30) отображаются до оплаты.",
+      "perk_api_rate_limit": "Более высокие суточные лимиты чтения и записи API",
+      "perk_subscription_retention": "Освобождается от обычной очистки при активной квалифицированной подписке",
+      "perk_one_time_retention": "Окно одногодичной бездействия с квалифицированной поддержкой",
+      "billing_summary": "Подписки автоматически обновляются с выбранным интервалом. Отменить будущие пролонгации в любое время. Одноразовые взносы не обновляются.",
+      "policies_title": "Поддержите взгляд",
+      "terms_summary": "Средства поддержки этого бесплатного проекта. Преимущества могут изменяться и не гарантированы. Платежи обычно не подлежат возмещению, в соответствии с действующим законодательством.",
+      "payment_terms_link": "Условия оплаты, отмены и возврата",
+      "retention_summary": "Соответствующая поддержка расширяет окно бездействия, освобождаются от активной квалификационной подписки. Возврат средств и возврат средств влияют на право на использование. Это не является гарантией хранения или защиты от удаления другой учетной записи.",
+      "retention_terms_link": "Полные условия хранения счетов",
+      "privacy_summary": "Stripe обрабатывает платежи. Мы сохраняем ограниченное количество платежей и поддерживающих записи для управления вашей поддержкой. Наша политика конфиденциальности описывает использование данных, сохранение и ваши права.",
+      "login_required_warning": "Чтобы получить льготы сторонника, необходимо войти в аккаунт.",
+      "price_to_us": "Поступит нам",
+      "price_per_month_suffix": "/мес",
+      "price_stripe_fees": "Комиссии Stripe",
+      "billed_every_label": "Периодичность оплаты: {label}",
+      "savings_note": "Вы экономите {amount} по сравнению с ежемесячной оплатой",
+      "kofi_deprecation_title": "Ko-fi (резервный вариант)",
+      "kofi_deprecation_detail": "Подписки и разовые взносы, перечисленные выше, теперь проходят через Stripe: комиссии ниже, и больше вашей поддержки напрямую получает наш проект. Ko-fi остаётся доступен только для разовых чаевых.",
+      "alt_payments_title": "Скоро появится больше способов оплаты",
+      "alt_payments_coming_soon": "Мы добавляем дополнительные способы оплаты, чтобы каждый мог поддержать проект наиболее удобным для себя способом.",
+      "alt_payment_crypto": "Криптовалюта",
+      "alt_payment_gift_cards": "Подарочные карты",
+      "alt_payments_more": "& другое",
+      "checkout_error_title": "Не удалось оформить заказ",
+      "checkout_error_generic": "Не удалось начать оформление заказа. Повторите попытку через мгновение.",
+      "manage_subscription_cta": "Управлять подпиской",
+      "upgrade_cta": "Выбрать уровень поддержки",
+      "portal_error_title": "Не удалось открыть биллинг-портал",
+      "portal_error_generic": "Не удалось открыть биллинг-портал. Повторите попытку.",
+      "status_active_subscription": "Активная подписка",
+      "status_active_one_time": "Активный сторонник",
+      "status_past_due": "Платёж просрочен",
+      "status_cancelled": "Подписка отменена",
+      "status_expired": "Срок подписки истёк",
+      "status_inactive": "Неактивный сторонник",
+      "status_summary_inactive": "Льготы сторонника больше не действуют. Выберите уровень ниже, чтобы восстановить их.",
+      "status_summary_renews": "Продление на {date}. Тариф можно изменить или отменить в любой момент.",
+      "status_summary_cancelled_until": "Доступ сохранится до {date}. После этой даты он закончится.",
+      "status_summary_subscription": "Спасибо, что не даёте проекту замереть. Оплатой можно управлять в любой момент.",
+      "status_summary_one_time": "Спасибо за разовый взнос.",
+      "status_summary_one_time_until": "Льготы сторонника активны до {date}.",
+      "thanks_subscription_title": "Добро пожаловать!",
+      "thanks_subscription_description": "Ваша подписка активируется. Значок выбранного уровня появится в ближайшее время.",
+      "thanks_one_time_title": "Спасибо за поддержку!",
+      "thanks_one_time_description": "Ваш взнос зачислен. Информация об отражении платежа в аккаунте может появиться через некоторое время.",
+      "one_time_amount_label": "Сумма разового взноса в USD",
+      "billing_6month_interval": "6 месяцев",
+      "billing_yearly_interval": "год"
     },
     "tasks": {
       "primary_views": {
@@ -982,22 +969,20 @@
           "experience_rewards": "Получаемый опыт",
           "next_tasks": "Следующие задания",
           "previous_tasks": "Предыдущие задания",
-          "collapse_completed_objectives": "Свернуть цели выполненных заданий",
-          "collapse_by_default": "Свернуть задания по умолчанию",
-          "hide_rewards": "Скрыть награды"
+          "collapse_completed_objectives": "Свернуть цели выполненных заданий"
         },
         "filter_bar": {
           "hint": "Показать или скрыть фильтры статуса.",
           "all_filter": "Фильтр \"Все\"",
-          "all_filter_hint": "Display every task regardless of status.",
+          "all_filter_hint": "Показывать все задания независимо от статуса.",
           "available_filter": "Фильтр \"Доступные\"",
-          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
+          "available_filter_hint": "Задания, которые можно начать прямо сейчас с учётом вашего уровня и предварительных условий.",
           "locked_filter": "Фильтр \"Заблокированные\"",
-          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
+          "locked_filter_hint": "Задания, заблокированные уровнем, репутацией торговца или предварительными заданиями.",
           "completed_filter": "Фильтр \"Завершённые\"",
-          "completed_filter_hint": "Tasks you've already finished.",
+          "completed_filter_hint": "Задания, которые вы уже выполнили.",
           "failed_filter": "Фильтр \"Проваленные\"",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+          "failed_filter_hint": "Задания, проваленные из-за несоблюдения условий."
         },
         "advanced": {
           "manual_fail_actions": "Отмечать проваленные вручную",
@@ -1147,8 +1132,8 @@
         "kappa_tooltip": "Это задание необходимо для получения контейнера Каппа",
         "level_badge_tooltip": "Требуется {level} уровень для открытия этого задания",
         "lightkeeper_tooltip": "Это задание необходимо для открытия Смотрителя Маяка",
-        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
-        "alternatives_badge": "{count} alt",
+        "alternatives_tooltip": "Вариантов на выбор: {count}. Достаточно выполнить один.",
+        "alternatives_badge": "{count} альт.",
         "location_tooltip": "Цели задания находятся на карте {map}",
         "next_tasks": "Следующее(ие) задание(я):",
         "open_item_on_tarkov_dev": "Открыть {name} на tarkov.dev",
@@ -1163,13 +1148,13 @@
       "blockers": {
         "player_level": "Требуется уровень игрока {comparison} {required} (текущее значение: {current}).",
         "trader_level": "Требуется {trader} уровень лояльности {comparison} {required} (текущее значение: {current}).",
-        "trader_reputation": "{trader} reputation {comparison} {required} required (current: {current}).",
+        "trader_reputation": "Требуемая репутация {trader}: {comparison} {required} (сейчас: {current}).",
         "prerequisite": "Выполните необходимые статусы задач для: {tasks}.",
         "story_route": "Познакомьтесь с требуемыми статусами задач для {tasks}, или пройдите одну из этих глав истории: {chapters}.",
         "failed_branch": "Заблокировано неудачной задаче: {task}.",
         "faction": "Доступно для {faction} символов.",
         "trader_unlock": "Разблокируйте {trader} , закончив {task}.",
-        "prestige": "Requires Prestige {required} (current: {current}).",
+        "prestige": "Требуется престиж {required} (сейчас: {current}).",
         "global_variable": "Значение прогресса сервера {comparison} {required} требуется (текущее значение: {current}).",
         "global_variable_unknown": "Требуется прогресс сервера {comparison} {required}. Ваше текущее значение недоступно для трекера. Используйте отметку, только если это задание доступно в игре; никакие счетчики не будут помечены как завершенные.",
         "task_counter": "Требуется {comparison} {required} завершенных задач из этого уровня лояльности трейдеров (завершено: {current}). Если эта задача уже доступна в игре, используйте метку.",
@@ -1189,7 +1174,6 @@
       }
     },
     "hideout": {
-      "summary": "Отслеживайте улучшения модулей, блокеры и то, что готово к следующей постройке.",
       "loading": "Загружаем данные об убежище",
       "station_link_label": "Перейти к {name}",
       "no_stations_found": "Модули не найдены. Попробуйте изменить фильтры.",
@@ -1232,7 +1216,6 @@
       }
     },
     "needed_items": {
-      "meta_description": "Просматривайте все предметы, нужные для активных заданий и улучшений убежища. Фильтруйте по квестам, крафтам и требованиям «Найдено в рейде».",
       "loading": "Загружаем данные заданий и убежища",
       "search_placeholder": "Поиск предметов, заданий или модулей убежища...",
       "items": "предметы",
@@ -1297,8 +1280,8 @@
           "token_value_missing": "Значение токена недоступно",
           "token_value_unavailable": "Невозможно отобразить токен",
           "token_value_unavailable_desc": "Ваш текущий API не показывает значения токена для существующих токенов.",
-          "token_cap_reached": "Token limit reached",
-          "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
+          "token_cap_reached": "Достигнут лимит токенов",
+          "token_cap_reached_desc": "У вас может быть не более 3 активных API-токенов. Отзовите существующий токен, чтобы создать новый.",
           "revoke_button": "Отозвать",
           "report": {
             "load_failed": "Не удалось загрузить API токены",
@@ -1323,10 +1306,6 @@
       }
     },
     "team": {
-      "meta": {
-        "description": "Объединяйтесь с товарищами по команде для отслеживания прогресса Escape from Tarkov. Делитесь выполненными заданиями, уровнем убежища и координируйте сбор предметов."
-      },
-      "page_title": "Команда",
       "page_description": "Пригласите товарищей по команде, выберите, какую команду вы видите, и отслеживайте вместе.",
       "invite": {
         "title": "Ссылка на приглашение",
@@ -1342,8 +1321,7 @@
         "title": "Участники ({count})",
         "no_members": "В этой команде пока нет участников. Поделитесь пригласительной ссылкой, чтобы добавить товарищей.",
         "alone": "Вы только здесь — поделитесь приглашённой ссылкой для добавления товарищей по команде.",
-        "copy_invite": "Скопировать ссылку приглашения",
-        "copied": "Скопировано!"
+        "copy_invite": "Скопировать ссылку приглашения"
       },
       "visibility": {
         "title": "Настройки видимости",
@@ -1373,8 +1351,6 @@
       },
       "card": {
         "manageteam": {
-          "title": "Члены Команды",
-          "no_members": "В этой команде пока нет участников! Пригласите их, используя ссылку выше.",
           "membercard": {
             "this_is_you": "(Это вы)",
             "owner": "Лидер",
@@ -1388,35 +1364,17 @@
             "remove_member": "Удалить {name} из команды"
           }
         },
-        "teamoptions": {
-          "title": "Настройка интеграции с командой",
-          "section_items": "Предметы",
-          "toggle_tasks": "Скрывать задания членов команды",
-          "toggle_items": "Скрывать нужные предметы членов команды",
-          "toggle_non_fir": "Скрывать нужные предметы без статуса \"Найдено в рейде\"",
-          "toggle_hideout": "Скрывать предметы, нужные для убежища",
-          "toggle_maps": "Скрывать цели на картах участников команды"
-        },
         "myteam": {
-          "title": "Моя Команда",
           "create_new_team": "Создать новую команду",
-          "disband_team": "Расформировать команду",
-          "leave_team": "Покинуть команду",
           "create_team_success": "Команда успешно создана.",
           "create_team_error": "Не удалось создать команду.",
           "create_team_error_ui_update": "Состояние команды не обновилось. Перезагрузите страницу или попробуйте снова.",
           "leave_team_success": "Команда успешно покинута.",
           "leave_team_error": "Не удалось покинуть вашу команду.",
           "already_in_team": "Вы уже состоите в команде {mode} . Сначала выйдите из своей команды.",
-          "url_copied": "URL скопирован в буфер обмена",
-          "copy_url_failed": "Не удалось скопировать URL в буфер обмена",
           "no_team": "Вы не состоите в команде.",
           "login_required": "Войдите, чтобы создать команду или управлять пригласительной ссылкой вашей команды.",
-          "team_invite_url_label": "Ссылка для приглашения в команду",
-          "copy_link": "Копировать",
-          "link_hidden_message": "Нажмите «Показать», чтобы отобразить ссылку для приглашения в команду.",
-          "user_not_authenticated": "Пользователь не авторизован.",
-          "leave_team_error_unexpected": "Неожиданная ошибка при выходе из команды."
+          "user_not_authenticated": "Пользователь не авторизован."
         },
         "teaminvite": {
           "description": "Вы получили приглашение в команду на TarkovTracker",
@@ -1441,15 +1399,12 @@
         "contributions": "{count} вкладов",
         "total": "Участники {count} | Участники {count}"
       },
-      "description": "Встречайте создателей, сотрудников, участников поддержки, бета-тестеров и разработчиков с открытым исходным кодом за Tarkov Tracker.",
       "team_link": "Поддерживается командой TarkovTracker — встречаются на странице About"
     },
     "about": {
       "title": "О ТарковТреке",
-      "description": "Познакомьтесь с командой, которая поддерживает TarkovTracker.org, партнеров за игровыми данными и как получить помощь от сообщества.",
       "intro": "TarkovTracker — бесплатный трекер с открытым исходным кодом для побега из Таркова. Он держит прогресс вашего квеста и линии истории, скрывает апгрейды и требования предметов в одном месте и остается актуальным с общинными данными игр. Проект осуществляется небольшой добровольческой командой с помощью разработчиков с открытым исходным кодом.",
       "team": {
-        "heading": "Команда",
         "summary": "TarkovTracker.org поддерживается небольшой командой волонтеров. Люди, указанные ниже, сохраняют сайт и поддерживают сообщество Discord.",
         "core_heading": "Основная команда",
         "support_heading": "Поддержка Discord"
@@ -1489,68 +1444,65 @@
       "popup_blocked_title": "Всплывающее окно заблокировано",
       "popup_blocked_description": "Ваш браузер заблокировал окно входа. Перенаправляем...",
       "authenticating": "Авторизация...",
-      "authenticating_description": "Please wait while we complete your sign in.",
+      "authenticating_description": "Пожалуйста, подождите, пока мы завершим вход.",
       "error_title": "Не удалось войти",
       "error_description": "Авторизация была отменена или не удалась. Пожалуйста, попробуйте снова.",
       "success_title": "Вход выполнен",
       "success_description": "Вы вошли через {provider}.",
-      "login_options": "Варианты входа",
-      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
+      "login_options": "Варианты входа"
     },
     "profile": {
-      "title": "User Profile",
-      "meta_description": "Share your progression story with level, achievements, task completion, and timeline insights for PvP or PvE.",
       "shared_player": "Общий игрок",
-      "shared_view": "Shared View",
-      "loading_shared_profile": "Loading shared profile...",
-      "loading_data": "Loading progression metadata...",
-      "shared_private": "This shared profile is private.",
-      "shared_not_found": "Shared profile not found.",
-      "shared_unavailable": "Shared profile is unavailable right now.",
-      "shared_load_failed": "Failed to load shared profile.",
-      "shared_mode_notice": "Viewing shared progression for this mode.",
+      "shared_view": "Общий вид",
+      "loading_shared_profile": "Загрузка общего профиля...",
+      "loading_data": "Загрузка данных о прогрессе...",
+      "shared_private": "Этот общий профиль скрыт.",
+      "shared_not_found": "Общий профиль не найден.",
+      "shared_unavailable": "Общий профиль сейчас недоступен.",
+      "shared_load_failed": "Не удалось загрузить общий профиль.",
+      "shared_mode_notice": "Просмотр общего прогресса в этом режиме.",
       "share_private_intro": "Этот режим приватный. Включите общий доступ в ",
       "account_settings_link": "Настройки аккаунта",
       "share_private_outro": ", чтобы сделать эту ссылку публичной.",
       "share_public_enabled": "Это общедоступный режим. Кто угодно может посмотреть его по ссылке.",
-      "share_private_enabled": "This mode is private.",
+      "share_private_enabled": "Этот режим приватный.",
       "mode_toggle_label": "Выберите режим профиля",
-      "copy_snapshot": "Copy Snapshot",
+      "copy_snapshot": "Копировать снимок",
       "view_tasks": "Открыть Задания",
-      "story_no_tasks": "Waiting for task metadata to build your story.",
-      "story_start": "{mode} profile is just getting started.",
-      "story_complete": "Main task storyline completed.",
-      "story_late": "Entering late-wipe progression arc.",
-      "story_mid": "Mid-wipe momentum is building.",
-      "story_early": "Early progression with steady momentum.",
-      "story_paragraph_empty": "{name} has not recorded timestamped progress in {mode} yet.",
-      "story_paragraph": "{name} has been active in {mode} for about {active_days} days, with {journey_days} days between first and latest tracked progress.",
-      "next_milestone_done": "All task completion milestones reached.",
-      "next_milestone_value": "{remaining}% left to reach {milestone}% task completion.",
-      "no_date": "No data yet",
-      "level_meta": "{mode} profile level and active faction ({faction})",
-      "tasks_meta": "{remaining} remaining, {failed} failed branches",
-      "objectives_meta": "{completion_pct}% completion across tracked objectives",
-      "hideout_meta": "{completed_parts} completed hideout item checkpoints",
-      "achievement_mainline": "Mainline Task Progress",
-      "achievement_objectives": "Objective Completion",
+      "story_no_tasks": "Ожидание данных о заданиях для формирования истории.",
+      "story_start": "Профиль «{mode}» только начинается.",
+      "story_complete": "Основная сюжетная линия заданий завершена.",
+      "story_late": "Начата поздняя стадия прогресса по вайпу.",
+      "story_mid": "В середине вайпа прогресс набирает обороты.",
+      "story_early": "Ранний прогресс с устойчивым темпом.",
+      "story_paragraph_empty": "{name}: в режиме {mode} пока нет зафиксированного прогресса с отметками времени.",
+      "story_paragraph": "{name}: активность в режиме {mode} составляет около {active_days} дн.; между первым и последним отслеженным прогрессом прошло {journey_days} дн.",
+      "next_milestone_done": "Достигнуты все этапы выполнения заданий.",
+      "next_milestone_value": "Осталось {remaining}% до достижения {milestone}% выполнения заданий.",
+      "no_date": "Пока нет данных",
+      "level_meta": "Уровень профиля «{mode}» и активная фракция ({faction})",
+      "tasks_meta": "Осталось {remaining}; неуспешных ветвей: {failed}",
+      "objectives_meta": "Выполнено {completion_pct}% отслеживаемых целей",
+      "hideout_meta": "Контрольные этапы улучшения убежища выполнены: {completed_parts}",
+      "achievement_mainline": "Прогресс основной линии заданий",
+      "achievement_objectives": "Выполнение целей",
       "no_storyline": "Для этого профиля нет данных по сюжету.",
       "storyline_auto_start": "Автозапуск",
       "storyline_discovered": "Обнаружено",
       "storyline_objectives_main": "Основные цели",
       "storyline_objectives_optional": "Дополнительные цели",
       "no_hideout": "Для этого профиля нет данных по убежищу.",
-      "hideout_item_fallback": "Hideout item",
-      "hideout_module_fallback": "Hideout upgrade",
+      "hideout_item_fallback": "Предмет убежища",
+      "hideout_module_fallback": "Улучшение убежища",
       "level_prefix": "Ур.",
       "no_tasks": "Для этого профиля нет доступных заданий.",
       "no_objectives": "Нет целей",
       "activity_timeline": "Хронология активности",
       "timeline_subtitle": "Последние события прогресса с отметками времени",
-      "timeline_task": "Task completion",
-      "timeline_failed": "Task branch failed",
-      "timeline_hideout": "Hideout module completed",
-      "timeline_hideout_item": "Hideout materials delivered",
+      "timeline_task": "Выполнение задания",
+      "timeline_failed": "Ветвь задания провалена",
+      "timeline_hideout": "Модуль убежища завершён",
+      "timeline_hideout_item": "Материалы для убежища доставлены",
       "started": "Начало",
       "latest_activity": "Последняя активность",
       "recent_momentum": "Динамика за 7 дней",
@@ -1565,20 +1517,20 @@
       "achievements_subtitle": "Ключевые этапы прогресса",
       "kappa_projection": "Таймлайн Каппы",
       "kappa_projection_subtitle": "Завершённая длительность или прогноз ETA",
-      "kappa_unknown": "Kappa timeline unavailable",
-      "kappa_unknown_detail": "No Kappa tasks detected for this profile.",
-      "kappa_done": "Kappa complete in this mode",
-      "kappa_done_detail": "Finished {total} Kappa tasks in about {days} days.",
-      "kappa_done_detail_simple": "All Kappa tasks are complete in this profile.",
-      "kappa_insufficient": "Kappa ETA needs more history",
-      "kappa_insufficient_detail": "Complete more timestamped tasks to generate an ETA.",
-      "kappa_pace_unavailable": "Not enough pace data to estimate completion.",
-      "kappa_projected_headline": "Estimated Kappa in about {days_remaining} days.",
-      "kappa_projected_detail": "Based on {sample_count} timestamped completions across {sample_days} days.",
-      "kappa_floor_note": "Estimate raised to account for {critical_path_floor} sequential prerequisites and level gates.",
-      "confidence_high": "High confidence",
-      "confidence_medium": "Medium confidence",
-      "confidence_low": "Low confidence",
+      "kappa_unknown": "Хронология Kappa недоступна",
+      "kappa_unknown_detail": "В этом профиле не обнаружены задания Kappa.",
+      "kappa_done": "Kappa завершена в этом режиме",
+      "kappa_done_detail": "Завершено заданий Kappa: {total}; примерно за {days} дн.",
+      "kappa_done_detail_simple": "Все задания Kappa в этом профиле выполнены.",
+      "kappa_insufficient": "Для расчёта срока Kappa не хватает истории",
+      "kappa_insufficient_detail": "Выполните больше заданий с отметками времени, чтобы определить срок.",
+      "kappa_pace_unavailable": "Недостаточно данных о темпе, чтобы оценить срок выполнения.",
+      "kappa_projected_headline": "Kappa будет завершена примерно через {days_remaining} дн.",
+      "kappa_projected_detail": "Данные для расчёта: {sample_count} выполнений с отметками времени за {sample_days} дн.",
+      "kappa_floor_note": "Оценка повышена с учётом {critical_path_floor} последовательных предварительных условий и требований по уровню.",
+      "confidence_high": "Высокая точность",
+      "confidence_medium": "Средняя точность",
+      "confidence_low": "Низкая точность",
       "estimated_finish": "Ожидаемое завершение",
       "kappa_remaining": "Осталось: {count}"
     },
@@ -1586,74 +1538,73 @@
       "not_found_description": "Извините, страница не найдена!"
     },
     "terms_of_service": {
-      "table_of_contents": "Table of contents",
-      "index_button": "Index"
+      "table_of_contents": "Содержание",
+      "index_button": "Указатель"
     },
     "resources": {
-      "title": "Resources & Guides",
-      "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
-      "search_placeholder": "Search tools and guides...",
-      "clear_filters": "Clear filters",
-      "no_results": "No resources match your search.",
-      "results_count": "{count} resources found",
-      "results_count_one": "1 resource found",
-      "filter_label": "Filter resources by category",
-      "more_actions": "More actions",
-      "suggest_title": "Know a useful Tarkov resource?",
-      "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
-      "suggest_cta": "Suggest a resource",
+      "title": "Ресурсы и руководства",
+      "subtitle": "Приложения-помощники, инструменты сообщества, ресурсы для разработчиков и руководства, которые помогут получить больше от TarkovTracker.",
+      "search_placeholder": "Поиск инструментов и руководств...",
+      "clear_filters": "Сбросить фильтры",
+      "no_results": "Нет ресурсов, соответствующих запросу.",
+      "results_count": "Найдено ресурсов: {count}",
+      "results_count_one": "Найден 1 ресурс",
+      "filter_label": "Фильтровать ресурсы по категории",
+      "more_actions": "Другие действия",
+      "suggest_title": "Знаете полезный ресурс, связанный с Tarkov?",
+      "suggest_description": "Предложите инструмент из сообщества или руководство для размещения на этой странице.",
+      "suggest_cta": "Предложить ресурс",
       "migration_banner": {
         "title": "Перемещение с TarkovTracker.io?",
         "cta": "Прочтите руководство по миграции"
       },
       "categories": {
         "tarkovtracker_guides": "Гиды TarkovTracker.org",
-        "companion_apps": "Companion Apps",
-        "data_and_apis": "Data & Developer Tools",
-        "calculators_and_reference": "Calculators & Reference"
+        "companion_apps": "Приложения-помощники",
+        "data_and_apis": "Данные и инструменты разработчика",
+        "calculators_and_reference": "Калькуляторы и справочные материалы"
       },
       "category_badges": {
         "tarkovtracker_guides": "Официальное руководство",
-        "companion_apps": "Desktop App",
-        "data_and_apis": "Data Platform",
-        "calculators_and_reference": "Reference"
+        "companion_apps": "Настольное приложение",
+        "data_and_apis": "Платформа данных",
+        "calculators_and_reference": "Справочные материалы"
       },
       "actions": {
-        "setup_guide": "Setup guide",
-        "read_guide": "Read guide",
-        "open_calculator": "Open calculator",
-        "view_changes": "View changes",
-        "open_tool": "Open tool",
-        "download_release": "Download latest release"
+        "setup_guide": "Руководство по настройке",
+        "read_guide": "Прочитать руководство",
+        "open_calculator": "Открыть калькулятор",
+        "view_changes": "Посмотреть изменения",
+        "open_tool": "Открыть инструмент",
+        "download_release": "Скачать последнюю версию"
       },
-      "back_to_hub": "Back to Resources",
-      "breadcrumb": "Breadcrumb",
-      "guide_label": "Guide",
-      "on_this_page": "On this page",
-      "compatibility_label": "Compatibility",
-      "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
-      "guide_title_template": "{name} Guide",
+      "back_to_hub": "Назад к ресурсам",
+      "breadcrumb": "Навигационная цепочка",
+      "guide_label": "Руководство",
+      "on_this_page": "На этой странице",
+      "compatibility_label": "Совместимость",
+      "guide_not_found": "Руководство не найдено. Возможно, у искомого ресурса пока нет руководства.",
       "meta": {
         "official_guide": "Официальное руководство",
         "maintained_by_team": "Поддерживается командой TarkovTracker.org",
         "windows": "Windows",
-        "setup_time": "5-minute setup",
-        "community_data": "Community maintained",
-        "web_tool": "Web tool",
-        "companion_app": "Companion App"
+        "setup_time": "Настройка за 5 минут",
+        "community_data": "Поддерживается сообществом",
+        "web_tool": "Веб-инструмент",
+        "companion_app": "Приложение-помощник"
       },
       "link_types": {
-        "website": "Open website",
-        "project_website": "Project website",
-        "github": "View source",
-        "discord": "Community support",
-        "download": "Download"
+        "website": "Открыть сайт",
+        "project_website": "Сайт проекта",
+        "github": "Посмотреть исходный код",
+        "discord": "Поддержка сообщества",
+        "download": "Скачать"
       },
       "guide_sections": {
         "video_walkthrough": "Прохождение видео",
-        "troubleshooting": "Troubleshooting",
-        "tips": "Tips & Tricks",
-        "faq": "Common Questions"
+        "troubleshooting": "Устранение неполадок",
+        "tips": "Советы и приёмы",
+        "faq": "Частые вопросы"
       },
       "items": {
         "tarkovtracker_org_vs_io": {
@@ -1662,23 +1613,23 @@
         },
         "tarkovdev": {
           "name": "Tarkov.dev",
-          "description": "Community-maintained item, quest, trader, and market data for players and developers."
+          "description": "Данные о предметах, заданиях, торговцах и рынке, поддерживаемые сообществом, для игроков и разработчиков."
         },
         "tarkovmonitor": {
           "name": "TarkovMonitor",
-          "description": "Read live raid data and automatically sync supported progress to TarkovTracker."
+          "description": "Читайте данные о текущих рейдах и автоматически синхронизируйте поддерживаемый прогресс с TarkovTracker."
         },
         "ratscanner": {
           "name": "RatScanner",
-          "description": "Scan in-game item tooltips to see market value, barter uses, and quest relevance."
+          "description": "Сканируйте игровые подсказки о предметах, чтобы видеть рыночную стоимость, применение в бартере и связь с заданиями."
         },
         "cultistcircle": {
           "name": "CultistCircle",
-          "description": "Calculate possible Cultist Circle rewards from the items you contribute."
+          "description": "Рассчитывайте возможные награды Круга культистов за предметы, которые вы предоставляете."
         },
         "tarkovchanges": {
           "name": "Tarkov Изменения",
-          "description": "Review item, quest, and gameplay changes between Tarkov updates."
+          "description": "Просматривайте изменения предметов, заданий и игровых механик между обновлениями Tarkov."
         }
       },
       "guides": {
@@ -1704,88 +1655,88 @@
           "faq_4_a": "No. Домен .io и развертывание принадлежат и контролируются первоначальным основателем проекта. Мы не имеем доступа к нему и не можем исправить, обновить или предоставить поддержку для .io."
         },
         "tarkovdev": {
-          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
-          "step_1_title": "Browse the website",
-          "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
-          "step_2_title": "Use the JSON API",
-          "step_2_desc": "If you are a developer, point your HTTP client at json.tarkov.dev. The endpoint catalog is at json.tarkov.dev/endpoints. The API is free, requires no authentication for read queries, and returns static JSON files you can cache locally.",
-          "step_3_title": "Join the community",
-          "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The JSON endpoints have no rate limit. For production apps, cache responses client-side to avoid redundant requests.",
-          "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
-          "faq_1_q": "Is the Tarkov.dev API free to use?",
-          "faq_1_a": "Yes, the JSON endpoints are completely free for read queries. No API key or authentication is required for standard usage.",
-          "faq_2_q": "How often is the data updated?",
-          "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
+          "overview": "Tarkov.dev — основа экосистемы данных сообщества. Он поддерживает набор данных с открытым исходным кодом о предметах, заданиях, торговцах, станциях убежища и не только. Все эти данные доступны через бесплатные статические JSON-эндпоинты json.tarkov.dev. Сам TarkovTracker использует эти эндпоинты, чтобы получать актуальные игровые данные. Если вы создаёте инструменты, пишете руководства или просто хотите узнать характеристики предметов, Tarkov.dev является авторитетным источником.",
+          "step_1_title": "Открыть сайт",
+          "step_1_desc": "Перейдите на tarkov.dev, чтобы искать предметы, проверять требования заданий, просматривать инвентари торговцев и изучать данные станций убежища в удобном интерфейсе без рекламы.",
+          "step_2_title": "Использовать JSON API",
+          "step_2_desc": "Если вы разработчик, направьте HTTP-клиент на json.tarkov.dev. Каталог эндпоинтов находится по адресу json.tarkov.dev/endpoints. API бесплатен, не требует аутентификации для запросов на чтение и возвращает статические JSON-файлы, которые можно кэшировать локально.",
+          "step_3_title": "Присоединиться к сообществу",
+          "step_3_desc": "Discord-сервер The Hideout — основная площадка для тех, кто предоставляет данные, разрабатывает инструменты и сообщает об ошибках. Если вы обнаружили устаревшие данные или хотите помочь проекту, присоединяйтесь.",
+          "tip_1": "У JSON-эндпоинтов нет ограничения частоты запросов. В приложениях для рабочей среды кэшируйте ответы на стороне клиента, чтобы не отправлять повторные запросы.",
+          "tip_2": "Данные Tarkov.dev часто обновляются во время сезонов вайпа. Если что-то кажется неверным, возможно, это уже исправлено в последнем наборе данных.",
+          "faq_1_q": "API Tarkov.dev бесплатен?",
+          "faq_1_a": "Да, JSON-эндпоинты полностью бесплатны для запросов на чтение. Для стандартного использования не требуется API-ключ или аутентификация.",
+          "faq_2_q": "Как часто обновляются данные?",
+          "faq_2_a": "Данные поддерживают участники сообщества и обновляют по мере обнаружения изменений в игре. В период активных вайпов обновления могут происходить несколько раз в день."
         },
         "tarkovmonitor": {
-          "overview": "TarkovMonitor is a desktop application by The Hideout team that watches Escape from Tarkov log files and can automatically mark completed quests in TarkovTracker. It also provides audio notifications, local statistics, and optional Tarkov.dev website integration.",
-          "compatibility": "Keep TarkovMonitor running while you play so it can watch new game log entries. It does not read game memory.",
-          "step_1_title": "Download TarkovMonitor",
-          "step_1_desc": "Download the latest Windows release ZIP from the official GitHub Releases page.",
-          "step_2_title": "Extract and launch",
-          "step_2_desc": "Extract the archive to a permanent folder, then run TarkovMonitor.exe. Do not run it directly from inside the ZIP file.",
-          "step_3_title": "Connect your TarkovTracker account",
-          "step_3_desc": "In TarkovMonitor settings, open the TarkovTracker integration section. Create a read-write API token in TarkovTracker Settings, then paste it into TarkovMonitor.",
-          "step_4_title": "Play with TarkovMonitor open",
-          "step_4_desc": "Play normally while TarkovMonitor stays open. When the game writes a supported quest-completion event to its logs, TarkovMonitor can mark that quest complete in TarkovTracker.",
-          "troubleshooting_1_title": "Progress is not syncing",
-          "troubleshooting_1_desc": "Confirm the API token is read-write, has not expired, and that TarkovMonitor is running the latest release.",
-          "troubleshooting_2_title": "Earlier progress is missing",
-          "troubleshooting_2_desc": "Use Read Past Logs in Initial Setup, then choose the correct wipe and profile breakpoint.",
-          "troubleshooting_3_title": "Game mode looks wrong",
-          "troubleshooting_3_desc": "Match your TarkovTracker game mode setting to the mode you are playing, either PvP or PvE.",
-          "tip_1": "Generate a read-write API token in TarkovTracker settings. A read-only token cannot update progress.",
-          "tip_2": "Normal monitoring only processes new logs written while TarkovMonitor is running.",
-          "faq_1_q": "Is TarkovMonitor safe to use?",
-          "faq_1_a": "TarkovMonitor watches the log files that Escape from Tarkov writes locally. It does not read game memory, and the logs are not updated while a raid is in progress. Any third-party tool carries some risk, so use it at your own discretion.",
-          "faq_2_q": "Does TarkovMonitor work with PvE mode?",
-          "faq_2_a": "Yes. It supports both PvP and PvE. Match your TarkovTracker game mode setting to the mode you are playing.",
-          "faq_3_q": "Do I need TarkovMonitor to use TarkovTracker?",
-          "faq_3_a": "No. TarkovTracker works fully with manual input. TarkovMonitor only automates supported progress updates."
+          "overview": "TarkovMonitor — настольное приложение от команды The Hideout, которое отслеживает файлы журналов Escape from Tarkov и может автоматически отмечать выполненные задания в TarkovTracker. Оно также предоставляет звуковые уведомления, локальную статистику и при желании интеграцию с сайтом Tarkov.dev.",
+          "compatibility": "Не закрывайте TarkovMonitor во время игры, чтобы приложение могло отслеживать новые записи журнала. Оно не читает память игры.",
+          "step_1_title": "Скачать TarkovMonitor",
+          "step_1_desc": "Скачайте последний ZIP-архив релиза для Windows с официальной страницы релизов GitHub.",
+          "step_2_title": "Извлечь и запустить",
+          "step_2_desc": "Извлеките архив в постоянную папку, затем запустите TarkovMonitor.exe. Не запускайте его прямо из ZIP-файла.",
+          "step_3_title": "Подключите аккаунт TarkovTracker",
+          "step_3_desc": "В настройках TarkovMonitor откройте раздел интеграции с TarkovTracker. Создайте токен API для чтения и записи в настройках TarkovTracker, затем вставьте его в TarkovMonitor.",
+          "step_4_title": "Играйте с запущенным TarkovMonitor",
+          "step_4_desc": "Играйте как обычно, оставив TarkovMonitor открытым. Когда игра записывает поддерживаемое событие выполнения задания в журналы, TarkovMonitor может отметить это задание выполненным в TarkovTracker.",
+          "troubleshooting_1_title": "Прогресс не синхронизируется",
+          "troubleshooting_1_desc": "Убедитесь, что токен API поддерживает чтение и запись, не истёк, а TarkovMonitor запущен в последней версии.",
+          "troubleshooting_2_title": "Отсутствуют данные о предыдущем прогрессе",
+          "troubleshooting_2_desc": "Выберите Read Past Logs в Initial Setup, затем укажите правильный вайп и контрольную точку профиля.",
+          "troubleshooting_3_title": "Неверно определяется режим игры",
+          "troubleshooting_3_desc": "Установите в TarkovTracker тот же режим игры, в который играете: PvP или PvE.",
+          "tip_1": "Создайте токен API для чтения и записи в настройках TarkovTracker. Токен только для чтения не может обновлять прогресс.",
+          "tip_2": "Стандартный режим мониторинга обрабатывает только новые записи, появившиеся в журналах во время работы TarkovMonitor.",
+          "faq_1_q": "Безопасен ли TarkovMonitor?",
+          "faq_1_a": "TarkovMonitor отслеживает файлы журналов, которые Escape from Tarkov записывает локально. Он не читает память игры, а журналы не обновляются во время рейда. Любой сторонний инструмент несёт определённые риски, поэтому используйте его на своё усмотрение.",
+          "faq_2_q": "Работает ли TarkovMonitor в режиме PvE?",
+          "faq_2_a": "Да. Поддерживаются PvP и PvE. Установите в TarkovTracker режим, в котором играете.",
+          "faq_3_q": "Нужен ли TarkovMonitor для использования TarkovTracker?",
+          "faq_3_a": "Нет. TarkovTracker полностью работает с ручным вводом. TarkovMonitor лишь автоматизирует поддерживаемые обновления прогресса."
         },
         "ratscanner": {
-          "overview": "RatScanner is an open-source desktop tool that identifies Escape from Tarkov items from screenshots and displays item data in an overlay. It operates externally and does not access game memory.",
-          "compatibility": "Use borderless or windowed mode. Exclusive fullscreen may prevent the overlay from appearing.",
-          "step_1_title": "Download the latest ZIP",
-          "step_1_desc": "Download RatScanner.zip from the official GitHub Releases page. The project website may lag behind the latest release.",
-          "step_2_title": "Extract and launch",
-          "step_2_desc": "Extract the ZIP to a permanent folder, then run RatScanner.exe. Do not launch it directly from inside the archive.",
-          "step_3_title": "Configure the overlay",
-          "step_3_desc": "Choose which item details appear in the overlay, set opacity, and confirm your scan hotkeys.",
-          "step_4_title": "Scan an item",
-          "step_4_desc": "Name scanning: open an item inspection window and click the magnifier. Icon scanning: hold the configured modifier key and left-click an item. RatScanner screenshots the item and displays its data.",
-          "troubleshooting_1_title": "RatScanner does not start",
-          "troubleshooting_1_desc": "Extract the full release folder first, then run the executable from that folder. If Windows or antivirus blocks it, confirm the file came from the official repository.",
-          "troubleshooting_2_title": "No item is detected",
-          "troubleshooting_2_desc": "Make sure the item inspection UI is fully visible, then try name scanning from the magnifier or icon scanning with the configured modifier.",
-          "troubleshooting_3_title": "Overlay does not appear",
-          "troubleshooting_3_desc": "Switch Tarkov to borderless or windowed mode. Exclusive fullscreen often hides overlays.",
-          "troubleshooting_4_title": "Prices look outdated",
-          "troubleshooting_4_desc": "RatScanner pulls market data from a third-party source, so values can lag behind live flea-market changes.",
-          "tip_1": "Use settings to choose which item details appear and adjust overlay opacity.",
-          "tip_2": "Displayed market values may lag behind live game or market changes.",
-          "faq_1_q": "Will RatScanner get me banned?",
-          "faq_1_a": "RatScanner reads item tooltips using screen capture and does not modify the game client or interact with game servers. Battlestate Games' stance on third-party tools can change, so use at your own risk.",
-          "faq_2_q": "Does RatScanner work with the flea market?",
-          "faq_2_a": "Yes. It shows current flea-market prices and can help compare flea versus trader value.",
-          "faq_3_q": "Can RatScanner show items needed for TarkovTracker?",
-          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page.",
+          "overview": "RatScanner — настольный инструмент с открытым исходным кодом, который распознаёт предметы Escape from Tarkov по снимкам экрана и показывает их данные в оверлее. Он работает как внешняя программа и не обращается к памяти игры.",
+          "compatibility": "Используйте режим без рамки или оконный режим. Эксклюзивный полноэкранный режим может мешать отображению оверлея.",
+          "step_1_title": "Скачать последний ZIP-архив",
+          "step_1_desc": "Скачайте RatScanner.zip с официальной страницы релизов GitHub. Сайт проекта может отставать от последнего релиза.",
+          "step_2_title": "Извлечь и запустить",
+          "step_2_desc": "Извлеките ZIP-архив в постоянную папку, затем запустите RatScanner.exe. Не запускайте его прямо из архива.",
+          "step_3_title": "Настройте оверлей",
+          "step_3_desc": "Выберите, какие сведения о предмете отображать в оверлее, задайте прозрачность и подтвердите сочетания клавиш для сканирования.",
+          "step_4_title": "Сканировать предмет",
+          "step_4_desc": "Сканирование по названию: откройте окно осмотра предмета и нажмите лупу. Сканирование по значку: удерживайте настроенную клавишу-модификатор и щёлкните левой кнопкой по предмету. RatScanner делает снимок предмета и показывает его данные.",
+          "troubleshooting_1_title": "RatScanner не запускается",
+          "troubleshooting_1_desc": "Сначала извлеките всю папку релиза, затем запустите исполняемый файл из неё. Если Windows или антивирус блокирует программу, убедитесь, что файл получен из официального репозитория.",
+          "troubleshooting_2_title": "Предмет не распознаётся",
+          "troubleshooting_2_desc": "Убедитесь, что интерфейс осмотра предмета полностью виден, затем попробуйте сканирование по названию через лупу или по значку с помощью заданной клавиши-модификатора.",
+          "troubleshooting_3_title": "Оверлей не отображается",
+          "troubleshooting_3_desc": "Переключите Tarkov в режим без рамки или оконный режим. Эксклюзивный полноэкранный режим часто скрывает оверлеи.",
+          "troubleshooting_4_title": "Цены выглядят устаревшими",
+          "troubleshooting_4_desc": "RatScanner получает рыночные данные из стороннего источника, поэтому значения могут отставать от текущих изменений на барахолке.",
+          "tip_1": "В настройках выберите, какие сведения о предмете отображать, и настройте прозрачность оверлея.",
+          "tip_2": "Отображаемые рыночные значения могут отставать от текущих изменений в игре или на рынке.",
+          "faq_1_q": "Могут ли меня забанить за использование RatScanner?",
+          "faq_1_a": "RatScanner считывает подсказки о предметах с помощью захвата экрана, не изменяет клиент игры и не взаимодействует с игровыми серверами. Позиция Battlestate Games в отношении сторонних инструментов может измениться, поэтому используйте его на свой риск.",
+          "faq_2_q": "Работает ли RatScanner с барахолкой?",
+          "faq_2_a": "Да. Он показывает текущие цены на барахолке и помогает сравнивать стоимость на барахолке и у торговца.",
+          "faq_3_q": "Может ли RatScanner показать предметы, необходимые для TarkovTracker?",
+          "faq_3_a": "Он может показывать общие сведения о предметах от своего поставщика данных. Для требований, основанных на вашем личном прогрессе в TarkovTracker, используйте страницу «Нужные предметы».",
           "faq_4_q": "Работает ли RatScanner с TarkovTracker.org?",
           "faq_4_a": "Да. Установите RatScanner, откройте раздел TarkovTracker в настройках и переключите бэкэнд TarkovTracker с .io на .org перед входом в тарковтрекер. rg API token. Команда TarkovTracker.org теперь помогает поддерживать RatScanner, поэтому .org интеграция и значения по умолчанию будут улучшаться в будущих выпусках."
         },
         "cultistcircle": {
-          "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
-          "step_1_title": "Visit the website",
-          "step_1_desc": "Go to cultistcircle.com to access the calculator. No account or download is required — it works entirely in your browser.",
-          "step_2_title": "Search for recipes",
-          "step_2_desc": "Use the search or browse functionality to find recipes by input item or output result. The calculator shows the trade ratios and possible outcomes for each combination.",
-          "tip_1": "Check the calculator before sacrificing rare items — some trades have much better value ratios than others.",
-          "tip_2": "Recipe data may lag behind game patches. If a recipe seems missing or incorrect, check back after the site has been updated.",
-          "faq_1_q": "Is CultistCircle free to use?",
-          "faq_1_a": "Yes, CultistCircle is completely free and runs in your browser with no account required.",
-          "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
-          "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
+          "overview": "CultistCircle — бесплатный калькулятор, созданный сообществом для функции «Круг культистов» в Escape from Tarkov. Он позволяет находить рецепты — какие предметы можно принести и что вы получите взамен, — без экспериментов в игре. Созданный одним разработчиком из сообщества, CultistCircle — удобный справочник для эффективного планирования сделок с Кругом культистов.",
+          "step_1_title": "Перейти на сайт",
+          "step_1_desc": "Перейдите на cultistcircle.com, чтобы открыть калькулятор. Аккаунт и загрузка не требуются — он работает полностью в браузере.",
+          "step_2_title": "Найти рецепты",
+          "step_2_desc": "Используйте поиск или функцию просмотра, чтобы находить рецепты по входному предмету или результату. Калькулятор показывает коэффициенты обмена и возможные исходы для каждой комбинации.",
+          "tip_1": "Проверяйте калькулятор перед принесением в жертву редких предметов — некоторые обмены имеют значительно выгоднее коэффициенты, чем другие.",
+          "tip_2": "Данные рецептов могут отставать от обновлений игры. Если рецепт отсутствует или кажется неверным, проверьте его после обновления сайта.",
+          "faq_1_q": "CultistCircle бесплатен?",
+          "faq_1_a": "Да, CultistCircle полностью бесплатен, работает в браузере и не требует аккаунта.",
+          "faq_2_q": "Связан ли CultistCircle с TarkovTracker?",
+          "faq_2_a": "Нет, CultistCircle — независимый проект одного разработчика из сообщества. Он указан здесь как полезный ресурс сообщества."
         }
       },
       "video": {
@@ -1794,6 +1745,23 @@
         "play": "Воспроизвести видео: {title}"
       },
       "official_guide_label": "Руководство по TarkovTracker.org"
+    },
+    "account_retention": {
+      "scope": "Эти правила применяются к методам удаления аккаунтов бездействия при работе с TarkovTracker. Они определяют, когда учетная запись может стать доступной для очистки, а не запланированной датой удаления.",
+      "standard": "Никакая поддержка: учетная запись может быть удалена через шесть месяцев без учета активности учетной записи.",
+      "previous_supporter": "Предыдущий сторонник: счет с установленным на него взносом, включая единовременный взнос или предыдущую подписку, может стать подлежащим удалению через год после окончания последней зарегистрированной деятельности по счету и ее последнего зарегистрированного взноса.",
+      "active_subscriber": "Активная квалифицируемая подписка: учетная запись освобождается от рутинного удаления неактивности, пока подписка сторонника остается активной, даже если учетная запись не используется.",
+      "subscription_end": "Отмена продления не прекращает действие этого исключения, пока продолжается платный доступ к подписке. После завершения доступа к подписке, включая любой льготный период оплаты, аккаунт может быть использован для удаления бездействия не ранее чем через год после последней зарегистрированной активности и окончания последнего периода доступа к подписке.",
+      "activity": "Мы оцениваем неактивность используя доступные записи входов, аутентифицированных сайтов или API использования и сохраняем изменения в учетной записи. Просмотр публичного профиля без входа в него не считается активностью для этого аккаунта.",
+      "exceptions": "Полностью возмещаемые взносы не удовлетворяют требованиям, предъявляемым к удержанию сторон; другие обоснованные взносы все еще могут претендовать. Возврат платежа немедленно удаляет все льготы и историю удержания сторонников, в том числе выгоды от предыдущих пожертвований. Аккаунты с возвратом платежа следуют стандартному правилу шестимесячной безактивности, которые применяются только к обычной очистке от неактивности. Они не препятствуют удалению вы запрашиваете, действиям по причинам нарушения или безопасности, удалению, требуемым законом, или удалению, когда Сервис будет прекращен.",
+      "no_guarantee": "Поддержка TarkovTracker не покупает постоянное хранение, услуги резервного копирования, гарантированную доступность или восстановление. Данные могут быть утеряны в результате сбоев, инцидентов с целью обеспечения безопасности или перебоев со стороны третьих лиц, а Сервис может быть приостановлен или закрыт. Политика хранения данных не гарантирует, что данные останутся в наличии в течение определенного периода.",
+      "backup": "Экспортируйте ваш прогресс из настроек и храните собственное резервное копирование. Экспорт и восстановление могут быть недоступны во время выхода из строя или после потери или удаления данных.",
+      "rights": "Ничто в такой политике не исключает или не ограничивает права и средства правовой защиты, которые не могут быть законно исключены или ограничены по закону.",
+      "notice": "Когда это возможно, мы предпринимаем разумные усилия для уведомления затрагиваемых пользователей до удаления обычной бездействия. Существенные изменения в данной политике будут сообщаться в соответствии с Условиями обслуживания и применимым законодательством.",
+      "terms_summary": "Регулярная очистка от неактивности осуществляется в соответствии с правилами удержания счетов, содержащимися в разделе 7.3, включая освобождение от ответственности активных подписчиков и годичное окно для предыдущих сторонников.",
+      "perk_summary": "Защита от обычной удаления бездействия в соответствии с положениями раздела7.3 правил удержания счетов, включая единоразовых доноров и предыдущих подписчиков",
+      "liability": "Любое исключение или ограничение ответственности за потерю данных или связанные с частной деятельностью инциденты применяются только в той степени, в какой это допускается применимым законодательством. Ничто в данной Политике не исключает или не ограничивает права и средства правовой защиты, которые не могут быть законно исключены или ограничены.",
+      "liability_label": "Ограничения, разрешенные законом:"
     }
   },
   "footer": {
@@ -1810,6 +1778,9 @@
       "explore": "Исследовать",
       "project": "Проект",
       "legal": "Юридическая информация"
+    },
+    "links": {
+      "org_vs_io": ".org против .io"
     }
   },
   "navigation_drawer": {
@@ -1819,30 +1790,20 @@
     "brand_name": "TarkovTracker.org",
     "login": "Войти",
     "logout": "Выйти",
-    "ratscanner": "Rat Scanner",
-    "tarkovguru": "Tarkov Guru",
-    "tarkovmonitor": "Tarkov Монитор",
-    "resources": "Resources",
-    "section_more": "Ещё",
+    "resources": "Ресурсы",
     "profile": "Профиль",
     "section_navigation": "Навигация",
-    "section_external": "Внешние ресурсы",
     "account_menu": "Меню аккаунта",
-    "edition_label": "Издание",
     "mode_auto": "Авто",
     "auto_level_enabled": "Включён автоматический расчёт уровня",
     "level_display_auto": "Уровень {level} (автоматический расчёт включён)",
     "level_display_editable": "Уровень {level} - нажмите или Enter, чтобы изменить",
     "increment_level": "Повысить уровень",
     "decrement_level": "Понизить уровень",
-    "xp_progress": "XP progress",
-    "xp_settings_link": "View XP and level settings"
+    "xp_progress": "Прогресс опыта",
+    "xp_settings_link": "Настройки опыта и уровня"
   },
   "profile": {
-    "title_with_mode": "Профиль {name} {mode}",
-    "mode_pvp": "ПВП",
-    "mode_pve": "PVE",
-    "mode_seasonal_pvp": "SEASONAL PVP",
     "season_short": "С{season}"
   },
   "streamer_tools": {
@@ -1850,7 +1811,6 @@
     "manage_sharing": "Управление доступом",
     "login_required": "Войдите, чтобы создать персональные ссылки на оверлей стримера.",
     "mode_private": "Этот игровой режим приватный. Публичный доступ должен быть включён, чтобы ссылки на источник браузера работали.",
-    "visibility_load_failed": "Не удается загрузить настройки общего доступа.",
     "open_account_settings": "Открыть настройки аккаунта",
     "content_title": "Контент",
     "mode_label": "Режим игры",
@@ -1935,7 +1895,7 @@
     "align_bottom_center": "Снизу по центру",
     "align_bottom_right": "Снизу справа",
     "copy_success": "URL оверлея скопирован",
-    "copy_failed": "Failed to copy overlay URL",
+    "copy_failed": "Не удалось скопировать ссылку на оверлей",
     "settings_reset": "Настройки стримера сброшены",
     "resolution_label": "Разрешение",
     "resolution_1080": "1080p",
@@ -1971,50 +1931,13 @@
       "account": "Аккаунт",
       "tools_integrations": "Инструменты и интеграции"
     },
-    "tab_seo": {
-      "progression": {
-        "title": "Настройки прогресса",
-        "description": "Управляйте прогрессом TarkovTracker, отображаемыми именами, опытом и навыками."
-      },
-      "prestige": {
-        "title": "Настройки престижа",
-        "description": "Просматривайте и управляйте отслеживанием престижа TarkovTracker."
-      },
-      "preferences": {
-        "title": "Предпочтения",
-        "description": "Настройте отображение, приватность, задания и карты в TarkovTracker."
-      },
-      "account": {
-        "title": "Аккаунт",
-        "description": "Управляйте параметрами аккаунта TarkovTracker, видимостью профиля и контролем данных."
-      },
-      "imports": {
-        "title": "Настройки импорта",
-        "description": "Импортируйте прогресс TarkovTracker из профилей Tarkov.dev и игровых логов EFT."
-      },
-      "backup_restore": {
-        "title": "Резервные копии",
-        "description": "Экспортируйте или восстанавливайте данные прогресса TarkovTracker и снимки для поддержки."
-      },
-      "api": {
-        "title": "Настройки API",
-        "description": "Управляйте API-токенами TarkovTracker и интеграциями аккаунта."
-      },
-      "streamer_tools": {
-        "title": "Инструменты \"Стример\"",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
-      }
-    },
-    "density": {
-      "comfortable": "Комфортная"
-    },
     "account": {
       "begin_deletion": "Начать удаление аккаунта"
     },
     "debug_state": {
-      "title": "Debug State",
-      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
-      "copy_button": "Copy Debug State"
+      "title": "Состояние отладки",
+      "description": "Создайте JSON-снимок текущего состояния трекера для отчёта об ошибке. В него входят режим игры, уровень, статусы выполнения заданий и цепочки предварительных условий.",
+      "copy_button": "Копировать состояние отладки"
     },
     "general": {
       "title": "Общие настройки",
@@ -2022,7 +1945,6 @@
       "privacy_mode_hint": "Скрывает конфиденциальную информацию во время трансляции."
     },
     "appearance": {
-      "title": "Внешний вид",
       "theme": "Тема",
       "theme_hint": "Выберите между темным и светлым интерфейсом. Ваш выбор запомнен на этом устройстве.",
       "theme_dark": "Тёмная",
@@ -2037,7 +1959,7 @@
         "show_prev": "Показывать предыдущие задания",
         "collapse_by_default": "Свернуть задания по умолчанию",
         "hide_rewards": "Скрыть награды",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "require_trader_levels": "Требовать уровень лояльности и репутацию торговца для доступа к заданиям",
         "flags_section": "Отображение задач",
         "availability_section": "Доступность задачи",
         "view_defaults_section": "Виды по умолчанию"
@@ -2059,9 +1981,8 @@
         }
       },
       "links": {
-        "title": "Wiki Links",
-        "antifandom": "Use antifandom.com",
-        "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
+        "antifandom": "Использовать antifandom.com",
+        "antifandom_hint": "Открывать ссылки вики на antifandom.com — зеркало Fandom, управляемое сообществом и почти без рекламы, вместо fandom.com."
       }
     },
     "game_profile": {
@@ -2124,7 +2045,6 @@
       "import_target_pvp": "Только PvP",
       "import_target_pve": "Только PvE",
       "import_target_all": "Все доступные",
-      "seasonal_import_locked": "Сезонный PvP импорт временно заблокирован до тех пор, пока не будет проверена исходная информация для сезона {season}.",
       "import_success_title": "Копия импортирована",
       "import_success_description": "Ваш прогресс был успешно восстановлен.",
       "import_error_title": "Ошибка резервного копирования",
@@ -2230,25 +2150,23 @@
       "session_changed": "Ваша учетная запись изменена. В этой сессии никаких дальнейших действий не будет."
     },
     "discord_link": {
-      "title": "Discord Account",
-      "description": "Link your Discord account to receive the Linked role and keep supporter perks synchronized.",
-      "link_account": "Link Discord account",
-      "login_to_link": "Log in to link Discord",
-      "linked_as": "Linked as {username}",
-      "sync_roles": "Sync Discord roles",
-      "error_title": "Discord link unavailable",
-      "not_in_guild_title": "Join the Discord server",
-      "not_in_guild": "Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.",
-      "load_error": "We could not load your Discord account link.",
-      "link_error": "We could not start Discord account linking. Please try again.",
-      "unlink_account": "Unlink Discord account",
-      "unlink_requires_login": "Add another login method before unlinking your only sign-in identity.",
-      "unlink_error": "We could not unlink your Discord account. Your link remains active.",
-      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
+      "title": "Аккаунт Discord",
+      "description": "Привяжите аккаунт Discord, чтобы получить роль Linked и синхронизировать льготы сторонника.",
+      "link_account": "Привязать аккаунт Discord",
+      "login_to_link": "Войдите, чтобы привязать Discord",
+      "linked_as": "Привязан как {username}",
+      "sync_roles": "Синхронизировать роли Discord",
+      "error_title": "Связь с Discord недоступна",
+      "not_in_guild_title": "Присоединитесь к серверу Discord",
+      "not_in_guild": "Ваш аккаунт привязан, но перед синхронизацией ролей необходимо присоединиться к серверу Discord TarkovTracker.",
+      "load_error": "Не удалось загрузить связь с аккаунтом Discord.",
+      "link_error": "Не удалось начать привязку аккаунта Discord. Повторите попытку.",
+      "unlink_account": "Отвязать аккаунт Discord",
+      "unlink_requires_login": "Добавьте другой способ входа, прежде чем отвязывать единственную учётную запись.",
+      "unlink_error": "Не удалось отвязать аккаунт Discord. Связь сохранилась.",
+      "sync_error": "Ваш аккаунт привязан, но не удалось синхронизировать роли Discord. Повторите попытку позже."
     },
     "prestige": {
-      "pvp_only_title": "Престиж доступен только в PvP",
-      "pvp_only": "Переключитесь в режим PvP, чтобы сделать престиж PvP-профиля.",
       "persistent_mode_unsupported_title": "Престиж недоступен",
       "persistent_mode_unsupported": "Престиж недоступен для постоянного PvE режима.",
       "seasonal_mode_unsupported": "Престиж недоступен в сезонных PvP.",
@@ -2339,20 +2257,20 @@
       "collapsed_hint": "Показаны навыки {shown} из {total} . Покажите все, чтобы увидеть все навыки."
     },
     "keybinds": {
-      "title": "Keyboard Shortcuts",
-      "omnibar_label": "Global Search (Omnibar)",
-      "omnibar_description": "Press this shortcut to open the global search palette.",
-      "undo_label": "Undo Last Action",
-      "undo_description": "Press this shortcut to revert your most recent progress change.",
-      "record_placeholder": "Click to record...",
-      "recording": "Press key combination...",
+      "title": "Сочетания клавиш",
+      "omnibar_label": "Глобальный поиск (Omnibar)",
+      "omnibar_description": "Нажмите это сочетание, чтобы открыть панель глобального поиска.",
+      "undo_label": "Отменить последнее действие",
+      "undo_description": "Нажмите это сочетание, чтобы отменить последнее изменение прогресса.",
+      "record_placeholder": "Нажмите, чтобы записать...",
+      "recording": "Нажмите сочетание клавиш...",
       "listening": "Прослушивание...",
-      "reset_aria": "Reset to default",
-      "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
-      "conflict_undo": "Shortcut conflicts with Search keybind.",
-      "conflict_rejected": "Already used by {action}. Press a different combination.",
-      "warn_system_omnibar": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+T, Ctrl+W, Alt+Tab).",
-      "warn_system_undo": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+W, Ctrl+T, Alt+Tab)."
+      "reset_aria": "Сбросить на значение по умолчанию",
+      "conflict_omnibar": "Сочетание клавиш конфликтует с сочетанием для отмены.",
+      "conflict_undo": "Сочетание клавиш конфликтует с сочетанием для поиска.",
+      "conflict_rejected": "Уже используется для {action}. Выберите другое сочетание.",
+      "warn_system_omnibar": "Предупреждение: может конфликтовать с системными сочетаниями клавиш браузера/ОС (например, Ctrl+T, Ctrl+W, Alt+Tab).",
+      "warn_system_undo": "Предупреждение: может конфликтовать с системными сочетаниями клавиш браузера/ОС (например, Ctrl+W, Ctrl+T, Alt+Tab)."
     },
     "experience": {
       "title": "Опыт и уровень",
@@ -2414,9 +2332,6 @@
       "import_unknown_to_mode": "Импортировать события неизвестного режима в",
       "import_unknown_to_mode_hint": "Известные события PvP/PvE автоматически распределяются. Это применяется только к нераспознанным событиям.",
       "auto_mode_hint": "Распределение по режимам определено по backend-логам и будет применено автоматически.",
-      "mode_summary_pvp": "PvP (авто)",
-      "mode_summary_pve": "PvE (авто)",
-      "mode_summary_both": "PvP + PvE (авто)",
       "success_title": "Логи EFT импортированы",
       "success_description": "Отмечено {complete_count} заданий как завершенные и {active_count} заданий как активные на основе игровых логов.",
       "error_title": "Ошибка импорта логов EFT",
@@ -2424,6 +2339,7 @@
       "cleared_logs_toast_description": "Импорт логов может читать только историю заданий, которая всё ещё есть в папке Logs. Удалённые сессии нельзя восстановить.",
       "errors": {
         "invalid_archive": "ZIP архив является неполным или содержит неверную запись журнала. Прогресс не был импортирован.",
+        "budget_exceeded": "Выбранные журналы превышают безопасный бюджет импорта. Выберите меньше последних сессий или извлечь только соответствующие лог файлы. Прогресс не был импортирован.",
         "record_too_large": "Отдельная запись журнала в {path} слишком велика для безопасного разбора данных. Прогресс не был импортирован. Пожалуйста, сообщите об этом в формате журнала.",
         "apply_import_failed": "Не удалось применить импортированные данные о завершении заданий.",
         "no_files_selected": "Файлы не выбраны.",
@@ -2459,7 +2375,7 @@
       "skills_count": "Обнаружено навыков: {count}",
       "last_refreshed": "Данные Tarkov.dev обновлены",
       "last_refreshed_unknown": "Неизвестен",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
+      "data_age_warning": "Возраст снимка Tarkov.dev: {days} дн. Если после этого вы играли, откройте свой профиль на Tarkov.dev, чтобы обновить данные, затем повторите получение перед импортом.",
       "cooldown_hint": "Недавно импортировано. Вы можете повторно импортировать этот профиль примерно за {minutes} мин.",
       "turnstile_hint": "Заполните проверку ниже для получения профиля.",
       "skills_details_toggle": "Показать значения навыков",
@@ -2472,7 +2388,7 @@
       "linked_uid": "UID Tarkov",
       "refetch_hint": "Сначала откройте свой профиль Tarkov.dev, чтобы он обновился там, затем загрузите его здесь повторно.",
       "refetch_mode_label": "Профиль для загрузки",
-      "refetch_mode_arena": "Arena",
+      "refetch_mode_arena": "Арена",
       "refetch_mode_arena_unavailable": "Импорт Arena появится позже.",
       "refetch_profile": "Обновить профиль",
       "unlink_profile": "Отвязать",
@@ -2483,7 +2399,9 @@
         "profile_not_generated": "У Тарков.dev пока нет снимка для этого профиля. Откройте страницу профиля на Тарков.dev один раз, давайте загрузим, затем получите снова.",
         "rate_limited": "Слишком много попыток импорта. Подождите {minutes} мин. и повторите попытку.",
         "verification_failed": "Проверка не удалась. Перезагрузите страницу и повторите попытку.",
-        "fetch_failed": "Не удалось получить профиль Tarkov.dev. Откройте профиль на Tarkov.dev, затем повторите попытку."
+        "fetch_failed": "Не удалось получить профиль Tarkov.dev. Откройте профиль на Tarkov.dev, затем повторите попытку.",
+        "tarkov_uid_conflict": "Этот профиль Tarkov уже связан с другим аккаунтом TarkovTracker, так что он не был связан здесь. Импортированный прогресс был сохранен. Отсоедините его от другого аккаунта, а затем импортируйте снова.",
+        "save_failed": "Профиль был импортирован на этом устройстве, но он не может быть сохранен в вашей учетной записи. Проверьте подключение; импорт остается на этом устройстве, пока оно не синхронизируется."
       }
     },
     "device_data": {
@@ -2553,9 +2471,9 @@
       "decrease_hideout_count": "Уменьшить счётчик убежища для {station_name}",
       "increase_hideout_count": "Увеличить счётчик убежища для {station_name}"
     },
-    "any_of_items": "Any one of these {count} items counts",
-    "any_of_items_short": "Any {count}",
-    "view_accepted_items": "View all {count} accepted items",
+    "any_of_items": "Подходит любой вариант ({count}).",
+    "any_of_items_short": "Любой из {count}",
+    "view_accepted_items": "Посмотреть все подходящие предметы ({count})",
     "not_collected": "Не получено",
     "click_to_collect": "Нажмите, чтобы получить",
     "click_to_uncollect": "Нажмите, чтобы отменить получение",
@@ -2572,24 +2490,22 @@
     "elite_level": "Уровень ELITE"
   },
   "game_settings": {
-    "toggle_game_mode_label": "Toggle game mode",
     "select_game_mode_label": "Выберите режим игры",
-    "select_faction_label": "Select faction",
+    "select_faction_label": "Выбрать фракцию",
     "season_ends_in": "Сезон {season} заканчивается в {days}d {hours}ч {minutes}м",
     "season_ended": "Сезон {season} завершен"
   },
   "oauth": {
     "consent": {
-      "meta_title": "OAuth Consent - TarkovTracker",
-      "authorize": "Authorize Application",
-      "loading": "Loading...",
+      "authorize": "Авторизовать приложение",
+      "loading": "Загрузка...",
       "error": "{error}",
-      "unknown": "Unknown Application",
-      "requesting_access": "is requesting access to your TarkovTracker account.",
-      "requested_permissions": "Requested Permissions:",
-      "redirect_to": "Will redirect to:",
+      "unknown": "Неизвестное приложение",
+      "requesting_access": "запрашивает доступ к вашей учётной записи TarkovTracker.",
+      "requested_permissions": "Запрошенные разрешения:",
+      "redirect_to": "Перенаправление на:",
       "approve": "Разрешить",
-      "deny": "Deny"
+      "deny": "Отклонить"
     }
   },
   "tarkov_access": {
@@ -2629,5 +2545,132 @@
     "no_prestige": "Без престижа",
     "prestige_n": "Престиж {n}"
   },
-  "generic": {}
+  "generic": {},
+  "seo": {
+    "site_name": "TarkovTracker",
+    "application_description": "Отслеживайте задания Escape from Tarkov, улучшения убежища, требования для Kappa, сюжетные задания и необходимые предметы в режимах PvP, PvE и Seasonal.",
+    "routes": {
+      "home": {
+        "title": "Трекер прогресса Escape from Tarkov · TarkovTracker.org",
+        "description": "Отслеживайте задания Escape from Tarkov, улучшения убежища, требования для Kappa, сюжетные задания и необходимые предметы в режимах PvP, PvE и Seasonal.",
+        "heading": "Трекер прогресса Escape from Tarkov"
+      },
+      "tasks": {
+        "title": "Трекер заданий в Таркове · TarkovTracker.org",
+        "description": "Отслеживайте задания в Таркове, их цели, награды и предварительные условия в режимах PvP, PvE и Seasonal."
+      },
+      "hideout": {
+        "title": "Трекер убежища в Таркове · TarkovTracker.org",
+        "description": "Планируйте улучшения убежища и отслеживайте требования к модулям и прогресс строительства."
+      },
+      "needed_items": {
+        "title": "Трекер нужных предметов для Таркова · TarkovTracker.org",
+        "description": "Находите все предметы, которые ещё нужны для заданий и улучшений убежища, в одном списке."
+      },
+      "kappa": {
+        "title": "Трекер «Каппа» и «Лайткипер» · TarkovTracker.org",
+        "description": "Отслеживайте требования заданий «Каппа» и «Лайткипер» и прогресс до их завершения."
+      },
+      "storyline": {
+        "title": "Трекер сюжетных заданий Таркова · TarkovTracker.org",
+        "description": "Выполняйте сюжетные задания Escape from Tarkov и отслеживайте свой прогресс."
+      },
+      "resources": {
+        "title": "Инструменты и руководства для Escape from Tarkov",
+        "description": "Открывайте для себя инструменты и руководства сообщества для TarkovTracker, TarkovMonitor, RatScanner и Tarkov.dev."
+      },
+      "about": {
+        "title": "О ТарковТреке",
+        "description": "Узнайте о TarkovTracker и его проекте, созданном сообществом для отслеживания прогресса в Escape from Tarkov."
+      },
+      "credits": {
+        "title": "Авторы TarkovTracker",
+        "description": "Познакомьтесь с авторами TarkovTracker и проектами сообщества, которые помогли его создать."
+      },
+      "changelog": {
+        "title": "Журнал изменений TarkovTracker",
+        "description": "Ознакомьтесь с последними релизами, улучшениями и исправлениями TarkovTracker."
+      },
+      "supporter": {
+        "title": "Поддержать TarkovTracker.org",
+        "description": "Помогите оплатить хостинг и разработку. Узнайте об уровнях поддержки и способах помочь проекту."
+      },
+      "privacy": {
+        "title": "Политика конфиденциальности TarkovTracker",
+        "description": "Узнайте, как TarkovTracker обрабатывает информацию об учётной записи и данные о прогрессе."
+      },
+      "terms_of_service": {
+        "title": "Условия использования TarkovTracker",
+        "description": "Ознакомьтесь с условиями использования TarkovTracker."
+      },
+      "tarkovtracker_org_vs_io": {
+        "title": "Руководство по TarkovTracker.org и TarkovTracker.io",
+        "description": "Узнайте, чем различаются TarkovTracker.org и TarkovTracker.io и как начать работу с ними."
+      },
+      "tarkovmonitor": {
+        "title": "Руководство по настройке TarkovMonitor",
+        "description": "Установите TarkovMonitor и подключите его к TarkovTracker, чтобы прогресс в рейдах и заданиях синхронизировался."
+      },
+      "ratscanner": {
+        "title": "Руководство по настройке RatScanner",
+        "description": "Установите RatScanner и подключите сканирование предметов к отслеживанию прогресса в TarkovTracker."
+      },
+      "tarkovdev": {
+        "title": "Руководство по данным Tarkov.dev",
+        "description": "Узнайте, как каналы JSON-данных Tarkov.dev поддерживают инструменты для Escape from Tarkov и отслеживание прогресса."
+      },
+      "cultistcircle": {
+        "title": "Руководство по калькулятору «Круг культистов»",
+        "description": "Узнайте, как пользоваться калькулятором «Круг культистов», чтобы изучать рецепты жертвоприношений и награды."
+      },
+      "settings": {
+        "title": "Настройки · TarkovTracker.org",
+        "description": "Управляйте предпочтениями, импортом данных, резервными копиями и интеграциями TarkovTracker."
+      },
+      "progression": {
+        "title": "Настройки прогресса · TarkovTracker.org",
+        "description": "Управляйте настройками уровня игрока, навыков и прогресса в TarkovTracker."
+      },
+      "prestige": {
+        "title": "Настройки престижа · TarkovTracker.org",
+        "description": "Управляйте прогрессом престижа в TarkovTracker."
+      },
+      "preferences": {
+        "title": "Предпочтения · TarkovTracker.org",
+        "description": "Настраивайте язык, оформление и параметры отслеживания в TarkovTracker."
+      },
+      "account": {
+        "title": "Учётная запись · TarkovTracker.org",
+        "description": "Управляйте своей учётной записью TarkovTracker и подключёнными сервисами."
+      },
+      "team": {
+        "title": "Команда · TarkovTracker.org",
+        "description": "Управляйте своей командой в TarkovTracker и общим прогрессом."
+      },
+      "admin": {
+        "title": "Администрирование · TarkovTracker.org",
+        "description": "Средства администрирования TarkovTracker."
+      },
+      "profile": {
+        "title": "Профиль игрока · TarkovTracker.org",
+        "description": "Просматривайте профиль игрока в TarkovTracker и его общий прогресс."
+      },
+      "login": {
+        "title": "Вход · TarkovTracker.org",
+        "description": "Войдите в TarkovTracker, чтобы синхронизировать прогресс и работать вместе со своей командой."
+      },
+      "auth_callback": {
+        "title": "Завершение входа · TarkovTracker.org",
+        "description": "Завершите вход в TarkovTracker."
+      },
+      "oauth_consent": {
+        "title": "Авторизация приложения · TarkovTracker.org",
+        "description": "Просмотрите запрос приложения на доступ к вашей учётной записи TarkovTracker."
+      },
+      "not_found": {
+        "title": "Страница не найдена",
+        "description": "Запрошенная страница TarkovTracker не найдена."
+      }
+    }
+  }
 }
