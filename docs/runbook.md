@@ -228,8 +228,9 @@ integration fails or is unavailable, not the normal path.
 
 5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
    the push changed `workers/api-gateway/**` or bypassed watch-path matching, also confirm
-   `Workers Builds: api-gateway` succeeded on it; if it changed only an unwatched
-   [Worker build input](#deployment), no check appears and the Worker still needs a build.
+   `Workers Builds: api-gateway` succeeded on it; if it changed an unwatched
+   [Worker build input](#deployment) without touching `workers/api-gateway/**`, no check appears
+   and the Worker still needs a build.
    `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the

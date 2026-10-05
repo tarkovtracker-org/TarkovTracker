@@ -2,19 +2,25 @@
 // Workers Builds only rebuilds for watched paths, so an undocumented input outside
 // workers/api-gateway/ can change the bundle without any Worker build (issue #1079).
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 import ts from 'typescript';
-const ROOT = resolve('.');
+const ROOT = realpathSync('.');
 const WORKER = 'workers/api-gateway';
 const RUNBOOK = 'docs/runbook.md';
 // Any bundled npm package makes the root lockfile a build input.
 const LOCKFILE = 'pnpm-lock.yaml';
 const RUNTIME_PREFIXES = ['node:', 'cloudflare:'];
+// Files esbuild parses for further imports, and the extensions it tries for extensionless specifiers.
+const SOURCE_RE = /\.[cm]?[jt]sx?$/;
+const EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.mjs', '.jsx'];
 const isFile = (path) => existsSync(path) && statSync(path).isFile();
 function workerEntry() {
-  const main = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8').match(/^main\s*=\s*"([^"]+)"/m);
+  const wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8');
+  // Wrangler `[alias]` can redirect any specifier; this scanner does not model it.
+  assert.doesNotMatch(wrangler, /^\s*\[alias\]/m, 'teach this check wrangler [alias] first');
+  const main = wrangler.match(/^main\s*=\s*"([^"]+)"/m);
   assert.ok(main, `${WORKER}/wrangler.toml must declare main`);
   return join(WORKER, main[1]);
 }
@@ -35,10 +41,21 @@ function callSpecifierOf(node) {
   assert.ok(ts.isStringLiteralLike(argument), `computed import: ${node.getText()}`);
   return argument;
 }
+/** Specifier of `import x = require('…')`. */
+function importEqualsSpecifierOf(node) {
+  const reference = node.moduleReference;
+  return ts.isExternalModuleReference(reference) ? reference.expression : undefined;
+}
 /** Module specifier of an import/export declaration or an import()/require() call. */
+const SPECIFIER_READERS = [
+  [ts.isImportDeclaration, (node) => node.moduleSpecifier],
+  [ts.isExportDeclaration, (node) => node.moduleSpecifier],
+  [ts.isImportEqualsDeclaration, importEqualsSpecifierOf],
+  [ts.isCallExpression, callSpecifierOf],
+];
 function specifierOf(node) {
-  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return node.moduleSpecifier;
-  return ts.isCallExpression(node) ? callSpecifierOf(node) : undefined;
+  const reader = SPECIFIER_READERS.find(([matches]) => matches(node));
+  return reader?.[1](node);
 }
 /** Every module specifier in a file, read from the TypeScript AST so comments and strings are inert. */
 function specifiersIn(file, code = readFileSync(file, 'utf8')) {
@@ -61,21 +78,27 @@ function specifierBase(fromFile, specifier, aliases) {
 function resolveImport(fromFile, specifier, aliases) {
   const base = specifierBase(fromFile, specifier, aliases);
   if (!base) return null;
-  const candidates = [base, `${base}.ts`, base.replace(/\.js$/, '.ts'), join(base, 'index.ts')];
+  const candidates = [
+    base,
+    ...EXTENSIONS.map((extension) => base + extension),
+    base.replace(/\.js$/, '.ts'),
+    ...EXTENSIONS.map((extension) => join(base, `index${extension}`)),
+  ];
   const found = candidates.find(isFile);
   assert.ok(found, `cannot resolve ${specifier} from ${relative(ROOT, fromFile)}`);
-  return found;
+  // esbuild records symlinked files under their real path.
+  return realpathSync(found);
 }
 /** Repo-relative files reachable from the wrangler entry; tests are excluded by construction. */
 function workerSourceClosure() {
   const aliases = workerAliases();
   const seen = new Set();
-  const pending = [resolve(workerEntry())];
+  const pending = [realpathSync(workerEntry())];
   while (pending.length > 0) {
     const file = pending.pop();
     if (seen.has(file)) continue;
     seen.add(file);
-    if (file.endsWith('.ts')) {
+    if (SOURCE_RE.test(file)) {
       pending.push(
         ...specifiersIn(file)
           .map((s) => resolveImport(file, s, aliases))
@@ -124,12 +147,16 @@ test('every import form is found, prose is ignored and computed imports fail', (
     "import type { D } from './d';",
     "const route = '/api/*'; /* import('./hidden') */ const msg = \"from 'x'\";",
     "import './e'; // import('./comment')",
+    "import f = require('./f');",
   ].join('\n');
-  assert.deepEqual(parse(code), ['./a', './b', './c', './d', './e']);
+  assert.deepEqual(parse(code), ['./a', './b', './c', './d', './e', './f']);
   assert.throws(() => parse('import(`./locales/${lang}.ts`);'), /computed import/);
   assert.throws(() => parse("require('./' + name);"), /computed import/);
   // Unknown aliases and npm packages both surface as the (unlisted) lockfile input.
-  assert.equal(specifierBase(file, '@app/x', workerAliases()), join(ROOT, LOCKFILE));
+  assert.equal(
+    specifierBase(file, '@not-a-configured-alias/x', workerAliases()),
+    join(ROOT, LOCKFILE)
+  );
 });
 test('a runbook without the build-input list is rejected', () => {
   assert.throws(() => documentedInputs('Confirm `Workers Builds: api-gateway` succeeded.'));
