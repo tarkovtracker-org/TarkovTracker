@@ -62,7 +62,10 @@ const isFile = (path) => existsSync(path) && statSync(path).isFile();
 function wranglerKeys(wrangler) {
   const firstTable = wrangler.search(/^\s*\[/m);
   const topLevel = firstTable === -1 ? wrangler : wrangler.slice(0, firstTable);
-  const keys = [...topLevel.matchAll(/^([A-Za-z_][\w-]*)\s*=/gm)].map(([, key]) => key);
+  // A dotted, quoted or indented key (`build.command = …`) is still a top-level setting.
+  const keys = [...topLevel.matchAll(/^\s*["']?([A-Za-z_][\w-]*)["']?\s*[=.]/gm)].map(
+    ([, key]) => key
+  );
   const tables = [...wrangler.matchAll(/^\s*\[{1,2}\s*([^\]\s]+)\s*\]{1,2}/gm)].map(
     ([, table]) => table.replace(/^env\.[^.]+\./, '').split('.')[0]
   );
@@ -322,8 +325,19 @@ test('wrangler.toml settings that can read more files must be modeled first', ()
   const keys = wranglerKeys('main = "x"\ntsconfig = "a"\n[env.staging.alias]\nx = 1\n[[rules]]\n');
   assert.deepEqual(keys, ['main', 'tsconfig', 'alias', 'rules']);
   assertModeledWrangler(readFileSync(join(WORKER, 'wrangler.toml'), 'utf8'));
-  for (const setting of ['tsconfig = "a"', '[build]', '[env.staging.alias]', '[[rules]]']) {
-    assert.throws(() => workerEntry(`main = "x"\n${setting}\n`), /settings first/);
+  const unmodeled = [
+    'tsconfig = "a"',
+    '[build]',
+    '[env.staging.alias]',
+    '[[rules]]',
+    'build.command = "x"',
+    'alias.foo = "x"',
+    'env.staging.tsconfig = "x"',
+    '"tsconfig" = "x"',
+    '  tsconfig = "x"',
+  ];
+  for (const setting of unmodeled) {
+    assert.throws(() => workerEntry(`main = "x"\n${setting}\n`), /settings first/, setting);
   }
   assert.equal(workerEntry('main = "src/index.ts"\n'), join(WORKER, 'src', 'index.ts'));
 });

@@ -139,8 +139,9 @@ Worker build, no `Workers Builds: api-gateway` check and no new Worker deploymen
 not a broken integration.
 
 Being a build input is not the same as being watched. Besides its directory, the build reads the
-sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, and the pnpm
-workspace files that install Wrangler and esbuild. Its inputs, kept in sync with the code by
+sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
+workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` the install's
+`postinstall` evaluates. Its inputs, kept in sync with the code by
 `scripts/workflow-tests/worker-build-inputs.mjs`:
 
 <!-- api-gateway-build-inputs:start -->
@@ -153,7 +154,7 @@ workspace files that install Wrangler and esbuild. Its inputs, kept in sync with
 - `tsconfig.json` — **not** watched (compiles the bundled files above; extends the generated
   `.nuxt/tsconfig.json`)
 - `nuxt.config.ts` — **not** watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
-  from it)
+  from it; the `app/utils/` modules it imports must also load for that install to succeed)
 - `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and every installed package)
 - `pnpm-workspace.yaml` — **not** watched (workspace membership, esbuild override, allowed build
   scripts)
