@@ -107,6 +107,9 @@ describe('active progress across tabs', () => {
       window.dispatchEvent(unload);
       expect(unload.defaultPrevented).toBe(true);
       await firstWrite;
+      // Let the storage operation and persist adapter continuations observe the first result.
+      await Promise.resolve();
+      await Promise.resolve();
       expect(values.get(STORAGE_KEYS.progress)).toBe(firstValue);
       expect(tab.status.progressSaveStatus.local).toBe('pending');
     } finally {

@@ -174,10 +174,11 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
   removalCleanupCallbacks.forEach((cleanup) => cleanup(userId));
   const keys = listStorageKeys();
   let removed = keys !== null;
-  removed = removeAccountRecoveryCopy(userId) && removed;
-  removed = removeSupersededProgressCopies(userId) && removed;
   const activeRemoval = await removeIfOwned(STORAGE_KEYS.progress, userId, true);
   removed = activeRemoval.complete && removed;
+  // An earlier queued replacement can retain the owner's active bytes while removal waits.
+  removed = removeAccountRecoveryCopy(userId) && removed;
+  removed = removeSupersededProgressCopies(userId) && removed;
   for (const key of OWNER_SCOPED_KEYS) {
     removed = (await removeIfOwned(key, userId)).complete && removed;
   }

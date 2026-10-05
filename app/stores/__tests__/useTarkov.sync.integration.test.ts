@@ -3973,6 +3973,9 @@ describe('useTarkov sync integration', () => {
       expect(readRecoveryLevel('user-1')).toBe(3);
     });
     it('retains nothing for an owner whose device data removal is pending', async () => {
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
       const { requestDeviceDataRemoval, clearDeviceDataRemoval } =
         await import('@/stores/tarkov/deviceData');
       localStorage.setItem(recoveryKey('user-1'), '{"_userId":"user-1","data":{}}');
