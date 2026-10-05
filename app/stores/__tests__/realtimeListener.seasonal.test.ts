@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
 import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
+import { GAME_MODE_VALUES, getGameModeSeasonNumber } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { WithRemoteSnapshot } from '@/utils/pendingState';
@@ -156,6 +157,68 @@ describe('seasonal progress realtime synchronization', () => {
     resetSyncTimeline();
     vi.clearAllMocks();
   });
+  it.each(GAME_MODE_VALUES)(
+    'preserves an acknowledged newer local %s reset level',
+    async (mode) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      state[mode].level = 7;
+      state[mode].progressEpoch = 2;
+      await setupRealtimeListener(store);
+      const callback = handlers.get('user_game_mode_progress');
+      expect(callback).toBeTypeOf('function');
+      callback!({
+        new: {
+          game_mode: mode,
+          season_number: getGameModeSeasonNumber(mode),
+          progress_data: { ...structuredClone(defaultState[mode]), level: 2, progressEpoch: 1 },
+          updated_at: '2026-10-05T12:00:00Z',
+        },
+      });
+      expect(state[mode]).toMatchObject({ level: 7, progressEpoch: 2 });
+    }
+  );
+  it.each(
+    GAME_MODE_VALUES.flatMap((mode) => [false, true].map((editLevel) => ({ mode, editLevel })))
+  )(
+    'accepts a lower reconnect level while preserving edits made during the read: $mode, edit=$editLevel',
+    async ({ mode, editLevel }) => {
+      const { setupRealtimeListener, reconcileRemoteSnapshot } =
+        await import('@/stores/tarkov/realtimeListener');
+      const result = Promise.withResolvers<unknown>();
+      supabaseContext.client.from.mockImplementation((table: string) => ({
+        select: () => ({
+          eq: () =>
+            table === 'user_progress'
+              ? { single: async () => ({ data: null, error: null }) }
+              : result.promise,
+        }),
+      }));
+      state[mode].level = 7;
+      state[mode].progressEpoch = 1;
+      await setupRealtimeListener(store);
+      const refresh = reconcileRemoteSnapshot();
+      state[mode].displayName = 'edited during read';
+      if (editLevel) state[mode].level = 3;
+      result.resolve({
+        data: [
+          {
+            game_mode: mode,
+            season_number: getGameModeSeasonNumber(mode),
+            progress_data: { ...structuredClone(defaultState[mode]), level: 2, progressEpoch: 1 },
+            updated_at: '2026-10-05T12:00:00Z',
+            progress_updated_at: '2026-10-05T12:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      await refresh;
+      expect(state[mode]).toMatchObject({
+        level: editLevel ? 3 : 2,
+        displayName: 'edited during read',
+        progressEpoch: 1,
+      });
+    }
+  );
   it.each(['mode reset', 'metadata'])(
     'acknowledges a direct save when its matching %s echo precedes the RPC response',
     async (scope) => {

@@ -24,7 +24,7 @@ import {
   resetTarkovSync,
   useTarkovStore,
 } from '@/stores/useTarkov';
-import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, getGameModeSeasonNumber } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
@@ -600,6 +600,101 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it.each(
+    GAME_MODE_VALUES.flatMap((mode) => [null, 3, 9].map((pendingLevel) => ({ mode, pendingLevel })))
+  )(
+    'keeps API level decreases durable with the real controller: $mode, pending=$pendingLevel',
+    async ({ mode, pendingLevel }) => {
+      const actual = await vi.importActual<typeof import('@/composables/supabase/useSupabaseSync')>(
+        '@/composables/supabase/useSupabaseSync'
+      );
+      useSupabaseSyncMock.mockImplementation(
+        (options) =>
+          actual.useSupabaseSync(
+            options as Parameters<typeof actual.useSupabaseSync>[0]
+          ) as unknown as ReturnType<typeof useSupabaseSyncMock>
+      );
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      await initializeTarkovSync();
+      const store = useTarkovStore();
+      const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
+        typeof actual.useSupabaseSync
+      >;
+      const remoteTime = Date.now();
+      const emit = (level: number, seconds: number) => {
+        const callback = getModeProgressCallback();
+        expect(callback).toBeTypeOf('function');
+        callback!({
+          new: {
+            game_mode: mode,
+            season_number: getGameModeSeasonNumber(mode),
+            progress_data: { ...progressWithLevel(level), progressEpoch: 1 },
+            updated_at: new Date(remoteTime + seconds * 1000).toISOString(),
+            progress_updated_at: new Date(remoteTime + seconds * 1000).toISOString(),
+          },
+          old: null,
+        });
+      };
+      emit(7, 1);
+      await nextTick();
+      expect(store[mode].level).toBe(7);
+      emit(2, 2);
+      await nextTick();
+      expect(store[mode].level).toBe(2);
+      emit(7, 3);
+      await nextTick();
+      expect(store[mode].level).toBe(7);
+      // An unrelated pending field must not make the old, clean level authoritative.
+      store[mode].displayName = 'pending name';
+      if (pendingLevel !== null) store[mode].level = pendingLevel;
+      await nextTick();
+      emit(2, 4);
+      await nextTick();
+      expect(store[mode]).toMatchObject({
+        level: pendingLevel ?? 2,
+        displayName: 'pending name',
+        progressEpoch: 1,
+      });
+      for (const other of GAME_MODE_VALUES.filter((candidate) => candidate !== mode)) {
+        expect(store[other]).toEqual(defaultState[other]);
+      }
+      controller.resume();
+      expect(await controller.syncToSupabase()).not.toBeNull();
+      expect(getLastSyncPayload().p_modes[mode]).toMatchObject({ level: pendingLevel ?? 2 });
+      expect(controller.hasPendingChanges?.()).toBe(false);
+      // Once that local edit is acknowledged, a later decrease must apply too.
+      emit(1, 5);
+      await nextTick();
+      expect(store[mode].level).toBe(1);
+      store[mode].displayName = 'later edit';
+      await nextTick();
+      controller.resume();
+      expect(await controller.syncToSupabase()).not.toBeNull();
+      expect(getLastSyncPayload().p_modes[mode]).toMatchObject({ level: 1 });
+      expect(controller.hasPendingChanges?.()).toBe(false);
+      const persisted = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+      expect(persisted.data[mode]).toMatchObject({ level: 1, progressEpoch: 1 });
+      emit(7, 1);
+      expect(store[mode].level).toBe(1);
+      resetTarkovSync('simulate reload after API decrease');
+      const reloadedPinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(reloadedPinia);
+      setActivePinia(reloadedPinia);
+      modeProgressResult.data = [
+        {
+          game_mode: mode,
+          season_number: getGameModeSeasonNumber(mode),
+          progress_data: { ...progressWithLevel(1), progressEpoch: 1, displayName: 'later edit' },
+          updated_at: new Date(remoteTime + 5000).toISOString(),
+          progress_updated_at: new Date(remoteTime + 5000).toISOString(),
+        },
+      ];
+      await initializeTarkovSync();
+      expect(useTarkovStore()[mode]).toMatchObject({ level: 1, progressEpoch: 1 });
+    }
+  );
   it.each([
     { scenario: 'foreign-transaction', reset: false, owner: 'user-1', edition: 1, marker: '999' },
     { scenario: 'changed-value', reset: false, owner: 'user-1', edition: 2, marker: '100' },

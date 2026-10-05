@@ -26,7 +26,7 @@ import {
   relieveProgressStoragePressure,
 } from '@/stores/tarkov/storageQuota';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
-import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES } from '@/utils/constants';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
@@ -378,6 +378,26 @@ describe('account recovery copies', () => {
     expect(selected?.modeTimestamps?.pvp).toBe(200);
     expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
   });
+  it.each(GAME_MODE_VALUES)(
+    'keeps a known newer %s level decrease when composing recovery and active copies',
+    (mode) => {
+      const older = structuredClone(defaultState);
+      older[mode].level = 7;
+      older[mode].progressEpoch = 1;
+      older[mode].taskCompletions.task = { complete: true, timestamp: 100 };
+      for (const level of [2, 1]) {
+        const newer = structuredClone(older);
+        newer[mode].level = level;
+        const selected = selectFreshestOwnerProgressSnapshot(
+          snapshot(100, older, { modeTimestamps: { [mode]: 100 } }),
+          snapshot(200, newer, { modeTimestamps: { [mode]: 200 } })
+        );
+        expect(selected?.state[mode]).toMatchObject({ level, progressEpoch: 1 });
+        expect(selected?.state[mode].taskCompletions.task?.complete).toBe(true);
+        expect(selected?.modeTimestamps?.[mode]).toBe(200);
+      }
+    }
+  );
   it('keeps the older mode clock when a newer equal-epoch copy contributes nothing', () => {
     const progressed = {
       ...structuredClone(defaultState),

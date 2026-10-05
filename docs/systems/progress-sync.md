@@ -213,6 +213,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   explicit `undefined` fields. Removing transient state must not become a persisted field deletion.
   A three-way merge compares each field with its acknowledged baseline, retaining only locally
   changed paths while accepting unrelated remote changes, including changes in other modes.
+  Player level is an editable scalar: accepted live/reconnect rows can lower a clean local level,
+  while a pending local level edit wins until acknowledged. Startup takes the level from the
+  preferred mode snapshot, so a newer decrease is not replaced by an older maximum.
+  Recovery composition also honors a known newer mode clock's level; an unknown-clock
+  placeholder cannot lower existing progress using only its envelope write time.
   Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,
   so an acknowledged count clear is not resurrected. Pending fields (including explicit clears) survive reconnect reads, incoming live events,
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
