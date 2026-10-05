@@ -144,7 +144,12 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   owner envelope cannot be attributed and is likewise kept without marking removal incomplete;
   malformed active bytes instead follow the quarantine flow below. Other accounts' data and cloud progress are untouched; the next sign-in clears the
   request. Removal and discard confirmations belong to the authenticated owner that opened them
-  and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
+  and capture a removal-request revision. Every cleanup continuation rechecks that revision and
+  the live session before deleting more copies or installing a write barrier. A superseded cleanup
+  cannot clear a newer request; signing back into the removed account also suppresses stale retry
+  markers and result toasts. Switching to another account keeps an unfinished cleanup retry scoped
+  to the removed owner.
+  Confirmations are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the

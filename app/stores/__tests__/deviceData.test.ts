@@ -16,8 +16,14 @@ import {
   persistActiveProgressValue,
   setActiveProgressWritesBlocked,
   flushActiveProgressWrites,
+  invalidateActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+const auth = vi.hoisted(() => ({ owner: null as string | null }));
+vi.mock('@/utils/userScopedStorage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/userScopedStorage')>()),
+  getCurrentSupabaseUserId: () => auth.owner,
+}));
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
@@ -31,10 +37,137 @@ describe('device data removal', () => {
   });
   beforeEach(async () => {
     await flushActiveProgressWrites();
+    auth.owner = null;
     localStorage.clear();
     clearDeviceDataRemoval();
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
+  });
+  it.each([
+    ['user-1', true],
+    ['user-2', true],
+    ['user-2', false],
+  ] as const)(
+    'preserves a new %s session when cleanup loses its lock fence (intent cleared: %s)',
+    async (owner, clearIntent) => {
+      let release!: () => void;
+      let requested!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const queued = new Promise<void>((resolve) => {
+        requested = resolve;
+      });
+      vi.stubGlobal('navigator', {
+        locks: {
+          request: async (_name: string, _options: unknown, callback: () => unknown) => {
+            requested();
+            await held;
+            return callback();
+          },
+        },
+      });
+      const original = owned('user-1');
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      requestDeviceDataRemoval('user-1');
+      const removing = removeAccountDeviceData('user-1');
+      await queued;
+      auth.owner = owner;
+      if (clearIntent) clearDeviceDataRemoval();
+      const preferences = JSON.stringify({ _userId: 'user-1', data: { language: 'fr' } });
+      const recoveryKey = `${STORAGE_KEYS.progressRecoveryPrefix}user-1`;
+      localStorage.setItem(STORAGE_KEYS.preferences, preferences);
+      localStorage.setItem(recoveryKey, original);
+      release();
+      expect(await removing).toBe(false);
+      expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe(preferences);
+      expect(localStorage.getItem(recoveryKey)).toBe(original);
+      expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+      const next = JSON.parse(owned(owner));
+      next.data.pvp.level = 20;
+      expect(await persistActiveProgressValue(JSON.stringify(next))).toBe(true);
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level).toBe(20);
+    }
+  );
+  it.each(['user-1', 'user-2'])(
+    'keeps a newer %s removal request when the old caller clears its token',
+    (incomingOwner) => {
+      const oldRequest = requestDeviceDataRemoval('user-1');
+      const newRequest = requestDeviceDataRemoval(incomingOwner);
+      clearDeviceDataRemoval(oldRequest);
+      expect(isDeviceDataRemovalPending(incomingOwner, newRequest)).toBe(true);
+      expect(isDeviceDataRemovalPending('user-1', oldRequest)).toBe(false);
+      clearDeviceDataRemoval(newRequest);
+      expect(isDeviceDataRemovalPending(incomingOwner)).toBe(false);
+    }
+  );
+  it.each([
+    [STORAGE_KEYS.preferences, LEGACY_STORAGE_KEYS.preferences],
+    [
+      `${STORAGE_KEYS.progressBackupPrefix}user-1_1`,
+      `${STORAGE_KEYS.progressBackupPrefix}user-1_2`,
+    ],
+  ])(
+    'stops remaining cleanup after the session changes while removing %s',
+    async (firstKey, nextKey) => {
+      const original = owned('user-1');
+      const fresh = JSON.stringify({ _userId: 'user-1', data: { session: 'new' } });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      localStorage.setItem(firstKey, original);
+      localStorage.setItem(nextKey, original);
+      const remove = localStorage.removeItem.bind(localStorage);
+      let switched = false;
+      const spy = vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+        remove(key);
+        if (key === firstKey && !switched) {
+          switched = true;
+          queueMicrotask(() => {
+            auth.owner = 'user-1';
+            clearDeviceDataRemoval();
+            localStorage.setItem(nextKey, fresh);
+          });
+        }
+      });
+      requestDeviceDataRemoval('user-1');
+      expect(await removeAccountDeviceData('user-1')).toBe(false);
+      expect(localStorage.getItem(nextKey)).toBe(fresh);
+      expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+      spy.mockRestore();
+    }
+  );
+  it('fences an old cleanup when a same-owner auth handoff ends its removal intent', async () => {
+    auth.owner = 'user-1';
+    let release!: () => void;
+    let requested!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queued = new Promise<void>((resolve) => {
+      requested = resolve;
+    });
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (_name: string, _options: unknown, callback: () => unknown) => {
+          requested();
+          await held;
+          return callback();
+        },
+      },
+    });
+    const original = owned('user-1');
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    requestDeviceDataRemoval('user-1');
+    const removing = removeAccountDeviceData('user-1');
+    await queued;
+    // A sign-out/sign-in handoff cancels old active mutations even when the final owner matches.
+    invalidateActiveProgressWrites();
+    clearDeviceDataRemoval();
+    const preferences = JSON.stringify({ _userId: 'user-1', data: { session: 'new' } });
+    localStorage.setItem(STORAGE_KEYS.preferences, preferences);
+    release();
+    expect(await removing).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe(preferences);
+    expect(await persistActiveProgressValue(original)).toBe(true);
   });
   it('rereads ownership when another tab replaces opaque bytes while cleanup waits', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, '{opaque');

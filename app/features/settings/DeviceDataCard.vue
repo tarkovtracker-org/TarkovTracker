@@ -144,6 +144,7 @@
     refreshIncompleteDeviceDataRemovals,
     removeAccountDeviceData,
     requestDeviceDataRemoval,
+    isDeviceDataRemovalPending,
     retryIncompleteDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
   import {
@@ -257,15 +258,23 @@
   const signOutAndRemove = async (
     userId: string,
     mode: SignOutMode
-  ): Promise<'removed' | 'remove_failed' | 'sign_out_failed'> => {
-    requestDeviceDataRemoval(userId);
+  ): Promise<'removed' | 'remove_failed' | 'sign_out_failed' | 'session_changed'> => {
+    const removalRevision = requestDeviceDataRemoval(userId);
     if (!(await signOutOwner(userId, mode))) {
-      clearDeviceDataRemoval();
+      clearDeviceDataRemoval(removalRevision);
       return 'sign_out_failed';
     }
     await nextTick();
+    if (!isDeviceDataRemovalPending(userId, removalRevision)) {
+      if (!isCurrentLoggedInOwner(userId)) markDeviceDataRemovalIncomplete(userId);
+      return 'session_changed';
+    }
     const removed = await tryRemoveAccountDeviceData(userId);
-    clearDeviceDataRemoval();
+    if (!isDeviceDataRemovalPending(userId, removalRevision)) {
+      if (!removed && !isCurrentLoggedInOwner(userId)) markDeviceDataRemovalIncomplete(userId);
+      return 'session_changed';
+    }
+    clearDeviceDataRemoval(removalRevision);
     if (!removed) markDeviceDataRemovalIncomplete(userId);
     return removed ? 'removed' : 'remove_failed';
   };
@@ -294,6 +303,7 @@
     const result = await signOutAndRemove(userId, mode).finally(() => {
       removing.value = false;
     });
+    if (result === 'session_changed') return;
     if (result === 'sign_out_failed') {
       deviceOnlyAvailable.value = lastFailure.value === 'revocation_unavailable';
       return;

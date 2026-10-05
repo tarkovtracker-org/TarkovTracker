@@ -21,7 +21,8 @@ const {
     deviceData: {
       requestDeviceDataRemoval: vi.fn(() => order.push('request')),
       clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
-      removeAccountDeviceData: vi.fn(() => {
+      isDeviceDataRemovalPending: vi.fn(() => true),
+      removeAccountDeviceData: vi.fn<() => boolean | Promise<boolean>>(() => {
         order.push('remove');
         return true;
       }),
@@ -100,6 +101,7 @@ describe('DeviceDataCard', () => {
       calls.push('remove');
       return true;
     });
+    deviceData.isDeviceDataRemovalPending.mockReturnValue(true);
     resetCloudSaveStatus();
     user.id = 'user-1';
     user.loggedIn = true;
@@ -120,6 +122,61 @@ describe('DeviceDataCard', () => {
       expect.objectContaining({ title: 'settings.device_data.removed' })
     );
   });
+  it.each(['user-1', 'user-2'])(
+    'keeps canceled removal outcomes scoped when %s signs in',
+    async (incomingOwner) => {
+      let finish!: (removed: boolean) => void;
+      deviceData.removeAccountDeviceData.mockImplementation(() => {
+        calls.push('remove');
+        return new Promise<boolean>((resolve) => {
+          finish = resolve;
+        });
+      });
+      signOutNow.mockImplementation(async () => {
+        calls.push('signOut');
+        reactiveUser.id = null;
+        reactiveUser.loggedIn = false;
+        return true;
+      });
+      const wrapper = await mountCard();
+      await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+      await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+      await flushPromises();
+      reactiveUser.id = incomingOwner;
+      reactiveUser.loggedIn = true;
+      deviceData.isDeviceDataRemovalPending.mockReturnValue(false);
+      finish(false);
+      await flushPromises();
+      const { STORAGE_KEYS } = await import('@/utils/storageKeys');
+      expect(localStorage.getItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-1`)).toBe(
+        incomingOwner === 'user-1' ? null : 'user-1'
+      );
+      expect(deviceData.clearDeviceDataRemoval).not.toHaveBeenCalled();
+      expect(toastAdd).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['user-1', 'user-2'])(
+    'does not start superseded cleanup when %s signs in during sign-out',
+    async (incomingOwner) => {
+      signOutNow.mockImplementation(async () => {
+        reactiveUser.id = incomingOwner;
+        reactiveUser.loggedIn = true;
+        deviceData.isDeviceDataRemovalPending.mockReturnValue(false);
+        return true;
+      });
+      const wrapper = await mountCard();
+      await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+      await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+      await flushPromises();
+      expect(deviceData.removeAccountDeviceData).not.toHaveBeenCalled();
+      expect(deviceData.clearDeviceDataRemoval).not.toHaveBeenCalled();
+      const { STORAGE_KEYS } = await import('@/utils/storageKeys');
+      expect(localStorage.getItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-1`)).toBe(
+        incomingOwner === 'user-1' ? null : 'user-1'
+      );
+      expect(toastAdd).not.toHaveBeenCalled();
+    }
+  );
   it('removes nothing and cancels the request when sign-out fails', async () => {
     signOutNow.mockImplementation(async () => {
       calls.push('signOut');
