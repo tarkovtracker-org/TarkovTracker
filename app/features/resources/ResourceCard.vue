@@ -37,7 +37,7 @@
             {{ categoryBadge }}
           </UBadge>
         </div>
-        <p class="text-surface-300 mt-2 min-h-12 text-[0.9375rem] leading-relaxed">
+        <p class="text-surface-300 mt-2 min-h-12 text-[0.9375rem] leading-relaxed wrap-break-word">
           {{ description }}
         </p>
       </div>

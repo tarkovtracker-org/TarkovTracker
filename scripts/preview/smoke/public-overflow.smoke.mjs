@@ -23,14 +23,23 @@ const mainOverflow = (page) =>
     .evaluate((main) =>
       Math.max(...[main, main.firstElementChild].map((node) => node.scrollWidth - node.clientWidth))
     );
-/** Every text node's line boxes, plus the content column, read in the page. */
+/** The page wrapper's content box: the column inside its horizontal padding. */
+const contentColumn = (page) =>
+  page.locator('#main-content > div > div').evaluate((wrapper) => {
+    const box = wrapper.getBoundingClientRect();
+    const style = getComputedStyle(wrapper);
+    return {
+      left: box.left + parseFloat(style.paddingLeft),
+      right: box.right - parseFloat(style.paddingRight),
+    };
+  });
+/** Every text node's line boxes, read in the page. */
 const textLines = (page) =>
   page.locator('#main-content').evaluate((main) => {
     const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
     const nodes = [];
     for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
-    const { left, right } = main.getBoundingClientRect();
-    const lines = nodes.map((node) => {
+    return nodes.map((node) => {
       const range = document.createRange();
       range.selectNodeContents(node);
       return {
@@ -39,15 +48,14 @@ const textLines = (page) =>
         boxes: [...range.getClientRects()].map((box) => ({ left: box.left, right: box.right })),
       };
     });
-    return { column: { left, right }, lines };
   });
-const pastColumn = (column) => (box) =>
+const outside = (column) => (box) =>
   box.right > box.left && (box.left < column.left - 0.5 || box.right > column.right + 0.5);
 /** Visible text lines that extend past the content column, so clipping cannot mask overflow. */
 const textOutsideColumn = async (page) => {
-  const { column, lines } = await textLines(page);
-  const outside = lines.filter((line) => line.text && !line.hidden);
-  return outside.filter((line) => line.boxes.some(pastColumn(column))).map((line) => line.text);
+  const column = await contentColumn(page);
+  const visible = (await textLines(page)).filter((line) => line.text && !line.hidden);
+  return visible.filter((line) => line.boxes.some(outside(column))).map((line) => line.text);
 };
 for (const width of [320, 360]) {
   test.describe(`${width}px public pages`, () => {
@@ -61,20 +69,20 @@ for (const width of [320, 360]) {
         expect(await textOutsideColumn(page), `${route} text outside the column`).toEqual([]);
       });
     }
-    test('every billing option stays beside the rail, fully visible and operable', async ({
+    test('every billing option and badge stays in the column beside the rail and is operable', async ({
       page,
     }) => {
       await page.goto(`${origin}/supporter`);
       const options = page.locator('#tiers button[aria-pressed]');
       await expect(options).toHaveCount(3);
-      const column = await page.locator('#main-content').evaluate((main) => {
-        const box = main.getBoundingClientRect();
-        return { left: box.left, right: box.right };
-      });
+      const column = await contentColumn(page);
       for (const option of await options.all()) {
-        const box = await option.boundingBox();
-        expect(box.x).toBeGreaterThanOrEqual(column.left);
-        expect(box.x + box.width).toBeLessThanOrEqual(column.right);
+        const boxes = await option.evaluate((node) =>
+          [node, ...node.querySelectorAll('span')].map((part) =>
+            part.getBoundingClientRect().toJSON()
+          )
+        );
+        expect(boxes.filter(outside(column)), 'option or badge outside the column').toEqual([]);
         expect(await option.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
         await option.click();
         await expect(option).toHaveAttribute('aria-pressed', 'true');
