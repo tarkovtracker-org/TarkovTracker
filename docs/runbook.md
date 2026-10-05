@@ -135,22 +135,24 @@ Cloudflare skips
 [watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
 (0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch path gets no
 Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
-not a broken integration. The Worker bundle also compiles code outside its directory. Its bundled
-source files, kept in sync with the code by `scripts/workflow-tests/worker-build-inputs.mjs`:
+not a broken integration. The Worker build also reads files outside its directory. Its inputs, kept
+in sync with the code by `scripts/workflow-tests/worker-build-inputs.mjs`:
 
 <!-- api-gateway-build-inputs:start -->
 
 - `workers/api-gateway/**` — watched by the trigger
 - `shared/**` — **not** watched
 - `app/utils/modeProgress.ts` — **not** watched
+- `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and any bundled package)
+- `pnpm-workspace.yaml` — **not** watched (overrides esbuild)
 
 <!-- api-gateway-build-inputs:end -->
 
 A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
 the previous Worker build. Until the trigger also watches those paths, treat that merge as needing a
-Worker build of its exact SHA; starting one is a production deployment and needs authorization.
-Root toolchain files (`pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package.json`, `.nvmrc`) are not
-watched either; the list above gains `pnpm-lock.yaml` if the Worker ever bundles an npm package.
+Worker build of its exact SHA; starting one is a production deployment and needs authorization. A
+toolchain-file change only matters when it changes the `workers/api-gateway` importer in the
+lockfile, the esbuild override, or a package the Worker bundles.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid

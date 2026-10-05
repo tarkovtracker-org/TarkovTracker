@@ -9,8 +9,10 @@ import ts from 'typescript';
 const ROOT = realpathSync('.');
 const WORKER = 'workers/api-gateway';
 const RUNBOOK = 'docs/runbook.md';
-// Any bundled npm package makes the root lockfile a build input.
+// The Worker is a pnpm workspace member: the root lockfile pins Wrangler/esbuild and every bundled
+// package, and the workspace file overrides esbuild. Both feed every build regardless of imports.
 const LOCKFILE = 'pnpm-lock.yaml';
+const TOOLCHAIN = [LOCKFILE, 'pnpm-workspace.yaml'];
 const RUNTIME_PREFIXES = ['node:', 'cloudflare:'];
 // Files esbuild parses for further imports. EXTENSIONS is esbuild's default `resolveExtensions`
 // order, which wrangler does not override, so ambiguous specifiers pick the file it bundles.
@@ -111,7 +113,8 @@ function workerSourceClosure() {
       );
     }
   }
-  return [...seen].map((file) => relative(ROOT, file)).sort();
+  const sources = [...seen].map((file) => relative(ROOT, file));
+  return [...new Set([...sources, ...TOOLCHAIN.filter(isFile)])].sort();
 }
 /** Backticked path patterns listed between the runbook's build-input markers. */
 function documentedInputs(markdown) {
