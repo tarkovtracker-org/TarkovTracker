@@ -119,8 +119,9 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys automatically. Three integrations do the work — none of them GitHub
-Actions — and each surfaces as a check on the merge commit when it runs:
+Merging to `main` deploys through three integrations — none of them GitHub Actions. Each one builds
+and deploys only when its trigger matches the merge, and surfaces as a check on the merge commit
+when it runs:
 
 | What                                 | Mechanism                    | Check on the merge commit     |
 | ------------------------------------ | ---------------------------- | ----------------------------- |

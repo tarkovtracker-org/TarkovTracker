@@ -12,9 +12,10 @@ const RUNBOOK = 'docs/runbook.md';
 // Any bundled npm package makes the root lockfile a build input.
 const LOCKFILE = 'pnpm-lock.yaml';
 const RUNTIME_PREFIXES = ['node:', 'cloudflare:'];
-// Files esbuild parses for further imports, and the extensions it tries for extensionless specifiers.
+// Files esbuild parses for further imports. EXTENSIONS is esbuild's default `resolveExtensions`
+// order, which wrangler does not override, so ambiguous specifiers pick the file it bundles.
 const SOURCE_RE = /\.[cm]?[jt]sx?$/;
-const EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.mjs', '.jsx'];
+const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json'];
 const isFile = (path) => existsSync(path) && statSync(path).isFile();
 function workerEntry() {
   const wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8');
@@ -81,7 +82,7 @@ function resolveImport(fromFile, specifier, aliases) {
   const candidates = [
     base,
     ...EXTENSIONS.map((extension) => base + extension),
-    base.replace(/\.js$/, '.ts'),
+    ...['.tsx', '.ts'].map((extension) => base.replace(/\.js$/, extension)),
     ...EXTENSIONS.map((extension) => join(base, `index${extension}`)),
   ];
   const found = candidates.find(isFile);
