@@ -191,13 +191,11 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
     revision === removalIntentRevision && sessionOwner === getCurrentSupabaseUserId();
   invalidateActiveProgressWrites(userId);
   removalCleanupCallbacks.forEach((cleanup) => cleanup(userId));
-  const keys = listStorageKeys();
-  let removed = keys !== null;
   const activeRemoval = await removeIfOwned(STORAGE_KEYS.progress, userId, true);
   // A canceled active-slot operation is not a storage failure. A later sign-in or
   // removal request must keep its copies and must not inherit this attempt's barrier.
   if (!isCurrent()) return false;
-  removed = activeRemoval.complete && removed;
+  let removed = activeRemoval.complete;
   // An earlier queued replacement can retain the owner's active bytes while removal waits.
   removed = removeAccountRecoveryCopy(userId) && removed;
   removed = removeSupersededProgressCopies(userId) && removed;
@@ -205,6 +203,9 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
     removed = (await removeIfOwned(key, userId)).complete && removed;
     if (!isCurrent()) return false;
   }
+  // The active-slot lock and owner cleanup can allow another tab to create a backup.
+  const keys = listStorageKeys();
+  removed = keys !== null && removed;
   for (const key of (keys ?? []).filter(isRecognizedBackupKey)) {
     removed = (await removeIfOwned(key, userId)).complete && removed;
     if (!isCurrent()) return false;

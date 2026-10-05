@@ -197,6 +197,36 @@ describe('device data removal', () => {
       ].sort()
     );
   });
+  it('removes owner backups created while active cleanup waits for its lock', async () => {
+    let release!: () => void;
+    let requested!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queued = new Promise<void>((resolve) => {
+      requested = resolve;
+    });
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (_name: string, _options: unknown, callback: () => unknown) => {
+          requested();
+          await held;
+          return callback();
+        },
+      },
+    });
+    localStorage.setItem(STORAGE_KEYS.progress, owned('user-1'));
+    const removing = removeAccountDeviceData('user-1');
+    await queued;
+    const ownerBackup = `${LEGACY_STORAGE_KEYS.progressBackupPrefix}2026-01-01T00:00:00.000Z`;
+    const foreignBackup = `${STORAGE_KEYS.progressBackupPrefix}user-2_10`;
+    localStorage.setItem(ownerBackup, owned('user-1'));
+    localStorage.setItem(foreignBackup, owned('user-2'));
+    release();
+    expect(await removing).toBe(true);
+    expect(localStorage.getItem(ownerBackup)).toBeNull();
+    expect(localStorage.getItem(foreignBackup)).toBe(owned('user-2'));
+  });
   it('removes legacy timestamp-named backups by their stored owner', async () => {
     const legacyTimestampBackup = `${LEGACY_STORAGE_KEYS.progressBackupPrefix}2026-01-01T00:00:00.000Z`;
     localStorage.setItem(legacyTimestampBackup, owned('user-1'));
