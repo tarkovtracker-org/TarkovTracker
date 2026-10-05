@@ -129,30 +129,43 @@ when it runs:
 | `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
 | DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
 
-The Worker build is path-filtered. Its `Deploy default branch` trigger builds `main` only when any
+The Worker build is path-filtered. Its `Deploy default branch` trigger runs `npx wrangler deploy`
+in root directory `workers/api-gateway`, with no build command. It builds `main` only when any
 commit in a push changes a file under its build watch path `workers/api-gateway/**`, or when
 Cloudflare skips
 [watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
 (0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch path gets no
 Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
-not a broken integration. The Worker build also reads files outside its directory. Its inputs, kept
-in sync with the code by `scripts/workflow-tests/worker-build-inputs.mjs`:
+not a broken integration.
+
+Being a build input is not the same as being watched. Besides its directory, the build reads the
+sources it bundles, the nearest `package.json` and `tsconfig.json` esbuild applies to them, and the
+pnpm workspace files that install Wrangler and esbuild. Its inputs, kept in sync with the code by
+`scripts/workflow-tests/worker-build-inputs.mjs`:
 
 <!-- api-gateway-build-inputs:start -->
 
 - `workers/api-gateway/**` — watched by the trigger
-- `shared/**` — **not** watched
-- `app/utils/modeProgress.ts` — **not** watched
-- `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and any bundled package)
-- `pnpm-workspace.yaml` — **not** watched (overrides esbuild)
+- `shared/**` — **not** watched (bundled)
+- `app/utils/modeProgress.ts` — **not** watched (bundled)
+- `package.json` — **not** watched (module type for the bundled files above; pnpm version, root
+  Wrangler and `postinstall` for workspace installs)
+- `tsconfig.json` — **not** watched (compiles the bundled files above; extends the
+  `.nuxt/tsconfig.json` that `nuxt prepare` generates from `nuxt.config.ts`)
+- `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and every installed package)
+- `pnpm-workspace.yaml` — **not** watched (workspace membership, esbuild override, allowed build
+  scripts)
 
 <!-- api-gateway-build-inputs:end -->
 
 A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
-the previous Worker build. Until the trigger also watches those paths, treat that merge as needing a
-Worker build of its exact SHA; starting one is a production deployment and needs authorization. A
-toolchain-file change only matters when it changes the `workers/api-gateway` importer in the
-lockfile, the esbuild override, or a package the Worker bundles.
+the previous Worker build, unless its push bypassed watch-path matching. Until the trigger also
+watches those paths, treat such a merge, including a lockfile-only dependency update, as needing a
+Worker build of its exact SHA; starting one is a production deployment and needs authorization.
+The check also rejects a `wrangler.json` or `wrangler.jsonc` in `workers/` or the repository root,
+which that deploy command would use instead of `workers/api-gateway/wrangler.toml`. The root
+`.nvmrc` is not listed: Cloudflare documents Node version files in the build's root directory,
+`workers/api-gateway`, which has none.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid

@@ -18,5 +18,5 @@ fails locally. Run with `pnpm run test:workflow`.
 | `security.mjs`            | Security workflow wiring and Gitleaks rules.                                       |
 | `preview*.mjs`            | The `preview/` pipeline and its workflows.                                         |
 | `finalization-shadow.mjs` | `preview/finalization-shadow.mjs`.                                                 |
-| `worker-build-inputs.mjs` | Runbook's api-gateway Workers Builds input list against the Worker import closure. |
+| `worker-build-inputs.mjs` | Runbook's api-gateway Workers Builds input list against the files the build reads. |
 | `helpers/`                | Shared fixtures: temp repos, workflow block parsing, ZIP building.                 |
