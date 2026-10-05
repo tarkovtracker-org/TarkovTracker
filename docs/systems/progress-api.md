@@ -111,12 +111,16 @@ sequenceDiagram
   lock/unlock) used by Worker task writes
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
+- `workers/api-gateway/src/utils/user-display-name.ts` — cached Auth metadata lookup shared by
+  personal and team API progress
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs
 
 ### Invariants
 
-- App user hydration and API progress responses share provider metadata fallback ordering, and the
-  app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
+- App user hydration, personal API progress, and team API progress share provider metadata fallback
+  ordering. Both API consumers use the same per-user display-name cache, so either endpoint must
+  resolve the same metadata before populating it. The app and API share one invalidation algorithm:
+  a requirement whose `status` includes `failed`
   never invalidates its task when the prerequisite is failed. Shared utilities must not import
   Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
 - Gateway task catalogs are frozen with one prepared dependency graph per snapshot. Catalog expiry

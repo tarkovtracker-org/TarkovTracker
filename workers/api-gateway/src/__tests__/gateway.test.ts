@@ -238,6 +238,8 @@ const createBaseFetchMock = ({
     return new Response('Not Found', { status: 404 });
   });
 beforeEach(() => {
+  deleteMemoryCache('user-display:user-1');
+  deleteMemoryCache('user-display:user-2');
   deleteMemoryCache('tarkov:tasks:regular');
   deleteMemoryCache('tarkov:tasks:pve');
   deleteMemoryCache('tarkov:tasks:pvp-season');
@@ -1474,6 +1476,63 @@ describe('api-gateway', () => {
       method: 'GET',
       headers: { Authorization: bearerForMode(mode), ...headers },
     });
+  const metadataCases = [
+    { provider: 'email', metadata: { full_name: 'QA Member' }, expected: 'QA Member' },
+    { provider: 'discord', metadata: { name: 'Legacy#1234' }, expected: 'Legacy' },
+    {
+      provider: 'twitch',
+      metadata: { preferred_username: 'streamer', full_name: 'Streamer Name' },
+      expected: 'Streamer Name',
+    },
+  ];
+  for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
+    it.each(
+      metadataCases.flatMap((scenario) =>
+        (['team', 'personal'] as const).map((first) => ({ ...scenario, first }))
+      )
+    )(
+      `shares provider metadata after $first progress warms the cache (${mode}, $provider)`,
+      async ({ provider, metadata, expected, first }) => {
+        const baseFetch = createBaseFetchMock({
+          permissions: ['GP', 'TP'],
+          gameMode: mode,
+          teamId: 'team-1',
+        });
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = new URL(String(input));
+          if (url.pathname.includes('/auth/v1/admin/users/')) {
+            return jsonResponse({
+              email: 'qa@example.invalid',
+              app_metadata: { provider },
+              user_metadata: metadata,
+            });
+          }
+          if (url.pathname.endsWith('/rest/v1/user_game_mode_progress')) {
+            const filter = url.searchParams.get('user_id') ?? '';
+            const ids = filter.startsWith('eq.') ? [filter.slice(3)] : ['user-1', 'user-2'];
+            return jsonResponse(ids.map((id) => ({ user_id: id, progress_data: { level: 1 } })));
+          }
+          return baseFetch(input, init);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const order = first === 'team' ? ['team', 'personal'] : ['personal', 'team'];
+        for (const kind of order) {
+          const request = kind === 'team' ? teamProgressRequest(mode) : progressRequest(mode);
+          const res = await worker.fetch(request, BASE_ENV);
+          expect(res.status).toBe(200);
+          const body = (await res.json()) as {
+            data: { displayName: string } | Array<{ displayName: string }>;
+          };
+          const rows = Array.isArray(body.data) ? body.data : [body.data];
+          expect(rows).toHaveLength(kind === 'team' ? 2 : 1);
+          expect(rows.map((row) => row.displayName)).toEqual(rows.map(() => expected));
+        }
+        expect(
+          fetchMock.mock.calls.filter(([url]) => String(url).includes('/auth/v1/admin/users/'))
+        ).toHaveLength(2);
+      }
+    );
+  }
   it.each([
     ['pvp', 0],
     ['pve', 0],
