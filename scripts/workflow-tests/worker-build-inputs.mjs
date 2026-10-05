@@ -22,26 +22,59 @@ const WORKSPACE_FILES = [
   '.pnpmfile.cjs',
   '.pnpmfile.mjs',
 ];
-// esbuild applies the nearest package.json (module type, sideEffects) and tsconfig (paths, JSX and
-// import options) above each bundled file, so files outside WORKER use the repository root's.
+// esbuild parses every package.json (module type, sideEffects) and tsconfig (paths, JSX and import
+// options) from each bundled file's directory up to the root, so outside files use the root's.
 const PACKAGE_CONFIGS = ['package.json'];
 const TS_CONFIGS = ['tsconfig.json', 'jsconfig.json'];
-// Without --config, wrangler prefers these anywhere up the tree over WORKER/wrangler.toml.
-const SHADOWING_WRANGLER_CONFIGS = ['wrangler.json', 'wrangler.jsonc'];
+// Without --config, `wrangler deploy` follows a deploy redirect, then prefers wrangler.json(c),
+// anywhere up the tree, over WORKER/wrangler.toml.
+const SHADOWING_WRANGLER_CONFIGS = [
+  '.wrangler/deploy/config.json',
+  'wrangler.json',
+  'wrangler.jsonc',
+];
+// A workspace install runs the root `postinstall`, whose `nuxt prepare` writes `.nuxt/` from this.
+const NUXT_CONFIG = 'nuxt.config.ts';
+// wrangler.toml settings this check models; others (tsconfig, [build], rules, base_dir, assets…)
+// can read or bundle more files.
+const MODELED_WRANGLER_KEYS = new Set([
+  'name',
+  'main',
+  'compatibility_date',
+  'workers_dev',
+  'preview_urls',
+  'routes',
+  'placement',
+  'dev',
+  'observability',
+  'durable_objects',
+  'ratelimits',
+  'migrations',
+  'vars',
+]);
 const RUNTIME_PREFIXES = ['node:', 'cloudflare:'];
 // Files esbuild parses for further imports. EXTENSIONS is esbuild's default `resolveExtensions`
 // order, which wrangler does not override, so ambiguous specifiers pick the file it bundles.
 const SOURCE_RE = /\.[cm]?[jt]sx?$/;
 const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json'];
 const isFile = (path) => existsSync(path) && statSync(path).isFile();
-function workerEntry() {
-  const wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8');
-  // Wrangler `[alias]` can redirect any specifier; this scanner does not model it.
-  assert.doesNotMatch(
-    wrangler,
-    /^\s*(\[(env\.[^\]]+\.)?alias\]|alias\s*[=.])/m,
-    'teach this check wrangler [alias] first'
+/** Top-level keys and table names in wrangler.toml, including `[env.<name>.<key>]` tables. */
+function wranglerKeys(wrangler) {
+  const firstTable = wrangler.search(/^\s*\[/m);
+  const topLevel = firstTable === -1 ? wrangler : wrangler.slice(0, firstTable);
+  const keys = [...topLevel.matchAll(/^([A-Za-z_][\w-]*)\s*=/gm)].map(([, key]) => key);
+  const tables = [...wrangler.matchAll(/^\s*\[{1,2}\s*([^\]\s]+)\s*\]{1,2}/gm)].map(
+    ([, table]) => table.replace(/^env\.[^.]+\./, '').split('.')[0]
   );
+  return [...keys, ...tables];
+}
+/** Fails on wrangler.toml settings this check does not model. */
+function assertModeledWrangler(wrangler) {
+  const unmodeled = wranglerKeys(wrangler).filter((key) => !MODELED_WRANGLER_KEYS.has(key));
+  assert.deepEqual(unmodeled, [], 'teach this check these wrangler.toml settings first');
+}
+function workerEntry(wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8')) {
+  assertModeledWrangler(wrangler);
   const main = wrangler.match(/^main\s*=\s*"([^"]+)"/m);
   assert.ok(main, `${WORKER}/wrangler.toml must declare main`);
   return join(WORKER, main[1]);
@@ -136,12 +169,13 @@ function workerSourceClosure() {
   }
   return [...seen];
 }
-/** The first of `names` found in `file`'s directory or an ancestor, up to the repository root. */
-function nearestConfig(file, names) {
-  for (let dir = dirname(file); ; dir = dirname(dir)) {
-    const found = names.map((name) => join(dir, name)).find(isFile);
-    if (found || !dir.startsWith(ROOT + sep)) return found;
+/** Every one of `names` in `file`'s directory and its ancestors, up to the repository root. */
+function ancestorConfigs(file, names) {
+  const found = [];
+  for (let dir = dirname(file); dir === ROOT || dir.startsWith(ROOT + sep); dir = dirname(dir)) {
+    found.push(...names.map((name) => join(dir, name)).filter(isFile));
   }
+  return found;
 }
 const isTracked = (file) =>
   spawnSync('git', ['ls-files', '--error-unmatch', '--', file], { stdio: 'ignore' }).status === 0;
@@ -153,11 +187,28 @@ function relativeBases(file) {
     .filter((path) => path.startsWith('.'))
     .map((path) => withJson(resolve(dirname(file), path)));
 }
-/** A tsconfig and its relative `extends` chain, split into tracked files and generated ones. */
-function tsconfigChain(file, found = { tracked: [], generated: [] }) {
-  (isTracked(file) ? found.tracked : found.generated).push(relative(ROOT, file));
-  for (const base of relativeBases(file)) tsconfigChain(base, found);
-  return found;
+/** Tsconfigs and their relative `extends` chains, split into tracked and generated files. */
+function tsconfigChains(files) {
+  const seen = new Set();
+  const pending = [...files];
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (!seen.has(file)) pending.push(...relativeBases(file));
+    seen.add(file);
+  }
+  const all = [...seen].map((file) => relative(ROOT, file));
+  return { tracked: all.filter(isTracked), generated: all.filter((file) => !isTracked(file)) };
+}
+/** Whether a workspace install's root `postinstall` regenerates `.nuxt/`. */
+const runsNuxtPrepare = () =>
+  /\bnuxt prepare\b/.test(JSON.parse(readFileSync('package.json', 'utf8')).scripts?.postinstall);
+/** The tracked config that writes generated tsconfig bases; the check fails on unknown ones. */
+function generatorsOf(generated) {
+  const unknown = generated.filter((file) => !file.startsWith('.nuxt/'));
+  assert.deepEqual(unknown, [], 'teach this check what generates these tsconfig bases');
+  if (generated.length === 0) return [];
+  assert.ok(runsNuxtPrepare(), 'teach this check how .nuxt/ is generated');
+  return [NUXT_CONFIG];
 }
 /** Wrangler configs that would replace WORKER/wrangler.toml for `npx wrangler deploy`. */
 function shadowingWranglerConfigs(exists = isFile) {
@@ -181,19 +232,17 @@ function workspaceInputs() {
 function workerBuildInputs() {
   assert.deepEqual(shadowingWranglerConfigs(), [], `teach this check a non-TOML ${WORKER} config`);
   const sources = workerSourceClosure();
-  const packages = sources.map((file) => nearestConfig(file, PACKAGE_CONFIGS)).filter(Boolean);
-  const chains = [...new Set(sources.map((file) => nearestConfig(file, TS_CONFIGS)))]
-    .filter(Boolean)
-    .map((file) => tsconfigChain(file));
+  const packages = sources.flatMap((file) => ancestorConfigs(file, PACKAGE_CONFIGS));
+  const { tracked, generated } = tsconfigChains(
+    new Set(sources.flatMap((file) => ancestorConfigs(file, TS_CONFIGS)))
+  );
   const files = [
     ...[...sources, ...packages].map((file) => relative(ROOT, file)),
-    ...chains.flatMap(({ tracked }) => tracked),
+    ...tracked,
+    ...generatorsOf(generated),
     ...workspaceInputs(),
   ];
-  return {
-    files: [...new Set(files)].sort(),
-    generated: [...new Set(chains.flatMap(({ generated }) => generated))].sort(),
-  };
+  return { files: [...new Set(files)].sort(), generated: generated.sort() };
 }
 /** The runbook text between its build-input markers. */
 function inputBlock(markdown) {
@@ -235,11 +284,12 @@ test('the closure follows imports outside workers/api-gateway', () => {
 });
 test('toolchain and esbuild configs are inputs regardless of what the Worker imports', () => {
   const { files } = workerBuildInputs();
-  // Workspace installs read the root files; esbuild reads the nearest manifest and tsconfig of
-  // every bundled file: the Worker's own, and the root ones for bundled shared/ and app/ files.
+  // Workspace installs read the root files and regenerate `.nuxt/`; esbuild reads every manifest
+  // and tsconfig above each bundled file: the Worker's own, and the root ones above all of them.
   const expected = [
     'package.json',
     'tsconfig.json',
+    NUXT_CONFIG,
     LOCKFILE,
     'pnpm-workspace.yaml',
     `${WORKER}/package.json`,
@@ -247,21 +297,35 @@ test('toolchain and esbuild configs are inputs regardless of what the Worker imp
   ];
   for (const input of expected)
     assert.ok(files.includes(input), `${input} feeds every Worker build`);
-  const shared = join(ROOT, 'shared', 'utils', '__fixture__.ts');
-  assert.equal(nearestConfig(shared, TS_CONFIGS), join(ROOT, 'tsconfig.json'));
-  assert.equal(nearestConfig(shared, PACKAGE_CONFIGS), join(ROOT, 'package.json'));
+  const nested = join(ROOT, WORKER, 'src', 'utils', '__fixture__.ts');
+  assert.deepEqual(ancestorConfigs(nested, PACKAGE_CONFIGS), [
+    join(ROOT, WORKER, 'package.json'),
+    join(ROOT, 'package.json'),
+  ]);
 });
-test('a generated tsconfig base must be named, not listed as a tracked input', () => {
-  const { generated } = tsconfigChain(join(ROOT, 'tsconfig.json'));
+test('generated tsconfig bases are named and their generator is an input', () => {
+  const { generated } = tsconfigChains([join(ROOT, 'tsconfig.json')]);
   assert.deepEqual(generated, ['.nuxt/tsconfig.json']);
+  assert.deepEqual(generatorsOf(generated), [NUXT_CONFIG]);
+  assert.deepEqual(generatorsOf([]), []);
+  assert.throws(() => generatorsOf(['.cache/tsconfig.json']), /generates these tsconfig bases/);
 });
-test('a wrangler.json(c) up the tree, which would replace wrangler.toml, is reported', () => {
+test('configs that would replace wrangler.toml up the tree are reported', () => {
   assert.deepEqual(shadowingWranglerConfigs(), []);
-  const added = new Set(['workers/wrangler.json', 'wrangler.jsonc']);
+  const added = new Set(['workers/.wrangler/deploy/config.json', 'wrangler.jsonc']);
   assert.deepEqual(
     shadowingWranglerConfigs((path) => added.has(path)),
     [...added]
   );
+});
+test('wrangler.toml settings that can read more files must be modeled first', () => {
+  const keys = wranglerKeys('main = "x"\ntsconfig = "a"\n[env.staging.alias]\nx = 1\n[[rules]]\n');
+  assert.deepEqual(keys, ['main', 'tsconfig', 'alias', 'rules']);
+  assertModeledWrangler(readFileSync(join(WORKER, 'wrangler.toml'), 'utf8'));
+  for (const setting of ['tsconfig = "a"', '[build]', '[env.staging.alias]', '[[rules]]']) {
+    assert.throws(() => workerEntry(`main = "x"\n${setting}\n`), /settings first/);
+  }
+  assert.equal(workerEntry('main = "src/index.ts"\n'), join(WORKER, 'src', 'index.ts'));
 });
 test('bare imports outside workers/api-gateway are not resolved with Worker aliases', () => {
   const shared = join(ROOT, 'shared', 'utils', '__fixture__.ts');
