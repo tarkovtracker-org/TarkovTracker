@@ -1113,17 +1113,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      update_task_completion: {
-        Args: {
-          p_complete: boolean
-          p_failed: boolean
-          p_game_mode: string
-          p_task_id: string
-          p_timestamp: number
-          p_user_id: string
-        }
-        Returns: undefined
-      }
     }
     Enums: {
       [_ in never]: never

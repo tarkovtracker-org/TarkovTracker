@@ -25,10 +25,10 @@ SELECT is((SELECT count(*) FROM progress_write_events), 0::bigint,
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   '{"pvp":{"level":11},"pve":{"level":20},"seasonal":{"level":30}}',
   private.active_season_number());
-SELECT is((SELECT count(*) FROM progress_write_events WHERE relation_name = 'user_progress'), 1::bigint,
-  'one persistent change updates the legacy mirror once');
+SELECT is((SELECT count(*) FROM progress_write_events WHERE relation_name = 'user_progress'), 0::bigint,
+  'a persistent mode change does not write the account row or emit its Realtime change');
 SELECT is((SELECT count(*) FROM progress_write_events WHERE mode = 'pvp'), 1::bigint,
-  'the RPC does not repeat the legacy trigger normalized write');
+  'a persistent mode change writes its normalized row once');
 SELECT is((SELECT count(*) FROM progress_write_events WHERE mode IN ('pve', 'seasonal')), 0::bigint,
   'unrelated modes do not produce writes');
 TRUNCATE progress_write_events;

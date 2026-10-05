@@ -127,16 +127,16 @@ SELECT results_eq(
   'the sync stores PvP and PvE at season zero and Seasonal at the active season'
 );
 SELECT is(
-  (SELECT pvp_data FROM public.user_progress
+  (SELECT pvp_data->>'level' FROM public.user_progress
    WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)),
-  (SELECT progress_data FROM seasonal_progress_expected WHERE game_mode = 'pvp'),
-  'the legacy PvP mirror matches normalized PvP progress'
+  NULL,
+  'the sync no longer writes the legacy PvP column'
 );
 SELECT is(
-  (SELECT pve_data FROM public.user_progress
+  (SELECT pve_data->>'level' FROM public.user_progress
    WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)),
-  (SELECT progress_data FROM seasonal_progress_expected WHERE game_mode = 'pve'),
-  'the legacy PvE mirror matches normalized PvE progress'
+  NULL,
+  'the sync no longer writes the legacy PvE column'
 );
 
 CREATE TEMP TABLE seasonal_progress_snapshot AS
@@ -168,17 +168,11 @@ SELECT lives_ok(
 RESET ROLE;
 
 SELECT results_eq(
-  $$SELECT current_game_mode, game_edition, tarkov_uid, pvp_data, pve_data
+  $$SELECT current_game_mode, game_edition, tarkov_uid
     FROM public.user_progress
     WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)$$,
-  $$SELECT
-      'pvp'::TEXT,
-      9::INTEGER,
-      999999::BIGINT,
-      public.sanitize_user_progress_mode_data(stale_modes->'pvp'),
-      public.sanitize_user_progress_mode_data(stale_modes->'pve')
-    FROM seasonal_progress_fixture$$,
-  'a stale Seasonal entry still commits account metadata and both legacy mirrors'
+  $$SELECT 'pvp'::TEXT, 9::INTEGER, 999999::BIGINT$$,
+  'a stale Seasonal entry still commits account metadata'
 );
 SELECT results_eq(
   $$SELECT game_mode, season_number, progress_data
@@ -228,17 +222,11 @@ SELECT lives_ok(
 RESET ROLE;
 
 SELECT results_eq(
-  $$SELECT current_game_mode, game_edition, tarkov_uid, pvp_data, pve_data
+  $$SELECT current_game_mode, game_edition, tarkov_uid
     FROM public.user_progress
     WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)$$,
-  $$SELECT
-      'pve'::TEXT,
-      8::INTEGER,
-      888888::BIGINT,
-      public.sanitize_user_progress_mode_data(omitted_season_modes->'pvp'),
-      public.sanitize_user_progress_mode_data(omitted_season_modes->'pve')
-    FROM seasonal_progress_fixture$$,
-  'an omitted season still commits account metadata and both legacy mirrors'
+  $$SELECT 'pve'::TEXT, 8::INTEGER, 888888::BIGINT$$,
+  'an omitted season still commits account metadata'
 );
 SELECT results_eq(
   $$SELECT game_mode, season_number, progress_data

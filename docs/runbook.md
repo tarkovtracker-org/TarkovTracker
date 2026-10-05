@@ -614,6 +614,10 @@ account activity, so retention deadlines and pending inactivity deletions are un
    I/O pressure.
 4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
 
+After `20261005090000_retire_legacy_mode_progress_dual_writes.sql` deploys, nothing writes the legacy
+columns, so the gate stays a read-only check and the helper must not run: it would copy frozen
+legacy progress into normalized rows.
+
 ### Manual activity history rollout
 
 Apply `20260910050000_add_manual_activity_history_to_progress` and
