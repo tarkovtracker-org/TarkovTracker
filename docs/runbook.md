@@ -119,14 +119,72 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys everything automatically. Three integrations do the work — none of them
-GitHub Actions — and each surfaces as a check on the merge commit:
+Merging to `main` deploys through three integrations — none of them GitHub Actions. Each one builds
+and deploys only when its trigger matches the merge, and surfaces as a check on the merge commit
+when it runs:
 
 | What                                 | Mechanism                    | Check on the merge commit     |
 | ------------------------------------ | ---------------------------- | ----------------------------- |
 | Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
 | `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
 | DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+
+The Worker build is path-filtered. Its `Deploy default branch` trigger runs `npx wrangler deploy`
+in root directory `workers/api-gateway`, with no build command. It builds `main` only when any
+commit in a push changes a file under its build watch path `workers/api-gateway/**`, or when
+Cloudflare skips
+[watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
+(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch path gets no
+Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
+not a broken integration.
+
+Being a build input is not the same as being watched. Besides its directory, the build reads the
+sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
+workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` and transitive local
+imports the install's `postinstall` evaluates. Its inputs, kept in sync with the code by
+`scripts/workflow-tests/worker-build-inputs.mjs`:
+
+<!-- api-gateway-build-inputs:start -->
+
+- `workers/api-gateway/**` — watched by the trigger
+- `shared/**` — **not** watched (bundled)
+- `app/utils/modeProgress.ts` — **not** watched (bundled)
+- `app/features/resources/resourceData.ts` — **not** watched (`nuxt prepare` import)
+- `app/locales/en.json` — **not** watched (`nuxt prepare` import)
+- `app/utils/apiProtectionConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/buildCommit.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/csp.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/entryRecoveryScript.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/locales.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/nuxtSecurityConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/prerenderOutput.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/routeSeo.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/runtimeConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/shellConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/stripBareNodeImports.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/theme.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/turnstileKeys.ts` — **not** watched (`nuxt prepare` import)
+- `package.json` — **not** watched (module type for the bundled files above; pnpm version and the
+  `postinstall` that workspace installs run)
+- `tsconfig.json` — **not** watched (compiles the bundled files above; extends the generated
+  `.nuxt/tsconfig.json`)
+- `nuxt.config.ts` — **not** watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
+  from it; the `app/utils/` modules it imports must also load for that install to succeed)
+- `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and every installed package)
+- `pnpm-workspace.yaml` — **not** watched (workspace membership, esbuild override, allowed build
+  scripts)
+
+<!-- api-gateway-build-inputs:end -->
+
+A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
+the previous Worker build, unless its push bypassed watch-path matching. Until the trigger also
+watches those paths, treat such a merge, including a lockfile-only dependency update, as needing a
+Worker build of its exact SHA; starting one is a production deployment and needs authorization.
+The check also rejects a deploy redirect (`.wrangler/deploy/config.json`), `wrangler.json` or
+`wrangler.jsonc` in `workers/api-gateway`, `workers/` or the repository root, which that deploy
+command would use instead of `workers/api-gateway/wrangler.toml`, and `wrangler.toml` settings it
+does not model. The root `.nvmrc` is not listed: Cloudflare documents Node version files in the
+build's root directory, `workers/api-gateway`, which has none.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -203,8 +261,11 @@ integration fails or is unavailable, not the normal path.
    merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
-5. Confirm the `Cloudflare Pages`, `Workers Builds: api-gateway` and `Supabase Preview` checks all
-   succeeded on the merge commit.
+5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
+   the push changed `workers/api-gateway/**` or bypassed watch-path matching, also confirm
+   `Workers Builds: api-gateway` succeeded on it. Otherwise, if it changed an unwatched
+   [Worker build input](#deployment), no check appears and the Worker still needs a build.
+   `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the
    Supabase dashboard. Manual fallback:
