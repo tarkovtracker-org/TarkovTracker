@@ -388,18 +388,15 @@ describe('active progress across tabs', () => {
     values.delete(STORAGE_KEYS.progress);
     expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
     tab.setActiveProgressWritesBlocked(false);
-    // Fully blocked site data holds no copy to restore, so it does not fail the reset.
-    const blocked = () => {
-      throw new DOMException('Site data is blocked', 'SecurityError');
-    };
-    vi.stubGlobal('localStorage', {
-      get length() {
-        return blocked();
+    // Blocked site data throws on access to `localStorage` itself and holds no copy to restore.
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => {
+        throw new DOMException('Site data is blocked', 'SecurityError');
       },
-      getItem: blocked,
-      removeItem: blocked,
     });
     expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
+    expect(tab.safeRemoveItem(STORAGE_KEYS.preferences)).toBe(false);
   });
   it('prevents synchronous helpers from bypassing active progress serialization', async () => {
     const tab = await openTab();

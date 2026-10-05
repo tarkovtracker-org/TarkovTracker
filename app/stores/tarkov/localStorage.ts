@@ -522,16 +522,18 @@ const removeStorageItem = (
   key: string,
   explicitOwnerRemoval?: string,
   expectedValue?: string,
-  storage: Storage = localStorage
+  storage?: Storage
 ): boolean => {
   if (typeof window === 'undefined') return false;
   try {
+    // Blocked site data throws on access to `localStorage` itself, so resolve it here.
+    const target = storage ?? localStorage;
     if (
       key === STORAGE_KEYS.progress &&
-      !canRemoveActiveProgress(storage.getItem(key), explicitOwnerRemoval, expectedValue)
+      !canRemoveActiveProgress(target.getItem(key), explicitOwnerRemoval, expectedValue)
     )
       return false;
-    storage.removeItem(key);
+    target.removeItem(key);
     return true;
   } catch (error) {
     logger.error(`[TarkovStore] Failed to remove localStorage key "${key}":`, error);

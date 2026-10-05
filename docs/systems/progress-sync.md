@@ -96,10 +96,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
   blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
   the next startup load retries the retention. A deliberate reset clears the owner's active copy
-  without creating an account recovery copy of the pre-reset progress. The reset reports completion
-  only once the clear confirms that no active copy remains for a reload to restore; otherwise (for
-  example without cross-tab locking, or when a session change cancels the clear) it reports
-  failure. Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
+  without creating an account recovery copy of the pre-reset progress. A Settings reset reports
+  completion only once the clear confirms that no active copy remains for a reload to restore;
+  otherwise (for example without cross-tab locking, or when a session change cancels the clear) it
+  reports failure. The online profile reset logs such a failure for its still-current session.
+  Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
