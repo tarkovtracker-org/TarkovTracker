@@ -8,7 +8,7 @@ import { logger } from '@/utils/logger';
 /** Bounded automatic cloud-save retries; afterwards changes stay pending for manual retry. */
 export const CLOUD_SAVE_RETRY_DELAYS_MS = [5000, 15000, 60000] as const;
 export type CloudSaveState = 'idle' | 'pending' | 'saving' | 'retry_scheduled' | 'failed';
-type LocalSaveState = 'unknown' | 'saved' | 'failed';
+type LocalSaveState = 'unknown' | 'pending' | 'saved' | 'failed';
 export type CloudSaveFailure = 'offline' | 'rate_limited' | 'auth' | 'unknown';
 export type LocalSaveFailure = 'quota' | 'unavailable' | 'unknown';
 export type CloudSaveStatus = {
@@ -37,10 +37,18 @@ const status = reactive<ProgressSaveStatusState>({
 });
 let cloudRetryHandler: (() => Promise<boolean>) | null = null;
 let unacknowledgedLocalFailure = false;
+let pendingLocalCloudHeld = false;
 export const progressSaveStatus: Readonly<ProgressSaveStatusState> = readonly(status);
+/** A queued write is held only in memory until the browser confirms it under the cross-tab lock. */
+export const recordLocalSavePending = (cloudHeld = false): void => {
+  status.local = 'pending';
+  status.localFailure = null;
+  pendingLocalCloudHeld = cloudHeld;
+};
 export const setCloudSaveStatus = (next: CloudSaveStatus): void => {
   if (status.cloud.state !== 'idle' && next.state === 'idle') {
     unacknowledgedLocalFailure = false;
+    pendingLocalCloudHeld = true;
   }
   status.cloud = { ...next };
 };
@@ -50,6 +58,7 @@ export const recordLocalSave = (
   failure: LocalSaveFailure | null = null,
   cloudHeld = false
 ): void => {
+  cloudHeld ||= status.local === 'pending' && pendingLocalCloudHeld;
   status.local = succeeded ? 'saved' : 'failed';
   status.localFailure = succeeded ? null : (failure ?? 'unknown');
   if (succeeded || !cloudHeld) unacknowledgedLocalFailure = !succeeded;
@@ -88,11 +97,21 @@ export const resetCloudSaveStatus = (): void => {
 export const acknowledgeStartupSync = (): void => {
   resetCloudSaveStatus();
   unacknowledgedLocalFailure = false;
+  pendingLocalCloudHeld = true;
 };
 export const hasPendingCloudChanges = (): boolean => status.cloud.state !== 'idle';
 /** Pending cloud changes without a confirmed local save may be lost on reload or sign-out. */
 export const hasUnsavedProgressChanges = (): boolean =>
-  status.local === 'failed' && (unacknowledgedLocalFailure || hasPendingCloudChanges());
+  (status.local === 'pending' && !pendingLocalCloudHeld) ||
+  ((status.local === 'failed' || status.local === 'pending') &&
+    (unacknowledgedLocalFailure || hasPendingCloudChanges()));
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (event) => {
+    if (status.local !== 'pending' || !hasUnsavedProgressChanges()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+}
 const QUOTA_ERROR_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED']);
 const UNAVAILABLE_ERROR_NAMES = new Set(['SecurityError', 'InvalidStateError']);
 const errorName = (error: unknown): string =>

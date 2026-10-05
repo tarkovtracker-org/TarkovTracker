@@ -271,7 +271,7 @@ describe('performReset seasonal', () => {
   it('clears only the owner active copy as a deliberate reset, not an owner change', async () => {
     const store = createStore();
     await performReset('pvp', store);
-    expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1');
+    expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1', true);
   });
   it('keeps no superseded copy for modes that are still at their defaults', async () => {
     pendingCloudChanges.value = true;

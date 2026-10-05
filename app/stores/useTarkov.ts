@@ -39,7 +39,8 @@ import {
   parsePersistedProgressState,
   progressStorageSerializer,
   readPersistedProgressState,
-  safeSetItem,
+  persistActiveProgressValue,
+  invalidateActiveProgressWrites,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
 import {
@@ -92,7 +93,6 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
-import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
@@ -137,10 +137,15 @@ const persistOnlineReset = async (
   client: ReturnType<typeof useNuxtApp>['$supabase']['client'],
   userId: string
 ) => {
+  const revision = sessionTransitionRevision;
+  const isCurrent = () =>
+    revision === sessionTransitionRevision && getCurrentSupabaseUserId() === userId;
   const freshState = buildOnlineResetState(store);
   const { error } = await syncProgressState(client, userId, freshState);
+  if (!isCurrent()) return;
   throwSyncError(error, 'Failed to reset online profile');
-  clearActiveProgressStorage(userId);
+  await clearActiveProgressStorage(userId, true);
+  if (!isCurrent()) return;
   patchProgressState(store, freshState);
 };
 const persistPrestigeLevel = async (
@@ -597,18 +602,18 @@ const retainPreviousOwnerCopy = (preservedState: string | null, previousUserId: 
   return retained;
 };
 /** Returns `true` when the previous owner's active copy was restored for a guest session. */
-const restorePreviousOwnerCopy = (
+const restorePreviousOwnerCopy = async (
   preservedState: string | null,
   previousUserId: string | null,
   currentUserId: string | null
-): boolean => {
+): Promise<boolean> => {
   if (isDeviceDataRemovalPending(previousUserId)) {
-    removeAccountDeviceData(previousUserId as string);
+    await removeAccountDeviceData(previousUserId as string);
     return false;
   }
   return (
     Boolean(preservedState && currentUserId === null) &&
-    safeSetItem(STORAGE_KEYS.progress, preservedState as string)
+    (await persistActiveProgressValue(preservedState as string))
   );
 };
 const resetSessionMemory = (reason: string | undefined, userId: string | null) => {
@@ -630,12 +635,15 @@ const retainForSessionTransition = (
   setActiveProgressWritesBlocked(true);
   return false;
 };
-export function resetTarkovStoreForSessionTransition(
+let sessionTransitionRevision = 0;
+export async function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
+  const revision = ++sessionTransitionRevision;
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
+  invalidateActiveProgressWrites();
   if (!retainForSessionTransition(preservedState, previousUserId)) {
     resetSessionMemory(reason, previousUserId);
     return;
@@ -645,10 +653,13 @@ export function resetTarkovStoreForSessionTransition(
   if (!import.meta.client) {
     return;
   }
-  if (restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId)) return;
+  const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
+  if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
+    return;
+  if (restored) return;
   // Only the active copy is cleared: recovery copies belong to their owners. The reset above
   // may have persisted a default placeholder for the new owner; it is not their progress.
-  clearActiveProgressStorage(currentUserId);
+  await clearActiveProgressStorage(currentUserId);
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {

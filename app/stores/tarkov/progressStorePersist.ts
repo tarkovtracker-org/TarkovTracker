@@ -49,7 +49,7 @@ const preserveMismatchedSeasonalCopy = (ownerId: string | null, state: UserState
 const retainOrBlockForeignCopy = (raw: string, ownerId: string): void => {
   if (saveAccountRecoveryCopy(raw, ownerId)) {
     setActiveProgressWritesBlocked(false);
-    clearActiveProgressStorage();
+    void clearActiveProgressStorage();
     return;
   }
   markAccountRecoveryRetentionBlocked();

@@ -15,6 +15,7 @@ import {
   setActiveProgressWritesBlocked,
   progressPersistStorage,
   progressStorageSerializer,
+  flushActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
 import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
@@ -560,14 +561,14 @@ const modeRow = (mode: string, progress: UserProgressData) => ({
   season_number: 0,
 });
 /** Models the real auth transition: the context user changes, then the app resets. */
-const switchSession = (
+const switchSession = async (
   previousUserId: string | null,
   nextUserId: string | null,
   reason = 'user switched'
 ) => {
   supabaseContext.user.id = nextUserId;
   supabaseContext.user.loggedIn = nextUserId !== null;
-  resetTarkovStoreForSessionTransition(previousUserId, reason);
+  await resetTarkovStoreForSessionTransition(previousUserId, reason);
 };
 /** Lets fire-and-forget realtime snapshot reads and upserts finish before observing. */
 const settleBackgroundWork = async (): Promise<void> => {
@@ -627,6 +628,7 @@ describe('useTarkov sync integration', () => {
       store.setTarkovUid(1001);
       store.pvp.level = 2;
       await nextTick();
+      await flushActiveProgressWrites();
       const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
         typeof actual.useSupabaseSync
       >;
@@ -692,6 +694,7 @@ describe('useTarkov sync integration', () => {
       store.setTarkovUid(1001);
       store.pvp.level = 2;
       await nextTick();
+      await flushActiveProgressWrites();
       const firstSave = controller.syncToSupabase();
       await firstStarted.promise;
       let secondSave: ReturnType<typeof controller.syncToSupabase> | undefined;
@@ -702,6 +705,7 @@ describe('useTarkov sync integration', () => {
         });
         store.setTarkovUid(2002);
         await nextTick();
+        await flushActiveProgressWrites();
         secondSave = controller.syncToSupabase();
       }
       firstReply.resolve({
@@ -836,6 +840,7 @@ describe('useTarkov sync integration', () => {
     rpc.mockResolvedValue({ data: { tarkov_uid: null, tarkov_uid_conflict: true }, error: null });
     await initializeTarkovSync();
     await nextTick();
+    await flushActiveProgressWrites();
     const envelope = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
     expect(envelope._userId).toBe('user-1');
     expect(envelope.data.tarkovUid).toBeNull();
@@ -908,6 +913,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(12);
     expect(store.pve.level).toBe(8);
     await nextTick();
+    await flushActiveProgressWrites();
     expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.tarkovUid).toBeNull();
     await syncProgressState(
       supabaseContext.client as unknown as ProgressRpcClient,
@@ -916,7 +922,8 @@ describe('useTarkov sync integration', () => {
     );
     expect(getLastSyncPayload().p_tarkov_uid).toBeNull();
   });
-  beforeEach(() => {
+  beforeEach(async () => {
+    await flushActiveProgressWrites();
     resetTarkovSync('test setup');
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
@@ -1059,8 +1066,46 @@ describe('useTarkov sync integration', () => {
     vi.restoreAllMocks();
     resetTarkovSync('test teardown');
     await nextTick();
+    await flushActiveProgressWrites();
     localStorage.clear();
   });
+  it.each(['user-2', 'user-1'])(
+    'fences an online reset awaiting the local lock after switching to %s',
+    async (nextOwner) => {
+      const store = useTarkovStore();
+      let release!: () => void;
+      let acquired!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const waiting = new Promise<void>((resolve) => {
+        acquired = resolve;
+      });
+      const request = vi
+        .spyOn(navigator.locks, 'request')
+        .mockImplementation(async (_name, _options, callback) => {
+          acquired();
+          await gate;
+          return callback({ name: `${STORAGE_KEYS.progress}:mutation`, mode: 'exclusive' } as Lock);
+        });
+      const reset = store.resetOnlineProfile();
+      await waiting;
+      supabaseContext.user.id = 'user-2';
+      const firstTransition = resetTarkovStoreForSessionTransition('user-1');
+      let secondTransition: Promise<void> | undefined;
+      if (nextOwner === 'user-1') {
+        supabaseContext.user.id = 'user-1';
+        secondTransition = resetTarkovStoreForSessionTransition('user-2');
+      }
+      store.$patch((state) => {
+        state.pvp.level = 37;
+      });
+      release();
+      await Promise.all([reset, firstTransition, secondTransition]);
+      expect(store.pvp.level).toBe(37);
+      request.mockRestore();
+    }
+  );
   it('keeps offline Seasonal edits when historical mode freshness is unknown and metadata is newer', async () => {
     const base = Date.parse('2026-09-06T12:00:00Z');
     const local = structuredClone(defaultState);
@@ -1174,6 +1219,7 @@ describe('useTarkov sync integration', () => {
     ];
     await initializeTarkovSync();
     await nextTick();
+    await flushActiveProgressWrites();
     const read = () => JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
     expect(read()._metadataTimestamp).toBe(base + 20_000);
     expect(read()._modeTimestamps.pvp).toBe(base + 20_000);
@@ -1188,12 +1234,14 @@ describe('useTarkov sync integration', () => {
       },
     });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(read().data.pvp.level).toBe(3);
     expect(read()._modeTimestamps.pvp).toBe(base + 30_000);
     useTarkovStore().$patch((state) => {
       state.pve.level = 4;
     });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(read()._modeTimestamps.pve).toBe(base + 40_000);
     expect(read()._modeTimestamps.pvp).toBe(base + 30_000);
     expect(read()._metadataTimestamp).toBe(base + 20_000);
@@ -1209,15 +1257,18 @@ describe('useTarkov sync integration', () => {
       },
     });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(read()._modeTimestamps.pve).toBe(base + 35_000);
     useTarkovStore().$patch({ gameEdition: 3 });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(read()._metadataTimestamp).toBe(base + 40_000);
     getRealtimeCallback()?.({
       old: null,
       new: createRemoteRow({ game_edition: 3, updated_at: new Date(base + 36_000).toISOString() }),
     });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(read()._metadataTimestamp).toBe(base + 36_000);
   });
   it.each(['', 'invalid-date'])(
@@ -1492,6 +1543,7 @@ describe('useTarkov sync integration', () => {
         state.pvp.level = 42;
       });
       await nextTick();
+      await flushActiveProgressWrites();
       expect(progressSaveStatus.local).toBe('failed');
       expect(progressSaveStatus.localFailure).toBe('quota');
       setItem.mockRestore();
@@ -1545,6 +1597,7 @@ describe('useTarkov sync integration', () => {
       state.pvp.level = 42;
     });
     await nextTick();
+    await flushActiveProgressWrites();
     expect(progressSaveStatus.local).toBe('failed');
     expect(progressSaveStatus.localFailure).toBe('quota');
     setItem.mockRestore();
@@ -1891,6 +1944,7 @@ describe('useTarkov sync integration', () => {
     ];
     await initializeTarkovSync();
     await nextTick();
+    await flushActiveProgressWrites();
     expect(store.pvp.level).toBe(9);
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
     expect(persisted.data.pvp.level).toBe(9);
@@ -1915,13 +1969,13 @@ describe('useTarkov sync integration', () => {
     store.$patch((state) => {
       state.pvp.level = 42;
     });
-    resetTarkovStoreForSessionTransition('user-1', 'logout');
+    await resetTarkovStoreForSessionTransition('user-1', 'logout');
     const restoredSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) || '{}');
     expect(store.pvp.level).toBe(1);
     expect(restoredSnapshot._userId).toBe('user-1');
     expect(restoredSnapshot.data?.pvp?.level).toBe(11);
   });
-  it('clears progress when preserved logout storage cannot be rewritten', () => {
+  it('clears progress when preserved logout storage cannot be rewritten', async () => {
     const store = useTarkovStore();
     const preservedTimestamp = Date.parse('2026-02-25T00:00:00.000Z');
     localStorage.setItem(
@@ -1944,7 +1998,7 @@ describe('useTarkov sync integration', () => {
       }
       return originalSetItem(key, value);
     });
-    expect(() => resetTarkovStoreForSessionTransition('user-1', 'logout')).not.toThrow();
+    await expect(resetTarkovStoreForSessionTransition('user-1', 'logout')).resolves.toBeUndefined();
     expect(store.pvp.level).toBe(1);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
     expect(loggerMock.error).toHaveBeenCalledWith(
@@ -1969,7 +2023,7 @@ describe('useTarkov sync integration', () => {
     );
     supabaseContext.user.id = null;
     supabaseContext.user.loggedIn = false;
-    resetTarkovStoreForSessionTransition('user-1', 'logout');
+    await resetTarkovStoreForSessionTransition('user-1', 'logout');
     store.$patch((state) => {
       state.pvp.level = 4;
     });
@@ -2008,7 +2062,7 @@ describe('useTarkov sync integration', () => {
     store.$patch((state) => {
       state.pvp.level = 42;
     });
-    resetTarkovStoreForSessionTransition('user-1', 'logout');
+    await resetTarkovStoreForSessionTransition('user-1', 'logout');
     const restoredSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) || '{}');
     expect(store.pvp.level).toBe(1);
     expect(restoredSnapshot._userId).toBeUndefined();
@@ -2458,6 +2512,7 @@ describe('useTarkov sync integration', () => {
       { id: 'legacy-only', timestamp: 1000, type: 'task', action: 'complete', title: 'Legacy' },
     ]);
     await nextTick();
+    await flushActiveProgressWrites();
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
     expect(syncInitialState).toHaveBeenCalledTimes(1);
     const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as {
@@ -2486,6 +2541,7 @@ describe('useTarkov sync integration', () => {
           { id: 'initial', timestamp: 1000, type: 'task', action: 'complete', title: 'Initial' },
         ]);
         await nextTick();
+        await flushActiveProgressWrites();
         expect(syncInitialState).toHaveBeenCalledTimes(1);
         if (outcome === 'session-reset') resetTarkovSync('session changed');
         await vi.advanceTimersByTimeAsync(5000);
@@ -2788,6 +2844,7 @@ describe('useTarkov sync integration', () => {
       const first = createPersistedStore();
       first[mode].level = 2;
       await nextTick();
+      await flushActiveProgressWrites();
       expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-1`)).toBe(raw);
       resetTarkovSync('reload');
       const restored = createPersistedStore();
@@ -2833,8 +2890,9 @@ describe('useTarkov sync integration', () => {
     const store = useTarkovStore();
     supabaseContext.user.id = null as unknown as string;
     supabaseContext.user.loggedIn = false;
-    resetTarkovStoreForSessionTransition('user-1', 'logout');
+    await resetTarkovStoreForSessionTransition('user-1', 'logout');
     await nextTick();
+    await flushActiveProgressWrites();
     supabaseContext.user.id = 'user-2';
     supabaseContext.user.loggedIn = true;
     resetTarkovSync('another account');
@@ -2920,6 +2978,7 @@ describe('useTarkov sync integration', () => {
     });
     store.pvp.level = 2;
     await nextTick();
+    await flushActiveProgressWrites();
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     single.mockResolvedValue({
@@ -3053,8 +3112,8 @@ describe('useTarkov sync integration', () => {
         taskAvailability: { s1: { requirements: 'old', timestamp: 0 } },
       }),
     ];
-    rpc.mockImplementationOnce(() => {
-      switchSession('user-1', 'user-2');
+    rpc.mockImplementationOnce(async () => {
+      await switchSession('user-1', 'user-2');
       return Promise.resolve({ error: null });
     });
     await initializeTarkovSync();
@@ -3353,7 +3412,7 @@ describe('useTarkov sync integration', () => {
       single.mockImplementationOnce(() => staleRead.promise);
       const staleInit = initializeTarkovSync();
       expect(getUserIdFilters()).toEqual(['user-1']);
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({
           updated_at: sessionClock(2_000),
@@ -3393,7 +3452,7 @@ describe('useTarkov sync integration', () => {
       single.mockImplementationOnce(() => staleRead.promise);
       const staleInit = initializeTarkovSync();
       expect(getUserIdFilters()).toEqual(['user-1']);
-      switchSession('user-1', null, 'logout');
+      await switchSession('user-1', null, 'logout');
       expect(useTarkovStore().pvp.taskCompletions['task-local-a']).toBeUndefined();
       expect(readPersistedEnvelope()._userId).toBe('user-1');
       const baseline = watchSessionActivity();
@@ -3427,7 +3486,7 @@ describe('useTarkov sync integration', () => {
       });
       const staleInit = initializeTarkovSync();
       await settleBackgroundWork();
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({
           updated_at: sessionClock(2_000),
@@ -3439,7 +3498,7 @@ describe('useTarkov sync integration', () => {
       });
       await initializeTarkovSync();
       await settleBackgroundWork();
-      switchSession('user-2', 'user-1');
+      await switchSession('user-2', 'user-1');
       const freshRow = createRemoteRow({
         updated_at: sessionClock(30_000),
         user_id: 'user-1',
@@ -3475,7 +3534,7 @@ describe('useTarkov sync integration', () => {
       const staleRead = createDeferredRead();
       single.mockImplementationOnce(() => staleRead.promise);
       const staleInit = initializeTarkovSync();
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({
           updated_at: sessionClock(2_000),
@@ -3519,7 +3578,7 @@ describe('useTarkov sync integration', () => {
       await settleBackgroundWork();
       // The row read and the deferred normalized read were both issued for user-1.
       expect(getUserIdFilters()).toEqual(['user-1', 'user-1']);
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({
           updated_at: sessionClock(2_000),
@@ -3566,7 +3625,7 @@ describe('useTarkov sync integration', () => {
       await vi.waitFor(() => expect(getUserIdFilters()).toHaveLength(retry ? 3 : 2), {
         timeout: 2000,
       });
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({ user_id: 'user-2', pvp_data: compoundProgress(33, 'task-b') }),
         error: null,
@@ -3607,7 +3666,7 @@ describe('useTarkov sync integration', () => {
       });
       await settleBackgroundWork();
       expect(rpc).toHaveBeenCalledTimes(1);
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       single.mockResolvedValue({
         data: createRemoteRow({
           updated_at: sessionClock(2_000),
@@ -3620,11 +3679,13 @@ describe('useTarkov sync integration', () => {
       await initializeTarkovSync();
       await settleBackgroundWork();
       await nextTick();
+      await flushActiveProgressWrites();
       const baseline = watchSessionActivity();
       staleMergeWrite.resolve({ error: null });
       await staleInit.catch(() => undefined);
       await settleBackgroundWork();
       await nextTick();
+      await flushActiveProgressWrites();
       expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
       const store = useTarkovStore();
       expect(store.pvp.level).toBe(33);
@@ -3667,7 +3728,7 @@ describe('useTarkov sync integration', () => {
       expect(status.progressSaveStatus.cloud).toEqual(failedStatus);
       await expect(status.retryCloudSave()).resolves.toBe(true);
       expect(retryNow).toHaveBeenCalledOnce();
-      switchSession('user-1', null, 'signed out');
+      await switchSession('user-1', null, 'signed out');
       expect(status.progressSaveStatus.cloud.state).toBe('idle');
       // A disposed controller cannot resurrect a warning for the next session.
       options.onSaveStatusChange(failedStatus);
@@ -3684,6 +3745,7 @@ describe('useTarkov sync integration', () => {
         state.pvp.level = 7;
       });
       await nextTick();
+      await flushActiveProgressWrites();
       expect(status.progressSaveStatus.local).toBe('saved');
       const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
@@ -3692,6 +3754,7 @@ describe('useTarkov sync integration', () => {
         state.pvp.level = 8;
       });
       await nextTick();
+      await flushActiveProgressWrites();
       expect(status.progressSaveStatus.local).toBe('failed');
       expect(status.progressSaveStatus.localFailure).toBe('quota');
       setItem.mockRestore();
@@ -3714,11 +3777,11 @@ describe('useTarkov sync integration', () => {
       const store = useTarkovStore();
       const preservedAt = Date.parse('2026-02-25T00:00:00.000Z');
       writeActiveCopy('user-1', 11, preservedAt);
-      switchSession('user-1', null, 'logout');
+      await switchSession('user-1', null, 'logout');
       expect(readRecoveryLevel('user-1')).toBe(11);
       // A guest session overwrites the active copy; the recovery copy is separate.
       writeActiveCopy(null, 4, preservedAt + 1000);
-      switchSession(null, 'user-2', 'login');
+      await switchSession(null, 'user-2', 'login');
       single.mockResolvedValue({
         data: createRemoteRow({
           user_id: 'user-2',
@@ -3730,7 +3793,7 @@ describe('useTarkov sync integration', () => {
       await initializeTarkovSync();
       expect(store.pvp.level).toBe(2);
       expect(readRecoveryLevel('user-1')).toBe(11);
-      switchSession('user-2', 'user-1', 'account switch');
+      await switchSession('user-2', 'user-1', 'account switch');
       single.mockResolvedValue({
         data: createRemoteRow({
           pvp_data: progressWithLevel(1),
@@ -3842,7 +3905,7 @@ describe('useTarkov sync integration', () => {
       options.onSynced();
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
     });
-    it('does not fold the transition placeholder into the next owner recovery copy', () => {
+    it('does not fold the transition placeholder into the next owner recovery copy', async () => {
       const pinia = createPinia().use(piniaPluginPersistedstate);
       createApp({}).use(pinia);
       setActivePinia(pinia);
@@ -3858,7 +3921,7 @@ describe('useTarkov sync integration', () => {
       });
       localStorage.setItem(recoveryKey('user-2'), recovery);
       writeActiveCopy('user-1', 3, base);
-      switchSession('user-1', 'user-2');
+      await switchSession('user-1', 'user-2');
       expect(localStorage.getItem(recoveryKey('user-2'))).toBe(recovery);
     });
     it('does not restore a recovery copy older than the owner active copy', async () => {
@@ -3895,15 +3958,15 @@ describe('useTarkov sync integration', () => {
       } as unknown as ReturnType<typeof useSupabaseSyncMock>);
       writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
       await initializeTarkovSync();
-      switchSession('user-1', null, 'logout');
+      await switchSession('user-1', null, 'logout');
       expect(hasPendingChanges).toHaveBeenCalled();
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
     });
-    it('keeps other accounts recovery copies and backups across session transitions', () => {
+    it('keeps other accounts recovery copies and backups across session transitions', async () => {
       localStorage.setItem(recoveryKey('user-9'), '{"_userId":"user-9","data":{}}');
       localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-9_123`, '{"data":{}}');
       writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
-      switchSession('user-1', 'user-2', 'account switch');
+      await switchSession('user-1', 'user-2', 'account switch');
       expect(localStorage.getItem(STORAGE_KEYS.progress) ?? '').not.toContain('"user-1"');
       expect(localStorage.getItem(recoveryKey('user-9'))).not.toBeNull();
       expect(localStorage.getItem(`${STORAGE_KEYS.progressBackupPrefix}user-9_123`)).not.toBeNull();
@@ -3919,7 +3982,7 @@ describe('useTarkov sync integration', () => {
         preservePersistedStateForUserId: 'user-1',
       });
       requestDeviceDataRemoval('user-1');
-      switchSession('user-1', null, 'logout');
+      await switchSession('user-1', null, 'logout');
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
       expect(localStorage.getItem(recoveryKey('user-2'))).not.toBeNull();
@@ -3931,7 +3994,7 @@ describe('useTarkov sync integration', () => {
         }),
         error: null,
       });
-      switchSession(null, 'user-1', 'owner signs back in after device removal');
+      await switchSession(null, 'user-1', 'owner signs back in after device removal');
       await initializeTarkovSync();
       expect(useTarkovStore().pvp.level).toBe(2);
     });
@@ -3947,7 +4010,7 @@ describe('useTarkov sync integration', () => {
         Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressBackupPrefix))
       ).toBe(false);
     });
-    it('protects an owner-scoped active copy during guest hydration when recovery storage is full', () => {
+    it('protects an owner-scoped active copy during guest hydration when recovery storage is full', async () => {
       const original = JSON.stringify({
         _timestamp: 10,
         _userId: 'user-1',
@@ -3966,16 +4029,17 @@ describe('useTarkov sync integration', () => {
       const store = useTarkovStore();
       expect(store.pvp.level).toBe(defaultState.pvp.level);
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
-      clearActiveProgressStorage();
+      await clearActiveProgressStorage();
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       progressPersistStorage.setItem(
         STORAGE_KEYS.progress,
         JSON.stringify({ _userId: null, data: defaultState })
       );
+      await flushActiveProgressWrites();
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       setItem.mockRestore();
     });
-    it('retains the latest owner envelope before a cross-tab write replaces it', () => {
+    it('retains the latest owner envelope before a cross-tab write replaces it', async () => {
       const latestOwnerCopy = JSON.stringify({
         _timestamp: 22,
         _userId: 'user-9',
@@ -3986,6 +4050,7 @@ describe('useTarkov sync integration', () => {
         STORAGE_KEYS.progress,
         JSON.stringify({ _timestamp: 23, _userId: 'user-2', data: defaultState })
       );
+      await flushActiveProgressWrites();
       expect(readRecoveryLevel('user-9')).toBe(21);
       expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) ?? '{}')._userId).toBe(
         'user-2'
@@ -4006,15 +4071,16 @@ describe('useTarkov sync integration', () => {
         if (key === recoveryKey('user-1')) throw new Error('full');
         return Storage.prototype.setItem.call(localStorage, key, value);
       });
-      switchSession('user-1', null, 'quota during sign-out');
+      await switchSession('user-1', null, 'quota during sign-out');
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       expect(store.pvp.level).toBe(defaultState.pvp.level);
-      switchSession(null, 'user-2', 'quota persists during next sign-in');
+      await switchSession(null, 'user-2', 'quota persists during next sign-in');
       expect(store.pvp.level).toBe(defaultState.pvp.level);
       progressPersistStorage.setItem(
         STORAGE_KEYS.progress,
         JSON.stringify({ _userId: 'user-2', data: defaultState })
       );
+      await flushActiveProgressWrites();
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       await expect(initializeTarkovSync()).rejects.toThrow('Account recovery retention is blocked');
       expect(useSupabaseSyncMock).not.toHaveBeenCalled();
@@ -4094,15 +4160,15 @@ describe('useTarkov sync integration', () => {
         if (key === recoveryKey('user-1')) throw new Error('full');
         return Storage.prototype.setItem.call(localStorage, key, value);
       });
-      switchSession('user-1', null, 'quota during sign-out');
+      await switchSession('user-1', null, 'quota during sign-out');
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       const { removeAccountDeviceData, requestDeviceDataRemoval } =
         await import('@/stores/tarkov/deviceData');
       requestDeviceDataRemoval('user-1');
-      removeAccountDeviceData('user-1');
+      await removeAccountDeviceData('user-1');
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
       setItem.mockRestore();
-      switchSession(null, 'user-2', 'owner removed local data');
+      await switchSession(null, 'user-2', 'owner removed local data');
       await initializeTarkovSync();
       expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
       expect(useTarkovStore().pvp.level).toBe(defaultState.pvp.level);
