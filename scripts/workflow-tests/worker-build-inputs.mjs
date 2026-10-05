@@ -28,13 +28,17 @@ function workerAliases() {
 const isImportCall = (node) =>
   node.expression.kind === ts.SyntaxKind.ImportKeyword ||
   (ts.isIdentifier(node.expression) && node.expression.text === 'require');
-/** Module specifier of an import/export/import()/require() node; fails on computed specifiers. */
-function specifierOf(node) {
-  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return node.moduleSpecifier;
-  if (!ts.isCallExpression(node) || !isImportCall(node)) return undefined;
+/** Literal argument of an import()/require() call; fails on computed specifiers. */
+function callSpecifierOf(node) {
+  if (!isImportCall(node)) return undefined;
   const [argument] = node.arguments;
   assert.ok(ts.isStringLiteralLike(argument), `computed import: ${node.getText()}`);
   return argument;
+}
+/** Module specifier of an import/export declaration or an import()/require() call. */
+function specifierOf(node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return node.moduleSpecifier;
+  return ts.isCallExpression(node) ? callSpecifierOf(node) : undefined;
 }
 /** Every module specifier in a file, read from the TypeScript AST so comments and strings are inert. */
 function specifiersIn(file, code = readFileSync(file, 'utf8')) {
