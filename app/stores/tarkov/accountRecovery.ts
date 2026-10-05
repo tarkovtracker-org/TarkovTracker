@@ -105,6 +105,8 @@ type ModeCandidate = {
   order: number;
   seasonNumber: number | null;
 };
+const isUneditedModePlaceholder = (snapshot: PersistedProgressSnapshot, mode: GameMode): boolean =>
+  snapshot.modeTimestamps?.[mode] === 0 && deepEqual(snapshot.state[mode], defaultState[mode]);
 const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): ModeCandidate => {
   const clock = snapshotModeClock(snapshot, mode);
   return {
@@ -114,7 +116,10 @@ const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): M
     ),
     clock,
     hasModeClock: validClock(snapshot.modeTimestamps?.[mode]) > 0,
-    order: snapshot.isSessionHandoff ? clock : clock || validClock(snapshot.timestamp),
+    order:
+      snapshot.isSessionHandoff || isUneditedModePlaceholder(snapshot, mode)
+        ? clock
+        : clock || validClock(snapshot.timestamp),
     seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
   };
 };

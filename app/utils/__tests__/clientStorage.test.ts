@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  flushActiveProgressWrites,
+  setActiveProgressRetentionGuard,
+} from '@/stores/tarkov/localStorage';
+import {
   clearPreferencesStorage,
   clearProgressStorage,
   clearUserScopedAppStorage,
@@ -31,11 +35,13 @@ const createStorageMock = (): Storage => {
   };
 };
 describe('clearUserScopedAppStorage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await flushActiveProgressWrites();
+    setActiveProgressRetentionGuard(() => true);
     localStorage.clear();
     sessionStorage.clear();
   });
-  it('clears scoped app storage keys and the default session migration guard', () => {
+  it('clears scoped app storage keys and the default session migration guard', async () => {
     [
       STORAGE_KEYS.progress,
       LEGACY_STORAGE_KEYS.progress,
@@ -56,7 +62,7 @@ describe('clearUserScopedAppStorage', () => {
     ].forEach((key) => localStorage.setItem(key, key));
     sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
     sessionStorage.setItem(LEGACY_STORAGE_KEYS.sessionDataMigrated, 'true');
-    clearUserScopedAppStorage(localStorage);
+    await clearUserScopedAppStorage(localStorage);
     [
       STORAGE_KEYS.progress,
       LEGACY_STORAGE_KEYS.progress,
@@ -78,34 +84,34 @@ describe('clearUserScopedAppStorage', () => {
     expect(sessionStorage.getItem(STORAGE_KEYS.sessionDataMigrated)).toBeNull();
     expect(sessionStorage.getItem(LEGACY_STORAGE_KEYS.sessionDataMigrated)).toBeNull();
   });
-  it('removes auth session keys when includeAuthSessions is enabled', () => {
+  it('removes auth session keys when includeAuthSessions is enabled', async () => {
     const authTokenKey = 'sb-test-auth-token';
     const codeVerifierKey = 'sb-test-code-verifier';
     const unrelatedKey = 'sb-test-refresh-token';
     localStorage.setItem(authTokenKey, 'token');
     localStorage.setItem(codeVerifierKey, 'verifier');
     localStorage.setItem(unrelatedKey, 'refresh');
-    clearUserScopedAppStorage(localStorage, { includeAuthSessions: true });
+    await clearUserScopedAppStorage(localStorage, { includeAuthSessions: true });
     expect(localStorage.getItem(authTokenKey)).toBeNull();
     expect(localStorage.getItem(codeVerifierKey)).toBeNull();
     expect(localStorage.getItem(unrelatedKey)).toBe('refresh');
   });
-  it('clears session migration guards from a custom session storage area', () => {
+  it('clears session migration guards from a custom session storage area', async () => {
     const customSessionStorage = createStorageMock();
     customSessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
     customSessionStorage.setItem(LEGACY_STORAGE_KEYS.sessionDataMigrated, 'true');
     sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'default');
     sessionStorage.setItem(LEGACY_STORAGE_KEYS.sessionDataMigrated, 'default');
-    clearUserScopedAppStorage(localStorage, { sessionStorageArea: customSessionStorage });
+    await clearUserScopedAppStorage(localStorage, { sessionStorageArea: customSessionStorage });
     expect(customSessionStorage.getItem(STORAGE_KEYS.sessionDataMigrated)).toBeNull();
     expect(customSessionStorage.getItem(LEGACY_STORAGE_KEYS.sessionDataMigrated)).toBeNull();
     expect(sessionStorage.getItem(STORAGE_KEYS.sessionDataMigrated)).toBe('default');
     expect(sessionStorage.getItem(LEGACY_STORAGE_KEYS.sessionDataMigrated)).toBe('default');
   });
-  it('skips session migration cleanup when sessionStorageArea is null', () => {
+  it('skips session migration cleanup when sessionStorageArea is null', async () => {
     sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
     sessionStorage.setItem(LEGACY_STORAGE_KEYS.sessionDataMigrated, 'true');
-    clearUserScopedAppStorage(localStorage, { sessionStorageArea: null });
+    await clearUserScopedAppStorage(localStorage, { sessionStorageArea: null });
     expect(sessionStorage.getItem(STORAGE_KEYS.sessionDataMigrated)).toBe('true');
     expect(sessionStorage.getItem(LEGACY_STORAGE_KEYS.sessionDataMigrated)).toBe('true');
   });
@@ -124,13 +130,14 @@ describe('hasSupabaseAuthSessionHint', () => {
   });
 });
 describe('safe storage defaults', () => {
-  afterEach(() => {
+  afterEach(async () => {
+    await flushActiveProgressWrites();
     vi.unstubAllGlobals();
   });
-  it('does not throw when localStorage is unavailable', () => {
+  it('does not throw when localStorage is unavailable', async () => {
     vi.stubGlobal('localStorage', undefined);
-    expect(() => clearProgressStorage()).not.toThrow();
+    await expect(clearProgressStorage()).resolves.toBeUndefined();
     expect(() => clearPreferencesStorage()).not.toThrow();
-    expect(() => clearUserScopedAppStorage()).not.toThrow();
+    await expect(clearUserScopedAppStorage()).resolves.toBeUndefined();
   });
 });
