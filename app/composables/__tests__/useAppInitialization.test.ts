@@ -37,6 +37,8 @@ const mockSupabase = {
 const mockSupporter = { fetchStatus: vi.fn(), subscribe: vi.fn(), reset: vi.fn() };
 vi.mock('@/composables/useSupporter', () => ({ useSupporter: () => mockSupporter }));
 const mockInitializeTarkovSync = vi.fn(async () => {});
+const mockSettlePendingProgressHandoffs = vi.fn(async () => {});
+const mockHasPendingProgressHandoff = vi.fn(() => false);
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockResetTarkovSync = vi.fn();
 const mockPreserveUnsavedSessionProgress = vi.fn();
@@ -78,6 +80,8 @@ vi.mock('@/composables/useToastI18n', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   initializeTarkovSync: () => mockInitializeTarkovSync(),
+  hasPendingProgressHandoff: () => mockHasPendingProgressHandoff(),
+  settlePendingProgressHandoffs: () => mockSettlePendingProgressHandoffs(),
   mayHoldUnsyncedProgress: (userId: string) => mockMayHoldUnsyncedProgress(userId),
   preserveUnsavedSessionProgress: (...args: unknown[]) =>
     mockPreserveUnsavedSessionProgress(...args),
@@ -124,6 +128,8 @@ describe('useAppInitialization locale setup', () => {
     });
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
+    mockHasPendingProgressHandoff.mockReset().mockReturnValue(false);
+    mockSettlePendingProgressHandoffs.mockReset().mockResolvedValue(undefined);
     mockResetTarkovStoreForSessionTransition.mockClear();
     mockResetTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
@@ -255,6 +261,29 @@ describe('useAppInitialization locale setup', () => {
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
     wrapper.unmount();
+  });
+  it('settles a pending logout handoff before starting the next login', async () => {
+    let release!: () => void;
+    const handoff = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    mockHasPendingProgressHandoff.mockReturnValue(true);
+    mockSettlePendingProgressHandoffs.mockImplementationOnce(() => handoff);
+    mockSupabaseUser.id = 'user-2';
+    mockSupabaseUser.loggedIn = true;
+    try {
+      await flushPromises();
+      expect(mockSettlePendingProgressHandoffs).toHaveBeenCalledOnce();
+      expect(mockResetTarkovStoreForSessionTransition).not.toHaveBeenCalled();
+      expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
+    } finally {
+      release();
+      await flushPromises();
+      wrapper.unmount();
+    }
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
   });
   it('does not refetch metadata before initialization', async () => {
     mockMetadataStore.hasInitialized = false;

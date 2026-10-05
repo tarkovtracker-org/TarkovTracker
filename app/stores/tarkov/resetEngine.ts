@@ -302,5 +302,7 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   // The reset RPC already saved this state; the patch above is not a new cloud change.
   if (saved) syncController?.acknowledgeExternalSave?.(saved);
   // Only this session's active copy: other accounts' recovery data is not part of a reset.
-  clearActiveProgressStorage(ownerId);
+  // An uncleared copy would return on reload, so the reset must not be reported as complete.
+  if (!(await clearActiveProgressStorage(ownerId, saved !== null)))
+    throw new Error('Local progress could not be cleared after reset');
 };

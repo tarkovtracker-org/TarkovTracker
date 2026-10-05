@@ -178,7 +178,10 @@ export class ProgressSyncSession {
     this.stopDeferredStart = null;
   }
   /** Capture (or clear) the persisted snapshot a following startup for `userId` may adopt. */
-  preserveSnapshot(options?: { preservePersistedStateForUserId?: string | null }): void {
+  preserveSnapshot(options?: {
+    preservePersistedStateForUserId?: string | null;
+    preservedSnapshot?: PersistedProgressSnapshot | null;
+  }): void {
     if (!options || !Object.hasOwn(options, 'preservePersistedStateForUserId')) {
       this.pendingResetSnapshot = null;
       return;
@@ -186,7 +189,13 @@ export class ProgressSyncSession {
     const userId = options.preservePersistedStateForUserId ?? null;
     this.pendingResetSnapshot = isDeviceDataRemovalPending(userId)
       ? null
-      : { snapshot: readPersistedProgressState(userId), userId };
+      : {
+          snapshot:
+            options.preservedSnapshot === undefined
+              ? readPersistedProgressState(userId)
+              : options.preservedSnapshot,
+          userId,
+        };
   }
   /** Hand `snapshot` to the next startup for `userId`, replacing any captured one. */
   handOffSnapshot(userId: string, snapshot: PersistedProgressSnapshot): void {
