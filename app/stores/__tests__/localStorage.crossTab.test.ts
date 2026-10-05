@@ -369,6 +369,35 @@ describe('active progress across tabs', () => {
     expect(tab.status.progressSaveStatus.local).toBe('failed');
     expect(tab.status.progressSaveStatus.localFailure).toBe('unavailable');
   });
+  it('reports whether a reset clear left an active copy that a reload could restore', async () => {
+    const tab = await openTab();
+    const original = envelope('owner', 10);
+    values.set(STORAGE_KEYS.progress, original);
+    expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
+    expect(values.has(STORAGE_KEYS.progress)).toBe(false);
+    values.set(STORAGE_KEYS.progress, original);
+    const locking = navigator;
+    vi.stubGlobal('navigator', {});
+    expect(await tab.clearActiveProgressStorage('owner')).toBe(false);
+    expect(values.get(STORAGE_KEYS.progress)).toBe(original);
+    vi.stubGlobal('navigator', locking);
+    tab.setActiveProgressWritesBlocked(true);
+    expect(await tab.clearActiveProgressStorage()).toBe(false);
+    expect(values.get(STORAGE_KEYS.progress)).toBe(original);
+    tab.setActiveProgressWritesBlocked(false);
+    // Fully blocked site data holds no copy to restore, so it does not fail the reset.
+    const blocked = () => {
+      throw new DOMException('Site data is blocked', 'SecurityError');
+    };
+    vi.stubGlobal('localStorage', {
+      get length() {
+        return blocked();
+      },
+      getItem: blocked,
+      removeItem: blocked,
+    });
+    expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
+  });
   it('prevents synchronous helpers from bypassing active progress serialization', async () => {
     const tab = await openTab();
     const original = envelope('owner', 10);

@@ -147,9 +147,11 @@ const persistOnlineReset = async (
   const { error } = await syncProgressState(client, userId, freshState);
   if (!isCurrent()) return;
   throwSyncError(error, 'Failed to reset online profile');
-  await clearActiveProgressStorage(userId, true);
+  const cleared = await clearActiveProgressStorage(userId, true);
   if (!isCurrent()) return;
   patchProgressState(store, freshState);
+  if (!cleared)
+    throw new Error('Online profile reset saved, but local progress could not be cleared');
 };
 const persistPrestigeLevel = async (
   store: TarkovStoreInstance,

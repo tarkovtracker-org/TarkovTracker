@@ -556,21 +556,23 @@ export const removeActiveProgressValue = async (
 /**
  * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
  * decided before the reset, so the active copy is removed without keeping a recovery copy.
- * Write barriers still apply.
+ * Write barriers still apply. Resolves `false` when an active copy may remain for a reload to
+ * restore; fully blocked storage holds none.
  */
 export const clearActiveProgressStorage = async (
   resetOwner?: string | null,
   cloudHeld = false
-): Promise<void> => {
-  if (typeof window === 'undefined') return;
+): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
   invalidateActiveProgressWrites(undefined, cloudHeld);
-  await mutateActiveProgress(() => {
+  const result = await mutateActiveProgress(() => {
     const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
     return removeStorageItem(STORAGE_KEYS.progress, explicitOwner)
       ? { ok: true }
       : { ok: false, error: null };
   });
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
+  return result.ok || isLocalStorageInaccessible();
 };
 const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;
 const legacyModeEvidence = (data: Record<string, unknown>, mode: GameMode): unknown => {

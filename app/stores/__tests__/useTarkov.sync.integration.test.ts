@@ -3638,6 +3638,65 @@ describe('useTarkov sync integration', () => {
       expect.objectContaining({ message: 'Failed to reset online profile: reset failed' })
     );
   });
+  it.each([
+    { scenario: 'cleared', locking: true },
+    { scenario: 'clear failed', locking: false },
+  ])(
+    'reports a signed-out Seasonal reset only once its active copy is cleared: $scenario',
+    async ({ locking }) => {
+      supabaseContext.user.id = null;
+      supabaseContext.user.loggedIn = false;
+      const original = JSON.stringify({
+        _userId: null,
+        _timestamp: Date.now(),
+        data: { ...structuredClone(defaultState), seasonal: progressWithLevel(17) },
+      });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      const store = useTarkovStore();
+      expect(store.seasonal.level).toBe(17);
+      const locks = Object.getOwnPropertyDescriptor(navigator, 'locks')!;
+      if (!locking)
+        Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+      try {
+        const reset = store.resetSeasonalData();
+        if (locking) await expect(reset).resolves.toBeUndefined();
+        else await expect(reset).rejects.toThrow('Local progress could not be cleared after reset');
+      } finally {
+        Object.defineProperty(navigator, 'locks', locks);
+      }
+      expect(store.seasonal.level).toBe(defaultState.seasonal.level);
+      const completion = expect(loggerMock.debug);
+      (locking ? completion : completion.not).toHaveBeenCalledWith(
+        '[TarkovStore] Seasonal data reset complete'
+      );
+      // A reload restores an uncleared envelope, so only a failure may be reported for it.
+      expect(localStorage.getItem(STORAGE_KEYS.progress) === original).toBe(!locking);
+    }
+  );
+  it('logs an online profile reset whose active copy could not be cleared as failed', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pvp.level = 42;
+    });
+    const locks = Object.getOwnPropertyDescriptor(navigator, 'locks')!;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+    try {
+      await store.resetOnlineProfile();
+    } finally {
+      Object.defineProperty(navigator, 'locks', locks);
+    }
+    // The cloud already holds the reset, so memory follows it even though cleanup failed.
+    expect(store.pvp.level).toBe(defaultState.pvp.level);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      'Error resetting online profile:',
+      expect.objectContaining({
+        message: 'Online profile reset saved, but local progress could not be cleared',
+      })
+    );
+  });
   it('shows load_failed and aborts sync for multi-provider account with no progress row', async () => {
     supabaseContext.user.providers = ['discord', 'google'];
     single.mockResolvedValue({
