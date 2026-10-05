@@ -20,7 +20,11 @@ const isFile = (path) => existsSync(path) && statSync(path).isFile();
 function workerEntry() {
   const wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8');
   // Wrangler `[alias]` can redirect any specifier; this scanner does not model it.
-  assert.doesNotMatch(wrangler, /^\s*\[alias\]/m, 'teach this check wrangler [alias] first');
+  assert.doesNotMatch(
+    wrangler,
+    /^\s*(\[(env\.[^\]]+\.)?alias\]|alias\s*[=.])/m,
+    'teach this check wrangler [alias] first'
+  );
   const main = wrangler.match(/^main\s*=\s*"([^"]+)"/m);
   assert.ok(main, `${WORKER}/wrangler.toml must declare main`);
   return join(WORKER, main[1]);
@@ -82,7 +86,7 @@ function resolveImport(fromFile, specifier, aliases) {
   const candidates = [
     base,
     ...EXTENSIONS.map((extension) => base + extension),
-    ...['.tsx', '.ts'].map((extension) => base.replace(/\.js$/, extension)),
+    ...['.ts', '.tsx'].map((extension) => base.replace(/\.js$/, extension)),
     ...EXTENSIONS.map((extension) => join(base, `index${extension}`)),
   ];
   const found = candidates.find(isFile);
