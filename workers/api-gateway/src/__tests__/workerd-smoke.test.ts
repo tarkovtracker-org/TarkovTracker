@@ -31,6 +31,19 @@ const createCountLatch = (target: number) => {
     },
   };
 };
+// Resolves when `latch` opens; rejects if any pending request settles first. None can
+// finish while the catalog gate is held, so early settlement fails fast instead of
+// leaving the test to hang until its timeout.
+const latchBeforeSettlement = (latch: Promise<void>, pending: Promise<unknown>[]) =>
+  new Promise<void>((resolve, reject) => {
+    void latch.then(resolve);
+    for (const request of pending) {
+      void request.then(
+        () => reject(new Error('Request settled before the upstream latch opened')),
+        reject
+      );
+    }
+  });
 const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: string[]) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(requestUrl(input));
@@ -196,14 +209,15 @@ describe('api-gateway workerd smoke', () => {
     const followers: Promise<unknown>[] = [];
     try {
       // Both shared catalog loads are registered and held upstream before any follower exists.
-      await catalogLoadsStarted.reached;
+      await latchBeforeSettlement(catalogLoadsStarted.reached, [first]);
       const others = Array.from({ length: 8 }, () =>
         harness!.getWorker().fetch('https://api.tarkovtracker.org/progress', { headers })
       );
       followers.push(...others);
-      // Every follower is admitted by workerd before the initiating client disconnects.
-      await progressReadsStarted.reached;
-      // The disconnect must happen with the shared catalog I/O still in flight.
+      // Every follower has passed auth and issued its progress read before the initiating
+      // client disconnects.
+      await latchBeforeSettlement(progressReadsStarted.reached, [first, ...others]);
+      // No follower started its own catalog load before the disconnect.
       expect(catalogRequests).toBe(2);
       controller.abort();
       expect(await cancellation).toBe('aborted');
