@@ -258,8 +258,12 @@ describe('active progress across tabs', () => {
         metadataTimestamp: clock,
       });
     }
-    // Clock bookkeeping must not become a hydration/handoff or unsaved-edit overlay.
-    expect(tab.progressPersistStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
+    // Clock-only writes preserve accepted freshness for an immediate auth handoff.
+    const pending = tab.parsePersistedProgressState(
+      tab.progressPersistStorage.getItem(STORAGE_KEYS.progress),
+      'owner'
+    );
+    expect(pending?.modeTimestamps).toEqual({ pvp: 60, pve: 60, seasonal: 60 });
     expect(tab.status.progressSaveStatus.local).toBe('saved');
     expect(tab.status.hasUnsavedProgressChanges()).toBe(false);
     await tab.flushActiveProgressWrites();
@@ -422,4 +426,93 @@ describe('active progress across tabs', () => {
     expect(await acknowledgement).toBe(false);
     expect(values.has(STORAGE_KEYS.progress)).toBe(false);
   });
+  it.each(['saved', 'failed'] as const)(
+    'rechecks acknowledgements after another tab commits independently newer modes, preserving %s status',
+    async (localStatus) => {
+      const first = await openTab();
+      const second = await openTab();
+      const originalState = structuredClone(defaultState);
+      const originalSerializer = first.createProgressStorageSerializer(() => null);
+      const original = originalSerializer.serialize(originalState, 'owner', 100);
+      values.set(STORAGE_KEYS.progress, original);
+      first.status.recordLocalSave(localStatus === 'saved', 'quota');
+      const localSaveBefore = { ...first.status.progressSaveStatus };
+      const serializer = first.createProgressStorageSerializer(
+        (owner) =>
+          first.parsePersistedProgressState(values.get(STORAGE_KEYS.progress) ?? null, owner),
+        (value, expected) => {
+          void first.persistActiveProgressValue(value, true, expected);
+        }
+      );
+      serializer.serialize(originalState, 'owner', 100);
+      const otherState = structuredClone(originalState);
+      otherState.pve.level = 42;
+      const newer = originalSerializer.serialize(otherState, 'owner', 200);
+      const write = second.persistActiveProgressValue(newer);
+      serializer.acceptRemote({
+        state: originalState,
+        userId: 'owner',
+        remote: originalState,
+        next: originalState,
+        updatedAtByMode: { pvp: 50, pve: 50, seasonal: 50 },
+        metadataTimestamp: 50,
+      });
+      // Accepted clocks remain visible for hydration and session handoff while the ack queues.
+      const pending = first.readPersistedProgressState('owner')!;
+      expect(pending.modeTimestamps).toEqual({ pvp: 50, pve: 50, seasonal: 50 });
+      expect(pending.metadataTimestamp).toBe(50);
+      expect(await write).toBe(true);
+      await first.flushActiveProgressWrites();
+      const reloaded = first.parsePersistedProgressState(
+        values.get(STORAGE_KEYS.progress)!,
+        'owner'
+      )!;
+      expect(reloaded.state.pve.level).toBe(42);
+      expect(reloaded.modeTimestamps).toEqual({ pvp: 100, pve: 200, seasonal: 100 });
+      expect(reloaded.metadataTimestamp).toBe(100);
+      expect(first.status.progressSaveStatus).toEqual(localSaveBefore);
+    }
+  );
+  it('keeps an earlier local edit pending until it settles when an acknowledgement queues', async () => {
+    const first = await openTab();
+    const second = await openTab();
+    const state = structuredClone(defaultState);
+    const serializer = first.createProgressStorageSerializer(() => null);
+    const original = serializer.serialize(state, 'owner', 100);
+    const expected = first.parsePersistedProgressState(original, 'owner')!;
+    const edit = first.persistActiveProgressValue(original);
+    state.pve.level = 42;
+    const newer = serializer.serialize(state, 'owner', 200);
+    const otherEdit = second.persistActiveProgressValue(newer);
+    const acknowledgement = first.persistActiveProgressValue(original, true, expected);
+    expect(first.status.progressSaveStatus.local).toBe('pending');
+    expect(first.status.hasUnsavedProgressChanges()).toBe(true);
+    expect(await edit).toBe(true);
+    expect(await otherEdit).toBe(true);
+    expect(await acknowledgement).toBe(false);
+    expect(values.get(STORAGE_KEYS.progress)).toBe(newer);
+    expect(first.status.progressSaveStatus.local).toBe('saved');
+    expect(first.status.hasUnsavedProgressChanges()).toBe(false);
+  });
+  it.each(['cleanup', 'session'] as const)(
+    'leaves save status unchanged when %s cancels a queued acknowledgement',
+    async (cancellation) => {
+      const first = await openTab();
+      const second = await openTab();
+      const serializer = first.createProgressStorageSerializer(() => null);
+      const original = serializer.serialize(structuredClone(defaultState), 'owner', 100);
+      const expected = first.parsePersistedProgressState(original, 'owner')!;
+      values.set(STORAGE_KEYS.progress, original);
+      first.status.recordLocalSave(true);
+      const localSaveBefore = { ...first.status.progressSaveStatus };
+      const acknowledgement = first.persistActiveProgressValue(original, true, expected);
+      if (cancellation === 'cleanup') first.invalidateActiveProgressWrites('owner');
+      else auth.owner = 'other';
+      const removal = second.clearActiveProgressStorage('owner');
+      expect(await acknowledgement).toBe(false);
+      await removal;
+      expect(values.has(STORAGE_KEYS.progress)).toBe(false);
+      expect(first.status.progressSaveStatus).toEqual(localSaveBefore);
+    }
+  );
 });

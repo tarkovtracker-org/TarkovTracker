@@ -9,10 +9,12 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
+  hasPendingProgressHandoff,
   mayHoldUnsyncedProgress,
   preserveUnsavedSessionProgress,
   resetTarkovStoreForSessionTransition,
   resetTarkovSync,
+  settlePendingProgressHandoffs,
   useTarkovStore,
 } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
@@ -332,6 +334,9 @@ export function useAppInitialization() {
       if (didSwitchUser(prevUserId, userId)) {
         resetInitializationState(loggedIn);
         await resetTarkovState('user switched', prevUserId);
+        if (token !== authChangeToken) return;
+      } else if (hasPendingProgressHandoff()) {
+        await settlePendingProgressHandoffs();
         if (token !== authChangeToken) return;
       }
       await runAuthenticatedInitialization(userId, token);

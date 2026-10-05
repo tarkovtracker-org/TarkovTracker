@@ -544,6 +544,10 @@ const adoptRemote = (ctx: StartupLoadContext, remote: RemoteProgress): Resolutio
   });
   return { state: next, needsRemoteCleanup: remoteHadDeprecatedData(remote) };
 };
+const hasLocalModeClock = (meta: LocalMeta): boolean =>
+  GAME_MODE_VALUES.some((mode) => (meta?.modeTimestamps?.[mode] ?? 0) > 0);
+const hasLocalProgressEdit = (local: LocalProgress): boolean =>
+  local.hasProgress || hasLocalModeClock(local.meta) || (local.meta?.metadataTimestamp ?? 0) > 0;
 const resolveWithRemote = async (
   ctx: StartupLoadContext,
   local: LocalProgress,
@@ -551,12 +555,8 @@ const resolveWithRemote = async (
 ): Promise<Resolution | null> => {
   const storedUserId = local.meta?.storedUserId ?? null;
   if (local.hasProgress && storedUserId === null) ctx.notifyLocalIgnored('guest');
-  // A known-clock level decrease can return the mode to its default tracking state.
-  // It still owns an edit; legacy placeholders with only a write time do not.
-  const hasModeClock = GAME_MODE_VALUES.some(
-    (mode) => (local.meta?.modeTimestamps?.[mode] ?? 0) > 0
-  );
-  if (storedUserId === ctx.userId && (local.hasProgress || hasModeClock)) {
+  // Explicit clocks identify scalar and metadata edits even when every mode is at defaults.
+  if (storedUserId === ctx.userId && hasLocalProgressEdit(local)) {
     return mergeWithRemote(ctx, local, remote);
   }
   return adoptRemote(ctx, remote);

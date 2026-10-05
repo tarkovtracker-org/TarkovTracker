@@ -42,7 +42,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   serialization does not reload shared storage because its old wrapper lacked an owner.
   When composing copies, session handoffs use each mode's clock directly, including zero, instead
   of borrowing another mode's edit time from the envelope. Other copies with unknown mode clocks
-  keep the existing write-time fallback. The handoff marker is in memory only, not a persisted field.
+  keep the existing write-time fallback. An untouched default mode with an explicit zero clock
+  also keeps zero authority, even when metadata has a newer edit clock. The handoff marker is in
+  memory only, not a persisted field.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key, including sign-out restoration, go through `persistActiveProgressValue`. It records
@@ -53,14 +55,19 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   across the durable read, ownership/retention checks, and mutation. Missing or rejected locking
   reports failure without an unlocked fallback. The synchronous Pinia adapter queues writes and
   offers pending edits for same-tab hydration, startup, and handoff; retention and quota pruning
-  read durable storage. The store's memory-only session reset suppresses both serialization and
-  adapter writes, so reset placeholders never acquire progress clocks or replace genuine pending
-  edits. Only the latest queued edit updates local save status. Session changes, write
+  read durable storage. Ordered pending writes, including accepted cloud clocks, transfer with
+  their captured baselines across auth changes. An acknowledgement can expose its clocks for
+  unchanged progress but cannot hide a different queued edit or clear its failed-save warning.
+  Restoration also checks its captured baseline under the lock. The store's memory-only session
+  reset suppresses both serialization and adapter writes and seeds a zero-clock serializer baseline,
+  so reset placeholders never acquire progress clocks or replace genuine pending edits. Only the
+  latest queued edit updates local save status. Session changes, write
   barriers, and resets invalidate earlier queued writes; cleanup for an old owner does not cancel
   another owner's edits. Remote clock acknowledgements compare their observed baseline again under
   the lock, including whether the slot existed, so a later write or clear wins. Conditional
-  acknowledgements use a separate serializer baseline overlay so successive accepted clocks persist
-  in order, without replacing genuine pending edits, hydration values, or their status. A superseded
+  acknowledgements share the ordered pending registry so successive accepted clocks persist
+  in order. Their clocks are available to hydration and handoff when progress is unchanged,
+  while different pending edits and their save status remain visible. A superseded
   acknowledgement is canceled without reporting a storage failure. Pending memory-only
   progress participates in sign-out protection and prompts before reload; a cloud-held acknowledgement
   alone does not create that loss warning. Tabs running older cached code do not participate in the

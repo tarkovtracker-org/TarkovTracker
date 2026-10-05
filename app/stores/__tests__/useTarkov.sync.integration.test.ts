@@ -10,6 +10,7 @@ import {
   readAccountRecoveryCopy,
   resetAccountRecoveryRetentionBlock,
 } from '@/stores/tarkov/accountRecovery';
+import { requestDeviceDataRemoval } from '@/stores/tarkov/deviceData';
 import {
   clearActiveProgressStorage,
   setActiveProgressWritesBlocked,
@@ -18,6 +19,7 @@ import {
   flushActiveProgressWrites,
   parsePersistedProgressState,
   persistActiveProgressValue,
+  getPendingProgressWritesForOwners,
 } from '@/stores/tarkov/localStorage';
 import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
@@ -27,6 +29,8 @@ import {
   resetTarkovSync,
   preserveUnsavedSessionProgress,
   useTarkovStore,
+  hasPendingProgressHandoff,
+  settlePendingProgressHandoffs,
 } from '@/stores/useTarkov';
 import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, getGameModeSeasonNumber } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -4589,5 +4593,352 @@ describe('useTarkov sync integration', () => {
       expect(useTarkovStore().pvp.progressEpoch).toBe(2);
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
     });
+    const holdOtherTabProgressLock = async (beforeRelease = () => {}) => {
+      const gate = Promise.withResolvers<undefined>();
+      const acquired = Promise.withResolvers<undefined>();
+      const held = navigator.locks.request(
+        `${STORAGE_KEYS.progress}:mutation`,
+        { mode: 'exclusive' },
+        () => {
+          acquired.resolve(undefined);
+          return gate.promise.then(beforeRelease);
+        }
+      );
+      await acquired.promise;
+      return { held, release: () => gate.resolve(undefined) };
+    };
+    it('preserves the incoming account edit made before a held-lock transition settles', async () => {
+      const now = Date.now();
+      writeActiveCopy('user-1', 10, now - 1000);
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      const store = useTarkovStore();
+      const { held, release } = await holdOtherTabProgressLock();
+      let transition!: Promise<void>;
+      try {
+        supabaseContext.user.id = 'user-2';
+        transition = resetTarkovStoreForSessionTransition('user-1', 'account switch');
+        store.$patch((current) => {
+          current.pvp.level = 9;
+        });
+        store.$persist();
+      } finally {
+        release();
+      }
+      await Promise.all([held, transition]);
+      await flushActiveProgressWrites();
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+      expect(saved._userId).toBe('user-2');
+      expect(saved.data.pvp.level).toBe(9);
+      expect(store.pvp.level).toBe(9);
+    });
+    it.each([false, true])(
+      'adopts a pending guest edit after logout has completed, intervening owner edit=%s',
+      async (interveningEdit) => {
+        const now = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        writeActiveCopy('user-1', 15, now - 2000);
+        const pinia = createPinia().use(piniaPluginPersistedstate);
+        createApp({}).use(pinia);
+        setActivePinia(pinia);
+        const store = useTarkovStore();
+        await switchSession('user-1', null, 'logout');
+        await flushActiveProgressWrites();
+        const { held, release } = await holdOtherTabProgressLock(() => {
+          if (interveningEdit) writeActiveCopy('user-1', 17, now + 1000);
+        });
+        let login!: Promise<void>;
+        try {
+          store.$patch((guest) => {
+            guest.pvp.level = 9;
+          });
+          store.$persist();
+          supabaseContext.user.id = 'user-2';
+          supabaseContext.user.loggedIn = true;
+          single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
+          modeProgressResult.data = [];
+          login = (
+            hasPendingProgressHandoff() ? settlePendingProgressHandoffs() : Promise.resolve()
+          ).then(() => initializeTarkovSync());
+        } finally {
+          release();
+        }
+        await Promise.all([held, login]);
+        await flushActiveProgressWrites();
+        expect(store.pvp.level).toBe(9);
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level).toBe(9);
+        expect(readRecoveryLevel('user-1')).toBe(interveningEdit ? 17 : 15);
+      }
+    );
+    it('keeps failed guest edits unsaved while the prior owner handoff settles', async () => {
+      const now = Date.now();
+      seedOwnedEnvelope('user-1', { pvp: progressWithLevel(10) }, now);
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      const store = useTarkovStore();
+      store.$persist();
+      await flushActiveProgressWrites();
+      const { held, release } = await holdOtherTabProgressLock();
+      const state = JSON.parse(JSON.stringify(store.$state));
+      progressStorageSerializer.acceptRemote({
+        state,
+        userId: 'user-1',
+        remote: state,
+        next: state,
+        updatedAtByMode: { pvp: now - 1000 },
+        metadataTimestamp: now - 1000,
+      });
+      supabaseContext.user.id = null;
+      supabaseContext.user.loggedIn = false;
+      const transition = resetTarkovStoreForSessionTransition('user-1', 'logout');
+      const setItem = localStorage.setItem.bind(localStorage);
+      const failure = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key === STORAGE_KEYS.progress && JSON.parse(value)._userId === null)
+          throw new DOMException('full', 'QuotaExceededError');
+        setItem(key, value);
+      });
+      try {
+        store.$patch((guest) => {
+          guest.pvp.level = 9;
+        });
+        store.$persist();
+      } finally {
+        release();
+      }
+      await Promise.all([held, transition]);
+      await flushActiveProgressWrites();
+      failure.mockRestore();
+      const status = await import('@/stores/tarkov/progressSaveStatus');
+      expect(store.pvp.level).toBe(9);
+      expect(status.progressSaveStatus.local).toBe('failed');
+      expect(status.hasUnsavedProgressChanges()).toBe(true);
+    });
+    it.each(['empty', 'recovery', 'remote'] as const)(
+      'keeps untouched mode clocks at zero when metadata changes during an account handoff, source=%s',
+      async (source) => {
+        const hasRecovery = source === 'recovery';
+        const now = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        if (hasRecovery)
+          localStorage.setItem(
+            recoveryKey('user-2'),
+            JSON.stringify({
+              _timestamp: now - 2000,
+              _userId: 'user-2',
+              data: {
+                ...structuredClone(defaultState),
+                pvp: {
+                  ...progressWithLevel(25),
+                  displayName: 'owner-B',
+                  pmcFaction: 'BEAR',
+                  xpOffset: 42,
+                },
+              },
+            })
+          );
+        writeActiveCopy('user-1', 10, now - 1000);
+        const pinia = createPinia().use(piniaPluginPersistedstate);
+        createApp({}).use(pinia);
+        setActivePinia(pinia);
+        const store = useTarkovStore();
+        const { held, release } = await holdOtherTabProgressLock();
+        let transition!: Promise<void>;
+        try {
+          supabaseContext.user.id = 'user-2';
+          transition = resetTarkovStoreForSessionTransition('user-1', 'account switch');
+          store.$patch({ gameEdition: 3 });
+          store.$persist();
+        } finally {
+          release();
+        }
+        await Promise.all([held, transition]);
+        await flushActiveProgressWrites();
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!)._modeTimestamps).toEqual({
+          pvp: 0,
+          pve: 0,
+          seasonal: 0,
+        });
+        single.mockResolvedValue({
+          data: createRemoteRow({
+            user_id: 'user-2',
+            game_edition: 1,
+            pvp_data: source === 'remote' ? progressWithLevel(25) : progressWithLevel(1),
+            updated_at: new Date(now - 3000).toISOString(),
+          }),
+          error: null,
+        });
+        await initializeTarkovSync();
+        expect(store.gameEdition).toBe(3);
+        expect(store.pvp.level).toBe(source === 'empty' ? 1 : 25);
+        expect(store.pvp.displayName).toBe(hasRecovery ? 'owner-B' : null);
+        expect(store.pvp.pmcFaction).toBe(hasRecovery ? 'BEAR' : 'USEC');
+        expect(store.pvp.xpOffset).toBe(hasRecovery ? 42 : 0);
+      }
+    );
+    it.each([
+      { nextOwner: null, interveningEdit: false, queued: 'none' },
+      { nextOwner: null, interveningEdit: true, queued: 'none' },
+      { nextOwner: 'user-2', interveningEdit: false, queued: 'none' },
+      { nextOwner: 'user-2', interveningEdit: true, queued: 'none' },
+      { nextOwner: null, interveningEdit: false, queued: 'persist' },
+      { nextOwner: null, interveningEdit: true, queued: 'persist' },
+      { nextOwner: 'user-2', interveningEdit: false, queued: 'second-ack' },
+      { nextOwner: null, interveningEdit: false, queued: 'prior-edit' },
+      { nextOwner: 'user-2', interveningEdit: false, queued: 'aba' },
+      { nextOwner: null, interveningEdit: false, queued: 'login-before-logout' },
+      { nextOwner: null, interveningEdit: false, queued: 'guest-edit' },
+      { nextOwner: null, interveningEdit: true, queued: 'guest-edit' },
+      { nextOwner: null, interveningEdit: false, queued: 'guest-edit-before-settlement' },
+      { nextOwner: 'user-2', interveningEdit: false, queued: 'current-edit-before-settlement' },
+      { nextOwner: null, interveningEdit: false, queued: 'metadata-edit-before-settlement' },
+      { nextOwner: null, interveningEdit: false, queued: 'device-removal-edit-before-settlement' },
+      { nextOwner: null, interveningEdit: false, queued: 'device-removal' },
+      { nextOwner: 'user-2', interveningEdit: false, queued: 'blocked-retention' },
+    ])(
+      'keeps acknowledged metadata clocks through $nextOwner transition with $queued queued while another tab holds the lock, intervening edit=$interveningEdit',
+      async ({ nextOwner, interveningEdit, queued }) => {
+        const now = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(now);
+        const localAt = now - (queued === 'blocked-retention' ? 5000 : 0);
+        const acknowledgedAt = localAt - 2000;
+        const remoteAt = localAt - 1000;
+        seedOwnedEnvelope('user-1', { gameEdition: 1, pvp: progressWithLevel(10) }, localAt);
+        const pinia = createPinia().use(piniaPluginPersistedstate);
+        createApp({}).use(pinia);
+        setActivePinia(pinia);
+        const store = useTarkovStore();
+        store.$persist();
+        await flushActiveProgressWrites();
+        const { held, release } = await holdOtherTabProgressLock(() => {
+          if (interveningEdit)
+            seedOwnedEnvelope(
+              'user-1',
+              { gameEdition: 3, pvp: progressWithLevel(10) },
+              localAt + 1000
+            );
+        });
+        let transition!: Promise<void>;
+        const setItem = localStorage.setItem.bind(localStorage);
+        const retentionFailure =
+          queued === 'blocked-retention'
+            ? vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+                if (key.startsWith(STORAGE_KEYS.progressRecoveryPrefix))
+                  throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+                setItem(key, value);
+              })
+            : null;
+        try {
+          if (queued === 'prior-edit' || queued === 'blocked-retention') {
+            store.$patch({ gameEdition: 3 });
+            store.$persist();
+          }
+          const state = structuredClone(JSON.parse(JSON.stringify(store.$state)));
+          if (queued !== 'blocked-retention')
+            progressStorageSerializer.acceptRemote({
+              state,
+              userId: 'user-1',
+              remote: state,
+              next: state,
+              updatedAtByMode: {
+                pvp: acknowledgedAt,
+                pve: acknowledgedAt,
+                seasonal: acknowledgedAt,
+              },
+              metadataTimestamp: acknowledgedAt,
+            });
+          if (queued === 'persist') store.$persist();
+          if (queued === 'second-ack')
+            progressStorageSerializer.acceptRemote({
+              state,
+              userId: 'user-1',
+              remote: state,
+              next: state,
+              updatedAtByMode: { pvp: acknowledgedAt - 1000 },
+              metadataTimestamp: acknowledgedAt - 1000,
+            });
+          supabaseContext.user.id = nextOwner;
+          supabaseContext.user.loggedIn = nextOwner !== null;
+          if (queued === 'device-removal') requestDeviceDataRemoval('user-1');
+          transition = resetTarkovStoreForSessionTransition('user-1', 'logout');
+          if (queued.endsWith('edit-before-settlement')) {
+            store.$patch((current) => {
+              if (queued === 'metadata-edit-before-settlement') current.gameEdition = 3;
+              else current.pvp.level = 9;
+            });
+            store.$persist();
+            if (queued === 'device-removal-edit-before-settlement')
+              requestDeviceDataRemoval('user-1');
+          }
+          if (queued === 'device-removal')
+            expect(getPendingProgressWritesForOwners(['user-1'])).toEqual([]);
+          if (queued === 'aba') {
+            supabaseContext.user.id = 'user-1';
+            supabaseContext.user.loggedIn = true;
+            const firstTransition = transition;
+            transition = Promise.all([
+              firstTransition,
+              resetTarkovStoreForSessionTransition('user-2', 'returns before handoff settles'),
+            ]).then(() => {});
+          }
+          if (queued === 'login-before-logout' || queued === 'guest-edit') {
+            if (queued === 'guest-edit') {
+              store.$patch((guest) => {
+                guest.pvp.level = 9;
+              });
+              store.$persist();
+            }
+            supabaseContext.user.id = 'user-2';
+            supabaseContext.user.loggedIn = true;
+            expect(hasPendingProgressHandoff()).toBe(true);
+            if (queued === 'guest-edit') {
+              single.mockResolvedValue({
+                data: null,
+                error: { code: 'PGRST116', message: 'No rows' },
+              });
+              modeProgressResult.data = [];
+            } else
+              single.mockResolvedValue({
+                data: createRemoteRow({ user_id: 'user-2' }),
+                error: null,
+              });
+            const firstTransition = transition;
+            const nextLogin = settlePendingProgressHandoffs().then(async () => {
+              await initializeTarkovSync();
+              await flushActiveProgressWrites();
+              if (queued === 'guest-edit') {
+                expect(store.pvp.level).toBe(9);
+                expect(
+                  JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level
+                ).toBe(9);
+              }
+            });
+            transition = Promise.all([firstTransition, nextLogin]).then(() => {});
+          }
+          await nextTick();
+        } finally {
+          release();
+        }
+        await Promise.all([held, transition]);
+        await flushActiveProgressWrites();
+        retentionFailure?.mockRestore();
+        if (queued.endsWith('edit-before-settlement')) {
+          const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) ?? 'null')?.data;
+          if (queued === 'metadata-edit-before-settlement') expect(current?.gameEdition).toBe(3);
+          else expect(current?.pvp?.level).toBe(9);
+        }
+        if (queued === 'device-removal-edit-before-settlement')
+          expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+        supabaseContext.user.id = 'user-1';
+        supabaseContext.user.loggedIn = true;
+        single.mockResolvedValue({
+          data: createRemoteRow({ game_edition: 2, updated_at: new Date(remoteAt).toISOString() }),
+          error: null,
+        });
+        await initializeTarkovSync();
+        expect(store.gameEdition).toBe(interveningEdit || queued === 'blocked-retention' ? 3 : 2);
+      }
+    );
   });
 });

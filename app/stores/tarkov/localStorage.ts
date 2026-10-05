@@ -2,6 +2,7 @@ import { migrateToGameModeStructure, type UserState } from '@/stores/progressSta
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   classifyLocalSaveFailure,
+  progressSaveStatus,
   recordLocalSave,
   recordLocalSavePending,
 } from '@/stores/tarkov/progressSaveStatus';
@@ -220,7 +221,7 @@ export const isLocalStorageInaccessible = (): boolean => {
     return true;
   }
 };
-type StorageWriteResult = { ok: true } | { ok: false; error: unknown; canceled?: boolean };
+type StorageWriteResult = { ok: true } | { ok: false; error: unknown; canceled?: true };
 let activeProgressWritesBlocked = false;
 const ACTIVE_PROGRESS_LOCK = `${STORAGE_KEYS.progress}:mutation`;
 let activeProgressGeneration = 0;
@@ -228,37 +229,68 @@ const ownerGenerations = new Map<string, number>();
 const ownerGenerationFor = (owner?: string | null): number =>
   owner ? (ownerGenerations.get(owner) ?? 0) : 0;
 let localWriteRevision = 0;
-let pendingProgressValue: { value: string; revision: number; cloudHeld: boolean } | null = null;
+let progressValueRevision = 0;
+let pendingValueRevision: number | null = null;
+let pendingEditRevision: number | null = null;
+const pendingProgressWrites = new Map<
+  number,
+  {
+    value: string;
+    cloudHeld: boolean;
+    expected?: PersistedProgressSnapshot | null;
+    baseline: PersistedProgressSnapshot | null;
+    handoff: boolean;
+  }
+>();
+const sameProgressWriteState = (left: string, right: string): boolean => {
+  const a = parseUserScopedStorage<unknown>(left);
+  const b = parseUserScopedStorage<unknown>(right);
+  if (!a || !b) return false;
+  return a._userId === b._userId && deepEqual(a.data, b.data);
+};
+const pendingProgressWriteAt = (revision: number | null) =>
+  pendingProgressWrites.get(revision ?? -1);
+const latestPendingProgressWrite = () => {
+  const edit = pendingProgressWriteAt(pendingEditRevision);
+  const latest = pendingProgressWriteAt(pendingValueRevision);
+  if (!edit) return latest;
+  if (!latest) return edit;
+  return sameProgressWriteState(edit.value, latest.value) ? latest : edit;
+};
 const readActiveProgressValue = (): string | null =>
-  pendingProgressValue?.value ?? safeGetItem(STORAGE_KEYS.progress);
-let pendingAcknowledgementValue: { value: string; revision: number } | null = null;
-let acknowledgementRevision = 0;
-const readSerializerProgressState = (userId: string | null): PersistedProgressSnapshot | null =>
-  parsePersistedProgressState(
-    pendingProgressValue?.value ??
-      pendingAcknowledgementValue?.value ??
-      safeGetItem(STORAGE_KEYS.progress),
-    userId
+  latestPendingProgressWrite()?.value ?? safeGetItem(STORAGE_KEYS.progress);
+/** Preserve the ordered baseline chain before an auth handoff invalidates its old session. */
+export const getPendingProgressWritesForOwners = (owners: (string | null)[]) => {
+  return [...pendingProgressWrites.values()].filter(
+    ({ value, handoff }) =>
+      handoff || owners.includes(parseUserScopedStorage<unknown>(value)?._userId ?? null)
   );
+};
+const discardPendingProgressWrites = (owner?: string): void => {
+  if (!owner) {
+    pendingProgressWrites.clear();
+    return;
+  }
+  for (const [revision, { value }] of pendingProgressWrites)
+    if (parseUserScopedStorage<unknown>(value)?._userId === owner)
+      pendingProgressWrites.delete(revision);
+};
 const activeProgressOperations = new Set<Promise<StorageWriteResult>>();
 /** Cancel queued writes before changing the session or intentionally clearing its progress. */
 export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false): void => {
+  const pending = latestPendingProgressWrite();
+  discardPendingProgressWrites(owner);
   if (owner) {
     ownerGenerations.set(owner, ownerGenerationFor(owner) + 1);
-    if (
-      parseUserScopedStorage<unknown>(pendingAcknowledgementValue?.value ?? '')?._userId === owner
-    )
-      pendingAcknowledgementValue = null;
-    if (parseUserScopedStorage<unknown>(pendingProgressValue?.value ?? '')?._userId !== owner)
-      return;
+    if (parseUserScopedStorage<unknown>(pending?.value ?? '')?._userId !== owner) return;
   } else {
     activeProgressGeneration += 1;
   }
-  if (pendingProgressValue)
-    recordLocalSave(false, null, cloudHeld || pendingProgressValue.cloudHeld);
+  if (pending && progressSaveStatus.local === 'pending')
+    recordLocalSave(false, null, cloudHeld || pending.cloudHeld);
   localWriteRevision += 1;
-  pendingProgressValue = null;
-  pendingAcknowledgementValue = null;
+  pendingValueRevision = null;
+  pendingEditRevision = null;
 };
 /** A synchronous plugin cannot await storage; lifecycle callers can wait for its queue to drain. */
 export const flushActiveProgressWrites = async (): Promise<void> => {
@@ -447,40 +479,85 @@ export const quarantineAndRemoveUnparseableActiveProgress = async (
   });
   return result.ok;
 };
-/**
- * Writes the active progress envelope and records whether the browser confirmed it.
- * Only this confirmation may be described to the player as a local save.
- */
+const parseHandoffBaseline = (raw: string | null): PersistedProgressSnapshot | null => {
+  try {
+    return parsePersistedProgressState(
+      raw,
+      parseUserScopedStorage<unknown>(raw ?? '')?._userId ?? null
+    );
+  } catch {
+    return null;
+  }
+};
+type ProgressWriteRequest = {
+  value: string;
+  cloudHeld: boolean;
+  expected?: PersistedProgressSnapshot | null;
+  handoffBaseline?: PersistedProgressSnapshot | null;
+};
+const queueProgressWrite = (request: ProgressWriteRequest): number => {
+  const baseline =
+    request.handoffBaseline === undefined
+      ? parseHandoffBaseline(readActiveProgressValue())
+      : request.handoffBaseline;
+  const valueRevision = ++progressValueRevision;
+  pendingProgressWrites.set(valueRevision, {
+    value: request.value,
+    cloudHeld: request.cloudHeld,
+    expected: request.expected,
+    baseline,
+    handoff: request.handoffBaseline !== undefined,
+  });
+  pendingValueRevision = valueRevision;
+  if (request.expected === undefined) pendingEditRevision = valueRevision;
+  return valueRevision;
+};
+const finishPendingProgressWrite = (valueRevision: number): void => {
+  pendingProgressWrites.delete(valueRevision);
+  if (pendingValueRevision === valueRevision) pendingValueRevision = null;
+  if (pendingEditRevision === valueRevision) pendingEditRevision = null;
+};
+const applyProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+  const required = request.expected === undefined ? request.handoffBaseline : request.expected;
+  if (
+    required !== undefined &&
+    !matchesExpectedProgress(localStorage.getItem(STORAGE_KEYS.progress), required)
+  )
+    return { ok: false, error: null, canceled: true };
+  return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
+};
+const shouldReportProgressWriteFailure = (
+  request: ProgressWriteRequest,
+  result: Extract<StorageWriteResult, { ok: false }>
+): boolean => !result.canceled || request.expected === undefined;
+const recordProgressWriteResult = (
+  request: ProgressWriteRequest,
+  result: StorageWriteResult
+): void => {
+  if (result.ok) {
+    // An ACK changes clocks, never the save result of a genuine edit.
+    if (request.expected === undefined) recordLocalSave(true);
+  } else if (shouldReportProgressWriteFailure(request, result)) {
+    recordLocalSave(false, classifyLocalSaveFailure(result.error), request.cloudHeld);
+  }
+};
+/** Writes active envelopes and transfers their captured baselines across auth changes. */
 export const persistActiveProgressValue = async (
-  value: string,
+  value: ProgressWriteRequest['value'],
   cloudHeld = false,
-  expected?: PersistedProgressSnapshot | null
+  expected?: PersistedProgressSnapshot | null,
+  handoffBaseline?: PersistedProgressSnapshot | null
 ): Promise<boolean> => {
-  // A conditional acknowledgement changes clocks for cloud-held state, not local edits.
-  // Keep any real queued value and its save status visible until its own write settles.
   const revision = expected === undefined ? ++localWriteRevision : localWriteRevision;
-  const acknowledgement = ++acknowledgementRevision;
-  if (expected !== undefined) pendingAcknowledgementValue = { value, revision: acknowledgement };
-  if (expected === undefined) {
-    pendingProgressValue = { value, revision, cloudHeld };
-    recordLocalSavePending(cloudHeld);
-  }
-  const result = await mutateActiveProgress(() => {
-    const current = localStorage.getItem(STORAGE_KEYS.progress);
-    if (expected !== undefined && !matchesExpectedProgress(current, expected)) {
-      return { ok: false, error: null, canceled: true };
-    }
-    return writeStorageItem(STORAGE_KEYS.progress, value, cloudHeld);
-  }, parseUserScopedStorage<unknown>(value)?._userId);
-  if (pendingAcknowledgementValue?.revision === acknowledgement) pendingAcknowledgementValue = null;
-  if (expected === undefined && pendingProgressValue?.revision === revision)
-    pendingProgressValue = null;
-  const canceledAcknowledgement = expected !== undefined && !result.ok && result.canceled;
-  if (localWriteRevision === revision && !canceledAcknowledgement) {
-    if (result.ok) {
-      if (expected === undefined) recordLocalSave(true);
-    } else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
-  }
+  const request = { value, cloudHeld, expected, handoffBaseline };
+  const valueRevision = queueProgressWrite(request);
+  if (expected === undefined) recordLocalSavePending(cloudHeld);
+  const result = await mutateActiveProgress(
+    () => applyProgressWrite(request),
+    parseUserScopedStorage<unknown>(value)?._userId
+  );
+  finishPendingProgressWrite(valueRevision);
+  if (localWriteRevision === revision) recordProgressWriteResult(request, result);
   return result.ok;
 };
 const matchesExpectedProgress = (
@@ -668,7 +745,7 @@ export const patchStoreState = (
   });
 };
 export const progressStorageSerializer = createProgressStorageSerializer(
-  readSerializerProgressState,
+  readPersistedProgressState,
   // Accepted remote state and clocks are already held by the cloud.
   (value, expected) => {
     void persistActiveProgressValue(value, true, expected);

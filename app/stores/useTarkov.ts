@@ -21,6 +21,7 @@ import {
   saveAccountRecoveryCopy,
   selectFreshestOwnerProgressSnapshot,
 } from '@/stores/tarkov/accountRecovery';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   clearDeviceDataRemoval,
   clearIncompleteDeviceDataRemoval,
@@ -35,6 +36,7 @@ import {
 import {
   clearActiveProgressStorage,
   cloneStateSnapshot,
+  getPendingProgressWritesForOwners,
   getPreservedProgressStorageValue,
   parsePersistedProgressState,
   progressStorageSerializer,
@@ -42,6 +44,7 @@ import {
   persistActiveProgressValue,
   invalidateActiveProgressWrites,
   setActiveProgressWritesBlocked,
+  type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
 import {
   markProgressMetadataHydrated,
@@ -557,6 +560,7 @@ export function resetTarkovSync(
   reason?: string,
   options?: {
     preservePersistedStateForUserId?: string | null;
+    preservedSnapshot?: PersistedProgressSnapshot | null;
     preserveStorageBaselineForUserId?: string;
   }
 ) {
@@ -611,6 +615,8 @@ const retainPreviousOwnerCopy = (preservedState: string | null, previousUserId: 
   setActiveProgressWritesBlocked(!retained);
   return retained;
 };
+const isSessionResetPlaceholder = (): boolean =>
+  deepEqual(sanitizeOwnedUserState(useTarkovStore().$state), sanitizeOwnedUserState(defaultState));
 /** Returns `true` when the previous owner's active copy was restored for a guest session. */
 const restorePreviousOwnerCopy = async (
   preservedState: string | null,
@@ -622,14 +628,33 @@ const restorePreviousOwnerCopy = async (
     return false;
   }
   return (
-    Boolean(preservedState && currentUserId === null) &&
-    (await persistActiveProgressValue(preservedState as string))
+    Boolean(preservedState && currentUserId === null && isSessionResetPlaceholder()) &&
+    (await persistActiveProgressValue(
+      preservedState as string,
+      false,
+      undefined,
+      parsePersistedProgressState(preservedState, previousUserId)
+    ))
   );
 };
-const resetSessionMemory = (reason: string | undefined, userId: string | null) => {
+const resetSessionMemory = (
+  reason: string | undefined,
+  userId: string | null,
+  preservedState: string | null
+) => {
   resetProgressMetadataHydration();
-  resetTarkovSync(reason, { preservePersistedStateForUserId: userId });
-  useTarkovStore().$reset();
+  resetTarkovSync(reason, {
+    preservePersistedStateForUserId: userId,
+    preservedSnapshot: userId ? parsePersistedProgressState(preservedState, userId) : undefined,
+  });
+  // A reset placeholder has no edits; only changes made in the incoming session earn clocks.
+  progressStorageSerializer.reset({
+    state: sanitizeOwnedUserState(defaultState),
+    storedUserId: getCurrentSupabaseUserId(),
+    timestamp: 0,
+    hadDeprecatedProgressData: false,
+  });
+  resetProgressStoreMemory(useTarkovStore());
 };
 /** Retains the previous owner's copy, or blocks active-copy writes when that is impossible. */
 const retainForSessionTransition = (
@@ -646,30 +671,80 @@ const retainForSessionTransition = (
   return false;
 };
 let sessionTransitionRevision = 0;
+export const hasPendingProgressHandoff = (): boolean =>
+  getPendingProgressWritesForOwners([null]).length > 0;
+const pendingHandoffWritesFor = (owners: (string | null)[]) =>
+  getPendingProgressWritesForOwners(owners).filter(
+    ({ value }) =>
+      !isDeviceDataRemovalPending(parseUserScopedStorage<unknown>(value)?._userId ?? null)
+  );
+const startProgressHandoff = (writes: ReturnType<typeof getPendingProgressWritesForOwners>) =>
+  writes.map(({ value, cloudHeld, expected, baseline }) =>
+    persistActiveProgressValue(value, cloudHeld, expected, baseline)
+  );
+const isCurrentSessionTransition = (revision: number, userId: string | null): boolean =>
+  revision === sessionTransitionRevision && userId === getCurrentSupabaseUserId();
+const isMatchingGuestProgress = (
+  guest: PersistedProgressSnapshot | null,
+  state: UserState
+): guest is PersistedProgressSnapshot =>
+  guest !== null &&
+  hasProgress(guest.state) &&
+  deepEqual(guest.state, sanitizeOwnedUserState(state));
+/** Finish an older auth handoff without resetting guest edits awaiting normal login adoption. */
+export async function settlePendingProgressHandoffs(): Promise<void> {
+  const userId = getCurrentSupabaseUserId();
+  const revision = sessionTransitionRevision;
+  const writes = pendingHandoffWritesFor([null, userId]);
+  const guest = readPersistedProgressState(null);
+  invalidateActiveProgressWrites();
+  await Promise.all(startProgressHandoff(writes));
+  // An intervening tab's envelope may supersede the transferred baseline chain. Keep guest
+  // edits available to normal login adoption without overwriting that newer owner's copy.
+  if (
+    userId &&
+    isCurrentSessionTransition(revision, userId) &&
+    isMatchingGuestProgress(guest, useTarkovStore().$state)
+  )
+    progressSync.handOffSnapshot(userId, guest);
+}
 export async function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
   const revision = ++sessionTransitionRevision;
   const preservedState = getPreservedProgressStorageValue(previousUserId);
+  const pendingWrites = pendingHandoffWritesFor([previousUserId]);
   const currentUserId = getCurrentSupabaseUserId();
   invalidateActiveProgressWrites();
   if (!retainForSessionTransition(preservedState, previousUserId)) {
-    resetSessionMemory(reason, previousUserId);
+    resetSessionMemory(reason, previousUserId, preservedState);
     return;
   }
   setActiveProgressWritesBlocked(false);
-  resetSessionMemory(reason, previousUserId);
+  // Transfer the owner's pending baseline chain before placeholders retain obsolete clocks.
+  const handoffWrites = startProgressHandoff(pendingWrites);
+  resetSessionMemory(reason, previousUserId, preservedState);
   if (!import.meta.client) {
     return;
+  }
+  if (handoffWrites.length) {
+    await Promise.all(handoffWrites);
+    if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
+      return;
   }
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
     return;
-  if (restored) return;
+  // Edits made while the handoff waited belong to the new session, beyond its reset placeholder.
+  if (restored || !isSessionResetPlaceholder()) return;
   // Only the active copy is cleared: recovery copies belong to their owners. The reset above
   // may have persisted a default placeholder for the new owner; it is not their progress.
-  await clearActiveProgressStorage(currentUserId);
+  const cleared = await clearActiveProgressStorage(currentUserId);
+  if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
+    return;
+  if (!cleared)
+    logger.error('[TarkovStore] Failed to clear active progress during session transition');
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
