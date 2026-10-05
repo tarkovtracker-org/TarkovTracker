@@ -1,6 +1,10 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import { classifyLocalSaveFailure, recordLocalSave } from '@/stores/tarkov/progressSaveStatus';
+import {
+  classifyLocalSaveFailure,
+  recordLocalSave,
+  recordLocalSavePending,
+} from '@/stores/tarkov/progressSaveStatus';
 import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
@@ -12,7 +16,7 @@ import {
   taskAvailabilityCandidates,
   type ConfirmationMap,
 } from '@/utils/taskAvailabilityConfirmation';
-import { parseUserScopedStorage } from '@/utils/userScopedStorage';
+import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type PersistedProgressSnapshot = {
   hadDeprecatedProgressData: boolean;
   state: UserState;
@@ -114,7 +118,7 @@ const acceptRemoteMode = (
 };
 export const createProgressStorageSerializer = (
   readPrevious: (userId: string | null) => PersistedProgressSnapshot | null,
-  persistAccepted?: (value: string) => void
+  persistAccepted?: (value: string, expected: PersistedProgressSnapshot | null) => void
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
   const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
@@ -167,7 +171,9 @@ export const createProgressStorageSerializer = (
       // would incorrectly timestamp downloaded progress as a new local edit.
       serialize(snapshot.state, snapshot.userId, Date.now());
       const accepted = previous!;
-      const canPersist = matchesPersistedSnapshot(readPrevious(snapshot.userId), accepted);
+      const persistedBefore = readPrevious(snapshot.userId);
+      const canPersist = matchesPersistedSnapshot(persistedBefore, accepted);
+      const expected = persistedBefore ? cloneStateSnapshot(accepted) : null;
       acceptRemoteMetadata(accepted, snapshot);
       GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(accepted, snapshot, mode));
       // Matching echoes may require no Pinia patch. Persist the accepted clocks
@@ -175,7 +181,11 @@ export const createProgressStorageSerializer = (
       // Another tab may have persisted an unsaved edit since our last write.
       // A clock-only acknowledgement must not overwrite that shared envelope.
       if (canPersist) {
-        persistAccepted?.(serialize(accepted.state, snapshot.userId, accepted.timestamp ?? 0));
+        // The pre-lock observation is only an optimization. Recheck this baseline under the lock.
+        persistAccepted?.(
+          serialize(accepted.state, snapshot.userId, accepted.timestamp ?? 0),
+          expected
+        );
       }
     },
   };
@@ -210,8 +220,85 @@ export const isLocalStorageInaccessible = (): boolean => {
     return true;
   }
 };
-type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
+type StorageWriteResult = { ok: true } | { ok: false; error: unknown; canceled?: boolean };
 let activeProgressWritesBlocked = false;
+const ACTIVE_PROGRESS_LOCK = `${STORAGE_KEYS.progress}:mutation`;
+let activeProgressGeneration = 0;
+const ownerGenerations = new Map<string, number>();
+const ownerGenerationFor = (owner?: string | null): number =>
+  owner ? (ownerGenerations.get(owner) ?? 0) : 0;
+let localWriteRevision = 0;
+let pendingProgressValue: { value: string; revision: number; cloudHeld: boolean } | null = null;
+const readActiveProgressValue = (): string | null =>
+  pendingProgressValue?.value ?? safeGetItem(STORAGE_KEYS.progress);
+let pendingAcknowledgementValue: { value: string; revision: number } | null = null;
+let acknowledgementRevision = 0;
+const readSerializerProgressState = (userId: string | null): PersistedProgressSnapshot | null =>
+  parsePersistedProgressState(
+    pendingProgressValue?.value ??
+      pendingAcknowledgementValue?.value ??
+      safeGetItem(STORAGE_KEYS.progress),
+    userId
+  );
+const activeProgressOperations = new Set<Promise<StorageWriteResult>>();
+/** Cancel queued writes before changing the session or intentionally clearing its progress. */
+export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false): void => {
+  if (owner) {
+    ownerGenerations.set(owner, ownerGenerationFor(owner) + 1);
+    if (
+      parseUserScopedStorage<unknown>(pendingAcknowledgementValue?.value ?? '')?._userId === owner
+    )
+      pendingAcknowledgementValue = null;
+    if (parseUserScopedStorage<unknown>(pendingProgressValue?.value ?? '')?._userId !== owner)
+      return;
+  } else {
+    activeProgressGeneration += 1;
+  }
+  if (pendingProgressValue)
+    recordLocalSave(false, null, cloudHeld || pendingProgressValue.cloudHeld);
+  localWriteRevision += 1;
+  pendingProgressValue = null;
+  pendingAcknowledgementValue = null;
+};
+/** A synchronous plugin cannot await storage; lifecycle callers can wait for its queue to drain. */
+export const flushActiveProgressWrites = async (): Promise<void> => {
+  while (activeProgressOperations.size) await Promise.all(activeProgressOperations);
+};
+const mutateActiveProgress = (
+  mutate: () => StorageWriteResult,
+  owner?: string | null
+): Promise<StorageWriteResult> => {
+  const generation = activeProgressGeneration;
+  const ownerGeneration = ownerGenerationFor(owner);
+  const sessionOwner = getCurrentSupabaseUserId();
+  const operation = (async (): Promise<StorageWriteResult> => {
+    try {
+      if (typeof window === 'undefined' || !navigator.locks) {
+        throw new DOMException('Cross-tab progress locking is unavailable', 'InvalidStateError');
+      }
+      return await navigator.locks.request(ACTIVE_PROGRESS_LOCK, { mode: 'exclusive' }, () => {
+        if (
+          generation !== activeProgressGeneration ||
+          sessionOwner !== getCurrentSupabaseUserId() ||
+          ownerGeneration !== ownerGenerationFor(owner)
+        ) {
+          return {
+            ok: false,
+            error: new Error('Progress operation belongs to an expired session'),
+            canceled: true,
+          };
+        }
+        return mutate();
+      });
+    } catch (error) {
+      logger.error('[TarkovStore] Active progress mutation failed:', error);
+      return { ok: false, error };
+    }
+  })();
+  activeProgressOperations.add(operation);
+  void operation.then(() => activeProgressOperations.delete(operation));
+  return operation;
+};
 type ActiveProgressRetentionGuard = (
   current: string | null,
   next: string | null,
@@ -219,6 +306,7 @@ type ActiveProgressRetentionGuard = (
 ) => boolean;
 let activeProgressRetentionGuard: ActiveProgressRetentionGuard = (current) => !current;
 export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
+  if (blocked) invalidateActiveProgressWrites();
   activeProgressWritesBlocked = blocked;
 };
 export const setActiveProgressRetentionGuard = (guard: ActiveProgressRetentionGuard): void => {
@@ -245,7 +333,9 @@ const writeStorageItem = (key: string, value: string, cloudHeld = false): Storag
     return { ok: false, error };
   }
 };
-export const safeSetItem = (key: string, value: string): boolean => writeStorageItem(key, value).ok;
+/** Synchronous helpers may only mutate keys outside the serialized active slot. */
+export const safeSetItem = (key: string, value: string): boolean =>
+  key !== STORAGE_KEYS.progress && writeStorageItem(key, value).ok;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const hasEnvelopeMetadata = (data: Record<string, unknown>): boolean =>
@@ -342,76 +432,144 @@ export const preserveUnparseableActiveProgress = (raw: string): boolean =>
  * Explicit device cleanup may release malformed active bytes only after exact quarantine and
  * after `confirmRelease` durably records that quarantine. Returns whether the slot was released.
  */
-export const quarantineAndRemoveUnparseableActiveProgress = (
+export const quarantineAndRemoveUnparseableActiveProgress = async (
   raw: string,
   confirmRelease: (quarantineKey: string) => boolean
-): boolean => {
-  const quarantineKey = quarantineUnparseableActiveProgress(raw);
-  if (!quarantineKey || !confirmRelease(quarantineKey)) return false;
-  try {
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
+): Promise<boolean> => {
+  const result = await mutateActiveProgress(() => {
+    const quarantineKey = quarantineUnparseableActiveProgress(raw);
+    if (!quarantineKey || !confirmRelease(quarantineKey)) return { ok: false, error: null };
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return { ok: false, error: null };
     localStorage.removeItem(STORAGE_KEYS.progress);
-    return localStorage.getItem(STORAGE_KEYS.progress) === null;
-  } catch (error) {
-    logger.error('[TarkovStore] Could not remove quarantined active progress:', error);
-    return false;
-  }
+    return localStorage.getItem(STORAGE_KEYS.progress) === null
+      ? { ok: true }
+      : { ok: false, error: null };
+  });
+  return result.ok;
 };
 /**
  * Writes the active progress envelope and records whether the browser confirmed it.
  * Only this confirmation may be described to the player as a local save.
  */
-export const persistActiveProgressValue = (value: string, cloudHeld = false): boolean => {
-  const result = writeStorageItem(STORAGE_KEYS.progress, value, cloudHeld);
-  if (result.ok) recordLocalSave(true);
-  else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
+export const persistActiveProgressValue = async (
+  value: string,
+  cloudHeld = false,
+  expected?: PersistedProgressSnapshot | null
+): Promise<boolean> => {
+  // A conditional acknowledgement changes clocks for cloud-held state, not local edits.
+  // Keep any real queued value and its save status visible until its own write settles.
+  const revision = expected === undefined ? ++localWriteRevision : localWriteRevision;
+  const acknowledgement = ++acknowledgementRevision;
+  if (expected !== undefined) pendingAcknowledgementValue = { value, revision: acknowledgement };
+  if (expected === undefined) {
+    pendingProgressValue = { value, revision, cloudHeld };
+    recordLocalSavePending(cloudHeld);
+  }
+  const result = await mutateActiveProgress(() => {
+    const current = localStorage.getItem(STORAGE_KEYS.progress);
+    if (expected !== undefined && !matchesExpectedProgress(current, expected)) {
+      return { ok: false, error: null, canceled: true };
+    }
+    return writeStorageItem(STORAGE_KEYS.progress, value, cloudHeld);
+  }, parseUserScopedStorage<unknown>(value)?._userId);
+  if (pendingAcknowledgementValue?.revision === acknowledgement) pendingAcknowledgementValue = null;
+  if (expected === undefined && pendingProgressValue?.revision === revision)
+    pendingProgressValue = null;
+  const canceledAcknowledgement = expected !== undefined && !result.ok && result.canceled;
+  if (localWriteRevision === revision && !canceledAcknowledgement) {
+    if (result.ok) {
+      if (expected === undefined) recordLocalSave(true);
+    } else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
+  }
   return result.ok;
+};
+const matchesExpectedProgress = (
+  raw: string | null,
+  expected: PersistedProgressSnapshot | null
+): boolean => {
+  if (expected === null) return raw === null;
+  const current = parsePersistedProgressState(raw, expected.storedUserId);
+  return current !== null && matchesPersistedSnapshot(current, expected);
 };
 /**
  * Storage adapter for the progress persist plugin. The plugin swallows storage
  * exceptions, so writes go through `persistActiveProgressValue` to surface them.
  */
 export const progressPersistStorage = {
-  getItem: (key: string): string | null => safeGetItem(key),
+  getItem: (key: string): string | null =>
+    key === STORAGE_KEYS.progress ? readActiveProgressValue() : safeGetItem(key),
   setItem: (key: string, value: string): void => {
-    if (key === STORAGE_KEYS.progress) persistActiveProgressValue(value);
+    if (key === STORAGE_KEYS.progress) void persistActiveProgressValue(value);
     else safeSetItem(key, value);
   },
 };
-export const safeRemoveItem = (key: string, explicitOwnerRemoval?: string): boolean => {
+const matchesExpectedValue = (current: string | null, expected?: string): boolean =>
+  expected === undefined || current === expected;
+const isExplicitOwnerRemoval = (current: string | null, owner?: string): boolean =>
+  Boolean(owner && current && parseUserScopedStorage<unknown>(current)?._userId === owner);
+const canRemoveActiveProgress = (
+  current: string | null,
+  owner?: string,
+  expected?: string
+): boolean => {
+  if (!matchesExpectedValue(current, expected)) return false;
+  return (
+    isExplicitOwnerRemoval(current, owner) ||
+    (!activeProgressWritesBlocked && activeProgressRetentionGuard(current, null))
+  );
+};
+const removeStorageItem = (
+  key: string,
+  explicitOwnerRemoval?: string,
+  expectedValue?: string,
+  storage: Storage = localStorage
+): boolean => {
   if (typeof window === 'undefined') return false;
   try {
-    if (key === STORAGE_KEYS.progress) {
-      const current = localStorage.getItem(key);
-      const currentOwner = current
-        ? (parseUserScopedStorage<unknown>(current)?._userId ?? null)
-        : null;
-      const explicitRemoval = Boolean(
-        explicitOwnerRemoval && currentOwner === explicitOwnerRemoval
-      );
-      if (
-        !explicitRemoval &&
-        (activeProgressWritesBlocked || !activeProgressRetentionGuard(current, null))
-      ) {
-        return false;
-      }
-    }
-    localStorage.removeItem(key);
+    if (
+      key === STORAGE_KEYS.progress &&
+      !canRemoveActiveProgress(storage.getItem(key), explicitOwnerRemoval, expectedValue)
+    )
+      return false;
+    storage.removeItem(key);
     return true;
   } catch (error) {
     logger.error(`[TarkovStore] Failed to remove localStorage key "${key}":`, error);
     return false;
   }
 };
+export const safeRemoveItem = (key: string): boolean =>
+  key !== STORAGE_KEYS.progress && removeStorageItem(key);
+/** Ownership and optional exact-byte checks are performed only after acquiring the shared lock. */
+export const removeActiveProgressValue = async (
+  explicitOwnerRemoval?: string,
+  expectedValue?: string,
+  storage?: Storage
+): Promise<boolean> => {
+  const result = await mutateActiveProgress(() =>
+    removeStorageItem(STORAGE_KEYS.progress, explicitOwnerRemoval, expectedValue, storage)
+      ? { ok: true }
+      : { ok: false, error: null }
+  );
+  return result.ok;
+};
 /**
  * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
  * decided before the reset, so the active copy is removed without keeping a recovery copy.
  * Write barriers still apply.
  */
-export const clearActiveProgressStorage = (resetOwner?: string | null) => {
+export const clearActiveProgressStorage = async (
+  resetOwner?: string | null,
+  cloudHeld = false
+): Promise<void> => {
   if (typeof window === 'undefined') return;
-  const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
-  safeRemoveItem(STORAGE_KEYS.progress, explicitOwner);
+  invalidateActiveProgressWrites(undefined, cloudHeld);
+  await mutateActiveProgress(() => {
+    const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
+    return removeStorageItem(STORAGE_KEYS.progress, explicitOwner)
+      ? { ok: true }
+      : { ok: false, error: null };
+  });
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
 };
 const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;
@@ -480,13 +638,13 @@ export const readPersistedProgressState = (
   if (!import.meta.client) {
     return null;
   }
-  return parsePersistedProgressState(safeGetItem(STORAGE_KEYS.progress), userId);
+  return parsePersistedProgressState(readActiveProgressValue(), userId);
 };
 export const getPreservedProgressStorageValue = (previousUserId: string | null): string | null => {
   if (!import.meta.client || !previousUserId) {
     return null;
   }
-  const rawPersistedState = safeGetItem(STORAGE_KEYS.progress);
+  const rawPersistedState = readActiveProgressValue();
   return parsePersistedProgressState(rawPersistedState, previousUserId) ? rawPersistedState : null;
 };
 export const patchStoreState = (
@@ -504,9 +662,9 @@ export const patchStoreState = (
   });
 };
 export const progressStorageSerializer = createProgressStorageSerializer(
-  readPersistedProgressState,
+  readSerializerProgressState,
   // Accepted remote state and clocks are already held by the cloud.
-  (value) => {
-    persistActiveProgressValue(value, true);
+  (value, expected) => {
+    void persistActiveProgressValue(value, true, expected);
   }
 );

@@ -45,10 +45,26 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   keep the existing write-time fallback. The handoff marker is in memory only, not a persisted field.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
-  progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
-  `unavailable`, `unknown`); only the sign-out restore of the previous owner's copy writes directly. A failed local write means the latest changes are memory-only, except a write of
+  progress key, including sign-out restoration, go through `persistActiveProgressValue`. It records
+  `pending` while queued, then `saved` or `failed` (`quota`, `unavailable`, `unknown`). A failed local write means the latest changes are memory-only, except a write of
   remote state and clocks the cloud already holds, which reports `failed` without marking progress
   unsaved.
+  All active-key writes and removals share one exclusive Web Lock (`v2_progress:mutation`), held
+  across the durable read, ownership/retention checks, and mutation. Missing or rejected locking
+  reports failure without an unlocked fallback. The synchronous Pinia adapter queues writes and
+  offers pending edits for same-tab hydration, startup, and handoff; retention and quota pruning
+  read durable storage. The store's memory-only session reset suppresses both serialization and
+  adapter writes, so reset placeholders never acquire progress clocks or replace genuine pending
+  edits. Only the latest queued edit updates local save status. Session changes, write
+  barriers, and resets invalidate earlier queued writes; cleanup for an old owner does not cancel
+  another owner's edits. Remote clock acknowledgements compare their observed baseline again under
+  the lock, including whether the slot existed, so a later write or clear wins. Conditional
+  acknowledgements use a separate serializer baseline overlay so successive accepted clocks persist
+  in order, without replacing genuine pending edits, hydration values, or their status. A superseded
+  acknowledgement is canceled without reporting a storage failure. Pending memory-only
+  progress participates in sign-out protection and prompts before reload; a cloud-held acknowledgement
+  alone does not create that loss warning. Tabs running older cached code do not participate in the
+  lock until they reload.
   If active bytes parse as neither a scoped envelope nor legacy progress, replacement first saves
   and reads back the exact bytes under an ownerless quarantine key. Quarantined bytes are never
   hydrated, assigned to an account, included in debug exports, or pruned as backups; if preservation
@@ -217,7 +233,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   while a pending local level edit wins until acknowledged. Startup takes the level from the
   preferred mode snapshot, so a newer decrease is not replaced by an older maximum.
   Recovery composition also honors a known newer mode clock's level; an unknown-clock
-  placeholder cannot lower existing progress using only its envelope write time.
+  placeholder cannot lower existing progress using only its envelope write time. Owned snapshots
+  with known mode clocks still reconcile a deliberate level decrease to the default level.
   Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,
   so an acknowledged count clear is not resurrected. Pending fields (including explicit clears) survive reconnect reads, incoming live events,
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.

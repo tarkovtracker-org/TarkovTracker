@@ -302,5 +302,5 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   // The reset RPC already saved this state; the patch above is not a new cloud change.
   if (saved) syncController?.acknowledgeExternalSave?.(saved);
   // Only this session's active copy: other accounts' recovery data is not part of a reset.
-  clearActiveProgressStorage(ownerId);
+  await clearActiveProgressStorage(ownerId, saved !== null);
 };

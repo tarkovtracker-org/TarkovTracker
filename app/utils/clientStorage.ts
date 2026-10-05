@@ -1,3 +1,4 @@
+import { removeActiveProgressValue } from '@/stores/tarkov/localStorage';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 const isSupabaseAuthStorageKey = (key: string): boolean => {
   return key.endsWith('-auth-token') || key.endsWith('-code-verifier');
@@ -46,12 +47,12 @@ const clearSessionMigrationKeys = (sessionStorageArea: Storage | null): void => 
   sessionStorageArea?.removeItem(STORAGE_KEYS.sessionDataMigrated);
   sessionStorageArea?.removeItem(LEGACY_STORAGE_KEYS.sessionDataMigrated);
 };
-export const clearProgressStorage = (storage?: Storage | null): void => {
+export const clearProgressStorage = async (storage?: Storage | null): Promise<void> => {
   storage ??= getDefaultLocalStorageArea();
   if (!storage) {
     return;
   }
-  storage.removeItem(STORAGE_KEYS.progress);
+  await removeActiveProgressValue(undefined, undefined, storage);
   storage.removeItem(LEGACY_STORAGE_KEYS.progress);
   getProgressBackupKeys(storage).forEach((key) => storage.removeItem(key));
 };
@@ -63,11 +64,11 @@ export const clearPreferencesStorage = (storage?: Storage | null): void => {
   storage.removeItem(STORAGE_KEYS.preferences);
   storage.removeItem(LEGACY_STORAGE_KEYS.preferences);
 };
-export const clearSessionScopedStorage = (
+export const clearSessionScopedStorage = async (
   localStorageArea: Storage | null = getDefaultLocalStorageArea(),
   sessionStorageArea: Storage | null = getDefaultSessionStorageArea()
-): void => {
-  clearProgressStorage(localStorageArea);
+): Promise<void> => {
+  await clearProgressStorage(localStorageArea);
   clearPreferencesStorage(localStorageArea);
   clearSessionMigrationKeys(sessionStorageArea);
 };
@@ -75,17 +76,17 @@ type ClearUserScopedAppStorageOptions = {
   includeAuthSessions?: boolean;
   sessionStorageArea?: Storage | null;
 };
-export const clearUserScopedAppStorage = (
+export const clearUserScopedAppStorage = async (
   storage: Storage | null = getDefaultLocalStorageArea(),
   options: ClearUserScopedAppStorageOptions = {}
-): void => {
+): Promise<void> => {
   const { includeAuthSessions = false, sessionStorageArea = getDefaultSessionStorageArea() } =
     options;
   if (!storage) {
     clearSessionMigrationKeys(sessionStorageArea);
     return;
   }
-  clearSessionScopedStorage(storage, sessionStorageArea);
+  await clearSessionScopedStorage(storage, sessionStorageArea);
   storage.removeItem(STORAGE_KEYS.analyticsConsent);
   storage.removeItem(LEGACY_STORAGE_KEYS.analyticsConsent);
   storage.removeItem(STORAGE_KEYS.adminLastPurge);

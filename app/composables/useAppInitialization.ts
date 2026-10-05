@@ -162,9 +162,10 @@ export function useAppInitialization() {
     await recordAccountActivityIfNeeded(expectedUserId, expectedToken);
   };
   onScopeDispose(cancelSyncRetry);
-  const resetTarkovState = (reason: string, previousUserId: string | null = null) => {
-    resetTarkovStoreForSessionTransition(previousUserId, reason);
+  const resetTarkovState = async (reason: string, previousUserId: string | null = null) => {
+    const transition = resetTarkovStoreForSessionTransition(previousUserId, reason);
     activityLogStore.resetForSession();
+    await transition;
   };
   const resetInitializationState = (loggedIn: boolean) => {
     syncStarted = false;
@@ -297,7 +298,7 @@ export function useAppInitialization() {
   // complexity findings of anonymous arrows by position, and each helper also
   // stays below the CRAP threshold for uncovered code.
   const resetForPreviousUser = (loggedIn: boolean, prevUserId: string) => {
-    resetTarkovState(loggedIn ? 'user unavailable' : 'logout', prevUserId);
+    void resetTarkovState(loggedIn ? 'user unavailable' : 'logout', prevUserId);
   };
   const resetForAuthLoss = (
     loggedIn: boolean,
@@ -311,7 +312,7 @@ export function useAppInitialization() {
     if (prevUserId) {
       resetForPreviousUser(loggedIn, prevUserId);
     } else if (!loggedIn) {
-      resetTarkovState('logout');
+      void resetTarkovState('logout');
     }
     resetInitializationState(loggedIn);
   };
@@ -329,8 +330,9 @@ export function useAppInitialization() {
         return;
       }
       if (didSwitchUser(prevUserId, userId)) {
-        resetTarkovState('user switched', prevUserId);
         resetInitializationState(loggedIn);
+        await resetTarkovState('user switched', prevUserId);
+        if (token !== authChangeToken) return;
       }
       await runAuthenticatedInitialization(userId, token);
     },

@@ -8,6 +8,8 @@ import {
   quarantineAndRemoveUnparseableActiveProgress,
   isUnparseableProgressStorageValue,
   safeRemoveItem,
+  removeActiveProgressValue,
+  invalidateActiveProgressWrites,
   safeSetItem,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
@@ -82,92 +84,107 @@ const quarantineRemainsForOwner = (userId: string): boolean => {
   return !safeRemoveItem(markerKey);
 };
 /** The active slot is released only once the owner's durable marker is confirmed. */
-const quarantineUnattributedActiveProgress = (raw: string, userId: string): RemovalResult => {
-  const released = quarantineAndRemoveUnparseableActiveProgress(raw, (quarantineKey) =>
+const quarantineUnattributedActiveProgress = async (
+  raw: string,
+  userId: string
+): Promise<RemovalResult | null> => {
+  const released = await quarantineAndRemoveUnparseableActiveProgress(raw, (quarantineKey) =>
     safeSetItem(removalMarkerKey(userId), quarantineKey)
   );
+  if (!released && readStorageItem(STORAGE_KEYS.progress) !== raw) return null;
   return { complete: false, released };
 };
-const removeOwnedActiveProgress = (userId: string): RemovalResult => {
-  const removed = safeRemoveItem(STORAGE_KEYS.progress, userId);
-  return { complete: removed, released: removed };
+const removeOwnedActiveProgress = async (
+  userId: string,
+  raw: string
+): Promise<RemovalResult | null> => {
+  const removed = await removeIfUnchanged(STORAGE_KEYS.progress, raw, userId);
+  return removed === null ? null : { complete: removed, released: removed };
 };
 const isForeignEnvelope = (envelope: ScopedEnvelope, userId: string): boolean =>
   Boolean(envelope?._userId && envelope._userId !== userId);
 /** Malformed active bytes are deleted only when they name this owner; otherwise quarantined. */
-const removeMalformedActiveProgress = (
+const removeMalformedActiveProgress = async (
   raw: string,
   userId: string,
   envelope: ScopedEnvelope
-): RemovalResult | null => {
+): Promise<RemovalResult | null> => {
   if (isForeignEnvelope(envelope, userId)) return { complete: true, released: true };
-  if (!isUnparseableProgressStorageValue(raw)) return null;
-  if (envelope?._userId === userId) return removeOwnedActiveProgress(userId);
+  if (envelope?._userId === userId) return removeOwnedActiveProgress(userId, raw);
   return quarantineUnattributedActiveProgress(raw, userId);
 };
 /** Another tab may replace a shared key between the ownership read and the removal. */
-const removeIfUnchanged = (key: string, raw: string, explicitOwner?: string): boolean | null => {
+const removeIfUnchanged = async (
+  key: string,
+  raw: string,
+  explicitOwner?: string
+): Promise<boolean | null> => {
   if (readStorageItem(key) !== raw) return null;
-  return safeRemoveItem(key, explicitOwner);
+  const removed =
+    key === STORAGE_KEYS.progress
+      ? await removeActiveProgressValue(explicitOwner, raw)
+      : safeRemoveItem(key);
+  return !removed && readStorageItem(key) !== raw ? null : removed;
 };
-const removeParsedOwnedValue = (
+const removeParsedOwnedValue = async (
   key: string,
   raw: string,
   userId: string,
   envelope: ScopedEnvelope,
   explicitProgressRemoval: boolean
-): RemovalResult | null => {
+): Promise<RemovalResult | null> => {
   // A value without an owner envelope cannot be proven to belong to this owner, so it is kept.
   if (!envelope || envelope._userId !== userId) return { complete: true, released: true };
-  const removed = removeIfUnchanged(key, raw, explicitProgressRemoval ? userId : undefined);
+  const removed = await removeIfUnchanged(key, raw, explicitProgressRemoval ? userId : undefined);
   return removed === null ? null : { complete: removed, released: removed };
 };
+const isMalformedActiveProgress = (key: string, raw: string, explicitRemoval: boolean): boolean =>
+  explicitRemoval && key === STORAGE_KEYS.progress && isUnparseableProgressStorageValue(raw);
 /** `null` means the stored value changed during the attempt and ownership must be re-read. */
-const attemptOwnedRemoval = (
+const attemptOwnedRemoval = async (
   key: string,
   userId: string,
   explicitProgressRemoval: boolean
-): RemovalResult | null => {
+): Promise<RemovalResult | null> => {
   const raw = readStorageItem(key);
   if (raw === undefined) return { complete: false, released: false };
   if (!raw) return { complete: true, released: true };
   const envelope = parseUserScopedStorage<unknown>(raw);
-  const malformedRemoval =
-    explicitProgressRemoval && key === STORAGE_KEYS.progress
-      ? removeMalformedActiveProgress(raw, userId, envelope)
-      : null;
-  return (
-    malformedRemoval ?? removeParsedOwnedValue(key, raw, userId, envelope, explicitProgressRemoval)
-  );
+  if (isMalformedActiveProgress(key, raw, explicitProgressRemoval)) {
+    return removeMalformedActiveProgress(raw, userId, envelope);
+  }
+  return removeParsedOwnedValue(key, raw, userId, envelope, explicitProgressRemoval);
 };
 const OWNERSHIP_REREAD_ATTEMPTS = 3;
-const removeIfOwned = (
+const removeIfOwned = async (
   key: string,
   userId: string,
   explicitProgressRemoval = false
-): RemovalResult => {
+): Promise<RemovalResult> => {
   for (let attempt = 0; attempt < OWNERSHIP_REREAD_ATTEMPTS; attempt += 1) {
-    const result = attemptOwnedRemoval(key, userId, explicitProgressRemoval);
+    const result = await attemptOwnedRemoval(key, userId, explicitProgressRemoval);
     if (result) return result;
   }
   return { complete: false, released: false };
 };
 /** Removes every locally stored copy owned by `userId`; other accounts are untouched. */
-export const removeAccountDeviceData = (userId: string): boolean => {
+export const removeAccountDeviceData = async (userId: string): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
+  invalidateActiveProgressWrites(userId);
   removalCleanupCallbacks.forEach((cleanup) => cleanup(userId));
   const keys = listStorageKeys();
   let removed = keys !== null;
+  const activeRemoval = await removeIfOwned(STORAGE_KEYS.progress, userId, true);
+  removed = activeRemoval.complete && removed;
+  // An earlier queued replacement can retain the owner's active bytes while removal waits.
   removed = removeAccountRecoveryCopy(userId) && removed;
   removed = removeSupersededProgressCopies(userId) && removed;
-  const activeRemoval = removeIfOwned(STORAGE_KEYS.progress, userId, true);
-  removed = activeRemoval.complete && removed;
   for (const key of OWNER_SCOPED_KEYS) {
-    removed = removeIfOwned(key, userId).complete && removed;
+    removed = (await removeIfOwned(key, userId)).complete && removed;
   }
   for (const key of keys ?? []) {
     if (!isRecognizedBackupKey(key)) continue;
-    removed = removeIfOwned(key, userId).complete && removed;
+    removed = (await removeIfOwned(key, userId)).complete && removed;
   }
   removed = !quarantineRemainsForOwner(userId) && removed;
   // A retained backup is already isolated; only an active copy needs a write barrier.
@@ -223,9 +240,11 @@ export const recordDeviceDataRemovalOutcome = (userId: string, removed: boolean)
   else markDeviceDataRemovalIncomplete(userId);
 };
 /** Retries every owner recorded by any tab; returns `true` once none remains incomplete. */
-export const retryIncompleteDeviceDataRemoval = (): boolean => {
+export const retryIncompleteDeviceDataRemoval = async (): Promise<boolean> => {
   const owners = [...new Set([...incompleteRemovalOwners.value, ...readIncompleteRemovalOwners()])];
   incompleteRemovalOwners.value = owners;
-  owners.filter((owner) => removeAccountDeviceData(owner)).forEach(endIncompleteRemoval);
+  for (const owner of owners) {
+    if (await removeAccountDeviceData(owner)) endIncompleteRemoval(owner);
+  }
   return incompleteRemovalOwners.value.length === 0;
 };
