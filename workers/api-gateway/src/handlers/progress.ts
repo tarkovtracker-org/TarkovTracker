@@ -1,14 +1,10 @@
 import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
 import { applyTaskTransition } from '@shared/utils/taskTransitions';
-import {
-  extractUserMetadataDisplayName,
-  extractUserMetadataUsername,
-} from '@shared/utils/userMetadata';
+import { getUserDisplayName } from '@/utils/user-display-name';
 import { hasMaterializedProgress } from '../../../../app/utils/modeProgress';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { logger } from '../utils/logger';
-import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
 import type {
   Env,
@@ -23,7 +19,6 @@ import type {
   GameMode,
   ProgressDataField,
 } from '../types';
-const DISPLAY_NAME_CACHE_TTL_SECONDS = 86400;
 interface ProgressMergePayload {
   taskCompletions?: Record<string, TaskCompletion>;
   taskObjectives?: Record<string, Record<string, unknown>>;
@@ -185,43 +180,6 @@ async function fetchCurrentProgressData(
   }>;
   const modeProgress = modeRows[0]?.progress_data ?? null;
   return hasMaterializedProgress(modeProgress) ? asProgressRecord(modeProgress) : {};
-}
-async function getUserDisplayName(env: Env, userId: string): Promise<string | null> {
-  const cacheKey = `user-display:${userId}`;
-  const cached = getMemoryCache<string>(cacheKey);
-  if (cached) return cached;
-  try {
-    const url = `${env.SUPABASE_URL}/auth/v1/admin/users/${userId}`;
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      email?: string | null;
-      user_metadata?: Record<string, unknown> | null;
-      app_metadata?: Record<string, unknown> | null;
-    };
-    const userMetadata =
-      data.user_metadata && typeof data.user_metadata === 'object' ? data.user_metadata : {};
-    const appMetadata =
-      data.app_metadata && typeof data.app_metadata === 'object' ? data.app_metadata : {};
-    const provider = typeof appMetadata.provider === 'string' ? appMetadata.provider : null;
-    const email = typeof data.email === 'string' ? data.email : null;
-    const username = extractUserMetadataUsername(userMetadata, email, provider);
-    const displayName = extractUserMetadataDisplayName(userMetadata, provider, username);
-    const resolved = displayName || username || (email ? email.split('@')[0] : null);
-    if (resolved) {
-      setMemoryCache(cacheKey, resolved, DISPLAY_NAME_CACHE_TTL_SECONDS);
-    }
-    return resolved;
-  } catch (error) {
-    logger.error('[getUserDisplayName] Failed to resolve display name:', error);
-    return null;
-  }
 }
 const orderRequestedFirst = (
   updateMap: Map<string, TaskState>,

@@ -6,6 +6,7 @@ export default defineConfig({
   root: gatewayRoot,
   resolve: {
     alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
       'cloudflare:workers': workerShim,
       '@shared': fileURLToPath(new URL('../../shared', import.meta.url)),
     },

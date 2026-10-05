@@ -1,7 +1,7 @@
+import { getUserDisplayName } from '@/utils/user-display-name';
 import { hasMaterializedProgress } from '../../../../app/utils/modeProgress';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
-import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
 import type { Env, ApiToken, GameMode, UserProgressModeRow, ProgressResponseData } from '../types';
 // Team member from database
@@ -95,55 +95,6 @@ const buildProgressData = async (
     fallbackDisplayName
   );
 };
-/**
- * Get display name for a user from Supabase auth
- */
-async function getUserDisplayName(env: Env, userId: string): Promise<string | null> {
-  const cacheKey = `user-display:${userId}`;
-  const cached = getMemoryCache<string>(cacheKey);
-  if (cached) return cached;
-  try {
-    const url = `${env.SUPABASE_URL}/auth/v1/admin/users/${userId}`;
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      email?: string | null;
-      user_metadata?: Record<string, unknown> | null;
-      app_metadata?: Record<string, unknown> | null;
-    };
-    const userMetadata = data.user_metadata || {};
-    const appMetadata = data.app_metadata || {};
-    const provider = typeof appMetadata.provider === 'string' ? appMetadata.provider : null;
-    const email = typeof data.email === 'string' ? data.email : null;
-    // Extract display name based on provider
-    let displayName: string | null = null;
-    if (provider === 'discord') {
-      displayName =
-        (userMetadata.global_name as string) ||
-        (userMetadata.username as string) ||
-        (userMetadata.preferred_username as string) ||
-        null;
-    } else if (provider === 'twitch') {
-      displayName =
-        (userMetadata.preferred_username as string) || (userMetadata.name as string) || null;
-    } else {
-      displayName = (userMetadata.name as string) || null;
-    }
-    const resolved = displayName || (email ? email.split('@')[0] : null);
-    if (resolved) {
-      setMemoryCache(cacheKey, resolved, 86400);
-    }
-    return resolved;
-  } catch {
-    return null;
-  }
-}
 /**
  * Handle GET /api/team/progress - Return team progress
  */
