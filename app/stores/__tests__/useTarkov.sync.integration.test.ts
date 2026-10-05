@@ -1210,6 +1210,90 @@ describe('useTarkov sync integration', () => {
       })
     );
   });
+  it.each([
+    { clock: 'advanced by mode writes', accountOffset: 30_000 },
+    { clock: 'advanced only by metadata', accountOffset: 5_000 },
+  ])(
+    'keeps newer remote trader and skill decreases over a stale local copy: account clock $clock',
+    async ({ accountOffset }) => {
+      const base = Date.parse('2026-09-06T12:00:00Z');
+      const progress = (level: number, reputation: number, endurance: number) => ({
+        ...progressWithLevel(20),
+        traders: { prapor: { level, reputation } },
+        skills: { Endurance: endurance },
+      });
+      localStorage.setItem(
+        STORAGE_KEYS.progress,
+        JSON.stringify({
+          _userId: 'user-1',
+          _timestamp: base + 10_000,
+          _metadataTimestamp: base + 5_000,
+          _modeTimestamps: { pvp: base + 10_000, pve: base + 10_000, seasonal: base + 10_000 },
+          data: { ...structuredClone(defaultState), pvp: progress(4, 0.8, 30) },
+        })
+      );
+      single.mockResolvedValue({
+        data: createRemoteRow({ updated_at: new Date(base + accountOffset).toISOString() }),
+        error: null,
+      });
+      modeProgressResult.data = [
+        {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: progress(2, 0.2, 10),
+          progress_updated_at: new Date(base + 30_000).toISOString(),
+        },
+      ];
+      await initializeTarkovSync();
+      const { pvp } = useTarkovStore();
+      expect(pvp.traders.prapor).toEqual({ level: 2, reputation: 0.2 });
+      expect(pvp.skills.Endurance).toBe(10);
+      const uploads = rpc.mock.calls.filter(([name]) => name === 'sync_user_game_mode_progress');
+      for (const [, payload] of uploads) {
+        expect(payload?.p_modes.pvp?.traders?.prapor?.level ?? 2).toBe(2);
+      }
+    }
+  );
+  it('keeps entries from both sides when Seasonal advanced after PvP, PvE and metadata', async () => {
+    const base = Date.parse('2026-09-06T12:00:00Z');
+    const seasonal = (taskId: string, timestamp: number) => ({
+      ...progressWithLevel(5),
+      taskCompletions: { [taskId]: { complete: true, timestamp } },
+    });
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _userId: 'user-1',
+        _timestamp: base + 10_000,
+        _metadataTimestamp: base + 5_000,
+        _modeTimestamps: { pvp: base + 5_000, pve: base + 5_000, seasonal: base + 10_000 },
+        data: { ...structuredClone(defaultState), seasonal: seasonal('local-task', base + 10_000) },
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({ updated_at: new Date(base + 5_000).toISOString() }),
+      error: null,
+    });
+    modeProgressResult.data = [
+      {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: progressWithLevel(1),
+        progress_updated_at: new Date(base + 5_000).toISOString(),
+      },
+      {
+        game_mode: 'seasonal',
+        season_number: ACTIVE_SEASON_NUMBER,
+        progress_data: seasonal('remote-task', base + 30_000),
+        progress_updated_at: new Date(base + 30_000).toISOString(),
+      },
+    ];
+    await initializeTarkovSync();
+    expect(Object.keys(useTarkovStore().seasonal.taskCompletions).sort()).toEqual([
+      'local-task',
+      'remote-task',
+    ]);
+  });
   it('keeps historical normalized PvP freshness null despite a newer account clock', async () => {
     const base = Date.parse('2026-09-06T12:00:00Z');
     seedOwnedEnvelope('user-1', { pvp: progressWithLevel(42) }, base + 20_000);
