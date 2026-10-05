@@ -239,8 +239,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   When a mode is newer than account metadata and persistent PvP/PvE progress (a mode that
   advanced independently, such as Seasonal), startup merges progress by entry timestamps and reset epochs;
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
-  Other known-clock modes take the newer side, so a newer trader, reputation, or skill decrease is
-  not replaced by a stale maximum even when mode writes stop advancing the account row (#1028).
+  That choice applies to every mode of the startup at once. Otherwise each known-clock mode takes
+  the newer side, so PvP/PvE writes that stop advancing the account row (#1028) do not by themselves
+  let a stale trader, reputation, or skill maximum replace a newer decrease.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
   have no per-offset timestamps or deletion markers to safely union concurrent edits.
   Local envelopes retain `_timestamp` for envelope compatibility and add `_metadataTimestamp` for
