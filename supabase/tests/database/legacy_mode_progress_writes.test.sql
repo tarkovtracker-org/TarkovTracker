@@ -140,7 +140,9 @@ SELECT ok((SELECT pending_since IS NULL AND last_active_at > now() - interval '1
   FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write still records account activity');
 SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
-    AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
+    AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029')
+    AND (SELECT (current_game_mode, game_edition, tarkov_uid) IS NOT DISTINCT FROM ('pvp', 1, NULL::bigint)
+         FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write advances only the account clock, as before');
 SELECT results_eq(
   $$SELECT game_mode, season_number = CASE WHEN game_mode = 'seasonal'

@@ -208,7 +208,8 @@ Teams, save status and recovery, and progress imports build on this storage; see
   Realtime events as account metadata only, so frozen legacy columns in those payloads are ignored.
   Because PvP/PvE writes no longer advance the account row's `updated_at`, startup treats a mode
   as independently advanced only when it is newer than both the account clock and the persistent
-  PvP/PvE clocks (#1087, which must deploy first), so startup merge decisions stay as they were.
+  PvP/PvE clocks (#1087, which must deploy first), so startup mode-merge decisions stay as they
+  were, while the account-metadata choice now follows actual metadata freshness.
   That decision covers every mode at once: a Seasonal client sync newer than PvP/PvE still selects
   the value-maximizing snapshot merge for all modes, a pre-existing gap tracked separately. The read-only
   `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
