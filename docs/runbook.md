@@ -147,8 +147,9 @@ source files, kept in sync with the code by `scripts/workflow-tests/worker-build
 
 A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
 the previous Worker build. Until the trigger also watches those paths, treat that merge as needing a
-Worker build of its exact SHA; starting one is a production deployment and needs authorization. The
-root `pnpm-lock.yaml` and `pnpm-workspace.yaml` pin the build toolchain and are not watched either.
+Worker build of its exact SHA; starting one is a production deployment and needs authorization.
+Root toolchain files (`pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package.json`, `.nvmrc`) are not
+watched either; the list above gains `pnpm-lock.yaml` if the Worker ever bundles an npm package.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -226,9 +227,10 @@ integration fails or is unavailable, not the normal path.
    Do not commit the value.
 
 5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
-   the push changed `workers/api-gateway/**`, also confirm `Workers Builds: api-gateway` succeeded
-   on it; if it changed only an unwatched [Worker build input](#deployment), no check appears and
-   the Worker still needs a build. `/health` reports a fixed version, so it identifies no build.
+   the push changed `workers/api-gateway/**` or bypassed watch-path matching, also confirm
+   `Workers Builds: api-gateway` succeeded on it; if it changed only an unwatched
+   [Worker build input](#deployment), no check appears and the Worker still needs a build.
+   `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the
    Supabase dashboard. Manual fallback:

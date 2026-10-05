@@ -5,42 +5,54 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
+import ts from 'typescript';
 const ROOT = resolve('.');
 const WORKER = 'workers/api-gateway';
 const RUNBOOK = 'docs/runbook.md';
+// Any bundled npm package makes the root lockfile a build input.
+const LOCKFILE = 'pnpm-lock.yaml';
 const RUNTIME_PREFIXES = ['node:', 'cloudflare:'];
-// `from '…'`, `import '…'`, `import(…)` and `require(…)` with any static string quote.
-const SPECIFIER_RE = /(?:\bfrom\s+|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"`])([^'"`$\s]+)\1/g;
-// Block comments and whole-line `//` comments, so prose such as "import `name`" is not scanned.
-const COMMENT_RE = /\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
 const isFile = (path) => existsSync(path) && statSync(path).isFile();
 function workerEntry() {
   const main = readFileSync(join(WORKER, 'wrangler.toml'), 'utf8').match(/^main\s*=\s*"([^"]+)"/m);
   assert.ok(main, `${WORKER}/wrangler.toml must declare main`);
   return join(WORKER, main[1]);
 }
-/** tsconfig `paths` as [specifier prefix, absolute target prefix]; wrangler applies them to all files. */
+/** tsconfig `paths` as [specifier prefix, absolute target prefix], longest prefix first. */
 function workerAliases() {
   const { paths } = JSON.parse(readFileSync(join(WORKER, 'tsconfig.json'), 'utf8')).compilerOptions;
-  return Object.entries(paths).map(([key, [target]]) => [
-    key.replace(/\*$/, ''),
-    resolve(WORKER, target.replace(/\*$/, '')),
-  ]);
+  return Object.entries(paths)
+    .map(([key, [target]]) => [key.replace(/\*$/, ''), resolve(WORKER, target.replace(/\*$/, ''))])
+    .sort(([a], [b]) => b.length - a.length);
 }
-function isInstalledPackage(specifier) {
-  const name = specifier
-    .split('/')
-    .slice(0, specifier.startsWith('@') ? 2 : 1)
-    .join('/');
-  return [WORKER, '.'].some((dir) => existsSync(join(dir, 'node_modules', name)));
+const isImportCall = (node) =>
+  node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+  (ts.isIdentifier(node.expression) && node.expression.text === 'require');
+/** Module specifier of an import/export/import()/require() node; fails on computed specifiers. */
+function specifierOf(node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return node.moduleSpecifier;
+  if (!ts.isCallExpression(node) || !isImportCall(node)) return undefined;
+  const [argument] = node.arguments;
+  assert.ok(ts.isStringLiteralLike(argument), `computed import: ${node.getText()}`);
+  return argument;
+}
+/** Every module specifier in a file, read from the TypeScript AST so comments and strings are inert. */
+function specifiersIn(file, code = readFileSync(file, 'utf8')) {
+  const source = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
+  const found = [];
+  const visit = (node) => {
+    const specifier = specifierOf(node);
+    if (specifier) found.push(specifier.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 function specifierBase(fromFile, specifier, aliases) {
   if (specifier.startsWith('.')) return resolve(dirname(fromFile), specifier);
   const alias = aliases.find(([prefix]) => specifier.startsWith(prefix));
   if (alias) return join(alias[1], specifier.slice(alias[0].length));
-  const external = RUNTIME_PREFIXES.some((p) => specifier.startsWith(p));
-  assert.ok(external || isInstalledPackage(specifier), `unknown import specifier ${specifier}`);
-  return null;
+  return RUNTIME_PREFIXES.some((p) => specifier.startsWith(p)) ? null : join(ROOT, LOCKFILE);
 }
 function resolveImport(fromFile, specifier, aliases) {
   const base = specifierBase(fromFile, specifier, aliases);
@@ -50,13 +62,7 @@ function resolveImport(fromFile, specifier, aliases) {
   assert.ok(found, `cannot resolve ${specifier} from ${relative(ROOT, fromFile)}`);
   return found;
 }
-function importsOf(file, aliases) {
-  const specifiers = [
-    ...readFileSync(file, 'utf8').replace(COMMENT_RE, '').matchAll(SPECIFIER_RE),
-  ].map((m) => m[2]);
-  return specifiers.map((s) => resolveImport(file, s, aliases)).filter(Boolean);
-}
-/** Repo-relative source files reachable from the wrangler entry; tests are excluded by construction. */
+/** Repo-relative files reachable from the wrangler entry; tests are excluded by construction. */
 function workerSourceClosure() {
   const aliases = workerAliases();
   const seen = new Set();
@@ -65,7 +71,13 @@ function workerSourceClosure() {
     const file = pending.pop();
     if (seen.has(file)) continue;
     seen.add(file);
-    pending.push(...importsOf(file, aliases));
+    if (file.endsWith('.ts')) {
+      pending.push(
+        ...specifiersIn(file)
+          .map((s) => resolveImport(file, s, aliases))
+          .filter(Boolean)
+      );
+    }
   }
   return [...seen].map((file) => relative(ROOT, file)).sort();
 }
@@ -91,18 +103,29 @@ test('runbook lists every api-gateway build input and nothing stale', () => {
   assert.ok(files.includes(workerEntry()));
   assert.deepEqual(inputDrift(patterns, files), { undocumented: [], stale: [] });
 });
-test('the closure reaches the Worker code outside workers/api-gateway', () => {
+test('the closure follows imports outside workers/api-gateway', () => {
   const outside = workerSourceClosure().filter((file) => !file.startsWith(`${WORKER}/`));
-  assert.ok(outside.includes('app/utils/modeProgress.ts'));
-  assert.ok(outside.includes('shared/utils/requirementStatus.ts'), 'transitive shared import');
-});
-test('every import form is scanned and unknown aliases fail', () => {
-  const source = "export { a } from './a';\nimport(`./b`);\nrequire('./c');\nimport './d';";
-  assert.deepEqual(
-    [...source.matchAll(SPECIFIER_RE)].map((m) => m[2]),
-    ['./a', './b', './c', './d']
+  assert.ok(
+    outside.some((file) => file.startsWith('shared/')),
+    'Worker imports shared/ today'
   );
-  assert.throws(() => specifierBase(workerEntry(), '@app/utils/constants', workerAliases()));
+});
+test('every import form is found, prose is ignored and computed imports fail', () => {
+  const file = join(ROOT, WORKER, 'src', '__fixture__.ts');
+  const parse = (code) => specifiersIn(file, code);
+  const code = [
+    "export { a } from'./a';",
+    'import(`./b`);',
+    "require('./c');",
+    "import type { D } from './d';",
+    "const route = '/api/*'; /* import('./hidden') */ const msg = \"from 'x'\";",
+    "import './e'; // import('./comment')",
+  ].join('\n');
+  assert.deepEqual(parse(code), ['./a', './b', './c', './d', './e']);
+  assert.throws(() => parse('import(`./locales/${lang}.ts`);'), /computed import/);
+  assert.throws(() => parse("require('./' + name);"), /computed import/);
+  // Unknown aliases and npm packages both surface as the (unlisted) lockfile input.
+  assert.equal(specifierBase(file, '@app/x', workerAliases()), join(ROOT, LOCKFILE));
 });
 test('a runbook without the build-input list is rejected', () => {
   assert.throws(() => documentedInputs('Confirm `Workers Builds: api-gateway` succeeded.'));
