@@ -4,6 +4,7 @@ import {
   persistActiveProgressValue,
   progressPersistStorage,
   safeGetItem,
+  flushActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
 import {
   classifyLocalSaveFailure,
@@ -35,23 +36,26 @@ const stubFailingStorage = () => {
   return { control, values };
 };
 describe('progress save status', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await flushActiveProgressWrites();
     localStorage.clear();
     resetCloudSaveStatus();
     recordLocalSave(true);
   });
-  afterEach(() => {
+  afterEach(async () => {
+    await flushActiveProgressWrites();
     vi.unstubAllGlobals();
   });
-  it('records a confirmed local save only when the browser accepts the write', () => {
-    expect(persistActiveProgressValue('{"data":{}}')).toBe(true);
+  it('records a confirmed local save only when the browser accepts the write', async () => {
+    expect(await persistActiveProgressValue('{"data":{}}')).toBe(true);
     expect(progressSaveStatus.local).toBe('saved');
     expect(safeGetItem(STORAGE_KEYS.progress)).toBe('{"data":{}}');
     expect(hasUnsavedProgressChanges()).toBe(false);
   });
-  it('surfaces quota failures that the persist plugin would otherwise swallow', () => {
+  it('surfaces quota failures that the persist plugin would otherwise swallow', async () => {
     stubFailingStorage();
     expect(() => progressPersistStorage.setItem(STORAGE_KEYS.progress, '{}')).not.toThrow();
+    await flushActiveProgressWrites();
     expect(progressSaveStatus.local).toBe('failed');
     expect(progressSaveStatus.localFailure).toBe('quota');
   });
@@ -78,19 +82,22 @@ describe('progress save status', () => {
     resetCloudSaveStatus();
     expect(hasUnsavedProgressChanges()).toBe(true);
   });
-  it('clears the unsaved state after a later write succeeds', () => {
+  it('clears the unsaved state after a later write succeeds', async () => {
     const { control, values } = stubFailingStorage();
     progressPersistStorage.setItem(STORAGE_KEYS.progress, '{"v":1}');
+    await flushActiveProgressWrites();
     expect(progressSaveStatus.local).toBe('failed');
     control.failWrites = false;
     progressPersistStorage.setItem(STORAGE_KEYS.progress, '{"v":2}');
+    await flushActiveProgressWrites();
     expect(values.get(STORAGE_KEYS.progress)).toBe('{"v":2}');
     expect(progressSaveStatus.local).toBe('saved');
     expect(progressSaveStatus.localFailure).toBeNull();
   });
-  it('does not treat writes to other keys as progress saves', () => {
+  it('does not treat writes to other keys as progress saves', async () => {
     recordLocalSave(false, 'quota');
     progressPersistStorage.setItem('other-key', 'value');
+    await flushActiveProgressWrites();
     expect(progressSaveStatus.local).toBe('failed');
   });
   it.each([
@@ -129,9 +136,9 @@ describe('progress save status', () => {
     registerCloudRetryHandler(vi.fn().mockRejectedValue(new Error('boom')));
     await expect(retryCloudSave()).resolves.toBe(false);
   });
-  it('does not count a failed write of cloud-held state as unsaved progress', () => {
+  it('does not count a failed write of cloud-held state as unsaved progress', async () => {
     stubFailingStorage();
-    expect(persistActiveProgressValue('{"data":{}}', true)).toBe(false);
+    expect(await persistActiveProgressValue('{"data":{}}', true)).toBe(false);
     expect(progressSaveStatus.local).toBe('failed');
     expect(hasUnsavedProgressChanges()).toBe(false);
   });

@@ -22,6 +22,18 @@ import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userSc
 import type { StateTree } from 'pinia';
 const QUOTA_CHECK_INTERVAL_MS = 60000;
 let lastQuotaCheckTime = 0;
+let resettingProgressMemory = false;
+/** Session reset clears memory; its caller separately retains, restores, or clears durable progress. */
+export const resetProgressStoreMemory = (store: {
+  $patch: (mutator: (state: UserState) => void) => void;
+}): void => {
+  resettingProgressMemory = true;
+  try {
+    store.$patch((state) => Object.assign(state, structuredClone(defaultState)));
+  } finally {
+    resettingProgressMemory = false;
+  }
+};
 /** Throttled to one check per minute; the local save status reports any actual save failure. */
 const manageQuota = (now: number, neededSpace: number): void => {
   if (now - lastQuotaCheckTime <= QUOTA_CHECK_INTERVAL_MS || typeof window === 'undefined') return;
@@ -49,13 +61,14 @@ const preserveMismatchedSeasonalCopy = (ownerId: string | null, state: UserState
 const retainOrBlockForeignCopy = (raw: string, ownerId: string): void => {
   if (saveAccountRecoveryCopy(raw, ownerId)) {
     setActiveProgressWritesBlocked(false);
-    clearActiveProgressStorage();
+    void clearActiveProgressStorage();
     return;
   }
   markAccountRecoveryRetentionBlocked();
   setActiveProgressWritesBlocked(true);
 };
 const serialize = (state: StateTree): string => {
+  if (resettingProgressMemory) return '';
   const now = Date.now();
   const sanitizedState = sanitizeOwnedUserState(state as UserState);
   const serialized = progressStorageSerializer.serialize(
@@ -110,6 +123,14 @@ const deserialize = (value: string): UserState => {
 /** User-scoped localStorage persistence; the userId wrapper prevents cross-user contamination. */
 export const progressStorePersist = {
   key: STORAGE_KEYS.progress,
-  storage: typeof window !== 'undefined' ? progressPersistStorage : undefined,
+  storage:
+    typeof window !== 'undefined'
+      ? {
+          getItem: progressPersistStorage.getItem,
+          setItem: (key: string, value: string) => {
+            if (!resettingProgressMemory) progressPersistStorage.setItem(key, value);
+          },
+        }
+      : undefined,
   serializer: { serialize, deserialize },
 };

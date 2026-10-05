@@ -198,7 +198,7 @@ const discardForeignProgress = (ctx: StartupLoadContext, storedUserId: string | 
     return false;
   }
   setActiveProgressWritesBlocked(false);
-  clearActiveProgressStorage();
+  void clearActiveProgressStorage();
   resetStoreToDefault(ctx.store);
   ctx.notifyLocalIgnored('other_account');
   return true;
@@ -553,6 +553,10 @@ const adoptRemote = (ctx: StartupLoadContext, remote: RemoteProgress): Resolutio
   });
   return { state: next, needsRemoteCleanup: remoteHadDeprecatedData(remote) };
 };
+const hasLocalModeClock = (meta: LocalMeta): boolean =>
+  GAME_MODE_VALUES.some((mode) => (meta?.modeTimestamps?.[mode] ?? 0) > 0);
+const hasLocalProgressEdit = (local: LocalProgress): boolean =>
+  local.hasProgress || hasLocalModeClock(local.meta) || (local.meta?.metadataTimestamp ?? 0) > 0;
 const resolveWithRemote = async (
   ctx: StartupLoadContext,
   local: LocalProgress,
@@ -560,7 +564,8 @@ const resolveWithRemote = async (
 ): Promise<Resolution | null> => {
   const storedUserId = local.meta?.storedUserId ?? null;
   if (local.hasProgress && storedUserId === null) ctx.notifyLocalIgnored('guest');
-  if (local.hasProgress && storedUserId === ctx.userId) {
+  // Explicit clocks identify scalar and metadata edits even when every mode is at defaults.
+  if (storedUserId === ctx.userId && hasLocalProgressEdit(local)) {
     return mergeWithRemote(ctx, local, remote);
   }
   return adoptRemote(ctx, remote);
@@ -575,7 +580,8 @@ const uploadLocalProgress = async (
   if (!(await upload(ctx, local.state, failure))) return null;
   acknowledgeHistoricalReconciliation(ctx.userId);
   const serialized = progressStorageSerializer.serialize(local.state, ctx.userId, Date.now());
-  persistActiveProgressValue(serialized, true);
+  await persistActiveProgressValue(serialized, true);
+  ensureCurrent(ctx);
   logger.debug('[TarkovStore] Migration complete');
   return { state: local.state, needsRemoteCleanup: false, migrated: true };
 };
@@ -617,7 +623,7 @@ const resolveStartupProgress = (
   if (local.hasProgress && local.meta) return uploadLocalProgress(ctx, local);
   return acceptNewUser(ctx);
 };
-const persistLocalOwnership = (
+const persistLocalOwnership = async (
   ctx: StartupLoadContext,
   state: UserState,
   timestamp: number | null
@@ -628,7 +634,7 @@ const persistLocalOwnership = (
     ctx.userId,
     timestamp ?? Date.now()
   );
-  if (!persistActiveProgressValue(serialized)) {
+  if (!(await persistActiveProgressValue(serialized))) {
     logger.warn('[TarkovStore] Could not persist local ownership metadata');
   }
 };
@@ -649,7 +655,12 @@ const loadStartupProgress = async (ctx: StartupLoadContext): Promise<StartupLoad
   const resolution = await resolveStartupProgress(ctx, local, loaded.remote);
   if (!resolution) return FAILED;
   if (needsOwnershipPersist(local, resolution.state)) {
-    persistLocalOwnership(ctx, resolution.state ?? local.state, local.meta?.timestamp ?? null);
+    await persistLocalOwnership(
+      ctx,
+      resolution.state ?? local.state,
+      local.meta?.timestamp ?? null
+    );
+    ensureCurrent(ctx);
   }
   logger.debug('[TarkovStore] Initial load complete');
   return {
