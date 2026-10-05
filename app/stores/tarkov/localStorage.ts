@@ -553,6 +553,10 @@ export const removeActiveProgressValue = async (
   );
   return result.ok;
 };
+/** An empty slot leaves nothing for a reload to restore, even where a write barrier refuses removal. */
+const clearActiveSlot = (explicitOwner?: string): boolean =>
+  localStorage.getItem(STORAGE_KEYS.progress) === null ||
+  removeStorageItem(STORAGE_KEYS.progress, explicitOwner);
 /**
  * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
  * decided before the reset, so the active copy is removed without keeping a recovery copy.
@@ -567,9 +571,7 @@ export const clearActiveProgressStorage = async (
   invalidateActiveProgressWrites(undefined, cloudHeld);
   const result = await mutateActiveProgress(() => {
     const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
-    return removeStorageItem(STORAGE_KEYS.progress, explicitOwner)
-      ? { ok: true }
-      : { ok: false, error: null };
+    return clearActiveSlot(explicitOwner) ? { ok: true } : { ok: false, error: null };
   });
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
   return result.ok || isLocalStorageInaccessible();

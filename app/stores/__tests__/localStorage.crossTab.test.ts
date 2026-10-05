@@ -384,6 +384,9 @@ describe('active progress across tabs', () => {
     tab.setActiveProgressWritesBlocked(true);
     expect(await tab.clearActiveProgressStorage()).toBe(false);
     expect(values.get(STORAGE_KEYS.progress)).toBe(original);
+    // A write barrier refuses removal, but an empty slot leaves nothing to restore.
+    values.delete(STORAGE_KEYS.progress);
+    expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
     tab.setActiveProgressWritesBlocked(false);
     // Fully blocked site data holds no copy to restore, so it does not fail the reset.
     const blocked = () => {
