@@ -70,6 +70,28 @@ describe('performReset seasonal', () => {
     registeredController.value = null;
     saveSupersededProgressCopyMock.mockClear();
   });
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'keeps a preferred lower %s level when startup merges timestamped progress',
+    (mode) => {
+      for (const localPreferred of [false, true]) {
+        const local = structuredClone(defaultState);
+        const remote = structuredClone(defaultState);
+        const preferred = localPreferred ? local : remote;
+        const older = localPreferred ? remote : local;
+        preferred[mode].level = 2;
+        older[mode].level = 7;
+        preferred[mode].progressEpoch = older[mode].progressEpoch = 1;
+        older[mode].taskCompletions.task = { complete: true, timestamp: 10 };
+        const result = resolveInitialSyncState(local, remote, 10, 20, 1, 1, {
+          mergeModeSnapshots: true,
+          localModeTimestamps: { [mode]: localPreferred ? 30 : 10 },
+          modeUpdatedAt: { [mode]: 20 },
+        });
+        expect(result[mode]).toMatchObject({ level: 2, progressEpoch: 1 });
+        expect(result[mode].taskCompletions.task?.complete).toBe(true);
+      }
+    }
+  );
   it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
     const local = structuredClone(defaultState);
     const remote = structuredClone(defaultState);

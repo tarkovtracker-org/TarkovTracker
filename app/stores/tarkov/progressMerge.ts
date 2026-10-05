@@ -485,6 +485,7 @@ export const mergePreferringSingleValues = (
   preferred: UserProgressData
 ): UserProgressData => ({
   ...mergeProgressData(other, preferred, true),
+  level: preferred.level,
   displayName: preferred.displayName,
   pmcFaction: preferred.pmcFaction,
   xpOffset: preferred.xpOffset,

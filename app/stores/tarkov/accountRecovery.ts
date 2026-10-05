@@ -100,6 +100,7 @@ type ModeCandidate = {
   progress: UserProgressData;
   confirmations: ConfirmationMap;
   clock: number;
+  hasModeClock: boolean;
   /** Session handoffs use mode clocks; other unknown clocks use the copy's write time. */
   order: number;
   seasonNumber: number | null;
@@ -112,6 +113,7 @@ const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): M
       snapshot.confirmationCandidates?.[mode] ?? snapshot.state[mode].taskAvailability
     ),
     clock,
+    hasModeClock: validClock(snapshot.modeTimestamps?.[mode]) > 0,
     order: snapshot.isSessionHandoff ? clock : clock || validClock(snapshot.timestamp),
     seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
   };
@@ -135,9 +137,15 @@ const archiveDisplacedMode = (
  * merged like any other local/remote pair; the newer clock wins fields that need a single value.
  * A newer copy that contributes nothing, such as a default placeholder, keeps the older clock.
  */
+const mergeRecoveryProgress = (older: ModeCandidate, newer: ModeCandidate): UserProgressData => {
+  const progress = mergePreferringSingleValues(older.progress, newer.progress);
+  // A placeholder's envelope write time cannot establish a newer scalar level.
+  if (!newer.hasModeClock) progress.level = Math.max(older.progress.level, newer.progress.level);
+  return progress;
+};
 const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
   const [older, newer] = right.order >= left.order ? [left, right] : [right, left];
-  const progress = mergePreferringSingleValues(older.progress, newer.progress);
+  const progress = mergeRecoveryProgress(older, newer);
   const confirmations = mergeTaskAvailabilityCandidates(older.confirmations, newer.confirmations);
   progress.taskAvailability = sanitizeTaskAvailabilityMap(confirmations);
   const olderAlone = mergePreferringSingleValues(older.progress, older.progress);

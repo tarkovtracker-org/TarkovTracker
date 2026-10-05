@@ -503,6 +503,8 @@ async function runSetupRealtimeListener(
     }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
     if (toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)) {
+      // Level is an editable scalar; the three-way merge below preserves only pending local edits.
+      merged.level = remoteProgress.level;
       merged.taskAvailability = mergeTaskAvailability(
         localState[mode].taskAvailability,
         remote.taskAvailability
