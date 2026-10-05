@@ -10,8 +10,8 @@
 -- * sync_user_game_mode_progress writes only account metadata to user_progress, and only when it
 --   changed, so a mode-only sync no longer rewrites the account row or emits a user_progress
 --   Realtime change; its normalized merge base is the normalized row alone.
--- * merge_progress_data creates a missing normalized row empty, never seeds from or mirrors to the
---   legacy columns, and no longer touches user_progress.
+-- * merge_progress_data creates a missing normalized row empty and never seeds from or mirrors to
+--   the legacy columns; only a Seasonal write still advances the account clock, as before.
 -- * The sync_legacy_user_progress_modes trigger and the unused legacy-only update_task_completion
 --   writer are dropped, so a legacy column write can no longer reach normalized progress.
 -- Signatures, grants and return contracts are unchanged for rolling clients and the deployed
@@ -266,6 +266,11 @@ BEGIN
   WHERE user_id = p_user_id
     AND game_mode = v_game_mode
     AND season_number = v_season_number;
+  -- As before, a Seasonal write advances the account clock (and only that). Startup treats a
+  -- mode newer than both that clock and the PvP/PvE clocks as independently advanced.
+  IF v_game_mode = 'seasonal' THEN
+    UPDATE public.user_progress SET updated_at = now() WHERE user_id = p_user_id;
+  END IF;
   RETURN 1;
 END;
 $function$;

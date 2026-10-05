@@ -181,9 +181,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
   source timestamps and records no account activity. Schema rollout and data completion are separate
   checks; see the runbook for bounded verification.
 - No runtime path writes `user_progress.pvp_data` / `pve_data` or merges from them (#1028 Phase 3).
-  `merge_progress_data` creates a missing normalized row empty under the account row lock, merges
-  into the normalized row only, and never touches `user_progress`; its `p_field` values keep the
-  legacy names only to select a mode. The sync RPC's merge base is the stored normalized row.
+  `merge_progress_data` creates a missing normalized row empty under the account row lock and
+  merges into the normalized row only; as before, a Seasonal write also advances
+  `user_progress.updated_at` (never a legacy column). Its `p_field` values keep the legacy names
+  only to select a mode. The sync RPC's merge base is the stored normalized row.
   Removing both former legacy seeds is safe only because the completion gate was zero: no account
   has legacy progress with a numeric `level` whose normalized row lacks one, so a frozen legacy
   column can never resurrect progress. Signup no longer creates placeholder normalized rows;
@@ -205,10 +206,11 @@ Teams, save status and recovery, and progress imports build on this storage; see
   Shared-profile, gateway, and teammate reads never request legacy progress. Public visibility and
   team authorization still precede normalized reads. Clients since #641 apply `user_progress`
   Realtime events as account metadata only, so frozen legacy columns in those payloads are ignored.
-  Because mode-only writes no longer advance the account row's `updated_at`, startup treats a mode
+  Because PvP/PvE writes no longer advance the account row's `updated_at`, startup treats a mode
   as independently advanced only when it is newer than both the account clock and the persistent
-  PvP/PvE clocks (#1087, which must deploy first). Persistent modes keep the newer-side-wins merge,
-  so newer trader, reputation and skill decreases are not replaced by stale maxima. The read-only
+  PvP/PvE clocks (#1087, which must deploy first), so startup merge decisions stay as they were.
+  That decision covers every mode at once: a Seasonal client sync newer than PvP/PvE still selects
+  the value-maximizing snapshot merge for all modes, a pre-existing gap tracked separately. The read-only
   `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
   still read the frozen columns until they are dropped (#1028 Phase 4).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active

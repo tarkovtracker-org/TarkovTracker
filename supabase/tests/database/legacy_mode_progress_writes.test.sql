@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(25);
 -- #1028 Phase 3: normalized rows are the only progress store. These checks fail if a legacy
 -- pvp_data / pve_data writer, the legacy-to-normalized bridge, or a legacy merge seed returns.
 INSERT INTO auth.users (id, email) VALUES
@@ -127,7 +127,10 @@ SELECT results_eq(
   'an API write creates a missing row empty instead of seeding the frozen legacy column');
 SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'pve_data',
   NULL, NULL, '{"level":12}');
--- Activity now comes from the normalized write alone (the account-row bump is gone).
+SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
+    AND pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
+  'PvP and PvE API writes leave the account row and legacy columns untouched');
+-- Account activity comes from the normalized write.
 DELETE FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029';
 INSERT INTO private.account_retention (user_id, last_active_at, pending_since)
 VALUES ('00000000-0000-0000-0000-000000001029', now() - interval '2 days', now() - interval '1 day');
@@ -137,8 +140,8 @@ SELECT ok((SELECT pending_since IS NULL AND last_active_at > now() - interval '1
   FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write still records account activity');
 SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
-    AND pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
-  'API writes for every mode leave the account row and legacy columns untouched');
+    AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
+  'a Seasonal API write advances only the account clock, as before');
 SELECT results_eq(
   $$SELECT game_mode, season_number = CASE WHEN game_mode = 'seasonal'
       THEN private.active_season_number() ELSE 0 END, progress_data->>'level'

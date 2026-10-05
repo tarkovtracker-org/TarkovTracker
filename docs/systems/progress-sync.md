@@ -223,7 +223,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. Mode changes write only their normalized
-  rows; the account row changes only with account metadata (#1028). Startup account metadata
+  rows; the account row changes only with account metadata, plus the account clock on a Seasonal
+  public-API write (#1028). Startup account metadata
   uses the account timestamp; each mode independently uses `progress_updated_at`, which changes only
   with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
   progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
