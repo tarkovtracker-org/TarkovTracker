@@ -616,7 +616,9 @@ account activity, so retention deadlines and pending inactivity deletions are un
 
 After `20261005090000_retire_legacy_mode_progress_dual_writes.sql` deploys, nothing writes the legacy
 columns, so the gate stays a read-only check and the helper must not run: it would copy frozen
-legacy progress into normalized rows.
+legacy progress over newer normalized rows. A non-zero gate after that point (for example a
+normalized row saved without a `level`) does not mean missing data, and Phase 4 must not use the
+gate as its precondition; Phase 4 removes the helper and gate with the columns.
 
 ### Manual activity history rollout
 

@@ -74,6 +74,9 @@ flowchart LR
 3. Realtime listens to both the account row, for metadata, and normalized rows. Recognized account metadata
    echoes advance the listener's timestamp watermark before being discarded, so older metadata
    cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
+   A sync that leaves metadata unchanged writes no account row and returns the stored
+   `metadata_write_id`; an echo matches only that marker together with the same values, so a
+   foreign metadata change is never mistaken for one.
    A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -202,10 +205,12 @@ Teams, save status and recovery, and progress imports build on this storage; see
   Shared-profile, gateway, and teammate reads never request legacy progress. Public visibility and
   team authorization still precede normalized reads. Clients since #641 apply `user_progress`
   Realtime events as account metadata only, so frozen legacy columns in those payloads are ignored.
-  Because mode-only writes no longer advance the account row's `updated_at`, startup compares mode
-  rows against an older account clock and reconciles persistent modes with the per-entry snapshot
-  merge that Seasonal already used. The read-only `get_teammate_legacy_progress` RPC and the
-  backfill gate still read the frozen columns until they are dropped (#1028 Phase 4).
+  Because mode-only writes no longer advance the account row's `updated_at`, startup treats a mode
+  as independently advanced only when it is newer than both the account clock and the persistent
+  PvP/PvE clocks (#1087, which must deploy first). Persistent modes keep the newer-side-wins merge,
+  so newer trader, reputation and skill decreases are not replaced by stale maxima. The read-only
+  `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
+  still read the frozen columns until they are dropped (#1028 Phase 4).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
