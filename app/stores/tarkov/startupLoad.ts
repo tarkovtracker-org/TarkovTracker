@@ -336,6 +336,15 @@ const modeScore = (mode: UserProgressData | undefined): number => {
 };
 const accountUpdatedAt = (row: UserProgressRow | null): number =>
   row?.updated_at ? Date.parse(row.updated_at) : 0;
+/**
+ * Only a mode written after both account metadata and persistent PvP/PvE progress advanced
+ * independently. PvP/PvE writes used to advance the account row too; once they stop (#1028),
+ * their own clocks keep them on the newer-side-wins merge instead of a value-maximizing one.
+ */
+const modeAdvancedIndependently = ({ row, modes }: RemoteProgress): boolean => {
+  const { pvp = 0, pve = 0 } = modes.updatedAtByMode ?? {};
+  return (modes.updatedAt ?? 0) > Math.max(accountUpdatedAt(row) || 0, pvp, pve);
+};
 /** Account metadata and normalized modes retain independent freshness, including unknown clocks. */
 const remoteFreshness = ({ row, modes }: RemoteProgress) => {
   const updatedAt = accountUpdatedAt(row);
@@ -406,7 +415,7 @@ const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): Use
     progressScore(local.state),
     progressScore(remote.state),
     {
-      mergeModeSnapshots: (remote.modes.updatedAt ?? 0) > (accountUpdatedAt(remote.row) || 0),
+      mergeModeSnapshots: modeAdvancedIndependently(remote),
       modeUpdatedAt: freshness.byMode,
       localModeTimestamps: perMode(
         (mode) => local.meta?.modeTimestamps?.[mode] ?? localTimestamp ?? 0
