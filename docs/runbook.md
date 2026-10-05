@@ -140,8 +140,8 @@ not a broken integration.
 
 Being a build input is not the same as being watched. Besides its directory, the build reads the
 sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
-workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` the install's
-`postinstall` evaluates. Its inputs, kept in sync with the code by
+workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` and transitive local
+imports the install's `postinstall` evaluates. Its inputs, kept in sync with the code by
 `scripts/workflow-tests/worker-build-inputs.mjs`:
 
 <!-- api-gateway-build-inputs:start -->
@@ -149,6 +149,21 @@ workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` the 
 - `workers/api-gateway/**` — watched by the trigger
 - `shared/**` — **not** watched (bundled)
 - `app/utils/modeProgress.ts` — **not** watched (bundled)
+- `app/features/resources/resourceData.ts` — **not** watched (`nuxt prepare` import)
+- `app/locales/en.json` — **not** watched (`nuxt prepare` import)
+- `app/utils/apiProtectionConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/buildCommit.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/csp.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/entryRecoveryScript.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/locales.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/nuxtSecurityConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/prerenderOutput.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/routeSeo.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/runtimeConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/shellConfig.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/stripBareNodeImports.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/theme.ts` — **not** watched (`nuxt prepare` import)
+- `app/utils/turnstileKeys.ts` — **not** watched (`nuxt prepare` import)
 - `package.json` — **not** watched (module type for the bundled files above; pnpm version and the
   `postinstall` that workspace installs run)
 - `tsconfig.json` — **not** watched (compiles the bundled files above; extends the generated

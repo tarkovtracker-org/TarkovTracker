@@ -153,11 +153,11 @@ function resolveImport(fromFile, specifier, aliases) {
   // esbuild records symlinked files under their real path.
   return realpathSync(found);
 }
-/** Absolute real paths reachable from the wrangler entry; tests are excluded by construction. */
-function workerSourceClosure() {
+/** Absolute real paths reachable from source entries; tests are excluded by construction. */
+function workerSourceClosure(entries = [workerEntry()]) {
   const aliases = workerAliases();
   const seen = new Set();
-  const pending = [realpathSync(workerEntry())];
+  const pending = entries.map((file) => realpathSync(file));
   while (pending.length > 0) {
     const file = pending.pop();
     if (seen.has(file)) continue;
@@ -234,7 +234,10 @@ function workspaceInputs() {
 /** Repo-relative build inputs, plus generated tsconfig bases the runbook must name. */
 function workerBuildInputs() {
   assert.deepEqual(shadowingWranglerConfigs(), [], `teach this check a non-TOML ${WORKER} config`);
-  const sources = workerSourceClosure();
+  const workerSources = workerSourceClosure();
+  const workerConfigs = workerSources.flatMap((file) => ancestorConfigs(file, TS_CONFIGS));
+  const generators = generatorsOf(tsconfigChains(new Set(workerConfigs)).generated);
+  const sources = [...new Set([...workerSources, ...workerSourceClosure(generators)])];
   const packages = sources.flatMap((file) => ancestorConfigs(file, PACKAGE_CONFIGS));
   const { tracked, generated } = tsconfigChains(
     new Set(sources.flatMap((file) => ancestorConfigs(file, TS_CONFIGS)))
@@ -312,6 +315,18 @@ test('generated tsconfig bases are named and their generator is an input', () =>
   assert.deepEqual(generatorsOf(generated), [NUXT_CONFIG]);
   assert.deepEqual(generatorsOf([]), []);
   assert.throws(() => generatorsOf(['.cache/tsconfig.json']), /generates these tsconfig bases/);
+});
+test('generator imports and their transitive dependencies are build inputs', () => {
+  const { files } = workerBuildInputs();
+  const expected = [
+    'app/utils/apiProtectionConfig.ts',
+    'app/utils/nuxtSecurityConfig.ts',
+    'app/utils/routeSeo.ts',
+    'app/features/resources/resourceData.ts',
+    'app/locales/en.json',
+  ];
+  for (const input of expected)
+    assert.ok(files.includes(input), `${input} feeds the generated tsconfig`);
 });
 test('configs that would replace wrangler.toml up the tree are reported', () => {
   assert.deepEqual(shadowingWranglerConfigs(), []);
