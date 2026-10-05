@@ -15,6 +15,22 @@ const requestUrl = (input: RequestInfo | URL): string => {
   if (typeof input === 'string') return input;
   return input instanceof URL ? input.toString() : input.url;
 };
+// Resolves once `arrive()` has been called `target` times. Lets tests wait on
+// an observed upstream event instead of polling against a wall-clock deadline.
+const createCountLatch = (target: number) => {
+  let arrivals = 0;
+  let open!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return {
+    reached,
+    arrive: () => {
+      arrivals++;
+      if (arrivals === target) open();
+    },
+  };
+};
 const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: string[]) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(requestUrl(input));
@@ -148,13 +164,20 @@ describe('api-gateway workerd smoke', () => {
       release = resolve;
     });
     let catalogRequests = 0;
+    // Tasks + hideout: the initiating request's shared catalog loads have reached upstream.
+    const catalogLoadsStarted = createCountLatch(2);
+    // Initiator + 8 followers have each issued their progress read upstream.
+    const progressReadsStarted = createCountLatch(9);
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (requestUrl(input).startsWith('https://json.tarkov.dev/')) {
+        const url = requestUrl(input);
+        if (url.startsWith('https://json.tarkov.dev/')) {
           catalogRequests++;
+          catalogLoadsStarted.arrive();
           await gate;
         }
+        if (url.includes('/user_game_mode_progress?')) progressReadsStarted.arrive();
         return outbound(input, init);
       })
     );
@@ -170,16 +193,18 @@ describe('api-gateway workerd smoke', () => {
       () => 'completed',
       () => 'aborted'
     );
+    const followers: Promise<unknown>[] = [];
     try {
-      await vi.waitFor(() => expect(catalogRequests).toBe(2));
+      // Both shared catalog loads are registered and held upstream before any follower exists.
+      await catalogLoadsStarted.reached;
       const others = Array.from({ length: 8 }, () =>
         harness!.getWorker().fetch('https://api.tarkovtracker.org/progress', { headers })
       );
-      await vi.waitFor(() =>
-        expect(
-          requests.filter(({ url }) => url.includes('/user_game_mode_progress?'))
-        ).toHaveLength(9)
-      );
+      followers.push(...others);
+      // Every follower is admitted by workerd before the initiating client disconnects.
+      await progressReadsStarted.reached;
+      // The disconnect must happen with the shared catalog I/O still in flight.
+      expect(catalogRequests).toBe(2);
       controller.abort();
       expect(await cancellation).toBe('aborted');
       release();
@@ -195,6 +220,9 @@ describe('api-gateway workerd smoke', () => {
       expect(unhandledUrls).toEqual([]);
     } finally {
       release();
+      // Let followers finish before afterEach closes workerd, so a failure above is
+      // not followed by teardown socket errors from still-open requests.
+      await Promise.allSettled(followers);
     }
   }, 30_000);
 });
