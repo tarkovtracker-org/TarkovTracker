@@ -244,7 +244,7 @@
         headers: { Authorization: `Bearer ${refreshedSession.access_token}` },
       });
       if (data?.success && !ownsDeletionSession(requestedOwner, requestedRevision)) {
-        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
+        deviceCleanupFailed.value = !(await forgetAccountOnDevice(requestedOwner));
         completeDeletion(requestedOwner, requestedRevision, data);
         return;
       }
@@ -319,7 +319,7 @@
         throw new Error(errorMessage);
       }
       if (data?.success) {
-        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
+        deviceCleanupFailed.value = !(await forgetAccountOnDevice(requestedOwner));
         completeDeletion(requestedOwner, requestedRevision, data);
       } else {
         throw new Error('Failed to delete account.');
@@ -346,11 +346,11 @@
     resetTarkovSync('account deleted');
   };
   /** A deleted account keeps no recovery copy on this device; other accounts keep theirs. */
-  const forgetAccountOnDevice = (userId: string | null): boolean => {
+  const forgetAccountOnDevice = async (userId: string | null): Promise<boolean> => {
     if (!userId) return false;
     let removed = false;
     try {
-      removed = removeAccountDeviceData(userId);
+      removed = await removeAccountDeviceData(userId);
       if (!removed) logger.warn('Some deleted account data could not be removed from this device.');
     } catch (error) {
       logger.error('Failed to remove deleted account data from this device:', error);
@@ -392,7 +392,7 @@
     // Never leave while this browser still holds the deleted account's session.
     sessionEndFailed.value = $supabase.user.id === deletedUserId;
     if (sessionEndFailed.value) return;
-    deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
+    deviceCleanupFailed.value = !(await forgetAccountOnDevice(deletedUserId));
     if (deviceCleanupFailed.value && !allowRemainingDeviceData) return;
     resetDeletedSession(deletedUserId, revision);
     showSuccessDialog.value = false;
@@ -403,7 +403,7 @@
     if (!deletedUserId) return;
     isRetryingDeviceCleanup.value = true;
     try {
-      deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
+      deviceCleanupFailed.value = !(await forgetAccountOnDevice(deletedUserId));
     } finally {
       isRetryingDeviceCleanup.value = false;
     }

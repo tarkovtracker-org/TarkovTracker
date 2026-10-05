@@ -14,7 +14,7 @@ const {
   supabaseContext,
   syncProgressStateMock,
 } = vi.hoisted(() => ({
-  clearProgressStorageMock: vi.fn(),
+  clearProgressStorageMock: vi.fn(async (_owner?: string | null, _cloudHeld?: boolean) => true),
   pendingCloudChanges: { value: false },
   registeredController: {
     value: null as { acknowledgeExternalSave: (saved: unknown) => void } | null,
@@ -293,8 +293,19 @@ describe('performReset seasonal', () => {
   it('clears only the owner active copy as a deliberate reset, not an owner change', async () => {
     const store = createStore();
     await performReset('pvp', store);
-    expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1');
+    expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1', true);
   });
+  it.each([true, false])(
+    'does not complete a reset whose active copy could not be cleared: signed in=%s',
+    async (loggedIn) => {
+      supabaseContext.user.loggedIn = loggedIn;
+      supabaseContext.user.id = loggedIn ? 'user-1' : null;
+      clearProgressStorageMock.mockResolvedValueOnce(false);
+      await expect(performReset('seasonal', createStore())).rejects.toThrow(
+        'Local progress could not be cleared after reset'
+      );
+    }
+  );
   it('keeps no superseded copy for modes that are still at their defaults', async () => {
     pendingCloudChanges.value = true;
     const store = createStore();

@@ -1,6 +1,23 @@
 import { enableAutoUnmount } from '@vue/test-utils';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, vi } from 'vitest';
+// DOM emulators omit Web Locks. Preserve asynchronous, exclusive FIFO acquisition in tests.
+if (typeof navigator !== 'undefined') {
+  const queues = new Map<string, Promise<unknown>>();
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: (name: string, _options: LockOptions, callback: () => unknown) => {
+        const result = (queues.get(name) ?? Promise.resolve()).then(callback);
+        queues.set(
+          name,
+          result.catch(() => {})
+        );
+        return result;
+      },
+    },
+  });
+}
 // ponytail: Vue hardcodes this experimental-Suspense notice (console.info, gated only on
 // non-prod) and Vitest's isolated forked workers reload Vue per file, so it spams every run.
 // Drop just that one line; pass everything else through.

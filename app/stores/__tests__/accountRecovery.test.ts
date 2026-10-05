@@ -20,6 +20,7 @@ import {
   parsePersistedProgressState,
   persistActiveProgressValue,
   setActiveProgressWritesBlocked,
+  flushActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
 import {
   findRedundantProgressBackups,
@@ -121,12 +122,12 @@ describe('account recovery copies', () => {
     expect(saveAccountRecoveryCopy(raw, 'user-2')).toBe(false);
     expect(localStorage.getItem(recoveryKey('user-2'))).toBeNull();
   });
-  it('retains original evidence before a bounded same-owner write and after a reload', () => {
+  it('retains original evidence before a bounded same-owner write and after a reload', async () => {
     const state = historicalState();
     const raw = progressEnvelope('user-1', 500, state);
     localStorage.setItem(STORAGE_KEYS.progress, raw);
     const bounded = progressEnvelope('user-1', 600, sanitizeOwnedUserState(state));
-    expect(persistActiveProgressValue(bounded)).toBe(true);
+    expect(await persistActiveProgressValue(bounded)).toBe(true);
     expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(bounded);
     resetAccountRecoveryRetentionBlock();
@@ -141,7 +142,7 @@ describe('account recovery copies', () => {
       })
     ).not.toHaveProperty('s1');
   });
-  it('blocks replacement on historical quota failure without losing either owner identity or bytes', () => {
+  it('blocks replacement on historical quota failure without losing either owner identity or bytes', async () => {
     const state = historicalState();
     const raw = progressEnvelope('user-1', 500, state);
     localStorage.setItem(STORAGE_KEYS.progress, raw);
@@ -151,7 +152,9 @@ describe('account recovery copies', () => {
       originalSet(key, value);
     });
     expect(
-      persistActiveProgressValue(progressEnvelope('user-1', 600, sanitizeOwnedUserState(state)))
+      await persistActiveProgressValue(
+        progressEnvelope('user-1', 600, sanitizeOwnedUserState(state))
+      )
     ).toBe(false);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
     expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
@@ -211,7 +214,8 @@ describe('account recovery copies', () => {
     const persisted = JSON.parse(localStorage.getItem(recoveryKey('user-1'))!);
     expect(mergeTaskAvailability(persisted.data.pvp.taskAvailability, remote)).toEqual(expected);
   });
-  beforeEach(() => {
+  beforeEach(async () => {
+    await flushActiveProgressWrites();
     localStorage.clear();
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
@@ -338,22 +342,22 @@ describe('account recovery copies', () => {
     expect(selected?.modeTimestamps?.seasonal).toBe(100);
     expect(listSupersededProgressCopies('user-1')).toHaveLength(1);
   });
-  it('keeps no recovery copy when the owner deliberately resets their own active copy', () => {
+  it('keeps no recovery copy when the owner deliberately resets their own active copy', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
-    clearActiveProgressStorage('user-1');
+    await clearActiveProgressStorage('user-1');
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
     expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
   });
-  it('still retains the active owner copy when cleanup is not that owner reset', () => {
+  it('still retains the active owner copy when cleanup is not that owner reset', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
-    clearActiveProgressStorage('user-2');
+    await clearActiveProgressStorage('user-2');
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
     expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(9);
   });
-  it('honors the write barrier during an owner reset cleanup', () => {
+  it('honors the write barrier during an owner reset cleanup', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
     setActiveProgressWritesBlocked(true);
-    clearActiveProgressStorage('user-1');
+    await clearActiveProgressStorage('user-1');
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(envelope('user-1', 10, 9));
   });
   it('merges divergent equal-epoch edits instead of dropping the older copy', () => {
@@ -611,12 +615,12 @@ describe('account recovery copies', () => {
     blockAccountRecoveryRetentionForOwner('user-2');
     expect(mayHoldAccountRecoveryCopy('user-1')).toBe(true);
   });
-  it('lifts the write barrier once opaque active bytes are preserved on a retry', () => {
+  it('lifts the write barrier once opaque active bytes are preserved on a retry', async () => {
     setActiveProgressWritesBlocked(true);
     localStorage.setItem(STORAGE_KEYS.progress, '{not json');
     expect(preserveForeignActiveCopy('user-1')).toBe(true);
     const envelope = JSON.stringify({ _userId: 'user-1', data: structuredClone(defaultState) });
-    expect(persistActiveProgressValue(envelope)).toBe(true);
+    expect(await persistActiveProgressValue(envelope)).toBe(true);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(envelope);
   });
   it('keeps retention blocked when retry finds no recovery copy', () => {
@@ -729,7 +733,7 @@ describe('account recovery copies', () => {
       ).toBe(true);
     }
   );
-  it('allows supported unscoped legacy progress to migrate to an owned envelope', () => {
+  it('allows supported unscoped legacy progress to migrate to an owned envelope', async () => {
     localStorage.setItem(
       STORAGE_KEYS.progress,
       JSON.stringify({ ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 9 } })
@@ -739,6 +743,7 @@ describe('account recovery copies', () => {
       data: { ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 9 } },
     });
     progressPersistStorage.setItem(STORAGE_KEYS.progress, migrated);
+    await flushActiveProgressWrites();
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(migrated);
   });
   it('reports a copy that could not be written', () => {
