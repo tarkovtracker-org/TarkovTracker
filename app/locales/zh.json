@@ -2,8 +2,8 @@
   "admin": {
     "verifying_access": "正在验证管理员访问权限……",
     "error_title": "连接错误",
-    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
-    "no_reference": "N/A",
+    "load_error_description": "加载管理员数据失败。请刷新页面或联系支持团队。参考编号：{reference}",
+    "no_reference": "不适用",
     "error": {
       "cache_purge_failed": "无法清除缓存。请重试。",
       "invalid_purge_type": "选择有效的缓存清除类型。",
@@ -22,50 +22,47 @@
       "twitch_config_update_failed": "无法更新 Twitch 配置。"
     },
     "access_warning_title": "管理员访问权限",
-    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
-    "cache_management_title": "Cache Management",
-    "last_purge_description": "Last purge: {type} at {timestamp}",
-    "tarkov_data_cache_label": "Tarkov Data Cache",
-    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
-    "purge_game_data_button": "Purge Game Data",
-    "full_cache_purge_label": "Full Cache Purge",
-    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
-    "purge_everything_button": "Purge Everything",
-    "cache_behavior_title": "Cache Behavior",
-    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
-    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
-    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
-    "confirm_purge_button": "Confirm Purge",
-    "all_cache_label": "All Cache",
-    "tarkov_data_label": "Tarkov Data",
-    "unauthorized_title": "Unauthorized",
-    "admin_privileges_required": "Admin privileges required for this action.",
-    "permission_denied": "You do not have permission to perform this action.",
-    "cache_purged_title": "Cache Purged",
-    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
-    "full_cache_purged_title": "Full Cache Purged",
-    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
-    "purge_failed_title": "Purge Failed",
-    "purge_failed_description": "Failed to purge cache",
-    "audit_log_title": "Admin Audit Log",
-    "refresh_button": "Refresh",
-    "audit_log_login_required": "Unauthorized: Please log in to continue.",
-    "audit_log_admin_required": "Unauthorized: Admin privileges required to view audit logs.",
-    "audit_log_table_not_found": "Audit log table not found.",
-    "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
-    "audit_log_fetch_failed": "Failed to fetch audit logs",
-    "no_actions_recorded": "No admin actions recorded yet",
-    "audit_log_by": "by",
-    "supporter_override_title": "Supporter Access",
-    "supporter_override_description": "Set a user's supporter state for production testing without creating a Stripe payment.",
-    "supporter_target_user_label": "User ID",
-    "supporter_target_user_placeholder": "Supabase auth user UUID",
-    "supporter_tier_label": "Tier",
-    "supporter_override_login_required": "You must be signed in to update supporter access.",
-    "supporter_override_saved_title": "Supporter access updated",
-    "supporter_override_enabled_description": "Enabled {tier} supporter access.",
-    "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_description": "Could not update supporter access.",
+    "access_warning_description": "此处执行的操作会影响所有用户。当前登录用户：{user}。",
+    "cache_management_title": "缓存管理",
+    "last_purge_description": "上次清除：{type}，时间：{timestamp}",
+    "tarkov_data_cache_label": "Tarkov 数据缓存",
+    "tarkov_data_cache_description": "清除已缓存的游戏数据（任务、藏身处、物品）。用户将从 tarkov.dev API 获取最新数据。",
+    "purge_game_data_button": "清除游戏数据",
+    "full_cache_purge_label": "清除全部缓存",
+    "full_cache_purge_description": "清除所有已缓存内容，包括静态资源。请谨慎使用——这会增加源站负载。",
+    "purge_everything_button": "全部清除",
+    "cache_behavior_title": "缓存机制",
+    "cache_info_description": "清除缓存后，下一个用户请求将触发从 tarkov.dev 获取最新数据。新数据随后会为所有用户缓存。",
+    "confirm_full_cache_purge_title": "确认清除全部缓存",
+    "confirm_full_cache_purge_description": "这将清除 Cloudflare 上所有已缓存的内容，包括静态资源、字体和 JavaScript 包。这可能会暂时延长所有用户的加载时间。",
+    "confirm_purge_button": "确认清除",
+    "all_cache_label": "全部缓存",
+    "tarkov_data_label": "Tarkov 数据",
+    "unauthorized_title": "未授权",
+    "admin_privileges_required": "此操作需要管理员权限。",
+    "cache_purged_title": "缓存已清除",
+    "tarkov_cache_purged_description": "Tarkov 数据缓存已清除。用户将收到最新数据。",
+    "full_cache_purged_title": "全部缓存已清除",
+    "full_cache_purged_description": "Cloudflare 上所有已缓存内容均已清除。",
+    "purge_failed_title": "清除失败",
+    "purge_failed_description": "清除缓存失败",
+    "audit_log_title": "管理员审计日志",
+    "refresh_button": "刷新",
+    "audit_log_login_required": "未授权：请登录以继续。",
+    "audit_log_admin_required": "未授权：查看审计日志需要管理员权限。",
+    "audit_log_table_not_found": "未找到审计日志表。",
+    "audit_log_table_not_found_description": "请运行 SQL 迁移以创建 admin_audit_log。",
+    "audit_log_fetch_failed": "获取审计日志失败",
+    "no_actions_recorded": "尚未记录任何管理员操作",
+    "audit_log_by": "操作者",
+    "supporter_override_title": "支持者权限",
+    "supporter_override_description": "在无需创建 Stripe 付款的情况下，为用户设置支持者状态以进行生产测试。",
+    "supporter_target_user_label": "用户 ID",
+    "supporter_target_user_placeholder": "Supabase 身份验证用户 UUID",
+    "supporter_tier_label": "支持档位",
+    "supporter_override_saved_title": "支持者权限已更新",
+    "supporter_override_enabled_description": "已启用 {tier} 档位支持权限。",
+    "supporter_override_disabled_description": "已关闭当前支持者权限。",
     "twitch_config_title": "Twitch直播",
     "twitch_config_description": "在站点的角落设置推广的Twitch频道。游客在几分钟内接听更改消息。",
     "twitch_channel_label": "频道",
@@ -73,13 +70,11 @@
     "twitch_display_name_label": "显示名称",
     "twitch_display_name_placeholder": "频道显示名称",
     "twitch_config_saved_title": "Twitch配置已更新",
-    "twitch_config_saved_description": "Promoted stream is now {channel}.",
+    "twitch_config_saved_description": "推广直播现已切换为 {channel}。",
     "twitch_config_saved_with_warning_title": "Twitch配置已保存",
     "twitch_config_saved_with_warning_description": "配置已保存，但缓存的访客仍可能看到上一个值。",
-    "twitch_config_failed_description": "无法更新 Twitch 配置。",
     "twitch_config_load_failed_title": "Twitch配置不可用",
-    "twitch_config_load_failed_description": "无法加载当前Twitch配置。",
-    "twitch_config_login_required": "您必须登录才能更新 Twitch 配置。"
+    "twitch_config_load_failed_description": "无法加载当前Twitch配置。"
   },
   "alerts": {
     "no_map_data": "此选择没有可用地图数据。"
@@ -95,8 +90,8 @@
     "hidden_label": "已隐藏",
     "user_label": "用户",
     "user_avatar_alt": "用户头像",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
-    "help_community_aria": "Help & community",
+    "supporter_badge_aria": "管理您的支持者订阅（{tier}）",
+    "help_community_aria": "帮助与社区",
     "community_section": "社区",
     "keyboard_shortcuts": "键盘快捷键",
     "report_problem": "报告问题",
@@ -105,7 +100,7 @@
     "switch_to_dark_theme": "切换到暗色主题"
   },
   "progress_save_status": {
-    "indicator_aria": "Progress save status: {status}",
+    "indicator_aria": "进度保存状态：{status}",
     "cloud_pending_label": "保存进度到云端",
     "cloud_retrying_label": "云保存重试",
     "cloud_failed_label": "云保存失败",
@@ -116,7 +111,7 @@
     "local_failed_description": "您的最新进度更改无法保存在此浏览器。 您可以继续跟踪，但如果您重新加载、关闭此标签或注销，其他地方未保存的更改可能会丢失。",
     "local_saved_note": "这些更改已保存在此浏览器。",
     "cloud_also_pending_note": "他们也没有保存到云端。导出进度以保存一份副本。",
-    "retry_scheduled": "Automatic retry {attempt} of {total} is scheduled.",
+    "retry_scheduled": "已安排第 {attempt} 次自动重试（共 {total} 次）。",
     "cause_offline": "原因：此设备似乎处于离线状态。",
     "cause_rate_limited": "原因：云服务暂时限制了节省。",
     "cause_auth": "原因：无法验证您的登录会话。",
@@ -144,7 +139,7 @@
     "trigger_label": "搜索任务、物品、商人…",
     "open_aria": "打开全局搜索",
     "aria_label": "全局搜索",
-    "placeholder": "Search tasks, needed items, hideout...",
+    "placeholder": "搜索任务、所需物品、藏身处...",
     "hint_min_chars": "至少输入2个字符以开始搜索……",
     "no_results": "未找到 “{query}”。",
     "group_tasks": "任务",
@@ -173,12 +168,12 @@
   "promoted_stream": {
     "close": "关闭直播",
     "expand": "打开直播",
-    "open_channel": "Go to Twitch channel",
-    "player_title": "{streamer} Twitch stream",
-    "region_label": "Promoted Twitch stream for {streamer}",
-    "reopen": "Reopen stream",
-    "shrink": "Shrink stream",
-    "title": "{streamer} live"
+    "open_channel": "前往 Twitch 频道",
+    "player_title": "{streamer} 的 Twitch 直播",
+    "region_label": "为 {streamer} 推广的 Twitch 直播",
+    "reopen": "重新打开直播",
+    "shrink": "缩小直播画面",
+    "title": "{streamer} 正在直播"
   },
   "buttons": {},
   "errors": {
@@ -216,6 +211,7 @@
         "plural": "任务已更新"
       },
       "state": {
+        "active": "已激活",
         "completed": "已完成",
         "failed": "失败",
         "uncompleted": "未完成"
@@ -231,6 +227,10 @@
     "progress_merged": {
       "title": "云端进度已同步",
       "description": "已从其他标签页/设备同步进度，并合并了 {count} 处本地差异。"
+    },
+    "tarkov_uid_conflict": {
+      "title": "Tarkov个人资料未链接",
+      "description": "Tarkov UID {uid} 已关联到另一个 TarkovTracker 账号，因此未关联到此账号。你的进度仍已保存。请解除该 UID 与其他账号的关联，或导入你自己的游戏档案。"
     },
     "load_failed": {
       "title": "无法加载进度",
@@ -307,7 +307,6 @@
     "support": "支持",
     "privacy_policy": "隐私政策",
     "terms_of_service": "服务条款",
-    "tarkov_dev": "Tarkov.dev",
     "streamer_tools": "直播工具",
     "prestige": "转生",
     "backup_restore": "备份和恢复",
@@ -329,7 +328,6 @@
     "pmc_extract": "PMC 撤离点",
     "scav_extract": "Scav 撤离点",
     "dashboard": "仪表板",
-    "meet_the_fence_reputation_requirement_required": "Meet the Fence reputation requirement ({required}).",
     "objectives": "目标",
     "kappa_tasks": "Kappa 任务",
     "getting_started": "新手上路",
@@ -348,7 +346,7 @@
     "view_on_wiki": "在 Wiki 上查看",
     "item": "物品",
     "reset_failed": "重置失败",
-    "was_status": "was {status}",
+    "was_status": "此前状态为 {status}",
     "fail": "失败",
     "accept": "接受",
     "ready_to_hand_over": "可以上交",
@@ -363,7 +361,6 @@
     "login": "登录",
     "overview": "概览",
     "api_documentation": "API 文档",
-    "tarkov_changes": "Tarkov Changes",
     "api": "API",
     "game_settings": "游戏设置",
     "custom_scale": "自定义比例",
@@ -390,7 +387,7 @@
       "page_guide_unavailable": "这个页面暂时还没有专属指南，请先使用新手引导。",
       "onboarding": "新用户引导",
       "onboarding_description": "先完成导入，再补齐基础设置，最后核对任务。",
-      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
+      "keyboard_shortcuts_error": "无法打开键盘快捷键。请重试。"
     },
     "onboarding": {
       "title": "开始设置",
@@ -546,7 +543,7 @@
     }
   },
   "maps": {
-    "tooltip_density": "Tooltips",
+    "tooltip_density": "工具提示",
     "map_settings": "地图设置",
     "not_available_title": "地图不可用",
     "not_available_description": "\"{mapName}\"的互动地图尚不可用。我们正在等待兼容地图的制作。",
@@ -564,7 +561,6 @@
     "legend": {
       "regular": "常规的",
       "pinned": "固定的",
-      "team": "团队",
       "shared_extract": "共享撤离点（任一阵营）",
       "coop_extract": "合作撤离点（PMC + Scav）"
     },
@@ -585,12 +581,12 @@
         "interact": "交互功能",
         "view": "查看"
       },
-      "pan": "{keys} or drag to pan",
-      "zoom": "{keys} to zoom",
-      "reset": "{key} to reset view",
-      "cycle_floors": "{keys} to cycle floors",
+      "pan": "{keys} 或拖动以平移",
+      "zoom": "{keys} 缩放",
+      "reset": "{key} 重置视图",
+      "cycle_floors": "{keys} 切换楼层",
       "floor_panel": "或使用地面板。",
-      "click_at_cursor": "{key} to click at cursor",
+      "click_at_cursor": "{key} 在光标位置点击",
       "click_marker": "点击标记查看详细信息。",
       "fullscreen": "在地图控制中使用全屏按钮。",
       "resize": "拖动地图的底部边缘来调整大小。"
@@ -602,7 +598,7 @@
       "all_controls": "所有控制"
     },
     "aria": {
-      "tooltip_density": "Tooltip density"
+      "tooltip_density": "工具提示密度"
     },
     "tooltip": {
       "go_to": "前往目标",
@@ -610,7 +606,7 @@
       "complete": "完成目标",
       "uncomplete": "取消完成目标",
       "objective_unavailable": "目标不可用。",
-      "stacked_objectives": "{count} objectives here"
+      "stacked_objectives": "此处有 {count} 个目标"
     }
   },
   "page": {
@@ -648,12 +644,7 @@
           "default": "{task} 是你总览面板上最明确的立即收益。",
           "filter_hidden_one": "你当前的筛选隐藏了 1 个可用任务。",
           "filter_hidden_other": "你当前的筛选隐藏了 {count} 个可用任务。",
-          "blocked_level_one": "{task} 是你最近的解锁项，但你还差 1 级。",
-          "blocked_level_other": "{task} 是你最近的解锁项，但你还差 {count} 级。",
-          "blocked_requirement": "{task} is blocked by its requirements.",
-          "blocked_prerequisite": "{task} 已经很接近了，但仍被前置任务限制。",
-          "blocked_fence": "{task} 正在等待 Fence 声望。",
-          "blocked_trader_unlock": "{task} 被另一个商人解锁任务卡住了。",
+          "blocked_requirement": "{task} 未满足前置要求。",
           "complete": "在当前总览范围内，你已经完成了所有可见任务。"
         },
         "stat": {
@@ -690,12 +681,6 @@
           "kappa_other": "最佳特殊链进度：推进 Kappa，还剩 {count} 个目标。",
           "lightkeeper_one": "最佳特殊链进度：推进灯塔守护者，还剩 1 个目标。",
           "lightkeeper_other": "最佳特殊链进度：推进灯塔守护者，还剩 {count} 个目标。",
-          "blocked_level_one": "最近的解锁项：只差 1 级。",
-          "blocked_level_other": "最近的解锁项：只差 {count} 级。",
-          "blocked_prerequisite_one": "最小阻碍集合：还剩 1 个前置任务。",
-          "blocked_prerequisite_other": "最小阻碍集合：还剩 {count} 个前置任务。",
-          "blocked_fence": "最近的声望门槛：还差 {count} 点 Fence 声望。",
-          "blocked_trader_unlock": "先处理商人门槛：完成 {task} 以解锁 {trader}。",
           "filters_one": "当前没有可见选项：1 个可用任务被你的筛选隐藏了。",
           "filters_other": "当前没有可见选项：{count} 个可用任务被你的筛选隐藏了。",
           "complete": "在当前总览范围内，已经没有可见工作了。"
@@ -705,10 +690,6 @@
           "ready_other": "现在可做。还剩 {count} 个目标。",
           "ready_no_objectives": "现在可做。",
           "filters": "调整任务筛选以显示被隐藏的选项。",
-          "level_one": "达到 {required} 级（还差 1 级）。",
-          "level_other": "达到 {required} 级（还差 {count} 级）。",
-          "prerequisite": "完成 {tasks}。",
-          "trader_unlock": "完成 {task} 以解锁 {trader}。",
           "complete": "没有阻碍。所有可见内容都已完成。"
         },
         "badge": {
@@ -730,8 +711,8 @@
         "filtered_warning_tooltip": "这些数据会遵循你的任务筛选设置（Kappa、灯塔守护者和普通任务）。"
       },
       "progress_card": {
-        "view_details": "View details for {label}",
-        "progress_label": "{label} progress"
+        "view_details": "查看 {label} 的详情",
+        "progress_label": "{label} 进度"
       },
       "milestones": {
         "title": "里程碑",
@@ -755,17 +736,16 @@
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav 信誉",
         "unlock_required": "需要解锁:",
-        "locked_summary": "{count} traders locked",
+        "locked_summary": "{count} 个商人已锁定",
         "sort": {
-          "aria_label": "Sort traders",
-          "direction_aria_label": "Toggle sort direction"
+          "aria_label": "排序商人",
+          "direction_aria_label": "切换排序方向"
         }
       }
     },
     "changelog": {
       "title": "更新日志",
       "description": "查看 TarkovTracker 的最新更新和变更。",
-      "back": "返回总览面板",
       "loading": "加载更新日志...",
       "error": "无法加载更新日志。",
       "empty": "暂无更新日志条目。",
@@ -786,8 +766,8 @@
       "wip_description": "该功能仍在开发中。随着我们持续整理数据，内容和功能会逐步扩展并优化。感谢你的耐心等待！",
       "no_data": "暂无可用的剧情章节数据。",
       "mark_incomplete": "标记为未完成",
-      "endings": "Endings",
-      "ending_progress": "{completed}/{total} known objectives",
+      "endings": "结局",
+      "ending_progress": "{completed}/{total} 个已知目标",
       "ending_evidence_pending": "尚未映射到此结束的目标。",
       "partial_data": "部分数据",
       "partial_data_hint": "本章的上游故事数据不完整，因此可能比所列目标更多。",
@@ -795,127 +775,134 @@
       "quest_route_known_steps_done": "所有已知步骤已完成",
       "quest_route_evidence_pending": "尚未抓取任何步骤",
       "quest_route_conflict": "多条路读取已完成；游戏中只能有一个。",
-      "quest_route_progress": "{completed}/{total} steps",
+      "quest_route_progress": "{completed}/{total} 个步骤",
       "stale_progress_one": "1 保存的目标标记不再与当前故事数据匹配，需要重新检查。",
-      "stale_progress_other": "{count} saved objective marks no longer match the current story data and need re-checking.",
-      "route_choice": "Route choice",
-      "route_chosen": "Route selected",
-      "route_blocks": "Blocks: {objectives}",
-      "route_blocked_by": "Blocked by: {objectives}",
-      "route_decision": "Decision {index}",
-      "route_choose_one": "Choose one",
-      "route_required_steps": "Required steps",
-      "route_optional_steps": "Optional steps",
-      "route_selected_hint": "This route is active.",
-      "route_switch_hint": "To switch routes, uncheck the selected route first.",
-      "route_unlocks_here": "Unlocks here",
-      "route_unlocks_chapter": "Chapter unlocks",
-      "route_unlocks_estimated": "Estimated timing",
-      "route_unlock_map": "Map: {name}",
-      "route_unlock_trader": "Trader: {name}",
-      "route_unlock_reward": "Reward: {name}"
+      "stale_progress_other": "有 {count} 个已保存的目标标记与当前剧情数据不再匹配，需要重新检查。",
+      "route_choice": "路线选择",
+      "route_chosen": "已选择路线",
+      "route_blocks": "任务节点：{objectives}",
+      "route_blocked_by": "被以下目标阻止：{objectives}",
+      "route_decision": "决策 {index}",
+      "route_choose_one": "选择一个",
+      "route_required_steps": "必需步骤",
+      "route_optional_steps": "可选步骤",
+      "route_selected_hint": "此路线已启用。",
+      "route_switch_hint": "要切换路线，请先取消选择当前路线。",
+      "route_unlocks_here": "此处解锁内容",
+      "route_unlocks_chapter": "章节解锁项",
+      "route_unlocks_estimated": "预计用时",
+      "route_unlock_map": "地图：{name}",
+      "route_unlock_trader": "商人：{name}",
+      "route_unlock_reward": "奖励：{name}"
     },
     "kappa": {
-      "title": "Kappa & Lightkeeper Tracker",
-      "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
+      "subtitle": "追踪您获取 Kappa 保险箱和完成点灯人任务的进度。",
       "row": {
-        "level_met_aria": "Required level {required}, you are level {current}",
-        "level_unmet_aria": "Requires level {required}, you are level {current}",
-        "level_title": "Required level {required} (you are {current})",
-        "level_summary": "Lv {required} (you {current})",
+        "level_met_aria": "需要等级 {required}，您当前为 {current} 级",
+        "level_unmet_aria": "需要等级 {required}，您当前为 {current} 级",
+        "level_title": "所需等级 {required}（您当前为 {current} 级）",
+        "level_summary": "Lv {required}（您当前 {current} 级）",
         "trader_level": "{trader} Lv{level}",
-        "action_uncomplete": "Mark uncomplete",
-        "action_reset_failed": "Reset failed",
-        "locked_by": "Requires: {task}"
+        "action_uncomplete": "标记为未完成",
+        "action_reset_failed": "重置失败状态",
+        "locked_by": "需要：{task}"
       },
-      "empty": "No tasks for this list yet.",
+      "empty": "此列表暂无任务。",
       "summary": {
-        "complete": "complete",
-        "final_goal": "Final Kappa Goal"
+        "complete": "完成",
+        "final_goal": "最终 Kappa 目标"
       },
       "trader_selector": {
-        "label": "Select Trader"
+        "label": "选择商人"
       },
       "trader": {
-        "other": "Other"
+        "other": "其他"
       }
     },
     "supporter": {
-      "title": "Support TarkovTracker",
-      "subtitle": "Help keep the site running. Every contribution goes directly toward hosting, development, and keeping the lights on.",
-      "billing_monthly": "Monthly",
-      "billing_6month": "6 Months",
-      "billing_yearly": "Yearly",
-      "most_popular": "Most Popular",
-      "tier_cta": "Subscribe",
-      "tier_login_cta": "Log in to subscribe",
-      "tier_change_cta": "Change plan in billing portal",
-      "current_tier_badge": "Current tier",
+      "title": "支持 TarkovTracker",
+      "subtitle": "帮助网站持续运行。每一份贡献都将直接用于服务器托管、开发和维持运营。",
+      "billing_monthly": "每月",
+      "billing_6month": "6 个月",
+      "billing_yearly": "每年",
+      "most_popular": "最受欢迎",
+      "tier_cta": "订阅",
+      "tier_login_cta": "登录以订阅",
+      "tier_change_cta": "在账单门户中更改套餐",
+      "current_tier_badge": "当前档位",
       "tier_scav_name": "Scav",
-      "tier_scav_tagline": "Just trying to get by",
+      "tier_scav_tagline": "努力活下去",
       "tier_timmy_name": "Timmy",
-      "tier_timmy_tagline": "Learning the ropes",
+      "tier_timmy_tagline": "熟悉门道",
       "tier_chad_name": "Chad",
-      "tier_chad_tagline": "True veteran supporter",
-      "perk_badge": "Supporter badge",
-      "perk_discord": "Supporter role in Discord (link your account and join our server)",
-      "perk_tier_role": "{tier} Tier role in Discord",
-      "perk_early_access": "Early access to new features",
-      "perk_priority_support": "Priority support",
-      "perk_feature_voting": "Feature voting priority",
-      "one_time_title": "One-Time Contribution",
-      "one_time_subtitle": "Prefer not to subscribe? Send a one-time gift from {min}.",
-      "one_time_cover_fees": "Cover Stripe fees",
-      "one_time_fee_amount": "{fees} in fees",
-      "one_time_amount_field_label": "Contribution amount",
-      "one_time_min_error": "{min} minimum",
-      "one_time_invalid_error": "Enter a valid amount",
-      "one_time_max_error": "{max} maximum",
-      "one_time_give_cta": "Give {total}",
-      "one_time_login_cta": "Log in to contribute",
-      "one_time_net_note": "{net} reaches us after fees",
-      "one_time_perks_heading": "Includes supporter perks",
-      "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
-      "perk_api_rate_limit": "Higher daily API read and write quotas",
-      "perk_data_retention": "Longer retention if inactive accounts are purged, while supporter status is active",
-      "login_required_warning": "You must be logged in to receive supporter perks.",
-      "price_to_us": "Goes to us",
+      "tier_chad_tagline": "真正的资深支持者",
+      "perk_badge": "支持者徽章",
+      "perk_discord": "Discord 中的支持者身份（关联账户并加入我们的服务器）",
+      "perk_tier_role": "Discord 中的 {tier} 档位身份",
+      "perk_early_access": "抢先体验新功能",
+      "perk_priority_support": "优先支持",
+      "perk_feature_voting": "功能投票优先权",
+      "one_time_title": "一次性支持",
+      "one_time_subtitle": "不想订阅？可从 {min} 起一次性赠送支持。",
+      "one_time_cover_fees": "承担 Stripe 手续费",
+      "one_time_fee_amount": "手续费 {fees}",
+      "one_time_amount_field_label": "支持金额",
+      "one_time_min_error": "最低金额为 {min}",
+      "one_time_invalid_error": "请输入有效金额",
+      "one_time_max_error": "最高金额为 {max}",
+      "one_time_give_cta": "支持 {total}",
+      "one_time_login_cta": "登录以提供支持",
+      "one_time_net_note": "扣除手续费后，我们将收到 {net}",
+      "one_time_perks_heading": "包含支持者权益",
+      "one_time_fee_transparency": "Stripe 手续费（2.9% + $0.30）会在付款前显示。",
+      "perk_api_rate_limit": "更高的每日 API 读写配额",
+      "perk_subscription_retention": "在合格订阅处于活动状态时免于例行非活动清理",
+      "perk_one_time_retention": "一年的无活动窗口，具备资格支持",
+      "billing_summary": "订阅在选定的时间间歇自动续订。取消将来的续订。一次性贡献不会更新。",
+      "policies_title": "一眼的支持",
+      "terms_summary": "这个免费项目的支持资金。Perks 可能会改变并且没有保证。付款一般是不可退还的，受适用法律的约束。",
+      "payment_terms_link": "付款、注销和退款条款",
+      "retention_summary": "符合条件的支持扩大了例行的不活动窗口；主动的合格订阅是免除的。 退款和收费影响到资格。这不是储存或保护免受其他账户删除的保证。",
+      "retention_terms_link": "完整账户留存条款",
+      "privacy_summary": "Stripe 处理付款。我们保留有限的付款和支持者记录来管理您的支持。我们的隐私政策解释数据使用、保留和您的权利。",
+      "login_required_warning": "您必须登录后才能享受支持者权益。",
+      "price_to_us": "我们实际收到",
       "price_per_month_suffix": "/mo",
-      "price_stripe_fees": "Stripe fees",
-      "billed_every_label": "Billed every {label}",
-      "savings_note": "You save {amount} vs. monthly",
-      "kofi_deprecation_title": "Ko-fi (backup option)",
-      "kofi_deprecation_detail": "Subscriptions and one-time contributions above now run through Stripe, which means lower fees and more of your support reaches us directly. Ko-fi stays available as a backup for one-time tips only.",
-      "alt_payments_title": "More Payment Methods Coming Soon",
-      "alt_payments_coming_soon": "We're working on adding additional payment options so everyone can contribute in the way that works best for them.",
-      "alt_payment_crypto": "Crypto",
-      "alt_payment_gift_cards": "Gift Cards",
-      "alt_payments_more": "& More",
-      "checkout_error_title": "Checkout failed",
-      "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment.",
-      "manage_subscription_cta": "Manage subscription",
-      "upgrade_cta": "Pick a tier",
-      "portal_error_title": "Could not open billing portal",
-      "portal_error_generic": "We could not open the billing portal. Please try again.",
-      "status_active_subscription": "Active subscription",
-      "status_active_one_time": "Active supporter",
-      "status_past_due": "Payment past due",
-      "status_cancelled": "Subscription cancelled",
-      "status_expired": "Subscription expired",
-      "status_inactive": "Inactive supporter",
-      "status_summary_inactive": "Support has lapsed. Pick a tier below to renew perks.",
-      "status_summary_renews": "Renews on {date}. You can change tier or cancel anytime.",
-      "status_summary_cancelled_until": "Access continues until {date}. It ends after that.",
-      "status_summary_subscription": "Thanks for keeping the lights on. Manage billing anytime.",
-      "status_summary_one_time": "Thanks for the one-time contribution.",
-      "status_summary_one_time_until": "Perks active until {date}.",
-      "thanks_subscription_title": "Welcome aboard!",
-      "thanks_subscription_description": "Your subscription is being activated. Your tier badge will appear shortly.",
-      "thanks_one_time_title": "Thanks for your support!",
-      "thanks_one_time_description": "Your contribution went through. It may take a moment to reflect on your account.",
-      "one_time_amount_label": "One-time contribution amount in USD",
-      "billing_6month_interval": "6 months",
-      "billing_yearly_interval": "year"
+      "price_stripe_fees": "Stripe 手续费",
+      "billed_every_label": "每 {label} 收费一次",
+      "savings_note": "相比按月订阅可节省 {amount}",
+      "kofi_deprecation_title": "Ko-fi（备用选项）",
+      "kofi_deprecation_detail": "上方订阅和一次性支持现已通过 Stripe 支付，这意味着手续费更低，更多支持将直接到达我们。Ko-fi 仍作为一次性打赏的备用方式保留。",
+      "alt_payments_title": "即将推出更多支付方式",
+      "alt_payments_coming_soon": "我们正在添加更多支付选项，让您可以选择最适合的方式提供支持。",
+      "alt_payment_crypto": "加密货币",
+      "alt_payment_gift_cards": "礼品卡",
+      "alt_payments_more": "及更多",
+      "checkout_error_title": "结账失败",
+      "checkout_error_generic": "无法开始结账。请稍后重试。",
+      "manage_subscription_cta": "管理订阅",
+      "upgrade_cta": "选择支持档位",
+      "portal_error_title": "无法打开账单门户",
+      "portal_error_generic": "无法打开账单门户。请重试。",
+      "status_active_subscription": "订阅有效",
+      "status_active_one_time": "支持有效",
+      "status_past_due": "付款逾期",
+      "status_cancelled": "订阅已取消",
+      "status_expired": "订阅已过期",
+      "status_inactive": "支持已停用",
+      "status_summary_inactive": "支持已到期。请选择下方支持档位以恢复权益。",
+      "status_summary_renews": "将于 {date} 续订。您可以随时更改档位或取消。",
+      "status_summary_cancelled_until": "访问权限将持续到 {date}，之后终止。",
+      "status_summary_subscription": "感谢您让网站持续运转。您可以随时管理账单。",
+      "status_summary_one_time": "感谢您的一次性支持。",
+      "status_summary_one_time_until": "权益有效至 {date}。",
+      "thanks_subscription_title": "欢迎加入！",
+      "thanks_subscription_description": "您的订阅正在激活。支持者徽章很快就会显示。",
+      "thanks_one_time_title": "感谢您的支持！",
+      "thanks_one_time_description": "您的一次性支持已成功提交。可能需要片刻才能在账户中显示。",
+      "one_time_amount_label": "一次性支持金额（美元）",
+      "billing_6month_interval": "6 个月",
+      "billing_yearly_interval": "年"
     },
     "tasks": {
       "primary_views": {
@@ -982,22 +969,20 @@
           "experience_rewards": "经验奖励",
           "next_tasks": "后续任务",
           "previous_tasks": "前置任务",
-          "collapse_completed_objectives": "折叠已完成任务的目标",
-          "collapse_by_default": "默认情况下收起任务",
-          "hide_rewards": "隐藏奖励"
+          "collapse_completed_objectives": "折叠已完成任务的目标"
         },
         "filter_bar": {
           "hint": "显示或隐藏状态筛选",
           "all_filter": "显示所有任务",
-          "all_filter_hint": "Display every task regardless of status.",
+          "all_filter_hint": "显示所有任务，不限状态。",
           "available_filter": "显示可用的任务",
-          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
+          "available_filter_hint": "根据您的等级和前置条件，当前即可开始的任务。",
           "locked_filter": "显示锁定的任务",
-          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
+          "locked_filter_hint": "受等级、商人声望或前置任务限制的任务。",
           "completed_filter": "显示已完成的任务",
-          "completed_filter_hint": "Tasks you've already finished.",
+          "completed_filter_hint": "您已完成的任务。",
           "failed_filter": "显示失败的任务",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+          "failed_filter_hint": "因错过条件而失败的任务。"
         },
         "advanced": {
           "manual_fail_actions": "手动失败操作",
@@ -1037,18 +1022,18 @@
         "raid_time_tooltip": "当前游戏内搜查时间",
         "raid_plan": {
           "title": "在地图上的任务",
-          "summary_all": "Showing all {total}",
-          "summary_hidden": "{hidden} of {total} hidden",
+          "summary_all": "正在显示全部 {total} 项",
+          "summary_hidden": "已隐藏 {hidden}/{total} 项",
           "choose_quests": "选择任务",
           "show_all": "显示全部",
           "popover_description": "取消勾选你没有运行这次突击来清除它们。\"只能隐藏其他一切。",
           "only": "仅限",
-          "show_only_named": "Show only {name} on the map",
+          "show_only_named": "仅在地图上显示 {name}",
           "show_only_quest": "仅在地图上显示此任务",
           "hide_quest": "从地图隐藏",
           "show_quest": "在地图上显示",
           "all_hidden_hint": "此地图上的每一个任务都是隐藏的。使用显示所有来将它们带回来。",
-          "hidden_section_title": "Hidden from map ({count})",
+          "hidden_section_title": "已从地图隐藏（{count}）",
           "hidden_section_description": "仍在跟踪，只需在地图上绘制。",
           "hidden_section_expand": "显示隐藏任务",
           "hidden_section_collapse": "收起隐藏的任务"
@@ -1147,8 +1132,8 @@
         "kappa_tooltip": "该任务是获得 Kappa 安全箱的必需任务",
         "level_badge_tooltip": "需要玩家最低等级 {level} 才能解锁该任务",
         "lightkeeper_tooltip": "该任务是解锁商人 Lightkeeper 的必需任务",
-        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
-        "alternatives_badge": "{count} alt",
+        "alternatives_tooltip": "此任务有 {count} 个备选方案——您只需完成其中一个",
+        "alternatives_badge": "{count} 个备选",
         "location_tooltip": "任务目标位于 {map}",
         "next_tasks": "后续任务：",
         "open_item_on_tarkov_dev": "在 tarkov.dev 打开 {name}",
@@ -1161,26 +1146,26 @@
         "reputation": "重写"
       },
       "blockers": {
-        "player_level": "Player level {comparison} {required} required (current: {current}).",
-        "trader_level": "{trader} Loyalty Level {comparison} {required} required (current: {current}).",
-        "trader_reputation": "{trader} reputation {comparison} {required} required (current: {current}).",
-        "prerequisite": "Meet the required task statuses for: {tasks}.",
-        "story_route": "Meet the required task statuses for {tasks}, or progress one of these story chapters: {chapters}.",
-        "failed_branch": "Blocked by failed task: {task}.",
-        "faction": "Available to {faction} characters.",
-        "trader_unlock": "Unlock {trader} by completing {task}.",
-        "prestige": "Requires Prestige {required} (current: {current}).",
-        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
-        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
-        "task_counter": "Requires {comparison} {required} completed tasks from this trader loyalty tier (completed: {current}). If this task is already available in-game, use Mark available.",
+        "player_level": "玩家等级需要 {comparison} {required}（当前：{current}）。",
+        "trader_level": "{trader} 忠诚等级需要 {comparison} {required}（当前：{current}）。",
+        "trader_reputation": "{trader} 声望需要 {comparison} {required}（当前：{current}）。",
+        "prerequisite": "满足以下任务的状态要求：{tasks}。",
+        "story_route": "满足 {tasks} 的任务状态要求，或推进以下剧情章节之一：{chapters}。",
+        "failed_branch": "被失败任务阻止：{task}。",
+        "faction": "仅 {faction} 角色可接取。",
+        "trader_unlock": "完成 {task} 以解锁 {trader}。",
+        "prestige": "需要声望等级 {required}（当前：{current}）。",
+        "global_variable": "服务器进度值需满足：{comparison} {required}（当前：{current}）。",
+        "global_variable_unknown": "服务器进度需满足 {comparison} {required}。跟踪器无法获取你当前的进度值。仅当此任务已在游戏内可用时，才使用“标记为可用”；计数器任务不会被标记为完成。",
+        "task_counter": "此商人忠诚度等级中的已完成任务数需达到 {comparison} {required}（已完成：{current}）。如果此任务已在游戏内可用，请使用“标记为可用”。",
         "dialogue": "需要游戏内的交易者对话。只有在确认此任务在游戏中可用后才能使用标记。",
-        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
+        "story_objective": "完成剧情目标\"{objective}\"（{chapter}）。",
         "unknown": "要求数据不可用或不支持。可用性无法确认。",
         "cycle": "必备链包含一个周期。可用性无法确认。",
         "complete": "此任务已完成。",
         "failed": "此任务失败。",
         "disabled": "此任务已禁用。",
-        "task_status": "{task} ({status})",
+        "task_status": "{task}（{status}）",
         "status_complete": "已完成",
         "status_failed": "失败",
         "status_active": "活动或接受",
@@ -1189,7 +1174,6 @@
       }
     },
     "hideout": {
-      "summary": "跟踪设施升级、卡点以及接下来可以建造的内容。",
       "loading": "加载藏身处数据中",
       "station_link_label": "前往 {name}",
       "no_stations_found": "未找到设施，可尝试修改筛选条件",
@@ -1232,12 +1216,11 @@
       }
     },
     "needed_items": {
-      "meta_description": "查看你在当前任务与藏身处升级中所需的全部物品。可按任务、制作与战局拾取要求进行筛选。",
       "loading": "加载任务及藏身处数据中",
       "search_placeholder": "搜索物品、任务或藏身处设施...",
       "items": "物品",
       "empty": "没有符合搜索的物品。",
-      "error": "Unable to load needed items.",
+      "error": "无法加载所需物品。",
       "filters": {
         "label": "筛选",
         "non_fir": "非战局拾取",
@@ -1274,10 +1257,10 @@
           "create_token_success": "API令牌创建成功",
           "create_token_error": "API令牌创建失败",
           "load_tokens_error": "加载 API 令牌失败",
-          "copy_failed": "Failed to copy token.",
-          "copy_token": "Copy token",
+          "copy_failed": "复制令牌失败。",
+          "copy_token": "复制令牌",
           "edit_name": "编辑令牌名称",
-          "edit_name_aria": "Edit token name for {name}",
+          "edit_name_aria": "编辑 {name} 的令牌名称",
           "save_name": "保存令牌名称",
           "cancel_name_edit": "取消令牌名称编辑",
           "name_updated": "令牌名称已更新",
@@ -1286,19 +1269,19 @@
           "token_created_description": "请立即复制并妥善保存，此令牌仅显示一次",
           "token_created_close": "完成",
           "token_copied": "令牌已复制到剪贴板",
-          "hide_token": "Hide token",
+          "hide_token": "隐藏令牌",
           "token_revoked": "令牌已撤销",
           "token_revoke_error": "令牌撤销失败，请重试",
           "no_tokens": "你暂无Tarkov Tracker API令牌",
           "not_logged_in": "需登录后才能创建API令牌",
           "default_note": "未命名令牌",
-          "show_token": "Show token",
-          "token_value_hidden": "Token value hidden by server configuration",
-          "token_value_missing": "Token value unavailable",
-          "token_value_unavailable": "Token value display unavailable",
-          "token_value_unavailable_desc": "Your current API does not expose token values for existing tokens.",
-          "token_cap_reached": "Token limit reached",
-          "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
+          "show_token": "显示令牌",
+          "token_value_hidden": "令牌值已被服务器配置隐藏",
+          "token_value_missing": "令牌值不可用",
+          "token_value_unavailable": "无法显示令牌值",
+          "token_value_unavailable_desc": "您当前的 API 不会提供现有令牌的值。",
+          "token_cap_reached": "已达到令牌上限",
+          "token_cap_reached_desc": "您最多只能拥有 3 个有效 API 令牌。请撤销一个现有令牌以创建新令牌。",
           "revoke_button": "撤销",
           "report": {
             "load_failed": "加载 API 令牌失败",
@@ -1323,10 +1306,6 @@
       }
     },
     "team": {
-      "meta": {
-        "description": "与队友协作推进《逃离塔科夫》进度。分享任务完成情况、藏身处状态，并协调物品收集。"
-      },
-      "page_title": "团队",
       "page_description": "邀请团队成员，选择您看到的团队进度，并一起跟踪。",
       "invite": {
         "title": "邀请链接",
@@ -1339,11 +1318,10 @@
         "copied": "已复制！"
       },
       "members": {
-        "title": "Members ({count})",
+        "title": "成员（{count}）",
         "no_members": "此团队中还没有成员。分享您的邀请链接以添加队友。",
         "alone": "只有您在这里 — — 分享您的邀请链接以添加队友。",
-        "copy_invite": "复制邀请链接",
-        "copied": "已复制！"
+        "copy_invite": "复制邀请链接"
       },
       "visibility": {
         "title": "可见性设置",
@@ -1373,50 +1351,30 @@
       },
       "card": {
         "manageteam": {
-          "title": "队伍成员",
-          "no_members": "队伍暂无成员！通过上方链接邀请队友加入",
           "membercard": {
             "this_is_you": "(这是你)",
             "owner": "队长",
             "taskscomplete": "任务完成情况 {completed}/{total}",
             "kick_success": "已成功移出队友",
             "kick_error": "移出队友失败",
-            "level_badge_alt": "Level {level} badge",
-            "hide_progress": "Hide {name}'s progress from me",
-            "show_progress": "Show {name}'s progress to me",
+            "level_badge_alt": "等级 {level} 徽章",
+            "hide_progress": "对我隐藏 {name} 的进度",
+            "show_progress": "向我显示 {name} 的进度",
             "enable_team_tasks": "在更改单个成员之前显示团队成员的任务",
-            "remove_member": "Remove {name} from team"
+            "remove_member": "将 {name} 移出队伍"
           }
         },
-        "teamoptions": {
-          "title": "队伍联动设置",
-          "section_items": "Items",
-          "toggle_tasks": "Hide team members' tasks",
-          "toggle_items": "Hide team members' needed items",
-          "toggle_non_fir": "Hide non-FIR needed items",
-          "toggle_hideout": "Hide hideout needed items",
-          "toggle_maps": "Hide team members' map objectives"
-        },
         "myteam": {
-          "title": "我的队伍",
           "create_new_team": "创建新队伍",
-          "disband_team": "解散队伍",
-          "leave_team": "退出队伍",
           "create_team_success": "新队伍创建成功",
           "create_team_error": "新队伍创建失败",
           "create_team_error_ui_update": "队伍状态未刷新，可刷新页面重试",
           "leave_team_success": "已成功退出队伍",
           "leave_team_error": "退出队伍失败",
-          "already_in_team": "You are already in a {mode} team. Leave your current team first.",
-          "url_copied": "URL 已复制到剪贴板",
-          "copy_url_failed": "复制URL到剪贴板失败",
+          "already_in_team": "您已经在 {mode} 队伍中。请先离开当前队伍。",
           "no_team": "你当前未加入任何队伍",
           "login_required": "登录以创建团队或管理您的团队邀请链接。",
-          "team_invite_url_label": "队伍邀请链接",
-          "copy_link": "复制",
-          "link_hidden_message": "点击「显示」查看队伍邀请链接",
-          "user_not_authenticated": "用户未登录",
-          "leave_team_error_unexpected": "退出队伍时发生未知错误"
+          "user_not_authenticated": "用户未登录"
         },
         "teaminvite": {
           "description": "你收到了 Tarkov Tracker 队伍邀请",
@@ -1439,17 +1397,14 @@
         "error": "当前无法加载贡献者。",
         "empty": "暂未找到贡献者。",
         "contributions": "{count} 次贡献",
-        "total": "{count} contributor | {count} contributors"
+        "total": "{count} 位贡献者 | {count} 位贡献者"
       },
-      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。",
       "team_link": "由 TarkovTracker 团队维护——在关于页面上会见他们！"
     },
     "about": {
       "title": "关于 TarkovTracker",
-      "description": "会见维护TarkovTracker.org的团队，其游戏数据背后的合作伙伴，以及如何从社区获得帮助。",
       "intro": "TarkovTracker是逃离Tarkov的免费开放源码进度跟踪器。 它会使您的任务和故事在线进度，隐藏升级和物品需求在一个地方，并保持社区维护的游戏数据的随时更新。 该项目由一个小型志愿者小组在开放源码捐助者的帮助下管理。",
       "team": {
-        "heading": "团队",
         "summary": "TarkovTracker.org由一个小型志愿团队维护。下面的人保持站点运行并支持Discord社区。",
         "core_heading": "核心团队",
         "support_heading": "Discord 支持"
@@ -1488,69 +1443,66 @@
       "continue_github": "使用 GitHub 登录",
       "popup_blocked_title": "弹出窗口被阻止",
       "popup_blocked_description": "你的浏览器阻止了登录窗口。正在为你重定向...",
-      "authenticating": "Authenticating...",
-      "authenticating_description": "Please wait while we complete your sign in.",
-      "error_title": "Sign-in failed",
-      "error_description": "Authentication was canceled or failed. Please try again.",
+      "authenticating": "正在验证身份...",
+      "authenticating_description": "请稍候，我们将完成您的登录。",
+      "error_title": "登录失败",
+      "error_description": "身份验证已取消或失败。请重试。",
       "success_title": "已登录",
       "success_description": "已通过 {provider} 登录。",
-      "login_options": "登录选项",
-      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
+      "login_options": "登录选项"
     },
     "profile": {
-      "title": "User Profile",
-      "meta_description": "Share your progression story with level, achievements, task completion, and timeline insights for PvP or PvE.",
       "shared_player": "共享玩家",
-      "shared_view": "Shared View",
-      "loading_shared_profile": "Loading shared profile...",
-      "loading_data": "Loading progression metadata...",
-      "shared_private": "This shared profile is private.",
-      "shared_not_found": "Shared profile not found.",
-      "shared_unavailable": "Shared profile is unavailable right now.",
-      "shared_load_failed": "Failed to load shared profile.",
-      "shared_mode_notice": "Viewing shared progression for this mode.",
+      "shared_view": "共享视图",
+      "loading_shared_profile": "正在加载共享资料...",
+      "loading_data": "正在加载进度元数据...",
+      "shared_private": "此共享资料为私密。",
+      "shared_not_found": "未找到共享资料。",
+      "shared_unavailable": "共享资料目前不可用。",
+      "shared_load_failed": "加载共享资料失败。",
+      "shared_mode_notice": "正在查看此模式的共享进度。",
       "share_private_intro": "此模式为私密。请在",
       "account_settings_link": "账户设置",
       "share_private_outro": "中启用共享以公开此链接。",
-      "share_public_enabled": "This mode is public. Anyone with the link can view it.",
-      "share_private_enabled": "This mode is private.",
+      "share_public_enabled": "此模式为公开。任何拥有链接的人均可查看。",
+      "share_private_enabled": "此模式为私密。",
       "mode_toggle_label": "选择资料模式",
-      "copy_snapshot": "Copy Snapshot",
-      "view_tasks": "Open Tasks",
-      "story_no_tasks": "Waiting for task metadata to build your story.",
-      "story_start": "{mode} profile is just getting started.",
-      "story_complete": "Main task storyline completed.",
-      "story_late": "Entering late-wipe progression arc.",
-      "story_mid": "Mid-wipe momentum is building.",
-      "story_early": "Early progression with steady momentum.",
-      "story_paragraph_empty": "{name} has not recorded timestamped progress in {mode} yet.",
-      "story_paragraph": "{name} has been active in {mode} for about {active_days} days, with {journey_days} days between first and latest tracked progress.",
-      "next_milestone_done": "All task completion milestones reached.",
-      "next_milestone_value": "{remaining}% left to reach {milestone}% task completion.",
-      "no_date": "No data yet",
-      "level_meta": "{mode} profile level and active faction ({faction})",
-      "tasks_meta": "{remaining} remaining, {failed} failed branches",
-      "objectives_meta": "{completion_pct}% completion across tracked objectives",
-      "hideout_meta": "{completed_parts} completed hideout item checkpoints",
-      "achievement_mainline": "Mainline Task Progress",
-      "achievement_objectives": "Objective Completion",
+      "copy_snapshot": "复制快照",
+      "view_tasks": "打开任务",
+      "story_no_tasks": "正在等待任务元数据，以构建您的进度历程。",
+      "story_start": "{mode} 资料进度才刚刚开始。",
+      "story_complete": "主线任务剧情已完成。",
+      "story_late": "现已进入周目后段。",
+      "story_mid": "周目中期的进度正在加快。",
+      "story_early": "前期进度稳步推进。",
+      "story_paragraph_empty": "{name} 尚未在 {mode} 中记录带时间戳的进度。",
+      "story_paragraph": "{name} 已在 {mode} 中活跃约 {active_days} 天，从首次记录进度到最新记录进度间隔 {journey_days} 天。",
+      "next_milestone_done": "已达到所有任务完成里程碑。",
+      "next_milestone_value": "任务完成度达到 {milestone}% 还需 {remaining}%。",
+      "no_date": "暂无数据",
+      "level_meta": "{mode} 资料等级及当前阵营（{faction}）",
+      "tasks_meta": "剩余 {remaining} 项，失败分支 {failed} 条",
+      "objectives_meta": "已跟踪目标完成度 {completion_pct}%",
+      "hideout_meta": "已完成 {completed_parts} 个藏身处物品检查点",
+      "achievement_mainline": "主线任务进度",
+      "achievement_objectives": "目标完成度",
       "no_storyline": "此档案暂无可用的剧情数据。",
       "storyline_auto_start": "自动开始",
       "storyline_discovered": "已发现",
       "storyline_objectives_main": "主要目标",
       "storyline_objectives_optional": "可选目标",
       "no_hideout": "此档案没有可用的藏身处数据。",
-      "hideout_item_fallback": "Hideout item",
-      "hideout_module_fallback": "Hideout upgrade",
+      "hideout_item_fallback": "藏身处物品",
+      "hideout_module_fallback": "藏身处升级",
       "level_prefix": "等级",
       "no_tasks": "此档案暂无可用任务。",
       "no_objectives": "暂无目标",
       "activity_timeline": "活动时间线",
       "timeline_subtitle": "带时间戳的近期进度事件",
-      "timeline_task": "Task completion",
-      "timeline_failed": "Task branch failed",
-      "timeline_hideout": "Hideout module completed",
-      "timeline_hideout_item": "Hideout materials delivered",
+      "timeline_task": "任务完成",
+      "timeline_failed": "任务分支失败",
+      "timeline_hideout": "藏身处模块完成",
+      "timeline_hideout_item": "藏身处物资已送达",
       "started": "开始时间",
       "latest_activity": "最近活动",
       "recent_momentum": "7日势头",
@@ -1565,20 +1517,20 @@
       "achievements_subtitle": "主要进度节点",
       "kappa_projection": "Kappa 时间线",
       "kappa_projection_subtitle": "已完成耗时或预计完成时间",
-      "kappa_unknown": "Kappa timeline unavailable",
-      "kappa_unknown_detail": "No Kappa tasks detected for this profile.",
-      "kappa_done": "Kappa complete in this mode",
-      "kappa_done_detail": "Finished {total} Kappa tasks in about {days} days.",
-      "kappa_done_detail_simple": "All Kappa tasks are complete in this profile.",
-      "kappa_insufficient": "Kappa ETA needs more history",
-      "kappa_insufficient_detail": "Complete more timestamped tasks to generate an ETA.",
-      "kappa_pace_unavailable": "Not enough pace data to estimate completion.",
-      "kappa_projected_headline": "Estimated Kappa in about {days_remaining} days.",
-      "kappa_projected_detail": "Based on {sample_count} timestamped completions across {sample_days} days.",
-      "kappa_floor_note": "Estimate raised to account for {critical_path_floor} sequential prerequisites and level gates.",
-      "confidence_high": "High confidence",
-      "confidence_medium": "Medium confidence",
-      "confidence_low": "Low confidence",
+      "kappa_unknown": "Kappa 时间线不可用",
+      "kappa_unknown_detail": "此资料未检测到 Kappa 任务。",
+      "kappa_done": "此模式下已完成 Kappa",
+      "kappa_done_detail": "约 {days} 天内完成了 {total} 个 Kappa 任务。",
+      "kappa_done_detail_simple": "此资料中的所有 Kappa 任务均已完成。",
+      "kappa_insufficient": "估算 Kappa 完成时间需要更多历史记录",
+      "kappa_insufficient_detail": "完成更多带时间戳的任务以生成预计完成时间。",
+      "kappa_pace_unavailable": "进度数据不足，无法估算完成时间。",
+      "kappa_projected_headline": "预计约 {days_remaining} 天后完成 Kappa。",
+      "kappa_projected_detail": "基于 {sample_days} 天内的 {sample_count} 条带时间戳的完成记录。",
+      "kappa_floor_note": "估算值已上调，以计入 {critical_path_floor} 个连续前置任务和等级门槛。",
+      "confidence_high": "高可信度",
+      "confidence_medium": "中等可信度",
+      "confidence_low": "低可信度",
       "estimated_finish": "预计完成时间",
       "kappa_remaining": "剩余 {count}"
     },
@@ -1586,74 +1538,73 @@
       "not_found_description": "抱歉，该页面不存在！"
     },
     "terms_of_service": {
-      "table_of_contents": "Table of contents",
-      "index_button": "Index"
+      "table_of_contents": "目录",
+      "index_button": "索引"
     },
     "resources": {
-      "title": "Resources & Guides",
-      "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
-      "search_placeholder": "Search tools and guides...",
-      "clear_filters": "Clear filters",
-      "no_results": "No resources match your search.",
-      "results_count": "{count} resources found",
-      "results_count_one": "1 resource found",
-      "filter_label": "Filter resources by category",
-      "more_actions": "More actions",
-      "suggest_title": "Know a useful Tarkov resource?",
-      "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
-      "suggest_cta": "Suggest a resource",
+      "title": "资源与指南",
+      "subtitle": "查找配套应用、社区工具、开发者资源和使用指南，更好地使用 TarkovTracker。",
+      "search_placeholder": "搜索工具和指南...",
+      "clear_filters": "清除筛选条件",
+      "no_results": "没有符合搜索条件的资源。",
+      "results_count": "找到 {count} 个资源",
+      "results_count_one": "找到 1 个资源",
+      "filter_label": "按类别筛选资源",
+      "more_actions": "更多操作",
+      "suggest_title": "了解实用 Tarkov 资源？",
+      "suggest_description": "建议将社区工具或指南收录到此页面。",
+      "suggest_cta": "建议资源",
       "migration_banner": {
         "title": "迁移自TarkovTracker.io？",
         "cta": "阅读迁移指南"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org 指南",
-        "companion_apps": "Companion Apps",
-        "data_and_apis": "Data & Developer Tools",
-        "calculators_and_reference": "Calculators & Reference"
+        "companion_apps": "配套应用",
+        "data_and_apis": "数据与开发者工具",
+        "calculators_and_reference": "计算器与参考资料"
       },
       "category_badges": {
         "tarkovtracker_guides": "官方指南",
-        "companion_apps": "Desktop App",
-        "data_and_apis": "Data Platform",
-        "calculators_and_reference": "Reference"
+        "companion_apps": "桌面应用",
+        "data_and_apis": "数据平台",
+        "calculators_and_reference": "参考资料"
       },
       "actions": {
-        "setup_guide": "Setup guide",
-        "read_guide": "Read guide",
-        "open_calculator": "Open calculator",
-        "view_changes": "View changes",
-        "open_tool": "Open tool",
-        "download_release": "Download latest release"
+        "setup_guide": "设置指南",
+        "read_guide": "阅读指南",
+        "open_calculator": "打开计算器",
+        "view_changes": "查看变更",
+        "open_tool": "打开工具",
+        "download_release": "下载最新版本"
       },
-      "back_to_hub": "Back to Resources",
-      "breadcrumb": "Breadcrumb",
-      "guide_label": "Guide",
-      "on_this_page": "On this page",
-      "compatibility_label": "Compatibility",
-      "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
-      "guide_title_template": "{name} Guide",
+      "back_to_hub": "返回资源中心",
+      "breadcrumb": "面包屑导航",
+      "guide_label": "指南",
+      "on_this_page": "本页内容",
+      "compatibility_label": "兼容性",
+      "guide_not_found": "未找到指南。您要查找的资源可能还没有指南。",
       "meta": {
         "official_guide": "官方指南",
         "maintained_by_team": "由 TarkovTracker.org 团队维护",
         "windows": "Windows",
-        "setup_time": "5-minute setup",
-        "community_data": "Community maintained",
-        "web_tool": "Web tool",
-        "companion_app": "Companion App"
+        "setup_time": "5 分钟设置",
+        "community_data": "社区维护",
+        "web_tool": "在线工具",
+        "companion_app": "配套应用"
       },
       "link_types": {
-        "website": "Open website",
-        "project_website": "Project website",
-        "github": "View source",
-        "discord": "Community support",
-        "download": "Download"
+        "website": "打开网站",
+        "project_website": "项目网站",
+        "github": "查看源代码",
+        "discord": "社区支持",
+        "download": "下载"
       },
       "guide_sections": {
         "video_walkthrough": "视频速览",
-        "troubleshooting": "Troubleshooting",
-        "tips": "Tips & Tricks",
-        "faq": "Common Questions"
+        "troubleshooting": "故障排除",
+        "tips": "技巧与窍门",
+        "faq": "常见问题"
       },
       "items": {
         "tarkovtracker_org_vs_io": {
@@ -1662,23 +1613,23 @@
         },
         "tarkovdev": {
           "name": "Tarkov.dev",
-          "description": "Community-maintained item, quest, trader, and market data for players and developers."
+          "description": "由社区维护的物品、任务、商人及市场数据，面向玩家和开发者。"
         },
         "tarkovmonitor": {
           "name": "TarkovMonitor",
-          "description": "Read live raid data and automatically sync supported progress to TarkovTracker."
+          "description": "读取实时对局数据，并将受支持的进度自动同步到 TarkovTracker。"
         },
         "ratscanner": {
           "name": "RatScanner",
-          "description": "Scan in-game item tooltips to see market value, barter uses, and quest relevance."
+          "description": "扫描游戏内物品提示，查看市场价值、交易用途和任务关联。"
         },
         "cultistcircle": {
           "name": "CultistCircle",
-          "description": "Calculate possible Cultist Circle rewards from the items you contribute."
+          "description": "根据您贡献的物品，计算可能获得的 Cultist Circle 奖励。"
         },
         "tarkovchanges": {
           "name": "Tarkov Changes",
-          "description": "Review item, quest, and gameplay changes between Tarkov updates."
+          "description": "查看 Tarkov 更新之间的物品、任务和玩法变更。"
         }
       },
       "guides": {
@@ -1704,96 +1655,113 @@
           "faq_4_a": "No. .io域名和部署由原项目创始人拥有和控制。 我们不能访问它，也不能修复、更新或支持.io上的任何东西。"
         },
         "tarkovdev": {
-          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
-          "step_1_title": "Browse the website",
-          "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
-          "step_2_title": "Use the JSON API",
-          "step_2_desc": "If you are a developer, point your HTTP client at json.tarkov.dev. The endpoint catalog is at json.tarkov.dev/endpoints. The API is free, requires no authentication for read queries, and returns static JSON files you can cache locally.",
-          "step_3_title": "Join the community",
-          "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The JSON endpoints have no rate limit. For production apps, cache responses client-side to avoid redundant requests.",
-          "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
-          "faq_1_q": "Is the Tarkov.dev API free to use?",
-          "faq_1_a": "Yes, the JSON endpoints are completely free for read queries. No API key or authentication is required for standard usage.",
-          "faq_2_q": "How often is the data updated?",
-          "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
+          "overview": "Tarkov.dev 是社区数据生态的核心。它维护一个开源数据集，涵盖物品、任务、商人、藏身处工作站等，并可通过 json.tarkov.dev 上的免费静态 JSON 端点访问。TarkovTracker 本身也使用这些端点，以随时获取最新游戏数据。如果您要开发工具、编写指南或只是查询物品属性，Tarkov.dev 都是权威来源。",
+          "step_1_title": "浏览网站",
+          "step_1_desc": "访问 tarkov.dev，以使用简洁、无广告的界面搜索物品、查看任务要求、浏览商人库存并探索藏身处工作站数据。",
+          "step_2_title": "使用 JSON API",
+          "step_2_desc": "如果您是开发者，请让 HTTP 客户端指向 json.tarkov.dev。端点目录位于 json.tarkov.dev/endpoints。该 API 免费，读取查询无需身份验证，并返回可缓存在本地的静态 JSON 文件。",
+          "step_3_title": "加入社区",
+          "step_3_desc": "Hideout Discord 是数据贡献者、工具开发者和错误报告交流的中心。如果发现过期数据或希望作出贡献，可在这里参与。",
+          "tip_1": "JSON 端点没有速率限制。对于生产环境应用，请在客户端缓存响应，避免重复请求。",
+          "tip_2": "Tarkov.dev 数据会在赛季期间频繁更新。如果某些内容看起来有误，最新数据集中可能已经修复。",
+          "faq_1_q": "Tarkov.dev API 可以免费使用吗？",
+          "faq_1_a": "可以。JSON 端点的读取查询完全免费。正常使用无需 API 密钥或身份验证。",
+          "faq_2_q": "数据多久更新一次？",
+          "faq_2_a": "数据由社区贡献者维护，并在发现游戏内变更后更新。在活跃赛季期间，每天可能更新多次。"
         },
         "tarkovmonitor": {
-          "overview": "TarkovMonitor is a desktop application by The Hideout team that watches Escape from Tarkov log files and can automatically mark completed quests in TarkovTracker. It also provides audio notifications, local statistics, and optional Tarkov.dev website integration.",
-          "compatibility": "Keep TarkovMonitor running while you play so it can watch new game log entries. It does not read game memory.",
-          "step_1_title": "Download TarkovMonitor",
-          "step_1_desc": "Download the latest Windows release ZIP from the official GitHub Releases page.",
-          "step_2_title": "Extract and launch",
-          "step_2_desc": "Extract the archive to a permanent folder, then run TarkovMonitor.exe. Do not run it directly from inside the ZIP file.",
-          "step_3_title": "Connect your TarkovTracker account",
-          "step_3_desc": "In TarkovMonitor settings, open the TarkovTracker integration section. Create a read-write API token in TarkovTracker Settings, then paste it into TarkovMonitor.",
-          "step_4_title": "Play with TarkovMonitor open",
-          "step_4_desc": "Play normally while TarkovMonitor stays open. When the game writes a supported quest-completion event to its logs, TarkovMonitor can mark that quest complete in TarkovTracker.",
-          "troubleshooting_1_title": "Progress is not syncing",
-          "troubleshooting_1_desc": "Confirm the API token is read-write, has not expired, and that TarkovMonitor is running the latest release.",
-          "troubleshooting_2_title": "Earlier progress is missing",
-          "troubleshooting_2_desc": "Use Read Past Logs in Initial Setup, then choose the correct wipe and profile breakpoint.",
-          "troubleshooting_3_title": "Game mode looks wrong",
-          "troubleshooting_3_desc": "Match your TarkovTracker game mode setting to the mode you are playing, either PvP or PvE.",
-          "tip_1": "Generate a read-write API token in TarkovTracker settings. A read-only token cannot update progress.",
-          "tip_2": "Normal monitoring only processes new logs written while TarkovMonitor is running.",
-          "faq_1_q": "Is TarkovMonitor safe to use?",
-          "faq_1_a": "TarkovMonitor watches the log files that Escape from Tarkov writes locally. It does not read game memory, and the logs are not updated while a raid is in progress. Any third-party tool carries some risk, so use it at your own discretion.",
-          "faq_2_q": "Does TarkovMonitor work with PvE mode?",
-          "faq_2_a": "Yes. It supports both PvP and PvE. Match your TarkovTracker game mode setting to the mode you are playing.",
-          "faq_3_q": "Do I need TarkovMonitor to use TarkovTracker?",
-          "faq_3_a": "No. TarkovTracker works fully with manual input. TarkovMonitor only automates supported progress updates."
+          "overview": "TarkovMonitor 是 The Hideout 团队推出的一款桌面应用，可监控《逃离塔科夫》的日志文件，并能在 TarkovTracker 中自动标记已完成的任务。它还提供音频通知、本地统计以及可选的 Tarkov.dev 网站集成。",
+          "compatibility": "游玩时请保持 TarkovMonitor 运行，以便监控新的游戏日志条目。它不会读取游戏内存。",
+          "step_1_title": "下载 TarkovMonitor",
+          "step_1_desc": "从官方 GitHub Releases 页面下载最新的 Windows 发布版 ZIP。",
+          "step_2_title": "解压并启动",
+          "step_2_desc": "将压缩包解压到一个长期使用的文件夹，然后运行 TarkovMonitor.exe。不要直接在 ZIP 文件内运行。",
+          "step_3_title": "连接您的 TarkovTracker 账户",
+          "step_3_desc": "在 TarkovMonitor 设置中打开 TarkovTracker 集成部分。在 TarkovTracker 设置中创建读写 API 令牌，然后将其粘贴到 TarkovMonitor。",
+          "step_4_title": "保持 TarkovMonitor 打开并开始游戏",
+          "step_4_desc": "照常游玩，同时保持 TarkovMonitor 打开。当游戏在日志中写入受支持的任务完成事件时，TarkovMonitor 可在 TarkovTracker 中将该任务标记为完成。",
+          "troubleshooting_1_title": "进度未同步",
+          "troubleshooting_1_desc": "确认 API 令牌具有读写权限、尚未过期，并且 TarkovMonitor 运行的是最新版本。",
+          "troubleshooting_2_title": "缺少较早的进度",
+          "troubleshooting_2_desc": "在 Initial Setup 中选择 Read Past Logs，然后选择正确的赛季和档案分界点。",
+          "troubleshooting_3_title": "游戏模式有误",
+          "troubleshooting_3_desc": "将 TarkovTracker 的游戏模式设置与您当前游玩的 PvP 或 PvE 模式保持一致。",
+          "tip_1": "在 TarkovTracker 设置中生成读写 API 令牌。只读令牌无法更新进度。",
+          "tip_2": "常规监控仅会处理 TarkovMonitor 运行期间写入的新日志。",
+          "faq_1_q": "TarkovMonitor 使用安全吗？",
+          "faq_1_a": "TarkovMonitor 会监控《逃离塔科夫》在本地写入的日志文件。它不会读取游戏内存，而且对局进行期间日志不会更新。任何第三方工具都可能存在一定风险，请自行酌情使用。",
+          "faq_2_q": "TarkovMonitor 支持 PvE 模式吗？",
+          "faq_2_a": "支持。它同时支持 PvP 和 PvE。请将 TarkovTracker 的游戏模式设置与您当前游玩的模式保持一致。",
+          "faq_3_q": "使用 TarkovTracker 需要 TarkovMonitor 吗？",
+          "faq_3_a": "不需要。TarkovTracker 可通过手动输入完整使用。TarkovMonitor 仅用于自动更新受支持的进度。"
         },
         "ratscanner": {
-          "overview": "RatScanner is an open-source desktop tool that identifies Escape from Tarkov items from screenshots and displays item data in an overlay. It operates externally and does not access game memory.",
-          "compatibility": "Use borderless or windowed mode. Exclusive fullscreen may prevent the overlay from appearing.",
-          "step_1_title": "Download the latest ZIP",
-          "step_1_desc": "Download RatScanner.zip from the official GitHub Releases page. The project website may lag behind the latest release.",
-          "step_2_title": "Extract and launch",
-          "step_2_desc": "Extract the ZIP to a permanent folder, then run RatScanner.exe. Do not launch it directly from inside the archive.",
-          "step_3_title": "Configure the overlay",
-          "step_3_desc": "Choose which item details appear in the overlay, set opacity, and confirm your scan hotkeys.",
-          "step_4_title": "Scan an item",
-          "step_4_desc": "Name scanning: open an item inspection window and click the magnifier. Icon scanning: hold the configured modifier key and left-click an item. RatScanner screenshots the item and displays its data.",
-          "troubleshooting_1_title": "RatScanner does not start",
-          "troubleshooting_1_desc": "Extract the full release folder first, then run the executable from that folder. If Windows or antivirus blocks it, confirm the file came from the official repository.",
-          "troubleshooting_2_title": "No item is detected",
-          "troubleshooting_2_desc": "Make sure the item inspection UI is fully visible, then try name scanning from the magnifier or icon scanning with the configured modifier.",
-          "troubleshooting_3_title": "Overlay does not appear",
-          "troubleshooting_3_desc": "Switch Tarkov to borderless or windowed mode. Exclusive fullscreen often hides overlays.",
-          "troubleshooting_4_title": "Prices look outdated",
-          "troubleshooting_4_desc": "RatScanner pulls market data from a third-party source, so values can lag behind live flea-market changes.",
-          "tip_1": "Use settings to choose which item details appear and adjust overlay opacity.",
-          "tip_2": "Displayed market values may lag behind live game or market changes.",
-          "faq_1_q": "Will RatScanner get me banned?",
-          "faq_1_a": "RatScanner reads item tooltips using screen capture and does not modify the game client or interact with game servers. Battlestate Games' stance on third-party tools can change, so use at your own risk.",
-          "faq_2_q": "Does RatScanner work with the flea market?",
-          "faq_2_a": "Yes. It shows current flea-market prices and can help compare flea versus trader value.",
-          "faq_3_q": "Can RatScanner show items needed for TarkovTracker?",
-          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page.",
+          "overview": "RatScanner 是一款开源桌面工具，可通过截图识别《逃离塔科夫》中的物品，并在叠加层中显示物品数据。它在游戏外部运行，不会访问游戏内存。",
+          "compatibility": "请使用无边框或窗口模式。独占全屏可能会导致叠加层无法显示。",
+          "step_1_title": "下载最新 ZIP",
+          "step_1_desc": "从官方 GitHub Releases 页面下载 RatScanner.zip。项目网站可能会落后于最新版本。",
+          "step_2_title": "解压并启动",
+          "step_2_desc": "将 ZIP 解压到一个长期使用的文件夹，然后运行 RatScanner.exe。不要直接从压缩包内启动。",
+          "step_3_title": "配置叠加层",
+          "step_3_desc": "选择叠加层中显示的物品详情，设置不透明度，并确认扫描快捷键。",
+          "step_4_title": "扫描物品",
+          "step_4_desc": "名称扫描：打开物品检视窗口并点击放大镜。图标扫描：按住配置的修饰键并左键单击物品。RatScanner 会截取物品画面并显示其数据。",
+          "troubleshooting_1_title": "RatScanner 无法启动",
+          "troubleshooting_1_desc": "请先解压完整的发布文件夹，然后从该文件夹运行可执行文件。如果被 Windows 或杀毒软件拦截，请确认文件来自官方仓库。",
+          "troubleshooting_2_title": "未检测到物品",
+          "troubleshooting_2_desc": "确保物品检视界面完整可见，然后尝试使用放大镜进行名称扫描，或按住配置的修饰键进行图标扫描。",
+          "troubleshooting_3_title": "叠加层未显示",
+          "troubleshooting_3_desc": "将 Tarkov 切换到无边框或窗口模式。独占全屏通常会隐藏叠加层。",
+          "troubleshooting_4_title": "价格似乎已过期",
+          "troubleshooting_4_desc": "RatScanner 从第三方来源获取市场数据，因此数值可能落后于跳蚤市场的实时变化。",
+          "tip_1": "在设置中选择要显示的物品详情，并调整叠加层不透明度。",
+          "tip_2": "显示的市场价格可能落后于游戏或市场的实时变化。",
+          "faq_1_q": "使用 RatScanner 会被封号吗？",
+          "faq_1_a": "RatScanner 通过屏幕捕获读取物品提示，不会修改游戏客户端，也不会与游戏服务器交互。Battlestate Games 对第三方工具的立场可能会改变，请自行承担使用风险。",
+          "faq_2_q": "RatScanner 支持跳蚤市场吗？",
+          "faq_2_a": "支持。它会显示当前跳蚤市场价格，并可帮助比较跳蚤市场与商人回收价值。",
+          "faq_3_q": "RatScanner 能显示 TarkovTracker 所需的物品吗？",
+          "faq_3_a": "它可以根据自身数据提供商显示常规物品信息。如需根据您的个人 TarkovTracker 进度查看需求，请使用“所需物品”页面。",
           "faq_4_q": "RatScanner是否与TarkovTracker.org合作？",
           "faq_4_a": "是的。安装RatScanner，在设置中打开TarkovTracker部分，并在进入您的tarkovTracker跟踪器之前切换TarkovTracker后端从.io到.org。 rg API 令牌。TarkovTracker.org团队现在帮助维护RatScanner，所以.org集成和默认将在未来版本中不断改进。"
         },
         "cultistcircle": {
-          "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
-          "step_1_title": "Visit the website",
-          "step_1_desc": "Go to cultistcircle.com to access the calculator. No account or download is required — it works entirely in your browser.",
-          "step_2_title": "Search for recipes",
-          "step_2_desc": "Use the search or browse functionality to find recipes by input item or output result. The calculator shows the trade ratios and possible outcomes for each combination.",
-          "tip_1": "Check the calculator before sacrificing rare items — some trades have much better value ratios than others.",
-          "tip_2": "Recipe data may lag behind game patches. If a recipe seems missing or incorrect, check back after the site has been updated.",
-          "faq_1_q": "Is CultistCircle free to use?",
-          "faq_1_a": "Yes, CultistCircle is completely free and runs in your browser with no account required.",
-          "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
-          "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
+          "overview": "CultistCircle 是一款免费、由社区构建的计算工具，用于计算《逃离塔科夫》中的 Cultist Circle 功能。您可以查询配方——可以献祭哪些物品以及能获得什么回报——无需在游戏内反复尝试。它由一名社区独立开发者制作，是高效规划圈子交易实用的参考工具。",
+          "step_1_title": "访问网站",
+          "step_1_desc": "前往 cultistcircle.com 即可使用计算器。无需账户或下载——它完全在浏览器中运行。",
+          "step_2_title": "搜索配方",
+          "step_2_desc": "使用搜索或浏览功能，按输入物品或输出结果查找配方。计算器会显示每种组合的交易比例和可能结果。",
+          "tip_1": "在献祭稀有物品前先查看计算器——有些交易的价值比要高得多。",
+          "tip_2": "配方数据可能落后于游戏补丁。如果配方似乎缺失或不正确，请在网站更新后再查看。",
+          "faq_1_q": "CultistCircle 可以免费使用吗？",
+          "faq_1_a": "可以，CultistCircle 完全免费，直接在浏览器中运行，无需账户。",
+          "faq_2_q": "CultistCircle 与 TarkovTracker 有隶属关系吗？",
+          "faq_2_a": "没有。CultistCircle 是由一名社区独立开发者创建的独立项目。此处将其列为实用的社区资源。"
         }
       },
       "video": {
-        "walkthrough_title": "{name} video walkthrough",
+        "walkthrough_title": "{name} 视频攻略",
         "caption": "社区视频遍历。步骤可能与书面指南略有不同。",
-        "play": "Play video: {title}"
+        "play": "播放视频：{title}"
       },
       "official_guide_label": "TarkovTracker.org指南"
+    },
+    "account_retention": {
+      "scope": "这些规则适用于在TarkovTracker运行时不活动的例行账户删除。 它们确定一个账户何时可能有资格清理，而不是计划删除日期。",
+      "standard": "无限期支持：在连续6个月后可删除一个帐户，但无需记录帐户活动。",
+      "previous_supporter": "先前的支助者：根据该账户入账的合格捐助，包括一次性捐助或先前的订阅， 在其上一次记录的账户活动及其最近记录的捐款较晚一年之后，可能有资格被删除。",
+      "active_subscriber": "主动的合格订阅：账户可以免于例行的不活动删除，同时其支持者仍然是活跃的，即使账户没有被使用。",
+      "subscription_end": "取消续订并不终止这种豁免，而有偿订阅仍在继续。 在订阅访问结束后，包括我们给予的任何账单宽限期， 一个帐户有资格在其上一次记录的活动晚于其最近的订阅访问期结束后一年内被取消活动。",
+      "activity": "我们使用登录、认证站点或API使用的现有记录以及保存的帐户数据更改来评估不活动。 在没有登录的情况下查看公开的个人资料不算作该帐户的活动。",
+      "exceptions": "全额退还的缴款不符合留存支持者的资格；其他有效缴款也许仍然符合资格。 收费立即取消所有支持者福利和支持者保留历史，包括先前缴款带来的福利。 带有收费的帐户遵循标准的6个月不活动规则。这些保护仅适用于例行的不活动清理。 它们不阻止删除您的请求、滥用或安全原因的行动、法律要求的删除或终止服务时的删除。",
+      "no_guarantee": "支持TarkovTracker并不购买永久性存储、备份服务，也不购买有保障的可用性或回收。 数据可能因故障、安全事件或第三方停职而丢失，该处可能被停职或关闭。 保留政策不能保证任何特定时期的数据仍然可以获得。",
+      "backup": "从设置导出进度并保留自己的备份。 导出和恢复可能在数据丢失或删除后不可用。",
+      "rights": "这项政策中没有任何规定排除或限制不能合法排除或限制的权利或补救办法。",
+      "notice": "在可行的情况下，我们将作出合理的努力，在例行不采取行动之前通知受影响的用户。 将根据服务条款和适用法律通报这项政策的重大变化。",
+      "terms_summary": "例行的不活动清理遵循第7.3节中的账户留存规则，包括对活跃用户的豁免和对以前支持者的一年窗口。",
+      "perk_summary": "第7.3节中的账户留存规则规定的例行不活动的保护措施，包括一次性缴款者和以前的订阅者",
+      "liability": "对数据丢失或与隐私有关的事故的赔偿责任的任何排除或限制只在适用法律允许的范围内适用。 这项政策中没有任何规定排除或限制不能合法排除或限制的权利或补救办法。",
+      "liability_label": "法律允许的限制："
     }
   },
   "footer": {
@@ -1804,45 +1772,38 @@
     "analytics_preferences": "分析偏好",
     "game_attribution": "Escape from Tarkov 及相关游戏内容和素材是 Battlestate Games Limited 及其授权方的商标和版权作品。保留所有权利。TarkovTracker 是非官方粉丝项目，与 Battlestate Games 无关联且未获其认可。",
     "tagline": "跟踪您从Tarkov的追求、隐藏升级和物品需求在一个地方。",
-    "version_release_link": "View the release notes for version {version} on GitHub",
-    "build_commit_link": "View build commit {commit} on GitHub",
+    "version_release_link": "在 GitHub 上查看版本 {version} 的发行说明",
+    "build_commit_link": "在 GitHub 上查看构建提交 {commit}",
     "sections": {
       "explore": "浏览",
       "project": "项目",
       "legal": "法律"
+    },
+    "links": {
+      "org_vs_io": "对比 .org 与 .io"
     }
   },
   "navigation_drawer": {
     "main_navigation": "主导航",
-    "close_menu": "Close menu",
+    "close_menu": "关闭菜单",
     "toggle": "切换菜单",
     "brand_name": "TarkovTracker.org",
     "login": "登录",
     "logout": "退出登录",
-    "ratscanner": "老鼠扫描仪",
-    "tarkovguru": "Tarkov 大师",
-    "tarkovmonitor": "Tarkov 监视器",
-    "resources": "Resources",
-    "section_more": "更多",
+    "resources": "资源",
     "profile": "个人资料",
     "section_navigation": "导航",
-    "section_external": "外部链接",
     "account_menu": "账户菜单",
-    "edition_label": "游戏版本",
     "mode_auto": "自动",
-    "auto_level_enabled": "Automatic level calculation is enabled",
+    "auto_level_enabled": "已启用自动等级计算",
     "level_display_auto": "等级 {level}（已启用自动计算）",
     "level_display_editable": "等级 {level}，点击或按回车编辑",
     "increment_level": "提升等级",
     "decrement_level": "降低等级",
-    "xp_progress": "XP progress",
-    "xp_settings_link": "View XP and level settings"
+    "xp_progress": "经验值进度",
+    "xp_settings_link": "查看经验值和等级设置"
   },
   "profile": {
-    "title_with_mode": "{name} 个人资料 {mode}",
-    "mode_pvp": "PVP",
-    "mode_pve": "PVE",
-    "mode_seasonal_pvp": "赛季PVP",
     "season_short": "S{season}"
   },
   "streamer_tools": {
@@ -1850,7 +1811,6 @@
     "manage_sharing": "管理共享",
     "login_required": "登录以生成个性化的主播叠加层链接。",
     "mode_private": "此游戏模式为私密。需启用公开共享才能使浏览器源链接正常工作。",
-    "visibility_load_failed": "无法加载共享设置。",
     "open_account_settings": "打开账户设置",
     "content_title": "内容",
     "mode_label": "游戏模式",
@@ -1935,7 +1895,7 @@
     "align_bottom_center": "下方居中",
     "align_bottom_right": "右下",
     "copy_success": "叠加层 URL 已复制",
-    "copy_failed": "Failed to copy overlay URL",
+    "copy_failed": "复制叠加层 URL 失败",
     "settings_reset": "主播设置已重置",
     "resolution_label": "分辨率",
     "resolution_1080": "1080p",
@@ -1971,50 +1931,13 @@
       "account": "账户",
       "tools_integrations": "工具和集成"
     },
-    "tab_seo": {
-      "progression": {
-        "title": "进度设置",
-        "description": "管理 TarkovTracker 进度、显示名称、经验和技能。"
-      },
-      "prestige": {
-        "title": "声望设置",
-        "description": "查看并管理 TarkovTracker 声望追踪。"
-      },
-      "preferences": {
-        "title": "偏好",
-        "description": "自定义 TarkovTracker 的显示、隐私、任务和地图偏好。"
-      },
-      "account": {
-        "title": "账户",
-        "description": "管理 TarkovTracker 账户选项、分享可见性和数据控制。"
-      },
-      "imports": {
-        "title": "导入设置",
-        "description": "从 Tarkov.dev 个人资料和 EFT 游戏日志导入 TarkovTracker 进度。"
-      },
-      "backup_restore": {
-        "title": "备份和恢复",
-        "description": "导出或恢复 TarkovTracker 进度数据和支持快照。"
-      },
-      "api": {
-        "title": "API 设置",
-        "description": "管理 TarkovTracker API 令牌和账户集成。"
-      },
-      "streamer_tools": {
-        "title": "直播工具",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
-      }
-    },
-    "density": {
-      "comfortable": "舒适"
-    },
     "account": {
       "begin_deletion": "开始删除账户"
     },
     "debug_state": {
-      "title": "Debug State",
-      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
-      "copy_button": "Copy Debug State"
+      "title": "调试状态",
+      "description": "捕获当前追踪器状态的 JSON 快照，用于提交错误报告。包含游戏模式、等级、任务完成状态和前置任务链。",
+      "copy_button": "复制调试状态"
     },
     "general": {
       "title": "常规首选项",
@@ -2022,7 +1945,6 @@
       "privacy_mode_hint": "在你直播时隐藏敏感信息。"
     },
     "appearance": {
-      "title": "外观",
       "theme": "主题",
       "theme_hint": "在暗色界面和亮色界面之间选择。您的选择在此设备上被记住。",
       "theme_dark": "深色",
@@ -2037,7 +1959,7 @@
         "show_prev": "显示前置任务",
         "collapse_by_default": "默认情况下收起任务",
         "hide_rewards": "隐藏奖励",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "require_trader_levels": "显示任务时要求满足商人忠诚等级和声望条件",
         "flags_section": "任务显示",
         "availability_section": "任务可用性",
         "view_defaults_section": "默认视图"
@@ -2059,9 +1981,8 @@
         }
       },
       "links": {
-        "title": "Wiki Links",
-        "antifandom": "Use antifandom.com",
-        "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
+        "antifandom": "使用 antifandom.com",
+        "antifandom_hint": "通过由社区运营、广告较少的 Fandom 镜像站 antifandom.com 打开 Wiki 链接，而不是 fandom.com。"
       }
     },
     "game_profile": {
@@ -2072,15 +1993,15 @@
       "description": "控制哪些游戏模式的个人资料可以通过分享链接查看。",
       "public": "公开",
       "private": "私密",
-      "toggle_label": "Toggle {mode} profile sharing",
-      "copy_link": "Copy {mode} profile link",
+      "toggle_label": "切换 {mode} 资料分享",
+      "copy_link": "复制 {mode} 资料链接",
       "load_failed": "无法加载共享设置。",
       "save_failed": "无法更新共享设置。",
       "login_required": "登录以管理个人资料分享的可见性。"
     },
     "game_settings": {
       "switch_mode_failed": "切换游戏模式失败，请重试",
-      "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
+      "switch_mode_fetch_failed": "游戏模式已切换，但未能刷新数据，请重试"
     },
     "data_management": {
       "reset_pvp_confirmation": "确定要重置你的 PvP 进度吗？",
@@ -2091,7 +2012,7 @@
       "reset_seasonal_warning": "这将永久删除当前赛季的赛季PvP进度。您的非赛季PvP和PvE数据不会受到影响。",
       "reset_all_confirmation": "确定要重置你的全部进度吗？",
       "reset_all_warning": "这将永久删除PvP，PvE和赛季PvP模式的全部进度。此操作无法撤销！",
-      "prestige_mode_warning": "Your current {mode} run will be archived, then its progression will reset for the next prestige level. Other modes are not affected.",
+      "prestige_mode_warning": "您当前的 {mode} 进程将被归档，随后其进度会重置，以便进入下一声望等级。其他模式不受影响。",
       "reset_confirm": "重置数据",
       "export_description": "下载PvP，PvE和赛季PvP模式的进度备份。",
       "export_button": "导出进度备份",
@@ -2124,7 +2045,6 @@
       "import_target_pvp": "仅 PvP",
       "import_target_pve": "仅 PvE",
       "import_target_all": "所有可用",
-      "seasonal_import_locked": "Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.",
       "import_success_title": "备份已导入",
       "import_success_description": "您的进度数据已成功恢复。",
       "import_error_title": "备份导入失败",
@@ -2230,25 +2150,23 @@
       "session_changed": "您的登录帐户已更改。本次会议将不再采取进一步行动。"
     },
     "discord_link": {
-      "title": "Discord Account",
-      "description": "Link your Discord account to receive the Linked role and keep supporter perks synchronized.",
-      "link_account": "Link Discord account",
-      "login_to_link": "Log in to link Discord",
-      "linked_as": "Linked as {username}",
-      "sync_roles": "Sync Discord roles",
-      "error_title": "Discord link unavailable",
-      "not_in_guild_title": "Join the Discord server",
-      "not_in_guild": "Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.",
-      "load_error": "We could not load your Discord account link.",
-      "link_error": "We could not start Discord account linking. Please try again.",
-      "unlink_account": "Unlink Discord account",
-      "unlink_requires_login": "Add another login method before unlinking your only sign-in identity.",
-      "unlink_error": "We could not unlink your Discord account. Your link remains active.",
-      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
+      "title": "Discord 账户",
+      "description": "关联 Discord 账户，以获得 Linked 身份并同步支持者权益。",
+      "link_account": "关联 Discord 账户",
+      "login_to_link": "登录以关联 Discord",
+      "linked_as": "已关联为 {username}",
+      "sync_roles": "同步 Discord 身份",
+      "error_title": "无法关联 Discord 账户",
+      "not_in_guild_title": "加入 Discord 服务器",
+      "not_in_guild": "您的账户已关联，但必须加入 TarkovTracker Discord 服务器后才能同步身份。",
+      "load_error": "无法加载您的 Discord 账户关联。",
+      "link_error": "无法开始关联 Discord 账户。请重试。",
+      "unlink_account": "取消关联 Discord 账户",
+      "unlink_requires_login": "取消关联唯一的登录身份前，请先添加其他登录方式。",
+      "unlink_error": "无法取消关联您的 Discord 账户。关联仍然有效。",
+      "sync_error": "您的账户已关联，但无法同步 Discord 身份。请稍后重试。"
     },
     "prestige": {
-      "pvp_only_title": "声望仅适用于 PvP",
-      "pvp_only": "请切换到 PvP 模式后再进行 PvP 声望。",
       "persistent_mode_unsupported_title": "当前无法声望",
       "persistent_mode_unsupported": "Prestige在持久性PvE模式下不可用。",
       "seasonal_mode_unsupported": "转生在赛季PvP中不可用。",
@@ -2264,10 +2182,10 @@
       "requirements_description": "追踪器正在检查你下一次真正的声望：声望 {level}。",
       "requirements_empty": "该声望等级没有额外的追踪器要求。",
       "archive_title": "归档本轮并开始下一声望",
-      "archive_description_mode": "Use this only when you are actually prestiging now. Your current {mode} run will be archived and its progression will reset for the next prestige level.",
+      "archive_description_mode": "仅当您现在确实要重置声望时才使用此操作。您当前的 {mode} 进程将被归档，其进度会重置，以便进入下一声望等级。",
       "archive_cta": "归档本轮并开始声望 {level}",
       "archive_cta_disabled": "当前无法声望",
-      "archive_dialog_title_mode": "Archive Current {mode} Run",
+      "archive_dialog_title_mode": "归档当前 {mode} 进程",
       "archive_sync_hint": "如果你只需要让追踪器匹配游戏内已有的声望，请改用上方的“设置当前声望”。",
       "archive_soft_gate_unmet": "仍有 {count} 项已跟踪要求看起来尚未完成。如果只是追踪器缺少上下文，你仍可继续。",
       "archive_soft_gate_manual": "仍有 {count} 项要求需要在游戏内手动确认。",
@@ -2336,23 +2254,23 @@
       },
       "quest_tooltip": "通过完成任务奖励自动授予技能等级。",
       "offset_tooltip": "在任务奖励级别顶部手动调整。正面意味着你培训了任务奖励以上的技能。",
-      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
+      "collapsed_hint": "正在显示 {total} 项技能中的 {shown} 项。显示全部以查看每项技能。"
     },
     "keybinds": {
-      "title": "Keyboard Shortcuts",
-      "omnibar_label": "Global Search (Omnibar)",
-      "omnibar_description": "Press this shortcut to open the global search palette.",
-      "undo_label": "Undo Last Action",
-      "undo_description": "Press this shortcut to revert your most recent progress change.",
-      "record_placeholder": "Click to record...",
-      "recording": "Press key combination...",
+      "title": "键盘快捷键",
+      "omnibar_label": "全局搜索（万能搜索栏）",
+      "omnibar_description": "按此快捷键打开全局搜索面板。",
+      "undo_label": "撤销上一次操作",
+      "undo_description": "按此快捷键可撤销最近的进度更改。",
+      "record_placeholder": "点击以录制...",
+      "recording": "请按快捷键组合...",
       "listening": "正在监听...",
-      "reset_aria": "Reset to default",
-      "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
-      "conflict_undo": "Shortcut conflicts with Search keybind.",
-      "conflict_rejected": "Already used by {action}. Press a different combination.",
-      "warn_system_omnibar": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+T, Ctrl+W, Alt+Tab).",
-      "warn_system_undo": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+W, Ctrl+T, Alt+Tab)."
+      "reset_aria": "重置为默认值",
+      "conflict_omnibar": "快捷键与撤销快捷键冲突。",
+      "conflict_undo": "快捷键与搜索快捷键冲突。",
+      "conflict_rejected": "已由“{action}”使用。请选择其他组合键。",
+      "warn_system_omnibar": "警告：可能与浏览器/操作系统快捷键冲突（例如 Ctrl+T、Ctrl+W、Alt+Tab）。",
+      "warn_system_undo": "警告：可能与浏览器/操作系统快捷键冲突（例如 Ctrl+W、Ctrl+T、Alt+Tab）。"
     },
     "experience": {
       "title": "经验与等级",
@@ -2365,10 +2283,10 @@
       "xp_to_next": "距下一级还需 {amount}",
       "reset_offset": "重置经验偏移量",
       "xp_progress_aria": "向下一级发展经验",
-      "xp_progress_value": "{percent}% toward the next level"
+      "xp_progress_value": "距离下一级还需 {percent}%"
     },
     "danger_zone": {
-      "confirm_instruction": "Type {word} to confirm resetting all data:",
+      "confirm_instruction": "请输入 {word} 以确认重置所有数据：",
       "confirm_word": "删除账户"
     },
     "log_import": {
@@ -2414,9 +2332,6 @@
       "import_unknown_to_mode": "将未知模式事件导入到",
       "import_unknown_to_mode_hint": "已知 PvP/PvE 事件会自动路由。此项仅适用于未解析事件。",
       "auto_mode_hint": "已从后端日志检测到模式路由，并将自动应用。",
-      "mode_summary_pvp": "PvP（自动）",
-      "mode_summary_pve": "PvE（自动）",
-      "mode_summary_both": "PvP + PvE（自动）",
       "success_title": "EFT 日志已导入",
       "success_description": "已根据游戏日志将 {complete_count} 个任务标记为已完成，并将 {active_count} 个任务标记为进行中。",
       "error_title": "EFT 日志导入失败",
@@ -2424,7 +2339,8 @@
       "cleared_logs_toast_description": "日志导入只能读取 Logs 文件夹里仍保留的任务历史。已删除的会话无法恢复。",
       "errors": {
         "invalid_archive": "ZIP存档不完整或包含无效的日志条目。未导入进度。",
-        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
+        "budget_exceeded": "选中的日志超出安全导入预算。选择较少最近的会话或仅提取相关的日志文件。没有导入任何进展。",
+        "record_too_large": "{path} 中的单条日志记录过大，无法安全解析。未导入任何进度。请报告此日志格式。",
         "apply_import_failed": "无法应用导入的任务完成数据。",
         "no_files_selected": "未选择任何文件。",
         "no_matching_tasks_found": "已找到任务事件，但与当前 TarkovTracker 任务均不匹配。",
@@ -2435,15 +2351,15 @@
         "invalid_mode": "选择一个有效的目标游戏模式。",
         "outside_active_season": "这些日志包含活动季节以外或没有可用日期的事件。从活动季节选择会话，然后导入季节性PvP。"
       },
-      "failed_tasks": "Matched failed tasks: {count}",
+      "failed_tasks": "匹配到失败任务：{count}",
       "unknown_failed_events": "任务失败(未知模式)",
       "skipped_malformed": {
-        "single": "Skipped {count} malformed notification.",
-        "plural": "Skipped {count} malformed notifications."
+        "single": "已跳过 {count} 条格式错误的通知。",
+        "plural": "已跳过 {count} 条格式错误的通知。"
       },
       "skipped_seasonal": {
-        "single": "Skipped {count} Seasonal event outside the active season or without a valid date.",
-        "plural": "Skipped {count} Seasonal events outside the active season or without valid dates."
+        "single": "已跳过 {count} 个不在活跃赛季内或没有有效日期的赛季活动。",
+        "plural": "已跳过 {count} 个不在活跃赛季内或没有有效日期的赛季活动。"
       }
     },
     "tarkov_dev_import": {
@@ -2459,8 +2375,8 @@
       "skills_count": "检测到 {count} 个技能",
       "last_refreshed": "Tarkov.dev 数据已更新",
       "last_refreshed_unknown": "未知",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
-      "cooldown_hint": "Imported recently. You can re-import this profile in about {minutes} min.",
+      "data_age_warning": "此 Tarkov.dev 快照已有 {days} 天。如果期间进行过游戏，请在 Tarkov.dev 上打开您的资料以刷新数据，然后重新获取后再导入。",
+      "cooldown_hint": "最近已导入。约 {minutes} 分钟后可重新导入此资料。",
       "turnstile_hint": "完成下面的人类验证以获取您的个人资料。",
       "skills_details_toggle": "查看技能数值",
       "skills_details_skill": "技能",
@@ -2478,19 +2394,21 @@
       "unlink_profile": "取消关联",
       "errors": {
         "unexpected_profile_flow": "获取 Tarkov.dev 资料时出错。请重试。",
-        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
-        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
+        "cooldown_active": "您最近导入过此资料。约 {minutes} 分钟后可重新导入。",
+        "profile_stale": "Tarkov.dev 上次刷新此资料是在 {days} 天前，数据已过旧，无法导入。请在 Tarkov.dev 上打开资料页面，等待加载完成后重新获取。",
         "profile_not_generated": "Tarkov.dev尚无此个人资料的快照。打开Tarkov.dev上的个人资料页面一次，让它加载，然后再次获取。",
-        "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
+        "rate_limited": "导入尝试次数过多。请等待约 {minutes} 分钟后重试。",
         "verification_failed": "人类验证失败。重新加载页面然后重试。",
-        "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。"
+        "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。",
+        "tarkov_uid_conflict": "这个Tarkov个人资料已经链接到另一个TarkovTracker帐户，因此它在这里没有链接。 导入的进度已保存。从另一个帐户取消链接，然后再次导入。",
+        "save_failed": "配置文件已经导入到此设备上，但它还不能保存到您的帐户。 检查您的连接；此设备上的导入一直保持到它同步。"
       }
     },
     "device_data": {
       "title": "此设备上的数据",
       "description": "登出将此帐户保存到此浏览器中的进度 所以尚未达到云端的更改可以在您重新登录时同步。 因重置或季节性滚动而移除的进度将单独保存以供出口。 移除此设备的数据会删除此账户的进度、恢复副本和首选项，并从此浏览器中标记您。",
       "cloud_unaffected": "您的云进度没有被删除。其他账户在此设备上的数据不受影响。",
-      "superseded_available": "{count} progress change(s) from a reset or Seasonal rollover are retained here for export only. They will not be restored or synced automatically.",
+      "superseded_available": "因重置或赛季更替而发生的 {count} 项进度更改仅保留在此处以供导出，不会自动恢复或同步。",
       "superseded_export": "导出替代进度",
       "superseded_export_error": "无法导出被取代的进度",
       "remove_button": "从此设备中删除此帐户的数据",
@@ -2553,9 +2471,9 @@
       "decrease_hideout_count": "减少 {station_name} 的藏身处数量",
       "increase_hideout_count": "增加 {station_name} 的藏身处数量"
     },
-    "any_of_items": "Any one of these {count} items counts",
-    "any_of_items_short": "Any {count}",
-    "view_accepted_items": "View all {count} accepted items",
+    "any_of_items": "以下 {count} 个物品中的任意一个都符合条件",
+    "any_of_items_short": "任意 {count} 个",
+    "view_accepted_items": "查看全部 {count} 个符合条件的物品",
     "not_collected": "未收集",
     "click_to_collect": "点击收藏",
     "click_to_uncollect": "点击取消收集",
@@ -2572,24 +2490,22 @@
     "elite_level": "精英级别"
   },
   "game_settings": {
-    "toggle_game_mode_label": "Toggle game mode",
     "select_game_mode_label": "选择游戏模式",
-    "select_faction_label": "Select faction",
+    "select_faction_label": "选择阵营",
     "season_ends_in": "第{season}赛季剩余{days}天{hours}小时{minutes}分钟",
-    "season_ended": "Season {season} has ended"
+    "season_ended": "第 {season} 赛季已结束"
   },
   "oauth": {
     "consent": {
-      "meta_title": "OAuth Consent - TarkovTracker",
-      "authorize": "Authorize Application",
-      "loading": "Loading...",
+      "authorize": "授权应用",
+      "loading": "正在加载...",
       "error": "{error}",
-      "unknown": "Unknown Application",
-      "requesting_access": "is requesting access to your TarkovTracker account.",
-      "requested_permissions": "Requested Permissions:",
-      "redirect_to": "Will redirect to:",
-      "approve": "Approve",
-      "deny": "Deny"
+      "unknown": "未知应用",
+      "requesting_access": "正在请求访问您的 TarkovTracker 账户。",
+      "requested_permissions": "请求的权限：",
+      "redirect_to": "将重定向至：",
+      "approve": "批准",
+      "deny": "拒绝"
     }
   },
   "tarkov_access": {
@@ -2629,5 +2545,132 @@
     "no_prestige": "无声望",
     "prestige_n": "声望 {n}"
   },
-  "generic": {}
+  "generic": {},
+  "seo": {
+    "site_name": "TarkovTracker",
+    "application_description": "追踪 PvP、PvE 和赛季模式下的逃离塔科夫任务、基地升级、Kappa 要求、剧情任务和所需物品。",
+    "routes": {
+      "home": {
+        "title": "逃离塔科夫进度追踪器 · TarkovTracker.org",
+        "description": "追踪 PvP、PvE 和赛季模式下的逃离塔科夫任务、基地升级、Kappa 要求、剧情任务和所需物品。",
+        "heading": "逃离塔科夫进度追踪器"
+      },
+      "tasks": {
+        "title": "塔科夫任务追踪器 · TarkovTracker.org",
+        "description": "追踪 PvP、PvE 和赛季模式下的塔科夫任务、目标、奖励和前置条件。"
+      },
+      "hideout": {
+        "title": "塔科夫基地追踪器 · TarkovTracker.org",
+        "description": "规划基地升级并追踪模块要求和建造进度。"
+      },
+      "needed_items": {
+        "title": "塔科夫所需物品追踪器 · TarkovTracker.org",
+        "description": "集中查看完成任务和升级藏身处仍需的物品。"
+      },
+      "kappa": {
+        "title": "Kappa 与 Lightkeeper 任务追踪器 · TarkovTracker.org",
+        "description": "追踪 Kappa 和 Lightkeeper 的任务要求与剩余进度。"
+      },
+      "storyline": {
+        "title": "塔科夫剧情追踪器 · TarkovTracker.org",
+        "description": "推进《逃离塔科夫》剧情任务并追踪进度。"
+      },
+      "resources": {
+        "title": "《逃离塔科夫》工具与指南",
+        "description": "查找适用于 TarkovTracker、TarkovMonitor、RatScanner 和 Tarkov.dev 的社区工具和指南。"
+      },
+      "about": {
+        "title": "关于 TarkovTracker",
+        "description": "了解用于追踪《逃离塔科夫》进度的 TarkovTracker 及其社区项目。"
+      },
+      "credits": {
+        "title": "TarkovTracker 致谢",
+        "description": "了解 TarkovTracker 背后的贡献者和社区项目。"
+      },
+      "changelog": {
+        "title": "TarkovTracker 更新日志",
+        "description": "查看 TarkovTracker 的最新版本更新、功能改进和问题修复。"
+      },
+      "supporter": {
+        "title": "支持 TarkovTracker.org",
+        "description": "为网站托管和开发提供资金支持。了解支持者档位和参与方式。"
+      },
+      "privacy": {
+        "title": "TarkovTracker 隐私政策",
+        "description": "了解 TarkovTracker 如何处理账户信息和进度数据。"
+      },
+      "terms_of_service": {
+        "title": "TarkovTracker 服务条款",
+        "description": "了解使用 TarkovTracker 时适用的条款。"
+      },
+      "tarkovtracker_org_vs_io": {
+        "title": "TarkovTracker.org 与 TarkovTracker.io 指南",
+        "description": "了解 TarkovTracker.org 与 TarkovTracker.io 的区别及如何上手。"
+      },
+      "tarkovmonitor": {
+        "title": "TarkovMonitor 配置指南",
+        "description": "安装 TarkovMonitor 并将其连接到 TarkovTracker，以同步突袭和任务进度。"
+      },
+      "ratscanner": {
+        "title": "RatScanner 配置指南",
+        "description": "安装 RatScanner，并将物品扫描功能与你的 TarkovTracker 进度关联。"
+      },
+      "tarkovdev": {
+        "title": "Tarkov.dev 数据指南",
+        "description": "了解 Tarkov.dev JSON 数据源如何支持《逃离塔科夫》相关工具和进度追踪。"
+      },
+      "cultistcircle": {
+        "title": "邪教徒圈计算器指南",
+        "description": "了解如何使用邪教徒圈计算器查看献祭配方和奖励。"
+      },
+      "settings": {
+        "title": "设置 · TarkovTracker.org",
+        "description": "管理 TarkovTracker 的偏好设置、导入、备份和集成。"
+      },
+      "progression": {
+        "title": "进度设置 · TarkovTracker.org",
+        "description": "管理 TarkovTracker 的等级、技能和进度设置。"
+      },
+      "prestige": {
+        "title": "声望设置 · TarkovTracker.org",
+        "description": "管理 TarkovTracker 的声望进度。"
+      },
+      "preferences": {
+        "title": "首选项 · TarkovTracker.org",
+        "description": "自定义 TarkovTracker 的语言、外观和追踪选项。"
+      },
+      "account": {
+        "title": "账户 · TarkovTracker.org",
+        "description": "管理你的 TarkovTracker 账户及已连接的服务。"
+      },
+      "team": {
+        "title": "队伍 · TarkovTracker.org",
+        "description": "管理你的 TarkovTracker 队伍和共享进度。"
+      },
+      "admin": {
+        "title": "管理 · TarkovTracker.org",
+        "description": "TarkovTracker 管理控件。"
+      },
+      "profile": {
+        "title": "玩家档案 · TarkovTracker.org",
+        "description": "查看 TarkovTracker 玩家档案和共享进度。"
+      },
+      "login": {
+        "title": "登录 · TarkovTracker.org",
+        "description": "登录 TarkovTracker，同步进度并与你的队伍协作。"
+      },
+      "auth_callback": {
+        "title": "登录回调 · TarkovTracker.org",
+        "description": "完成 TarkovTracker 登录。"
+      },
+      "oauth_consent": {
+        "title": "授权应用 · TarkovTracker.org",
+        "description": "查看某个应用请求访问你的 TarkovTracker 账户。"
+      },
+      "not_found": {
+        "title": "找不到页面",
+        "description": "找不到所请求的 TarkovTracker 页面。"
+      }
+    }
+  }
 }
