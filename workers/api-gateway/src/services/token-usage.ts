@@ -45,7 +45,7 @@ async function readBoundedBody(reader: ReadableStreamDefaultReader<Uint8Array>):
   return text + decoder.decode();
 }
 function classifyStatus(status: number): Outcome['outcome'] {
-  if (status === 401 || status === 403) return 'authorization';
+  if ([401, 403].includes(status)) return 'authorization';
   if (status === 429 || status >= 500) return 'transient';
   return 'http_error';
 }
