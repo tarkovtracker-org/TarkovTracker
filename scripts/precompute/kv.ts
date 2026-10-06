@@ -43,11 +43,17 @@ async function writeWithRetries(
   for (let attempt = 0; attempt < KV_WRITE_ATTEMPTS; attempt++) {
     const failure = await writeAttempt(url, key, value, apiToken);
     if (!failure) return;
-    if (!failure.retryable || attempt === KV_WRITE_ATTEMPTS - 1) throw failure.error;
+    if (isTerminalFailure(failure, attempt)) throw failure.error;
     await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
   }
 }
 type WriteFailure = { error: Error; retryable: boolean };
+function isTerminalFailure(failure: WriteFailure, attempt: number): boolean {
+  return !failure.retryable || attempt === KV_WRITE_ATTEMPTS - 1;
+}
+function isSuccessfulWrite(response: Response, body: CloudflareApiResponse | null): boolean {
+  return response.ok && body?.success === true;
+}
 async function writeAttempt(
   url: URL,
   key: string,
@@ -73,7 +79,7 @@ async function writeAttempt(
     };
   }
   const body = (await response.json().catch(() => null)) as CloudflareApiResponse | null;
-  if (response.ok && body?.success === true) return null;
+  if (isSuccessfulWrite(response, body)) return null;
   return {
     error: new Error(`KV write failed for "${key}": ${errorDetail(response, body)}`),
     retryable: isTransientFailure(response, body),
@@ -86,8 +92,8 @@ function hasUnavailableError(body: CloudflareApiResponse | null): boolean {
   return body?.errors?.some((error) => error.code === 7009) === true;
 }
 function errorDetail(response: Response, body: CloudflareApiResponse | null): string {
-  return (
-    body?.errors?.map((error) => `${error.code ?? '?'}: ${error.message ?? '?'}`).join('; ') ||
-    `HTTP ${response.status}`
-  );
+  return body?.errors?.map(formatApiError).join('; ') || `HTTP ${response.status}`;
+}
+function formatApiError(error: { code?: number; message?: string }): string {
+  return `${error.code ?? '?'}: ${error.message ?? '?'}`;
 }
