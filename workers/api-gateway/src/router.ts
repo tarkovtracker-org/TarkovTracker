@@ -1,3 +1,4 @@
+import { CatalogUnavailableError } from './services/catalog-error';
 import { extractBearerToken } from './auth';
 import { authenticateAndRateLimit } from './authentication';
 import {
@@ -36,6 +37,7 @@ function isConfiguredApiHost(hostname: string, configuredHost?: string): boolean
 type Action = 'progress-read' | 'progress-write' | 'token-info';
 type RouteContext = {
   apiPath: string;
+  rlHeaders?: Record<string, string>;
   ctx?: ExecutionContext;
   env: Env;
   inboundUserAgent: string;
@@ -108,12 +110,12 @@ function publicResponse(
   }
   return apiHostPublicResponse(path, origin, reqOrigin);
 }
-function authorize(
+async function authorize(
   context: RouteContext,
   permission: Permission,
   action: Action
 ): Promise<AuthResult> {
-  return authenticateAndRateLimit({
+  const result = await authenticateAndRateLimit({
     action,
     ctx: context.ctx,
     env: context.env,
@@ -124,6 +126,8 @@ function authorize(
     requestOrigin: context.reqOrigin,
     userAgent: context.inboundUserAgent,
   });
+  if (!(result instanceof Response)) context.rlHeaders = result.rlHeaders;
+  return result;
 }
 function isTaskState(value: unknown): value is TaskState {
   return typeof value === 'string' && TASK_STATES.has(value as TaskState);
@@ -403,18 +407,22 @@ export async function handleGatewayRequest(
   }
   const rawToken = extractBearerToken(request.headers.get('Authorization'));
   if (!rawToken) return errorResponse('Unauthorized', 401, origin, reqOrigin);
+  const context: RouteContext = {
+    apiPath,
+    ctx,
+    env,
+    inboundUserAgent,
+    origin,
+    rawToken,
+    reqOrigin,
+    request,
+  };
   try {
-    return await routeAuthenticated({
-      apiPath,
-      ctx,
-      env,
-      inboundUserAgent,
-      origin,
-      rawToken,
-      reqOrigin,
-      request,
-    });
+    return await routeAuthenticated(context);
   } catch (error) {
+    if (error instanceof CatalogUnavailableError) {
+      return errorResponse(error.message, 503, origin, reqOrigin, context.rlHeaders);
+    }
     console.error('API error:', error);
     return errorResponse('Internal server error', 500, origin, reqOrigin);
   }
