@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,9 +20,12 @@ const charge = {
 };
 const priorCharge = { ...charge, id: 'ch_prior', amount_refunded: 0, refunded: false };
 const source = readFileSync(new URL('../stripe-webhook/index.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(`${source}\nexport { dispatchEvent };`, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText;
+const compiled = ts.transpileModule(
+  `${source}\nexport const dispatchForTest = (event: StripeEvent) => processingClient.run(fencedClient(event.id, 'test_claim'), () => dispatchEvent(event));`,
+  {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }
+).outputText;
 function createHarness(
   initial: Row,
   resources: Record<string, unknown>,
@@ -77,10 +81,11 @@ function createHarness(
     if (!(path in resources)) return Promise.resolve(new Response('unavailable', { status: 503 }));
     return Promise.resolve(new Response(JSON.stringify(resources[path]), { status: 200 }));
   });
-  const exports: { dispatchEvent?: (event: unknown) => Promise<void> } = {};
+  const exports: { dispatchForTest?: (event: unknown) => Promise<void> } = {};
   runInNewContext(compiled, {
     exports,
     require: (name: string) => {
+      if (name === 'node:async_hooks') return { AsyncLocalStorage };
       if (name.startsWith('npm:')) {
         return {
           createClient: () => ({
@@ -121,7 +126,7 @@ function createHarness(
   });
   return {
     dispatch: (type: string, object: unknown) =>
-      exports.dispatchEvent!({ id: 'evt_1', type, data: { object } }),
+      exports.dispatchForTest!({ id: 'evt_1', type, data: { object } }),
     current: () => row,
     writes,
     fetch,

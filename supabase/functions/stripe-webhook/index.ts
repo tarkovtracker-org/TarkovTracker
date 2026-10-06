@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { corsHeadersFor } from '../_shared/cors.ts';
 import {
   isDiscordNotInGuildError,
@@ -73,6 +74,12 @@ if (missingRequiredEnvVars.length > 0) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
 });
+const processingClient = new AsyncLocalStorage<typeof supabase>();
+function eventClient(): typeof supabase {
+  const client = processingClient.getStore();
+  if (!client) throw new Error('Stripe processing requires a fenced client');
+  return client;
+}
 /**
  * PermanentError is thrown when an event cannot be processed and Stripe should
  * NOT retry (e.g., malformed payload, missing supporter row that will never
@@ -131,21 +138,35 @@ function hexToBytes(hex: string): Uint8Array | null {
   return out;
 }
 /**
- * Atomically claim a Stripe event by ID. Returns true if this is the first
- * time we've seen this event (caller should process it), false if it's a
- * duplicate (caller should ack and skip). Idempotency is the contract:
- * regardless of how many retries Stripe sends, side effects run once.
+ * Receipt is distinct from completion. The database serializes claims and
+ * fences billing writes using the request-specific client headers below.
  */
-async function claimEvent(eventId: string, eventType: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('stripe_events')
-    .insert({ event_id: eventId, event_type: eventType });
-  if (!error) return true;
-  // Postgres unique violation = already processed
-  if (error.code === '23505') return false;
-  console.error('[stripe-webhook] Failed to record event:', { eventId, error });
-  // Treat unknown DB errors as transient so Stripe retries
-  throw new Error(`Event claim failed: ${error.message}`);
+type EventClaim = { outcome: string; token?: string };
+async function claimEvent(eventId: string, eventType: string): Promise<EventClaim> {
+  const { data, error } = await supabase.rpc('claim_stripe_event', {
+    p_event_id: eventId,
+    p_event_type: eventType,
+  });
+  if (error) throw new Error(`Event claim failed: ${error.message}`);
+  return data as EventClaim;
+}
+async function finishEvent(
+  eventId: string,
+  token: string,
+  outcome: 'completed' | 'retryable' | 'terminal'
+): Promise<void> {
+  const { data, error } = await supabase.rpc('finish_stripe_event', {
+    p_event_id: eventId,
+    p_claim_token: token,
+    p_outcome: outcome,
+  });
+  if (error || data !== true) throw new Error('Stripe event completion was not recorded');
+}
+function fencedClient(eventId: string, token: string): typeof supabase {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    global: { headers: { 'x-stripe-event-id': eventId, 'x-stripe-claim-token': token } },
+  });
 }
 /**
  * Extract Discord user ID from Supabase auth identities.
@@ -154,7 +175,7 @@ async function claimEvent(eventId: string, eventType: string): Promise<boolean> 
  * depending on auth client version, not the Discord-side user id.
  */
 async function getDiscordUserId(userId: string): Promise<string | null> {
-  const { data: linkedAccount, error: linkedAccountError } = await supabase
+  const { data: linkedAccount, error: linkedAccountError } = await eventClient()
     .from('discord_account_links')
     .select('discord_user_id')
     .eq('user_id', userId)
@@ -166,7 +187,7 @@ async function getDiscordUserId(userId: string): Promise<string | null> {
       error: linkedAccountError,
     });
   }
-  const { data } = await supabase.auth.admin.getUserById(userId);
+  const { data } = await eventClient().auth.admin.getUserById(userId);
   if (!data?.user?.identities) return null;
   const discordIdentity = data.user.identities.find((i) => i.provider === 'discord');
   if (!discordIdentity) return null;
@@ -192,7 +213,7 @@ async function resolveDiscordUserIdForSupporter(supporter: any): Promise<string 
   const resolved = await getDiscordUserId(userId);
   if (!resolved) return persisted;
   if (supporter.discord_user_id !== resolved) {
-    const { error } = await supabase
+    const { error } = await eventClient()
       .from('supporters')
       .update({ discord_user_id: resolved })
       .eq('user_id', userId);
@@ -343,7 +364,7 @@ async function activateSupporterFromSession(session: any, source: string): Promi
   const discordUserId = await getDiscordUserId(userId);
   // Preserve started_at across re-subscriptions so renewal/upgrade flows
   // don't reset the original support date. Only set it when the row is new.
-  const { data: existing } = await supabase
+  const { data: existing } = await eventClient()
     .from('supporters')
     .select(
       'started_at, status, type, stripe_subscription_id, stripe_customer_id, tier, expires_at'
@@ -381,7 +402,7 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     expires_at: hasLiveSubscription && !isSubscription ? existing.expires_at : null,
     updated_at: new Date().toISOString(),
   };
-  const { data: activated, error } = await supabase
+  const { data: activated, error } = await eventClient()
     .from('supporters')
     .upsert(record, { onConflict: 'user_id' })
     .select('*')
@@ -451,7 +472,7 @@ async function findSupporterBy(
   column: 'stripe_subscription_id' | 'stripe_customer_id' | 'user_id',
   value: string
 ) {
-  const { data, error } = await supabase
+  const { data, error } = await eventClient()
     .from('supporters')
     .select('*')
     .eq(column, value)
@@ -615,7 +636,7 @@ async function reconcileSubscription(
       : 'supporter';
   const hasEverSupported = supporter?.has_ever_supported === true || verifiedHistory;
   const discordUserId = await getDiscordUserId(userId);
-  const { data: reconciled, error } = await supabase
+  const { data: reconciled, error } = await eventClient()
     .from('supporters')
     .upsert(
       {
@@ -761,7 +782,7 @@ async function expireDeletedSubscription(
 ): Promise<boolean> {
   const now = new Date();
   const endedAt = subscriptionEndDate(subscription, now, supporter.expires_at);
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await eventClient()
     .from('supporters')
     .update({
       status: 'expired',
@@ -953,7 +974,7 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
     );
     return;
   }
-  const { error } = await supabase
+  const { error } = await eventClient()
     .from('supporters')
     .update({ status: 'expired', expires_at: new Date().toISOString() })
     .eq('user_id', userId);
@@ -1012,7 +1033,7 @@ async function revokeSupporter(
         expires_at: new Date().toISOString(),
         stripe_subscription_id: null,
       };
-  const { data, error } = await supabase
+  const { data, error } = await eventClient()
     .from('supporters')
     .update({
       ...updates,
@@ -1182,7 +1203,7 @@ async function recordCustomerDisqualification(
   customerId: string,
   userId: string | null
 ): Promise<void> {
-  const { error } = await supabase.rpc('disqualify_supporter_customer', {
+  const { error } = await eventClient().rpc('disqualify_supporter_customer', {
     p_customer_id: customerId,
     p_user_id: userId,
   });
@@ -1205,7 +1226,7 @@ async function handleCustomerlessChargeback(dispute: { charge?: unknown }): Prom
   const userId = await resolveDisputedChargeUserId(dispute);
   const chargeId = getStripeReferenceId(dispute.charge);
   if (!userId || !chargeId) return;
-  const { error } = await supabase.rpc('disqualify_supporter_account', {
+  const { error } = await eventClient().rpc('disqualify_supporter_account', {
     p_user_id: userId,
     p_charge_id: chargeId,
   });
@@ -1275,39 +1296,41 @@ Deno.serve(async (req: Request) => {
     console.warn('[stripe-webhook] Missing event id/type');
     return jsonResponse({ error: 'Malformed event' }, 400, req);
   }
-  // Idempotency: claim the event ID before any side effects. Duplicates are
-  // ack'd 200 with no further work.
-  let claimed: boolean;
+  let claim: EventClaim;
   try {
-    claimed = await claimEvent(event.id, event.type);
+    claim = await claimEvent(event.id, event.type);
   } catch (err) {
     console.error('[stripe-webhook] Event claim transient failure, retrying:', err);
     return jsonResponse({ error: 'Event claim failed' }, 500, req);
   }
-  if (!claimed) {
-    console.info(`[stripe-webhook] Duplicate event ignored: ${event.id} (${event.type})`);
+  if (claim.outcome === 'completed' || claim.outcome === 'terminal') {
     return jsonResponse({ received: true, duplicate: true }, 200, req);
   }
+  if (claim.outcome !== 'claimed' || !claim.token) {
+    console.warn('[stripe-webhook] Event not available for processing:', {
+      eventId: event.id,
+      outcome: claim.outcome,
+    });
+    return jsonResponse({ error: 'Event awaiting recovery', outcome: claim.outcome }, 503, req);
+  }
   try {
-    await dispatchEvent(event);
+    await processingClient.run(fencedClient(event.id, claim.token), () => dispatchEvent(event));
+    await finishEvent(event.id, claim.token, 'completed');
   } catch (err) {
+    const outcome = err instanceof PermanentError ? 'terminal' : 'retryable';
+    try {
+      await finishEvent(event.id, claim.token, outcome);
+    } catch (completionError) {
+      // Keep the receipt. A later delivery can reclaim the expired lease even
+      // if this request cannot persist its failure outcome.
+      console.error('[stripe-webhook] Failed to persist event outcome:', completionError);
+      return jsonResponse({ error: 'Event outcome not recorded' }, 500, req);
+    }
     if (err instanceof PermanentError) {
-      // Permanent failures: log and ack 200 so Stripe stops retrying. Ops
-      // can investigate via the stripe_events row already inserted.
       console.error(`[stripe-webhook] Permanent failure for ${event.type}:`, err.message);
       return jsonResponse({ received: true, error: 'permanent' }, 200, req);
     }
-    // Transient failure: roll back the idempotency claim so the next retry
-    // can process. If rollback fails, log and let Stripe retry the dedup
-    // row will block re-processing — better than double-side-effects.
     console.error(`[stripe-webhook] Transient failure for ${event.type}:`, err);
-    const { error: rollbackErr } = await supabase
-      .from('stripe_events')
-      .delete()
-      .eq('event_id', event.id);
-    if (rollbackErr) {
-      console.error('[stripe-webhook] Idempotency rollback failed:', rollbackErr);
-    }
     return jsonResponse({ error: 'Processing failed' }, 500, req);
   }
   return jsonResponse({ received: true }, 200, req);
