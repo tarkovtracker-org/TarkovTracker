@@ -99,7 +99,9 @@ merge approval or authorizes collapsing a command as completed. Genuine pending 
 requested reviewers and other outstanding requests still block duplicate requests.
 
 A recognized refusal remains `unavailable` on every head until another review completes or an
-operator explicitly requests a retry. Time passing does not establish available capacity. Normal
+operator explicitly requests a retry. A valid code-review completion strictly after a refusal
+clears that refusal across heads; it still establishes completion only for its exact reviewed
+commit. A later refusal blocks requests again. Time passing does not establish available capacity. Normal
 `--request` invocations never retry a refused request automatically.
 
 After confirming capacity is available, an authorized caller can make one guarded attempt:

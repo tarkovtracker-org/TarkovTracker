@@ -69,9 +69,16 @@ export function wasRefused(request, activities) {
       activity.requestedAt === request.at
   );
 }
+function superseded(refusal, activities) {
+  return activities.some((activity) => activity.kind === 'complete' && activity.at > refusal.at);
+}
+function activeRefusal(activity, activities) {
+  return activity.kind === 'refused' && !superseded(activity, activities);
+}
 export function usageLimitState(context) {
   if (context.retryUnavailable) return null;
-  if (!context.activities.some((activity) => activity.kind === 'refused')) return null;
+  if (!context.activities.some((activity) => activeRefusal(activity, context.activities)))
+    return null;
   return {
     status: 'unavailable',
     reason:

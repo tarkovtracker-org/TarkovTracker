@@ -419,3 +419,21 @@ test('explicit retry preserves unknown activity, pending reviews and unresolved 
     'pending'
   );
 });
+test('a later completed review clears refusal on a new head without transferring completion', () => {
+  const comments = [limitedRequest(), limitReply(), reviewComment(head, '2026-09-27T02:30:00Z')];
+  const newPull = pull({ head: { sha: otherHead } });
+  const state = classifyState(inputs({ pull: newPull, comments }), now);
+  assert.equal(state.status, 'unreviewed');
+  assert.equal(state.result, undefined);
+  for (const [completedAt, expected] of [
+    ['2026-09-27T02:00:00Z', 'unknown'],
+    [refusedAt, 'unavailable'],
+  ]) {
+    const stale = [limitedRequest(), limitReply(), reviewComment(head, completedAt)];
+    assert.equal(classifyState(inputs({ pull: newPull, comments: stale }), now).status, expected);
+  }
+  const later = '2026-09-27T02:45:01Z';
+  comments.push(limitedRequest(otherHead, '2026-09-27T02:45:00Z'));
+  comments.push(limitReply({ created_at: later, updated_at: later }));
+  assert.equal(classifyState(inputs({ pull: newPull, comments }), now).status, 'unavailable');
+});
