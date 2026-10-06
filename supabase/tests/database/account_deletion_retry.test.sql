@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(27);
+SELECT plan(31);
 
 CREATE TEMP TABLE retry_fixture (name text PRIMARY KEY, user_id uuid NOT NULL);
 INSERT INTO retry_fixture
@@ -7,7 +7,7 @@ SELECT name, ('00000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid
 FROM (VALUES
   (2001, 'solo_owner'), (2002, 'not_due'), (2003, 'dead'), (2004, 'gone'),
   (2005, 'leased'), (2006, 'stale'), (2007, 'broken'), (2008, 'last_try'),
-  (2009, 'stored'), (2010, 'fk_owner')
+  (2009, 'stored'), (2010, 'fk_owner'), (2011, 'unsaved'), (2012, 'reclaimed')
 ) AS fixtures(n, name);
 CREATE FUNCTION pg_temp.retry_user(p_name text) RETURNS uuid LANGUAGE sql AS $$
   SELECT user_id FROM retry_fixture WHERE name = p_name;
@@ -40,13 +40,16 @@ VALUES
   (pg_temp.retry_user('stale'), 'in_progress', 1, 5, NULL, now() - interval '1 hour'),
   (pg_temp.retry_user('broken'), 'failed', 1, 5, now() - interval '1 day', now() - interval '1 day'),
   (pg_temp.retry_user('last_try'), 'failed', 4, 5, now() - interval '1 day', now() - interval '1 day'),
-  (pg_temp.retry_user('stored'), 'failed', 1, 5, now() - interval '1 day', now() - interval '1 day');
+  (pg_temp.retry_user('stored'), 'failed', 1, 5, now() - interval '1 day', now() - interval '1 day'),
+  (pg_temp.retry_user('unsaved'), 'failed', 1, 5, now() - interval '1 day', now() - interval '1 day');
+INSERT INTO public.account_deletion_jobs(user_id, status, attempts, max_attempts, claim_token, updated_at)
+VALUES (pg_temp.retry_user('reclaimed'), 'in_progress', 1, 5, '00000000-0000-0000-0000-000000002199', now());
 INSERT INTO storage.buckets(id, name, owner_id)
 VALUES ('retry-test', 'retry-test', pg_temp.retry_user('stored')::text);
 
 CREATE FUNCTION pg_temp.block_retry_delete() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.id IN (SELECT user_id FROM retry_fixture WHERE name IN ('broken', 'last_try')) THEN
+  IF OLD.id IN (SELECT user_id FROM retry_fixture WHERE name IN ('broken', 'last_try', 'unsaved')) THEN
     RAISE EXCEPTION 'simulated auth delete failure';
   END IF;
   RETURN OLD;
@@ -54,9 +57,17 @@ END;
 $$;
 CREATE TRIGGER block_retry_delete BEFORE DELETE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION pg_temp.block_retry_delete();
+CREATE FUNCTION pg_temp.block_retry_record() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.user_id = pg_temp.retry_user('unsaved') THEN RAISE EXCEPTION 'simulated record failure'; END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER block_retry_record BEFORE UPDATE ON public.account_deletion_jobs
+  FOR EACH ROW EXECUTE FUNCTION pg_temp.block_retry_record();
 
 SELECT is(private.run_account_deletion_retries(50),
-  jsonb_build_object('completed', 3, 'skipped', 0, 'failed', 2),
+  jsonb_build_object('completed', 3, 'skipped', 0, 'failed', 3, 'unrecorded', 1),
   'retries due and stale jobs and counts rollbacks');
 
 SELECT is((SELECT count(*)::integer FROM auth.users WHERE id = pg_temp.retry_user('solo_owner')), 0,
@@ -96,7 +107,16 @@ SELECT ok((pg_temp.retry_job('broken')).next_run_at > now() + interval '23 hours
   'failed retry backs off for a day');
 SELECT is((pg_temp.retry_job('last_try')).status, 'dead_lettered', 'final failed attempt dead-letters');
 
+SELECT is((pg_temp.retry_job('unsaved')).attempts, 1, 'unrecorded failure leaves the job unchanged');
+
 DROP TRIGGER block_retry_delete ON auth.users;
+DROP TRIGGER block_retry_record ON public.account_deletion_jobs;
+
+SELECT private.record_account_deletion_retry_failure(pg_temp.retry_user('reclaimed'), 'P0001');
+SELECT is((pg_temp.retry_job('reclaimed')).claim_token, '00000000-0000-0000-0000-000000002199'::uuid,
+  'failure recording keeps a replacement claim');
+SELECT is((pg_temp.retry_job('reclaimed')).attempts, 1, 'failure recording does not charge a replacement claim');
+SELECT is((pg_temp.retry_job('reclaimed')).status, 'in_progress', 'replacement claim stays in progress');
 
 DELETE FROM public.teams WHERE id = '00000000-0000-0000-0000-000000002102';
 SELECT is((SELECT pvp_team_id FROM public.user_system WHERE user_id = pg_temp.retry_user('fk_owner')),

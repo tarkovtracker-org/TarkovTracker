@@ -31,6 +31,8 @@ END;
 $$;
 
 -- A failed retry rolls back completely and consumes one attempt, dead-lettering at max_attempts.
+-- The rollback also releases the claim, so a fresh in_progress row belongs to another worker and is
+-- left untouched; only the restored pre-claim state (due work or an expired lease) is charged.
 CREATE FUNCTION private.record_account_deletion_retry_failure(p_user_id uuid, p_error text)
 RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
   UPDATE public.account_deletion_jobs SET
@@ -41,7 +43,8 @@ RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
     last_error = 'scheduled_retry_failed', last_error_at = clock_timestamp(),
     last_error_details = jsonb_build_object('stage', 'scheduled_retry', 'sqlstate', p_error),
     updated_at = clock_timestamp(), claim_token = NULL
-  WHERE user_id = p_user_id AND status IN ('pending', 'failed', 'in_progress');
+  WHERE user_id = p_user_id AND (status IN ('pending', 'failed')
+    OR (status = 'in_progress' AND updated_at <= clock_timestamp() - interval '15 minutes'));
 $$;
 
 -- No secrets, HTTP callbacks, or separate deletion worker: due failed jobs and expired leases are
@@ -49,6 +52,7 @@ $$;
 CREATE FUNCTION private.run_account_deletion_retries(p_limit integer DEFAULT 50)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' SET lock_timeout = '2s' AS $$
 DECLARE v_job record; v_completed integer := 0; v_skipped integer := 0; v_failed integer := 0;
+  v_unrecorded integer := 0;
   v_limit integer := least(greatest(coalesce(p_limit, 50), 1), 500);
 BEGIN
   IF NOT pg_try_advisory_xact_lock(hashtext('account-deletion-retry')) THEN
@@ -73,11 +77,14 @@ BEGIN
       v_failed := v_failed + 1;
       BEGIN
         PERFORM private.record_account_deletion_retry_failure(v_job.user_id, SQLSTATE);
-      EXCEPTION WHEN OTHERS THEN NULL;
+      EXCEPTION WHEN OTHERS THEN
+        v_unrecorded := v_unrecorded + 1;
+        RAISE WARNING 'account deletion retry failure not recorded for %: %', v_job.user_id, SQLSTATE;
       END;
     END;
   END LOOP;
-  RETURN jsonb_build_object('completed', v_completed, 'skipped', v_skipped, 'failed', v_failed);
+  RETURN jsonb_build_object('completed', v_completed, 'skipped', v_skipped, 'failed', v_failed,
+    'unrecorded', v_unrecorded);
 END;
 $$;
 
