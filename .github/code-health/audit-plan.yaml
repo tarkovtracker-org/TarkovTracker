@@ -607,7 +607,6 @@ queue:
         supabase/functions/discord-unlink/index.ts,
         supabase/functions/_shared/discord.ts,
         supabase/functions/account-delete/index.ts,
-        supabase/functions/account-delete-reconcile/index.ts,
       ]
     status: queued
     priority: P2
