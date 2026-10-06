@@ -72,17 +72,6 @@ interface SupabaseUserData {
   pve_data?: UserProgressData;
   [key: string]: unknown;
 }
-// Fast hash for change detection - avoids full JSON comparison
-function hashState(obj: unknown): string {
-  const str = JSON.stringify(obj);
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return hash.toString(36);
-}
 function getMissingColumnName(error: SupabaseErrorLike): string | null {
   const combined = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`;
   const schemaCacheMatch = combined.match(/could not find the ['"]([^'"]+)['"] column/i);
@@ -200,7 +189,7 @@ export function useSupabaseSync<
   const isSyncing = ref(false);
   const isPaused = ref(false);
   let snapshotDepth = 0;
-  let lastSyncedHash: string | null = null;
+  let lastSyncedPayload: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
   const pendingState = createPendingStateTracker(() => store.$state);
@@ -388,9 +377,9 @@ export function useSupabaseSync<
    * describes the signed-in user, so it must not be acknowledged.
    */
   const canCommitWrite = (ownerId: string): boolean => !disposed && $supabase.user.id === ownerId;
-  const commitSync = (currentHash: string, syncVersion: number, acknowledge: () => void) => {
+  const commitSync = (serializedPayload: string, syncVersion: number, acknowledge: () => void) => {
     acknowledge();
-    lastSyncedHash = currentHash;
+    lastSyncedPayload = serializedPayload;
     clearPendingVersion(syncVersion);
     resetRetryBudget();
     lastFailure = null;
@@ -403,7 +392,7 @@ export function useSupabaseSync<
   const writeAndCommit = async (
     dataToSave: TPayload,
     transformedState: TPayload,
-    currentHash: string,
+    serializedPayload: string,
     syncVersion: number,
     acknowledge: () => void,
     ownerId: string
@@ -414,7 +403,7 @@ export function useSupabaseSync<
       handleWriteFailure(attempt.error);
       return null;
     }
-    if (canCommitWrite(ownerId)) commitSync(currentHash, syncVersion, acknowledge);
+    if (canCommitWrite(ownerId)) commitSync(serializedPayload, syncVersion, acknowledge);
     return transformedState;
   };
   const runSyncToSupabase = async (
@@ -424,9 +413,9 @@ export function useSupabaseSync<
     ownerId: string
   ): Promise<TPayload | null> => {
     const dataToSave = buildSyncPayload(transformedState, ownerId);
-    // Skip unchanged writes; this is what keeps egress down.
-    const currentHash = hashState(dataToSave);
-    if (currentHash === lastSyncedHash) {
+    // Compare the exact captured wire representation: hashes can collide and lose edits.
+    const serializedPayload = JSON.stringify(dataToSave);
+    if (serializedPayload === lastSyncedPayload) {
       acknowledge();
       clearPendingVersion(syncVersion);
       logger.debug('[Sync] Skipping - data unchanged');
@@ -435,7 +424,7 @@ export function useSupabaseSync<
     return await writeAndCommit(
       dataToSave,
       transformedState,
-      currentHash,
+      serializedPayload,
       syncVersion,
       acknowledge,
       ownerId
@@ -592,9 +581,9 @@ export function useSupabaseSync<
   const captureRemoteMerge = (): RemoteStateMerge => {
     const reconcile = pendingState.capture();
     return (...args) => {
-      // Clear at observation time: an external save may restore the hash while a read awaits.
+      // Clear at observation time: an external save may restore the payload baseline while a read awaits.
       // Even a revert to that save must reach the sender's current per-mode comparison.
-      lastSyncedHash = null;
+      lastSyncedPayload = null;
       return reconcile(...args);
     };
   };
@@ -608,17 +597,17 @@ export function useSupabaseSync<
       schedulePendingSync();
     }
   };
-  const payloadHash = (state: TState, ownerId: string): string | null => {
+  const serializeStatePayload = (state: TState, ownerId: string): string | null => {
     const payload = capturePayload(state);
-    return payload ? hashState(buildSyncPayload(payload, ownerId)) : null;
+    return payload ? JSON.stringify(buildSyncPayload(payload, ownerId)) : null;
   };
   /** Later saves skip `saved`; the store is acknowledged now only if it still matches it. */
   const acknowledgeExternalSave = (saved: TState) => {
     const ownerId = syncOwnerId();
-    const savedHash = ownerId ? payloadHash(saved, ownerId) : null;
-    if (!savedHash) return;
-    lastSyncedHash = savedHash;
-    if (payloadHash(store.$state as TState, ownerId!) !== savedHash) return;
+    const savedPayload = ownerId ? serializeStatePayload(saved, ownerId) : null;
+    if (!savedPayload) return;
+    lastSyncedPayload = savedPayload;
+    if (serializeStatePayload(store.$state as TState, ownerId!) !== savedPayload) return;
     pendingState.captureAcknowledgement(snapshotSyncState(store.$state as TState))();
     debouncedSync.cancel();
     clearPendingVersion(localVersion);
