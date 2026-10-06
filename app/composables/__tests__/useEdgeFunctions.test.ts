@@ -115,6 +115,15 @@ describe('useEdgeFunctions.getTeamMembers', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockSupabaseClient.functions.invoke).not.toHaveBeenCalled();
   });
+  it('throws the original auth error when the session refresh fails', async () => {
+    const authError = { status: 401 };
+    mockFetch.mockRejectedValueOnce(authError);
+    mockSupabaseClient.auth.refreshSession.mockRejectedValueOnce(new Error('refresh failed'));
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(edgeFunctions.getTeamMembers('team-1')).rejects.toBe(authError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
   it('throws the retry auth error instead of the original auth error', async () => {
     const firstError = { status: 401 };
     const secondError = { status: 403 };
