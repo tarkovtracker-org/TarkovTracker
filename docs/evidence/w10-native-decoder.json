@@ -1,22 +1,52 @@
 {
   "scope": "Native browser boundary only; not application acceptance",
   "sourceSha256": "58be713bbc4277931a4c3cdee885f7a8ab7b3df966f8e7caad6395b75f11c145",
-  "repositorySha256": "392027fe94cb69cd005daf728528fd11b4f5613e8fa7939ec5bd9f7c6faa236b",
+  "repositorySha256": "f3e3694be1487cab2b85bb1c77fa495cbad3b5a3493909ca0ab834682ea0a4d7",
   "browser": "Chrome/154.0.8037.97",
   "actors": [
     {
       "name": "w10-actor-a",
-      "pid": 42976
+      "pid": 45568
     },
     {
       "name": "w10-actor-b",
-      "pid": 25456
+      "pid": 45948
     }
   ],
   "primitiveRace": {
-    "attempts": 50,
-    "lostUpdates": 0,
-    "failures": []
+    "attempts": 20,
+    "lostUpdates": 1,
+    "failures": [
+      {
+        "order": [0, 1],
+        "round": 3,
+        "contention": {
+          "held": [
+            {
+              "clientId": "21652B3D208078BBA95597607E35D305",
+              "mode": "exclusive",
+              "name": "w10-01-3:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "E40C0EF3272E124E194DA746517DB8C7",
+              "mode": "exclusive",
+              "name": "w10-01-3:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true,
+        "freshRendererRead": "{\"pvp\":1,\"pve\":42,\"seasonal\":33,\"clock\":100}"
+      }
+    ]
   },
   "storageBarrier": [
     {
@@ -28,14 +58,14 @@
       "contention": {
         "held": [
           {
-            "clientId": "CF38CA164BF9871AE73322BFE2E471EF",
+            "clientId": "21652B3D208078BBA95597607E35D305",
             "mode": "exclusive",
             "name": "barrier-01:mutation"
           }
         ],
         "pending": [
           {
-            "clientId": "0598A5FE70AE6707C42EBE76E50454F6",
+            "clientId": "E40C0EF3272E124E194DA746517DB8C7",
             "mode": "exclusive",
             "name": "barrier-01:mutation"
           }
@@ -57,14 +87,14 @@
       "contention": {
         "held": [
           {
-            "clientId": "0598A5FE70AE6707C42EBE76E50454F6",
+            "clientId": "E40C0EF3272E124E194DA746517DB8C7",
             "mode": "exclusive",
             "name": "barrier-10:mutation"
           }
         ],
         "pending": [
           {
-            "clientId": "CF38CA164BF9871AE73322BFE2E471EF",
+            "clientId": "21652B3D208078BBA95597607E35D305",
             "mode": "exclusive",
             "name": "barrier-10:mutation"
           }

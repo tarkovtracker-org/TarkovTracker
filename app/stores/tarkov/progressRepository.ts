@@ -48,9 +48,14 @@ type RecordEntry = { exists: false } | { exists: true; value: unknown };
 const requireShape = (valid: boolean, kind: RecordKind): void => {
   if (!valid) throw new ProgressRepositoryDataError(kind, 'shape');
 };
+const isPlainRecord = (value: object): boolean => {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
 const requireRecord = (value: unknown, kind: RecordKind): Record<string, unknown> => {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
     throw new ProgressRepositoryDataError(kind, 'shape');
+  requireShape(isPlainRecord(value), kind);
   return value as Record<string, unknown>;
 };
 const requireVersion = (value: Record<string, unknown>, kind: RecordKind): void => {

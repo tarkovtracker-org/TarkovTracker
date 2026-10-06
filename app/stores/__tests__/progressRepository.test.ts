@@ -123,6 +123,8 @@ describe('inactive progress transaction repository', () => {
     { apiUpdateHistory: 'corrupt' },
     { taskAvailability: [] },
     { skills: { Strength: 'corrupt' } },
+    { skills: new Map([['Strength', 1]]) },
+    { taskAvailability: new Date(0) },
     { taskObjectives: { item: { count: 'corrupt' } } },
     {
       manualActivityHistory: [

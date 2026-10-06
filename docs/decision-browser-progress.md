@@ -71,9 +71,9 @@ outside W10's storage replacement.
 ## Authoritative commit contract
 
 The [decoder-stage native receipt](./evidence/w10-native-decoder.json) reruns the updated module
-controls in separate renderer processes and passes both orders. Its bounded 50 race trials had
-zero localStorage losses; the earlier six-loss receipt remains the positive counterexample,
-not a deterministic claim. Focused decoder tests cover rejection with unchanged originals,
+controls in separate renderer processes and passes both orders. Its bounded 20 race trials had
+one localStorage loss; the earlier six-loss receipt provides positive evidence in both orders.
+The race is timing-sensitive, not a deterministic claim. Focused decoder tests cover rejection with unchanged originals,
 missing optionals and competing queued revision-CAS writes. Trial counts outside 1–1000 are
 rejected before browser launch.
 
@@ -106,7 +106,8 @@ sessions are rejected rather than silently upgraded. Opaque additional fields an
 strings are retained. A typed check table covers every current `UserProgressData` field, validates
 known map/history entries and present optionals, and allows missing optionals without defaulting.
 Malformed known fields are rejected even when opaque extensions are retained. Revision zero is
-empty-only. Existing coercive sanitizers are unsuitable for this retain-and-reject boundary.
+empty-only. Dictionaries must be plain records; Map/Date values are rejected and retained.
+Existing coercive sanitizers are unsuitable for this retain-and-reject boundary.
 Recovery/export UI remains an integration gate. Conflict retry must never just increment `expectedRevision` on a stale
 envelope: reread accepted state and reapply the original intent.
 
