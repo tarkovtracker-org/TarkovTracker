@@ -126,18 +126,21 @@ sequenceDiagram
 
 - Teams: `app/features/team/*` via `app/composables/api/useEdgeFunctions.ts`
 - Tokens: `app/features/settings/ApiTokens.vue` via the same composable
+- Discord: `app/features/settings/DiscordLinkCard.vue` (direct `functions.invoke`)
 
 #### Edge Functions (enforced today)
 
-| Function       | Scope key      | Limit | Window |
-| -------------- | -------------- | ----: | ------ |
-| `team-create`  | `team-create`  |    10 | 1 hour |
-| `team-join`    | `team-join`    |    30 | 10 min |
-| `team-leave`   | `team-leave`   |    30 | 1 hour |
-| `team-kick`    | `team-kick`    |    20 | 1 hour |
-| `team-disband` | `team-disband` |    10 | 1 hour |
-| `token-create` | `token-create` |     3 | 1 hour |
-| `token-revoke` | `token-revoke` |    50 | 10 min |
+| Function            | Scope key           | Limit | Window |
+| ------------------- | ------------------- | ----: | ------ |
+| `team-create`       | `team-create`       |    10 | 1 hour |
+| `team-join`         | `team-join`         |    30 | 10 min |
+| `team-leave`        | `team-leave`        |    30 | 1 hour |
+| `team-kick`         | `team-kick`         |    20 | 1 hour |
+| `team-disband`      | `team-disband`      |    10 | 1 hour |
+| `token-create`      | `token-create`      |     3 | 1 hour |
+| `token-revoke`      | `token-revoke`      |    50 | 10 min |
+| `discord-role-sync` | `discord-role-sync` |    10 | 10 min |
+| `discord-unlink`    | `discord-unlink`    |    10 | 1 hour |
 
 Source of truth for limits: `supabase/functions/_shared/rate-limit.ts`  
 RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`
@@ -480,7 +483,7 @@ Treat these deliberately; do not “make everything fail open” without underst
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts`                                                                                                                          |
 | Mutation RPC + table                   | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`                                                                                                |
-| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick,team-disband}/`                                                           |
+| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick,team-disband,discord-role-sync,discord-unlink}/`                          |
 | Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
 | Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
 | Worker entrypoint and routing          | `workers/api-gateway/src/index.ts`, `workers/api-gateway/src/router.ts`                                                                                             |
