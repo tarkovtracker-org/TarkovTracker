@@ -1,5 +1,6 @@
 // GitHub code-review evidence only: security results never establish code-review completion.
 import {
+  hasActiveRefusal,
   scopeUsageLimits,
   usageLimitActivity,
   usageLimitState,
@@ -264,6 +265,7 @@ function pendingRequest(context) {
   return item ? status('pending', item.reason) : null;
 }
 function currentCompletion(context) {
+  if (hasActiveRefusal(context)) return null;
   return context.current ? { status: 'complete', result: context.current.result } : null;
 }
 function unknownActivity(context) {

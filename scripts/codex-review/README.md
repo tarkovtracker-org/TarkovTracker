@@ -101,7 +101,8 @@ requested reviewers and other outstanding requests still block duplicate request
 A recognized refusal remains `unavailable` on every head until another review completes or an
 operator explicitly requests a retry. A valid code-review completion strictly after a refusal
 clears that refusal across heads; it still establishes completion only for its exact reviewed
-commit. A later refusal blocks requests again. Time passing does not establish available capacity. Normal
+commit. A newer refusal also blocks reuse of an older same-commit completion, including during
+an explicit retry. A strictly later completion clears it. A later refusal blocks requests again. Time passing does not establish available capacity. Normal
 `--request` invocations never retry a refused request automatically.
 
 After confirming capacity is available, an authorized caller can make one guarded attempt:

@@ -437,3 +437,21 @@ test('a later completed review clears refusal on a new head without transferring
   comments.push(limitReply({ created_at: later, updated_at: later }));
   assert.equal(classifyState(inputs({ pull: newPull, comments }), now).status, 'unavailable');
 });
+test('a newer refusal hides older same-head completion, including during explicit retry', () => {
+  const older = reviewComment(head, '2026-09-27T01:30:00Z');
+  const comments = [older, limitedRequest(), limitReply()];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'unavailable');
+  assert.equal(
+    classifyState(inputs({ comments, retryUnavailable: true }), now).status,
+    'unreviewed'
+  );
+  const ambiguous = reviewComment(head, refusedAt);
+  assert.equal(
+    classifyState(inputs({ comments: [...comments, ambiguous] }), now).status,
+    'unavailable'
+  );
+  const newer = reviewComment(head, '2026-09-27T02:30:00Z');
+  assert.equal(classifyState(inputs({ comments: [...comments, newer] }), now).status, 'complete');
+  const unknown = limitReply({ body: 'Unrecognized bot activity' });
+  assert.equal(classifyState(inputs({ comments: [...comments, unknown] }), now).status, 'unknown');
+});

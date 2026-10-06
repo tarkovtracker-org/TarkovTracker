@@ -75,10 +75,12 @@ function superseded(refusal, activities) {
 function activeRefusal(activity, activities) {
   return activity.kind === 'refused' && !superseded(activity, activities);
 }
+export function hasActiveRefusal(context) {
+  return context.activities.some((activity) => activeRefusal(activity, context.activities));
+}
 export function usageLimitState(context) {
   if (context.retryUnavailable) return null;
-  if (!context.activities.some((activity) => activeRefusal(activity, context.activities)))
-    return null;
+  if (!hasActiveRefusal(context)) return null;
   return {
     status: 'unavailable',
     reason:
