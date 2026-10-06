@@ -16,6 +16,7 @@ import {
 import {
   captureProgressRecoverySources,
   ProgressRecoveryBundleError,
+  progressRecoveryValidationLimits,
 } from '@/stores/tarkov/progressRecoverySources';
 import {
   openProgressRepository,
@@ -308,6 +309,79 @@ describe('inactive committed progress recovery bundle', () => {
       /source/
     );
     expect(values.get(STORAGE_KEYS.progress)).toContain('foreign');
+  });
+  it.each([Array(1), [undefined], Object.assign(Array(2), { 1: undefined })])(
+    'rejects sparse or undefined source inventory on both paths: %j',
+    async (sources) => {
+      const valid = parseProgressRecoveryBundle(await bundle());
+      const request = { ...valid, sources } as ProgressRecoveryBundle;
+      expect(() => serializeProgressRecoveryBundle(request)).toThrowError(/source/);
+      expect(() => parseProgressRecoveryBundle(container(stringify(request)))).toThrowError(
+        /source/
+      );
+      expect((await repository.read(token)).revision).toBe(0);
+    }
+  );
+  it('charges aliased metadata raw bytes before any raw JSON parsing on both paths', async () => {
+    const valid = parseProgressRecoveryBundle(await bundle());
+    const raw = JSON.stringify({ _userId: 'owner-A', padding: 'x'.repeat(16_384) });
+    valid.sources = Array.from({ length: 600 }, (_, index) => ({
+      key: `${STORAGE_KEYS.progressBackupPrefix}${index}`,
+      raw,
+      kind: 'backup',
+      namespace: 'v2',
+      observed: { parse: 'json', declaredOwner: 'owner-A', originalSeasonNumber: undefined },
+    }));
+    const encoded = container(stringify(valid));
+    expect(encoded.length).toBeLessThan(150_000);
+    const parse = vi.spyOn(JSON, 'parse');
+    expect(() => serializeProgressRecoveryBundle(valid)).toThrowError(/limit/);
+    expect(() => parseProgressRecoveryBundle(encoded)).toThrowError(/limit/);
+    expect(parse.mock.calls.filter(([input]) => input === raw)).toHaveLength(0);
+    parse.mockRestore();
+    expect(valid.sources[599]!.raw).toBe(raw);
+  });
+  it('bounds capture metadata work before parsing repeated storage values', () => {
+    const raw = 'x'.repeat(100_000);
+    const keys = Array.from(
+      { length: 100 },
+      (_, index) => `${STORAGE_KEYS.progressBackupPrefix}${index}`
+    );
+    keys.forEach((key) => values.set(key, raw));
+    const parse = vi.spyOn(JSON, 'parse');
+    expect(() => captureProgressRecoverySources(storage, keys)).toThrowError(/limit/);
+    expect(parse).not.toHaveBeenCalled();
+    parse.mockRestore();
+    expect(values.get(keys[99]!)).toBe(raw);
+  });
+  it('counts shared API history/task validation in every occurrence on both paths', async () => {
+    await save();
+    const valid = parseProgressRecoveryBundle(await bundle());
+    const task = { id: 'task-A', state: 'active' as const };
+    const tasks = Array(200).fill(task);
+    valid.committed.state!.pvp.apiUpdateHistory = Array(200).fill({
+      id: 'update-A',
+      at: 1,
+      source: 'api',
+      tasks,
+    });
+    const encoded = container(stringify(valid));
+    expect(encoded.length).toBeLessThan(4_000);
+    const reads = vi.fn(() => 'task-A');
+    Object.defineProperty(task, 'id', { get: reads, enumerable: true });
+    expect(() => serializeProgressRecoveryBundle(valid)).toThrowError(/limit/);
+    expect(reads.mock.calls.length).toBeLessThan(progressRecoveryValidationLimits.checks);
+    expect(() => parseProgressRecoveryBundle(encoded)).toThrowError(/limit/);
+    expect((await repository.read(token)).revision).toBe(1);
+  });
+  it('does not memoize away repeated checks across cyclic known chapter contexts', async () => {
+    await save();
+    const valid = parseProgressRecoveryBundle(await bundle());
+    const chapters: Record<string, { objectives: unknown }> = {};
+    for (let index = 0; index < 100; index += 1) chapters[String(index)] = { objectives: chapters };
+    Object.assign(valid.committed.state!.pvp, { storyChapters: chapters });
+    expect(() => serializeProgressRecoveryBundle(valid)).toThrowError(/limit/);
+    expect(() => parseProgressRecoveryBundle(container(stringify(valid)))).toThrowError(/limit/);
   });
 });
 describe('bounded pinned recovery codec before revival', () => {

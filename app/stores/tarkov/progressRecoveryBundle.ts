@@ -6,6 +6,7 @@ import {
 import {
   captureProgressRecoverySources,
   ProgressRecoveryBundleError,
+  progressRecoveryValidationLimits,
   validateProgressRecoverySources,
   type ProgressRecoverySource,
 } from '@/stores/tarkov/progressRecoverySources';
@@ -38,9 +39,18 @@ const validateSession = (value: unknown): ProgressOwnerToken => {
 const validateBundle = (value: unknown): ProgressRecoveryBundle => {
   const bundle = record(value);
   const session = validateSession(bundle.session);
-  validateProgressRepositorySnapshot(bundle.committed, session.owner);
+  validateProgressRepositorySnapshot(bundle.committed, session.owner, validationWork());
   validateProgressRecoverySources(bundle.sources);
   return bundle as ProgressRecoveryBundle;
+};
+/** Per-validation call; never memoizes away owner/epoch or other context-sensitive checks. */
+const validationWork = (): (() => void) => {
+  let checks = 0;
+  return () => {
+    checks += 1;
+    if (checks > progressRecoveryValidationLimits.checks)
+      throw new ProgressRecoveryBundleError('limit');
+  };
 };
 const parseContainer = (raw: string): Record<string, unknown> => {
   requireRecoveryTextLimit(raw);
@@ -64,8 +74,8 @@ const parseContainerPayload = (container: Record<string, unknown>): ProgressReco
 };
 /** Versioned data codec, never executable serialization. Refuse an export the parser cannot read. */
 export const serializeProgressRecoveryBundle = (request: ProgressRecoveryBundle): string => {
-  const bundle = validateBundle(request);
-  const payload = encodeRecoveryPayload(bundle);
+  const payload = encodeRecoveryPayload(request);
+  validateBundle(request);
   const encoded = JSON.stringify({ _format: format, _version: 1, _codec: codec, payload });
   parseProgressRecoveryBundle(encoded);
   return encoded;

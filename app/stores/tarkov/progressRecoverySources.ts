@@ -9,6 +9,11 @@ export class ProgressRecoveryBundleError extends Error {
   }
 }
 type SourceKind = 'active' | 'backup' | 'account-recovery' | 'superseded' | 'quarantine';
+export const progressRecoveryValidationLimits = {
+  checks: 10_000,
+  sources: 10_000,
+  metadataCharacters: 8 * 1024 * 1024,
+} as const;
 type StorageNamespace = 'v2' | 'legacy';
 type SourceRule = {
   kind: SourceKind;
@@ -125,8 +130,11 @@ export const captureProgressRecoverySources = (
   keys: readonly string[]
 ): ProgressRecoverySource[] => {
   const selected = [...new Set(keys)];
+  requireBudget(selected.length <= progressRecoveryValidationLimits.sources);
   selected.forEach(sourceRule); // Validate every key before reading any value.
-  return selected.map((key) => makeSource(key, storage.getItem(key)));
+  const sources = selected.map((key) => ({ key, raw: storage.getItem(key) }));
+  checkSourceBudget(sources);
+  return sources.map((source) => makeSource(source.key, source.raw));
 };
 const requireSource = (valid: boolean): void => {
   if (!valid) throw new ProgressRecoveryBundleError('source');
@@ -135,9 +143,28 @@ const requireSource = (valid: boolean): void => {
 export const validateProgressRecoverySources = (value: unknown): ProgressRecoverySource[] => {
   requireSource(Array.isArray(value));
   const sources = value as ProgressRecoverySource[];
+  checkSourceBudget(sources);
   sources.forEach(validateSource);
   requireSource(new Set(sources.map((source) => source.key)).size === sources.length);
   return sources;
+};
+/** Charge every occurrence, including aliased raw strings, before any metadata JSON parsing. */
+const checkSourceBudget = (sources: unknown[]): void => {
+  requireBudget(sources.length <= progressRecoveryValidationLimits.sources);
+  let characters = 0;
+  for (const [index, value] of sources.entries()) {
+    requireSource(Object.hasOwn(sources, index));
+    characters += sourceCharacters(value);
+    requireBudget(characters <= progressRecoveryValidationLimits.metadataCharacters);
+  }
+};
+const sourceCharacters = (value: unknown): number => {
+  const raw = asRecord(value).raw;
+  requireSource(raw === null || typeof raw === 'string');
+  return raw === null ? 0 : (raw as string).length;
+};
+const requireBudget = (valid: boolean): void => {
+  if (!valid) throw new ProgressRecoveryBundleError('limit');
 };
 const validateSource = (value: unknown): void => {
   const source = asRecord(value);

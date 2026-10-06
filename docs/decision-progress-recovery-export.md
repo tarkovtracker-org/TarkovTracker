@@ -86,6 +86,17 @@ null-prototype tags are admitted; Date descriptors require a bounded string. The
 not a second serializer or migration framework. Cycles and already hydrated shared nodes
 do not count as additional recursive hydration. Unsupported or malformed data rejects.
 
+Hydration limits do not alone bound later validation: a small file can reuse one task list
+in many history entries, or reuse one long raw string across many source entries. Each parse
+and serialize validation therefore has a separate 10,000-check budget propagated through
+the existing known-field decoder's fields, maps and lists. Every occurrence is charged,
+including cycles/aliases; no results are memoized and owner/epoch checks still run in context.
+Repository operations without a recovery budget retain their existing validation behavior.
+Source inventories must be dense, contain at most 10,000 entries and total at most 8 Mi UTF-16
+raw code units across all occurrences. The whole source budget is checked before any raw
+metadata JSON parsing, including capture. These are per-validation limits: serialization's
+verification parse is independently bounded as well. Rejection does not mutate originals.
+
 ## Why this precedes rollback and restoration
 
 An untouched legacy snapshot does not contain new-only commits. The focused proof imports

@@ -93,7 +93,8 @@ const decodeEpochs = (value: unknown): Epochs => {
   modes.forEach((mode) => requireCounter(record[mode], 'owner'));
   return record as Epochs;
 };
-type ValueCheck = (value: unknown) => void;
+type ValidationWork = () => void;
+type ValueCheck = (value: unknown, work?: ValidationWork) => void;
 const finite: ValueCheck = (value) =>
   requireShape(typeof value === 'number' && Number.isFinite(value), 'owner');
 const text: ValueCheck = (value) => requireShape(typeof value === 'string', 'owner');
@@ -101,23 +102,36 @@ const boolean: ValueCheck = (value) => requireShape(typeof value === 'boolean', 
 const counter: ValueCheck = (value) => requireCounter(value, 'owner');
 const optional =
   (check: ValueCheck): ValueCheck =>
-  (value) => {
-    if (value !== undefined) check(value);
+  (value, work) => {
+    if (value !== undefined) check(value, work);
   };
-const fields = (value: unknown, checks: Record<string, ValueCheck>): void => {
+const fields = (
+  value: unknown,
+  checks: Record<string, ValueCheck>,
+  work?: ValidationWork
+): void => {
   const record = requireRecord(value, 'owner');
-  Object.entries(checks).forEach(([key, check]) => check(record[key]));
+  Object.entries(checks).forEach(([key, check]) => {
+    work?.();
+    check(record[key], work);
+  });
 };
 const map =
   (check: ValueCheck): ValueCheck =>
-  (value) => {
-    Object.values(requireRecord(value, 'owner')).forEach(check);
+  (value, work) => {
+    Object.values(requireRecord(value, 'owner')).forEach((entry) => {
+      work?.();
+      check(entry, work);
+    });
   };
 const list =
   (check: ValueCheck): ValueCheck =>
-  (value) => {
+  (value, work) => {
     requireShape(Array.isArray(value), 'owner');
-    Array.from(value as unknown[]).forEach(check);
+    for (const entry of value as unknown[]) {
+      work?.();
+      check(entry, work);
+    }
   };
 const choice =
   (choices: Record<string, true>): ValueCheck =>
@@ -125,24 +139,32 @@ const choice =
     text(value);
     requireShape(Object.hasOwn(choices, value as string), 'owner');
   };
-const completion: ValueCheck = (value) =>
-  fields(value, { complete: optional(boolean), timestamp: optional(finite) });
-const objective: ValueCheck = (value) =>
-  fields(value, {
-    complete: optional(boolean),
-    timestamp: optional(finite),
-    count: optional(finite),
-  });
-const task: ValueCheck = (value) =>
-  fields(value, {
-    complete: optional(boolean),
-    failed: optional(boolean),
-    timestamp: optional(finite),
-    manual: optional(boolean),
-  });
-const chapter: ValueCheck = (value) => {
-  completion(value);
-  fields(value, { objectives: optional(map(completion)) });
+const completion: ValueCheck = (value, work) =>
+  fields(value, { complete: optional(boolean), timestamp: optional(finite) }, work);
+const objective: ValueCheck = (value, work) =>
+  fields(
+    value,
+    {
+      complete: optional(boolean),
+      timestamp: optional(finite),
+      count: optional(finite),
+    },
+    work
+  );
+const task: ValueCheck = (value, work) =>
+  fields(
+    value,
+    {
+      complete: optional(boolean),
+      failed: optional(boolean),
+      timestamp: optional(finite),
+      manual: optional(boolean),
+    },
+    work
+  );
+const chapter: ValueCheck = (value, work) => {
+  completion(value, work);
+  fields(value, { objectives: optional(map(completion)) }, work);
 };
 const apiStates = {
   active: true,
@@ -164,24 +186,33 @@ const activityActions = {
   sync: true,
   available: true,
 } satisfies Record<ManualActivityAction, true>;
-const apiTask: ValueCheck = (value) => fields(value, { id: text, state: choice(apiStates) });
-const apiUpdate: ValueCheck = (value) =>
-  fields(value, {
-    id: text,
-    at: finite,
-    source: choice({ api: true }),
-    tasks: optional(list(apiTask)),
-    taskCount: optional(counter),
-  });
-const manualActivity: ValueCheck = (value) =>
-  fields(value, {
-    id: text,
-    timestamp: finite,
-    type: choice(activityTypes),
-    action: choice(activityActions),
-    title: text,
-    details: optional(text),
-  });
+const apiTask: ValueCheck = (value, work) =>
+  fields(value, { id: text, state: choice(apiStates) }, work);
+const apiUpdate: ValueCheck = (value, work) =>
+  fields(
+    value,
+    {
+      id: text,
+      at: finite,
+      source: choice({ api: true }),
+      tasks: optional(list(apiTask)),
+      taskCount: optional(counter),
+    },
+    work
+  );
+const manualActivity: ValueCheck = (value, work) =>
+  fields(
+    value,
+    {
+      id: text,
+      timestamp: finite,
+      type: choice(activityTypes),
+      action: choice(activityActions),
+      title: text,
+      details: optional(text),
+    },
+    work
+  );
 // Compile-time completeness: additions to the known persisted contract require an explicit check.
 // Missing optional fields and opaque extensions are retained; no sanitizer/defaulting runs here.
 const modeChecks = {
@@ -192,11 +223,11 @@ const modeChecks = {
   taskObjectives: map(objective),
   taskCompletions: map(task),
   taskAvailability: optional(
-    map((value) => fields(value, { requirements: text, timestamp: finite }))
+    map((value, work) => fields(value, { requirements: text, timestamp: finite }, work))
   ),
   hideoutParts: map(objective),
   hideoutModules: map(completion),
-  traders: map((value) => fields(value, { level: finite, reputation: finite })),
+  traders: map((value, work) => fields(value, { level: finite, reputation: finite }, work)),
   skills: map(finite),
   prestigeLevel: finite,
   progressEpoch: optional(counter),
@@ -207,9 +238,9 @@ const modeChecks = {
   manualActivityHistory: optional(list(manualActivity)),
   manualActivityEpoch: optional(counter),
 } satisfies Record<keyof Required<UserProgressData>, ValueCheck>;
-const validateModeState = (value: unknown, expectedEpoch: number): void => {
+const validateModeState = (value: unknown, expectedEpoch: number, work?: ValidationWork): void => {
   const mode = requireRecord(value, 'owner');
-  fields(mode, modeChecks);
+  fields(mode, modeChecks, work);
   const epoch = mode.progressEpoch === undefined ? 0 : mode.progressEpoch;
   requireCounter(epoch, 'owner');
   if (epoch !== expectedEpoch) throw new ProgressRepositoryDataError('owner', 'epoch');
@@ -233,7 +264,10 @@ const validateEmptySnapshot = (snapshot: ProgressRepositorySnapshot): void => {
     'owner'
   );
 };
-const validateSnapshotState = (snapshot: ProgressRepositorySnapshot): void => {
+const validateSnapshotState = (
+  snapshot: ProgressRepositorySnapshot,
+  work?: ValidationWork
+): void => {
   if (snapshot.deleted || snapshot.state === null) {
     validateEmptySnapshot(snapshot);
     return;
@@ -241,10 +275,14 @@ const validateSnapshotState = (snapshot: ProgressRepositorySnapshot): void => {
   const state = requireRecord(snapshot.state, 'owner');
   requireShape(snapshot.revision > 0, 'owner');
   validateStateMetadata(state);
-  modes.forEach((mode) => validateModeState(state[mode], snapshot.epochs[mode]));
+  modes.forEach((mode) => validateModeState(state[mode], snapshot.epochs[mode], work));
 };
 /** Decode without sanitation or migration. A rejected original remains untouched in its own key. */
-const decodeSnapshot = (entry: RecordEntry, owner: Owner): ProgressRepositorySnapshot => {
+const decodeSnapshot = (
+  entry: RecordEntry,
+  owner: Owner,
+  work?: ValidationWork
+): ProgressRepositorySnapshot => {
   if (!entry.exists) return emptySnapshot(owner);
   const value = requireRecord(entry.value, 'owner');
   requireVersion(value, 'owner');
@@ -255,14 +293,15 @@ const decodeSnapshot = (entry: RecordEntry, owner: Owner): ProgressRepositorySna
   requireShape(typeof value.deleted === 'boolean', 'owner');
   requireNullableText(value.legacyRaw, 'owner');
   const snapshot = value as ProgressRepositorySnapshot;
-  validateSnapshotState(snapshot);
+  validateSnapshotState(snapshot, work);
   return snapshot;
 };
 /** Validation for portable recovery records; never treats supplied data as an absent IDB key. */
 export const validateProgressRepositorySnapshot = (
   value: unknown,
-  owner: string | null
-): ProgressRepositorySnapshot => decodeSnapshot({ exists: true, value }, owner);
+  owner: string | null,
+  work?: ValidationWork
+): ProgressRepositorySnapshot => decodeSnapshot({ exists: true, value }, owner, work);
 const ownerKey = (owner: Owner): string => `owner:${JSON.stringify(owner)}`;
 const emptySnapshot = (owner: Owner): ProgressRepositorySnapshot => ({
   version: 1,
