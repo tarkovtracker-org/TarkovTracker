@@ -108,6 +108,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
+    "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
     "validate:changes": "node scripts/ci/validate-changes.mjs",
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",
