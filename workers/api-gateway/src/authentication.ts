@@ -200,7 +200,12 @@ export async function authenticateAndRateLimit(
 ): Promise<AuthSuccess | Response> {
   const abuseResponse = await enforceAbuseGate(context);
   if (abuseResponse) return abuseResponse;
-  const validation = await validateToken(context.env, context.rawToken, context.permission);
+  const validation = await validateToken(
+    context.env,
+    context.rawToken,
+    context.permission,
+    context.ctx
+  );
   if (!validation.valid) {
     return errorResponse(
       validation.error,

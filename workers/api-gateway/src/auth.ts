@@ -1,4 +1,5 @@
 import { logger } from './utils/logger';
+import { updateTokenUsage } from './services/token-usage';
 import type { Env, ApiToken, Permission } from './types';
 const TOKEN_PREFIX_GAME_MODES: ReadonlyArray<readonly [string, ApiToken['game_mode']]> = [
   ['PVP_', 'pvp'],
@@ -36,7 +37,8 @@ export function extractBearerToken(authHeader: string | null): string | null {
 export async function validateToken(
   env: Env,
   token: string,
-  requiredPermission?: Permission
+  requiredPermission?: Permission,
+  ctx?: Pick<ExecutionContext, 'waitUntil'>
 ): Promise<{ valid: true; token: ApiToken } | { valid: false; error: string; status: number }> {
   try {
     // Validate token format (must have valid prefix)
@@ -101,38 +103,12 @@ export async function validateToken(
       expires_at: row.expires_at,
     };
     // Update usage stats (non-blocking)
-    updateTokenUsage(env, safeToken.token_id).catch(() => {});
+    const accounting = updateTokenUsage(env, safeToken.token_id);
+    if (ctx) ctx.waitUntil(accounting);
+    else await accounting;
     return { valid: true, token: safeToken };
   } catch (error) {
     console.error('Token validation error:', error);
     return { valid: false, error: 'Token validation failed', status: 500 };
   }
-}
-/**
- * Update token usage statistics (non-blocking)
- */
-async function updateTokenUsage(env: Env, tokenId: string): Promise<void> {
-  // Use raw SQL via RPC to increment usage_count
-  const url = `${env.SUPABASE_URL}/rest/v1/rpc/increment_token_usage`;
-  await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ p_token_id: tokenId }),
-  }).catch(() => {
-    // Fallback: just update last_used_at if RPC doesn't exist
-    fetch(`${env.SUPABASE_URL}/rest/v1/api_tokens?token_id=eq.${tokenId}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ last_used_at: new Date().toISOString() }),
-    });
-  });
 }
