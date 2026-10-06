@@ -103,12 +103,19 @@ const dateReferences = (value: unknown[]): unknown[] => {
 };
 const arrayReferences = (value: unknown[]): unknown[] => {
   if (typeof value[0] === 'string') return taggedReferences(value);
-  if (value[0] === -7) {
-    requireArrayLength(value[1]); // SPARSE=-7: [-7,length,index,reference,...].
-    return everyOther(value, 3);
-  }
+  if (value[0] === -7) return sparseReferences(value);
   requireArrayLength(value.length);
   return value;
+};
+const sparseReferences = (value: unknown[]): unknown[] => {
+  requireArrayLength(value[1]); // SPARSE=-7: [-7,length,index,reference,...].
+  requireCodec(value.length % 2 === 0);
+  everyOther(value, 2).forEach((index) => requireSparseIndex(index, value[1] as number));
+  return everyOther(value, 3);
+};
+const requireSparseIndex = (index: unknown, length: number): void => {
+  requireCodec(typeof index === 'number' && Number.isSafeInteger(index));
+  requireCodec((index as number) >= 0 && (index as number) < length);
 };
 const nodeReferences = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return arrayReferences(value);

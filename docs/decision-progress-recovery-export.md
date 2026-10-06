@@ -81,7 +81,9 @@ Input text is capped before JSON parsing. The outer shape/format/version/codec a
 before payload revival. A small preflight of the pinned flattened-table layout checks node,
 edge, first-hydration traversal depth and logical array lengths before calling `unflatten` or
 the downstream snapshot/source validators. Sparse `[-7,length,index,reference,…]` descriptors
-cannot use a tiny file to allocate an arbitrarily long array. Only the supported Date/Map/Set/
+cannot use a tiny file to allocate an arbitrarily long array. Sparse index/reference pairs
+must be complete, with non-negative integer indices below the declared length, before the
+codec library is invoked. Only the supported Date/Map/Set/
 null-prototype tags are admitted; Date descriptors require a bounded string. The guard is
 not a second serializer or migration framework. Cycles and already hydrated shared nodes
 do not count as additional recursive hydration. Unsupported or malformed data rejects.

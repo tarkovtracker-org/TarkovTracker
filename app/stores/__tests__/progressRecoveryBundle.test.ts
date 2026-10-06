@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { stringify } from 'devalue';
+import { stringify, unflatten } from 'devalue';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
@@ -23,6 +23,10 @@ import {
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+vi.mock('devalue', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('devalue')>();
+  return { ...actual, unflatten: vi.fn(actual.unflatten) };
+});
 const container = (payload: string) =>
   JSON.stringify({
     _format: 'tarkovtracker-progress-recovery',
@@ -393,6 +397,18 @@ describe('bounded pinned recovery codec before revival', () => {
     const payload = `[[-7,${progressRecoveryLimits.arrayLength + 1}]]`;
     expect(payload.length).toBeLessThan(20);
     expect(() => decodeRecoveryPayload(payload)).toThrowError(/limit/);
+  });
+  it.each([
+    '[[-7,1,1000000,-1]]',
+    '[[-7,1,"0",-1]]',
+    '[[-7,1,-1,-1]]',
+    '[[-7,1,0.5,-1]]',
+    '[[-7,1,0]]',
+    '[[-7,0,0,-1]]',
+  ])('rejects malformed sparse pairs before invoking unflatten: %s', (payload) => {
+    vi.mocked(unflatten).mockClear();
+    expect(() => decodeRecoveryPayload(payload)).toThrowError(/codec/);
+    expect(unflatten).not.toHaveBeenCalled();
   });
   it('caps flat table nodes before building its reference graph', () => {
     expect(() =>
