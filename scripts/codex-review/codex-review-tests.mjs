@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync } 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { classifyState, parseArgs, runGuard } from './codex-review.mjs';
+import { classifyState, guardExitCode, parseArgs, runGuard } from './codex-review.mjs';
 const head = '84671de39454b0fceb8eef1b2ae9cd3460bbf2fc';
 const oldHead = '29ba60fa9c000000000000000000000000000000';
 const now = Date.parse('2026-09-27T02:00:00Z');
@@ -619,6 +619,95 @@ test('missing or invalid GitHub Date fails closed before requesting', async () =
     );
     assert.equal(posts, 0);
     assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('usage limits stop polling promptly and return a distinct nonzero exit code', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-limits-stop-'));
+  const requested = {
+    ...request('2026-09-27T01:00:00Z', head),
+    updated_at: '2026-09-27T01:00:00Z',
+  };
+  const refusal = {
+    user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+    body: 'You have reached your Codex usage limits for code reviews.',
+    created_at: '2026-09-27T01:00:01Z',
+    updated_at: '2026-09-27T01:00:01Z',
+  };
+  let sleeps = 0;
+  let posts = 0;
+  const routes = emptyApiRoutes({
+    commentsResponse: [requested, refusal].map(JSON.stringify).join('\n'),
+  });
+  routes.post = () => {
+    posts += 1;
+  };
+  try {
+    const result = await runGuard(
+      { pr: 44, repo: 'example/repo', request: true, waitSeconds: 600 },
+      {
+        runGh: mockGh(routes),
+        gitCommonDir: root,
+        now: () => now,
+        sleep: async () => {
+          sleeps += 1;
+          throw new Error('must stop without polling');
+        },
+      }
+    );
+    assert.equal(result.status, 'unavailable');
+    assert.equal(guardExitCode(result), 3);
+    assert.match(result.message, /another provider or a human/);
+    assert.equal(sleeps, 0);
+    assert.equal(posts, 0);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+    assert.equal(guardExitCode({ status: 'complete' }), 0);
+    assert.equal(guardExitCode({ status: 'pending' }), 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('after cooldown the shared guard permits exactly one same-head retry, then handles another refusal', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-limits-retry-'));
+  const requestedAt = '2026-09-27T01:00:00Z';
+  const refusedAt = '2026-09-27T01:00:01Z';
+  const requested = { ...request(requestedAt, head), updated_at: requestedAt };
+  const refusal = {
+    user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+    body: 'You have reached your Codex usage limits for code reviews.',
+    created_at: refusedAt,
+    updated_at: refusedAt,
+  };
+  const comments = [requested, refusal];
+  let serverNow = Date.parse(refusedAt) + 86400000;
+  let posts = 0;
+  const routes = emptyApiRoutes();
+  const ordinaryGh = mockGh(routes);
+  const runGh = (args) => {
+    if (args.includes('--method')) {
+      posts += 1;
+      const createdAt = new Date(serverNow).toISOString();
+      const posted = { ...request(createdAt, head), updated_at: createdAt };
+      comments.push(posted);
+      return JSON.stringify(posted);
+    }
+    if (args.at(-1).endsWith('/comments')) return comments.map(JSON.stringify).join('\n');
+    if (args.includes('--include')) return withServerDate(JSON.stringify(pull()), args, serverNow);
+    return ordinaryGh(args);
+  };
+  const options = { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 };
+  const deps = { runGh, gitCommonDir: root, now: () => now };
+  try {
+    assert.equal((await runGuard(options, deps)).status, 'pending');
+    assert.equal(posts, 1);
+    assert.equal((await runGuard(options, deps)).status, 'pending');
+    assert.equal(posts, 1);
+    serverNow += 1000;
+    const createdAt = new Date(serverNow).toISOString();
+    comments.push({ ...refusal, created_at: createdAt, updated_at: createdAt });
+    assert.equal((await runGuard(options, deps)).status, 'unavailable');
+    assert.equal(posts, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

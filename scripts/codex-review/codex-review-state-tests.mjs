@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyState, evidenceShas } from './codex-review-state.mjs';
+import { classifyState, completedReviewRequests, evidenceShas } from './codex-review-state.mjs';
 const head = '84671de39454b0fceb8eef1b2ae9cd3460bbf2fc';
 const otherHead = '29ba60fa9c000000000000000000000000000000';
 const now = Date.parse('2026-09-27T03:00:00Z');
@@ -263,4 +263,112 @@ test('only trusted GitHub request associations can block coordination', () => {
     const comment = { ...request('2026-09-27T02:00:00Z'), author_association: association };
     assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'unreviewed');
   }
+});
+const refusedAt = '2026-09-27T02:00:01Z';
+const limitReply = (extra = {}) => ({
+  user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+  body: 'You have reached your Codex usage limits for code reviews.',
+  created_at: refusedAt,
+  updated_at: refusedAt,
+  ...extra,
+});
+const limitedRequest = (sha = head, createdAt = '2026-09-27T02:00:00Z') => ({
+  ...request(createdAt, sha),
+  updated_at: createdAt,
+});
+test('usage-limit refusal ends the request without establishing completion on any head', () => {
+  const comments = [limitedRequest(), limitReply()];
+  assert.deepEqual(completedReviewRequests(inputs({ comments })), []);
+  for (const sha of [head, otherHead]) {
+    const state = classifyState(inputs({ pull: pull({ head: { sha } }), comments }), now);
+    assert.equal(state.status, 'unavailable');
+    assert.match(state.reason, /another provider or a human/);
+    assert.equal(state.retryAt, Date.parse(refusedAt) + 24 * 60 * 60 * 1000);
+    assert.equal(state.result, undefined);
+  }
+});
+test('usage-limit cooldown permits a new request but never grants review completion', () => {
+  const comments = [limitedRequest(), limitReply()];
+  const retryAt = Date.parse(refusedAt) + 24 * 60 * 60 * 1000;
+  assert.equal(classifyState(inputs({ comments }), retryAt - 1).status, 'unavailable');
+  assert.equal(classifyState(inputs({ comments }), retryAt).status, 'unreviewed');
+  comments.push(limitedRequest(head, new Date(retryAt).toISOString()));
+  assert.equal(classifyState(inputs({ comments }), retryAt + 1000).status, 'pending');
+  const later = new Date(retryAt + 2000).toISOString();
+  comments.push(limitReply({ created_at: later, updated_at: later }));
+  assert.equal(classifyState(inputs({ comments }), retryAt + 3000).status, 'unavailable');
+});
+test('a usage-limit refusal retires only the confirmed matching local intent', () => {
+  const comments = [limitedRequest(), limitReply()];
+  const intent = { sha: head, requestedAt: Date.parse('2026-09-27T02:00:00Z') };
+  assert.equal(classifyState(inputs({ comments, intents: [intent] }), now).status, 'unavailable');
+  for (const requestedAt of [null, intent.requestedAt + 1]) {
+    assert.equal(
+      classifyState(inputs({ comments, intents: [{ ...intent, requestedAt }] }), now).status,
+      'pending'
+    );
+  }
+});
+test('a refusal cannot retire earlier unmatched requests or genuine pending formal reviews', () => {
+  const comments = [limitedRequest(head, '2026-09-27T01:30:00Z'), limitedRequest(), limitReply()];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'pending');
+  const reviews = [
+    { user: { login: 'chatgpt-codex-connector[bot]' }, state: 'PENDING', commit_id: head },
+  ];
+  assert.equal(
+    classifyState(inputs({ comments: comments.slice(1), reviews }), now).status,
+    'pending'
+  );
+});
+test('spoofed, edited, ambiguous and unrelated usage-limit evidence stays fail closed', () => {
+  const replies = [
+    limitReply({ user: { login: 'chatgpt-codex-connector[bot]', type: 'User' } }),
+    limitReply({ updated_at: '2026-09-27T02:30:00Z' }),
+    limitReply({ created_at: 'invalid', updated_at: 'invalid' }),
+    limitReply({ created_at: '2026-09-27T02:00:00Z', updated_at: '2026-09-27T02:00:00Z' }),
+    limitReply({ body: 'Example: You have reached your Codex usage limits for code reviews.' }),
+  ];
+  for (const reply of replies) {
+    const state = classifyState(
+      inputs({ comments: [limitedRequest(), reply] }),
+      now + 2 * 86400000
+    );
+    assert.ok(['unknown', 'pending'].includes(state.status), JSON.stringify(reply));
+    assert.equal(
+      classifyState(
+        inputs({ pull: pull({ head: { sha: otherHead } }), comments: [limitedRequest(), reply] }),
+        now + 2 * 86400000
+      ).status,
+      'unknown'
+    );
+  }
+  for (const comments of [
+    [limitReply()],
+    [limitedRequest(null), limitReply()],
+    [{ ...limitedRequest(), updated_at: refusedAt }, limitReply()],
+    [limitedRequest(), limitedRequest(), limitReply()],
+  ]) {
+    assert.ok(['unknown', 'pending'].includes(classifyState(inputs({ comments }), now).status));
+  }
+  const outsider = limitReply({ user: { login: 'outsider', type: 'Bot' } });
+  assert.equal(
+    classifyState(inputs({ comments: [limitedRequest(), outsider] }), now).status,
+    'pending'
+  );
+});
+test('exact-head completion after a refusal remains reusable', () => {
+  const comments = [limitedRequest(), limitReply(), reviewComment(head, '2026-09-27T02:30:00Z')];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'complete');
+});
+test('a same-second newer request makes refusal correlation ambiguous', () => {
+  const comments = [
+    limitedRequest(head, '2026-09-27T01:00:00Z'),
+    limitedRequest(head, refusedAt),
+    limitReply(),
+  ];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'pending');
+  assert.equal(
+    classifyState(inputs({ pull: pull({ head: { sha: otherHead } }), comments }), now).status,
+    'unknown'
+  );
 });

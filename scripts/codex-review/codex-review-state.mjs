@@ -1,4 +1,10 @@
 // GitHub code-review evidence only: security results never establish code-review completion.
+import {
+  scopeUsageLimits,
+  usageLimitActivity,
+  usageLimitState,
+  wasRefused,
+} from './codex-review-unavailable.mjs';
 const BOT = 'chatgpt-codex-connector[bot]';
 const SUMMARY = '<!-- codex-pull-request-review-summary -->';
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -107,7 +113,12 @@ function summaryActivity(body, resolvedShas) {
 }
 function commentActivity(comment, resolvedShas) {
   const body = bodyOf(comment);
+  const refusal = usageLimitActivity(comment);
+  if (refusal) return refusal;
   if (body.includes(SUMMARY)) return summaryActivity(body, resolvedShas);
+  return commentResult(comment, body, resolvedShas);
+}
+function commentResult(comment, body, resolvedShas) {
   if (!/^Codex Review:/im.test(body))
     return unknown('Unrecognized Codex activity; inspect before requesting');
   const sha = body.match(/\*{0,2}Reviewed commit:\*{0,2}\s*`?([0-9a-f]{7,40})`?/i)?.[1];
@@ -150,6 +161,7 @@ function requestRecord(comment, resolvedShas) {
   return {
     sha,
     tagged: Boolean(reference),
+    unchanged: comment.updated_at === comment.created_at,
     invalidSha: Boolean(reference) && !sha,
     at: Date.parse(comment.created_at),
     reason: 'A Codex review request has no matching completion',
@@ -245,7 +257,8 @@ function pendingRequest(context) {
     )
   )
     return status('unknown', 'Invalid review request timestamp');
-  const item = outstanding(context.requests, context.completed, context.headSha).find((request) =>
+  const unresolved = context.requests.filter((request) => !wasRefused(request, context.activities));
+  const item = outstanding(unresolved, context.completed, context.headSha).find((request) =>
     blocksCurrent(request, context.headSha)
   );
   return item ? status('pending', item.reason) : null;
@@ -281,7 +294,7 @@ function buildContext(inputs, now, headSha) {
     ...inputs,
     requestedReviewers,
     headSha,
-    activities,
+    activities: scopeUsageLimits(activities, requests),
     completed,
     current,
     requests,
@@ -296,6 +309,7 @@ function decideContext(context) {
     pendingRequest,
     currentCompletion,
     unknownActivity,
+    usageLimitState,
     eligiblePull,
   ];
   return decisions.map((decide) => decide(context)).find(Boolean);

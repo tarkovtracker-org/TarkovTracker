@@ -301,7 +301,9 @@ function step(context) {
   return state;
 }
 function shouldStop(state, now, deadline) {
-  return ['complete', 'unreviewed', 'unknown'].includes(state.status) || now >= deadline;
+  return (
+    ['complete', 'unreviewed', 'unknown', 'unavailable'].includes(state.status) || now >= deadline
+  );
 }
 export async function runGuard(options, deps = {}) {
   const context = contextFor(options, dependencies(deps));
@@ -313,11 +315,15 @@ export async function runGuard(options, deps = {}) {
     await context.sleep(Math.min(POLL_INTERVAL_MS, deadline - context.now()));
   }
 }
+export function guardExitCode(state) {
+  if (state.status === 'complete') return 0;
+  return state.status === 'unavailable' ? 3 : 2;
+}
 async function main(argv) {
   try {
     const result = await runGuard(parseArgs(argv));
     process.stdout.write(`${result.message}\n`);
-    if (result.status !== 'complete') process.exitCode = 2;
+    process.exitCode = guardExitCode(result);
   } catch (error) {
     process.stderr.write(`Codex review guard failed closed: ${error.message}\n`);
     process.exitCode = 2;

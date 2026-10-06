@@ -3,13 +3,14 @@
 Requests or waits for a Codex PR review without duplicate posts. Agents use it as described in
 [`AGENTS.md`](../../AGENTS.md); never post raw `@codex review` comments instead.
 
-| File                        | What it does                                                      | Run by                   |
-| --------------------------- | ----------------------------------------------------------------- | ------------------------ |
-| `codex-review.mjs`          | Command-line entry: `node scripts/codex-review/codex-review.mjs`. | agents, by hand          |
-| `codex-review-state.mjs`    | Reads a PR's review state from GitHub.                            | `codex-review.mjs`       |
-| `codex-review-lock.mjs`     | Lock so two runs cannot request the same review.                  | `codex-review.mjs`       |
-| `codex-review-collapse.mjs` | Collapses acknowledged or completed review commands.              | `codex-review.mjs`       |
-| `*-tests.mjs`               | `node --test` tests for the files above.                          | `pnpm run test:workflow` |
+| File                           | What it does                                                            | Run by                   |
+| ------------------------------ | ----------------------------------------------------------------------- | ------------------------ |
+| `codex-review.mjs`             | Command-line entry: `node scripts/codex-review/codex-review.mjs`.       | agents, by hand          |
+| `codex-review-state.mjs`       | Reads a PR's review state from GitHub.                                  | `codex-review.mjs`       |
+| `codex-review-unavailable.mjs` | Authenticates and scopes usage-limit refusals and their retry cooldown. | `codex-review-state.mjs` |
+| `codex-review-lock.mjs`        | Lock so two runs cannot request the same review.                        | `codex-review.mjs`       |
+| `codex-review-collapse.mjs`    | Collapses acknowledged or completed review commands.                    | `codex-review.mjs`       |
+| `*-tests.mjs`                  | `node --test` tests for the files above.                                | `pnpm run test:workflow` |
 
 ## Guard behavior
 
@@ -17,8 +18,8 @@ Agents must use `node scripts/codex-review/codex-review.mjs <PR> --wait-seconds 
 reviews. Add `--request` only when authorized to post a review request. Use `--repo owner/name`
 when the PR belongs to another repository. Do not post raw `@codex review` comments or issue a
 second request because a polling window expired. Batch corrections before requesting a review.
-Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
-exits nonzero. A successful exit confirms review completion, not merge readiness.
+Only observed code-review completion exits successfully (0). Usage-limit refusal exits 3; pending,
+unreviewed, uncertain status and tool errors exit 2. A successful exit confirms review completion, not merge readiness.
 
 Authorized `--request` invocations also collapse original review commands after a verified eyes
 reaction from `chatgpt-codex-connector[bot]` or explicit matching code-review completion. This
@@ -56,7 +57,8 @@ under the root review policy, after assessing integration risks. The guard still
 for the exact current head; it does not transfer completion from a pre-update commit. After
 retargeting to a different base branch, review the new diff before merging.
 A completed code review can contain findings; the normal feedback-resolution gate still applies.
-Unknown or unavailable status must be reported as incomplete, never treated as permission to retry.
+Unknown or unavailable status must be reported as incomplete. Unknown evidence never authorizes retry;
+recognized usage-limit refusals follow the bounded retry policy below.
 An unreviewed PR must be quiet for five minutes after creation or its latest
 update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
 This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
@@ -81,6 +83,28 @@ because GitHub timestamps have second precision and exact-commit completion is r
 bot activity still marked running continues to block a new request. A newer summary-only completion
 remains unknown even when an earlier explicit result exists for the same SHA; completion does not
 establish clean findings, which must be verified from the actual review output.
+
+### Usage-limit refusals
+
+An unchanged usage-limit reply from GitHub's authenticated `chatgpt-codex-connector[bot]` ends
+only the latest preceding, unchanged SHA-tagged member/owner/collaborator request. Request and
+reply timestamps must be valid and strictly ordered; same-second or duplicate request ambiguity,
+edited replies/requests, untagged requests, missing bot identity and unrelated messages remain
+fail-closed. The matching local intent is retired only if its confirmed server request timestamp
+and SHA match. An uncertain delivery intent remains pending.
+
+The result is `unavailable`, with exit code 3, a fallback to another provider or a human, and a
+`retryAt` timestamp. Waiting stops immediately. A refusal never establishes completion, grants
+merge approval or authorizes collapsing a command as completed. Genuine pending formal reviews,
+requested reviewers and other outstanding requests still block duplicate requests.
+
+Usage limits block guarded requests on every head for 24 hours after the latest recognized reply.
+The cooldown uses GitHub's final response `Date`, including the exact boundary, not the local
+clock. Afterward the existing quiet period and all other checks must pass before an authorized
+`--request` can post one retry under the shared lock. The posted request and durable intent block
+further retries; another refusal starts a fresh cooldown. This is a bounded retry policy, not
+proof that credits or limits have reset. Plain observation never posts a retry. Do not edit
+historical refusal evidence or delete intents to force eligibility.
 
 ### Historical untagged requests
 
