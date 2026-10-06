@@ -96,12 +96,17 @@ test('Dependabot ignores direct dependencies that a pnpm override pins', () => {
   const config = read('.github/dependabot.yml');
   const npm = config.slice(0, config.indexOf('package-ecosystem: github-actions'));
   const ignore = npm.slice(npm.indexOf('    ignore:\n'), npm.indexOf('    groups:\n'));
-  for (const name of pinned)
-    assert.match(
-      ignore,
-      new RegExp(`- dependency-name: '?${name.replace(/[/.]/g, '\\$&')}'?\\n(?! {8}update-types)`),
-      name
-    );
+  const unconditional = new Set(
+    ignore
+      .split('\n      - ')
+      .slice(1)
+      .map((entry) =>
+        entry.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'))
+      )
+      .filter((lines) => lines.length === 1)
+      .map((lines) => lines[0].replace(/^dependency-name: /, '').replace(/^'(.*)'$/, '$1'))
+  );
+  for (const name of pinned) assert.ok(unconditional.has(name), name);
 });
 test('Dependabot auto-merge holds manifest changes to auth and billing clients', () => {
   const sensitive = autoMergeJob().match(/grep -E '([^']+)'/)[1];
