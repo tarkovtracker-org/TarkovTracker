@@ -368,9 +368,6 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-[functions.team-members]
-verify_jwt = false
-
 [functions.team-join]
 verify_jwt = false
 
