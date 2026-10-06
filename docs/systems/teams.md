@@ -28,7 +28,8 @@ path.
 - `supabase/migrations/20261002080000_durable_team_cooldowns.sql` — durable leave/kick cooldown
   state and the `leave_team`/`kick_team` RPCs that claim it
 - `supabase/functions/team-create/index.ts`, `supabase/functions/_shared/team-create-error.ts` —
-  authenticated team creation and database membership-conflict classification
+  authenticated team creation and database membership-conflict classification; new join codes
+  must be 12–255 characters (the client generates 12-character alphanumeric codes)
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
 - `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
