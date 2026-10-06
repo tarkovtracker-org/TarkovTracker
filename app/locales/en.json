@@ -147,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
-    "clear": "Clear",
     "empty": "No activity recorded yet.",
     "badge_api": "API Sync",
     "api_synced": "API Progress Synced",

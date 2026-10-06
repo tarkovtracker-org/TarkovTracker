@@ -102,13 +102,6 @@ describe('useActivityLogStore', () => {
     expect(store.hasUnread).toBe(false);
     expect(store.unreadCount).toBe(0);
   });
-  it('clears the manual log and marks everything read', () => {
-    const store = useActivityLogStore();
-    tarkovState.manualActivityHistory = [legacyEntry()];
-    store.clearLog();
-    expect(tarkovState.manualActivityHistory).toHaveLength(0);
-    expect(store.hasUnread).toBe(false);
-  });
   it('keeps synced manual entries on session reset and only clears the read marker', () => {
     const store = useActivityLogStore();
     tarkovState.manualActivityHistory = [legacyEntry()];

@@ -176,10 +176,6 @@ export const useActivityLogStore = defineStore('activityLog', {
         Date.now()
       );
     },
-    clearLog() {
-      useTarkovStore().clearManualActivityHistory();
-      this.markAllAsRead();
-    },
     /**
      * Reset only the device-local read marker. Manual entries now follow the
      * progress store's own session lifecycle, so this no longer writes an empty
