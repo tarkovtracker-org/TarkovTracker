@@ -48,6 +48,7 @@ overrides:
   serialize-javascript: '^7.0.5'
   'sharp@<0.35.4': '^0.35.4'
   shell-quote: 'npm:shell-quote@^1'
+  simple-git: '4.0.2'
   tar: '^7.5.19'
   'undici@6': '^6.29.0'
   'undici@7': '^7.30.0'
@@ -64,3 +65,5 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
+patchedDependencies:
+  '@nuxt/devtools@3.4.1': patches/@nuxt__devtools@3.4.1.patch
