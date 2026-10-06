@@ -82,6 +82,27 @@ test('Dependabot auto-merge covers every npm group except auth and billing', () 
   for (const group of groups)
     assert.ok(eligible.includes(`dependabot/npm_and_yarn/${group}-*`), group);
 });
+test('Dependabot ignores direct dependencies that a pnpm override pins', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const direct = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+  const workspace = read('pnpm-workspace.yaml');
+  const overrides = workspace.slice(workspace.indexOf('\noverrides:\n') + 12).split(/\n\S/)[0];
+  const pinned = [...overrides.matchAll(/^ {2}'?([^:'\n]+?)'?:/gm)]
+    .map((m) => m[1])
+    .filter((key) => !key.includes('>'))
+    .map((key) => key.replace(/(?<=.)@[^@]*$/, ''))
+    .filter((name) => direct.has(name));
+  assert.ok(pinned.length > 0);
+  const config = read('.github/dependabot.yml');
+  const npm = config.slice(0, config.indexOf('package-ecosystem: github-actions'));
+  const ignore = npm.slice(npm.indexOf('    ignore:\n'), npm.indexOf('    groups:\n'));
+  for (const name of pinned)
+    assert.match(
+      ignore,
+      new RegExp(`- dependency-name: '?${name.replace(/[/.]/g, '\\$&')}'?\\n(?! {8}update-types)`),
+      name
+    );
+});
 test('Dependabot auto-merge holds manifest changes to auth and billing clients', () => {
   const sensitive = autoMergeJob().match(/grep -E '([^']+)'/)[1];
   const grep = (line) => spawnSync('grep', ['-E', sensitive], { input: `${line}\n` }).status === 0;
