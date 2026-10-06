@@ -9,10 +9,17 @@ const MODES: GameMode[] = ['pvp', 'pve', 'seasonal'];
 const taskPayload = (id = 'root') => ({
   data: {
     tasks: {
-      [id]: { id, name: id, objectives: [{ id: `${id}-objective` }], taskRequirements: [] },
+      [id]: {
+        id,
+        name: id,
+        objectives: [{ id: `${id}-objective` }],
+        failConditions: [],
+        taskRequirements: [],
+      },
       child: {
         id: 'child',
         name: 'child',
+        failConditions: [],
         objectives: [{ id: 'child-objective' }],
         taskRequirements: [{ task: id, status: ['COMPLETE'] }],
       },
@@ -64,6 +71,33 @@ describe('gateway catalog cache', () => {
     { name: 'HTTP error', response: () => Promise.resolve(new Response('', { status: 503 })) },
     { name: 'network error', response: () => Promise.reject(new Error('offline')) },
     { name: 'malformed JSON', response: () => Promise.resolve(new Response('{')) },
+    {
+      name: 'absent failure rules',
+      response: () =>
+        Promise.resolve(
+          Response.json({
+            data: { tasks: { root: { id: 'root', objectives: [], taskRequirements: [] } } },
+          })
+        ),
+    },
+    {
+      name: 'malformed failure rules',
+      response: () =>
+        Promise.resolve(
+          Response.json({
+            data: {
+              tasks: {
+                root: {
+                  id: 'root',
+                  objectives: [],
+                  taskRequirements: [],
+                  failConditions: [{ task: 'child', status: 4 }],
+                },
+              },
+            },
+          })
+        ),
+    },
     { name: 'malformed envelope', response: () => Promise.resolve(Response.json({ data: null })) },
   ])('retries after a shared $name instead of caching failure', async ({ response }) => {
     const fetcher = vi

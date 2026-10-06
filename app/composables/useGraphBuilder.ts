@@ -1,3 +1,4 @@
+import { buildTaskFailureAlternatives } from '@shared/utils/taskFailureEdges';
 import {
   createGraph,
   type TaskGraph,
@@ -46,10 +47,6 @@ function buildContainsAllNeeds(
 export function useGraphBuilder() {
   const normalizeStatus = (status: string[] | undefined) =>
     (status ?? []).map((entry) => entry.toLowerCase());
-  const hasStatus = (status: string[] | undefined, statuses: string[]) => {
-    const normalized = normalizeStatus(status);
-    return statuses.some((value) => normalized.includes(value));
-  };
   const isActiveOnly = (status: string[] | undefined) => {
     const normalized = normalizeStatus(status);
     const hasActive =
@@ -104,43 +101,9 @@ export function useGraphBuilder() {
     const tempMapTasks: { [mapId: string]: string[] } = {};
     const tempObjectiveMaps: { [taskId: string]: ObjectiveMapInfo[] } = {};
     const tempObjectiveGPS: { [taskId: string]: ObjectiveGPSInfo[] } = {};
-    const tempAlternativeTasks: { [taskId: string]: string[] } = {};
+    const tempAlternativeTasks = buildTaskFailureAlternatives(taskList);
     const tempNeededObjectives: NeededItemTaskObjective[] = [];
-    const taskById = new Map(taskList.map((task) => [task.id, task]));
-    const addAlternative = (sourceId: string | undefined, alternativeId: string) => {
-      if (!sourceId || sourceId === alternativeId) return;
-      if (!tempAlternativeTasks[sourceId]) {
-        tempAlternativeTasks[sourceId] = [];
-      }
-      if (!tempAlternativeTasks[sourceId]!.includes(alternativeId)) {
-        tempAlternativeTasks[sourceId]!.push(alternativeId);
-      }
-    };
-    const hasFailConditionForTask = (task: Task | undefined, targetTaskId: string) => {
-      const failConditions = task?.failConditions;
-      const normalizedFailConditions = Array.isArray(failConditions)
-        ? failConditions
-        : normalizeTaskObjectives<TaskObjective>(failConditions);
-      if (!normalizedFailConditions.length) return false;
-      return normalizedFailConditions.some(
-        (objective) =>
-          objective?.task?.id === targetTaskId &&
-          hasStatus(objective.status, ['complete', 'completed'])
-      );
-    };
     taskList.forEach((task) => {
-      // Process taskRequirements to find alternative tasks.
-      // Active-only requirements can represent branching when the required task
-      // explicitly fails if this task is completed.
-      task.taskRequirements?.forEach((requirement) => {
-        if (requirement?.task?.id && isActiveOnly(requirement.status)) {
-          const requiredTask = taskById.get(requirement.task.id);
-          // If the required task fails when this task completes, treat them as mutual alternatives.
-          if (hasFailConditionForTask(requiredTask, task.id)) {
-            addAlternative(requirement.task.id, task.id);
-          }
-        }
-      });
       // Process objectives
       const objectives = Array.isArray(task.objectives)
         ? task.objectives
@@ -210,15 +173,6 @@ export function useGraphBuilder() {
             },
             ...buildContainsAllNeeds(task.id, objective)
           );
-        }
-      });
-      // Process fail conditions for alternative tasks (complete-status triggers)
-      const failConditions = Array.isArray(task.failConditions)
-        ? task.failConditions
-        : normalizeTaskObjectives<TaskObjective>(task.failConditions);
-      failConditions.forEach((objective) => {
-        if (objective?.task?.id && hasStatus(objective.status, ['complete', 'completed'])) {
-          addAlternative(objective.task.id, task.id);
         }
       });
     });
