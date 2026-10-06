@@ -21,9 +21,11 @@ vi.mock('@/utils/logger', () => ({
 const useStore = defineStore('payload-regression', {
   state: () => structuredClone(defaultState),
 });
+const sessions = new Set<ProgressSyncSession>();
 const startSync = () => {
   const store = useStore();
   const session = new ProgressSyncSession();
+  sessions.add(session);
   session.start({
     store,
     userId: user.id,
@@ -41,6 +43,8 @@ describe('progress sync payload equality', () => {
     user.loggedIn = true;
   });
   afterEach(() => {
+    for (const session of sessions) session.reset();
+    sessions.clear();
     vi.useRealTimers();
   });
   it('uploads Aa then BB through the production transform and deduplicates identical payloads', async () => {
@@ -63,7 +67,6 @@ describe('progress sync payload equality', () => {
     await sync.syncToSupabase();
     expect(sendProgressSync).toHaveBeenCalledTimes(2);
     expect(sync.hasPendingChanges!()).toBe(false);
-    sync.cleanup();
   });
   it('does not acknowledge pending BB when an external save acknowledged Aa', async () => {
     const { store, sync } = startSync();
@@ -80,7 +83,6 @@ describe('progress sync payload equality', () => {
       pvp_data: { displayName: 'BB' },
     });
     expect(sync.hasPendingChanges!()).toBe(false);
-    sync.cleanup();
   });
   it('retains a failed payload until a successful retry acknowledges it', async () => {
     sendProgressSync.mockResolvedValueOnce({ error: { message: 'offline' } });
@@ -92,7 +94,6 @@ describe('progress sync payload equality', () => {
     await sync.retryNow();
     expect(sendProgressSync).toHaveBeenCalledTimes(2);
     expect(sync.hasPendingChanges!()).toBe(false);
-    sync.cleanup();
   });
   it('does not acknowledge an upload that finishes after an owner switch', async () => {
     let finish!: (result: { error: null }) => void;
@@ -114,6 +115,5 @@ describe('progress sync payload equality', () => {
     await sync.syncToSupabase();
     expect(sendProgressSync).toHaveBeenCalledTimes(2);
     expect(sync.hasPendingChanges!()).toBe(false);
-    sync.cleanup();
   });
 });
