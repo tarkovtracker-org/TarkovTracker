@@ -3,26 +3,19 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
-const { mockCreateToken, mockEq, mockRevokeToken, mockUpdate, mockUpdateSingle } = vi.hoisted(
-  () => ({
-    mockCreateToken: vi.fn(),
-    mockEq: vi.fn(),
-    mockRevokeToken: vi.fn(),
-    mockUpdate: vi.fn(),
-    mockUpdateSingle: vi.fn(),
-  })
-);
+const { mockCreateToken, mockDelete, mockEq, mockUpdate, mockUpdateSingle } = vi.hoisted(() => ({
+  mockCreateToken: vi.fn(),
+  mockDelete: vi.fn(),
+  mockEq: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockUpdateSingle: vi.fn(),
+}));
 const mockSupabaseUser = reactive({
   loggedIn: true,
   id: 'user-a',
 });
 const mockToast = {
   add: vi.fn(),
-};
-const runtimeConfig = {
-  public: {
-    allowDirectTokenCreateFallback: false,
-  },
 };
 const pendingLoads = new Map<
   string,
@@ -45,19 +38,25 @@ const pendingCreates = new Map<
   string,
   (value: { tokenId?: string; tokenValue?: string }) => void
 >();
-const mockInsert = vi.fn();
-const mockInsertSingle = vi.fn();
 const mockFrom = vi.fn(() => {
-  let operation: 'insert' | 'select' | 'update' = 'select';
+  let deleteFilters: Record<string, string> = {};
   let currentUserId = '';
   const table = {
-    insert: vi.fn((payload: Record<string, unknown>) => {
-      operation = 'insert';
-      mockInsert(payload);
-      return table;
+    delete: vi.fn(() => {
+      deleteFilters = {};
+      const chain = {
+        eq: vi.fn((column: string, value: string) => {
+          deleteFilters[column] = value;
+          return chain;
+        }),
+        then: (
+          onfulfilled: (value: unknown) => unknown,
+          onrejected?: (reason: unknown) => unknown
+        ) => Promise.resolve(mockDelete(deleteFilters)).then(onfulfilled, onrejected),
+      };
+      return chain;
     }),
     update: vi.fn((payload: Record<string, unknown>) => {
-      operation = 'update';
       mockUpdate(payload);
       return table;
     }),
@@ -75,7 +74,7 @@ const mockFrom = vi.fn(() => {
         })
     ),
     select: vi.fn(() => table),
-    single: vi.fn(() => (operation === 'update' ? mockUpdateSingle() : mockInsertSingle())),
+    single: vi.fn(() => mockUpdateSingle()),
   };
   return table;
 });
@@ -91,12 +90,10 @@ mockNuxtImport('useNuxtApp', () => () => ({
     client: mockSupabaseClient,
   },
 }));
-mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 mockNuxtImport('useToast', () => () => mockToast);
 vi.mock('@/composables/api/useEdgeFunctions', () => ({
   useEdgeFunctions: () => ({
     createToken: mockCreateToken,
-    revokeToken: mockRevokeToken,
   }),
 }));
 vi.mock('@/utils/logger', () => ({
@@ -220,13 +217,10 @@ describe('ApiTokens', () => {
     vi.spyOn(globalThis.crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer);
     pendingLoads.clear();
     pendingCreates.clear();
-    runtimeConfig.public.allowDirectTokenCreateFallback = false;
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-a';
     mockCreateToken.mockReset();
     mockEq.mockReset();
-    mockInsert.mockReset();
-    mockInsertSingle.mockReset();
     mockUpdate.mockReset();
     mockUpdateSingle.mockReset();
     mockCreateToken.mockImplementation(
@@ -235,7 +229,8 @@ describe('ApiTokens', () => {
           pendingCreates.set(mockSupabaseUser.id, resolve);
         })
     );
-    mockRevokeToken.mockReset();
+    mockDelete.mockReset();
+    mockDelete.mockResolvedValue({ error: null });
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -419,7 +414,6 @@ describe('ApiTokens', () => {
           resolveRename = resolve;
         })
     );
-    mockRevokeToken.mockResolvedValueOnce(undefined);
     const wrapper = await createWrapper();
     await flushPromises();
     resolveLoadMany('user-a', [
@@ -511,36 +505,8 @@ describe('ApiTokens', () => {
     );
     expect(wrapper.text()).not.toContain('Fallback Token');
   });
-  it('allows direct insert fallback when explicitly enabled and token-create is unavailable', async () => {
-    runtimeConfig.public.allowDirectTokenCreateFallback = true;
-    mockCreateToken.mockRejectedValueOnce({ status: 404, data: { message: 'Not found' } });
-    mockInsertSingle.mockResolvedValueOnce({
-      data: { token_id: 'user-a-direct-token' },
-      error: null,
-    });
-    const wrapper = await createWrapper();
-    await flushPromises();
-    await clickButton(wrapper, 'page.settings.card.apitokens.new_token_expand');
-    await clickButton(wrapper, 'page.settings.card.apitokens.submit_new_token');
-    await flushPromises();
-    expect(mockCreateToken).toHaveBeenCalledTimes(1);
-    expect(mockInsert).toHaveBeenCalledTimes(1);
-    resolveLoad('user-a', 'Fallback Token');
-    await flushPromises();
-    expect(
-      mockToast.add.mock.calls.filter(
-        ([payload]) => payload.title === 'page.settings.card.apitokens.create_token_success'
-      )
-    ).toHaveLength(1);
-    expect(wrapper.text()).toContain('Fallback Token');
-  });
-  it('uses the SZN prefix for Seasonal token creation and direct fallback', async () => {
-    runtimeConfig.public.allowDirectTokenCreateFallback = true;
-    mockCreateToken.mockRejectedValueOnce({ status: 404, data: { message: 'Not found' } });
-    mockInsertSingle.mockResolvedValueOnce({
-      data: { token_id: 'user-a-seasonal-token' },
-      error: null,
-    });
+  it('sends a SZN-prefixed token value for Seasonal token creation', async () => {
+    mockCreateToken.mockResolvedValueOnce({ tokenId: 'user-a-seasonal-token' });
     const wrapper = await createWrapper();
     await flushPromises();
     await clickButton(wrapper, 'page.settings.card.apitokens.new_token_expand');
@@ -553,14 +519,37 @@ describe('ApiTokens', () => {
         tokenValue: expect.stringMatching(/^SZN_[0-9a-f]{18}$/),
       })
     );
-    const edgeTokenValue = mockCreateToken.mock.calls[0]?.[0].tokenValue;
-    expect(edgeTokenValue).toMatch(/^SZN_[0-9a-f]{18}$/);
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        game_mode: 'seasonal',
-        token_value: edgeTokenValue,
-      })
+  });
+  it('revokes a token with an owner-scoped direct delete and reloads the list', async () => {
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    pendingLoads.clear();
+    await clickButton(wrapper, 'page.settings.card.apitokens.revoke_button');
+    await flushPromises();
+    expect(mockDelete).toHaveBeenCalledWith({ token_id: 'user-a-token', user_id: 'user-a' });
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'page.settings.card.apitokens.token_revoked' })
     );
+    expect(pendingLoads.has('user-a')).toBe(true);
+  });
+  it('shows an error toast when the token delete fails', async () => {
+    mockDelete.mockResolvedValueOnce({ error: { code: '42501', message: 'permission denied' } });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    await clickButton(wrapper, 'page.settings.card.apitokens.revoke_button');
+    await flushPromises();
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'page.settings.card.apitokens.token_revoke_error' })
+    );
+    expect(
+      mockToast.add.mock.calls.filter(
+        ([payload]) => payload.title === 'page.settings.card.apitokens.token_revoked'
+      )
+    ).toHaveLength(0);
   });
   it('disables create and shows the token cap alert when the account has 3 active tokens', async () => {
     const wrapper = await createWrapper();

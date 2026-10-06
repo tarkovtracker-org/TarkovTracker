@@ -303,16 +303,7 @@
     type GameMode,
   } from '@/utils/constants';
   import { logger } from '@/utils/logger';
-  import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
   import type { RawTokenRow, TokenPermission, TokenRow } from '@/types/api';
-  type ApiTokenInsertPayload = {
-    game_mode: GameMode;
-    note: string | null;
-    permissions: TokenPermission[];
-    token_hash: string;
-    token_value?: string;
-    user_id: string;
-  };
   type ApiTokenUpdatePayload = {
     note: string | null;
   };
@@ -322,7 +313,7 @@
   } | null;
   interface SupabaseTable {
     select: (query: string) => SupabaseTable;
-    insert: (data: ApiTokenInsertPayload) => SupabaseTable;
+    delete: () => SupabaseTable;
     update: (data: ApiTokenUpdatePayload) => SupabaseTable;
     eq: (column: string, value: string) => SupabaseTable;
     order: (column: string, options?: { ascending: boolean }) => SupabaseTable;
@@ -335,7 +326,6 @@
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { $supabase } = useNuxtApp();
-  const runtimeConfig = useRuntimeConfig();
   const { showErrorToast } = useDiagnosticToast();
   const edgeFunctions = useEdgeFunctions();
   const showCreateDialog = ref(false);
@@ -384,9 +374,6 @@
       selectedPermissions.value.length > 0 &&
       !!selectedGameMode.value &&
       !tokenCapReached.value
-  );
-  const allowDirectTokenCreateFallback = computed(
-    () => runtimeConfig.public.allowDirectTokenCreateFallback === true
   );
   const formatDate = (date: string | null) => {
     if (!date) return '';
@@ -534,12 +521,6 @@
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     return `${API_TOKEN_PREFIXES[gameMode]}${hex}`;
   };
-  const hashToken = async (token: string) => {
-    const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-    return Array.from(new Uint8Array(buffer))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  };
   const togglePermission = (value: TokenPermission, checked: boolean) => {
     if (checked) {
       if (!selectedPermissions.value.includes(value)) {
@@ -550,70 +531,23 @@
     }
   };
   const createToken = async () => {
-    const table = tableClient();
     const userId = getActiveUserId();
-    if (creating.value || !canSubmit.value || !userId || !table) return;
+    if (creating.value || !canSubmit.value || !userId) return;
     const requestId = ++createTokenRequestId;
     creating.value = true;
-    const createTokenDirect = async (rawToken: string) => {
-      if (!isCurrentTokenCreate(requestId, userId)) return null;
-      const hashedToken = await hashToken(rawToken);
-      if (!isCurrentTokenCreate(requestId, userId)) return null;
-      const insertPayload: ApiTokenInsertPayload = {
-        user_id: userId,
-        token_hash: hashedToken,
-        permissions: selectedPermissions.value,
-        game_mode: selectedGameMode.value,
-        note: note.value || null,
-      };
-      if (supportsRawTokens.value) {
-        insertPayload.token_value = rawToken;
-      }
-      const attemptInsert = async () =>
-        table.insert(insertPayload).select('token_id').single() as Promise<{
-          data: { token_id: string } | null;
-          error: { code?: string } | null;
-        }>;
-      let insertResult = await attemptInsert();
-      if (!isCurrentTokenCreate(requestId, userId)) return null;
-      if (insertResult.error?.code === '42703' && supportsRawTokens.value) {
-        supportsRawTokens.value = false;
-        delete insertPayload.token_value;
-        insertResult = await attemptInsert();
-        if (!isCurrentTokenCreate(requestId, userId)) return null;
-      }
-      if (insertResult.error) throw insertResult.error;
-      return insertResult.data?.token_id || null;
-    };
     try {
       const rawToken = generateToken(selectedGameMode.value);
-      let response: { tokenId?: string; tokenValue?: string } | null = null;
-      try {
-        response = await edgeFunctions.createToken({
-          permissions: selectedPermissions.value,
-          gameMode: selectedGameMode.value,
-          note: note.value || null,
-          tokenValue: supportsRawTokens.value ? rawToken : undefined,
-        });
-      } catch (error) {
-        if (
-          !allowDirectTokenCreateFallback.value ||
-          !shouldFallbackForUnavailableTokenFunction(error)
-        ) {
-          throw error;
-        }
-        logger.warn(
-          '[ApiTokens] token-create unavailable, falling back to direct insert via opt-in flag:',
-          error
-        );
-        const tokenId = await createTokenDirect(rawToken);
-        response = { tokenId: tokenId || undefined, tokenValue: rawToken };
-      }
+      const response = await edgeFunctions.createToken({
+        permissions: selectedPermissions.value,
+        gameMode: selectedGameMode.value,
+        note: note.value || null,
+        tokenValue: supportsRawTokens.value ? rawToken : undefined,
+      });
       if (!isCurrentTokenCreate(requestId, userId)) {
         return;
       }
-      const tokenId = (response as { tokenId?: string })?.tokenId || null;
-      const tokenValue = (response as { tokenValue?: string })?.tokenValue || rawToken;
+      const tokenId = response?.tokenId || null;
+      const tokenValue = response?.tokenValue || rawToken;
       generatedToken.value = tokenValue;
       toast.add({
         title: t('page.settings.card.apitokens.create_token_success'),
@@ -802,11 +736,20 @@
       finishTokenRename(requestId);
     }
   };
+  const deleteToken = async (tokenId: string) => {
+    const table = tableClient();
+    const userId = getActiveUserId();
+    if (!table || !userId) throw new Error('Not signed in');
+    const { error } = (await table.delete().eq('token_id', tokenId).eq('user_id', userId)) as {
+      error: SupabaseTokenError;
+    };
+    if (error) throw error;
+  };
   const revokeToken = async (tokenId: string) => {
     if (!tokenId) return;
     revokingId.value = tokenId;
     try {
-      await edgeFunctions.revokeToken(tokenId);
+      await deleteToken(tokenId);
       toast.add({
         title: t('page.settings.card.apitokens.token_revoked'),
         color: 'success',

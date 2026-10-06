@@ -322,44 +322,6 @@ describe('useEdgeFunctions.createToken', () => {
     });
     expect(mockFetch).not.toHaveBeenCalled();
   });
-  it('uses DELETE invocation for token revoke', async () => {
-    mockSupabaseClient.functions.invoke.mockResolvedValue({
-      data: { success: true },
-      error: null,
-    });
-    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
-    const edgeFunctions = useEdgeFunctions();
-    await expect(edgeFunctions.revokeToken('token-1')).resolves.toEqual({ success: true });
-    expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledWith('token-revoke', {
-      body: { tokenId: 'token-1' },
-      method: 'DELETE',
-    });
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-  it('falls back to direct delete when token-revoke is unavailable', async () => {
-    const deleteEq = vi.fn(() => ({ error: null }));
-    const deleteFn = vi.fn(() => ({
-      eq: deleteEq,
-    }));
-    mockSupabaseClient.from.mockReturnValueOnce({
-      delete: deleteFn,
-      eq: vi.fn(),
-    } as never);
-    mockSupabaseClient.functions.invoke.mockResolvedValue({
-      data: null,
-      error: { status: 404, data: { message: 'Not found' } },
-    });
-    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
-    const edgeFunctions = useEdgeFunctions();
-    await expect(edgeFunctions.revokeToken('token-1')).resolves.toEqual({ success: true });
-    expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledWith('token-revoke', {
-      body: { tokenId: 'token-1' },
-      method: 'DELETE',
-    });
-    expect(mockSupabaseClient.from).toHaveBeenCalledWith('api_tokens');
-    expect(deleteFn).toHaveBeenCalledTimes(1);
-    expect(deleteEq).toHaveBeenCalledWith('token_id', 'token-1');
-  });
 });
 describe('useEdgeFunctions.purgeCache', () => {
   beforeEach(() => {
