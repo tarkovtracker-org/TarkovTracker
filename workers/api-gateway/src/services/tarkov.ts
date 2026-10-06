@@ -1,4 +1,5 @@
 import { waitUntil } from 'cloudflare:workers';
+import { CatalogUnavailableError } from './catalog-error';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { prepareTaskCatalog } from '../utils/task-catalog';
 import { TARKOVTRACKER_USER_AGENT } from '../utils/userAgent';
@@ -30,19 +31,19 @@ const getApiGameMode = (gameMode: GameMode): 'regular' | 'pve' | 'pvp-season' =>
   return 'regular';
 };
 // Fetch a json.tarkov.dev endpoint and unwrap the { data: ... } envelope.
-// Returns null on any error so callers degrade to empty data instead of
-// throwing.
-async function fetchJson<T>(path: string): Promise<T | null> {
+// Required rules must fail closed when their catalog is unavailable.
+async function fetchJson<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${JSON_BASE_URL}/${path}`, {
       headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!response.ok) return null;
-    const json = (await response.json()) as { data: T };
-    return json.data;
+    if (!response.ok) throw new CatalogUnavailableError();
+    const json: unknown = await response.json();
+    if (!isRecord(json) || !isRecord(json.data)) throw new CatalogUnavailableError();
+    return json.data as T;
   } catch {
-    return null;
+    throw new CatalogUnavailableError();
   }
 }
 type JsonTask = {
@@ -71,6 +72,48 @@ const asString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 const asFiniteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+function requireCatalog(
+  value: unknown,
+  validEntry: (entry: Record<string, unknown>) => boolean
+): asserts value is Record<string, unknown> {
+  if (!isRecord(value)) throw new CatalogUnavailableError();
+  const entries = Object.values(value);
+  if (!entries.length || !entries.every((entry) => isRecord(entry) && validEntry(entry))) {
+    throw new CatalogUnavailableError();
+  }
+}
+function isTaskRequirement(value: unknown): boolean {
+  if (!isRecord(value) || !asString(value.task)) return false;
+  return Array.isArray(value.status) && value.status.every((status) => typeof status === 'string');
+}
+function isTaskRuleEntry(task: Record<string, unknown>): boolean {
+  if (!asString(task.id) || !Array.isArray(task.taskRequirements)) return false;
+  return task.taskRequirements.every(isTaskRequirement) && isObjectiveList(task.objectives);
+}
+function isObjectiveList(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every((objective) => isRecord(objective) && Boolean(asString(objective.id)))
+  );
+}
+function isHideoutLevel(value: unknown): boolean {
+  if (!isRecord(value) || !asString(value.id) || asFiniteNumber(value.level) === undefined)
+    return false;
+  return Array.isArray(value.itemRequirements) && value.itemRequirements.every(isHideoutItem);
+}
+function isHideoutItem(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    Boolean(asString(value.item) ?? asString(value.id)) && asFiniteNumber(value.count) !== undefined
+  );
+}
+function isHideoutEntry(station: Record<string, unknown>): boolean {
+  return (
+    Boolean(asString(station.id)) &&
+    Array.isArray(station.levels) &&
+    station.levels.every(isHideoutLevel)
+  );
+}
 export function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
   const apiGameMode = getApiGameMode(gameMode);
   const cacheKey = `tarkov:tasks:${apiGameMode}`;
@@ -78,7 +121,7 @@ export function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
 }
 async function fetchTasks(apiGameMode: string, cacheKey: string): Promise<TarkovTask[]> {
   const data = await fetchJson<JsonTasksPayload>(`${apiGameMode}/tasks`);
-  if (!data || !isRecord(data.tasks)) return [];
+  requireCatalog(data.tasks, isTaskRuleEntry);
   const tasks: TarkovTask[] = Object.values(data.tasks)
     .filter(isRecord)
     .flatMap((rawTask) => {
@@ -132,7 +175,7 @@ async function fetchHideoutStations(
   cacheKey: string
 ): Promise<TarkovHideoutStation[]> {
   const data = await fetchJson<JsonHideoutPayload>(`${apiGameMode}/hideout`);
-  if (!data || !isRecord(data)) return [];
+  requireCatalog(data, isHideoutEntry);
   const stations: TarkovHideoutStation[] = Object.values(data)
     .filter(isRecord)
     .flatMap((rawStation) => {

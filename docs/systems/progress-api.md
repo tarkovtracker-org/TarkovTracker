@@ -74,6 +74,12 @@ sequenceDiagram
    The originating request retains that operation with `waitUntil`; streams are consumed there and
    only parsed public catalog data is shared. Every settled operation leaves the in-flight map;
    failures remain uncached and retryable, with the existing 30-second fetch timeout.
+   Missing, empty, or structurally malformed required catalogs return 503 with the ordinary error
+   envelope and any available quota headers. Progress and team reads do not return partial derived
+   state or ETags on this path. Single and batch task writes await validated task rules before
+   applying transitions or calling the progress merge RPC; level and objective patches do not
+   evaluate task rules and retain their existing behavior. Expired catalogs are not used as a
+   last-good fallback.
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
    algorithm the app uses) and game-edition hideout auto-completes.
