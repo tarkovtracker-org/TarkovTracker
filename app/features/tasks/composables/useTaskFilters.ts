@@ -61,7 +61,7 @@ export function useTaskFilters({
       searchQuery.value = getQueryString(newQ) || '';
     }
   );
-  const debouncedSearch = ref('');
+  const debouncedSearch = ref(searchQuery.value);
   const updateDebouncedSearch = debounce((value: string) => {
     debouncedSearch.value = value;
   }, 180);
