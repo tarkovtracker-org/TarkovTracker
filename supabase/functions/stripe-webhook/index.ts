@@ -1271,6 +1271,55 @@ function jsonResponse(body: unknown, status: number, req: Request): Response {
     headers: { ...corsHeadersFor(req), 'Content-Type': 'application/json' },
   });
 }
+async function deliverEvent(event: StripeEvent, req: Request): Promise<Response> {
+  let claim: EventClaim;
+  try {
+    claim = await claimEvent(event.id, event.type);
+  } catch (err) {
+    console.error('[stripe-webhook] Event claim transient failure, retrying:', err);
+    return jsonResponse({ error: 'Event claim failed' }, 500, req);
+  }
+  return await respondToClaim(event, claim, req);
+}
+async function respondToClaim(event: StripeEvent, claim: EventClaim, req: Request): Promise<Response> {
+  if (['completed', 'terminal'].includes(claim.outcome)) {
+    return jsonResponse({ received: true, duplicate: true }, 200, req);
+  }
+  if (claim.outcome !== 'claimed' || !claim.token) {
+    console.warn('[stripe-webhook] Event not available for processing:', {
+      eventId: event.id,
+      outcome: claim.outcome,
+    });
+    return jsonResponse({ error: 'Event awaiting recovery', outcome: claim.outcome }, 503, req);
+  }
+  return await processClaimedEvent(event, claim.token, req);
+}
+async function processClaimedEvent(event: StripeEvent, token: string, req: Request): Promise<Response> {
+  try {
+    await processingClient.run(fencedClient(event.id, token), () => dispatchEvent(event));
+    await finishEvent(event.id, token, 'completed');
+  } catch (err) {
+    return await respondToFailure(event, token, err, req);
+  }
+  return jsonResponse({ received: true }, 200, req);
+}
+async function respondToFailure(event: StripeEvent, token: string, err: unknown, req: Request): Promise<Response> {
+  const outcome = err instanceof PermanentError ? 'terminal' : 'retryable';
+  try {
+    await finishEvent(event.id, token, outcome);
+  } catch (completionError) {
+    // A later delivery can reclaim the expired lease even if this request
+    // cannot persist its failure outcome. Never delete the receipt.
+    console.error('[stripe-webhook] Failed to persist event outcome:', completionError);
+    return jsonResponse({ error: 'Event outcome not recorded' }, 500, req);
+  }
+  if (err instanceof PermanentError) {
+    console.error(`[stripe-webhook] Permanent failure for ${event.type}:`, err.message);
+    return jsonResponse({ received: true, error: 'permanent' }, 200, req);
+  }
+  console.error(`[stripe-webhook] Transient failure for ${event.type}:`, err);
+  return jsonResponse({ error: 'Processing failed' }, 500, req);
+}
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeadersFor(req) });
@@ -1296,42 +1345,5 @@ Deno.serve(async (req: Request) => {
     console.warn('[stripe-webhook] Missing event id/type');
     return jsonResponse({ error: 'Malformed event' }, 400, req);
   }
-  let claim: EventClaim;
-  try {
-    claim = await claimEvent(event.id, event.type);
-  } catch (err) {
-    console.error('[stripe-webhook] Event claim transient failure, retrying:', err);
-    return jsonResponse({ error: 'Event claim failed' }, 500, req);
-  }
-  if (claim.outcome === 'completed' || claim.outcome === 'terminal') {
-    return jsonResponse({ received: true, duplicate: true }, 200, req);
-  }
-  if (claim.outcome !== 'claimed' || !claim.token) {
-    console.warn('[stripe-webhook] Event not available for processing:', {
-      eventId: event.id,
-      outcome: claim.outcome,
-    });
-    return jsonResponse({ error: 'Event awaiting recovery', outcome: claim.outcome }, 503, req);
-  }
-  try {
-    await processingClient.run(fencedClient(event.id, claim.token), () => dispatchEvent(event));
-    await finishEvent(event.id, claim.token, 'completed');
-  } catch (err) {
-    const outcome = err instanceof PermanentError ? 'terminal' : 'retryable';
-    try {
-      await finishEvent(event.id, claim.token, outcome);
-    } catch (completionError) {
-      // Keep the receipt. A later delivery can reclaim the expired lease even
-      // if this request cannot persist its failure outcome.
-      console.error('[stripe-webhook] Failed to persist event outcome:', completionError);
-      return jsonResponse({ error: 'Event outcome not recorded' }, 500, req);
-    }
-    if (err instanceof PermanentError) {
-      console.error(`[stripe-webhook] Permanent failure for ${event.type}:`, err.message);
-      return jsonResponse({ received: true, error: 'permanent' }, 200, req);
-    }
-    console.error(`[stripe-webhook] Transient failure for ${event.type}:`, err);
-    return jsonResponse({ error: 'Processing failed' }, 500, req);
-  }
-  return jsonResponse({ received: true }, 200, req);
+  return await deliverEvent(event, req);
 });

@@ -6,6 +6,9 @@ const receipts = new Map<string, Receipt>();
 let upstreamAttempts = 0;
 let failUpstream = false;
 let failOutcome = false;
+let failAttribution = false;
+let supporterWrites = 0;
+const denials = new Map<string, string>();
 let writeHeaders: Headers | undefined;
 let handler: (req: Request) => Promise<Response>;
 const secret = 'whsec_isolated_test';
@@ -16,7 +19,44 @@ const supporter = {
   status: 'active',
   updated_at: '2026-01-01T00:00:00Z',
   discord_user_id: null,
+  stripe_customer_id: 'cus_test',
+  type: 'subscription',
+  tier: 'scav',
+  has_ever_supported: true,
+  retention_history_verified: true,
 };
+let row: Record<string, unknown> = { ...supporter };
+function stripeResponse(url: URL): Response {
+  upstreamAttempts++;
+  if (failUpstream) return reply({ error: 'isolated Stripe outage' }, 503);
+  if (url.pathname.startsWith('/v1/charges/')) {
+    if (failAttribution) return reply({ error: 'isolated attribution outage' }, 503);
+    return reply({ customer: 'cus_test', metadata: { user_id: userId } });
+  }
+  return reply({ id: 'sub_test', status: 'canceled', ended_at: 1_700_000_000 });
+}
+async function supporterResponse(request: Request, url: URL): Promise<Response> {
+  const matches = [...url.searchParams]
+    .filter(([, value]) => value.startsWith('eq.'))
+    .every(([column, value]) => String(row[column]) === value.slice(3));
+  if (request.method === 'GET') return reply(matches ? { ...row } : null);
+  writeHeaders = request.headers;
+  if (!matches) return reply([]);
+  row = { ...row, ...(await request.json()), updated_at: `revision_${++supporterWrites}` };
+  return reply([{ ...row }]);
+}
+async function disqualifyResponse(request: Request): Promise<Response> {
+  const params = await request.json();
+  if (!denials.has(params.p_customer_id)) denials.set(params.p_customer_id, '2026-01-01T00:00:00Z');
+  row = {
+    ...row,
+    supporter_disqualified_at: denials.get(params.p_customer_id),
+    status: 'cancelled',
+    has_ever_supported: false,
+  };
+  writeHeaders = request.headers;
+  return new Response(null, { status: 204 });
+}
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -47,19 +87,12 @@ function finish(params: Record<string, string>): Response {
 async function fakeFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
   const request = new Request(input, init);
   const url = new URL(request.url);
-  if (url.hostname === 'api.stripe.com') {
-    upstreamAttempts++;
-    if (failUpstream) return reply({ error: 'isolated Stripe outage' }, 503);
-    return reply({ id: 'sub_test', status: 'canceled', ended_at: 1_700_000_000 });
-  }
+  if (url.hostname === 'api.stripe.com') return stripeResponse(url);
   assertEquals(url.hostname, 'supabase.invalid');
   if (url.pathname.endsWith('/claim_stripe_event')) return claim(await request.json());
   if (url.pathname.endsWith('/finish_stripe_event')) return finish(await request.json());
-  if (url.pathname.endsWith('/supporters')) {
-    if (request.method === 'GET') return reply(supporter);
-    writeHeaders = request.headers;
-    return reply([{ user_id: userId }]);
-  }
+  if (url.pathname.endsWith('/supporters')) return supporterResponse(request, url);
+  if (url.pathname.endsWith('/disqualify_supporter_customer')) return disqualifyResponse(request);
   if (url.pathname.endsWith('/discord_account_links')) return reply(null);
   if (url.pathname.includes('/auth/v1/')) return reply({ user: { identities: [] } });
   throw new Error(`Unexpected isolated request: ${request.method} ${url.pathname}`);
@@ -125,6 +158,7 @@ Deno.test(
         assertEquals(upstreamAttempts, 2);
       });
       await test.step('failed failure persistence stays retryable after expiry', async () => {
+        row = { ...supporter };
         failUpstream = true;
         failOutcome = true;
         assertEquals((await handler(await signedRequest('evt_outage'))).status, 500);
@@ -139,12 +173,42 @@ Deno.test(
         assert(receipts.get('evt_outage')?.token !== previousToken);
       });
       await test.step('successful partial effects with lost completion can recover', async () => {
+        row = { ...supporter };
+        const before = supporterWrites;
         failOutcome = true;
         assertEquals((await handler(await signedRequest('evt_partial'))).status, 500);
+        assertEquals(row.stripe_subscription_id, null);
+        assertEquals(row.status, 'expired');
+        assertEquals(supporterWrites, before + 1);
         receipts.get('evt_partial')!.expires = 0;
         failOutcome = false;
         assertEquals((await handler(await signedRequest('evt_partial'))).status, 200);
         assertEquals(receipts.get('evt_partial')?.state, 'completed');
+        assertEquals(supporterWrites, before + 1);
+      });
+      await test.step('chargeback partial denial survives attribution failure and retry', async () => {
+        row = { ...supporter };
+        failAttribution = true;
+        const dispute = { customer: 'cus_test', charge: 'ch_test' };
+        assertEquals(
+          (await handler(await signedRequest('evt_dispute', 'charge.dispute.created', dispute)))
+            .status,
+          500
+        );
+        assertEquals(denials.size, 1);
+        const denialDate = row.supporter_disqualified_at;
+        assertEquals(row.has_ever_supported, false);
+        failAttribution = false;
+        assertEquals(
+          (await handler(await signedRequest('evt_dispute', 'charge.dispute.created', dispute)))
+            .status,
+          200
+        );
+        assertEquals(receipts.get('evt_dispute')?.state, 'completed');
+        assertEquals(denials.size, 1);
+        assertEquals(row.supporter_disqualified_at, denialDate);
+        assertEquals(row.has_ever_supported, false);
+        assertEquals(writeHeaders?.get('x-stripe-event-id'), 'evt_dispute');
       });
       await test.step('unknown historical receipt is not acknowledged or replayed', async () => {
         receipts.set('evt_legacy', { state: 'legacy_unknown', token: '', expires: 0 });
