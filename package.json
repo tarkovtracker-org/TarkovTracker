@@ -106,6 +106,7 @@
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "systems:check": "node scripts/checks/check-systems-drift.mjs",
     "test": "vitest run",
+    "test:progress-native": "node scripts/checks/progress-renderer-repro.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
