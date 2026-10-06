@@ -139,7 +139,10 @@ sequenceDiagram
 | `team-disband`      | `team-disband`      |    10 | 1 hour |
 | `token-create`      | `token-create`      |     3 | 1 hour |
 | `discord-role-sync` | `discord-role-sync` |    10 | 10 min |
-| `discord-unlink`    | `discord-unlink`    |    10 | 1 hour |
+| `discord-unlink`    | `discord-role-sync` |     9 | 10 min |
+
+`discord-unlink` shares the `discord-role-sync` bucket but is refused once 9 of 10 slots are
+used, so the role restore the settings page runs after a failed identity unlink always has a slot.
 
 Source of truth for limits: `supabase/functions/_shared/rate-limit.ts`  
 RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`
