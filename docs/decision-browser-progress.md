@@ -40,7 +40,7 @@ Receipts distinguish primitive boundary reproduction from actual repository cont
 include separate script/repository source hashes.
 
 Run the native probe with `W10_CHROMIUM` set to a locally installed Chromium executable and
-`pnpm run test:progress-native`. `W10_ROUNDS` sets the bounded trial count per order;
+`pnpm run test:progress-native`. `W10_ROUNDS` sets 1–1000 trials per order (default 50);
 `W10_RECEIPT` chooses the full JSON receipt path. The browser profile and trace are local
 artifacts. [The compact native receipt](./evidence/w10-native-repository.json) records the
 reviewed outcomes; the script deliberately does not require a timing-sensitive loss to occur.
@@ -70,6 +70,13 @@ outside W10's storage replacement.
 
 ## Authoritative commit contract
 
+The [decoder-stage native receipt](./evidence/w10-native-decoder.json) reruns the updated module
+controls in separate renderer processes and passes both orders. Its bounded 50 race trials had
+zero localStorage losses; the earlier six-loss receipt remains the positive counterexample,
+not a deterministic claim. Focused decoder tests cover rejection with unchanged originals,
+missing optionals and competing queued revision-CAS writes. Trial counts outside 1–1000 are
+rejected before browser launch.
+
 The inactive substrate stores session control and owner-scoped progress in one object store.
 Native readwrite transactions serialize the session check, latest-record read, revision check
 and replacement. A transaction result resolves only on `complete`, never on put-request
@@ -87,6 +94,21 @@ does not rely on distinct wall-clock milliseconds. Epoch metadata comes from the
 state. Ordinary edits cannot change epochs; selected reset increments only selected epochs and
 preserves unrelated modes. First import accepts validated source epochs once. Deletion retains
 an epoch tombstone with no progress payload and forbids automatic import.
+
+Every stored session and owner record is decoded inside its transaction before use. Logical
+version, structural shape, owner-key identity, safe counters and mode/state epoch consistency
+are checked centrally. Unknown versions or corrupt records return `ProgressRepositoryDataError`
+without resetting, migrating, falling back, overwriting or deleting their original keys. Cursor
+reads distinguish an absent key from a present null/undefined value. Activation also validates
+the destination owner before changing the session. Outgoing records use the same validation.
+Session records explicitly carry logical version 1; the earlier inactive prototype's unversioned
+sessions are rejected rather than silently upgraded. Opaque additional fields and exact legacy
+strings are retained. A typed check table covers every current `UserProgressData` field, validates
+known map/history entries and present optionals, and allows missing optionals without defaulting.
+Malformed known fields are rejected even when opaque extensions are retained. Revision zero is
+empty-only. Existing coercive sanitizers are unsuitable for this retain-and-reject boundary.
+Recovery/export UI remains an integration gate. Conflict retry must never just increment `expectedRevision` on a stale
+envelope: reread accepted state and reapply the original intent.
 
 An owner token includes a persisted generation. A transition A to B to A invalidates old A
 operations even though the account ID matches again. Joining an already-active owner can reuse

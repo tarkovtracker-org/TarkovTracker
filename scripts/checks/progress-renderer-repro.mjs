@@ -1,15 +1,19 @@
 // Standalone native-storage boundary probe; does not load the application or contact its services.
-import { createServer } from 'node:http';
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import ts from 'typescript';
 const executable = process.env.W10_CHROMIUM;
 if (!executable) throw new Error('Set W10_CHROMIUM to a local Chromium executable');
 const rounds = Number(process.env.W10_ROUNDS ?? 50);
+assert(
+  Number.isSafeInteger(rounds) && rounds > 0 && rounds <= 1000,
+  'W10_ROUNDS must be an integer from 1 to 1000 per order'
+);
 const output = process.env.W10_RECEIPT ?? 'progress-renderer-receipt.json';
 const profile = await mkdtemp(join(tmpdir(), 'w10-renderer-'));
 const repositorySource = await readFile(
