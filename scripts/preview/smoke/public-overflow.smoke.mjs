@@ -69,24 +69,32 @@ for (const width of [320, 360]) {
         expect(await textOutsideColumn(page), `${route} text outside the column`).toEqual([]);
       });
     }
-    test('every billing option and badge stays in the column beside the rail and is operable', async ({
-      page,
-    }) => {
-      await page.goto(`${origin}/supporter`);
-      const options = page.locator('#tiers button[aria-pressed]');
-      await expect(options).toHaveCount(3);
-      const column = await contentColumn(page);
-      for (const option of await options.all()) {
-        const boxes = await option.evaluate((node) =>
-          [node, ...node.querySelectorAll('span')].map((part) =>
-            part.getBoundingClientRect().toJSON()
-          )
-        );
-        expect(boxes.filter(outside(column)), 'option or badge outside the column').toEqual([]);
-        expect(await option.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
-        await option.click();
-        await expect(option).toHaveAttribute('aria-pressed', 'true');
-      }
-    });
+    // Polish and Russian carry the longest single-word billing labels.
+    for (const locale of ['en-US', 'pl-PL', 'ru-RU']) {
+      test.describe(locale, () => {
+        test.use({ locale });
+        test('every billing option and badge stays in the column beside the rail and is operable', async ({
+          page,
+        }) => {
+          await page.goto(`${origin}/supporter`);
+          const options = page.locator('#tiers button[aria-pressed]');
+          await expect(options).toHaveCount(3);
+          const column = await contentColumn(page);
+          for (const option of await options.all()) {
+            const boxes = await option.evaluate((node) =>
+              [node, ...node.querySelectorAll('span')].map((part) =>
+                part.getBoundingClientRect().toJSON()
+              )
+            );
+            expect(boxes.filter(outside(column)), 'option or badge outside the column').toEqual([]);
+            expect(await option.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(
+              true
+            );
+            await option.click();
+            await expect(option).toHaveAttribute('aria-pressed', 'true');
+          }
+        });
+      });
+    }
   });
 }

@@ -8,7 +8,7 @@
       :key="opt.value"
       type="button"
       :aria-pressed="modelValue === opt.value"
-      class="relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-center text-sm font-medium transition-all duration-200 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-4"
+      class="relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-center text-sm font-medium wrap-anywhere hyphens-auto transition-all duration-200 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-4"
       :class="
         modelValue === opt.value
           ? 'bg-primary-600 text-white shadow-md'
