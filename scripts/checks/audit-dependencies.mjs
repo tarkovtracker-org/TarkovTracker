@@ -1,11 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 // Production dependencies ship with no known advisory at any severity unless it is reviewed and
-// accepted here. Each entry names the package, explains why the advisory cannot reach production,
-// and expires; an expired or mismatched entry fails so it is re-reviewed, and a stale one warns.
+// accepted here. Each entry names the package, the reviewed dependency chains (`via`, matched as
+// path suffixes), why the advisory cannot reach production, and an expiry. An expired or
+// mismatched entry, or a finding on any other path, fails so it is re-reviewed; a stale one warns.
 export const ACCEPTED_ADVISORIES = {
   'GHSA-vfj7-8cjw-p6xm': {
     package: 'braces',
+    via: [
+      '@intlify/unplugin-vue-i18n>fast-glob>micromatch>braces',
+      'nitropack>globby>fast-glob>micromatch>braces',
+    ],
     reason:
       'No patched braces release exists (<= 3.0.3). It is reached only through fast-glob in build ' +
       'tooling (nitropack globby, @intlify/unplugin-vue-i18n), which expands repo-controlled glob ' +
@@ -14,6 +19,7 @@ export const ACCEPTED_ADVISORIES = {
   },
   'GHSA-86w9-cpqp-85rv': {
     package: 'node-forge',
+    via: ['listhen>node-forge'],
     reason:
       'No patched node-forge release exists (<= 1.4.0). It is reached only through listhen, which ' +
       'generates self-signed certificates for the local `nuxt dev` server. It never verifies ' +
@@ -22,48 +28,71 @@ export const ACCEPTED_ADVISORIES = {
   },
 };
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const asList = (value) => (Array.isArray(value) ? value : []);
+const asRecord = (value) => (isRecord(value) ? value : {});
+const isReviewed = (path, via) =>
+  typeof path === 'string' && via.some((chain) => path === chain || path.endsWith(`>${chain}`));
+// Paths that the entry has not reviewed; a missing path list counts as unreviewed.
+function unreviewedPaths(advisory, entry) {
+  const paths = asList(advisory.findings).flatMap((finding) => asList(asRecord(finding).paths));
+  if (paths.length === 0) return ['(no dependency path reported)'];
+  const via = asList(entry.via);
+  return paths.filter((path) => !isReviewed(path, via));
+}
+function describe(raw) {
+  const advisory = asRecord(raw);
+  const id = advisory.github_advisory_id || `npm-${advisory.id}`;
+  const name = advisory.module_name;
+  return { advisory, id, name, label: `${id} ${name} ${advisory.severity} (${advisory.title})` };
+}
+function acceptanceFailures({ advisory, id, name, label }, entry, today) {
+  if (!entry) return [`unaccepted production advisory ${label}`];
+  if (entry.package !== name) return [`${id} is accepted for ${entry.package}, not ${name}`];
+  if (!(entry.expires >= today)) return [`acceptance for ${label} expired ${entry.expires}`];
+  return unreviewedPaths(advisory, entry).map(
+    (path) => `${id} reaches ${name} through an unreviewed path: ${path}`
+  );
+}
+function malformedReport(report) {
+  const detail = isRecord(report) && report.error ? `: ${JSON.stringify(report.error)}` : '';
+  return { failures: [`pnpm audit returned no advisory report${detail}`], warnings: [] };
+}
 /** Pure verdict for a `pnpm audit --json` report; anything malformed fails closed. */
 export function evaluateAudit(report, accepted, today) {
-  if (!isRecord(report) || !isRecord(report.advisories)) {
-    const detail = isRecord(report) && report.error ? `: ${JSON.stringify(report.error)}` : '';
-    return { failures: [`pnpm audit returned no advisory report${detail}`], warnings: [] };
-  }
-  const failures = [];
-  const seen = new Set();
-  for (const advisory of Object.values(report.advisories)) {
-    const id = advisory?.github_advisory_id || `npm-${advisory?.id}`;
-    const name = advisory?.module_name;
-    const label = `${id} ${name} ${advisory?.severity} (${advisory?.title})`;
-    const entry = accepted[id];
-    seen.add(id);
-    if (!entry) failures.push(`unaccepted production advisory ${label}`);
-    else if (entry.package !== name)
-      failures.push(`${id} is accepted for ${entry.package}, not ${name}`);
-    else if (!(entry.expires >= today))
-      failures.push(`acceptance for ${label} expired ${entry.expires}`);
-  }
+  if (!isRecord(report) || !isRecord(report.advisories)) return malformedReport(report);
+  const found = Object.values(report.advisories).map(describe);
+  const seen = new Set(found.map(({ id }) => id));
+  const failures = found.flatMap((finding) =>
+    acceptanceFailures(finding, accepted[finding.id], today)
+  );
   const warnings = Object.keys(accepted)
     .filter((id) => !seen.has(id))
     .map((id) => `${id} is no longer reported; remove its acceptance`);
   return { failures, warnings };
 }
-function main() {
+function readReport() {
   const run = spawnSync('pnpm', ['audit', '--prod', '--json'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'inherit'],
   });
-  let report;
+  if (run.error || run.signal) return undefined;
   try {
-    report = run.error || run.signal ? undefined : JSON.parse(run.stdout);
+    return JSON.parse(run.stdout);
   } catch {
-    report = undefined;
+    return undefined;
   }
+}
+function main() {
   const today = new Date().toISOString().slice(0, 10);
-  const { failures, warnings } = evaluateAudit(report, ACCEPTED_ADVISORIES, today);
-  for (const warning of warnings) console.log(`::warning title=Dependency audit::${warning}`);
-  for (const failure of failures) console.log(`::error title=Dependency audit::${failure}`);
-  if (failures.length === 0) console.log('Production dependency audit passed.');
-  return failures.length === 0 ? 0 : 1;
+  const { failures, warnings } = evaluateAudit(readReport(), ACCEPTED_ADVISORIES, today);
+  const annotations = [
+    ...warnings.map((text) => `::warning title=Dependency audit::${text}`),
+    ...failures.map((text) => `::error title=Dependency audit::${text}`),
+  ];
+  for (const annotation of annotations) console.log(annotation);
+  if (failures.length > 0) return 1;
+  console.log('Production dependency audit passed.');
+  return 0;
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) process.exitCode = main();

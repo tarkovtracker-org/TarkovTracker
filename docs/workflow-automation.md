@@ -336,8 +336,9 @@ Reusable security gate called by CI, plus the weekly standalone audit:
 **Jobs:**
 
 - `security-scan` - `scripts/checks/audit-dependencies.mjs` (blocking): any production advisory at
-  any severity fails unless its reviewed entry names the package, why it cannot reach production,
-  and an expiry; expired or mismatched entries fail and stale ones warn. Informational
+  any severity fails unless its reviewed entry names the package, the dependency chains reviewed
+  (any other path fails), why it cannot reach production, and an expiry; expired or mismatched
+  entries fail and stale ones warn. Informational
   all-dependency audit at `high` (a notice, never a failure), schedule-only outdated check,
   checksum-verified Gitleaks secret detection (blocking), preceded by a canary check that a
   generated service-role JWT in `wrangler.toml` is still reported (allowlists stay value-exact)

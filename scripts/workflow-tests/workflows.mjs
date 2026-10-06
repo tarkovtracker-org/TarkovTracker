@@ -56,34 +56,41 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   assert.match(jobBlock(gate, 'auto-merge'), /timeout-minutes: 90/);
   assert.match(read('.github/codecov.yml'), /absolute-floor:/);
 });
-test('Dependabot auto-merge excludes auth and billing dependencies', () => {
-  const gate = read('.github/workflows/dependabot-auto-merge.yml');
+const autoMergeJob = () =>
+  jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge');
+const npmGroups = (config) =>
+  [
+    ...config
+      .slice(
+        config.indexOf('package-ecosystem: npm'),
+        config.indexOf('package-ecosystem: github-actions')
+      )
+      .matchAll(/^ {6}([a-z-]+):\n {8}(?:patterns|dependency-type)/gm),
+  ].map((m) => m[1]);
+test('Dependabot auto-merge covers every npm group except auth and billing', () => {
   const config = read('.github/dependabot.yml');
-  const eligible = jobBlock(gate, 'auto-merge');
+  const eligible = autoMergeJob();
   assert.match(eligible, /dependabot\/npm_and_yarn\/auth-and-billing-\*\)\n\s*;;/);
-  const npm = config.slice(
-    config.indexOf('package-ecosystem: npm'),
-    config.indexOf('package-ecosystem: github-actions')
-  );
-  for (const group of [...npm.matchAll(/^ {6}([a-z-]+):\n {8}(?:patterns|dependency-type)/gm)].map(
-    (m) => m[1]
-  ))
-    if (group !== 'auth-and-billing')
-      assert.ok(eligible.includes(`dependabot/npm_and_yarn/${group}-*`), group);
-  const sensitive = eligible.match(/grep -E '([^']+)'/)[1];
-  const grep = (line) => spawnSync('grep', ['-E', sensitive], { input: `${line}\n` }).status === 0;
-  for (const line of [
-    '+    "stripe": "^1.0.0",',
-    '-\t"@supabase/supabase-js": "2.0.0",',
-    '+  "supabase": "2.1.0"',
-  ])
-    assert.ok(grep(line), line);
-  for (const line of ['+    "stripe-mock": "1.0.0",', ' "stripe": "^1.0.0",'])
-    assert.ok(!grep(line), line);
   assert.match(
     config,
     /auth-and-billing:\n {8}patterns:\n {10}- stripe\n {10}- '@stripe\/\*'\n {10}- '@supabase\/\*'\n {10}- supabase/
   );
+  const groups = npmGroups(config).filter((group) => group !== 'auth-and-billing');
+  assert.ok(groups.length >= 8, groups.join());
+  for (const group of groups)
+    assert.ok(eligible.includes(`dependabot/npm_and_yarn/${group}-*`), group);
+});
+test('Dependabot auto-merge holds manifest changes to auth and billing clients', () => {
+  const sensitive = autoMergeJob().match(/grep -E '([^']+)'/)[1];
+  const grep = (line) => spawnSync('grep', ['-E', sensitive], { input: `${line}\n` }).status === 0;
+  const held = [
+    '+    "stripe": "^1.0.0",',
+    '-\t"@supabase/supabase-js": "2.0.0",',
+    '+  "supabase": "2.1.0"',
+  ];
+  for (const line of held) assert.ok(grep(line), line);
+  for (const line of ['+    "stripe-mock": "1.0.0",', ' "stripe": "^1.0.0",'])
+    assert.ok(!grep(line), line);
 });
 test('path selection applies to pull requests only; pushes, forks and Deno checks stay covered', () => {
   const ci = read('.github/workflows/ci.yml');
