@@ -42,3 +42,16 @@ export const resolveAppLocale = (
     DEFAULT_LOCALE
   );
 };
+/**
+ * A locale's name in its own language ("Deutsch", "日本語"), so people can find their language
+ * whatever the current UI language is. Falls back to the upper-case code if `Intl` lacks data.
+ */
+export const getLocaleNativeName = (code: string): string => {
+  try {
+    const name = new Intl.DisplayNames([code], { type: 'language' }).of(code);
+    if (name && name !== code) return name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
+  } catch {
+    // Unknown or malformed tag: fall through to the code.
+  }
+  return code.toUpperCase();
+};
