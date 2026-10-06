@@ -604,10 +604,11 @@ export function useSupabaseSync<
   /** Later saves skip `saved`; the store is acknowledged now only if it still matches it. */
   const acknowledgeExternalSave = (saved: TState) => {
     const ownerId = syncOwnerId();
-    const savedPayload = ownerId ? serializeStatePayload(saved, ownerId) : null;
+    if (!ownerId) return;
+    const savedPayload = serializeStatePayload(saved, ownerId);
     if (!savedPayload) return;
     lastSyncedPayload = savedPayload;
-    if (serializeStatePayload(store.$state as TState, ownerId!) !== savedPayload) return;
+    if (serializeStatePayload(store.$state as TState, ownerId) !== savedPayload) return;
     pendingState.captureAcknowledgement(snapshotSyncState(store.$state as TState))();
     debouncedSync.cancel();
     clearPendingVersion(localVersion);
