@@ -1,6 +1,6 @@
 ---
-title: "Supabase Edge Functions"
-wiki_page_id: "page-edge-functions"
+title: 'Supabase Edge Functions'
+wiki_page_id: 'page-edge-functions'
 ---
 
 <details>
@@ -12,9 +12,10 @@ The following files were used as context for generating this wiki page:
 - [supabase/functions/account-delete/index.ts](supabase/functions/account-delete/index.ts)
 - [supabase/functions/team-create/index.ts](supabase/functions/team-create/index.ts)
 - [supabase/config.toml](supabase/config.toml)
-- [app/composables/__tests__/useEdgeFunctions.test.ts](app/composables/__tests__/useEdgeFunctions.test.ts)
+- [app/composables/**tests**/useEdgeFunctions.test.ts](app/composables/__tests__/useEdgeFunctions.test.ts)
 - [AGENTS.md](AGENTS.md)
 - [code_review.md](code_review.md)
+
 </details>
 
 # Supabase Edge Functions
@@ -45,7 +46,7 @@ flowchart TD
 ```
 
 This diagram illustrates the flow from the user interface through the client-side composables to the server-side logic in Supabase.
-Sources: [app/composables/__tests__/useEdgeFunctions.test.ts:80-91](app/composables/__tests__/useEdgeFunctions.test.ts#L80-L91), [app/composables/__tests__/useEdgeFunctions.test.ts:168-193](app/composables/__tests__/useEdgeFunctions.test.ts#L168-L193)
+Sources: [app/composables/**tests**/useEdgeFunctions.test.ts:80-91](app/composables/__tests__/useEdgeFunctions.test.ts#L80-L91), [app/composables/**tests**/useEdgeFunctions.test.ts:168-193](app/composables/__tests__/useEdgeFunctions.test.ts#L168-L193)
 
 ## Core Function Modules
 
@@ -55,31 +56,35 @@ Sources: [supabase/config.toml:314-350](supabase/config.toml#L314-L350)
 
 ### Functional Overview Table
 
-| Function Name | JWT Verify | Primary Purpose |
-| :--- | :---: | :--- |
-| `team-create` | False | Initializes new teams with join codes and member limits. |
-| `account-delete` | False | Performs irreversible removal of user progress and personal data. |
-| `discord-role-sync` | False | Synchronizes supporter tiers with roles in the TarkovTracker Discord. |
-| `stripe-webhook` | False | Handles payment deliveries (validates via Stripe-Signature). |
-| `token-create` | False | Generates public API tokens for external integration. |
-| `admin-cache-purge` | False | Triggered by administrators to clear Tarkov data or static assets. |
+| Function Name       | JWT Verify | Primary Purpose                                                       |
+| :------------------ | :--------: | :-------------------------------------------------------------------- |
+| `team-create`       |   False    | Initializes new teams with join codes and member limits.              |
+| `account-delete`    |   False    | Performs irreversible removal of user progress and personal data.     |
+| `discord-role-sync` |   False    | Synchronizes supporter tiers with roles in the TarkovTracker Discord. |
+| `stripe-webhook`    |   False    | Handles payment deliveries (validates via Stripe-Signature).          |
+| `token-create`      |   False    | Generates public API tokens for external integration.                 |
+| `admin-cache-purge` |   False    | Triggered by administrators to clear Tarkov data or static assets.    |
 
 Sources: [supabase/config.toml:314-350](supabase/config.toml#L314-L350), [supabase/functions/team-create/index.ts](supabase/functions/team-create/index.ts), [supabase/functions/account-delete/index.ts](supabase/functions/account-delete/index.ts)
 
 ## Implementation Details
 
 ### Team Management
+
 The `team-create` function is responsible for setting up team metadata, including the game mode (PvP/PvE), join codes, and maximum member capacity. Even if a custom gateway URL is configured for team operations, the client invokes this function directly via the Supabase client.
 
-Sources: [supabase/functions/team-create/index.ts](supabase/functions/team-create/index.ts), [app/composables/__tests__/useEdgeFunctions.test.ts:121-140](app/composables/__tests__/useEdgeFunctions.test.ts#L121-L140)
+Sources: [supabase/functions/team-create/index.ts](supabase/functions/team-create/index.ts), [app/composables/**tests**/useEdgeFunctions.test.ts:121-140](app/composables/__tests__/useEdgeFunctions.test.ts#L121-L140)
 
 ### API Token Lifecycle
-Tokens are managed through `token-create` and `token-revoke`. The revocation logic includes a fallback mechanism: if the dedicated edge function fails (e.g., returns a `404`), the client-side logic attempts a direct delete operation on the `api_tokens` table.
 
-Sources: [supabase/config.toml:330-333](supabase/config.toml#L330-L333), [app/composables/__tests__/useEdgeFunctions.test.ts:219-255](app/composables/__tests__/useEdgeFunctions.test.ts#L219-L255)
+Tokens are created only through `token-create`. Revocation is a direct, RLS-scoped delete on the `api_tokens` table from `ApiTokens.vue`.
+
+Sources: [supabase/config.toml:330-333](supabase/config.toml#L330-L333), [app/composables/**tests**/useEdgeFunctions.test.ts:219-255](app/composables/__tests__/useEdgeFunctions.test.ts#L219-L255)
 
 ### Data Privacy and Deletion
+
 The `account-delete` module handles the complex task of wiping a user's existence from the platform. This includes:
+
 1.  Clearing progress tracking data.
 2.  Transferring team ownership to the oldest member or disbanding teams.
 3.  Revoking all active API tokens.
@@ -101,7 +106,7 @@ sequenceDiagram
 ```
 
 This sequence demonstrates the logic executed within the account-deletion edge function to ensure no orphaned teams remain.
-Sources: [supabase/functions/account-delete/index.ts](supabase/functions/account-delete/index.ts), [app/pages/terms-of-service.vue (contextual)](app/pages/terms-of-service.vue (contextual))
+Sources: [supabase/functions/account-delete/index.ts](supabase/functions/account-delete/index.ts), [app/pages/terms-of-service.vue (contextual)](app/pages/terms-of-service.vue 'contextual')
 
 ## Security and Validation
 
@@ -110,12 +115,14 @@ Every code change affecting `supabase/functions/` must be manually inspected for
 Sources: [code_review.md:14-16](code_review.md#L14-L16), [code_review.md:34-36](code_review.md#L34-L36)
 
 ### Error Handling
-The client-side wrappers normalize errors from these functions into `SupabaseFunctionError` objects, which include:
-*  `status`: The HTTP status code returned by the function.
-*  `functionName`: The name of the function that failed.
-*  `data`: The JSON error payload from the function body.
 
-Sources: [app/composables/__tests__/useEdgeFunctions.test.ts:194-217](app/composables/__tests__/useEdgeFunctions.test.ts#L194-L217)
+The client-side wrappers normalize errors from these functions into `SupabaseFunctionError` objects, which include:
+
+- `status`: The HTTP status code returned by the function.
+- `functionName`: The name of the function that failed.
+- `data`: The JSON error payload from the function body.
+
+Sources: [app/composables/**tests**/useEdgeFunctions.test.ts:194-217](app/composables/__tests__/useEdgeFunctions.test.ts#L194-L217)
 
 ## Conclusion
 
