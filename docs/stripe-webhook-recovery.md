@@ -83,7 +83,7 @@ parsing or claiming. The existing secret and API version contract are unchanged.
    checks are not authenticated Stripe or production acceptance. Observe `in_progress`, unknown
    receipts, processing errors and lease recovery after rollout.
 5. The existing cleanup job now deletes only completed/terminal receipts older than 30 days from
-   completion. Unresolved receipts remain available for investigation. Alert and disposition them;
+   completion, using a partial completion-time index for resolved receipts. Unresolved receipts remain available for investigation. Alert and disposition them;
    growth is an operational signal, not permission to replay them automatically.
 
 For each unknown historical receipt, obtain its Stripe event and delivery evidence and inspect

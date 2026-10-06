@@ -1,5 +1,8 @@
 BEGIN;
-SELECT plan(28);
+SELECT plan(29);
+SELECT ok(EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND tablename='stripe_events'
+  AND indexname='stripe_events_resolved_completion_idx' AND indexdef LIKE '%completed_at%'
+  AND indexdef LIKE '%completed%terminal%'), 'resolved-only completion index supports retention');
 INSERT INTO auth.users(id, email) VALUES
   ('00000000-0000-0000-0000-000000000702', 'stripe-recovery@example.invalid');
 INSERT INTO public.supporters(user_id, tier, status, type)
