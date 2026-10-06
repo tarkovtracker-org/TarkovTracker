@@ -21,7 +21,7 @@ Merges follow the merge class below.
 - Test `pnpm run test` | Gateway `pnpm run test:api-gateway` | Supabase `pnpm run supabase:check`
 - Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
 - Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
-- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi` | Deps `pnpm run deps`
+- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi`
 - Brief `pnpm run brief --file <path>` (`--symbol <file:export>`, `--base <ref>`): consumers, docs,
   tests, and checks before editing; advisory, read its Uncertainty section
 

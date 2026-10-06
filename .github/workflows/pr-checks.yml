@@ -142,14 +142,21 @@ jobs:
             --show-interactive-dev-session=false \
             --log-level error &
           echo $! > /tmp/server.pid
-          pnpm exec wait-on \
-            http-get://localhost:3000 \
-            http-get://localhost:3000/api/tarkov/cache-meta \
-            http-get://localhost:3000/api/tarkov/bootstrap?lang=en \
-            http-get://localhost:3000/tasks \
-            http-get://localhost:3000/hideout \
-            --timeout 120000 \
-            --httpTimeout 20000
+          deadline=$((SECONDS + 120))
+          for url in \
+            http://localhost:3000 \
+            http://localhost:3000/api/tarkov/cache-meta \
+            'http://localhost:3000/api/tarkov/bootstrap?lang=en' \
+            http://localhost:3000/tasks \
+            http://localhost:3000/hideout; do
+            until curl -fsS -o /dev/null --max-time 20 "$url"; do
+              if (( SECONDS >= deadline )); then
+                echo "::error::Timed out waiting for $url"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # 12.6.2
         with:
