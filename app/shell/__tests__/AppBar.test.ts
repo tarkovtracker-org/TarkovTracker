@@ -154,7 +154,8 @@ const mountAppBar = async () => {
         },
         UDropdownMenu: {
           props: ['items'],
-          template: `<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.onSelect?.()">{{ item.label }}</button></template></div>`,
+          data: () => ({ expandedSubmenu: '' }),
+          template: `<div data-dropdown-menu><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : item.onSelect?.()">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
         },
         UIcon: {
           props: ['name'],
@@ -279,6 +280,32 @@ describe('AppBar locale switching', () => {
     const trigger = wrapper.get('[data-testid="app-locale-menu"]');
     expect(trigger.attributes('aria-label')).toBe('settings.locale: English');
     expect(trigger.classes()).toEqual(expect.arrayContaining(['h-8', 'w-8', 'hidden']));
+    wrapper.unmount();
+  });
+  it('switches language through the mobile More submenu', async () => {
+    windowWidthRef.value = 375;
+    const wrapper = await mountAppBar();
+    const moreMenu = wrapper
+      .findAll('[data-dropdown-menu]')
+      .find((menu) => menu.find('button[aria-label="common.more"]').exists());
+    expect(moreMenu).toBeDefined();
+    await moreMenu!.get('button[aria-label="common.more"]').trigger('click');
+    expect(moreMenu!.find('[data-submenu]').exists()).toBe(false);
+    await moreMenu!.get('[data-menu-item="settings.locale"]').trigger('click');
+    const submenu = moreMenu!.get('[data-submenu]');
+    expect(submenu.findAll('button').map((item) => item.text())).toEqual([
+      'English',
+      'Deutsch',
+      'Français',
+    ]);
+    expect(submenu.get('[data-menu-item="English"]').attributes('data-checked')).toBe('true');
+    await submenu.get('[data-menu-item="Deutsch"]').trigger('click');
+    await flushPromises();
+    expect(setLocale).toHaveBeenCalledWith('de');
+    expect(mockPreferencesStore.setLocaleOverride).toHaveBeenCalledWith('de');
+    expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('de');
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
+    expect(submenu.get('[data-menu-item="Deutsch"]').attributes('data-checked')).toBe('true');
     wrapper.unmount();
   });
   it('ignores another switch while one is still loading, then allows it', async () => {
