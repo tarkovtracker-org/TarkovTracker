@@ -18,15 +18,6 @@
         >
           {{ t('activity_log.mark_read', 'Mark read') }}
         </UButton>
-        <UButton
-          variant="ghost"
-          color="neutral"
-          size="xs"
-          class="text-xs"
-          @click="activityLogStore.clearLog"
-        >
-          {{ t('activity_log.clear', 'Clear') }}
-        </UButton>
       </div>
     </div>
     <div v-if="entries.length === 0" class="text-surface-400 py-8 text-center text-xs sm:text-sm">

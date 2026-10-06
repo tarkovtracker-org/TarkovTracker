@@ -180,9 +180,11 @@ sequenceDiagram
 point at string keys to look up in the language envelope. `applyTranslations` walks those paths and
 replaces the key with the translated string.
 
-- A fast path (`immutableUpdate`) handles the common JSONPath shapes (`*`, `prop[*]`, `prop`)
-  without a dependency.
-- If a path shape is not handled by the fast path, it falls back to `jsonpath-plus` for correctness.
+- `parseTranslationPath` accepts only the subset upstream emits: `.name`, `.*`, `[*]`,
+  `['a','b']` unions and `..name` recursive descent. No expressions are evaluated.
+- `translateAtPath` walks own properties only, skips `__proto__`/`constructor`/`prototype`, and
+  copies on write, so the input envelope is never mutated.
+- Unsupported paths are logged with a warning and skipped; the data under them stays untouched.
 - Primary language wins; English is the fallback when a key is missing in the primary language.
 
 ### Files

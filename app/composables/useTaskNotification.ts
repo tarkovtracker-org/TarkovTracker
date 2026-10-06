@@ -1,5 +1,4 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
-import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
@@ -17,7 +16,6 @@ interface TaskNotificationReturn {
 export function useTaskNotification(): TaskNotificationReturn {
   const { t } = useI18n({ useScope: 'global' });
   const actionHistoryStore = useActionHistoryStore();
-  const activityLogStore = useActivityLogStore();
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const tasks = computed(() => metadataStore.tasks);
@@ -111,18 +109,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     task: Task | undefined;
     releaseStoryObjectives: () => void;
   };
-  const logUndo = (
-    { event }: UndoContext,
-    action: TaskActionPayload['action'],
-    titleKey: string,
-    statusKey: string
-  ) => {
-    activityLogStore.addManualEntry({
-      id: `manual-task-undo-${event.taskId}-${Date.now()}`,
-      type: 'task',
-      action,
-      title: t(titleKey, { name: event.taskName }),
-    });
+  const showUndoStatus = ({ event }: UndoContext, statusKey: string) => {
     updateTaskStatus(statusKey, event.taskName);
   };
   const uncompleteObjectives = (task: Task | undefined) => {
@@ -140,12 +127,7 @@ export function useTaskNotification(): TaskNotificationReturn {
           'setTaskUncompleted',
           'setTaskObjectiveUncomplete'
         );
-        logUndo(
-          context,
-          'uncomplete',
-          'activity_log.entry.undo_completed',
-          'page.tasks.questcard.undo_complete'
-        );
+        showUndoStatus(context, 'page.tasks.questcard.undo_complete');
       },
       uncomplete: (context) => {
         tarkovStore.setTaskComplete(context.event.taskId);
@@ -154,12 +136,7 @@ export function useTaskNotification(): TaskNotificationReturn {
         }
         handleAlternatives(context.task?.alternatives, 'setTaskFailed');
         raiseToMinLevel(context.task?.minPlayerLevel);
-        logUndo(
-          context,
-          'complete',
-          'activity_log.entry.undo_uncompleted',
-          'page.tasks.questcard.undo_uncomplete'
-        );
+        showUndoStatus(context, 'page.tasks.questcard.undo_uncomplete');
       },
       reset_failed: (context) => {
         if (context.event.wasManualFail) {
@@ -168,23 +145,13 @@ export function useTaskNotification(): TaskNotificationReturn {
           tarkovStore.setTaskFailed(context.event.taskId);
         }
         if (context.task?.objectives) clearTaskObjectives(context.task.objectives);
-        logUndo(
-          context,
-          'fail',
-          'activity_log.entry.undo_reset_failed',
-          'page.tasks.questcard.undo_reset_failed'
-        );
+        showUndoStatus(context, 'page.tasks.questcard.undo_reset_failed');
       },
       fail: (context) => {
         tarkovStore.setTaskUncompleted(context.event.taskId);
         context.releaseStoryObjectives();
         uncompleteObjectives(context.task);
-        logUndo(
-          context,
-          'uncomplete',
-          'activity_log.entry.undo_failed',
-          'page.tasks.questcard.undo_failed'
-        );
+        showUndoStatus(context, 'page.tasks.questcard.undo_failed');
       },
     };
   const taskProvesStartGates = (task: Task) => {
@@ -229,12 +196,6 @@ export function useTaskNotification(): TaskNotificationReturn {
   };
   const onTaskAction = (event: TaskActionPayload) => {
     const title = t(entryTitleKeys[event.action], { name: event.taskName });
-    activityLogStore.addManualEntry({
-      id: `manual-task-${event.taskId}-${Date.now()}`,
-      type: 'task',
-      action: event.action,
-      title,
-    });
     registerUndo(event, title);
     showActionStatus(event);
   };

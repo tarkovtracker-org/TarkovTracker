@@ -147,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
-    "clear": "Clear",
     "empty": "No activity recorded yet.",
     "badge_api": "API Sync",
     "api_synced": "API Progress Synced",
@@ -157,11 +156,7 @@
       "uncompleted": "Uncompleted Task: {name}",
       "failed": "Failed Task: {name}",
       "reset_failed": "Reset Failed Task: {name}",
-      "available": "Unlocked Task: {name}",
-      "undo_completed": "Undid Task Completion: {name}",
-      "undo_uncompleted": "Undid Task Uncompletion: {name}",
-      "undo_reset_failed": "Undid Reset Failed Task: {name}",
-      "undo_failed": "Undid Task Failure: {name}"
+      "available": "Unlocked Task: {name}"
     }
   },
   "promoted_stream": {
