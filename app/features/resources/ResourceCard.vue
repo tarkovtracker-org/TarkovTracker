@@ -22,7 +22,9 @@
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-start justify-between gap-2">
-          <h3 class="light:text-surface-50 text-lg font-semibold tracking-wide text-white">
+          <h3
+            class="light:text-surface-50 min-w-0 text-lg font-semibold tracking-wide wrap-break-word text-white"
+          >
             {{ name }}
           </h3>
           <UBadge
@@ -35,7 +37,7 @@
             {{ categoryBadge }}
           </UBadge>
         </div>
-        <p class="text-surface-300 mt-2 min-h-12 text-[0.9375rem] leading-relaxed">
+        <p class="text-surface-300 mt-2 min-h-12 text-[0.9375rem] leading-relaxed wrap-break-word">
           {{ description }}
         </p>
       </div>

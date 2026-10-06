@@ -12,13 +12,13 @@
     >
       <UIcon name="i-mdi-bookmark" class="h-6 w-6" />
     </div>
-    <div class="min-w-0 flex-1 space-y-2">
+    <div class="min-w-0 flex-1 space-y-2 wrap-break-word">
       <div>
         <p class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase">
           {{ guideLabel }}
         </p>
         <h1
-          class="light:text-surface-50 mt-1 text-2xl font-bold tracking-wide text-white sm:text-3xl"
+          class="light:text-surface-50 mt-1 text-xl font-bold tracking-wide text-white sm:text-3xl"
         >
           {{ title }}
         </h1>

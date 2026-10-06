@@ -33,7 +33,7 @@
         <p class="text-surface-400 mt-2 max-w-2xl text-sm leading-relaxed">
           {{ t('page.about.partners.summary') }}
         </p>
-        <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AboutMemberCard v-for="member in partnerMembers" :key="member.id" :member="member" />
         </ul>
       </section>
