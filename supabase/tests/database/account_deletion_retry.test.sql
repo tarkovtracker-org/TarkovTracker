@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(25);
+SELECT plan(27);
 
 CREATE TEMP TABLE retry_fixture (name text PRIMARY KEY, user_id uuid NOT NULL);
 INSERT INTO retry_fixture
@@ -56,8 +56,8 @@ CREATE TRIGGER block_retry_delete BEFORE DELETE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION pg_temp.block_retry_delete();
 
 SELECT is(private.run_account_deletion_retries(50),
-  jsonb_build_object('completed', 3, 'skipped', 1, 'failed', 2),
-  'retries due and stale jobs, skipping storage owners and counting rollbacks');
+  jsonb_build_object('completed', 3, 'skipped', 0, 'failed', 2),
+  'retries due and stale jobs and counts rollbacks');
 
 SELECT is((SELECT count(*)::integer FROM auth.users WHERE id = pg_temp.retry_user('solo_owner')), 0,
   'retry removes the Auth identity');
@@ -85,6 +85,9 @@ SELECT is((pg_temp.retry_job('leased')).status, 'in_progress', 'live lease is no
 SELECT is((SELECT count(*)::integer FROM auth.users WHERE id = pg_temp.retry_user('leased')), 1,
   'live lease user is not deleted');
 SELECT is((pg_temp.retry_job('stored')).status, 'failed', 'storage owner is not deleted by SQL');
+SELECT is((pg_temp.retry_job('stored')).attempts, 1, 'storage owner is excluded from the batch');
+SELECT is(private.retry_account_deletion(pg_temp.retry_user('stored')), false,
+  'direct retry refuses to orphan Storage data');
 
 SELECT is((SELECT count(*)::integer FROM auth.users WHERE id = pg_temp.retry_user('broken')), 1,
   'failed retry rolls back the deletion');

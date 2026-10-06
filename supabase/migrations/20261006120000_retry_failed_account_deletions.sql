@@ -55,10 +55,13 @@ BEGIN
     RETURN jsonb_build_object('skipped', 'already_running');
   END IF;
   FOR v_job IN
-    SELECT user_id FROM public.account_deletion_jobs
-    WHERE (status IN ('pending', 'failed') AND (next_run_at IS NULL OR next_run_at <= clock_timestamp()))
-      OR (status = 'in_progress' AND updated_at <= clock_timestamp() - interval '15 minutes')
-    ORDER BY next_run_at NULLS FIRST, user_id LIMIT v_limit
+    SELECT j.user_id FROM public.account_deletion_jobs j
+    WHERE ((j.status IN ('pending', 'failed') AND (j.next_run_at IS NULL OR j.next_run_at <= clock_timestamp()))
+      OR (j.status = 'in_progress' AND j.updated_at <= clock_timestamp() - interval '15 minutes'))
+      -- Storage owners need Storage API cleanup first; never let them fill every batch.
+      AND NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.owner_id = j.user_id::text)
+      AND NOT EXISTS (SELECT 1 FROM storage.buckets b WHERE b.owner_id = j.user_id::text)
+    ORDER BY j.next_run_at NULLS FIRST, j.user_id LIMIT v_limit
   LOOP
     BEGIN
       IF private.retry_account_deletion(v_job.user_id) THEN
@@ -68,7 +71,10 @@ BEGIN
       END IF;
     EXCEPTION WHEN OTHERS THEN
       v_failed := v_failed + 1;
-      PERFORM private.record_account_deletion_retry_failure(v_job.user_id, SQLSTATE);
+      BEGIN
+        PERFORM private.record_account_deletion_retry_failure(v_job.user_id, SQLSTATE);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
     END;
   END LOOP;
   RETURN jsonb_build_object('completed', v_completed, 'skipped', v_skipped, 'failed', v_failed);
