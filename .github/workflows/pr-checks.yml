@@ -149,10 +149,14 @@ jobs:
             'http://localhost:3000/api/tarkov/bootstrap?lang=en' \
             http://localhost:3000/tasks \
             http://localhost:3000/hideout; do
-            until curl -fsS -o /dev/null --max-time 20 "$url"; do
-              if (( SECONDS >= deadline )); then
+            while :; do
+              remaining=$((deadline - SECONDS))
+              if (( remaining <= 0 )); then
                 echo "::error::Timed out waiting for $url"
                 exit 1
+              fi
+              if curl -fsS -o /dev/null --max-time $((remaining < 20 ? remaining : 20)) "$url"; then
+                break
               fi
               sleep 2
             done
