@@ -372,3 +372,15 @@ test('a same-second newer request makes refusal correlation ambiguous', () => {
     'unknown'
   );
 });
+test('overlapping requests for different heads cannot be retired by an unscoped refusal', () => {
+  const earlier = limitedRequest(otherHead, '2026-09-27T01:30:00Z');
+  const comments = [earlier, limitedRequest(), limitReply()];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'pending');
+  assert.equal(classifyState(inputs({ comments }), now + 2 * 86400000).status, 'pending');
+});
+test('completed historical requests do not make a later refusal ambiguous', () => {
+  const earlier = limitedRequest(otherHead, '2026-09-27T01:00:00Z');
+  const done = reviewComment(otherHead, '2026-09-27T01:30:00Z');
+  const comments = [limitReply(), done, limitedRequest(), earlier];
+  assert.equal(classifyState(inputs({ comments }), now).status, 'unavailable');
+});

@@ -87,8 +87,8 @@ establish clean findings, which must be verified from the actual review output.
 ### Usage-limit refusals
 
 An unchanged usage-limit reply from GitHub's authenticated `chatgpt-codex-connector[bot]` ends
-only the latest preceding, unchanged SHA-tagged member/owner/collaborator request. Request and
-reply timestamps must be valid and strictly ordered; same-second or duplicate request ambiguity,
+only a unique outstanding, preceding, unchanged SHA-tagged member/owner/collaborator request. Request and
+reply timestamps must be valid and strictly ordered; same-second or overlapping request ambiguity,
 edited replies/requests, untagged requests, missing bot identity and unrelated messages remain
 fail-closed. The matching local intent is retired only if its confirmed server request timestamp
 and SHA match. An uncertain delivery intent remains pending.

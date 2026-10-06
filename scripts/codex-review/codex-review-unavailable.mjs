@@ -21,35 +21,46 @@ export function usageLimitActivity(comment) {
   if (!unchangedTimestamp(comment)) return unknown('Edited or invalid Codex usage-limit reply');
   return { kind: 'refused', at: Date.parse(comment.created_at) };
 }
-function precedingRequests(activity, requests) {
+function completionMatches(request, event) {
+  return event.kind === 'complete' && event.sha === request.sha && event.at >= request.at;
+}
+function completedBefore(request, activity, events) {
+  return events.some((event) => event.at < activity.at && completionMatches(request, event));
+}
+function unresolvedBefore(request, activity, events) {
+  if (wasRefused(request, events)) return false;
+  return !completedBefore(request, activity, events);
+}
+function precedingRequests(activity, requests, events) {
   return requests
     .filter((request) => !request.local && request.at < activity.at)
+    .filter((request) => unresolvedBefore(request, activity, events))
     .sort((a, b) => b.at - a.at);
-}
-function ambiguousRequest(request, next) {
-  return next?.at === request.at;
 }
 function tiedRequest(activity, requests) {
   return requests.some((request) => !request.local && request.at === activity.at);
 }
 function validRefusedRequest(request, next) {
-  return Boolean(request.sha) && request.unchanged && !ambiguousRequest(request, next);
+  return Boolean(request.sha) && request.unchanged && !next;
 }
-function requestRefusal(activity, requests) {
-  const [request, next] = precedingRequests(activity, requests);
+function requestRefusal(activity, requests, events) {
+  const [request, next] = precedingRequests(activity, requests, events);
   if (!request) return unknown('Codex usage-limit reply has no preceding request');
   if (!validRefusedRequest(request, next))
     return unknown('Codex usage-limit reply has no unambiguous unchanged tagged request');
   return { ...activity, sha: request.sha, requestedAt: request.at };
 }
-function scopeRefusal(activity, requests) {
+function scopeRefusal(activity, requests, events) {
   if (activity.kind !== 'refused') return activity;
   if (tiedRequest(activity, requests))
     return unknown('Codex usage-limit reply and request have ambiguous same-second ordering');
-  return requestRefusal(activity, requests);
+  return requestRefusal(activity, requests, events);
 }
 export function scopeUsageLimits(activities, requests) {
-  return activities.map((activity) => scopeRefusal(activity, requests));
+  const scoped = [];
+  const ordered = activities.toSorted((a, b) => (a.at ?? 0) - (b.at ?? 0));
+  for (const activity of ordered) scoped.push(scopeRefusal(activity, requests, scoped));
+  return scoped;
 }
 export function wasRefused(request, activities) {
   return activities.some(
