@@ -248,7 +248,7 @@ importers:
   workers/api-gateway:
     devDependencies:
       '@apidevtools/swagger-parser':
-        specifier: ^13.0.0
+        specifier: 13.0.0
         version: 13.0.0(openapi-types@12.1.3)
       '@types/node':
         specifier: ^26.0.1
