@@ -335,7 +335,10 @@ Reusable security gate called by CI, plus the weekly standalone audit:
 
 **Jobs:**
 
-- `security-scan` - `pnpm audit --prod --audit-level=critical` (blocking), informational
+- `security-scan` - `scripts/checks/audit-dependencies.mjs` (blocking): any production advisory at
+  any severity fails unless its reviewed entry names the package, the complete dependency chains
+  reviewed (any other path, or a finding without one, fails), why it cannot reach production, and an expiry; expired or mismatched
+  entries fail and stale ones warn. Informational
   all-dependency audit at `high` (a notice, never a failure), schedule-only outdated check,
   checksum-verified Gitleaks secret detection (blocking), preceded by a canary check that a
   generated service-role JWT in `wrangler.toml` is still reported (allowlists stay value-exact)
@@ -542,12 +545,8 @@ issue #647), not re-tightening the gate.
 
 Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
-**Auto-merged groups:**
-
-- lint and format tooling
-- testing tooling
-- tailwind tooling
-- release tooling
+**Auto-merged groups:** every minor/patch npm group except `auth-and-billing` (Stripe and
+Supabase clients), which stays confirm-required. Majors and GitHub Actions updates stay manual.
 
 **Safety rules:**
 
@@ -558,12 +557,13 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
   `pull_request_target` token is read-only, so the post-CI workflow owns preview dispatch and merge
 - Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
   change stays manual
-- Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all dependencies, and all GitHub Actions
-  updates stay manual
+- A changed `package.json` line naming `stripe`, `@stripe/*`, `@supabase/*`, or `supabase` keeps
+  the PR manual even if group membership drifts
+- All GitHub Actions updates stay manual
 - GitHub Actions updates may require a repository or organization Actions allowlist change for the
   new pinned SHA, which CI on the Dependabot branch cannot validate reliably
 - PR must stay on the validated head SHA, the GitHub Actions `CI Result` and `PR Meta` check runs
-  must complete, the latest `Preview Result` status must be `success`, and no check run or latest
+  and Socket's `Socket Security: Pull Request Alerts` check run (app `156372`) must succeed, the latest `Preview Result` status must be `success`, and no check run or latest
   status context may fail or remain pending; the merge command also matches the validated head
   commit to close the final race. Individual CI/security job names are no longer listed; the wait
   is bounded to 60 minutes inside a 90-minute job
@@ -922,15 +922,17 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
   behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
-- Patch cooldown is short so safe patch updates do not sit for a full week
+- Cooldown: 30 days for majors, 7 for minors, 3 for patches; security updates skip the cooldown
+  and are vetted in review instead
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent dependency PRs and 1 GitHub Actions PR
-- Conservative auto-merge for allowlisted low-risk Dependabot groups after CI/security checks pass
+- Auto-merge for minor/patch groups other than `auth-and-billing` after CI, Socket, and preview pass
 - Gitleaks runs via a pinned CLI download in CI with release checksum verification instead of the deprecated `gitleaks-action` runtime
 
 **Current package groups:**
 
+- auth and billing (`stripe`, `@stripe/*`, `@supabase/*`, `supabase`; never auto-merged)
 - nuxt ecosystem
 - lint and format tooling
 - testing tooling
@@ -943,14 +945,14 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Review strategy:**
 
 - Let Dependabot batch low-risk tooling updates for scheduled review windows
-- Let the auto-merge workflow clear allowlisted npm tooling PRs after checks pass
+- Let the auto-merge workflow clear minor/patch npm group PRs after checks pass
 - Review every GitHub Actions PR manually, including minor and patch updates; update repository and
   organization Actions allowlists first when the pinned SHA is restricted
 - Keep major upgrades explicit
 - Allow official GitHub-maintained actions to propose major updates when GitHub changes required
   action runtimes, but do not auto-merge them
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
-- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all dependency updates manual
+- Keep auth and billing client updates manual; they need confirmation before merge
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
 
 ## Development Environment Setup
