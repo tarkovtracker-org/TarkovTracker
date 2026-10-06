@@ -8,6 +8,9 @@ The reliability policy and vocabulary live in `CONTEXT.md`. Local persistence an
 acknowledgement are separate facts, tracked in `app/stores/tarkov/progressSaveStatus.ts` and
 shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 
+- **Unchanged saves.** The sync controller deduplicates only identical serialized payloads after
+  the production transform and owner assignment. External acknowledgements use the same comparison;
+  a different pending payload stays pending. Remote observations invalidate the saved baseline.
 - **Cloud status.** `useSupabaseSync` reports `pending` from the first local change until the
   service acknowledges the latest version, `saving` while a write is in flight, `retry_scheduled`
   after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS` in
