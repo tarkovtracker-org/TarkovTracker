@@ -396,9 +396,6 @@ verify_jwt = false
 [functions.account-delete]
 verify_jwt = false
 
-[functions.account-delete-reconcile]
-verify_jwt = false
-
 [functions.admin-cache-purge]
 verify_jwt = false
 

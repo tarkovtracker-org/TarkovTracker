@@ -324,9 +324,11 @@ Important:
 
 This is **not** wired through `consume_mutation_rate_limit` today. It remains a second pattern for
 “sensitive mutation limiting” because the dedicated table also retains the deletion audit history.
-Both RPCs are service-role-only. A job claim holds a 15-minute lease; the reconciler can recover a
-stale `in_progress` job after that lease, but a fencing token prevents the stale worker from
-overwriting its replacement. Only an explicit user request can reset and revive dead-lettered work.
+Both RPCs are service-role-only. A job claim holds a 15-minute lease; the daily
+`account-deletion-retry` Cron job (`private.run_account_deletion_retries`) retries due `failed` jobs
+and recovers stale `in_progress` jobs after that lease, but a fencing token prevents the stale worker
+from overwriting its replacement. Each failed retry rolls back and consumes one attempt. Only an
+explicit user request can reset and revive dead-lettered work.
 
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.
