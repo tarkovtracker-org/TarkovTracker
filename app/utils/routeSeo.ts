@@ -163,22 +163,26 @@ const imageMeta = (image: RouteSeoImage) => [
   { property: 'og:image:height', content: String(image.height) },
   { property: 'og:image:alt', content: image.alt },
   { name: 'twitter:image', content: image.src },
+  { name: 'twitter:image:width', content: String(image.width) },
+  { name: 'twitter:image:height', content: String(image.height) },
   { name: 'twitter:image:alt', content: image.alt },
 ];
 const optionalImageMeta = (image?: RouteSeoImage) => (image ? imageMeta(image) : []);
 const canonicalMeta = (canonical?: string) =>
   canonical ? [{ property: 'og:url', content: canonical }] : [];
+// Discord already displays og:site_name above the title; avoid repeating the brand.
+const previewTitle = (title: string): string => title.replace(/ · TarkovTracker\.org$/, '');
 const createMeta = (seo: RouteSeo) =>
   [
     { name: 'description', content: seo.description },
     { name: 'robots', content: seo.indexable ? 'index, follow' : 'noindex, nofollow' },
-    { property: 'og:title', content: seo.title },
+    { property: 'og:title', content: previewTitle(seo.title) },
     { property: 'og:description', content: seo.description },
     ...canonicalMeta(seo.canonical),
     { property: 'og:site_name', content: readEnglishKey('seo.site_name') },
     { property: 'og:type', content: seo.guide ? 'article' : 'website' },
     { name: 'twitter:card', content: seo.image ? 'summary_large_image' : 'summary' },
-    { name: 'twitter:title', content: seo.title },
+    { name: 'twitter:title', content: previewTitle(seo.title) },
     { name: 'twitter:description', content: seo.description },
     ...optionalImageMeta(seo.image),
   ].map((tag) => ({ ...tag, key: 'property' in tag ? tag.property : tag.name }));

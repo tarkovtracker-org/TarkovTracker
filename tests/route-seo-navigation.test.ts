@@ -37,6 +37,9 @@ describe('route metadata navigation', () => {
       await router!.push('/settings');
       await settleHead();
       expect(document.head.querySelector('meta[property="og:image"]')).toBeNull();
+      expect(
+        document.head.querySelector('meta[property="og:title"]')?.getAttribute('content')
+      ).toBe('Settings');
       expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(
         'noindex, nofollow'
       );
@@ -48,6 +51,12 @@ describe('route metadata navigation', () => {
       expect(
         document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')
       ).toBe('summary');
+      expect(
+        document.head.querySelector('meta[property="og:title"]')?.getAttribute('content')
+      ).toBe('Tarkov Quest Tracker');
+      expect(
+        document.head.querySelector('meta[name="twitter:title"]')?.getAttribute('content')
+      ).toBe('Tarkov Quest Tracker');
       expect(document.head.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
       expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
         'https://tarkovtracker.org/tasks'

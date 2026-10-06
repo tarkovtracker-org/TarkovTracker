@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertLinkPreviewMetadata } from './linkPreview';
 import { CLIENT_DOCUMENT_ROUTES, PUBLIC_SEO_ROUTES, resolveRouteSeo, SEO_ORIGIN } from './routeSeo';
 const readDocument = (directory: string, route: string): string => {
   const relative = route === '/' ? 'index.html' : `${route.slice(1)}.html`;
@@ -36,6 +37,7 @@ const assertDocumentMetadata = (html: string, route: string): void => {
     route
   );
   assertCanonical(html, route);
+  assertLinkPreviewMetadata(html, route);
 };
 const assertImagePolicy = (html: string, route: string): void => {
   if (!resolveRouteSeo(route).image && /(?:property="og:image"|name="twitter:image")/.test(html)) {
