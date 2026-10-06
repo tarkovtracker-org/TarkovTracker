@@ -31,6 +31,21 @@ mockNuxtImport('useI18n', () => () => ({
   locale: { value: 'en' },
 }));
 describe('ActivityLogPanel', () => {
+  it('does not offer a Clear control that leaves API history visible', () => {
+    const wrapper = mount(ActivityLogPanel, {
+      global: {
+        stubs: {
+          UButton: { template: '<button><slot /></button>' },
+          UIcon: true,
+          UBadge: true,
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('activity_log.api_synced');
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain(
+      'activity_log.clear'
+    );
+  });
   it('counts every API task update not shown in the entry preview', () => {
     const wrapper = mount(ActivityLogPanel, {
       global: { stubs: { UButton: true, UIcon: true, UBadge: true } },
