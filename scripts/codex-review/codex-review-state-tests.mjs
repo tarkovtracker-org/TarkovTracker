@@ -283,20 +283,32 @@ test('usage-limit refusal ends the request without establishing completion on an
     const state = classifyState(inputs({ pull: pull({ head: { sha } }), comments }), now);
     assert.equal(state.status, 'unavailable');
     assert.match(state.reason, /another provider or a human/);
-    assert.equal(state.retryAt, Date.parse(refusedAt) + 24 * 60 * 60 * 1000);
+    assert.equal(state.retryAt, undefined);
     assert.equal(state.result, undefined);
   }
 });
-test('usage-limit cooldown permits a new request but never grants review completion', () => {
+test('refusals never expire; only explicit retry restores request eligibility', () => {
   const comments = [limitedRequest(), limitReply()];
-  const retryAt = Date.parse(refusedAt) + 24 * 60 * 60 * 1000;
-  assert.equal(classifyState(inputs({ comments }), retryAt - 1).status, 'unavailable');
-  assert.equal(classifyState(inputs({ comments }), retryAt).status, 'unreviewed');
-  comments.push(limitedRequest(head, new Date(retryAt).toISOString()));
-  assert.equal(classifyState(inputs({ comments }), retryAt + 1000).status, 'pending');
-  const later = new Date(retryAt + 2000).toISOString();
+  assert.equal(classifyState(inputs({ comments }), now + 10 * 86400000).status, 'unavailable');
+  for (const sha of [head, otherHead]) {
+    assert.equal(
+      classifyState(
+        inputs({ pull: pull({ head: { sha } }), comments, retryUnavailable: true }),
+        now
+      ).status,
+      'unreviewed'
+    );
+  }
+  const recent = pull({ updated_at: new Date(now - 1000).toISOString() });
+  assert.equal(
+    classifyState(inputs({ pull: recent, comments, retryUnavailable: true }), now).status,
+    'pending'
+  );
+  comments.push(limitedRequest(head, '2026-09-27T02:30:00Z'));
+  assert.equal(classifyState(inputs({ comments, retryUnavailable: true }), now).status, 'pending');
+  const later = '2026-09-27T02:30:01Z';
   comments.push(limitReply({ created_at: later, updated_at: later }));
-  assert.equal(classifyState(inputs({ comments }), retryAt + 3000).status, 'unavailable');
+  assert.equal(classifyState(inputs({ comments }), now).status, 'unavailable');
 });
 test('a usage-limit refusal retires only the confirmed matching local intent', () => {
   const comments = [limitedRequest(), limitReply()];
@@ -383,4 +395,27 @@ test('completed historical requests do not make a later refusal ambiguous', () =
   const done = reviewComment(otherHead, '2026-09-27T01:30:00Z');
   const comments = [limitReply(), done, limitedRequest(), earlier];
   assert.equal(classifyState(inputs({ comments }), now).status, 'unavailable');
+});
+test('explicit retry preserves unknown activity, pending reviews and unresolved intents', () => {
+  const comments = [limitedRequest(), limitReply()];
+  const cases = [
+    { comments: [...comments, limitReply({ body: 'Unrecognized bot activity' })] },
+    {
+      reviews: [
+        { user: { login: 'chatgpt-codex-connector[bot]' }, state: 'PENDING', commit_id: head },
+      ],
+    },
+    { requestedReviewers: { users: [{ login: 'chatgpt-codex-connector[bot]' }] } },
+    { intents: [{ sha: head, requestedAt: null }] },
+  ];
+  for (const extra of cases) {
+    const state = classifyState(inputs({ comments, retryUnavailable: true, ...extra }), now);
+    assert.ok(['pending', 'unknown'].includes(state.status));
+  }
+  const spoofed = limitReply({ user: { login: 'chatgpt-codex-connector[bot]', type: 'User' } });
+  assert.equal(
+    classifyState(inputs({ comments: [limitedRequest(), spoofed], retryUnavailable: true }), now)
+      .status,
+    'pending'
+  );
 });

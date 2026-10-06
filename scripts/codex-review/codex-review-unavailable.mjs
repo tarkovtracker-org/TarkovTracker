@@ -1,7 +1,6 @@
 // A refusal ends one request, never establishes review completion.
 const BOT = 'chatgpt-codex-connector[bot]';
 const LIMIT_MESSAGE = 'You have reached your Codex usage limits for code reviews.';
-const RETRY_DELAY_MS = 24 * 60 * 60 * 1000;
 const unknown = (reason) => ({ kind: 'unknown', reason });
 function isUsageLimit(comment) {
   return (comment.body ?? '').startsWith(LIMIT_MESSAGE);
@@ -71,15 +70,11 @@ export function wasRefused(request, activities) {
   );
 }
 export function usageLimitState(context) {
-  const refusal = context.activities
-    .filter((activity) => activity.kind === 'refused')
-    .sort((a, b) => b.at - a.at)[0];
-  if (!refusal) return null;
-  const retryAt = refusal.at + RETRY_DELAY_MS;
-  if (context.now >= retryAt) return null;
+  if (context.retryUnavailable) return null;
+  if (!context.activities.some((activity) => activity.kind === 'refused')) return null;
   return {
     status: 'unavailable',
-    retryAt,
-    reason: `Codex declined a review due to usage limits; use another provider or a human. One guarded retry is eligible after ${new Date(retryAt).toISOString()}; this does not prove the limit has reset.`,
+    reason:
+      'Codex declined a review due to usage limits; use another provider or a human. After confirming capacity is available, use --request --retry-unavailable for one guarded attempt.',
   };
 }

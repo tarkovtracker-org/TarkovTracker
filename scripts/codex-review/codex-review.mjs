@@ -70,7 +70,15 @@ function fetchState(context) {
   const { pull: refreshed, serverTime } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const changed = changedSnapshot(pull, refreshed);
   if (changed) return changed;
-  const inputs = { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas };
+  const inputs = {
+    pull: refreshed,
+    comments,
+    reviews,
+    requestedReviewers,
+    intents,
+    resolvedShas,
+    retryUnavailable: Boolean(context.request && context.retryUnavailable),
+  };
   if (context.collapseRequests) collapseReviewCommands(context, inputs);
   return classifyState(inputs, serverTime);
 }
@@ -143,7 +151,7 @@ function persistIntent(directory, repo, pr, sha, createdAt, requestedAt = null) 
   return path;
 }
 function usage() {
-  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--collapse-requests] [--wait-seconds N]';
+  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--retry-unavailable] [--collapse-requests] [--wait-seconds N]';
 }
 function validateWait(waitSeconds) {
   if (!Number.isSafeInteger(waitSeconds) || waitSeconds < 0 || waitSeconds > 3600) {
@@ -166,6 +174,7 @@ export function parseArgs(argv) {
     options: {
       repo: { type: 'string' },
       request: { type: 'boolean', default: false },
+      'retry-unavailable': { type: 'boolean', default: false },
       'collapse-requests': { type: 'boolean', default: false },
       'wait-seconds': { type: 'string', default: '0' },
     },
@@ -173,8 +182,11 @@ export function parseArgs(argv) {
   const waitSeconds = Number(values['wait-seconds']);
   validateWait(waitSeconds);
   validateRepo(values.repo);
+  if (values['retry-unavailable'] && !values.request)
+    throw new Error('--retry-unavailable requires --request');
   return {
     request: values.request,
+    retryUnavailable: values['retry-unavailable'],
     collapseRequests: values['collapse-requests'],
     repo: values.repo ?? null,
     waitSeconds,

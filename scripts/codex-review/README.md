@@ -3,14 +3,14 @@
 Requests or waits for a Codex PR review without duplicate posts. Agents use it as described in
 [`AGENTS.md`](../../AGENTS.md); never post raw `@codex review` comments instead.
 
-| File                           | What it does                                                            | Run by                   |
-| ------------------------------ | ----------------------------------------------------------------------- | ------------------------ |
-| `codex-review.mjs`             | Command-line entry: `node scripts/codex-review/codex-review.mjs`.       | agents, by hand          |
-| `codex-review-state.mjs`       | Reads a PR's review state from GitHub.                                  | `codex-review.mjs`       |
-| `codex-review-unavailable.mjs` | Authenticates and scopes usage-limit refusals and their retry cooldown. | `codex-review-state.mjs` |
-| `codex-review-lock.mjs`        | Lock so two runs cannot request the same review.                        | `codex-review.mjs`       |
-| `codex-review-collapse.mjs`    | Collapses acknowledged or completed review commands.                    | `codex-review.mjs`       |
-| `*-tests.mjs`                  | `node --test` tests for the files above.                                | `pnpm run test:workflow` |
+| File                           | What it does                                                                  | Run by                   |
+| ------------------------------ | ----------------------------------------------------------------------------- | ------------------------ |
+| `codex-review.mjs`             | Command-line entry: `node scripts/codex-review/codex-review.mjs`.             | agents, by hand          |
+| `codex-review-state.mjs`       | Reads a PR's review state from GitHub.                                        | `codex-review.mjs`       |
+| `codex-review-unavailable.mjs` | Authenticates and scopes usage-limit refusals and explicit retry eligibility. | `codex-review-state.mjs` |
+| `codex-review-lock.mjs`        | Lock so two runs cannot request the same review.                              | `codex-review.mjs`       |
+| `codex-review-collapse.mjs`    | Collapses acknowledged or completed review commands.                          | `codex-review.mjs`       |
+| `*-tests.mjs`                  | `node --test` tests for the files above.                                      | `pnpm run test:workflow` |
 
 ## Guard behavior
 
@@ -58,7 +58,7 @@ for the exact current head; it does not transfer completion from a pre-update co
 retargeting to a different base branch, review the new diff before merging.
 A completed code review can contain findings; the normal feedback-resolution gate still applies.
 Unknown or unavailable status must be reported as incomplete. Unknown evidence never authorizes retry;
-recognized usage-limit refusals follow the bounded retry policy below.
+recognized usage-limit refusals follow the explicit retry policy below.
 An unreviewed PR must be quiet for five minutes after creation or its latest
 update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
 This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
@@ -94,17 +94,27 @@ fail-closed. The matching local intent is retired only if its confirmed server r
 and SHA match. An uncertain delivery intent remains pending.
 
 The result is `unavailable`, with exit code 3, a fallback to another provider or a human, and a
-`retryAt` timestamp. Waiting stops immediately. A refusal never establishes completion, grants
+message describing the explicit retry option. Waiting stops immediately. A refusal never establishes completion, grants
 merge approval or authorizes collapsing a command as completed. Genuine pending formal reviews,
 requested reviewers and other outstanding requests still block duplicate requests.
 
-Usage limits block guarded requests on every head for 24 hours after the latest recognized reply.
-The cooldown uses GitHub's final response `Date`, including the exact boundary, not the local
-clock. Afterward the existing quiet period and all other checks must pass before an authorized
-`--request` can post one retry under the shared lock. The posted request and durable intent block
-further retries; another refusal starts a fresh cooldown. This is a bounded retry policy, not
-proof that credits or limits have reset. Plain observation never posts a retry. Do not edit
-historical refusal evidence or delete intents to force eligibility.
+A recognized refusal remains `unavailable` on every head until another review completes or an
+operator explicitly requests a retry. Time passing does not establish available capacity. Normal
+`--request` invocations never retry a refused request automatically.
+
+After confirming capacity is available, an authorized caller can make one guarded attempt:
+
+```sh
+node scripts/codex-review/codex-review.mjs <PR> --request --retry-unavailable --wait-seconds 600
+```
+
+`--retry-unavailable` requires `--request`. It bypasses only the recognized refusal status; the
+quiet period, pending reviews, requested reviewers, unknown evidence, shared lock, final
+recheck and durable intent still apply. The retry option is consumed after one POST, so a
+subsequent refusal stops that same invocation immediately. A failed or uncertain POST remains
+blocked by the saved intent. Repeating the command while a request is pending never posts again.
+Plain observation is read-only. Do not edit historical refusal evidence or delete intents to
+force eligibility. The flag is an explicit retry choice, not proof that limits have reset.
 
 ### Historical untagged requests
 

@@ -87,10 +87,13 @@ test('parses bounded CLI arguments and rejects invalid wait durations', () => {
       request: true,
       waitSeconds: 600,
       collapseRequests: false,
+      retryUnavailable: false,
     }
   );
   assert.throws(() => parseArgs(['944', '--wait-seconds', '-1']));
   assert.equal(parseArgs(['944', '--collapse-requests']).collapseRequests, true);
+  assert.throws(() => parseArgs(['944', '--retry-unavailable']), /requires --request/);
+  assert.equal(parseArgs(['944', '--request', '--retry-unavailable']).retryUnavailable, true);
 });
 test('plain observation stays read-only and authorized cleanup leaves guard completion unchanged', async () => {
   const command = {
@@ -247,7 +250,7 @@ test('mixed-case repo retries find an ambiguous post intent without posting agai
   };
   try {
     const blocked = await runGuard(
-      { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+      { pr: 44, repo: 'example/repo', request: true, retryUnavailable: true, waitSeconds: 0 },
       baseDeps
     );
     assert.equal(blocked.status, 'pending');
@@ -264,14 +267,17 @@ test('mixed-case repo retries find an ambiguous post intent without posting agai
       }),
     };
     await assert.rejects(
-      runGuard({ pr: 44, repo: 'Example/Repo', request: true, waitSeconds: 0 }, failingDeps)
+      runGuard(
+        { pr: 44, repo: 'Example/Repo', request: true, retryUnavailable: true, waitSeconds: 0 },
+        failingDeps
+      )
     );
     assert.equal(posts, 1);
     const canonicalIntentPath = join(stateRoot, 'intents', `example_repo-44-${head}.json`);
     const mixedCaseIntentPath = join(stateRoot, 'intents', `Example_Repo-44-${head}.json`);
     renameSync(canonicalIntentPath, mixedCaseIntentPath);
     const retry = await runGuard(
-      { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+      { pr: 44, repo: 'example/repo', request: true, retryUnavailable: true, waitSeconds: 0 },
       failingDeps
     );
     assert.equal(retry.status, 'pending');
@@ -668,7 +674,7 @@ test('usage limits stop polling promptly and return a distinct nonzero exit code
     rmSync(root, { recursive: true, force: true });
   }
 });
-test('after cooldown the shared guard permits exactly one same-head retry, then handles another refusal', async () => {
+test('explicit retry permits exactly one same-head request and a subsequent refusal stops the same invocation', async () => {
   const root = mkdtempSync(join(tmpdir(), 'codex-limits-retry-'));
   const requestedAt = '2026-09-27T01:00:00Z';
   const refusedAt = '2026-09-27T01:00:01Z';
@@ -680,7 +686,7 @@ test('after cooldown the shared guard permits exactly one same-head retry, then 
     updated_at: refusedAt,
   };
   const comments = [requested, refusal];
-  let serverNow = Date.parse(refusedAt) + 86400000;
+  let serverNow = Date.parse(refusedAt) + 600000;
   let posts = 0;
   const routes = emptyApiRoutes();
   const ordinaryGh = mockGh(routes);
@@ -696,9 +702,22 @@ test('after cooldown the shared guard permits exactly one same-head retry, then 
     if (args.includes('--include')) return withServerDate(JSON.stringify(pull()), args, serverNow);
     return ordinaryGh(args);
   };
-  const options = { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 };
+  const options = {
+    pr: 44,
+    repo: 'example/repo',
+    request: true,
+    retryUnavailable: true,
+    waitSeconds: 0,
+  };
   const deps = { runGh, gitCommonDir: root, now: () => now };
   try {
+    assert.equal(
+      (await runGuard({ ...options, retryUnavailable: false }, deps)).status,
+      'unavailable'
+    );
+    assert.equal(posts, 0);
+    assert.equal((await runGuard({ ...options, request: false }, deps)).status, 'unavailable');
+    assert.equal(posts, 0);
     assert.equal((await runGuard(options, deps)).status, 'pending');
     assert.equal(posts, 1);
     assert.equal((await runGuard(options, deps)).status, 'pending');
@@ -706,8 +725,29 @@ test('after cooldown the shared guard permits exactly one same-head retry, then 
     serverNow += 1000;
     const createdAt = new Date(serverNow).toISOString();
     comments.push({ ...refusal, created_at: createdAt, updated_at: createdAt });
-    assert.equal((await runGuard(options, deps)).status, 'unavailable');
+    assert.equal(
+      (await runGuard({ ...options, retryUnavailable: false }, deps)).status,
+      'unavailable'
+    );
     assert.equal(posts, 1);
+    serverNow += 1000;
+    let sleeps = 0;
+    const result = await runGuard(
+      { ...options, waitSeconds: 600 },
+      {
+        ...deps,
+        sleep: async () => {
+          sleeps += 1;
+          if (sleeps > 1) throw new Error('must stop after one refused retry');
+          serverNow += 1000;
+          const at = new Date(serverNow).toISOString();
+          comments.push({ ...refusal, created_at: at, updated_at: at });
+        },
+      }
+    );
+    assert.equal(result.status, 'unavailable');
+    assert.equal(posts, 2);
+    assert.equal(sleeps, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
