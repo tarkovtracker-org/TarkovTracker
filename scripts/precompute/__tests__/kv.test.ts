@@ -82,6 +82,42 @@ describe('createKvRestWriter', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     }
   );
+  it.each([new TypeError('terminated'), new DOMException('timed out', 'TimeoutError')])(
+    'retries body transport failures after HTTP 200 headers: %s',
+    async (error) => {
+      const response = jsonResponse({ success: true });
+      vi.spyOn(response, 'json').mockRejectedValue(error);
+      fetchMock
+        .mockResolvedValueOnce(response)
+        .mockResolvedValueOnce(jsonResponse({ success: true }));
+      const pending = writer().put('key', 'value');
+      void pending.catch(() => {});
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    }
+  );
+  it('preserves the body transport error when retries are exhausted', async () => {
+    const error = new TypeError('terminated');
+    fetchMock.mockImplementation(() => {
+      const response = jsonResponse({ success: true });
+      vi.spyOn(response, 'json').mockRejectedValue(error);
+      return Promise.resolve(response);
+    });
+    const assertion = expect(writer().put('key', 'value')).rejects.toMatchObject({
+      message: 'KV write failed for "key": terminated',
+      cause: error,
+    });
+    void assertion.catch(() => {});
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it('does not retry malformed JSON on HTTP 200', async () => {
+    fetchMock.mockResolvedValue(new Response('invalid JSON'));
+    await expect(writer().put('key', 'value')).rejects.toThrow('HTTP 200');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('bounds transport retries and preserves the final cause', async () => {
     const error = new TypeError('fetch failed');
     fetchMock.mockRejectedValue(error);
@@ -116,10 +152,13 @@ describe('createKvRestWriter', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('throws with the HTTP status when the body is not JSON', async () => {
-    fetchMock.mockResolvedValue(new Response('bad gateway', { status: 502 }));
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(new Response('bad gateway', { status: 502 }))
+    );
     const assertion = expect(writer().put('key', 'value')).rejects.toThrow(
       'KV write failed for "key": HTTP 502'
     );
+    void assertion.catch(() => {});
     await vi.runAllTimersAsync();
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(3);

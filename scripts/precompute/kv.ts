@@ -61,6 +61,7 @@ async function writeAttempt(
   apiToken: string
 ): Promise<WriteFailure | null> {
   let response: Response;
+  let body: CloudflareApiResponse | null;
   try {
     response = await fetch(url, {
       body: value,
@@ -71,6 +72,7 @@ async function writeAttempt(
       method: 'PUT',
       signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
     });
+    body = await readApiResponse(response);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return {
@@ -78,7 +80,6 @@ async function writeAttempt(
       retryable: true,
     };
   }
-  const body = (await response.json().catch(() => null)) as CloudflareApiResponse | null;
   if (isSuccessfulWrite(response, body)) return null;
   return {
     error: new Error(`KV write failed for "${key}": ${errorDetail(response, body)}`),
@@ -96,4 +97,12 @@ function errorDetail(response: Response, body: CloudflareApiResponse | null): st
 }
 function formatApiError(error: { code?: number; message?: string }): string {
   return `${error.code ?? '?'}: ${error.message ?? '?'}`;
+}
+async function readApiResponse(response: Response): Promise<CloudflareApiResponse | null> {
+  try {
+    return (await response.json()) as CloudflareApiResponse;
+  } catch (error) {
+    if (error instanceof SyntaxError) return null;
+    throw error;
+  }
 }
