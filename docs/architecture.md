@@ -36,7 +36,7 @@ validates UUID/mode paths and reads the static profile shell without querying a 
 resource slugs real 404 responses. Legacy aliases remain HTTP 301 redirects.
 
 Application link previews are text-only `summary` cards. Social titles omit the repeated
-` · TarkovTracker.org` suffix because Discord displays the site name above them; browser titles
+`· TarkovTracker.org` suffix and its preceding space because Discord displays the site name above them; browser titles
 and canonicals keep their existing values. The global `theme-color` supplies the brand tan accent. Guides also default to text-only. To select
 an image, set `guide.shareImage` in [`resourceData.ts`](../app/features/resources/resourceData.ts)
 with `src`, the asset's actual `width` and `height`, and an `altKey` pointing to English copy in
@@ -45,11 +45,9 @@ are never selected automatically. Replace those fields to change the selection, 
 `shareImage` to disable it. Only explicitly selected images receive `summary_large_image` cards. Both Open Graph and Twitter
 image tags include dimensions immediately after their image URL.
 
-The prerender build validates initial social tags on all 18 public documents and 12 client shells:
-missing, stale, duplicate, commented-out, body-only, or unexpected social tags fail the build, as do invalid accent
-colors and copy beyond Discord's UTF-8 limits (70 bytes for titles, 350 for descriptions). The SEO
-preview smoke suite reads every document without executing its scripts and checks navigation,
-profile privacy, query normalization, redirects, and 404s.
+The [prerender validator](../app/utils/prerenderOutput.ts) checks initial link-preview metadata
+at build time. The [SEO preview smoke suite](../scripts/preview/smoke/seo.smoke.mjs) checks deployed
+documents and metadata changes during navigation.
 
 Use [Discord's Embed Debugger](https://discord.com/developers/embeds) while signed in to inspect
 Discord's actual selected tags and layout. Previews are cached for about 30 minutes; append a fresh
