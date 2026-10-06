@@ -97,8 +97,8 @@ flowchart LR
    deploys the matching application constants before the new season opens.
 6. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
-7. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
-   only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
+7. Prestige applies to persistent PvP and PvE (six levels each); Seasonal PvP does not support it,
+   so the archive RPC accepts only `pvp` and `pve` and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP. Prestige archives use the same account write queue as background
    syncs, supersede older splits, and acknowledge only the persistent modes the transaction writes.

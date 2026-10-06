@@ -156,6 +156,80 @@ describe('useTarkov prestigePvP', () => {
     expect(store.pve.progressEpoch).toBe(8);
   });
 });
+describe('useTarkov PvE prestige', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    clearAcknowledgedModes();
+    supabaseContext.user.id = 'user-1';
+    supabaseContext.user.loggedIn = true;
+    rpc.mockResolvedValue({ data: null, error: null });
+  });
+  it('archives and resets only PvE progress', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.currentGameMode = 'pve';
+      state.pvp = { ...state.pvp, level: 30, prestigeLevel: 2, progressEpoch: 5 };
+      state.pve = {
+        ...state.pve,
+        displayName: 'Offline',
+        level: 44,
+        pmcFaction: 'USEC',
+        prestigeLevel: 1,
+        progressEpoch: 3,
+      };
+    });
+    await store.prestigeMode('pve');
+    expect(rpc).toHaveBeenCalledWith(
+      'archive_prestige_run_and_reset_progress',
+      expect.objectContaining({
+        p_archived_progress: expect.objectContaining({ level: 44, prestigeLevel: 1 }),
+        p_mode: 'pve',
+        p_prestige_from: 1,
+        p_prestige_to: 2,
+        p_pve_data: expect.objectContaining({
+          displayName: 'Offline',
+          level: 1,
+          prestigeLevel: 2,
+          progressEpoch: 4,
+        }),
+        p_pvp_data: expect.objectContaining({ level: 30, prestigeLevel: 2, progressEpoch: 5 }),
+      })
+    );
+    expect(store.pve.level).toBe(1);
+    expect(store.pve.prestigeLevel).toBe(2);
+    expect(store.pvp.level).toBe(30);
+    expect(store.pvp.prestigeLevel).toBe(2);
+  });
+  it('refuses to archive past the sixth PvE prestige', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pve.prestigeLevel = 6;
+    });
+    await expect(store.prestigeMode('pve')).rejects.toThrow('Maximum prestige level reached.');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it('syncs the PvE prestige level without touching PvP', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pvp.prestigeLevel = 3;
+      state.pve.prestigeLevel = 0;
+      state.pve.progressEpoch = 2;
+    });
+    await store.syncPrestigeLevel('pve', 9);
+    expect(rpc).toHaveBeenCalledWith(
+      'sync_user_game_mode_progress',
+      expect.objectContaining({
+        p_modes: expect.objectContaining({
+          pve: expect.objectContaining({ prestigeLevel: 6, progressEpoch: 2 }),
+          pvp: expect.objectContaining({ prestigeLevel: 3 }),
+        }),
+      })
+    );
+    expect(store.pve.prestigeLevel).toBe(6);
+    expect(store.pvp.prestigeLevel).toBe(3);
+  });
+});
 describe('useTarkov prestigeMode seasonal', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

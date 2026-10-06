@@ -2162,7 +2162,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Prestige Unavailable",
-      "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
       "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
       "current_level": "Current Prestige Level",
       "set_current": "Set Current Prestige",
