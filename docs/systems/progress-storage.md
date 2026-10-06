@@ -203,7 +203,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in [EFT log import](./imports.md#eft-log-import); unresolved-mode events require an explicit destination choice.
-- Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
+- The activity feed and its unread badge show only API updates. Manual task actions and Undo
+  retain their immediate status messages without creating activity entries. Previously saved manual
+  entries remain compatible with progress sync and legacy adoption but are hidden from the feed.
+- Historical manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
   next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
   lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
   stable id in the equal-epoch branch, a reset/prestige epoch win discards the losing side's feed

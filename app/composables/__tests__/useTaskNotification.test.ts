@@ -1,3 +1,4 @@
+import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
 import { effectScope } from 'vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
@@ -37,6 +38,7 @@ const createTarkovStore = (options: {
   };
 };
 const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore>[0] = {}) => {
+  setActivePinia(createPinia());
   const tarkovStore = createTarkovStore(options);
   const metadataStore = { tasks };
   vi.resetModules();
@@ -61,6 +63,26 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it.each(['complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
+    'keeps manual %s and its undo out of activity history',
+    async (action) => {
+      const { notification, tarkovStore, stop } = await setup([]);
+      notification.onTaskAction({
+        action,
+        taskId: 'first-in-line',
+        taskName: 'First in Line',
+        statusKey: 'status',
+      });
+      expect(notification.showUndoButton.value).toBe(action !== 'available');
+      expect(tarkovStore.addManualActivityEntries).not.toHaveBeenCalled();
+      notification.undoLastAction();
+      expect(tarkovStore.addManualActivityEntries).not.toHaveBeenCalled();
+      if (action === 'complete') {
+        expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('first-in-line');
+      }
+      stop();
+    }
+  );
   it('does not fail already completed alternatives when undoing uncomplete', async () => {
     const task: Task = {
       id: 'task-main',

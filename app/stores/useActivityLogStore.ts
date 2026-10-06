@@ -12,8 +12,8 @@ import {
 } from '@/utils/userScopedStorage';
 import type { ApiUpdateMeta, ManualActivityEntry } from '@/types/progress';
 /**
- * Display row for the activity feed: a manual entry from the synced progress
- * blob or a synthesized API sync row. Internal to this store — consumers read
+ * Display row for the activity feed, synthesized from API sync history.
+ * Internal to this store — consumers read
  * the inferred type off `allEntries`.
  */
 interface ActivityLogEntry {
@@ -59,15 +59,6 @@ const activityLogTimestampSerializer = {
 };
 const validReadTimestamp = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
-const toActivityLogEntry = (entry: ManualActivityEntry): ActivityLogEntry => ({
-  id: entry.id,
-  timestamp: entry.timestamp,
-  source: 'manual',
-  type: entry.type,
-  action: entry.action,
-  title: entry.title,
-  ...(entry.details ? { details: entry.details } : {}),
-});
 /**
  * Read manual activity entries left behind by the pre-#445 standalone
  * `useStorage` ref. Returns `null` when the payload belongs to another user, so
@@ -138,9 +129,6 @@ export const useActivityLogStore = defineStore('activityLog', {
     lastReadTimestamp(): number {
       return this.lastReadByMode[useTarkovStore().getCurrentGameMode()] ?? 0;
     },
-    manualEntries(): ActivityLogEntry[] {
-      return useTarkovStore().getManualActivityHistory().map(toActivityLogEntry);
-    },
     allEntries(): ActivityLogEntry[] {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
@@ -155,52 +143,27 @@ export const useActivityLogStore = defineStore('activityLog', {
           metadata: entry,
         })
       );
-      const combined = [...apiEntries, ...this.manualEntries];
-      combined.sort((a, b) => b.timestamp - a.timestamp);
-      return combined.slice(0, ACTIVITY_LOG_DISPLAY_LIMIT);
+      apiEntries.sort((a, b) => b.timestamp - a.timestamp);
+      return apiEntries.slice(0, ACTIVITY_LOG_DISPLAY_LIMIT);
     },
     unreadCount(): number {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
-      const apiUnreadCount = (currentData?.apiUpdateHistory || []).reduce(
+      return (currentData?.apiUpdateHistory || []).reduce(
         (count: number, entry: ApiUpdateMeta) =>
           entry.at > this.lastReadTimestamp ? count + 1 : count,
         0
       );
-      const manualUnreadCount = tarkovStore
-        .getManualActivityHistory()
-        .reduce(
-          (count, entry) => (entry.timestamp > this.lastReadTimestamp ? count + 1 : count),
-          0
-        );
-      return apiUnreadCount + manualUnreadCount;
     },
     hasUnread(): boolean {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
-      return (
-        (currentData?.apiUpdateHistory || []).some(
-          (entry: ApiUpdateMeta) => entry.at > this.lastReadTimestamp
-        ) ||
-        tarkovStore
-          .getManualActivityHistory()
-          .some((entry) => entry.timestamp > this.lastReadTimestamp)
+      return (currentData?.apiUpdateHistory || []).some(
+        (entry: ApiUpdateMeta) => entry.at > this.lastReadTimestamp
       );
     },
   },
   actions: {
-    addManualEntry(entry: Omit<ActivityLogEntry, 'timestamp' | 'source'>) {
-      useTarkovStore().addManualActivityEntries([
-        {
-          id: entry.id,
-          timestamp: Date.now(),
-          type: entry.type,
-          action: entry.action,
-          title: entry.title,
-          ...(entry.details ? { details: entry.details } : {}),
-        },
-      ]);
-    },
     markAllAsRead() {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
@@ -208,12 +171,8 @@ export const useActivityLogStore = defineStore('activityLog', {
         (latest: number, entry: ApiUpdateMeta) => Math.max(latest, entry.at),
         0
       );
-      const latestManualTimestamp = tarkovStore
-        .getManualActivityHistory()
-        .reduce((latest, entry) => Math.max(latest, entry.timestamp), 0);
       this.lastReadByMode[tarkovStore.getCurrentGameMode()] = Math.max(
         latestApiTimestamp,
-        latestManualTimestamp,
         Date.now()
       );
     },
