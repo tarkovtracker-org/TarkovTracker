@@ -31,20 +31,25 @@ END;
 $$;
 
 -- A failed retry rolls back completely and consumes one attempt, dead-lettering at max_attempts.
--- The rollback also releases the claim, so a fresh in_progress row belongs to another worker and is
--- left untouched; only the restored pre-claim state (due work or an expired lease) is charged.
-CREATE FUNCTION private.record_account_deletion_retry_failure(p_user_id uuid, p_error text)
-RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
-  UPDATE public.account_deletion_jobs SET
-    attempts = attempts + 1,
-    status = CASE WHEN attempts + 1 >= max_attempts THEN 'dead_lettered' ELSE 'failed' END,
-    dead_lettered_at = CASE WHEN attempts + 1 >= max_attempts THEN clock_timestamp() END,
-    next_run_at = CASE WHEN attempts + 1 < max_attempts THEN clock_timestamp() + interval '1 day' END,
-    last_error = 'scheduled_retry_failed', last_error_at = clock_timestamp(),
-    last_error_details = jsonb_build_object('stage', 'scheduled_retry', 'sqlstate', p_error),
-    updated_at = clock_timestamp(), claim_token = NULL
-  WHERE user_id = p_user_id AND (status IN ('pending', 'failed')
-    OR (status = 'in_progress' AND updated_at <= clock_timestamp() - interval '15 minutes'));
+-- The rollback also releases the claim, so another worker may claim (and even fail) the job before
+-- this runs. Only the exact pre-claim snapshot is charged; any newer claim keeps its own state.
+CREATE FUNCTION private.record_account_deletion_retry_failure(p_user_id uuid, p_error text,
+  p_attempts integer, p_updated_at timestamptz)
+RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
+  WITH charged AS (
+    UPDATE public.account_deletion_jobs SET
+      attempts = attempts + 1,
+      status = CASE WHEN attempts + 1 >= max_attempts THEN 'dead_lettered' ELSE 'failed' END,
+      dead_lettered_at = CASE WHEN attempts + 1 >= max_attempts THEN clock_timestamp() END,
+      next_run_at = CASE WHEN attempts + 1 < max_attempts THEN clock_timestamp() + interval '1 day' END,
+      last_error = 'scheduled_retry_failed', last_error_at = clock_timestamp(),
+      last_error_details = jsonb_build_object('stage', 'scheduled_retry', 'sqlstate', p_error),
+      updated_at = clock_timestamp(), claim_token = NULL
+    WHERE user_id = p_user_id AND status IN ('pending', 'failed', 'in_progress')
+      AND attempts = p_attempts AND updated_at IS NOT DISTINCT FROM p_updated_at
+    RETURNING 1
+  )
+  SELECT EXISTS (SELECT 1 FROM charged);
 $$;
 
 -- No secrets, HTTP callbacks, or separate deletion worker: due failed jobs and expired leases are
@@ -59,7 +64,7 @@ BEGIN
     RETURN jsonb_build_object('skipped', 'already_running');
   END IF;
   FOR v_job IN
-    SELECT j.user_id FROM public.account_deletion_jobs j
+    SELECT j.user_id, j.attempts, j.updated_at FROM public.account_deletion_jobs j
     WHERE ((j.status IN ('pending', 'failed') AND (j.next_run_at IS NULL OR j.next_run_at <= clock_timestamp()))
       OR (j.status = 'in_progress' AND j.updated_at <= clock_timestamp() - interval '15 minutes'))
       -- Storage owners need Storage API cleanup first; never let them fill every batch.
@@ -76,7 +81,10 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       v_failed := v_failed + 1;
       BEGIN
-        PERFORM private.record_account_deletion_retry_failure(v_job.user_id, SQLSTATE);
+        IF NOT private.record_account_deletion_retry_failure(v_job.user_id, SQLSTATE, v_job.attempts,
+          v_job.updated_at) THEN
+          v_unrecorded := v_unrecorded + 1;
+        END IF;
       EXCEPTION WHEN OTHERS THEN
         v_unrecorded := v_unrecorded + 1;
         RAISE WARNING 'account deletion retry failure not recorded for %: %', v_job.user_id, SQLSTATE;
@@ -89,7 +97,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION private.retry_account_deletion(uuid),
-  private.record_account_deletion_retry_failure(uuid, text),
+  private.record_account_deletion_retry_failure(uuid, text, integer, timestamptz),
   private.run_account_deletion_retries(integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION private.run_account_deletion_retries(integer) TO service_role;

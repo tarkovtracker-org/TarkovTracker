@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(31);
+SELECT plan(34);
 
 CREATE TEMP TABLE retry_fixture (name text PRIMARY KEY, user_id uuid NOT NULL);
 INSERT INTO retry_fixture
@@ -112,7 +112,11 @@ SELECT is((pg_temp.retry_job('unsaved')).attempts, 1, 'unrecorded failure leaves
 DROP TRIGGER block_retry_delete ON auth.users;
 DROP TRIGGER block_retry_record ON public.account_deletion_jobs;
 
-SELECT private.record_account_deletion_retry_failure(pg_temp.retry_user('reclaimed'), 'P0001');
+SELECT is(private.record_account_deletion_retry_failure(pg_temp.retry_user('reclaimed'), 'P0001', 1,
+  now() - interval '1 hour'), false, 'failure recording rejects a replacement claim');
+SELECT is(private.record_account_deletion_retry_failure(pg_temp.retry_user('not_due'), 'P0001', 0,
+  (pg_temp.retry_job('not_due')).updated_at), false, 'failure recording rejects a replacement failure');
+SELECT is((pg_temp.retry_job('not_due')).attempts, 1, 'replacement failure keeps its attempts');
 SELECT is((pg_temp.retry_job('reclaimed')).claim_token, '00000000-0000-0000-0000-000000002199'::uuid,
   'failure recording keeps a replacement claim');
 SELECT is((pg_temp.retry_job('reclaimed')).attempts, 1, 'failure recording does not charge a replacement claim');
