@@ -13,4 +13,5 @@ if ! pnpm exec supabase status >/dev/null 2>&1; then
 fi
 pnpm exec supabase db reset --no-seed
 pnpm exec supabase test db supabase/tests/database
+pnpm run supabase:test:concurrency
 pnpm exec supabase db lint --schema public --fail-on error

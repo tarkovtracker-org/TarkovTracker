@@ -18,6 +18,9 @@ See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs 
 
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
+Receipt completion, fenced retries, migration-before-handler rollout and historical receipt
+disposition: [Stripe webhook recovery](./stripe-webhook-recovery.md).
+
 Set these in Supabase Dashboard → Project Settings → Edge Functions (canonical definitions in
 [`architecture.md` §Environment Variables](./architecture.md#environment-variables) and
 `supabase/functions/.env.example`):
