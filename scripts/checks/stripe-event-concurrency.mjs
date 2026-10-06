@@ -2,6 +2,7 @@
 // No connection URL, production credentials or remote target is accepted.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 const project = readFileSync('supabase/config.toml', 'utf8').match(
@@ -9,9 +10,10 @@ const project = readFileSync('supabase/config.toml', 'utf8').match(
 )?.[1];
 const container = process.argv[2] ?? `supabase_db_${project}`;
 assert.match(container, /^supabase_db_[\w-]+$/);
-const user = '00000000-0000-4000-8000-000000000705';
-const event = 'evt_isolated_concurrency_regression';
-const application = 'stripe_fence_regression_holder';
+const user = randomUUID();
+const event = `evt_isolated_${user}`;
+const application = `stripe_fence_holder_${user}`;
+const claimantApplication = `stripe_fence_claimant_${user}`;
 const psql = [
   'exec',
   container,
@@ -85,12 +87,12 @@ async function checkReplacement(rollback) {
   );
   const started = performance.now();
   const claimant = runConnection(
-    `SET application_name='stripe_fence_regression_claimant'; SELECT public.claim_stripe_event('${event}','test')`
+    `SET application_name='${claimantApplication}'; SELECT public.claim_stripe_event('${event}','test')`
   );
   // Observe actual PostgreSQL lock wait while the holder owns the row. Timing
   // alone cannot prove that claim replacement is fenced by the billing write.
   await waitFor(
-    `SELECT count(*) FROM pg_stat_activity WHERE application_name='stripe_fence_regression_claimant' AND wait_event_type='Lock' AND wait_event='transactionid'`,
+    `SELECT count(*) FROM pg_stat_activity WHERE application_name='${claimantApplication}' AND wait_event_type='Lock' AND wait_event='transactionid'`,
     '1'
   );
   const claimResult = await claimant;
@@ -110,12 +112,36 @@ async function checkReplacement(rollback) {
     `PASS receipt replacement waits for ${rollback ? 'rollback' : 'commit'} across lease expiry; stale subsequent write rejected (${Math.round(elapsed)}ms)`
   );
 }
-try {
-  query(`INSERT INTO auth.users(id,email) VALUES ('${user}','stripe-concurrency@example.invalid');
-    INSERT INTO public.supporters(user_id,type,tier) VALUES ('${user}','one_time','scav');`);
+function createFixture() {
+  query(`BEGIN; INSERT INTO auth.users(id,email) VALUES ('${user}','stripe-${user}@example.invalid');
+    INSERT INTO public.supporters(user_id,type,tier) VALUES ('${user}','one_time','scav'); COMMIT;`);
+}
+async function withFixture(run, setup = createFixture) {
+  let created = false;
+  try {
+    setup();
+    created = true;
+    await run();
+  } finally {
+    if (created) {
+      query(`DELETE FROM public.supporters WHERE user_id='${user}'; DELETE FROM auth.users WHERE id='${user}';
+        DELETE FROM public.stripe_events WHERE event_id='${event}';`);
+    }
+  }
+}
+async function assertFailedSetupPreservesExisting() {
+  // A nested invocation collides with this run's existing fixture. Its setup
+  // fails before ownership is established, so it must leave those rows intact.
+  await assert.rejects(
+    withFixture(() => {}, createFixture),
+    /duplicate key/
+  );
+  assert.equal(query(`SELECT count(*) FROM auth.users WHERE id='${user}'`), '1');
+  assert.equal(query(`SELECT tier FROM public.supporters WHERE user_id='${user}'`), 'scav');
+  console.log(`PASS failed setup preserves pre-existing fixture ${user}`);
+}
+await withFixture(async () => {
+  await assertFailedSetupPreservesExisting();
   await checkReplacement(false);
   await checkReplacement(true);
-} finally {
-  query(`DELETE FROM public.supporters WHERE user_id='${user}'; DELETE FROM auth.users WHERE id='${user}';
-    DELETE FROM public.stripe_events WHERE event_id='${event}';`);
-}
+});
