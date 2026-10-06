@@ -126,18 +126,23 @@ sequenceDiagram
 
 - Teams: `app/features/team/*` via `app/composables/api/useEdgeFunctions.ts`
 - Tokens: `app/features/settings/ApiTokens.vue` via the same composable
+- Discord: `app/features/settings/DiscordLinkCard.vue` (direct `functions.invoke`)
 
 #### Edge Functions (enforced today)
 
-| Function       | Scope key      | Limit | Window |
-| -------------- | -------------- | ----: | ------ |
-| `team-create`  | `team-create`  |    10 | 1 hour |
-| `team-join`    | `team-join`    |    30 | 10 min |
-| `team-leave`   | `team-leave`   |    30 | 1 hour |
-| `team-kick`    | `team-kick`    |    20 | 1 hour |
-| `team-disband` | `team-disband` |    10 | 1 hour |
-| `token-create` | `token-create` |     3 | 1 hour |
-| `token-revoke` | `token-revoke` |    50 | 10 min |
+| Function            | Scope key           | Limit | Window |
+| ------------------- | ------------------- | ----: | ------ |
+| `team-create`       | `team-create`       |    10 | 1 hour |
+| `team-join`         | `team-join`         |    30 | 10 min |
+| `team-leave`        | `team-leave`        |    30 | 1 hour |
+| `team-kick`         | `team-kick`         |    20 | 1 hour |
+| `team-disband`      | `team-disband`      |    10 | 1 hour |
+| `token-create`      | `token-create`      |     3 | 1 hour |
+| `discord-role-sync` | `discord-role-sync` |    10 | 10 min |
+| `discord-unlink`    | `discord-role-sync` |     9 | 10 min |
+
+`discord-unlink` shares the `discord-role-sync` bucket but is refused once 9 of 10 slots are
+used, so the role restore the settings page runs after a failed identity unlink always has a slot.
 
 Source of truth for limits: `supabase/functions/_shared/rate-limit.ts`  
 RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`
@@ -159,16 +164,12 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 
 #### Known bypass gaps
 
-- **Token create** is Edge-only by default. A direct insert into `api_tokens` is used only when
-  `NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=true` (default **false** in `nuxt.config.ts` /
-  `ApiTokens.vue`). Keep that flag off in production so create stays on the Edge limiter.
-- **Token revoke** has an automatic unavailable-function fallback to direct delete in
-  `useEdgeFunctions.revokeToken`. That path **skips** the Edge limiter; DB/RLS still apply.
+- **Token create** is Edge-only. Authenticated clients have no `INSERT` grant on `api_tokens`.
+- **Token revoke** is a direct PostgREST delete and is not Edge-rate-limited. RLS restricts the
+  delete to the owner's rows.
 - **Token rename** is a direct PostgREST update and is not Edge-rate-limited. Database grants restrict
   authenticated updates to the `note` column, and RLS restricts the row to its owner.
 - The DB still enforces the **max 3 active tokens** trigger even if rate limiting is skipped.
-- Prefer keeping create/revoke behind Edge Functions in production and avoid enabling create
-  fallbacks.
 
 #### Hygiene
 
@@ -480,7 +481,7 @@ Treat these deliberately; do not “make everything fail open” without underst
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts`                                                                                                                          |
 | Mutation RPC + table                   | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`                                                                                                |
-| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick,team-disband}/`                                                           |
+| Edge consumers                         | `supabase/functions/{token-create,team-create,team-join,team-leave,team-kick,team-disband,discord-role-sync,discord-unlink}/`                                       |
 | Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
 | Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
 | Worker entrypoint and routing          | `workers/api-gateway/src/index.ts`, `workers/api-gateway/src/router.ts`                                                                                             |

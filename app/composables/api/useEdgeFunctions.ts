@@ -5,7 +5,6 @@
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { refreshSupabaseSession } from '@/utils/supabaseAuth';
-import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
 import type { PurgeCacheResponse } from '@/types/edge';
 import type { MemberProfile } from '@/types/tarkov';
 import type {
@@ -236,41 +235,6 @@ export const useEdgeFunctions = () => {
     );
   };
   /**
-   * Revoke an API token
-   * @param tokenId The ID of the token to revoke
-   */
-  const revokeToken = async (tokenId: string) => {
-    try {
-      return await callSupabaseFunction<{ success?: boolean }>(
-        'token-revoke',
-        { tokenId },
-        'DELETE'
-      );
-    } catch (error) {
-      if (!shouldFallbackForUnavailableTokenFunction(error)) {
-        throw error;
-      }
-      logger.warn(
-        '[EdgeFunctions] token-revoke unavailable, falling back to direct delete:',
-        error
-      );
-      try {
-        const { error: deleteError } = await $supabase.client
-          .from('api_tokens')
-          .delete()
-          .eq('token_id', tokenId);
-        if (deleteError) throw deleteError;
-        return { success: true } as const;
-      } catch (innerError) {
-        logger.error(
-          '[EdgeFunctions] Token revocation failed after direct-delete fallback:',
-          innerError
-        );
-        throw innerError;
-      }
-    }
-  };
-  /**
    * Purge Cloudflare cache (admin only)
    * @param purgeType Type of cache purge: 'all' for entire zone, 'tarkov-data' for game data only
    */
@@ -291,7 +255,6 @@ export const useEdgeFunctions = () => {
     getTeamMembers,
     // API token management
     createToken,
-    revokeToken,
     // Admin functions
     purgeCache,
   };

@@ -387,9 +387,6 @@ verify_jwt = false
 [functions.token-create]
 verify_jwt = false
 
-[functions.token-revoke]
-verify_jwt = false
-
 [functions.account-delete]
 verify_jwt = false
 
