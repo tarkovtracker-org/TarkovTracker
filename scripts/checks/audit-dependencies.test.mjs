@@ -40,13 +40,19 @@ describe('evaluateAudit', () => {
     ).toEqual([expect.stringContaining('accepted for pkg, not other')]);
   });
   it('fails a finding on an unreviewed or missing dependency path', () => {
-    const paths = ['.>tool>pkg', '.>runtime>pkg', '.>notool>pkg'];
+    const paths = ['.>tool>pkg', '.>runtime>pkg', '.>notool>pkg', '.>runtime>tool>pkg'];
     expect(
       evaluateAudit(report(advisory('GHSA-a', 'pkg', 'low', paths)), accepted, '2026-10-06')
         .failures
     ).toEqual([
       'GHSA-a reaches pkg through an unreviewed path: .>runtime>pkg',
       'GHSA-a reaches pkg through an unreviewed path: .>notool>pkg',
+      'GHSA-a reaches pkg through an unreviewed path: .>runtime>tool>pkg',
+    ]);
+    const mixed = advisory('GHSA-a', 'pkg');
+    mixed.findings.push({ version: '1.0.1', paths: [] });
+    expect(evaluateAudit(report(mixed), accepted, '2026-10-06').failures).toEqual([
+      'GHSA-a reaches pkg through an unreviewed path: (no dependency path reported)',
     ]);
     expect(
       evaluateAudit(report(advisory('GHSA-a', 'pkg', 'low', [])), accepted, '2026-10-06').failures

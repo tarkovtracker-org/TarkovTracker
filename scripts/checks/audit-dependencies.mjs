@@ -1,15 +1,18 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 // Production dependencies ship with no known advisory at any severity unless it is reviewed and
-// accepted here. Each entry names the package, the reviewed dependency chains (`via`, matched as
-// path suffixes), why the advisory cannot reach production, and an expiry. An expired or
-// mismatched entry, or a finding on any other path, fails so it is re-reviewed; a stale one warns.
+// accepted here. Each entry names the package, the complete reviewed dependency chains (`via`,
+// matched exactly after the leading importer segment), why the advisory cannot reach production,
+// and an expiry. An expired or mismatched entry, or a finding on any other path, fails so it is
+// re-reviewed; a stale one warns.
 export const ACCEPTED_ADVISORIES = {
   'GHSA-vfj7-8cjw-p6xm': {
     package: 'braces',
     via: [
-      '@intlify/unplugin-vue-i18n>fast-glob>micromatch>braces',
-      'nitropack>globby>fast-glob>micromatch>braces',
+      '@nuxtjs/i18n>@intlify/unplugin-vue-i18n>fast-glob>micromatch>braces',
+      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
+      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
+      'nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
     ],
     reason:
       'No patched braces release exists (<= 3.0.3). It is reached only through fast-glob in build ' +
@@ -19,7 +22,14 @@ export const ACCEPTED_ADVISORIES = {
   },
   'GHSA-86w9-cpqp-85rv': {
     package: 'node-forge',
-    via: ['listhen>node-forge'],
+    via: [
+      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/cli>listhen>node-forge',
+      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
+      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/cli>listhen>node-forge',
+      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
+      'nuxt>@nuxt/cli>listhen>node-forge',
+      'nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
+    ],
     reason:
       'No patched node-forge release exists (<= 1.4.0). It is reached only through listhen, which ' +
       'generates self-signed certificates for the local `nuxt dev` server. It never verifies ' +
@@ -30,14 +40,19 @@ export const ACCEPTED_ADVISORIES = {
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const asList = (value) => (Array.isArray(value) ? value : []);
 const asRecord = (value) => (isRecord(value) ? value : {});
-const isReviewed = (path, via) =>
-  typeof path === 'string' && via.some((chain) => path === chain || path.endsWith(`>${chain}`));
-// Paths that the entry has not reviewed; a missing path list counts as unreviewed.
+// pnpm prefixes each path with its importer (`.` for the root); everything after it must match.
+const chainOf = (path) => (typeof path === 'string' ? path.split('>').slice(1).join('>') : '');
+const isReviewed = (path, via) => via.includes(chainOf(path));
+const findingPaths = (finding) => {
+  const paths = asList(asRecord(finding).paths);
+  return paths.length > 0 ? paths : ['(no dependency path reported)'];
+};
+// Paths that the entry has not reviewed; a finding without paths counts as unreviewed.
 function unreviewedPaths(advisory, entry) {
-  const paths = asList(advisory.findings).flatMap((finding) => asList(asRecord(finding).paths));
-  if (paths.length === 0) return ['(no dependency path reported)'];
+  const findings = asList(advisory.findings);
+  if (findings.length === 0) return ['(no dependency path reported)'];
   const via = asList(entry.via);
-  return paths.filter((path) => !isReviewed(path, via));
+  return findings.flatMap(findingPaths).filter((path) => !isReviewed(path, via));
 }
 function describe(raw) {
   const advisory = asRecord(raw);

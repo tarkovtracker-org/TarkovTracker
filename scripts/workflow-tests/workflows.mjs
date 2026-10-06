@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
 import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
@@ -91,6 +93,35 @@ test('Dependabot auto-merge holds manifest changes to auth and billing clients',
   for (const line of held) assert.ok(grep(line), line);
   for (const line of ['+    "stripe-mock": "1.0.0",', ' "stripe": "^1.0.0",'])
     assert.ok(!grep(line), line);
+});
+test('Dependabot auto-merge holds the PR when manifest changes cannot be read', () => {
+  const job = autoMergeJob();
+  const start = job.indexOf('# Defense in depth');
+  const end = job.indexOf('echo "eligible=true"', start);
+  const hold = job
+    .slice(start, end + 'echo "eligible=true" >> "$GITHUB_OUTPUT"'.length)
+    .replace(/^ {10}/gm, '');
+  const dir = mkdtempSync(join(tmpdir(), 'hold-'));
+  writeFileSync(join(dir, 'gh'), '#!/bin/sh\nprintf "%s" "$GH_OUT"\nexit "$GH_STATUS"\n', {
+    mode: 0o755,
+  });
+  const verdict = (out, status = 0) => {
+    const output = join(dir, `out-${Math.random()}`);
+    writeFileSync(output, '');
+    spawnSync('bash', ['-e', '-o', 'pipefail', '-c', hold], {
+      env: {
+        PATH: `${dir}:${process.env.PATH}`,
+        GITHUB_OUTPUT: output,
+        GH_OUT: out,
+        GH_STATUS: String(status),
+      },
+    });
+    return readFileSync(output, 'utf8').trim();
+  };
+  assert.equal(verdict('+  "vue": "3.5.0",'), 'eligible=true');
+  assert.equal(verdict('+  "stripe": "1.0.0",'), 'eligible=false');
+  assert.equal(verdict('MISSING_PATCH'), 'eligible=false');
+  assert.equal(verdict('', 1), 'eligible=false');
 });
 test('path selection applies to pull requests only; pushes, forks and Deno checks stay covered', () => {
   const ci = read('.github/workflows/ci.yml');

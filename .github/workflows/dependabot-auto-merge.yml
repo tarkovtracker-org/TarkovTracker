@@ -108,12 +108,30 @@ jobs:
             exit 0
           fi
           # Defense in depth for group drift: any changed manifest line naming an auth or
-          # billing client keeps the PR for human confirmation.
-          sensitive="$(
+          # billing client keeps the PR for human confirmation. Unreadable changes hold it too.
+          if ! patches="$(
             gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
-              --jq '.[] | select(.filename | endswith("package.json")) | .patch // ""' |
-              grep -E '^[-+][[:space:]]*"(stripe|@stripe/[^"]+|@supabase/[^"]+|supabase)":' || true
-          )"
+              --jq '.[] | select(.filename | endswith("package.json")) | .patch // "MISSING_PATCH"'
+          )"; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Could not read the PR's manifest changes; merge needs confirmation."
+            exit 0
+          fi
+          if printf '%s\n' "$patches" | grep -qx 'MISSING_PATCH'; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::A manifest diff is unavailable; merge needs confirmation."
+            exit 0
+          fi
+          grep_status=0
+          sensitive="$(
+            printf '%s\n' "$patches" |
+              grep -E '^[-+][[:space:]]*"(stripe|@stripe/[^"]+|@supabase/[^"]+|supabase)":'
+          )" || grep_status=$?
+          if [ "$grep_status" -gt 1 ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Manifest inspection failed; merge needs confirmation."
+            exit 0
+          fi
           if [ -n "$sensitive" ]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Dependabot PR changes an auth or billing dependency; merge needs confirmation:"
