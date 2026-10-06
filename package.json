@@ -22,7 +22,6 @@
     "fflate": "^0.8.3",
     "h3": "^1.15.11",
     "ipaddr.js": "^2.4.0",
-    "jsonpath-plus": "^10.4.0",
     "leaflet": "^1.9.4",
     "lru-cache": "^11.3.3",
     "mdast-util-from-markdown": "2.0.3",

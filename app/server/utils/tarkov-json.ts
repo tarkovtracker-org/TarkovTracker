@@ -1,4 +1,3 @@
-import { JSONPath } from 'jsonpath-plus';
 import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
@@ -89,11 +88,6 @@ type TarkovJsonOptions = {
 };
 type TarkovJsonPrestigeOptions = TarkovJsonOptions & {
   project?: (payload: JsonTasksPayload) => JsonTasksPayload;
-};
-type JsonPathResult = {
-  parent?: unknown;
-  parentProperty?: string | number;
-  value?: unknown;
 };
 type TranslationLookupResult = {
   source: 'fallback' | 'primary';
@@ -194,7 +188,7 @@ async function fetchEnvelope<T>(
   options: TarkovJsonOptions
 ): Promise<TarkovJsonEnvelope<T>> {
   const fetcher = options.deps?.fetcher ?? ($fetch as TarkovJsonFetcherRequest);
-  const fetcherLogger = options.deps?.logger ?? logger;
+  const fetcherLogger = resolveLogger(options);
   const sleep =
     options.deps?.sleep ??
     ((ms: number) =>
@@ -292,235 +286,121 @@ function readTranslation(
   }
   return undefined;
 }
-function parseJsonPath(path: string): string[] | null {
-  if (!path.startsWith('$.')) return null;
-  const parts = path.slice(2).split('.');
-  const segments: string[] = [];
-  for (const part of parts) {
-    if (!part) return null;
-    if (part === '*') {
-      segments.push('*');
-    } else if (part.endsWith('[*]')) {
-      const key = part.slice(0, -3);
-      if (!/^[a-zA-Z0-9_-]+$/.test(key)) return null;
-      segments.push(part);
-    } else {
-      if (!/^[a-zA-Z0-9_-]+$/.test(part)) return null;
-      segments.push(part);
-    }
+// Upstream translation paths use a small JSONPath subset: `.name`, `.*`, `[*]`, `['a','b']` and
+// `..name`. Anything else is reported and skipped; no expression is ever evaluated.
+type TranslationPathSegment =
+  | { kind: 'child'; names: string[] }
+  | { kind: 'wildcard' }
+  | { kind: 'descendant'; names: string[] };
+type TranslateFn = (key: string) => string | undefined;
+const PATH_NAME = '[A-Za-z0-9_-]+';
+const PATH_TOKEN = new RegExp(
+  `^(?:\\.\\.(${PATH_NAME})|\\.(${PATH_NAME})|\\[('${PATH_NAME}'(?:,'${PATH_NAME}')*)\\]|\\.\\*|\\[\\*\\])`
+);
+function toPathSegment(match: RegExpExecArray): TranslationPathSegment {
+  if (match[1]) return { kind: 'descendant', names: [match[1]] };
+  if (match[2]) return { kind: 'child', names: [match[2]] };
+  if (match[3])
+    return { kind: 'child', names: [...new Set(match[3].split(',').map((n) => n.slice(1, -1)))] };
+  return { kind: 'wildcard' };
+}
+function tokenizeTranslationPath(rest: string): TranslationPathSegment[] | null {
+  const segments: TranslationPathSegment[] = [];
+  for (let match = PATH_TOKEN.exec(rest); match; match = PATH_TOKEN.exec(rest)) {
+    segments.push(toPathSegment(match));
+    rest = rest.slice(match[0].length);
   }
+  return rest || !segments.length ? null : segments;
+}
+const hasUnsafeName = (segment: TranslationPathSegment) =>
+  segment.kind !== 'wildcard' && segment.names.some((name) => UNSAFE_TRANSLATION_KEYS.has(name));
+function parseTranslationPath(path: string): TranslationPathSegment[] | null {
+  if (!path.startsWith('$')) return null;
+  const segments = tokenizeTranslationPath(path.slice(1));
+  if (!segments || segments.some(hasUnsafeName)) return null;
   return segments;
 }
-function immutableUpdate(
-  obj: unknown,
-  segments: string[],
+type JsonContainer = Record<string, unknown> | unknown[];
+const isJsonContainer = (node: unknown): node is JsonContainer =>
+  node !== null && typeof node === 'object';
+const isSafeOwnKey = (node: JsonContainer, key: string) =>
+  !UNSAFE_TRANSLATION_KEYS.has(key) && Object.hasOwn(node, key);
+function containerKeys(node: JsonContainer, names?: string[]): string[] {
+  if (Array.isArray(node)) return names ? [] : Object.keys(node);
+  return (names ?? Object.keys(node)).filter((key) => isSafeOwnKey(node, key));
+}
+const shallowCopy = (node: JsonContainer): JsonContainer =>
+  Array.isArray(node) ? [...node] : { ...node };
+function updateEntries(
+  node: JsonContainer,
+  keys: string[],
+  update: (value: unknown) => unknown
+): JsonContainer {
+  let result = node;
+  for (const key of keys) {
+    const value = (node as Record<string, unknown>)[key];
+    const updated = update(value);
+    if (updated === value) continue;
+    if (result === node) result = shallowCopy(node);
+    (result as Record<string, unknown>)[key] = updated;
+  }
+  return result;
+}
+const translateLeaf = (node: unknown, translate: TranslateFn) =>
+  typeof node === 'string' ? (translate(node) ?? node) : node;
+function translateSegment(
+  node: JsonContainer,
+  segment: TranslationPathSegment,
+  visit: (value: unknown, offset: 0 | 1) => unknown
+): JsonContainer {
+  const next = (value: unknown) => visit(value, 1);
+  if (segment.kind === 'wildcard') return updateEntries(node, containerKeys(node), next);
+  const matched = updateEntries(node, containerKeys(node, segment.names), next);
+  if (segment.kind === 'child') return matched;
+  return updateEntries(matched, containerKeys(matched), (value) => visit(value, 0));
+}
+function translateAtPath(
+  node: unknown,
+  segments: TranslationPathSegment[],
   index: number,
-  translateFn: (val: string) => string | undefined
+  translate: TranslateFn
 ): unknown {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (index >= segments.length) {
-    return obj;
-  }
   const segment = segments[index];
-  if (segment === undefined) {
-    return obj;
-  }
-  const isLast = index === segments.length - 1;
-  if (segment === '*') {
-    if (Array.isArray(obj)) {
-      let copied = false;
-      let newArr = obj as unknown[];
-      for (let i = 0; i < obj.length; i++) {
-        if (isLast) {
-          const val = obj[i];
-          if (typeof val === 'string') {
-            const trans = translateFn(val);
-            if (trans !== undefined) {
-              if (!copied) {
-                newArr = [...obj];
-                copied = true;
-              }
-              newArr[i] = trans;
-            }
-          }
-        } else {
-          const updated = immutableUpdate(obj[i], segments, index + 1, translateFn);
-          if (updated !== obj[i]) {
-            if (!copied) {
-              newArr = [...obj];
-              copied = true;
-            }
-            newArr[i] = updated;
-          }
-        }
-      }
-      return newArr;
-    } else {
-      let copied = false;
-      const record = obj as Record<string, unknown>;
-      let newObj = record;
-      for (const key of Object.keys(record)) {
-        if (isLast) {
-          const val = record[key];
-          if (typeof val === 'string') {
-            const trans = translateFn(val);
-            if (trans !== undefined) {
-              if (!copied) {
-                newObj = { ...record };
-                copied = true;
-              }
-              newObj[key] = trans;
-            }
-          }
-        } else {
-          const updated = immutableUpdate(record[key], segments, index + 1, translateFn);
-          if (updated !== record[key]) {
-            if (!copied) {
-              newObj = { ...record };
-              copied = true;
-            }
-            newObj[key] = updated;
-          }
-        }
-      }
-      return newObj;
-    }
-  } else if (segment.endsWith('[*]')) {
-    const prop = segment.slice(0, -3);
-    const record = obj as Record<string, unknown>;
-    const arr = record[prop];
-    if (Array.isArray(arr)) {
-      let copied = false;
-      let newArr = arr as unknown[];
-      for (let i = 0; i < arr.length; i++) {
-        if (isLast) {
-          const val = arr[i];
-          if (typeof val === 'string') {
-            const trans = translateFn(val);
-            if (trans !== undefined) {
-              if (!copied) {
-                newArr = [...arr];
-                copied = true;
-              }
-              newArr[i] = trans;
-            }
-          }
-        } else {
-          const updated = immutableUpdate(arr[i], segments, index + 1, translateFn);
-          if (updated !== arr[i]) {
-            if (!copied) {
-              newArr = [...arr];
-              copied = true;
-            }
-            newArr[i] = updated;
-          }
-        }
-      }
-      if (newArr !== arr) {
-        return {
-          ...record,
-          [prop]: newArr,
-        };
-      }
-    }
-    return obj;
-  } else {
-    const record = obj as Record<string, unknown>;
-    const val = record[segment];
-    if (isLast) {
-      if (typeof val === 'string') {
-        const trans = translateFn(val);
-        if (trans !== undefined) {
-          return {
-            ...record,
-            [segment]: trans,
-          };
-        }
-      }
-    } else {
-      const updated = immutableUpdate(val, segments, index + 1, translateFn);
-      if (updated !== val) {
-        return {
-          ...record,
-          [segment]: updated,
-        };
-      }
-    }
-    return obj;
-  }
+  if (!segment) return translateLeaf(node, translate);
+  if (!isJsonContainer(node)) return node;
+  return translateSegment(node, segment, (value, offset) =>
+    translateAtPath(value, segments, index + offset, translate)
+  );
+}
+type TranslationWarn = (message: string, context: JsonRecord) => void;
+function applyTranslationPath(
+  current: unknown,
+  path: string,
+  translate: TranslateFn,
+  warn: TranslationWarn
+): unknown {
+  const segments = parseTranslationPath(path);
+  if (segments) return translateAtPath(current, segments, 0, translate);
+  warn('[TarkovJson] Skipped unsupported translation path', { path });
+  return current;
 }
 function applyTranslations<T>(
   response: TarkovJsonEnvelope<T>,
-  primaryTranslations?: JsonRecord,
-  fallbackTranslations?: JsonRecord
+  primaryTranslations: JsonRecord | undefined,
+  fallbackTranslations: JsonRecord | undefined,
+  warn: TranslationWarn
 ): T {
   const translations = primaryTranslations ?? fallbackTranslations;
-  if (!translations || !response.translations?.length) return response.data;
-  const translateFn = (key: string) => {
-    const translated = readTranslation(translations, fallbackTranslations, key);
-    return translated?.value;
-  };
-  let updatedResponse = response as TarkovJsonEnvelope<T>;
-  let useFallback = false;
-  for (const path of response.translations ?? []) {
-    const segments = parseJsonPath(path);
-    if (segments) {
-      try {
-        updatedResponse = immutableUpdate(
-          updatedResponse,
-          segments,
-          0,
-          translateFn
-        ) as TarkovJsonEnvelope<T>;
-      } catch (error) {
-        logger.warn('[TarkovJson] Failed to apply fast translation path', {
-          error: error instanceof Error ? error.message : String(error),
-          path,
-        });
-        useFallback = true;
-        break;
-      }
-    } else {
-      useFallback = true;
-      break;
-    }
-  }
-  if (useFallback) {
-    const translatedResponse = structuredClone(response) as TarkovJsonEnvelope<T>;
-    for (const path of response.translations ?? []) {
-      try {
-        JSONPath({
-          path,
-          json: translatedResponse,
-          resultType: 'all',
-          callback: (result: JsonPathResult) => {
-            const parent = result.parent;
-            if (!isRecord(parent) && !Array.isArray(parent)) return;
-            const parentProperty = result.parentProperty;
-            if (parentProperty === undefined) return;
-            const translationKey = result.value;
-            if (typeof translationKey !== 'string') return;
-            const translated = readTranslation(translations, fallbackTranslations, translationKey);
-            if (!translated) return;
-            if (translated.source === 'fallback') {
-              logger.debug('[TarkovJson] Applied fallback translation', { path, translationKey });
-            }
-            (parent as Record<string | number, unknown>)[parentProperty] = translated.value;
-          },
-        });
-      } catch (error) {
-        logger.warn('[TarkovJson] Failed to apply translation path', {
-          error: error instanceof Error ? error.message : String(error),
-          path,
-        });
-      }
-    }
-    return translatedResponse.data;
-  }
-  return updatedResponse.data;
+  if (!translations) return response.data;
+  const translate: TranslateFn = (key) =>
+    readTranslation(translations, fallbackTranslations, key)?.value;
+  const translated = (response.translations ?? []).reduce<unknown>(
+    (current, path) => applyTranslationPath(current, path, translate, warn),
+    response
+  );
+  return (translated as TarkovJsonEnvelope<T>).data;
 }
+const resolveLogger = (options: TarkovJsonOptions) => options.deps?.logger ?? logger;
 export async function fetchTarkovJsonEndpoint<T>(
   endpoint: TarkovJsonEndpoint,
   options: TarkovJsonOptions = {}
@@ -539,7 +419,8 @@ export async function fetchTarkovJsonEndpoint<T>(
   return applyTranslations(
     baseResponse,
     primaryResponse.status === 'fulfilled' ? primaryResponse.value.data : undefined,
-    fallbackResponse.status === 'fulfilled' ? fallbackResponse.value?.data : undefined
+    fallbackResponse.status === 'fulfilled' ? fallbackResponse.value?.data : undefined,
+    resolveLogger(options).warn
   );
 }
 function adaptCategoryRef(value: unknown, context: AdapterContext) {

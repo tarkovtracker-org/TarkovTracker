@@ -225,7 +225,7 @@ describe('fetchTarkovJsonEndpoint', () => {
     expect(result.items.item1?.shortName).toBe('Short');
     expect(result.items.item2?.name).toBe('item.name');
   });
-  it('falls back to JSONPath when the fast path cannot parse a translation path', async () => {
+  it('translates recursive descent and nested array wildcard paths', async () => {
     const fetcher = createFetcher({
       'https://json.tarkov.dev/regular/items': {
         data: { items: [{ id: 'item1', name: 'item.name', tags: ['tag.one', 'tag.two'] }] },
@@ -243,6 +243,106 @@ describe('fetchTarkovJsonEndpoint', () => {
     });
     expect(result.items[0]?.name).toBe('Bandage');
     expect(result.items[0]?.tags).toEqual(['Medical', 'Healing']);
+  });
+  it('translates the union and descendant paths upstream emits for tasks', async () => {
+    const base = {
+      data: {
+        tasks: {
+          t1: {
+            objectives: [
+              {
+                playerHealthEffect: { effects: ['effect.pain'], bodyParts: ['part.head'] },
+                zones: [{ bodyParts: ['part.chest'] }],
+                note: 'part.head',
+              },
+            ],
+          },
+        },
+      },
+      translations: [
+        "$.data.tasks.*.objectives[*]['healthEffect','playerHealthEffect','enemyHealthEffect'].effects[*]",
+        '$.data.tasks.*.objectives[*]..bodyParts[*]',
+      ],
+    };
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/tasks': base,
+      'https://json.tarkov.dev/regular/tasks_de': {
+        data: { 'effect.pain': 'Schmerzen', 'part.head': 'Kopf' },
+      },
+      'https://json.tarkov.dev/regular/tasks_en': {
+        data: { 'effect.pain': 'Pain', 'part.head': 'Head', 'part.chest': 'Thorax' },
+      },
+    });
+    const before = JSON.stringify(base);
+    const result = await fetchTarkovJsonEndpoint<{ tasks: Record<string, unknown> }>('tasks', {
+      deps: { fetcher },
+      lang: 'de',
+    });
+    expect(result.tasks.t1).toEqual({
+      objectives: [
+        {
+          playerHealthEffect: { effects: ['Schmerzen'], bodyParts: ['Kopf'] },
+          zones: [{ bodyParts: ['Thorax'] }],
+          note: 'part.head',
+        },
+      ],
+    });
+    expect(JSON.stringify(base)).toBe(before);
+  });
+  it('preserves data and warns for unsupported translation paths', async () => {
+    const warn = vi.fn();
+    const items = { item1: { name: 'item.name', shortName: 'item.short' } };
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': {
+        data: { items },
+        translations: [
+          '$.data.items[?(@.name)].name',
+          '$.data.items.*.__proto__',
+          "$.data.items['constructor','name']",
+          '$.data.items.*.shortName',
+        ],
+      },
+      'https://json.tarkov.dev/regular/items_en': {
+        data: { 'item.name': 'Bandage', 'item.short': 'Band' },
+      },
+    });
+    const result = await fetchTarkovJsonEndpoint<{ items: typeof items }>('items', {
+      deps: { fetcher, logger: { error: vi.fn(), warn } },
+      lang: 'en',
+    });
+    expect(result.items.item1).toEqual({ name: 'item.name', shortName: 'Band' });
+    expect(items.item1.shortName).toBe('item.short');
+    expect(warn).toHaveBeenCalledTimes(3);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unsupported'), {
+      path: '$.data.items[?(@.name)].name',
+    });
+  });
+  it('skips own __proto__ keys when walking wildcards', async () => {
+    const items = JSON.parse('{"__proto__":{"name":"item.name"},"item1":{"name":"item.name"}}');
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': {
+        data: { items },
+        translations: ['$.data.items.*.name'],
+      },
+      'https://json.tarkov.dev/regular/items_en': { data: { 'item.name': 'Bandage' } },
+    });
+    const result = await fetchTarkovJsonEndpoint<{
+      items: Record<string, { name: string }>;
+    }>('items', { deps: { fetcher }, lang: 'en' });
+    expect(result.items.item1?.name).toBe('Bandage');
+    expect(Object.getOwnPropertyDescriptor(result.items, '__proto__')?.value).toEqual({
+      name: 'item.name',
+    });
+    expect(({} as { name?: string }).name).toBeUndefined();
+  });
+  it('returns the original objects when nothing is translated', async () => {
+    const data = { items: { item1: { name: 'item.name' } } };
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': { data, translations: ['$.data.items.*.name'] },
+      'https://json.tarkov.dev/regular/items_en': { data: {} },
+    });
+    const result = await fetchTarkovJsonEndpoint('items', { deps: { fetcher }, lang: 'en' });
+    expect(result).toBe(data);
   });
   it('does not fetch translation files when the base response has no translation paths', async () => {
     const payload = { items: {} };
