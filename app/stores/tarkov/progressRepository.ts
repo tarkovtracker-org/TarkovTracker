@@ -258,6 +258,11 @@ const decodeSnapshot = (entry: RecordEntry, owner: Owner): ProgressRepositorySna
   validateSnapshotState(snapshot);
   return snapshot;
 };
+/** Validation for portable recovery records; never treats supplied data as an absent IDB key. */
+export const validateProgressRepositorySnapshot = (
+  value: unknown,
+  owner: string | null
+): ProgressRepositorySnapshot => decodeSnapshot({ exists: true, value }, owner);
 const ownerKey = (owner: Owner): string => `owner:${JSON.stringify(owner)}`;
 const emptySnapshot = (owner: Owner): ProgressRepositorySnapshot => ({
   version: 1,

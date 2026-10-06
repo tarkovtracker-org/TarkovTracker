@@ -19,6 +19,7 @@
     "@vue-flow/core": "^1.48.2",
     "@vue-flow/minimap": "^1.5.4",
     "@vueuse/core": "^14.2.1",
+    "devalue": "5.9.4",
     "fflate": "^0.8.3",
     "h3": "^1.15.11",
     "ipaddr.js": "^2.4.0",
