@@ -83,6 +83,11 @@ sequenceDiagram
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
    algorithm the app uses) and game-edition hideout auto-completes.
+   Browser and Worker catalogs compile completion-triggered failure edges through
+   `shared/utils/taskFailureEdges.ts`. The existing internal `alternatives` projection remains
+   compatible with repair/action consumers; it is derived from `failConditions`, not upstream
+   `alternatives`. Missing references do not create edges, and a reverse edge is inferred only
+   for the existing active-only requirement pattern backed by an explicit completion failure.
    Gateway task catalogs are frozen and registered with a prepared dependency graph once per catalog
    snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
    state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.

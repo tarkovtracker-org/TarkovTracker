@@ -1,0 +1,85 @@
+{
+  "source": "https://json.tarkov.dev/regular/tasks",
+  "capturedAt": "2026-10-06T18:46:47.7795626Z",
+  "sha256": "e5589b8b49f9e148d70077ae043b4ba69ca95bb9332168e91fcfa6ada007e599",
+  "data": {
+    "tasks": {
+      "597a0f5686f774273b74f676": {
+        "id": "597a0f5686f774273b74f676",
+        "name": "597a0f5686f774273b74f676 name",
+        "factionName": "Any",
+        "objectives": [
+          {
+            "id": "5a3fbc9586f77459d52a16c4",
+            "type": "visit"
+          },
+          {
+            "id": "59b242ea86f7741e6e0e7a86",
+            "type": "mark",
+            "count": 1
+          }
+        ],
+        "failConditions": [
+          {
+            "id": "597a19ff86f774792c2e36f2",
+            "type": "taskStatus",
+            "count": null,
+            "task": "597a171586f77405ba6887d3",
+            "status": ["complete"]
+          },
+          {
+            "id": "597a1a0486f774779c70e8a6",
+            "type": "taskStatus",
+            "count": null,
+            "task": "597a160786f77477531d39d2",
+            "status": ["complete"]
+          }
+        ],
+        "taskRequirements": [
+          {
+            "task": "597a0e5786f77426d66c0636",
+            "status": ["complete"]
+          }
+        ]
+      },
+      "597a160786f77477531d39d2": {
+        "id": "597a160786f77477531d39d2",
+        "name": "597a160786f77477531d39d2 name",
+        "factionName": "Any",
+        "objectives": [
+          {
+            "id": "5a3fc1f286f7744ccc15d643",
+            "type": "visit"
+          },
+          {
+            "id": "5998366886f77455853b2d9f",
+            "type": "mark",
+            "count": 1
+          }
+        ],
+        "failConditions": [
+          {
+            "id": "597a16e386f77477531d39d5",
+            "type": "taskStatus",
+            "count": null,
+            "task": "597a0f5686f774273b74f676",
+            "status": ["complete"]
+          },
+          {
+            "id": "597a1a3186f77475b4612032",
+            "type": "taskStatus",
+            "count": null,
+            "task": "597a171586f77405ba6887d3",
+            "status": ["complete"]
+          }
+        ],
+        "taskRequirements": [
+          {
+            "task": "597a0f5686f774273b74f676",
+            "status": ["active"]
+          }
+        ]
+      }
+    }
+  }
+}

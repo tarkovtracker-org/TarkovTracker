@@ -141,6 +141,9 @@ export interface TarkovTask {
   name: string;
   factionName?: string;
   objectives?: TarkovObjective[];
+  failConditions?: TarkovTaskRequirement[];
+  /** Internal projection of completion-triggered failure edges. */
+  alternatives?: string[];
   taskRequirements?: TarkovTaskRequirement[];
 }
 export interface TarkovObjective {

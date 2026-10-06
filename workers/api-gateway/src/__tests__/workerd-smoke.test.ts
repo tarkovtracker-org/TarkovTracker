@@ -93,7 +93,16 @@ const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: str
     }
     if (url.toString() === 'https://json.tarkov.dev/pvp-season/tasks') {
       return jsonResponse({
-        data: { tasks: { unrelated: { id: 'unrelated', objectives: [], taskRequirements: [] } } },
+        data: {
+          tasks: {
+            unrelated: {
+              id: 'unrelated',
+              objectives: [],
+              failConditions: [],
+              taskRequirements: [],
+            },
+          },
+        },
       });
     }
     if (url.toString() === 'https://json.tarkov.dev/pvp-season/hideout') {

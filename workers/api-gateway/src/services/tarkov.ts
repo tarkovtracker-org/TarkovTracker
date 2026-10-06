@@ -1,3 +1,4 @@
+import { buildTaskFailureAlternatives, getTaskReferenceId } from '@shared/utils/taskFailureEdges';
 import { waitUntil } from 'cloudflare:workers';
 import { CatalogUnavailableError } from './catalog-error';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
@@ -51,6 +52,7 @@ type JsonTask = {
   name?: unknown;
   factionName?: unknown;
   objectives?: unknown;
+  failConditions?: unknown;
   taskRequirements?: unknown;
 };
 type JsonTasksPayload = { tasks?: unknown };
@@ -83,12 +85,26 @@ function requireCatalog(
   }
 }
 function isTaskRequirement(value: unknown): boolean {
-  if (!isRecord(value) || !asString(value.task)) return false;
+  if (!isRecord(value) || !getTaskReferenceId(value.task)) return false;
   return Array.isArray(value.status) && value.status.every((status) => typeof status === 'string');
 }
 function isTaskRuleEntry(task: Record<string, unknown>): boolean {
   if (!asString(task.id) || !Array.isArray(task.taskRequirements)) return false;
-  return task.taskRequirements.every(isTaskRequirement) && isObjectiveList(task.objectives);
+  return isTaskRuleLists(task);
+}
+function isTaskRuleLists(task: Record<string, unknown>): boolean {
+  return (
+    (task.taskRequirements as unknown[]).every(isTaskRequirement) &&
+    isObjectiveList(task.objectives) &&
+    isFailureConditionList(task.failConditions)
+  );
+}
+function isFailureConditionList(value: unknown): boolean {
+  return Array.isArray(value) && value.every(isFailureCondition);
+}
+function isFailureCondition(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return value.task === undefined || isTaskRequirement(value);
 }
 function isObjectiveList(value: unknown): boolean {
   return (
@@ -144,8 +160,12 @@ async function fetchTasks(apiGameMode: string, cacheKey: string): Promise<Tarkov
               },
             ];
           }),
+          failConditions: asRecords(task.failConditions).flatMap((condition) => {
+            const taskId = getTaskReferenceId(condition.task);
+            return taskId ? [{ task: { id: taskId }, status: condition.status as string[] }] : [];
+          }),
           taskRequirements: asRecords(task.taskRequirements).flatMap((requirement) => {
-            const requiredTaskId = asString(requirement.task);
+            const requiredTaskId = getTaskReferenceId(requirement.task);
             if (!requiredTaskId) return [];
             return [
               {
@@ -161,6 +181,8 @@ async function fetchTasks(apiGameMode: string, cacheKey: string): Promise<Tarkov
         },
       ];
     });
+  const alternatives = buildTaskFailureAlternatives(tasks);
+  for (const task of tasks) task.alternatives = alternatives[task.id];
   prepareTaskCatalog(tasks);
   setMemoryCache(cacheKey, tasks, CACHE_TTL);
   return tasks;
