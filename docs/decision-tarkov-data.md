@@ -321,6 +321,8 @@ Do not fall back to raw tarkov.dev on a runtime miss. Use the previous validated
 
 ---
 
+**Status 2026-10-06:** the interim Worker now rejects unavailable, empty, or structurally malformed task/hideout catalogs with a typed availability error. Task transitions load validated rules before persistence; progress/team reads return 503 rather than incomplete derived progress. The existing one-hour mode-specific cache remains bounded; expired data is not used as an unversioned last-good fallback. Immutable release publication and the Worker KV cutover remain open.
+
 ## Target runtime flows
 
 ### Metadata/UI request

@@ -221,6 +221,21 @@ export const OPENAPI_SPEC = {
           },
         },
       },
+      CatalogUnavailable: {
+        description:
+          'Required game data is unavailable or malformed. No progress write was made. Retry later.',
+        headers: {
+          'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+          'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+          'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
+        },
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+            example: { success: false, error: 'Game data temporarily unavailable' },
+          },
+        },
+      },
       NotModified: {
         description:
           'Payload unchanged since the ETag in If-None-Match. Empty body. The request still ' +
@@ -739,6 +754,7 @@ export const OPENAPI_SPEC = {
           '403': { $ref: '#/components/responses/Forbidden' },
           '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
+          '503': { $ref: '#/components/responses/CatalogUnavailable' },
         },
       },
     },
@@ -779,6 +795,7 @@ export const OPENAPI_SPEC = {
           '403': { $ref: '#/components/responses/Forbidden' },
           '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
+          '503': { $ref: '#/components/responses/CatalogUnavailable' },
         },
       },
     },
@@ -861,6 +878,7 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
+          '503': { $ref: '#/components/responses/CatalogUnavailable' },
         },
       },
     },
@@ -960,6 +978,7 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
+          '503': { $ref: '#/components/responses/CatalogUnavailable' },
         },
       },
     },
