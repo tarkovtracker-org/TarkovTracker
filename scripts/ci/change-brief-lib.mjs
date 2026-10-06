@@ -128,6 +128,7 @@ const runnerFor = (path) => {
     : 'vitest';
 };
 const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
+const DENO_TEST_FLAGS = ['--config', 'supabase/functions/deno.json', '--frozen'];
 // Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
 const testOperands = (files) => files.map((file) => `./${file}`);
 const runnerCommands = {
@@ -147,7 +148,10 @@ const runnerCommands = {
     ],
   }),
   node: (files) => ({ executable: 'node', args: ['--test', '--', ...testOperands(files)] }),
-  deno: (files) => ({ executable: 'deno', args: ['test', ...testOperands(files)] }),
+  deno: (files) => ({
+    executable: 'deno',
+    args: ['test', ...DENO_TEST_FLAGS, ...testOperands(files)],
+  }),
 };
 /** Groups test files into shell-independent executable/argv records; never executed by the brief. */
 export function testCommands(tests) {

@@ -157,7 +157,7 @@ test('path selection applies to pull requests only; pushes, forks and Deno check
   assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
   assert.match(ci, /args\+=\(--full\)/);
   assert.match(ci, /vitest run --coverage --shard=/);
-  assert.match(ci, /deno test supabase\/functions\/_shared\/\*\.deno\.test\.ts/);
+  assert.match(ci, /run: pnpm run test:deno$/m);
   assert.match(ci, /github.event.pull_request.head.repo.fork != true/);
   // Coverage and bundle uploads need the org token, so they stay fork-gated.
   // The build needs no secrets and must run on fork pull requests.
@@ -284,4 +284,11 @@ test('CI job-level full gates match the classifier manifest', () => {
       jobs.some((match) => match[1] === job),
       job
     );
+});
+test('Deno resolves the functions config and fails on lockfile drift', () => {
+  const script = JSON.parse(read('package.json')).scripts['test:deno'];
+  assert.match(script, /^deno test --config supabase\/functions\/deno\.json --frozen /);
+  for (const file of ['.github/workflows/ci.yml', 'scripts/ci/validate-changes.mjs'])
+    assert.doesNotMatch(read(file), /\bdeno test\b/, file);
+  assert.match(read('.gitignore'), /^\/deno\.lock$/m);
 });
