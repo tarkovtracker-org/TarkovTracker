@@ -299,15 +299,25 @@ describe('PrestigeCard', () => {
     expect(wrapper.text()).toContain(expected);
     expect(wrapper.text()).not.toContain(fallback);
   });
-  it('shows an unsupported-mode notice and skips history loading in PvE mode', async () => {
+  it('loads history, sets the level, and archives runs in PvE mode', async () => {
     mockState.currentGameMode = 'pve';
-    fetchPrestigeRunsMock.mockResolvedValue([createPrestigeRun('run-1')]);
+    fetchPrestigeRunsMock.mockResolvedValue([{ ...createPrestigeRun('run-1'), mode: 'pve' }]);
     const wrapper = createWrapper();
     await flushPromises();
-    expect(fetchPrestigeRunsMock).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported_title');
-    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported');
-    expect(wrapper.text()).not.toContain('settings.prestige.set_current');
+    expect(fetchPrestigeRunsMock).toHaveBeenCalledWith('pve', 20);
+    expect(wrapper.text()).not.toContain('settings.prestige.persistent_mode_unsupported_title');
+    await wrapper.find('select').setValue('2');
+    await findButtonByText(wrapper, 'settings.prestige.set_current')!.trigger('click');
+    await flushPromises();
+    expect(syncPrestigeLevelMock).toHaveBeenCalledWith('pve', 2);
+    await findButtonByText(wrapper, 'settings.prestige.archive_cta')!.trigger('click');
+    await wrapper.find('input').setValue('settings.prestige.confirm_word');
+    const archiveButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().includes('settings.prestige.archive_cta'));
+    await archiveButtons[archiveButtons.length - 1]!.trigger('click');
+    await flushPromises();
+    expect(prestigeModeMock).toHaveBeenCalledWith('pve');
   });
   it('reports prestige as unavailable in Seasonal PvP', async () => {
     mockState.currentGameMode = 'seasonal';
