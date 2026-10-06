@@ -92,10 +92,12 @@ const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: str
       return jsonResponse([{ user_id: 'runtime-user', game_edition: 1 }]);
     }
     if (url.toString() === 'https://json.tarkov.dev/pvp-season/tasks') {
-      return jsonResponse({ data: { tasks: {} } });
+      return jsonResponse({
+        data: { tasks: { unrelated: { id: 'unrelated', objectives: [], taskRequirements: [] } } },
+      });
     }
     if (url.toString() === 'https://json.tarkov.dev/pvp-season/hideout') {
-      return jsonResponse({ data: {} });
+      return jsonResponse({ data: { stash: { id: 'stash', levels: [] } } });
     }
     unhandledUrls.push(url.toString());
     return new Response('Unhandled outbound request', { status: 500 });
