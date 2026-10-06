@@ -1,6 +1,5 @@
-import { assertEquals, assert } from 'jsr:@std/assert';
+import { assertEquals, assert } from 'jsr:@std/assert@1.0.19';
 import { stub } from 'jsr:@std/testing@1.0.19/mock';
-
 type Receipt = { state: string; token: string; expires: number };
 const receipts = new Map<string, Receipt>();
 let upstreamAttempts = 0;
