@@ -1,9 +1,18 @@
+import { fileURLToPath } from 'node:url';
 import { defineVitestConfig } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
 const logLevel = process.env.NUXT_PUBLIC_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
 const ciReporters = isSharded ? ['default', 'junit', 'github-actions'] : ['default', 'junit'];
 export default defineVitestConfig({
+  resolve: {
+    alias: {
+      // Cross-runtime catalog regressions use the same Node lifetime shim as gateway tests.
+      'cloudflare:workers': fileURLToPath(
+        new URL('./workers/api-gateway/src/__tests__/cloudflare-workers.ts', import.meta.url)
+      ),
+    },
+  },
   define: {
     'import.meta.env.NUXT_PUBLIC_LOG_LEVEL': JSON.stringify(logLevel),
   },
@@ -13,7 +22,7 @@ export default defineVitestConfig({
     setupFiles: ['./tests/test-setup.ts'],
     exclude: [
       ...configDefaults.exclude,
-      'workers/**',
+      'workers/api-gateway/**',
       '**/*.deno.test.ts',
       '**/node_modules/**',
       '**/.codex/**',

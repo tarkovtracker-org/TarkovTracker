@@ -1,3 +1,4 @@
+import branchFixture from '../../../../tests/fixtures/task-failure-branches.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';
@@ -231,7 +232,7 @@ const createBaseFetchMock = ({
           tasks: Object.fromEntries(
             tasks.map((task) => [
               String(task.id),
-              { objectives: [], taskRequirements: [], ...task },
+              { objectives: [], failConditions: [], taskRequirements: [], ...task },
             ])
           ),
         },
@@ -938,6 +939,7 @@ describe('api-gateway', () => {
                 name: 'Task One',
                 factionName: 'Any',
                 objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
+                failConditions: [],
                 taskRequirements: [],
               },
             },
@@ -1970,7 +1972,12 @@ describe('required catalog availability', () => {
       name: 'partial rules',
       response: async () =>
         jsonResponse({
-          data: { tasks: { A: { id: 'A', objectives: [], taskRequirements: [] }, B: null } },
+          data: {
+            tasks: {
+              A: { id: 'A', objectives: [], failConditions: [], taskRequirements: [] },
+              B: null,
+            },
+          },
         }),
     },
   ];
@@ -2052,6 +2059,50 @@ describe('required catalog availability', () => {
       await expectErrorResponse(res, 503, 'Game data temporarily unavailable');
       expect(res.headers.get('ETag')).toBeNull();
       expect(res.headers.get('X-RateLimit-Remaining')).not.toBeNull();
+    }
+  );
+});
+describe('failure branch response parity', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'applies hydrated branch rules to individual and team reads in %s',
+    async (mode) => {
+      const sourceId = '597a0f5686f774273b74f676';
+      const targetId = '597a160786f77477531d39d2';
+      vi.stubGlobal(
+        'fetch',
+        createBaseFetchMock({
+          gameMode: mode,
+          tasks: Object.values(branchFixture.data.tasks),
+          permissions: ['GP', 'TP'],
+          teamId: 'team-1',
+          userProgress: {
+            user_id: 'user-1',
+            game_edition: 1,
+            progress_data: {
+              level: 1,
+              pmcFaction: 'USEC',
+              taskCompletions: { [sourceId]: { complete: true }, [targetId]: { complete: false } },
+            },
+          },
+        })
+      );
+      const headers = {
+        Authorization: 'Bearer ' + { pvp: 'PVP', pve: 'PVE', seasonal: 'SZN' }[mode] + '_abc123',
+      };
+      const progress = await worker.fetch(buildRequest('/progress', { headers }), BASE_ENV);
+      expect(progress.status).toBe(200);
+      const single = (await progress.json()) as {
+        data: { tasksProgress: Array<{ id: string; invalid?: boolean }> };
+      };
+      expect(single.data.tasksProgress.find((task) => task.id === targetId)?.invalid).toBe(true);
+      const team = await worker.fetch(buildRequest('/team/progress', { headers }), BASE_ENV);
+      expect(team.status).toBe(200);
+      const members = (await team.json()) as {
+        data: Array<{ tasksProgress: Array<{ id: string; invalid?: boolean }> }>;
+      };
+      expect(members.data).toHaveLength(2);
+      for (const member of members.data)
+        expect(member.tasksProgress.find((task) => task.id === targetId)?.invalid).toBe(true);
     }
   );
 });

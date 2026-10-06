@@ -158,6 +158,8 @@ The Worker service, callers, and caches now select distinct `regular` and `pve` 
 
 The remaining limitation is architectural rather than mode correctness: the Worker still fetches directly from the upstream JSON service instead of consuming an immutable validated release. Phase 4 removes that runtime upstream dependency.
 
+**Status 2026-10-06:** browser graph preparation and the interim Worker adapter now share a runtime-free completion-failure edge builder (`shared/utils/taskFailureEdges.ts`). The Worker preserves and validates task failure conditions before deriving the same internal `alternatives` projection used by existing repair/action consumers. Raw string and hydrated task references, completion aliases, and the existing active-only reciprocal pattern are normalized consistently. This closes runtime branch-input drift without claiming the Phase 3 representation migration or immutable release architecture is complete.
+
 ### P0: branch semantics depend on removed `alternatives`
 
 The upstream `alternatives` field no longer exists. Branch relationships are represented by `taskStatus` failure conditions. Compile explicit branch/failure edges from `failConditions` and remove runtime dependence on `alternatives`.

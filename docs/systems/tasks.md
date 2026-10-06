@@ -2,6 +2,12 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Task search
+
+The initial route `q` filters tasks immediately, including tasks loaded later. Search comparisons
+trim whitespace and ignore case. Later typing and route changes retain the 180 ms debounce;
+clearing search cancels any pending update and restores the visible list immediately.
+
 ## Canonical task progression
 
 ### Server-side start requirements

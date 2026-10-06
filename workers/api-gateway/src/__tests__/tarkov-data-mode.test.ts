@@ -20,7 +20,15 @@ describe('Tarkov data modes', () => {
         const mode = url.includes('/pve/') ? 'pve' : 'regular';
         return jsonResponse({
           data: {
-            tasks: { [mode]: { id: mode, name: mode, objectives: [], taskRequirements: [] } },
+            tasks: {
+              [mode]: {
+                id: mode,
+                name: mode,
+                objectives: [],
+                failConditions: [],
+                taskRequirements: [],
+              },
+            },
           },
         });
       }
