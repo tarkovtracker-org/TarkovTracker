@@ -565,7 +565,6 @@ export default defineNuxtConfig({
   postcss: {
     plugins: {
       '@tailwindcss/postcss': {},
-      autoprefixer: {},
     },
   },
   vite: {

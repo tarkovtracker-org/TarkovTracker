@@ -8,11 +8,11 @@
   ],
   "ignoreDependencies": [
     "@codecov/nuxt-plugin",
+    "@iconify-json/heroicons",
+    "@iconify-json/lucide",
     "@iconify-json/mdi",
     "@semantic-release/npm",
     "@tailwindcss/postcss",
-    "autoprefixer",
-    "defu",
     "lru-cache",
     "postcss",
     "vitest-environment-nuxt",

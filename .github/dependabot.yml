@@ -76,7 +76,6 @@ updates:
           - '@vue/test-utils'
           - happy-dom
           - fake-indexeddb
-          - wait-on
         update-types:
           - minor
           - patch
@@ -94,7 +93,6 @@ updates:
         patterns:
           - tailwindcss
           - '@tailwindcss/*'
-          - autoprefixer
           - postcss
           - prettier-plugin-tailwindcss
         update-types:
