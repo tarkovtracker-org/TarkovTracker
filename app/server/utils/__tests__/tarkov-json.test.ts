@@ -291,6 +291,13 @@ describe('fetchTarkovJsonEndpoint', () => {
   });
   it('preserves data and warns for unsupported translation paths', async () => {
     const warn = vi.fn();
+    const injectedLogger = {
+      error: vi.fn(),
+      warn(this: unknown, ...args: unknown[]) {
+        if (this !== injectedLogger) throw new Error('logger receiver lost');
+        warn(...args);
+      },
+    };
     const items = { item1: { name: 'item.name', shortName: 'item.short' } };
     const fetcher = createFetcher({
       'https://json.tarkov.dev/regular/items': {
@@ -307,7 +314,7 @@ describe('fetchTarkovJsonEndpoint', () => {
       },
     });
     const result = await fetchTarkovJsonEndpoint<{ items: typeof items }>('items', {
-      deps: { fetcher, logger: { error: vi.fn(), warn } },
+      deps: { fetcher, logger: injectedLogger },
       lang: 'en',
     });
     expect(result.items.item1).toEqual({ name: 'item.name', shortName: 'Band' });

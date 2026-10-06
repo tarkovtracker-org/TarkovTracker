@@ -372,30 +372,30 @@ function translateAtPath(
     translateAtPath(value, segments, index + offset, translate)
   );
 }
-type TranslationWarn = (message: string, context: JsonRecord) => void;
+type TranslationLogger = Pick<typeof logger, 'warn'>;
 function applyTranslationPath(
   current: unknown,
   path: string,
   translate: TranslateFn,
-  warn: TranslationWarn
+  log: TranslationLogger
 ): unknown {
   const segments = parseTranslationPath(path);
   if (segments) return translateAtPath(current, segments, 0, translate);
-  warn('[TarkovJson] Skipped unsupported translation path', { path });
+  log.warn('[TarkovJson] Skipped unsupported translation path', { path });
   return current;
 }
 function applyTranslations<T>(
   response: TarkovJsonEnvelope<T>,
   primaryTranslations: JsonRecord | undefined,
   fallbackTranslations: JsonRecord | undefined,
-  warn: TranslationWarn
+  log: TranslationLogger
 ): T {
   const translations = primaryTranslations ?? fallbackTranslations;
   if (!translations) return response.data;
   const translate: TranslateFn = (key) =>
     readTranslation(translations, fallbackTranslations, key)?.value;
   const translated = (response.translations ?? []).reduce<unknown>(
-    (current, path) => applyTranslationPath(current, path, translate, warn),
+    (current, path) => applyTranslationPath(current, path, translate, log),
     response
   );
   return (translated as TarkovJsonEnvelope<T>).data;
@@ -420,7 +420,7 @@ export async function fetchTarkovJsonEndpoint<T>(
     baseResponse,
     primaryResponse.status === 'fulfilled' ? primaryResponse.value.data : undefined,
     fallbackResponse.status === 'fulfilled' ? fallbackResponse.value?.data : undefined,
-    resolveLogger(options).warn
+    resolveLogger(options)
   );
 }
 function adaptCategoryRef(value: unknown, context: AdapterContext) {
