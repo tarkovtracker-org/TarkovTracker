@@ -70,9 +70,15 @@ parsing or claiming. The existing secret and API version contract are unchanged.
    have no direct execution grants. Existing table and chargeback RPC grants remain unchanged.
 2. Replay and test in an isolated database, then verify the target identity, migration history,
    function definitions, trigger coverage and grants using the database migration runbook.
-3. Apply the schema migration before deploying the handler. The previous handler can still insert
-   receipts, but they become unknown; keep the interval short and reconcile any deliveries in that
-   interval. Deploying the new handler first fails closed because the new RPCs are absent.
+3. Merge the migration and handler together through the approved `main` change. Repository Actions
+   only validate the local database; the external Supabase GitHub integration deploys production.
+   Its [deployment workflow](https://supabase.com/docs/guides/deployment/branching) applies migrations
+   at step 5 before deploying changed Edge Functions at step 7; dependent steps skip on failure.
+   Verify the actual integration result and deployed migration/function definitions. Do not run
+   out-of-band `db push` from an unmerged branch. The previous handler can still insert receipts
+   during the deployment interval, but they become unknown; reconcile those deliveries. Deploying
+   the new handler first fails closed because the new RPCs are absent. Per-PR Supabase previews are
+   disabled in this repository; a skipped preview check does not verify a database deployment.
 4. Test signed requests in an approved isolated Stripe/Supabase environment. Local mocked-service
    checks are not authenticated Stripe or production acceptance. Observe `in_progress`, unknown
    receipts, processing errors and lease recovery after rollout.
