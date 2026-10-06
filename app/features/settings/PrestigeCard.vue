@@ -943,14 +943,16 @@
     if (targetPrestigeLevel === null) {
       return;
     }
+    const archiveMode = currentMode.value;
+    const archiveModeLabel = currentModeLabel.value;
     archivingPrestige.value = true;
     try {
-      await tarkovStore.prestigeMode(currentMode.value);
+      await tarkovStore.prestigeMode(archiveMode);
       toast.add({
-        title: t('settings.prestige_pvp.success_title', { mode: currentModeLabel.value }),
+        title: t('settings.prestige_pvp.success_title', { mode: archiveModeLabel }),
         description: t('settings.prestige_pvp.success_description', {
           level: targetPrestigeLevel,
-          mode: currentModeLabel.value,
+          mode: archiveModeLabel,
         }),
         color: 'success',
       });
@@ -961,7 +963,7 @@
       logger.error('[PrestigeCard] Failed to prestige mode data:', error);
       toast.add({
         title: t('settings.prestige_pvp.error_title', 'Prestige Failed'),
-        description: t('settings.prestige_pvp.error_description', { mode: currentModeLabel.value }),
+        description: t('settings.prestige_pvp.error_description', { mode: archiveModeLabel }),
         color: 'error',
       });
     } finally {
@@ -973,6 +975,7 @@
     ([loggedIn, userId, mode], previous) => {
       const [prevLoggedIn, prevUserId, prevMode] = previous ?? [false, null, GAME_MODES.PVE];
       if (prevMode !== mode) {
+        selectedPrestigeLevel.value = currentPrestigeLevel.value;
         showArchiveDialog.value = false;
         showDeleteHistoryDialog.value = false;
         archiveConfirmText.value = '';
