@@ -269,8 +269,17 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   retain unknown mode freshness; account timestamps never substitute for it. Other errors and
   failed fallback reads remain failures. Each read probes the column again so completed migrations
   take effect without a reload.
-  When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
-  clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
+  Startup selects the merge policy independently for each mode. Known-clock PvP/PvE progress
+  takes the preferred snapshot, so stale trader, reputation, or skill maxima cannot replace
+  newer decreases. Seasonal merges progress by entry timestamps when its own normalized
+  progress clock exceeds account metadata, regardless of PvP/PvE or aggregate clocks; otherwise
+  it takes the preferred snapshot. Unknown normalized mode clocks retain timestamped snapshot
+  merging in every mode. Higher reset epochs always win before either policy. Profile fields
+  use the preferred snapshot verbatim, including null names and empty offsets; Seasonal's
+  existing trader and skill maximum behavior during snapshot merging is unchanged.
+  This client policy does not protect older cached clients: phase 3 must retain server
+  compatibility account-clock updates until protocol retirement is enforced. Elapsed deployment
+  time alone cannot prove that those clients are retired.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
   have no per-offset timestamps or deletion markers to safely union concurrent edits.
   Local envelopes retain `_timestamp` for envelope compatibility and add `_metadataTimestamp` for

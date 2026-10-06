@@ -406,7 +406,11 @@ const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): Use
     progressScore(local.state),
     progressScore(remote.state),
     {
-      mergeModeSnapshots: (remote.modes.updatedAt ?? 0) > (accountUpdatedAt(remote.row) || 0),
+      mergeModeSnapshots: {
+        pvp: false,
+        pve: false,
+        seasonal: (freshness.byMode.seasonal ?? 0) > (freshness.metadataUpdatedAt ?? 0),
+      },
       modeUpdatedAt: freshness.byMode,
       localModeTimestamps: perMode(
         (mode) => local.meta?.modeTimestamps?.[mode] ?? localTimestamp ?? 0

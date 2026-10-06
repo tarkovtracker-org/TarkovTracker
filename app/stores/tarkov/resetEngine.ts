@@ -158,7 +158,7 @@ export const resolveInitialSyncState = (
   localScore: number,
   remoteScore: number,
   options: {
-    mergeModeSnapshots?: boolean;
+    mergeModeSnapshots?: boolean | Partial<Record<GameMode, boolean>>;
     modeUpdatedAt?: Partial<Record<GameMode, number>>;
     localModeTimestamps?: Partial<Record<GameMode, number>>;
   } = {}
@@ -183,7 +183,15 @@ export const resolveInitialSyncState = (
     remoteModeData: UserProgressData,
     mode: GameMode
   ): UserProgressData =>
-    resolveModeData(clocks, mergeModeSnapshots, localModeData, remoteModeData, mode);
+    resolveModeData(
+      clocks,
+      typeof mergeModeSnapshots === 'boolean'
+        ? mergeModeSnapshots
+        : (mergeModeSnapshots[mode] ?? false),
+      localModeData,
+      remoteModeData,
+      mode
+    );
   return {
     currentGameMode: preferLocalMetadata ? localState.currentGameMode : remoteState.currentGameMode,
     gameEdition: preferLocalMetadata
