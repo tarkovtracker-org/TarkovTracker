@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(26);
+SELECT plan(28);
 INSERT INTO auth.users(id, email) VALUES
   ('00000000-0000-0000-0000-000000000702', 'stripe-recovery@example.invalid');
 INSERT INTO public.supporters(user_id, tier, status, type)
@@ -70,6 +70,14 @@ SET LOCAL ROLE authenticated;
 SELECT throws_ok($$UPDATE public.supporters SET tier = 'chad'$$, '42501', NULL,
   'missing webhook headers do not bypass existing browser write grants');
 RESET ROLE;
+SELECT set_config('request.headers', '{"x-stripe-event-id":"evt_recovery","x-stripe-claim-token":"spoofed"}', true);
+SET LOCAL ROLE authenticated;
+SELECT throws_ok($$UPDATE public.supporters SET tier = 'chad'$$, '42501', NULL,
+  'spoofed headers grant browser roles no billing writes');
+SELECT throws_ok($$SELECT public.claim_stripe_event('evt_spoof', 'test')$$, '42501', NULL,
+  'spoofed headers grant browser roles no claim RPC');
+RESET ROLE;
+SELECT set_config('request.headers', '{}', true);
 SELECT ok((SELECT command LIKE '%completed_at%' AND command LIKE '%completed%terminal%'
   FROM cron.job WHERE jobname = 'stripe-events-cleanup'), 'retention preserves unresolved receipts');
 SELECT * FROM finish();
