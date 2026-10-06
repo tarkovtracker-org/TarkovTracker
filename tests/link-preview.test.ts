@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
+import { RESOURCES } from '@/features/resources/resourceData';
+import { assertLinkPreviewMetadata } from '@/utils/prerenderOutput';
 import * as routeSeo from '@/utils/routeSeo';
-import { assertLinkPreviewMetadata } from '@/utils/linkPreview';
 import { CLIENT_DOCUMENT_ROUTES, PUBLIC_SEO_ROUTES, createRouteSeoHead } from '@/utils/routeSeo';
 const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 const documentFor = (route: string) => {
@@ -17,6 +18,25 @@ describe('initial HTML link previews', () => {
   });
   it.each([
     ['missing title', (html: string) => html.replace(/<meta property="og:title"[^>]*>/, '')],
+    [
+      'commented title',
+      (html: string) => html.replace(/(<meta property="og:title"[^>]*>)/, '<!-- $1 -->'),
+    ],
+    [
+      'script-only title',
+      (html: string) =>
+        html.replace(/(<meta property="og:title"[^>]*>)/, "<script>const tag = '$1';</script>"),
+    ],
+    [
+      'template-only title',
+      (html: string) =>
+        html.replace(/(<meta property="og:title"[^>]*>)/, '<template>$1</template>'),
+    ],
+    [
+      'noscript-only title',
+      (html: string) =>
+        html.replace(/(<meta property="og:title"[^>]*>)/, '<noscript>$1</noscript>'),
+    ],
     [
       'wrong title',
       (html: string) => html.replace(/(property="og:title" content=")[^"]*/, '$1Wrong page'),
@@ -82,6 +102,29 @@ describe('initial HTML link previews', () => {
       expect(() => assertLinkPreviewMetadata(html, '/kappa')).not.toThrow();
     }
   );
+  it('accepts selected guide images and rejects missing image dimensions', () => {
+    const guide = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');
+    if (!guide?.hasGuide) throw new Error('Missing guide');
+    const original = guide.guide.shareImage;
+    guide.guide.shareImage = {
+      src: '/selected-guide.webp',
+      width: 1200,
+      height: 630,
+      altKey: 'seo.routes.tarkovmonitor.title',
+    };
+    try {
+      const html = documentFor('/resources/tarkovmonitor');
+      expect(() => assertLinkPreviewMetadata(html, '/resources/tarkovmonitor')).not.toThrow();
+      expect(() =>
+        assertLinkPreviewMetadata(
+          html.replace(/<meta name="twitter:image:width"[^>]*>/, ''),
+          '/resources/tarkovmonitor'
+        )
+      ).toThrow('twitter:image:width');
+    } finally {
+      guide.guide.shareImage = original;
+    }
+  });
   it('keeps query strings and player identifiers out of profile preview metadata', () => {
     const route = '/profile/11111111-1111-4111-8111-111111111111/pve?token=private';
     const html = documentFor(route);

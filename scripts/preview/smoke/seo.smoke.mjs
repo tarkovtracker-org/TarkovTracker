@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { RESOURCES } from '@/features/resources/resourceData';
 import { previewGet, protectPreviewBrowser } from './access.mjs';
 import { previewOrigin } from './readiness.mjs';
 const origin = previewOrigin();
@@ -79,12 +80,28 @@ function assertSocialMetadata(meta, copy, route) {
   expect(meta['twitter:description']).toEqual([copy.description]);
   expect(meta['og:site_name']).toEqual([english.seo.site_name]);
   expect(meta['theme-color']).toEqual(['#c8a882']);
-  expect(meta['twitter:card']).toEqual(['summary']);
+  assertSelectedImage(meta, route);
   expect(meta['og:type']).toEqual([route.startsWith('/resources/') ? 'article' : 'website']);
-  expect(meta['og:image']).toBeUndefined();
-  expect(meta['twitter:image']).toBeUndefined();
   expect(Buffer.byteLength(title)).toBeLessThanOrEqual(70);
   expect(Buffer.byteLength(copy.description)).toBeLessThanOrEqual(350);
+}
+const selectedImage = (route) =>
+  RESOURCES.find((resource) => `/resources/${resource.slug}` === route)?.guide?.shareImage;
+function assertSelectedImage(meta, route) {
+  const image = selectedImage(route);
+  expect(meta['twitter:card']).toEqual([image ? 'summary_large_image' : 'summary']);
+  if (!image) {
+    expect(meta['og:image']).toBeUndefined();
+    expect(meta['twitter:image']).toBeUndefined();
+    return;
+  }
+  const url = new URL(image.src, canonicalOrigin).href;
+  expect(meta['og:image']).toEqual([url]);
+  expect(meta['twitter:image']).toEqual([url]);
+  expect(meta['og:image:width']).toEqual([String(image.width)]);
+  expect(meta['og:image:height']).toEqual([String(image.height)]);
+  expect(meta['twitter:image:width']).toEqual([String(image.width)]);
+  expect(meta['twitter:image:height']).toEqual([String(image.height)]);
 }
 function assertIndexing({ meta, hasHeading }, route) {
   const isPublic = route in publicPages;

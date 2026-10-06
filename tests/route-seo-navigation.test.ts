@@ -1,9 +1,9 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
-import { defineComponent, h, nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
+import { defineComponent, h, nextTick } from 'vue';
+import { useRouter } from '#imports';
 import { useRouteSeo } from '@/composables/useRouteSeo';
 import { RESOURCES } from '@/features/resources/resourceData';
-import { useRouter } from '#imports';
 describe('route metadata navigation', () => {
   it('removes selected guide image metadata and restores public indexing after a private route', async () => {
     const resource = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');

@@ -46,7 +46,7 @@ are never selected automatically. Replace those fields to change the selection, 
 image tags include dimensions immediately after their image URL.
 
 The prerender build validates initial social tags on all 18 public documents and 12 client shells:
-missing, stale, duplicate, body-only, or unexpected social tags fail the build, as do invalid accent
+missing, stale, duplicate, commented-out, body-only, or unexpected social tags fail the build, as do invalid accent
 colors and copy beyond Discord's UTF-8 limits (70 bytes for titles, 350 for descriptions). The SEO
 preview smoke suite reads every document without executing its scripts and checks navigation,
 profile privacy, query normalization, redirects, and 404s.
