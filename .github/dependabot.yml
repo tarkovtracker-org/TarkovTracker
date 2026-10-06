@@ -14,7 +14,7 @@ updates:
       default-days: 7
       semver-major-days: 30
       semver-minor-days: 7
-      semver-patch-days: 1
+      semver-patch-days: 3
     labels:
       - dependencies
       - javascript
@@ -29,6 +29,16 @@ updates:
         update-types:
           - version-update:semver-major
     groups:
+      # Auth and billing clients are confirm-required: this group is never auto-merged.
+      auth-and-billing:
+        patterns:
+          - stripe
+          - '@stripe/*'
+          - '@supabase/*'
+          - supabase
+        update-types:
+          - minor
+          - patch
       nuxt-ecosystem:
         dependency-type: production
         patterns:

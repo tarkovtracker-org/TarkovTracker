@@ -51,7 +51,7 @@ test('security is a reusable workflow with only the weekly schedule as a standal
   const scan = jobBlock(security, 'security-scan');
   assert.match(
     workflowStep(scan, 'Audit production dependencies'),
-    /run: pnpm audit --prod --audit-level=critical$/m
+    /run: node "\$GITHUB_WORKSPACE\/scripts\/checks\/audit-dependencies\.mjs"$/m
   );
   const informational = workflowStep(scan, 'Audit all dependencies (informational)');
   assert.match(informational, /::notice title=Informational dependency audit::/);

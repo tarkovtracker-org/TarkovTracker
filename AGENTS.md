@@ -3,8 +3,8 @@
 Repository contract for coding agents. Executable config (`package.json`, `nuxt.config.ts`,
 `tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Cloud agents and
 contributors may not load shared global rules, so two baselines stay here: preserve existing
-worktree changes, and get explicit authorization before production deploys, destructive actions,
-and merges.
+worktree changes, and get explicit authorization before production deploys and destructive actions.
+Merges follow the merge class below.
 
 ## Project map
 
@@ -83,6 +83,14 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   bypass the guard; never run Codex reviews locally. Pending or unknown review is incomplete.
 - Auth, billing, migrations, and database or Durable Object concurrency control (locks, claims,
   fencing) need one independent review before merge: Codex, another provider, or a human.
+- Merge class: a green, low-risk PR may merge without asking when every change is docs, tests,
+  CI-only changes that keep every security control, patch/minor dependency updates outside
+  `auth-and-billing`, lockfile-only refreshes, or small fixes with no confirm-required surface.
+  Confirm-required (an explicit "merge" naming it, even when green): migrations or schema/RLS;
+  auth, sessions, permissions, or access checks; billing, payments, or entitlements (Stripe,
+  Supabase clients); secrets or credentials; major upgrades; production data scripts; deploy,
+  infra, DNS, or Worker trigger config; weakening any security control, check, or ruleset; and
+  public API or data-format contracts. Otherwise report it `READY` with the reason.
 - The PR body lists the validation commands and results.
 - Review risk areas and severity live in `docs/code-review.md`.
 

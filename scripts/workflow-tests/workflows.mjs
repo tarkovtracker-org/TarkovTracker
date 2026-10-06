@@ -14,20 +14,27 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   const statuses = [
     ...wait.match(/expected_statuses=\(([\s\S]*?)\)/)[1].matchAll(/"([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.deepEqual(expected, ['CI Result', 'PR Meta']);
+  assert.deepEqual(expected, [
+    'CI Result|15368',
+    'PR Meta|15368',
+    'Socket Security: Pull Request Alerts|156372',
+  ]);
   assert.deepEqual(statuses, ['Preview Result']);
   // Individual CI and security job names are no longer a dependency of the merge gate.
   for (const name of ['Security Scan', 'CodeQL', 'Type Check', 'Validate', 'Fallow audit'])
     assert.ok(!expected.includes(name), name);
   const workflows = ['ci', 'pr-checks'].map((name) => read(`.github/workflows/${name}.yml`));
-  for (const name of expected)
+  for (const name of expected
+    .filter((entry) => entry.endsWith('|15368'))
+    .map((e) => e.split('|')[0]))
     assert.ok(
       workflows.some((w) => w.includes(`name: ${name}\n`)),
       name
     );
   assert.match(read('scripts/preview/profile.mjs'), /STATUS_CONTEXT = 'Preview Result'/);
   // Check runs must come from GitHub Actions; a foreign app cannot satisfy the aggregate name.
-  assert.match(wait, /select\(\.name == \$name and \.app\.id == 15368\)/);
+  assert.match(wait, /select\(\.name == \$name and \.app\.id == \$app\)/);
+  assert.match(wait, /--argjson app "\$check_app"/);
   assert.match(wait, /failing_status_count.*-gt 0/);
   for (const job of [
     'Refresh preview state',
@@ -48,6 +55,35 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   assert.match(wait, /deadline=\$\(\(SECONDS \+ 3600\)\)/);
   assert.match(jobBlock(gate, 'auto-merge'), /timeout-minutes: 90/);
   assert.match(read('.github/codecov.yml'), /absolute-floor:/);
+});
+test('Dependabot auto-merge excludes auth and billing dependencies', () => {
+  const gate = read('.github/workflows/dependabot-auto-merge.yml');
+  const config = read('.github/dependabot.yml');
+  const eligible = jobBlock(gate, 'auto-merge');
+  assert.match(eligible, /dependabot\/npm_and_yarn\/auth-and-billing-\*\)\n\s*;;/);
+  const npm = config.slice(
+    config.indexOf('package-ecosystem: npm'),
+    config.indexOf('package-ecosystem: github-actions')
+  );
+  for (const group of [...npm.matchAll(/^ {6}([a-z-]+):\n {8}(?:patterns|dependency-type)/gm)].map(
+    (m) => m[1]
+  ))
+    if (group !== 'auth-and-billing')
+      assert.ok(eligible.includes(`dependabot/npm_and_yarn/${group}-*`), group);
+  const sensitive = eligible.match(/grep -E '([^']+)'/)[1];
+  const grep = (line) => spawnSync('grep', ['-E', sensitive], { input: `${line}\n` }).status === 0;
+  for (const line of [
+    '+    "stripe": "^1.0.0",',
+    '-\t"@supabase/supabase-js": "2.0.0",',
+    '+  "supabase": "2.1.0"',
+  ])
+    assert.ok(grep(line), line);
+  for (const line of ['+    "stripe-mock": "1.0.0",', ' "stripe": "^1.0.0",'])
+    assert.ok(!grep(line), line);
+  assert.match(
+    config,
+    /auth-and-billing:\n {8}patterns:\n {10}- stripe\n {10}- '@stripe\/\*'\n {10}- '@supabase\/\*'\n {10}- supabase/
+  );
 });
 test('path selection applies to pull requests only; pushes, forks and Deno checks stay covered', () => {
   const ci = read('.github/workflows/ci.yml');
