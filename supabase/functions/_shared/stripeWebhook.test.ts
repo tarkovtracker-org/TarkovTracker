@@ -303,13 +303,12 @@ describe('payment-specific webhook fulfillment', () => {
   it('limits one-time checkout perks by amount and keeps grandfathered open access', async () => {
     const resources = resourcesForPayments();
     resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const paid = { ...session, amount_total: 1200, created: 1791374400 };
+    const paid = { ...session, amount_total: 1200, created: 1791331260 };
     const harness = createHarness(supporter, resources);
-    const before = Date.now();
     await harness.dispatch('checkout.session.completed', paid);
-    const expiresMs = Date.parse(String(harness.current().expires_at));
-    expect(expiresMs - before).toBeGreaterThanOrEqual(90 * 86_400_000 - 1000);
-    expect(expiresMs - before).toBeLessThanOrEqual(90 * 86_400_000 + 60_000);
+    expect(harness.current().expires_at).toBe(
+      new Date((paid.created + 90 * 86_400) * 1000).toISOString()
+    );
     const legacy = { ...supporter, status: 'active', expires_at: null };
     const grandfathered = createHarness(legacy, resources);
     await grandfathered.dispatch('checkout.session.completed', paid);
