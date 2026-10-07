@@ -148,8 +148,14 @@ Teams, save status and recovery, and progress imports build on this storage; see
   preserves legitimate row and column access, including token-note updates. Billing events remain
   server-only; supporters and admin audit logs expose only their RLS-filtered authenticated reads.
   Future `public` tables/views created by the migration role `postgres` require explicit client grants.
-  Platform-owned creating-role defaults are a separate boundary tracked in
-  [#1133](https://github.com/tarkovtracker-org/TarkovTracker/issues/1133).
+  Reserved `supabase_admin` defaults are provider-owned: hosted `postgres` cannot alter them.
+  Application objects must use reviewed `postgres` migrations with explicit grants; platform
+  extensions must use a schema outside the configured Data API exposed schemas where supported.
+  Re-audit global/public table/view and sequence defaults, relation ownership and effective
+  client/service-role access before and after extension changes, platform upgrades, restores, or
+  a new platform-owned public relation. The
+  [platform-defaults runbook](../runbook.md#platform-owned-public-relation-defaults) records the
+  supported boundary, remediation policy and 2026-10-07 production readback for #1133.
 - Nitro shared-profile and team-member reads resolve Seasonal through the service-role-only
   `get_active_season_number` RPC on each request before cache lookup. Cache keys include the resolved
   season; missing credentials, failed lookups and invalid responses return 503 rather than falling

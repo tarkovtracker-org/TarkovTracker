@@ -109,6 +109,9 @@ GitHub has computed the test merge; other pending reasons are left alone.
   again immediately before upload. A superseded attempt, moved head, moved base, or test merge
   with different parents or tree cannot deploy, and a late success is not published for an obsolete
   candidate. A regenerated test merge with the same parents and tree is the same candidate.
+  A `pull_request` build checks out the test merge, so its tree claim must equal the current test
+  merge's tree (not the head commit's, which differs whenever the branch is behind its base); push
+  and dispatched branch builds claim the tree of the commit the run built.
 - Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
   completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
