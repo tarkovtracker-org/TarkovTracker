@@ -5,6 +5,14 @@ describe('isSupporterActivityActive', () => {
   it('treats active supporters as active without an expiry', () => {
     expect(isSupporterActivityActive({ status: 'active', expiresAt: null }, NOW)).toBe(true);
   });
+  it('ends time-limited active access at its expiry', () => {
+    expect(
+      isSupporterActivityActive({ status: 'active', expiresAt: '2026-05-26T12:00:00.000Z' }, NOW)
+    ).toBe(true);
+    expect(
+      isSupporterActivityActive({ status: 'active', expiresAt: '2026-05-24T12:00:00.000Z' }, NOW)
+    ).toBe(false);
+  });
   it('keeps past_due supporters active only during grace', () => {
     expect(
       isSupporterActivityActive({ status: 'past_due', expiresAt: '2026-05-26T12:00:00.000Z' }, NOW)
