@@ -1,108 +1,20 @@
 {
   "originalHead": "7a8fb7eff9612dffb9332c839bf7b49befba882b",
   "scope": "Actual production reset/persistence modules and real Pinia plugin in separate native renderers; synthetic local guest flows, no hosted UI/account/provider acceptance.",
-  "harnessSha256": "2a1e7a8ddec29dccba82f660996ff328fdcb842d9be15d3c6d5bbc7448803ce8",
-  "entrySha256": "6906aef9c60816c8f43fc2b08e78eecaa76c9aa335113153b7fc86e95beea531",
-  "bundleSha256": "fe11234d7813d99ae8c99203470f046f059f57e8ebfa2607af5f03f84d4f43c6",
+  "harnessSha256": "b043d090c4315cea5cee2cb3b6ec167942fc7db8e937cfcfc27043cd292c7ebe",
+  "entrySha256": "cddf2b56663f76ccecd66fa2c3717cd8218d87667a9e00a4f2f7e6ae3b567d48",
+  "bundleSha256": "e78a90096af411eac8c97f2f4770da2c38a277e5219299b256d86278ee70e567",
   "browser": "Chrome/154.0.8037.97",
-  "rendererPids": [28316, 44312],
+  "rendererPids": [45132, 43996],
   "visibility": "Exact raw storage-event/read barrier before stale-reset tests; not a cure/proof for #1092 immediate-release cache gap.",
   "sourceSha256": [
     {
-      "path": "app/utils/constants.ts",
-      "sha256": "348e1ab4e6dae8114b86cb2e5614f37bcec6e375ec445d6705e0ad262f65bba5"
+      "path": "app/composables/i18nHelpers.ts",
+      "sha256": "82241f930aa37b9866c64db7f10f0d7a5c1fa7dea6634b9c1f0f6e6cc290a3a1"
     },
     {
-      "path": "shared/utils/apiTaskUpdates.ts",
-      "sha256": "393ae8e0c9eccda00181e9129027d324f0a3fee984e0cb8e532add67bc1a956f"
-    },
-    {
-      "path": "app/types/progress.ts",
-      "sha256": "4de791669d6e4a10d6962fd14990afcdc5cdc869414537bda105ade5047cf65d"
-    },
-    {
-      "path": "app/utils/taskAvailabilityConfirmation.ts",
-      "sha256": "78679c3b2bd3e19e87bd01b6ce6fa1747c8c70dc3f3d1fad16c712cdf7809d85"
-    },
-    {
-      "path": "app/utils/progressSanitizers.ts",
-      "sha256": "a6f869032686771a64204d2d96b5d47a55ae5ccc53337cc1ba1a2106d983cbb6"
-    },
-    {
-      "path": "app/utils/editionHelpers.ts",
-      "sha256": "406965ae7d1c83aadf501c25338a29e0d83e4a1bd6cc0558e94a406f569ed6a5"
-    },
-    {
-      "path": "app/utils/taskStatus.ts",
-      "sha256": "c3fdea85270173fe2268833e2cdb13b80ee5ceeaf8586e0f2c8d78d3c187075c"
-    },
-    {
-      "path": "app/stores/progressState.ts",
-      "sha256": "957a19981224d5795b73fd0c65b9f4a5c6a8d4b6c6a564ebffc7f8d50c0c3285"
-    },
-    {
-      "path": "app/stores/tarkov/deepEqual.ts",
-      "sha256": "28a7ced4146b3954367e6ac7959b3b5e4ff29554ef52fe72d6b99649d9b1d857"
-    },
-    {
-      "path": "app/utils/logger.ts",
-      "sha256": "15ca2b81bf9659e4e0f08baeb091143b74d5e6b114c9d414e9f68eeace9eb0fb"
-    },
-    {
-      "path": "app/utils/modeProgress.ts",
-      "sha256": "eea8e5bda6bee2c439e6d15398764a9f2d728ddfbcbc028a871acca48dfb6f1d"
-    },
-    {
-      "path": "app/stores/tarkov/progressMerge.ts",
-      "sha256": "953f8d45b9897db384eb5ed64b13981e17813ea0e29d79eac5c0d51dc83e83bb"
-    },
-    {
-      "path": "app/stores/tarkov/initialSyncState.ts",
-      "sha256": "696941980dcda1b3279eddf317c9ef21f42a890e2479d71e9f45bac85c1e9b32"
-    },
-    {
-      "path": "app/stores/tarkov/progressSaveStatus.ts",
-      "sha256": "c15adf4268a578011bbbea380cb8c6b2b6320375251a27d8ec510b1036c3c4d0"
-    },
-    {
-      "path": "app/utils/storageKeys.ts",
-      "sha256": "e428061b1329b8dea40623a2b71051a56280235441f499fe07633d67a3529c71"
-    },
-    {
-      "path": "app/utils/userScopedStorage.ts",
-      "sha256": "00fb6099347ba6bb169fe303426eca2ef01635df34f8dc5a61571b34ac137320"
-    },
-    {
-      "path": "app/stores/tarkov/localStorage.ts",
-      "sha256": "fba3a3bd24adb5d78e06ab163efb4aa3da3411f5a2ab97976d869094969b3102"
-    },
-    {
-      "path": "app/stores/tarkov/supersededProgress.ts",
-      "sha256": "38ec9ddc0b25ca522625ebecbe17cdfe548d822032620196f6886bbf4d2226ae"
-    },
-    {
-      "path": "app/stores/tarkov/accountRecovery.ts",
-      "sha256": "26ea379b13258c8a05fc49c6b3927b8d05c89a57aebfc5a81461403f82752a71"
-    },
-    {
-      "path": "app/stores/tarkov/storageQuota.ts",
-      "sha256": "d732740252f9a8f8927c8e02e174f8d4618502ed5404bfc3fcb207442e85834b"
-    },
-    {
-      "path": "app/stores/tarkov/progressStorePersist.ts",
-      "sha256": "238c87a2492b211155886c4f100bdad4c61817065561311a4c27c60ae86126bb"
-    },
-    {
-      "path": "app/stores/tarkov/metadataEchoes.ts",
-      "sha256": "0406d465f87bd890d5b140892fcf8a30fc9e16850e6c097c0aceb632078a32d8"
-    },
-    {
-      "path": "app/stores/tarkov/acknowledgedModes.ts",
-      "sha256": "3dd176264b3a3fd531c865f8bee296764ae4c47ac8d99d4e5634c7210748a84a"
-    },
-    {
-      "path": "app/stores/tarkov/progressPersistence.ts",
-      "sha256": "37844eedf7a25945f68bd08413fe41f5081022487ffbee2db8267edba25a869b"
+      "path": "app/composables/useGraphBuilder.ts",
+      "sha256": "7308a6ba9912d170211c159860ff6c4e2809db93e8786ff9990a7f22f9de4a5d"
     },
     {
       "path": "app/composables/useSafeToast.ts",
@@ -113,6 +25,22 @@
       "sha256": "6baa125f5926066fd726e91920191b84ac8aedb031679f57ebf5a50421c6be35"
     },
     {
+      "path": "app/data/maps.json",
+      "sha256": "cb964cc81e95c5dd861dd0f7e251480d52ff24911a60a4783e914dd48beccaf6"
+    },
+    {
+      "path": "app/stores/progressState.ts",
+      "sha256": "957a19981224d5795b73fd0c65b9f4a5c6a8d4b6c6a564ebffc7f8d50c0c3285"
+    },
+    {
+      "path": "app/stores/tarkov/accountRecovery.ts",
+      "sha256": "26ea379b13258c8a05fc49c6b3927b8d05c89a57aebfc5a81461403f82752a71"
+    },
+    {
+      "path": "app/stores/tarkov/acknowledgedModes.ts",
+      "sha256": "3dd176264b3a3fd531c865f8bee296764ae4c47ac8d99d4e5634c7210748a84a"
+    },
+    {
       "path": "app/stores/tarkov/apiUpdateNotifier.ts",
       "sha256": "4f03b5b49cdc29c40ac357b6136a921bb47c4557c2a11479a8a8bf4d66ef79a7"
     },
@@ -121,32 +49,168 @@
       "sha256": "aee75848ea543275771eb46454eb8f4bbafddb562aeef234e1f70302898f5df7"
     },
     {
+      "path": "app/stores/tarkov/deepEqual.ts",
+      "sha256": "28a7ced4146b3954367e6ac7959b3b5e4ff29554ef52fe72d6b99649d9b1d857"
+    },
+    {
+      "path": "app/stores/tarkov/fetchResponse.ts",
+      "sha256": "4e9729840bb3d8a1e0db96e28ed5435cdd0ac315fcd69c7b653444b415500f88"
+    },
+    {
+      "path": "app/stores/tarkov/initialSyncState.ts",
+      "sha256": "696941980dcda1b3279eddf317c9ef21f42a890e2479d71e9f45bac85c1e9b32"
+    },
+    {
+      "path": "app/stores/tarkov/itemPicker.ts",
+      "sha256": "b18b8b6b53c6ba19b3186aaea5e63d6a9f1d68a4114737af6195f075d6815e14"
+    },
+    {
+      "path": "app/stores/tarkov/localStorage.ts",
+      "sha256": "3da9250b4869cd1ce96e4496cc74fc0a48030928ad1c2d2495f2fe4626c7a802"
+    },
+    {
+      "path": "app/stores/tarkov/metadataEchoes.ts",
+      "sha256": "0406d465f87bd890d5b140892fcf8a30fc9e16850e6c097c0aceb632078a32d8"
+    },
+    {
+      "path": "app/stores/tarkov/metadataStoreBridge.ts",
+      "sha256": "c8563b2f883d726e711be1337414f76fd6abefc3d67b0be0c5d60ae460e3a0cb"
+    },
+    {
+      "path": "app/stores/tarkov/progressMerge.ts",
+      "sha256": "953f8d45b9897db384eb5ed64b13981e17813ea0e29d79eac5c0d51dc83e83bb"
+    },
+    {
+      "path": "app/stores/tarkov/progressPersistence.ts",
+      "sha256": "37844eedf7a25945f68bd08413fe41f5081022487ffbee2db8267edba25a869b"
+    },
+    {
+      "path": "app/stores/tarkov/progressSaveStatus.ts",
+      "sha256": "c15adf4268a578011bbbea380cb8c6b2b6320375251a27d8ec510b1036c3c4d0"
+    },
+    {
+      "path": "app/stores/tarkov/progressStorePersist.ts",
+      "sha256": "49bda22bffa23499d6f8bf158e1012f9e0f380dff4b309cee61d79183e6658a4"
+    },
+    {
+      "path": "app/stores/tarkov/promiseStore.ts",
+      "sha256": "377f8a460caa4dd1846b5ebb3a41576147c959ac58c70c11c590a3e5ef030a90"
+    },
+    {
+      "path": "app/stores/tarkov/realtimeListener.ts",
+      "sha256": "65376b3cb073a252f3bfc5962ea46949f09ecb7fd839de645e49e143cad7f76b"
+    },
+    {
+      "path": "app/stores/tarkov/resetEngine.ts",
+      "sha256": "9364fcaf0cee3bb62f751e2c8485e44e897a6afc101f6b463a6acec432139f92"
+    },
+    {
+      "path": "app/stores/tarkov/startupOwnership.ts",
+      "sha256": "911aa4c4a2fb70d9a38734480e25cef824bd1e17e055513875fda93454c03659"
+    },
+    {
+      "path": "app/stores/tarkov/storageQuota.ts",
+      "sha256": "d732740252f9a8f8927c8e02e174f8d4618502ed5404bfc3fcb207442e85834b"
+    },
+    {
+      "path": "app/stores/tarkov/supersededProgress.ts",
+      "sha256": "38ec9ddc0b25ca522625ebecbe17cdfe548d822032620196f6886bbf4d2226ae"
+    },
+    {
       "path": "app/stores/tarkov/syncTimeline.ts",
       "sha256": "8926e463eae71c3e7e2d13d56ae413efe261c9bf093937fa33661cfd6397bd26"
     },
     {
+      "path": "app/stores/useMetadata.ts",
+      "sha256": "63dfacd571799db061c0a4f180c906bbbcae519e7f5e54cb3d3d3705c6e4dd66"
+    },
+    {
+      "path": "app/types/progress.ts",
+      "sha256": "b15c9aac953dd0012eb9f9fae34af832597bf40575680e8f5831c30bbe927ecf"
+    },
+    {
+      "path": "app/utils/async.ts",
+      "sha256": "d94aa9a679e841c30ad790cbfcb2abd3d1a19ebad242e87bac6951bbd4914e3b"
+    },
+    {
+      "path": "app/utils/constants.ts",
+      "sha256": "facda2861b68d01788536035a82001d9ed18e1a91ced1a17cda295f033ba5ecc"
+    },
+    {
+      "path": "app/utils/editionHelpers.ts",
+      "sha256": "406965ae7d1c83aadf501c25338a29e0d83e4a1bd6cc0558e94a406f569ed6a5"
+    },
+    {
+      "path": "app/utils/graphHelpers.ts",
+      "sha256": "b708c4e20ec66404656b8d7d4ef6e71a939c9435ac7779c8b3931e695e53090f"
+    },
+    {
+      "path": "app/utils/idleScheduler.ts",
+      "sha256": "bee955a4b7175beafd034894131fc488b350802c2f3baeacdc48502905358d18"
+    },
+    {
       "path": "app/utils/locales.ts",
-      "sha256": "db9ea3fff9064a54f51b3fff28b23e82d11b9590527d2455b1526547d84e4414"
+      "sha256": "66df3d88a6d2f3da5e5d982ba072d06f2e749dc2b2fa02d45898f1ce80a5acc9"
+    },
+    {
+      "path": "app/utils/logger.ts",
+      "sha256": "15ca2b81bf9659e4e0f08baeb091143b74d5e6b114c9d414e9f68eeace9eb0fb"
+    },
+    {
+      "path": "app/utils/modeProgress.ts",
+      "sha256": "eea8e5bda6bee2c439e6d15398764a9f2d728ddfbcbc028a871acca48dfb6f1d"
+    },
+    {
+      "path": "app/utils/pendingState.ts",
+      "sha256": "181472316a2728112ddce521ec114d608cf31246fa63b7293bb49c792029d50e"
+    },
+    {
+      "path": "app/utils/perf.ts",
+      "sha256": "e817fc5bfae0da9d0946b8f935040191bf4dcec32c529a4f36f8dbefc409fb36"
     },
     {
       "path": "app/utils/preferencesStorage.ts",
       "sha256": "f1471c7f5f50822880e29508d617b26611ff0b4ebb0a91dc246fa5e4f032cca0"
     },
     {
-      "path": "app/composables/i18nHelpers.ts",
-      "sha256": "dd227661645a7b6ef66a2edc1e2ade96e0e7fbecbfb0c65858898a04ed990715"
+      "path": "app/utils/prestige.ts",
+      "sha256": "166f9cd9edb43ea4bf274ae85035c3d16cf29b9b9ff6d059bfa045fc7de67ec3"
     },
     {
-      "path": "shared/utils/requirementStatus.ts",
-      "sha256": "a080bdf0b29d2605eeb262ceaaa7fa43a9e567e9f1139cec5c3b1c8fa603145a"
+      "path": "app/utils/progressSanitizers.ts",
+      "sha256": "46574621793581c3ee537e13ebd74e58a6f7dec7fce17b4d22a1f7545e213c1a"
     },
     {
-      "path": "shared/utils/taskFailureEdges.ts",
-      "sha256": "a79253d7866c24e76b543b222ca1a94b9c84d19c616e40ba1aae67c53bce8536"
+      "path": "app/utils/realtimeChannel.ts",
+      "sha256": "efcbd1ae2a55d16bc122d5bac5b1174f8657c9217c15e72e32d7b855170e2205"
     },
     {
-      "path": "app/utils/graphHelpers.ts",
-      "sha256": "b708c4e20ec66404656b8d7d4ef6e71a939c9435ac7779c8b3931e695e53090f"
+      "path": "app/utils/realtimeVisibility.ts",
+      "sha256": "edd399e0213a9cba1b8dbe142c789cfac2d4c2af615aa4c39bc9f3eb9d48b8df"
+    },
+    {
+      "path": "app/utils/seasonalPerks.ts",
+      "sha256": "4af9f201253d23fb0f475d0feccf4ac007a4ea8b3cd38885b8cba416cdc62cee"
+    },
+    {
+      "path": "app/utils/storageKeys.ts",
+      "sha256": "a226bb45f1ecf7856780e8ad67d5a6e06c248430ee96ed588d4337df4509d002"
+    },
+    {
+      "path": "app/utils/storylineObjectives.ts",
+      "sha256": "daa31aa4187a0bd441e009ba6fb019b305babada1cebdc01f3d53f9d4395f5b8"
+    },
+    {
+      "path": "app/utils/tarkovApiFetch.ts",
+      "sha256": "a265bdd9b03b443324bf6ac2629c2dfc78d88e5012012fd7fb7bdc05db6abaae"
+    },
+    {
+      "path": "app/utils/tarkovCache.ts",
+      "sha256": "ebe495b0f1dcbf16a451f5fca5022e177832c453405c6758868ffce920ddc424"
+    },
+    {
+      "path": "app/utils/taskAvailabilityConfirmation.ts",
+      "sha256": "78679c3b2bd3e19e87bd01b6ce6fa1747c8c70dc3f3d1fad16c712cdf7809d85"
     },
     {
       "path": "app/utils/taskNormalization.ts",
@@ -157,88 +221,24 @@
       "sha256": "292685bcda73f1897610062369f11708b94c0f7762d196392994fe7c6c3328fe"
     },
     {
-      "path": "app/composables/useGraphBuilder.ts",
-      "sha256": "bb6d4630dcf2caeaebadb02d5b420a921d50f91fa88f8d9d8dc21803676e34b6"
+      "path": "app/utils/taskStatus.ts",
+      "sha256": "c3fdea85270173fe2268833e2cdb13b80ee5ceeaf8586e0f2c8d78d3c187075c"
     },
     {
-      "path": "app/data/maps.json",
-      "sha256": "cb964cc81e95c5dd861dd0f7e251480d52ff24911a60a4783e914dd48beccaf6"
+      "path": "app/utils/userScopedStorage.ts",
+      "sha256": "00fb6099347ba6bb169fe303426eca2ef01635df34f8dc5a61571b34ac137320"
     },
     {
-      "path": "app/stores/tarkov/fetchResponse.ts",
-      "sha256": "4e9729840bb3d8a1e0db96e28ed5435cdd0ac315fcd69c7b653444b415500f88"
+      "path": "shared/utils/apiTaskUpdates.ts",
+      "sha256": "a1ffaca8c654f35ab8d1b9ffe06c774631c20658f4c692991aee1abf070c9052"
     },
     {
-      "path": "app/stores/tarkov/itemPicker.ts",
-      "sha256": "b18b8b6b53c6ba19b3186aaea5e63d6a9f1d68a4114737af6195f075d6815e14"
+      "path": "shared/utils/requirementStatus.ts",
+      "sha256": "a080bdf0b29d2605eeb262ceaaa7fa43a9e567e9f1139cec5c3b1c8fa603145a"
     },
     {
-      "path": "app/stores/tarkov/metadataStoreBridge.ts",
-      "sha256": "c8563b2f883d726e711be1337414f76fd6abefc3d67b0be0c5d60ae460e3a0cb"
-    },
-    {
-      "path": "app/stores/tarkov/promiseStore.ts",
-      "sha256": "377f8a460caa4dd1846b5ebb3a41576147c959ac58c70c11c590a3e5ef030a90"
-    },
-    {
-      "path": "app/utils/idleScheduler.ts",
-      "sha256": "bee955a4b7175beafd034894131fc488b350802c2f3baeacdc48502905358d18"
-    },
-    {
-      "path": "app/utils/perf.ts",
-      "sha256": "e817fc5bfae0da9d0946b8f935040191bf4dcec32c529a4f36f8dbefc409fb36"
-    },
-    {
-      "path": "app/utils/prestige.ts",
-      "sha256": "166f9cd9edb43ea4bf274ae85035c3d16cf29b9b9ff6d059bfa045fc7de67ec3"
-    },
-    {
-      "path": "app/utils/seasonalPerks.ts",
-      "sha256": "4af9f201253d23fb0f475d0feccf4ac007a4ea8b3cd38885b8cba416cdc62cee"
-    },
-    {
-      "path": "app/utils/storylineObjectives.ts",
-      "sha256": "daa31aa4187a0bd441e009ba6fb019b305babada1cebdc01f3d53f9d4395f5b8"
-    },
-    {
-      "path": "app/utils/tarkovApiFetch.ts",
-      "sha256": "a19e031539d9bc368655ca7eef0e7043c42a189a042a1015d2de151c8f9cdc41"
-    },
-    {
-      "path": "app/utils/tarkovCache.ts",
-      "sha256": "14634a66c3ae48ae8db569b0603a54048447456c7cddcf0ebad57f7dafa4344a"
-    },
-    {
-      "path": "app/stores/useMetadata.ts",
-      "sha256": "09006df7766c94d9117b2bb59cfc14ca8d4546f7cad4d31aa8872c6441b06b68"
-    },
-    {
-      "path": "app/utils/pendingState.ts",
-      "sha256": "181472316a2728112ddce521ec114d608cf31246fa63b7293bb49c792029d50e"
-    },
-    {
-      "path": "app/utils/realtimeVisibility.ts",
-      "sha256": "afbe8ba626e80318692324e5649f60a9ebd13adbf20f8a3048a072982c8ca2ee"
-    },
-    {
-      "path": "app/utils/realtimeChannel.ts",
-      "sha256": "efcbd1ae2a55d16bc122d5bac5b1174f8657c9217c15e72e32d7b855170e2205"
-    },
-    {
-      "path": "app/stores/tarkov/realtimeListener.ts",
-      "sha256": "65376b3cb073a252f3bfc5962ea46949f09ecb7fd839de645e49e143cad7f76b"
-    },
-    {
-      "path": "app/stores/tarkov/startupOwnership.ts",
-      "sha256": "911aa4c4a2fb70d9a38734480e25cef824bd1e17e055513875fda93454c03659"
-    },
-    {
-      "path": "app/utils/async.ts",
-      "sha256": "e01e85d7ec232fe65d77ee3e02908f4a8f4ee3ee573b4b1f8717eac2dc85759f"
-    },
-    {
-      "path": "app/stores/tarkov/resetEngine.ts",
-      "sha256": "9364fcaf0cee3bb62f751e2c8485e44e897a6afc101f6b463a6acec432139f92"
+      "path": "shared/utils/taskFailureEdges.ts",
+      "sha256": "a79253d7866c24e76b543b222ca1a94b9c84d19c616e40ba1aae67c53bce8536"
     }
   ],
   "results": [
@@ -364,8 +364,8 @@
     }
   ],
   "baselineDefectsReproduced": 4,
-  "focusedTests": 373,
-  "newRegressionControls": 15,
+  "focusedTests": 386,
+  "newRegressionControls": 28,
   "noRuntimeAuthorityCutover": true,
   "sourceCompleteness": "Preserves existing PR history; completeness of original Linux staged/unstaged work is unverified without manifests.",
   "combinedRecoveryBaselineHead": "738a5f4f1217bf0931e11e0ea0c68ebe64193ceb",
@@ -402,8 +402,8 @@
       "finalUnsaved": false
     }
   ],
-  "integratedBase": "0a5ff981c25efe51e12dfcd16a3a6b06e8f84aef",
-  "nativeObservedHead": "74e07d885d162a1279bc7490efaae53409d2c366",
+  "integratedBase": "bf7bafeba9bdfe455e77918bce1fdc314b2e9ea3",
+  "nativeObservedHead": "d92adb051e1cd2b7beda4ae644112aaa47b336f1",
   "queuedAdoptionBaselineHead": "31c6ee3d0fa6bb165d1bae9a666117889b4ffeed",
   "queuedAdoptionBaselineDefectsReproduced": 4,
   "queuedAdoptionBaselineSuccessControls": 4,
@@ -577,5 +577,255 @@
       "liveDisplayName": "Live"
     }
   ],
-  "originalBaselineHarnessSha256": "80fb897adbabf998690700e99294c9b873bd69fd3001e4459af289ade3fb0487"
+  "originalBaselineHarnessSha256": "80fb897adbabf998690700e99294c9b873bd69fd3001e4459af289ade3fb0487",
+  "nativeCases": 36,
+  "nativeObservedHeadIncludesUncommittedSource": true,
+  "resetTransitionBaselineHead": "c836c25f877c07ecbe715a4876da62e571d1629c",
+  "resetTransitionBaselineRendererPids": [8672, 10704],
+  "resetTransitionUnitRed": {
+    "failed": 8,
+    "controlsPassed": 5,
+    "total": 13
+  },
+  "resetTransitionResults": [
+    {
+      "kind": "resetAdoption",
+      "actor": 0,
+      "during": true,
+      "fresh": false,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 0,
+      "during": true,
+      "fresh": true,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 0,
+      "during": false,
+      "fresh": false,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 0,
+      "during": false,
+      "fresh": true,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 1,
+      "during": true,
+      "fresh": false,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 1,
+      "during": true,
+      "fresh": true,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 1,
+      "during": false,
+      "fresh": false,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAdoption",
+      "actor": 1,
+      "during": false,
+      "fresh": true,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAbortPrefix",
+      "actor": 0,
+      "during": null,
+      "fresh": null,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetAbortPrefix",
+      "actor": 1,
+      "during": null,
+      "fresh": null,
+      "case": null,
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 0,
+      "during": null,
+      "fresh": null,
+      "case": "canceled",
+      "preserved": true,
+      "finalStatus": "failed",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 0,
+      "during": null,
+      "fresh": null,
+      "case": "successful",
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 0,
+      "during": null,
+      "fresh": null,
+      "case": "successor",
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 0,
+      "during": null,
+      "fresh": null,
+      "case": "dirty",
+      "preserved": true,
+      "finalStatus": "failed",
+      "finalUnsaved": true,
+      "finalPending": 0,
+      "retryPvpLevel": 3
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 1,
+      "during": null,
+      "fresh": null,
+      "case": "canceled",
+      "preserved": true,
+      "finalStatus": "failed",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 1,
+      "during": null,
+      "fresh": null,
+      "case": "successful",
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 1,
+      "during": null,
+      "fresh": null,
+      "case": "successor",
+      "preserved": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "retryPvpLevel": null
+    },
+    {
+      "kind": "resetCancellation",
+      "actor": 1,
+      "during": null,
+      "fresh": null,
+      "case": "dirty",
+      "preserved": true,
+      "finalStatus": "failed",
+      "finalUnsaved": true,
+      "finalPending": 0,
+      "retryPvpLevel": 3
+    }
+  ],
+  "resetTransitionReceipts": [
+    {
+      "file": "w1129-native-reset-final-red.json",
+      "sha256": "0937cef2c14356b792bf60775eaefffabde054b30ac073d126a76d96a2687800"
+    },
+    {
+      "file": "w1129-native-reset-final-green.json",
+      "sha256": "fe824061a82ddaf7bac038e24fc223aa893be065841a9f0eb541d11bf5b3fc83"
+    },
+    {
+      "file": "w1129-reset-transition-final-red.log",
+      "sha256": "b8974ea2940d50ab0159ba1d1031b6250a7207deba60d0b7e7d9ba4045a22444"
+    },
+    {
+      "file": "w1129-dirty-cancellation-retry-red.log",
+      "sha256": "ea7980bcff2fbbbd00a3741a5cc58516396f918b069c1ee76b24d2e4cac70d44"
+    },
+    {
+      "file": "w1129-dirty-cancellation-retry-green.log",
+      "sha256": "1d233333792de4bc19da9c5b97f0fef6e010e4dd52371d1d0fb6eeee76a4ad23"
+    }
+  ],
+  "independentHarnessSha256": "ae0308e1a53bca65514c9a5c9c2020a8564e1a2922e043544920a7819f79fa2a"
 }

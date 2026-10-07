@@ -140,10 +140,23 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   baseline together before exposing the rebased memory. Imported unchanged fields and clocks
   therefore remain unchanged intent through a later failure, compaction or reset. The earliest
   outstanding memory baseline covers the ordered queued intent and uncaptured live edits.
+  A reset also includes captures made during its lock wait. Before exposing committed reset
+  memory, it transforms both sides of those remaining queued pairs into that representation;
+  imported unchanged values cannot become follow-up edits. An aborted reset carries its
+  uncommitted prefix into the first remaining queued capture before releasing the lock.
   A failed reset restores that memory edit baseline, separate from retry baselines folded
   against newer observed storage. Thus untouched stale memory cannot become edits that undo another
   tab's corrections; unsaved memory edits remain available for the next save. A newer reset epoch
   still discards obsolete mode intent.
+  Pending local status belongs to the revision that started it. A canceled reset settles its
+  own status as failed without reporting a save or replacing a genuine successor's status.
+  Cancellation alone creates no memory-only edit; existing unsaved changes remain warned.
+  The guest source key is the stable Pinia state object. Resets reject mixed captured sources
+  before mutation rather than borrowing another store's baseline. A failed reset continuation
+  restores serializer coordinates only while its revision and guest session still own them.
+  A canceled reset retains earlier failed intent only while its status ticket still owns the
+  operation and the same guest state object still holds exactly its captured memory; a successor
+  save or replacement memory prevents that restoration.
   These checks use the bytes observed by the current renderer. Web Locks serialize cooperating
   operations but do not prove immediate cross-renderer localStorage cache visibility (#1092);
   this change does not resolve that boundary or enable the inactive IndexedDB authority.

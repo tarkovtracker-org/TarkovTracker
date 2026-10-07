@@ -699,6 +699,352 @@ describe('active progress across tabs', () => {
     expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(0);
     expect(tab.status.progressSaveStatus.local).toBe('saved');
   });
+  it.each([true, false])(
+    'review regression: successful reset accounts for edits queued during its wait=%s',
+    async (during) => {
+      const tab = await openTab();
+      const writer = await openTab();
+      const state = structuredClone(defaultState);
+      state.pvp.level = 20;
+      state.pve.level = 42;
+      state.pve.skills.strength = 10;
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      writer.progressStorageSerializer.reset(writer.parsePersistedProgressState(original, null));
+      const other = structuredClone(state);
+      other.pve.skills.strength = 3;
+      await writer.persistActiveProgressValue(
+        writer.progressStorageSerializer.serialize(other, null, 200)
+      );
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      const reset = tab.resetGuestProgress(
+        ['pvp'],
+        false,
+        () => state,
+        (next) => {
+          tab.progressStorageSerializer.reset(next);
+          Object.assign(state, next.state);
+        }
+      );
+      other.pve.skills.strength = 1;
+      const correction = writer.persistActiveProgressValue(
+        writer.progressStorageSerializer.serialize(other, null, 300)
+      );
+      let edit: Promise<boolean> | undefined;
+      if (during) {
+        state.pve.level = 55;
+        edit = tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 400)
+        );
+      }
+      release();
+      await reset;
+      expect(await correction).toBe(true);
+      const corrected = writer.parsePersistedProgressState(
+        values.get(STORAGE_KEYS.progress),
+        null
+      )!;
+      if (!during) {
+        state.pve.level = 55;
+        edit = tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 400)
+        );
+      }
+      await edit;
+      await tab.flushActiveProgressWrites();
+      const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+      expect(saved.state.pve.skills.strength).toBe(1);
+      expect(state.pve.skills.strength).toBe(1);
+      expect(saved.state.pve.level).toBe(55);
+      expect(saved.state.pvp.progressEpoch).toBe(1);
+      if (during) expect(saved.modeTimestamps?.pve).toBe(corrected.modeTimestamps?.pve);
+      expect(tab.status.progressSaveStatus.local).toBe('saved');
+      expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(0);
+    }
+  );
+  it('review regression: failed reset keeps earlier failed intent for writes queued during its wait', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 20;
+    state.pve.level = 42;
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    const failure = vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('Injected failure', 'QuotaExceededError');
+    });
+    state.pvp.level = 3;
+    expect(
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 200)
+      )
+    ).toBe(false);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    failure.mockImplementationOnce(() => {
+      throw new DOMException('Injected reset failure', 'QuotaExceededError');
+    });
+    const reset = tab.resetGuestProgress(
+      ['pve'],
+      false,
+      () => state,
+      (next) => Object.assign(state, next.state)
+    );
+    state.pve.level = 55;
+    const edit = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    release();
+    await expect(reset).rejects.toThrow('could not be saved');
+    expect(await edit).toBe(true);
+    await tab.flushActiveProgressWrites();
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp.level).toBe(3);
+    expect(state.pvp.level).toBe(3);
+    expect(saved.state.pve.level).toBe(55);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it.each([
+    'canceled',
+    'successful',
+    'successor',
+    'pending successor',
+    'failed successor',
+    'dirty cancel',
+  ] as const)(
+    'review regression: reset status settles without replacing real intent: %s',
+    async (kind) => {
+      const tab = await openTab();
+      const state = structuredClone(defaultState);
+      state.pvp.level = 20;
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      if (kind === 'dirty cancel') {
+        vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+          throw new DOMException('Injected failure', 'QuotaExceededError');
+        });
+        state.pvp.level = 3;
+        await tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 200)
+        );
+      }
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      const reset = tab.resetGuestProgress(
+        ['pvp'],
+        false,
+        () => state,
+        (next) => Object.assign(state, next.state)
+      );
+      if (kind !== 'successful') tab.invalidateActiveProgressWrites();
+      let releaseSuccessor: (() => void) | undefined;
+      if (kind === 'pending successor') {
+        const successorGate = new Promise<void>((resolve) => {
+          releaseSuccessor = resolve;
+        });
+        void navigator.locks.request('successor held', { mode: 'exclusive' }, () => successorGate);
+      }
+      let successor: Promise<boolean> | undefined;
+      if (kind.includes('successor')) {
+        state.pve.level = 55;
+        if (kind === 'failed successor')
+          vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+            throw new DOMException('Injected failure', 'QuotaExceededError');
+          });
+        successor = tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 300)
+        );
+      }
+      release();
+      if (kind === 'successful') await reset;
+      else await expect(reset).rejects.toThrow('could not be saved');
+      if (releaseSuccessor) {
+        expect(tab.status.progressSaveStatus.local).toBe('pending');
+        expect(tab.status.hasUnsavedProgressChanges()).toBe(true);
+        releaseSuccessor();
+      }
+      if (successor) expect(await successor).toBe(kind !== 'failed successor');
+      await tab.flushActiveProgressWrites();
+      expect(tab.status.progressSaveStatus.local).toBe(
+        ['successful', 'successor', 'pending successor'].includes(kind) ? 'saved' : 'failed'
+      );
+      expect(tab.status.hasUnsavedProgressChanges()).toBe(
+        ['dirty cancel', 'failed successor'].includes(kind)
+      );
+      expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(
+        kind === 'failed successor' ? 1 : 0
+      );
+      if (kind === 'dirty cancel') {
+        state.pve.level = 55;
+        await tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 400)
+        );
+        expect(
+          tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pvp.level
+        ).toBe(3);
+      }
+    }
+  );
+  it.each([false, true])(
+    'review regression: reset refuses a different source arriving during its wait=%s',
+    async (during) => {
+      const tab = await openTab();
+      const state = structuredClone(defaultState);
+      state.pvp.level = 20;
+      const other = structuredClone(state);
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      let reset: Promise<unknown> | undefined;
+      if (during)
+        reset = tab.resetGuestProgress(
+          ['pvp'],
+          false,
+          () => state,
+          (next) => Object.assign(state, next.state)
+        );
+      other.pve.level = 55;
+      const edit = tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(other, null, 200)
+      );
+      if (!during)
+        reset = tab.resetGuestProgress(
+          ['pvp'],
+          false,
+          () => state,
+          (next) => Object.assign(state, next.state)
+        );
+      const rejected = expect(reset).rejects.toThrow(
+        during ? 'could not be saved' : 'another progress source'
+      );
+      release();
+      await rejected;
+      expect(await edit).toBe(true);
+      expect(state.pvp.level).toBe(20);
+      expect(other.pve.level).toBe(55);
+      expect(tab.status.progressSaveStatus.local).toBe('saved');
+    }
+  );
+  it('review regression: failed reset continuation cannot rewind a newer adopted baseline', async () => {
+    const tab = await openTab();
+    const writer = await openTab();
+    const state = structuredClone(defaultState);
+    state.pve.skills.strength = 10;
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    writer.progressStorageSerializer.reset(writer.parsePersistedProgressState(original, null));
+    const other = structuredClone(state);
+    other.pve.skills.strength = 3;
+    await writer.persistActiveProgressValue(
+      writer.progressStorageSerializer.serialize(other, null, 200)
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('Injected failure', 'QuotaExceededError');
+    });
+    const reset = tab.resetGuestProgress(
+      ['pvp'],
+      false,
+      () => state,
+      (next) => Object.assign(state, next.state)
+    );
+    state.pve.level = 55;
+    const edit = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    release();
+    await expect(reset).rejects.toThrow('could not be saved');
+    expect(await edit).toBe(true);
+    other.pve.skills.strength = 1;
+    await writer.persistActiveProgressValue(
+      writer.progressStorageSerializer.serialize(other, null, 400)
+    );
+    state.seasonal.level = 55;
+    await tab.persistActiveProgressValue(tab.progressStorageSerializer.serialize(state, null, 500));
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pve.skills.strength).toBe(1);
+    expect(state.pve.skills.strength).toBe(1);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('review regression: reset adoption preserves queued undo, removal, live intent and newer epochs', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 20;
+    state.pve.skills.strength = 10;
+    state.pve.taskCompletions.old = { complete: true, failed: true };
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    const failure = vi.spyOn(localStorage, 'setItem');
+    for (const level of [3, 4]) {
+      failure.mockImplementationOnce(() => {
+        throw new DOMException('Injected failure', 'QuotaExceededError');
+      });
+      state.pvp.level = level;
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 200)
+      );
+    }
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    const reset = tab.resetGuestProgress(
+      ['pvp'],
+      false,
+      () => state,
+      (next) => Object.assign(state, next.state)
+    );
+    delete state.pve.skills.strength;
+    const first = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    state.pve.skills.strength = 10;
+    state.pve.taskCompletions.old = { complete: false, failed: false };
+    const second = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 400)
+    );
+    state.pve.displayName = 'Live';
+    const newer = structuredClone(defaultState);
+    newer.pvp.progressEpoch = 7;
+    newer.pve.skills.strength = 3;
+    values.set(STORAGE_KEYS.progress, guestEnvelope(newer, { pvp: 500, pve: 500, seasonal: 100 }));
+    release();
+    await reset;
+    await Promise.all([first, second]);
+    await tab.flushActiveProgressWrites();
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 8 });
+    expect(saved.state.pve.skills.strength).toBe(10);
+    expect(saved.state.pve.taskCompletions.old).toEqual({ complete: false, failed: false });
+    expect(saved.state.pve.displayName).toBe('Live');
+    expect(saved.state).toEqual(state);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+    expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(0);
+  });
   it('adopts a guest reset from another tab before saving a subsequent legitimate edit', async () => {
     const first = await openTab();
     const second = await openTab();
@@ -1179,9 +1525,7 @@ describe('active progress across tabs', () => {
       expect(values.get(LEGACY_STORAGE_KEYS.progress)).toBe(original);
       expect(adopt).not.toHaveBeenCalled();
       expect(state.pvp.level).toBe(40);
-      expect(tab.status.progressSaveStatus.local).toBe(
-        ['session', 'generation', 'blocked'].includes(failure) ? 'pending' : 'failed'
-      );
+      expect(tab.status.progressSaveStatus.local).toBe('failed');
     }
   );
   it('retains every owner when a second tab writes between the first read and write', async () => {

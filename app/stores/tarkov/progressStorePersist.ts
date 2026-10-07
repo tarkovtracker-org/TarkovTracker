@@ -147,7 +147,7 @@ export const progressStorePersist = {
   key: STORAGE_KEYS.progress,
   afterHydrate: ({ store }: PiniaPluginContext) => {
     guestProgressSources.set(store.$state, {
-      key: store,
+      key: store.$state,
       readState: () => sanitizeOwnedUserState(store.$state as UserState),
       acceptState: (snapshot) => applyPersistedProgressSnapshot(store, snapshot),
     });
