@@ -64,6 +64,8 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 - **Questions or bugs?** See [`SUPPORT.md`](SUPPORT.md) for where to ask.
 - **Found a security issue?** See [`SECURITY.md`](SECURITY.md) for how to report it privately.
 - **Community:** Join us on [Discord](https://discord.gg/M8nBgA2sT6).
+- **Support the project:** TarkovTracker is free, ad-free, and maintained almost entirely by one
+  developer. [Becoming a supporter](https://tarkovtracker.org/supporter) keeps updates coming.
 - **Translations:** Help translate at
   [translate.tarkovtracker.org](https://translate.tarkovtracker.org). Available in English,
   Chinese, Czech, French, German, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish,

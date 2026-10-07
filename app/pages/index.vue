@@ -5,6 +5,7 @@
         <slot name="header" />
         <DashboardNextActions />
         <DashboardMigrationBanner />
+        <DashboardSupportBanner :completed-tasks="dashboardStats.completedTasks.value" />
         <DashboardChangelog />
         <div class="mb-8">
           <button
