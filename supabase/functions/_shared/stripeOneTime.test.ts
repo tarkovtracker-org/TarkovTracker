@@ -39,6 +39,18 @@ describe('one-time supporter duration', () => {
     const legacy = { type: 'one_time', status: 'active', expires_at: null };
     expect(oneTimeExpiresAt(legacy, 300, paidAt, now)).toBeNull();
   });
+  it('keeps open-ended access for payments made before the change', () => {
+    expect(oneTimeExpiresAt(null, 300, days(-1), now)).toBeNull();
+  });
+  it('stacks a distinct older payment delivered out of order', () => {
+    const newer = {
+      type: 'one_time',
+      status: 'active',
+      expires_at: days(30),
+      last_contribution_at: days(1),
+    };
+    expect(oneTimeExpiresAt(newer, 300, paidAt, now)).toBe(days(60));
+  });
   it('does not extend from an expired or revoked one-time row', () => {
     const expired = { type: 'one_time', status: 'expired', expires_at: days(10) };
     expect(oneTimeExpiresAt(expired, 300, paidAt, now)).toBe(days(30));

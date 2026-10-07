@@ -2,6 +2,7 @@ const CENTS_PER_PERIOD = 300;
 const PERIOD_DAYS = 30;
 const MAX_PERIODS = 12;
 const DAY_MS = 86_400_000;
+const EFFECTIVE_MS = Date.parse('2026-10-07T00:00:00.000Z');
 export type OneTimeSupporter = {
   type?: unknown;
   status?: unknown;
@@ -18,8 +19,10 @@ export function oneTimePeriods(amountCents: number): number {
   if (!Number.isFinite(amountCents) || amountCents <= 0) return 0;
   return Math.min(MAX_PERIODS, Math.max(1, Math.floor(amountCents / CENTS_PER_PERIOD)));
 }
-/** Rows granted before one-time perks expired keep their open-ended access. */
-function isGrandfathered(existing: OneTimeSupporter): boolean {
+/** Rows and payments from before one-time perks expired keep open-ended access. */
+function isGrandfathered(existing: OneTimeSupporter, paidAt: string | null): boolean {
+  const paidMs = timestampMs(paidAt);
+  if (paidMs !== null && paidMs < EFFECTIVE_MS) return true;
   return (
     existing?.type === 'one_time' && existing.status === 'active' && existing.expires_at == null
   );
@@ -30,7 +33,7 @@ function isAlreadyApplied(existing: OneTimeSupporter, paidAt: string | null): bo
   const paidMs = timestampMs(paidAt);
   if (lastMs === null || paidMs === null) return false;
   return (
-    existing?.type === 'one_time' && timestampMs(existing.expires_at) !== null && lastMs >= paidMs
+    existing?.type === 'one_time' && timestampMs(existing.expires_at) !== null && lastMs === paidMs
   );
 }
 function remainingExpiryMs(existing: OneTimeSupporter, nowMs: number): number {
@@ -43,7 +46,7 @@ export function oneTimeExpiresAt(
   paidAt: string | null,
   now: Date
 ): string | null {
-  if (isGrandfathered(existing)) return null;
+  if (isGrandfathered(existing, paidAt)) return null;
   if (isAlreadyApplied(existing, paidAt)) return existing!.expires_at as string;
   const startMs = remainingExpiryMs(existing, now.getTime());
   return new Date(startMs + oneTimePeriods(amountCents) * PERIOD_DAYS * DAY_MS).toISOString();

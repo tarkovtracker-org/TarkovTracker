@@ -292,7 +292,7 @@ describe('payment-specific webhook fulfillment', () => {
   it('limits one-time checkout perks by amount and keeps grandfathered open access', async () => {
     const resources = resourcesForPayments();
     resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const paid = { ...session, amount_total: 900 };
+    const paid = { ...session, amount_total: 900, created: 1791374400 };
     const harness = createHarness(supporter, resources);
     const before = Date.now();
     await harness.dispatch('checkout.session.completed', paid);
@@ -303,6 +303,13 @@ describe('payment-specific webhook fulfillment', () => {
     const grandfathered = createHarness(legacy, resources);
     await grandfathered.dispatch('checkout.session.completed', paid);
     expect(grandfathered.current()).toMatchObject({ status: 'active', expires_at: null });
+  });
+  it('keeps open-ended one-time access for checkouts paid before the change', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
+    const harness = createHarness(supporter, resources);
+    await harness.dispatch('checkout.session.completed', { ...session, amount_total: 300 });
+    expect(harness.current()).toMatchObject({ status: 'active', expires_at: null });
   });
 });
 describe('webhook Discord chargeback fencing', () => {
