@@ -245,6 +245,14 @@ describe('useMetadataStore promise tracking', () => {
     expect(lookup).toHaveBeenCalledWith('de');
     expect(store.languageCode).toBe('en');
   });
+  it('checks the same fallback language that metadata loads for unsupported locales', async () => {
+    const store = useMetadataStore();
+    const lookup = vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
+    store.updateLanguageAndGameMode('unsupported-region');
+    expect(store.languageCode).toBe('en');
+    await store.hasCriticalLocaleCache('unsupported-region');
+    expect(lookup).toHaveBeenCalledWith(store.languageCode);
+  });
   it('treats a failed cache lookup as uncached so network switching remains available', async () => {
     const store = useMetadataStore();
     vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);

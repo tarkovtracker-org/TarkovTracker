@@ -726,7 +726,7 @@ export const useMetadataStore = defineStore('metadata', {
     async hasCriticalLocaleCache(locale: string): Promise<boolean> {
       const language =
         LOCALE_TO_API_MAPPING[locale as keyof typeof LOCALE_TO_API_MAPPING] ??
-        extractLanguageCode(locale);
+        extractLanguageCode(locale, [...API_SUPPORTED_LANGUAGES]);
       const mode = this.getApiGameMode();
       const cached = await Promise.all([
         this.loadCriticalCacheData(language),
