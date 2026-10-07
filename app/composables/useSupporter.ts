@@ -26,7 +26,7 @@ const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
 let subscriptionRequestVersion = 0;
-let statusLoadedForUserId: string | null = null;
+const statusLoadedForUserId = ref<string | null>(null);
 let initialRead: {
   userId: string;
   promise: Promise<boolean>;
@@ -98,7 +98,7 @@ export function useSupporter() {
       } else {
         supporterState.value = null;
       }
-      statusLoadedForUserId = userId;
+      statusLoadedForUserId.value = userId;
       success = true;
       return true;
     } catch (e: unknown) {
@@ -106,6 +106,7 @@ export function useSupporter() {
       if (!isCurrentStatusRequest(userId, requestVersion)) return false;
       error.value = e instanceof Error ? e.message : 'Failed to load supporter status';
       supporterState.value = null;
+      statusLoadedForUserId.value = null;
       return false;
     } finally {
       finishStatusRequest(userId, requestVersion, success);
@@ -114,12 +115,12 @@ export function useSupporter() {
   async function subscribe(userId: string): Promise<boolean> {
     if (!$supabase || !userId) return false;
     if (channel && channelUserId === userId) {
-      if (statusLoadedForUserId === userId) return true;
+      if (statusLoadedForUserId.value === userId) return true;
       return initialRead?.promise ?? fetchStatus(userId);
     }
     initialRead?.resolve(false);
     initialRead = null;
-    statusLoadedForUserId = null;
+    statusLoadedForUserId.value = null;
     const requestVersion = ++subscriptionRequestVersion;
     const previousChannel = channel;
     channel = null;
@@ -175,7 +176,7 @@ export function useSupporter() {
     subscriptionRequestVersion += 1;
     initialRead?.resolve(false);
     initialRead = null;
-    statusLoadedForUserId = null;
+    statusLoadedForUserId.value = null;
     const channelToRemove = channel;
     channel = null;
     channelUserId = null;
@@ -244,6 +245,7 @@ export function useSupporter() {
   return {
     supporter: supporterState,
     loading,
+    loadedUserId: readonly(statusLoadedForUserId),
     error,
     isSupporter,
     isActiveSubscriber,

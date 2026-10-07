@@ -248,7 +248,7 @@ function claimSha(candidate, pull) {
   if (candidate.runEvent !== 'pull_request' || !pull) return null;
   return pull.base.sha;
 }
-/** Tree of the commit GitHub triggered the run for; binds the build to the run's commit. */
+/** Tree of the commit GitHub triggered the run for; binds push and dispatched branch builds. */
 function runTreeSha(run) {
   const tree = run.head_commit?.tree_id;
   return SHA_PATTERN.test(String(tree)) ? tree : null;
@@ -379,10 +379,26 @@ function readManifest(destination) {
     throw failure('Preview artifact has no readable manifest.');
   }
 }
+function bindsTestMerge(candidate, pull) {
+  return [
+    candidate.runEvent === 'pull_request',
+    SHA_PATTERN.test(String(pull?.merge_commit_sha)),
+  ].every(Boolean);
+}
+/** pull_request CI checks out the test merge, so its build tree is the merge tree, not the head's.
+   Equivalent regenerated merges share that tree, so the current merge's tree binds both. */
+async function testMergeTreeSha(github, context, pull) {
+  const shape = await commitShape(github, context, pull.merge_commit_sha);
+  return shape && representsPull(shape, pull) ? shape.tree : null;
+}
 async function mergeBoundExpectation({ github, context, candidate, pull, manifest, expected }) {
-  if (candidate.runEvent !== 'pull_request' || !pull) return expected;
+  if (!bindsTestMerge(candidate, pull)) return expected;
   const equivalent = await equivalentTestMerge(github, context, pull, manifest.checkedOutSha);
-  return equivalent ? { ...expected, checkedOutSha: manifest.checkedOutSha } : expected;
+  return {
+    ...expected,
+    checkedOutSha: equivalent ? manifest.checkedOutSha : expected.checkedOutSha,
+    treeSha: await testMergeTreeSha(github, context, pull),
+  };
 }
 async function verifiedArtifact({ github, context, candidate, pull, run, destination }) {
   const artifact = await fetchArtifact(github, context, run, destination);
