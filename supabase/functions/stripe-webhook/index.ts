@@ -365,13 +365,14 @@ async function activateSupporterFromSession(session: any, source: string): Promi
   const discordUserId = await getDiscordUserId(userId);
   // Preserve started_at across re-subscriptions so renewal/upgrade flows
   // don't reset the original support date. Only set it when the row is new.
-  const { data: existing } = await eventClient()
+  const { data: existing, error: existingError } = await eventClient()
     .from('supporters')
     .select(
       'started_at, status, type, stripe_subscription_id, stripe_customer_id, tier, expires_at, last_contribution_at'
     )
     .eq('user_id', userId)
     .maybeSingle();
+  if (existingError) throw new Error(`Supporter lookup failed: ${existingError.message}`);
   const startedAt = existing?.started_at ?? new Date().toISOString();
   // Guard: do not overwrite a subscription (active OR in grace period) with
   // one-time payment fields. past_due subscribers are still subscribers.

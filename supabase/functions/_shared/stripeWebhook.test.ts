@@ -30,7 +30,12 @@ const compiled = ts.transpileModule(
 function createHarness(
   initial: Row,
   resources: Record<string, unknown>,
-  options: { discord?: boolean; grant?: () => Promise<void>; remove?: () => Promise<void> } = {}
+  options: {
+    discord?: boolean;
+    grant?: () => Promise<void>;
+    remove?: () => Promise<void>;
+    readError?: boolean;
+  } = {}
 ) {
   let row: Row = { ...initial };
   const writes: Row[] = [];
@@ -39,11 +44,14 @@ function createHarness(
     let values: Row | null = null;
     let filters: Array<[string, unknown]> = [];
     let action = 'read';
+    let columns = '';
     const result = () => {
       if (table === 'discord_account_links' && options.discord) {
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
       if (table !== 'supporters') return { data: null, error: null };
+      if (options.readError && columns.includes('last_contribution_at'))
+        return { data: null, error: { message: 'down' } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
@@ -52,7 +60,10 @@ function createHarness(
       return { data: { ...row }, error: null };
     };
     const builder = {
-      select: () => builder,
+      select: (selected = '') => {
+        columns = selected;
+        return builder;
+      },
       eq: (key: string, value: unknown) => {
         filters.push([key, value]);
         return builder;
@@ -303,6 +314,15 @@ describe('payment-specific webhook fulfillment', () => {
     const grandfathered = createHarness(legacy, resources);
     await grandfathered.dispatch('checkout.session.completed', paid);
     expect(grandfathered.current()).toMatchObject({ status: 'active', expires_at: null });
+  });
+  it('retries instead of overwriting purchased time when the supporter read fails', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
+    const harness = createHarness(supporter, resources, { readError: true });
+    await expect(
+      harness.dispatch('checkout.session.completed', { ...session, created: 1791374400 })
+    ).rejects.toThrow('Supporter lookup failed');
+    expect(harness.writes).toHaveLength(0);
   });
   it('keeps open-ended one-time access for checkouts paid before the change', async () => {
     const resources = resourcesForPayments();
