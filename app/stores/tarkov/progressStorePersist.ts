@@ -7,6 +7,7 @@ import {
 import {
   clearActiveProgressStorage,
   cloneStateSnapshot,
+  discardGuestProgressIntent,
   parsePersistedProgressState,
   progressPersistStorage,
   progressStorageSerializer,
@@ -32,6 +33,7 @@ let serializedGuestSource: { value: string; source?: GuestProgressSource } | nul
 export const resetProgressStoreMemory = (store: {
   $patch: (mutator: (state: UserState) => void) => void;
 }): void => {
+  discardGuestProgressIntent();
   resettingProgressMemory = true;
   try {
     store.$patch((state) => Object.assign(state, structuredClone(defaultState)));

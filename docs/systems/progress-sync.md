@@ -132,9 +132,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   their original bytes when reconciliation changes
   no state or clocks. Failed
   reads, writes, retention checks, session fences, or unavailable locks reject before memory changes.
-  A failed ordinary guest write remains unacknowledged intent, folded into at most one failed
-  request per store/source until a subsequent successful write includes it or an explicit reset/session
-  invalidation discards it. Failure is registered before releasing the lock so queued undo and live
+  Uncommitted guest intent belongs to a retained prefix keyed by the stable store/source,
+  independently of in-flight requests and save-status tickets. Failed writes fold that prefix into
+  one retry frame against the observed bytes before releasing the lock, so queued undo and live
   edits remain ordered. An unrelated save cannot clear another source's failed-save warning.
   Successful adoption transforms each remaining queued before/after pair and its memory edit
   baseline together before exposing the rebased memory. Imported unchanged fields and clocks
@@ -142,23 +142,22 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   outstanding memory baseline covers the ordered queued intent and uncaptured live edits.
   A reset also includes captures made during its lock wait. Before exposing committed reset
   memory, it transforms both sides of those remaining queued pairs into that representation;
-  imported unchanged values cannot become follow-up edits. An aborted reset carries its
-  uncommitted prefix into the first remaining queued capture before releasing the lock.
-  A failed reset restores that memory edit baseline, separate from retry baselines folded
-  against newer observed storage. Thus untouched stale memory cannot become edits that undo another
-  tab's corrections; unsaved memory edits remain available for the next save. A newer reset epoch
-  still discards obsolete mode intent.
+  imported unchanged values cannot become follow-up edits. A reset retains the ordered prefix
+  before canceling older requests; ordinary writes and subsequent resets both replay it. Changed
+  memory captures keep their before/after pair, while repeated unchanged captures add no frame.
+  Cancellation, failed reads and failed writes cannot consume that prefix. A successful commit
+  consumes it inside the lock, after incorporating it or discarding selected obsolete mode intent
+  through the committed reset epoch. Untouched stale memory cannot undo another tab's corrections.
   Pending local status belongs to the revision that started it. A canceled reset settles its
   own status as failed without reporting a save or replacing a genuine successor's status.
   Cancellation alone creates no memory-only edit; existing unsaved changes remain warned.
   The guest source key is the stable Pinia state object. Resets reject mixed captured sources
-  before mutation rather than borrowing another store's baseline. A failed reset continuation
-  restores serializer coordinates only while its revision and guest session still own them.
-  The reset owns its captured uncommitted prefix until commit. Cancellation transfers that
-  prefix under the lock into the first same-source queued edit before it can execute. With no
-  successor, the same guest state's serializer retains the prefix for uncaptured live edits
-  and a later retry. Status ownership cannot discard intent or rewind a successor's baseline;
-  another owner or captured source prevents recovery.
+  before mutation rather than borrowing another store's baseline. With no successor, the retained
+  prefix remains available for later retry and the existing account handoff/retention path;
+  uncaptured live changes remain relative to their memory baseline. Status ownership cannot
+  discard data or rewind a successor's baseline. Explicit hydration/session memory replacement
+  discards the old scope after the caller's retention/handoff handling; a committed active clear
+  consumes retained intent inside the lock. Raw owned envelopes cannot consume guest intent.
   These checks use the bytes observed by the current renderer. Web Locks serialize cooperating
   operations but do not prove immediate cross-renderer localStorage cache visibility (#1092);
   this change does not resolve that boundary or enable the inactive IndexedDB authority.

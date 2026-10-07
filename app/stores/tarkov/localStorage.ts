@@ -135,7 +135,8 @@ const initialGuestProgressSnapshot = (): PersistedProgressSnapshot => ({
 });
 export const createProgressStorageSerializer = (
   readPrevious: (userId: string | null) => PersistedProgressSnapshot | null,
-  persistAccepted?: (value: string, expected: PersistedProgressSnapshot | null) => void
+  persistAccepted?: (value: string, expected: PersistedProgressSnapshot | null) => void,
+  resetScope?: (snapshot: PersistedProgressSnapshot | null) => void
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
   let guestSerialization: {
@@ -208,6 +209,7 @@ export const createProgressStorageSerializer = (
       };
     },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {
+      resetScope?.(snapshot);
       guestSerialization = null;
       previous = snapshot
         ? cloneStateSnapshot({ ...snapshot, confirmationCandidates: undefined })
@@ -286,14 +288,25 @@ const markLocalProgressPending = (revision: number, cloudHeld = false): void => 
   recordLocalSavePending(cloudHeld);
 };
 const pendingProgressWrites = new Map<number, ProgressWriteRequest>();
+/** Logical guest intent outlives request cancellation; only a commit or explicit scope clears it. */
+const retainedGuestPrefixes = new Map<object, ProgressWriteRequest[]>();
+export const discardGuestProgressIntent = (): void => retainedGuestPrefixes.clear();
+const guestProgressWrites = (): ProgressWriteRequest[] => [
+  ...[...retainedGuestPrefixes.values()].flat(),
+  ...[...pendingProgressWrites.values()].filter(
+    (request) => !request.failedGuest && !request.guestCommitted
+  ),
+];
 const sameProgressWriteState = (left: string, right: string): boolean => {
   const a = parseUserScopedStorage<unknown>(left);
   const b = parseUserScopedStorage<unknown>(right);
   if (!a || !b) return false;
   return a._userId === b._userId && deepEqual(a.data, b.data);
 };
-const pendingProgressWriteAt = (revision: number | null) =>
-  pendingProgressWrites.get(revision ?? -1);
+const pendingProgressWriteAt = (revision: number | null) => {
+  const request = pendingProgressWrites.get(revision ?? -1);
+  return request?.guestCommitted ? undefined : request;
+};
 const latestPendingProgressWrite = () => {
   const edit = pendingProgressWriteAt(pendingEditRevision);
   const latest = pendingProgressWriteAt(pendingValueRevision);
@@ -302,10 +315,12 @@ const latestPendingProgressWrite = () => {
   return sameProgressWriteState(edit.value, latest.value) ? latest : edit;
 };
 const readActiveProgressValue = (): string | null =>
-  latestPendingProgressWrite()?.value ?? safeGetItem(STORAGE_KEYS.progress);
+  latestPendingProgressWrite()?.value ??
+  [...retainedGuestPrefixes.values()].at(-1)?.at(-1)?.value ??
+  safeGetItem(STORAGE_KEYS.progress);
 /** Preserve the ordered baseline chain before an auth handoff invalidates its old session. */
 export const getPendingProgressWritesForOwners = (owners: (string | null)[]) => {
-  return [...pendingProgressWrites.values()].filter(
+  return guestProgressWrites().filter(
     ({ value, handoff }) =>
       handoff || owners.includes(parseUserScopedStorage<unknown>(value)?._userId ?? null)
   );
@@ -329,6 +344,7 @@ const activeProgressOperations = new Set<Promise<StorageWriteResult>>();
 /** Cancel queued writes before changing the session or intentionally clearing its progress. */
 export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false): void => {
   const pending = latestPendingProgressWrite();
+  retainCancelingGuestWrites(owner);
   progressStorageSerializer.clearGuestSource();
   discardPendingProgressWrites(owner);
   if (owner) {
@@ -347,18 +363,9 @@ export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false
 export const flushActiveProgressWrites = async (): Promise<void> => {
   while (activeProgressOperations.size) await Promise.all(activeProgressOperations);
 };
-const cancelActiveProgressMutation = (recover?: () => void): StorageWriteResult => {
-  recover?.();
-  return {
-    ok: false,
-    error: new Error('Progress operation belongs to an expired session'),
-    canceled: true,
-  };
-};
 const mutateActiveProgress = (
   mutate: () => StorageWriteResult,
-  owner?: string | null,
-  recoverCanceled?: () => void
+  owner?: string | null
 ): Promise<StorageWriteResult> => {
   const generation = activeProgressGeneration;
   const ownerGeneration = ownerGenerationFor(owner);
@@ -374,7 +381,11 @@ const mutateActiveProgress = (
           sessionOwner !== getCurrentSupabaseUserId() ||
           ownerGeneration !== ownerGenerationFor(owner)
         ) {
-          return cancelActiveProgressMutation(recoverCanceled);
+          return {
+            ok: false,
+            error: new Error('Progress operation belongs to an expired session'),
+            canceled: true,
+          };
         }
         return mutate();
       });
@@ -555,13 +566,19 @@ type ProgressWriteRequest = {
   guestBaseline: PersistedProgressSnapshot | null;
   /** Before-state in visible memory's representation; only adoption may rebase it. */
   guestMemoryBaseline: PersistedProgressSnapshot | null;
+  /** Captured memory after-state; failure folding changes retry bytes only. */
+  guestMemoryValue?: string;
   source?: GuestProgressSource;
   failedGuest?: { error: unknown };
   guestReconciled?: boolean;
+  intentId?: number;
+  guestCommitted?: true;
   handoff: boolean;
 };
 const queueProgressWrite = (request: ProgressWriteRequest): number => {
   const valueRevision = ++progressValueRevision;
+  request.intentId = valueRevision;
+  request.guestMemoryValue = request.value;
   pendingProgressWrites.set(valueRevision, request);
   pendingValueRevision = valueRevision;
   if (request.expected === undefined) pendingEditRevision = valueRevision;
@@ -766,6 +783,7 @@ const replaceGuestWriteIntent = (
   request.guestBaseline = cloneStateSnapshot(before);
   request.guestMemoryBaseline = cloneStateSnapshot(memoryBefore);
   request.value = encodeProgressSnapshot(after);
+  request.guestMemoryValue = request.value;
 };
 const rebaseQueuedGuestWrite = (
   request: ProgressWriteRequest,
@@ -870,10 +888,7 @@ const reconcileCapturedGuestSnapshot = (
 ): PersistedProgressSnapshot =>
   applyCapturedGuestIntent(before, incoming, current, reconcileGuestSnapshots(incoming, current));
 const failedGuestWritesBefore = (request: ProgressWriteRequest): ProgressWriteRequest[] => {
-  const writes = [...pendingProgressWrites.values()];
-  return writes
-    .slice(0, writes.indexOf(request))
-    .filter((pending) => pending.failedGuest && pending.source?.key === request.source?.key);
+  return retainedGuestPrefixes.get(request.source?.key ?? request) ?? [];
 };
 const reconcileGuestWrite = (
   request: ProgressWriteRequest,
@@ -900,10 +915,41 @@ const foldGuestWriteRequest = (
   request.guestReconciled = true;
 };
 const discardFailedGuestWritesBefore = (request: ProgressWriteRequest): void => {
-  const obsolete = new Set(failedGuestWritesBefore(request));
+  const writes = [...pendingProgressWrites.values()];
+  const obsolete = new Set(
+    writes
+      .slice(0, writes.indexOf(request))
+      .filter((pending) => pending.failedGuest && pending.source?.key === request.source?.key)
+  );
   for (const [revision, pending] of pendingProgressWrites) {
     if (obsolete.has(pending)) finishPendingProgressWrite(revision);
   }
+};
+const cloneGuestIntent = (request: ProgressWriteRequest): ProgressWriteRequest => ({
+  ...request,
+  baseline: cloneStateSnapshot(request.baseline),
+  guestBaseline: cloneStateSnapshot(request.guestBaseline),
+  guestMemoryBaseline: cloneStateSnapshot(request.guestMemoryBaseline),
+});
+const isUncommittedGuestWrite = (request: ProgressWriteRequest): boolean =>
+  !request.failedGuest && !request.guestCommitted && isOrdinaryGuestWrite(request);
+const retainCancelingGuestWrite = (request: ProgressWriteRequest): void => {
+  const source = request.source;
+  if (!source) return;
+  const prefix = retainedGuestPrefixes.get(source.key) ?? [];
+  if (prefix.some((frame) => frame.intentId === request.intentId)) return;
+  retainedGuestPrefixes.set(source.key, [...prefix, cloneGuestIntent(request)]);
+};
+const retainCancelingGuestWrites = (owner?: string): void => {
+  if (owner) return;
+  for (const request of [...pendingProgressWrites.values()].filter(isUncommittedGuestWrite))
+    retainCancelingGuestWrite(request);
+};
+const registerFailedGuestPrefix = (request: ProgressWriteRequest): void => {
+  if (request.source) retainedGuestPrefixes.set(request.source.key, [cloneGuestIntent(request)]);
+};
+const consumeGuestPrefix = (source: GuestProgressSource | undefined): void => {
+  if (source) retainedGuestPrefixes.delete(source.key);
 };
 const retainGuestMemoryBaseline = (request: ProgressWriteRequest): void => {
   const earliest = failedGuestWritesBefore(request)[0];
@@ -917,8 +963,9 @@ const retainFailedGuestWrite = (request: ProgressWriteRequest, error: unknown): 
   }
   discardFailedGuestWritesBefore(request);
   request.failedGuest = { error };
+  registerFailedGuestPrefix(request);
 };
-const applyGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+const commitGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
   const incoming = parsePersistedProgressState(request.value, null)!;
   const current = parsePersistedProgressState(localStorage.getItem(STORAGE_KEYS.progress), null);
   const accepted = reconcileGuestWrite(request, current);
@@ -928,6 +975,8 @@ const applyGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteRes
     request.cloudHeld
   );
   if (result.ok) {
+    request.guestCommitted = true;
+    consumeGuestPrefix(request.source);
     adoptGuestWrite(request, accepted);
     discardFailedGuestWritesBefore(request);
   } else {
@@ -936,6 +985,15 @@ const applyGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteRes
     if (request.source) retainFailedGuestWrite(request, result.error);
   }
   return result;
+};
+const applyGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+  try {
+    return commitGuestProgressWrite(request);
+  } catch (error) {
+    if (!request.guestCommitted) retainFailedGuestWrite(request, error);
+    logger.error('[TarkovStore] Guest progress mutation failed:', error);
+    return { ok: false, error };
+  }
 };
 const captureGuestProgress = (readState: () => UserState) => {
   const value = progressStorageSerializer.serialize(
@@ -946,6 +1004,40 @@ const captureGuestProgress = (readState: () => UserState) => {
   const baseline = progressStorageSerializer.takeGuestSource(value)?.baseline ?? null;
   progressStorageSerializer.reset(baseline);
   return { value, guestBaseline: baseline };
+};
+const guestIntentSnapshot = (request?: ProgressWriteRequest): PersistedProgressSnapshot | null => {
+  if (!request) return null;
+  return parsePersistedProgressState(request.guestMemoryValue ?? request.value, null);
+};
+const hasChangedGuestCapture = (
+  captured: ReturnType<typeof captureGuestProgress>,
+  snapshot: PersistedProgressSnapshot,
+  prefix: ProgressWriteRequest[]
+): boolean => {
+  const logical = guestIntentSnapshot(prefix.at(-1));
+  return !deepEqual(snapshot.state, logical?.state ?? captured.guestBaseline?.state);
+};
+const retainGuestResetPrefix = (
+  source: GuestProgressSource,
+  intent: ProgressWriteRequest[],
+  captured: ReturnType<typeof captureGuestProgress>
+): void => {
+  const prefix = intent.map(cloneGuestIntent);
+  const snapshot = parsePersistedProgressState(captured.value, null)!;
+  const baseline = guestIntentSnapshot(prefix.at(-1)) ?? captured.guestBaseline;
+  if (hasChangedGuestCapture(captured, snapshot, prefix)) {
+    prefix.push({
+      ...captured,
+      baseline,
+      guestBaseline: baseline,
+      guestMemoryBaseline: baseline,
+      guestMemoryValue: captured.value,
+      cloudHeld: false,
+      handoff: false,
+      source,
+    });
+  }
+  if (prefix.length) retainedGuestPrefixes.set(source.key, prefix);
 };
 const reconcileGuestResetIntent = (
   requests: Pick<ProgressWriteRequest, 'value' | 'guestBaseline'>[],
@@ -1075,65 +1167,9 @@ const rebaseGuestResetWrites = (
     );
   }
 };
-/** An aborted reset must carry its uncommitted prefix into the first remaining capture. */
-const restoreGuestResetWriteIntent = (
-  requests: ProgressWriteRequest[],
-  baseline: PersistedProgressSnapshot | null
-): void => {
-  const first = requests[0];
-  if (!first?.guestBaseline) return;
-  replaceGuestWriteIntent(first, baseline, parsePersistedProgressState(first.value, null)!);
-};
-const withGuestResetRecovery = (
-  requests: ProgressWriteRequest[],
-  baseline: PersistedProgressSnapshot | null,
-  mutate: () => StorageWriteResult,
-  committed: () => boolean
-): StorageWriteResult => {
-  try {
-    const result = mutate();
-    if (!result.ok) restoreGuestResetWriteIntent(requests, baseline);
-    return result;
-  } catch (error) {
-    if (!committed()) restoreGuestResetWriteIntent(requests, baseline);
-    throw error;
-  }
-};
 const assertGuestResetSource = (requests: ProgressWriteRequest[], source: object): void => {
   if (requests.some((request) => request.source && request.source.key !== source))
     throw new Error('Guest reset cannot consume another progress source');
-};
-const restoreGuestResetBaseline = (
-  revision: number,
-  result: Extract<StorageWriteResult, { ok: false }>,
-  baseline: PersistedProgressSnapshot | null
-): void => {
-  if (result.canceled || !ownsGuestProgressRevision(revision)) return;
-  progressStorageSerializer.reset(baseline);
-};
-const hasGuestResetSource = (source: UserState, readState: () => UserState): boolean =>
-  getCurrentSupabaseUserId() === null && source === readState();
-const restoreCanceledGuestResetBaseline = (
-  revision: number,
-  queued: ProgressWriteRequest[],
-  baseline: PersistedProgressSnapshot | null
-): void => {
-  if (queued.length || pendingLocalSaveRevision !== revision) return;
-  progressStorageSerializer.reset(baseline);
-};
-/** The reset owns its captured prefix until commit; cancellation transfers it before release. */
-const recoverCanceledGuestReset = (
-  revision: number,
-  source: UserState,
-  readState: () => UserState,
-  baseline: PersistedProgressSnapshot | null
-): void => {
-  if (!hasGuestResetSource(source, readState)) return;
-  const remaining = [...pendingProgressWrites.values()].filter(isOrdinaryGuestWrite);
-  if (remaining.some((request) => request.source && request.source.key !== source)) return;
-  const queued = remaining.filter((request) => request.source?.key === source);
-  restoreGuestResetWriteIntent(queued, baseline);
-  restoreCanceledGuestResetBaseline(revision, queued, baseline);
 };
 /** Guest resets replace one envelope under the same lock as ordinary guest writes. */
 export const resetGuestProgress = async (
@@ -1143,64 +1179,54 @@ export const resetGuestProgress = async (
   acceptState: (snapshot: PersistedProgressSnapshot) => void
 ): Promise<PersistedProgressSnapshot> => {
   const source = readState();
-  const pending = [...pendingProgressWrites.values()].filter(isOrdinaryGuestWrite);
+  const pending = guestProgressWrites().filter(isOrdinaryGuestWrite);
   assertGuestResetSource(pending, source);
-  const hadUnsavedChanges = hasUnsavedProgressChanges();
   const captured = captureGuestProgress(readState);
   const intent = pending.filter((request) => request.source?.key === source);
-  const baseline = intent[0]?.guestMemoryBaseline ?? captured.guestBaseline;
+  const guestSource = { key: source, readState, acceptState };
+  retainGuestResetPrefix(guestSource, intent, captured);
+  const hadUnsavedChanges = hasUnsavedProgressChanges() || retainedGuestPrefixes.has(source);
   invalidateActiveProgressWrites();
   const revision = localWriteRevision;
   let accepted: PersistedProgressSnapshot | null = null;
   markLocalProgressPending(revision);
-  const result = await mutateActiveProgress(
-    () => {
-      const remaining = [...pendingProgressWrites.values()].filter(isOrdinaryGuestWrite);
-      const queued = remaining.filter((request) => request.source?.key === source);
-      return withGuestResetRecovery(
+  const result = await mutateActiveProgress(() => {
+    const remaining = [...pendingProgressWrites.values()].filter(isOrdinaryGuestWrite);
+    assertGuestResetSource(guestProgressWrites(), source);
+    const queued = remaining.filter((request) => request.source?.key === source);
+    const current = readGuestProgressForReset();
+    const latest = captureGuestProgress(readState);
+    latest.guestBaseline = parsePersistedProgressState(
+      queued.at(-1)?.value ?? captured.value,
+      null
+    );
+    const prefix = retainedGuestPrefixes.get(source) ?? [];
+    const next = buildGuestResetSnapshot(
+      reconcileGuestResetIntent([...prefix, ...queued, latest], current),
+      resetModes,
+      resetAll
+    );
+    const written = writeStorageItem(STORAGE_KEYS.progress, encodeProgressSnapshot(next));
+    if (written.ok) {
+      accepted = next;
+      consumeGuestPrefix(guestSource);
+      rebaseGuestResetWrites(
         queued,
-        baseline,
-        () => {
-          assertGuestResetSource(remaining, source);
-          const current = readGuestProgressForReset();
-          const latest = captureGuestProgress(readState);
-          latest.guestBaseline = parsePersistedProgressState(
-            queued.at(-1)?.value ?? captured.value,
-            null
-          );
-          const next = buildGuestResetSnapshot(
-            reconcileGuestResetIntent([...intent, captured, ...queued, latest], current),
-            resetModes,
-            resetAll
-          );
-          const written = writeStorageItem(STORAGE_KEYS.progress, encodeProgressSnapshot(next));
-          if (written.ok) {
-            accepted = next;
-            rebaseGuestResetWrites(
-              queued,
-              parsePersistedProgressState(latest.value, null)!,
-              next,
-              resetAll
-            );
-            // Adopt inside the lock: no newer writer or auth continuation can intervene after commit.
-            progressStorageSerializer.reset(next);
-            acceptState(next);
-          }
-          return written;
-        },
-        () => accepted !== null
+        parsePersistedProgressState(latest.value, null)!,
+        next,
+        resetAll
       );
-    },
-    null,
-    () => recoverCanceledGuestReset(revision, source, readState, baseline)
-  );
+      progressStorageSerializer.reset(next);
+      acceptState(next);
+    }
+    return written;
+  }, null);
   recordGuestResetResult(
     revision,
     result,
     hasUnchangedGuestResetMemory(captured, readState, hadUnsavedChanges)
   );
   if (!result.ok) {
-    restoreGuestResetBaseline(revision, result, baseline);
     throw new Error('Local guest progress could not be saved after reset');
   }
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
@@ -1236,8 +1262,8 @@ const recordProgressWriteResult = (
   }
 };
 const recordGuestSaveAcknowledgement = (): void => {
-  const failed = [...pendingProgressWrites.values()].find((pending) => pending.failedGuest);
-  if (failed) recordLocalSave(false, classifyLocalSaveFailure(failed.failedGuest!.error));
+  const failed = [...retainedGuestPrefixes.values()].flat()[0];
+  if (failed) recordLocalSave(false, classifyLocalSaveFailure(failed.failedGuest?.error));
   else recordLocalSave(true);
 };
 const isRetainableGuestWriteFailure = (
@@ -1250,8 +1276,17 @@ const finishProgressWriteResult = (
   valueRevision: number,
   result: StorageWriteResult
 ): void => {
-  if (isRetainableGuestWriteFailure(request, result)) retainFailedGuestWrite(request, result.error);
+  if (isRetainableGuestWriteFailure(request, result))
+    retainUnregisteredGuestFailure(request, valueRevision, result.error);
   else finishPendingProgressWrite(valueRevision);
+};
+const retainUnregisteredGuestFailure = (
+  request: ProgressWriteRequest,
+  revision: number,
+  error: unknown
+): void => {
+  if (!request.failedGuest && pendingProgressWrites.get(revision) === request)
+    retainFailedGuestWrite(request, error);
 };
 /** Writes active envelopes and transfers their captured baselines across auth changes. */
 export const persistActiveProgressValue = async (
@@ -1394,12 +1429,16 @@ export const clearActiveProgressStorage = async (
   const revision = localWriteRevision;
   const result = await mutateActiveProgress(() => {
     const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
-    return clearActiveSlot(explicitOwner) ? { ok: true } : { ok: false, error: null };
+    return finishActiveProgressClear(clearActiveSlot(explicitOwner));
   });
   const cleared =
     (result.ok && safeRemoveItem(LEGACY_STORAGE_KEYS.progress)) || isLocalStorageInaccessible();
   if (!cleared) reportActiveClearFailure(result, revision, cloudHeld);
   return cleared;
+};
+const finishActiveProgressClear = (cleared: boolean): StorageWriteResult => {
+  if (cleared) discardGuestProgressIntent();
+  return cleared ? { ok: true } : { ok: false, error: null };
 };
 const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;
 const legacyModeEvidence = (data: Record<string, unknown>, mode: GameMode): unknown => {
@@ -1495,5 +1534,8 @@ export const progressStorageSerializer = createProgressStorageSerializer(
   // Accepted remote state and clocks are already held by the cloud.
   (value, expected) => {
     void persistActiveProgressValue(value, true, expected);
+  },
+  (snapshot) => {
+    if (!snapshot || snapshot.storedUserId !== null) discardGuestProgressIntent();
   }
 );
