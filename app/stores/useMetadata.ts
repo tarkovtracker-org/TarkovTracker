@@ -946,6 +946,7 @@ export const useMetadataStore = defineStore('metadata', {
               return;
             }
             processData(cached);
+            if (loadingKey) this.$patch({ [loadingKey]: false });
             perfSource = 'cache';
             endPerf({ cached: true });
             return;

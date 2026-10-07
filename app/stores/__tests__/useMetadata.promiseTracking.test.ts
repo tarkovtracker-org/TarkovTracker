@@ -214,6 +214,30 @@ describe('useMetadataStore promise tracking', () => {
     expect(store.hideoutError).toBeNull();
     expect(store.hideoutLoading).toBe(false);
   });
+  it('clears loading when a cached request replaces an aborted network request', async () => {
+    const store = useMetadataStore();
+    const oldController = new AbortController();
+    let resolveFetch!: (value: { data: TarkovTasksCoreQueryResult }) => void;
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          })
+      )
+    );
+    const oldRequest = store.fetchTasksCoreData(true, oldController.signal);
+    const rejected = expect(oldRequest).rejects.toMatchObject({ name: 'AbortError' });
+    expect(store.loading).toBe(true);
+    oldController.abort();
+    vi.mocked(cacheUtils.getCachedData).mockResolvedValue(tasksCorePayload());
+    await store.fetchTasksCoreData(false, new AbortController().signal);
+    const loadingAfterCache = store.loading;
+    resolveFetch({ data: tasksCorePayload() });
+    await rejected;
+    expect(loadingAfterCache).toBe(false);
+  });
   it('checks the target locale cache without changing the active language', async () => {
     const store = useMetadataStore();
     const lookup = vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
