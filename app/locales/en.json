@@ -735,6 +735,14 @@
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Support TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -815,7 +823,7 @@
     },
     "supporter": {
       "title": "Support TarkovTracker",
-      "subtitle": "Help keep the site running. Every contribution goes directly toward hosting, development, and keeping the lights on.",
+      "subtitle": "TarkovTracker is free, ad-free, and open source, and nearly all of its development is done by one person. Player support pays for hosting and for the time behind every fix, update, and new feature. Monthly support helps most because it makes that work sustainable.",
       "billing_monthly": "Monthly",
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
@@ -833,7 +841,6 @@
       "perk_badge": "Supporter badge",
       "perk_discord": "Supporter role in Discord (link your account and join our server)",
       "perk_tier_role": "{tier} Tier role in Discord",
-      "perk_early_access": "Early access to new features",
       "perk_priority_support": "Priority support",
       "perk_feature_voting": "Feature voting priority",
       "one_time_title": "One-Time Contribution",
@@ -867,11 +874,6 @@
       "savings_note": "You save {amount} vs. monthly",
       "kofi_deprecation_title": "Ko-fi (backup option)",
       "kofi_deprecation_detail": "Subscriptions and one-time contributions above now run through Stripe, which means lower fees and more of your support reaches us directly. Ko-fi stays available as a backup for one-time tips only.",
-      "alt_payments_title": "More Payment Methods Coming Soon",
-      "alt_payments_coming_soon": "We're working on adding additional payment options so everyone can contribute in the way that works best for them.",
-      "alt_payment_crypto": "Crypto",
-      "alt_payment_gift_cards": "Gift Cards",
-      "alt_payments_more": "& More",
       "checkout_error_title": "Checkout failed",
       "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment.",
       "manage_subscription_cta": "Manage subscription",
