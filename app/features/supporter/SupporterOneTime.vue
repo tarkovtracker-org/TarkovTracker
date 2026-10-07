@@ -9,7 +9,7 @@
           {{ t('page.supporter.one_time_subtitle', { min: formattedMinimum }) }}
         </p>
         <p class="text-surface-300 mt-4 text-xs font-semibold tracking-wide uppercase">
-          {{ t('page.supporter.one_time_perks_heading', 'Includes supporter perks') }}
+          {{ t('page.supporter.one_time_perks_heading') }}
         </p>
         <ul class="mt-2 space-y-2">
           <li
