@@ -1,0 +1,472 @@
+{
+  "scope": "Native browser boundary only; not application acceptance",
+  "sourceSha256": "992efd5d807ca901b347292a7f46679a4654eb06beceeb1aeef1c7ff5dfa937e",
+  "repositorySha256": "9c68eef8088a53bd18dddff5135fbe280a8a201401d17dbeee9400b29d7cf930",
+  "browser": "Chrome/154.0.8037.97",
+  "actors": [
+    {
+      "actor": "w10-actor-a",
+      "pid": 35280
+    },
+    {
+      "actor": "w10-actor-b",
+      "pid": 41500
+    }
+  ],
+  "primitiveRace": {
+    "attempts": 100,
+    "lostUpdates": 6,
+    "failures": [
+      {
+        "order": [0, 1],
+        "round": 3,
+        "contention": {
+          "held": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-01-3:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-01-3:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true,
+        "freshRendererRead": "{\"pvp\":1,\"pve\":42,\"seasonal\":33,\"clock\":100}"
+      },
+      {
+        "order": [0, 1],
+        "round": 4,
+        "contention": {
+          "held": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-01-4:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-01-4:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true
+      },
+      {
+        "order": [0, 1],
+        "round": 5,
+        "contention": {
+          "held": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-01-5:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-01-5:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true
+      },
+      {
+        "order": [1, 0],
+        "round": 34,
+        "contention": {
+          "held": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-10-34:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-10-34:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true,
+        "freshRendererRead": "{\"pvp\":1,\"pve\":42,\"seasonal\":33,\"clock\":100}"
+      },
+      {
+        "order": [1, 0],
+        "round": 36,
+        "contention": {
+          "held": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-10-36:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-10-36:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true
+      },
+      {
+        "order": [1, 0],
+        "round": 49,
+        "contention": {
+          "held": [
+            {
+              "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+              "mode": "exclusive",
+              "name": "w10-10-49:mutation"
+            }
+          ],
+          "pending": [
+            {
+              "clientId": "770DBA98C438190CAD7477F235057877",
+              "mode": "exclusive",
+              "name": "w10-10-49:mutation"
+            }
+          ]
+        },
+        "raw": "{\"pvp\":20,\"pve\":42,\"seasonal\":33,\"clock\":100}",
+        "state": {
+          "pvp": 1,
+          "pve": 42,
+          "seasonal": 33,
+          "clock": 100
+        },
+        "lostUpdate": true
+      }
+    ]
+  },
+  "storageBarrier": [
+    {
+      "order": [0, 1],
+      "barrier": {
+        "eventValue": "{\"pvp\":20,\"pve\":55,\"seasonal\":33,\"clock\":500}",
+        "nativeRead": "{\"pvp\":20,\"pve\":55,\"seasonal\":33,\"clock\":500}"
+      },
+      "contention": {
+        "held": [
+          {
+            "clientId": "770DBA98C438190CAD7477F235057877",
+            "mode": "exclusive",
+            "name": "barrier-01:mutation"
+          }
+        ],
+        "pending": [
+          {
+            "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+            "mode": "exclusive",
+            "name": "barrier-01:mutation"
+          }
+        ]
+      },
+      "state": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    },
+    {
+      "order": [1, 0],
+      "barrier": {
+        "eventValue": "{\"pvp\":20,\"pve\":55,\"seasonal\":33,\"clock\":500}",
+        "nativeRead": "{\"pvp\":20,\"pve\":55,\"seasonal\":33,\"clock\":500}"
+      },
+      "contention": {
+        "held": [
+          {
+            "clientId": "D0E91DD381F04A8C3E71F520F4129108",
+            "mode": "exclusive",
+            "name": "barrier-10:mutation"
+          }
+        ],
+        "pending": [
+          {
+            "clientId": "770DBA98C438190CAD7477F235057877",
+            "mode": "exclusive",
+            "name": "barrier-10:mutation"
+          }
+        ]
+      },
+      "state": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    }
+  ],
+  "indexedDB": [
+    {
+      "order": [0, 1],
+      "firstSave": false,
+      "before": {
+        "pvp": 20,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "after": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "saved": true
+    },
+    {
+      "order": [0, 1],
+      "firstSave": false,
+      "abort": {
+        "saved": false
+      },
+      "retained": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    },
+    {
+      "order": [0, 1],
+      "firstSave": true,
+      "before": {
+        "pvp": 20,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "after": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "saved": true
+    },
+    {
+      "order": [0, 1],
+      "firstSave": true,
+      "abort": {
+        "saved": false
+      },
+      "retained": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    },
+    {
+      "order": [1, 0],
+      "firstSave": false,
+      "before": {
+        "pvp": 20,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "after": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "saved": true
+    },
+    {
+      "order": [1, 0],
+      "firstSave": false,
+      "abort": {
+        "saved": false
+      },
+      "retained": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    },
+    {
+      "order": [1, 0],
+      "firstSave": true,
+      "before": {
+        "pvp": 20,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "after": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      },
+      "saved": true
+    },
+    {
+      "order": [1, 0],
+      "firstSave": true,
+      "abort": {
+        "saved": false
+      },
+      "retained": {
+        "pvp": 1,
+        "pve": 55,
+        "seasonal": 33,
+        "clock": 500
+      }
+    }
+  ],
+  "repository": [
+    {
+      "order": [0, 1],
+      "rejected": {
+        "saved": false,
+        "reason": "revision"
+      },
+      "reset": {
+        "revision": 2,
+        "epochs": {
+          "pvp": 1,
+          "pve": 0,
+          "seasonal": 0
+        },
+        "levels": {
+          "pvp": 1,
+          "pve": 55,
+          "seasonal": 1
+        }
+      },
+      "abort": {
+        "failure": "AbortError",
+        "putSucceeded": true,
+        "saved": false,
+        "baseline": 2
+      },
+      "afterAbort": {
+        "revision": 2,
+        "levels": {
+          "pvp": 1,
+          "pve": 55,
+          "seasonal": 1
+        }
+      },
+      "removal": {
+        "deleted": true,
+        "state": null,
+        "epochs": {
+          "pvp": 2,
+          "pve": 1,
+          "seasonal": 1
+        },
+        "revision": 3
+      },
+      "reimport": {
+        "saved": false,
+        "reason": "deleted"
+      }
+    },
+    {
+      "order": [1, 0],
+      "rejected": {
+        "saved": false,
+        "reason": "revision"
+      },
+      "reset": {
+        "revision": 2,
+        "epochs": {
+          "pvp": 1,
+          "pve": 0,
+          "seasonal": 0
+        },
+        "levels": {
+          "pvp": 1,
+          "pve": 55,
+          "seasonal": 1
+        }
+      },
+      "abort": {
+        "failure": "AbortError",
+        "putSucceeded": true,
+        "saved": false,
+        "baseline": 2
+      },
+      "afterAbort": {
+        "revision": 2,
+        "levels": {
+          "pvp": 1,
+          "pve": 55,
+          "seasonal": 1
+        }
+      },
+      "removal": {
+        "deleted": true,
+        "state": null,
+        "epochs": {
+          "pvp": 2,
+          "pve": 1,
+          "seasonal": 1
+        },
+        "revision": 3
+      },
+      "reimport": {
+        "saved": false,
+        "reason": "deleted"
+      }
+    }
+  ]
+}
