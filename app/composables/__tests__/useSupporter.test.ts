@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
+import { resolveSupportBanner } from '@/features/dashboard/supportBanner';
 import { createDeferred } from '@/utils/test-helpers';
 const userState = reactive({
   id: 'user-1',
@@ -165,6 +166,51 @@ describe('useSupporter', () => {
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
     expect(mockChannel).toHaveBeenCalledOnce();
     supporter.unsubscribe();
+  });
+  it('hides the support banner after a rejected refresh clears a successful status read', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const banner = () =>
+      resolveSupportBanner({
+        userId: userState.id,
+        loadedUserId: supporter.loadedUserId.value,
+        supporter: supporter.supporter.value,
+        createdAt: null,
+        completedTasks: 20,
+        dismissedAt: null,
+      });
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(true);
+    expect(banner()).toBe('new');
+    mockMaybeSingle.mockRejectedValueOnce(new Error('offline'));
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(false);
+    expect(supporter.supporter.value).toBeNull();
+    expect(supporter.loadedUserId.value).toBeNull();
+    expect(banner()).toBeNull();
+  });
+  it('does not let a stale rejected refresh clear a newer successful status read', async () => {
+    const stale = createDeferred<{ data: null; error: null }>();
+    mockMaybeSingle.mockReturnValueOnce(stale.promise).mockResolvedValueOnce({
+      data: {
+        expires_at: '2030-01-01T00:00:00.000Z',
+        has_ever_supported: true,
+        started_at: '2026-01-01T00:00:00.000Z',
+        status: 'active',
+        tier: 'chad',
+        type: 'subscription',
+      },
+      error: null,
+    });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const staleRequest = supporter.fetchStatus('user-1');
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(true);
+    stale.reject(new Error('offline'));
+    await expect(staleRequest).resolves.toBe(false);
+    expect(supporter.loadedUserId.value).toBe('user-1');
+    expect(supporter.supporter.value?.tier).toBe('chad');
+    expect(supporter.error.value).toBeNull();
+    expect(supporter.loading.value).toBe(false);
   });
   it('does not apply a stale status response after reset', async () => {
     const deferred = createDeferred<{

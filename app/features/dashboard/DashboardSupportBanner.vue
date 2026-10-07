@@ -36,7 +36,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useStorage } from '@vueuse/core';
+  import { useNow, useStorage } from '@vueuse/core';
   import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useSupporter } from '@/composables/useSupporter';
   import { resolveSupportBanner } from '@/features/dashboard/supportBanner';
@@ -47,6 +47,7 @@
   const { supporter, loadedUserId } = useSupporter();
   const { trackEvent } = useAnalyticsEvents();
   const dismissedAt = useStorage<string | null>(STORAGE_KEYS.supportBannerDismissedAt, null);
+  const now = useNow({ interval: 1000 });
   const variant = computed(() =>
     resolveSupportBanner({
       userId: $supabase.user?.loggedIn ? ($supabase.user.id ?? null) : null,
@@ -55,6 +56,7 @@
       createdAt: $supabase.user?.createdAt ?? null,
       completedTasks: props.completedTasks,
       dismissedAt: dismissedAt.value,
+      nowMs: now.value.getTime(),
     })
   );
   function dismiss() {

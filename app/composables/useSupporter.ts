@@ -106,6 +106,7 @@ export function useSupporter() {
       if (!isCurrentStatusRequest(userId, requestVersion)) return false;
       error.value = e instanceof Error ? e.message : 'Failed to load supporter status';
       supporterState.value = null;
+      statusLoadedForUserId.value = null;
       return false;
     } finally {
       finishStatusRequest(userId, requestVersion, success);
