@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import * as billing from './stripeBilling.ts';
 import * as retention from './stripeRetention.ts';
+import * as oneTime from './stripeOneTime.ts';
 import * as tiers from './stripeTier.ts';
 type Row = Record<string, unknown>;
 const userId = '0bcd1234-1234-1234-1234-123456789abc';
@@ -29,7 +30,12 @@ const compiled = ts.transpileModule(
 function createHarness(
   initial: Row,
   resources: Record<string, unknown>,
-  options: { discord?: boolean; grant?: () => Promise<void>; remove?: () => Promise<void> } = {}
+  options: {
+    discord?: boolean;
+    grant?: () => Promise<void>;
+    remove?: () => Promise<void>;
+    readError?: boolean;
+  } = {}
 ) {
   let row: Row = { ...initial };
   const writes: Row[] = [];
@@ -38,11 +44,14 @@ function createHarness(
     let values: Row | null = null;
     let filters: Array<[string, unknown]> = [];
     let action = 'read';
+    let columns = '';
     const result = () => {
       if (table === 'discord_account_links' && options.discord) {
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
       if (table !== 'supporters') return { data: null, error: null };
+      if (options.readError && columns.includes('last_contribution_at'))
+        return { data: null, error: { message: 'down' } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
@@ -51,7 +60,10 @@ function createHarness(
       return { data: { ...row }, error: null };
     };
     const builder = {
-      select: () => builder,
+      select: (selected = '') => {
+        columns = selected;
+        return builder;
+      },
       eq: (key: string, value: unknown) => {
         filters.push([key, value]);
         return builder;
@@ -100,6 +112,7 @@ function createHarness(
       }
       if (name.endsWith('stripeBilling.ts')) return billing;
       if (name.endsWith('stripeRetention.ts')) return retention;
+      if (name.endsWith('stripeOneTime.ts')) return oneTime;
       if (name.endsWith('stripeTier.ts')) return tiers;
       if (name.endsWith('cors.ts')) return {};
       return {
@@ -286,6 +299,36 @@ describe('payment-specific webhook fulfillment', () => {
       has_ever_supported: true,
     });
     expect(harness.fetch.mock.calls.some(([url]) => url.includes('/charges?'))).toBe(false);
+  });
+  it('limits one-time checkout perks by amount and keeps grandfathered open access', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
+    const paid = { ...session, amount_total: 1200, created: 1791331260 };
+    const harness = createHarness(supporter, resources);
+    await harness.dispatch('checkout.session.completed', paid);
+    expect(harness.current().expires_at).toBe(
+      new Date((paid.created + 90 * 86_400) * 1000).toISOString()
+    );
+    const legacy = { ...supporter, status: 'active', expires_at: null };
+    const grandfathered = createHarness(legacy, resources);
+    await grandfathered.dispatch('checkout.session.completed', paid);
+    expect(grandfathered.current()).toMatchObject({ status: 'active', expires_at: null });
+  });
+  it('retries instead of overwriting purchased time when the supporter read fails', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
+    const harness = createHarness(supporter, resources, { readError: true });
+    await expect(
+      harness.dispatch('checkout.session.completed', { ...session, created: 1791374400 })
+    ).rejects.toThrow('Supporter lookup failed');
+    expect(harness.writes).toHaveLength(0);
+  });
+  it('keeps open-ended one-time access for checkouts paid before the change', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
+    const harness = createHarness(supporter, resources);
+    await harness.dispatch('checkout.session.completed', { ...session, amount_total: 300 });
+    expect(harness.current()).toMatchObject({ status: 'active', expires_at: null });
   });
 });
 describe('webhook Discord chargeback fencing', () => {

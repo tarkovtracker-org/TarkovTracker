@@ -386,7 +386,7 @@ authentication.
 | `mode`     | string | Yes          | `subscription` or `payment`      |
 | `tier`     | string | Subscription | `scav`, `timmy`, or `chad`       |
 | `interval` | string | Subscription | `monthly`, `6month`, or `yearly` |
-| `amount`   | number | One-time     | USD amount (min 1, max 999)      |
+| `amount`   | number | One-time     | USD amount (min 4, max 520)      |
 
 **Response:**
 

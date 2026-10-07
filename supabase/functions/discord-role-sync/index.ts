@@ -18,8 +18,8 @@ type Supporter = {
 };
 function isActive(supporter: Supporter | null): boolean {
   if (!supporter) return false;
-  if (supporter.status === 'active') return true;
-  if (supporter.status !== 'past_due' || !supporter.expires_at) return false;
+  if (supporter.status === 'active' && !supporter.expires_at) return true;
+  if (!['active', 'past_due'].includes(supporter.status) || !supporter.expires_at) return false;
   const expiresAt = Date.parse(supporter.expires_at);
   return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }

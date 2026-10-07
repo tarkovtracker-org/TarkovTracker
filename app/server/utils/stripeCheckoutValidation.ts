@@ -2,7 +2,7 @@ import { createError } from 'h3';
 export const VALID_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 const VALID_INTERVALS = ['monthly', '6month', 'yearly'] as const;
 const VALID_MODES = ['payment', 'subscription'] as const;
-export const MIN_ONE_TIME_CENTS = 300;
+export const MIN_ONE_TIME_CENTS = 400;
 export const MAX_ONE_TIME_CENTS = 52_000;
 export type CheckoutTier = (typeof VALID_TIERS)[number];
 export type CheckoutInterval = (typeof VALID_INTERVALS)[number];

@@ -34,6 +34,7 @@ import {
   stripeInvoicePaymentCount,
   withFreshStripeRoleGrant,
 } from '../_shared/stripeRetention.ts';
+import { oneTimeExpiresAt, type OneTimeSupporter } from '../_shared/stripeOneTime.ts';
 import {
   getTierPriceConfig,
   isSupporterTier,
@@ -364,13 +365,14 @@ async function activateSupporterFromSession(session: any, source: string): Promi
   const discordUserId = await getDiscordUserId(userId);
   // Preserve started_at across re-subscriptions so renewal/upgrade flows
   // don't reset the original support date. Only set it when the row is new.
-  const { data: existing } = await eventClient()
+  const { data: existing, error: existingError } = await eventClient()
     .from('supporters')
     .select(
-      'started_at, status, type, stripe_subscription_id, stripe_customer_id, tier, expires_at'
+      'started_at, status, type, stripe_subscription_id, stripe_customer_id, tier, expires_at, last_contribution_at'
     )
     .eq('user_id', userId)
     .maybeSingle();
+  if (existingError) throw new Error(`Supporter lookup failed: ${existingError.message}`);
   const startedAt = existing?.started_at ?? new Date().toISOString();
   // Guard: do not overwrite a subscription (active OR in grace period) with
   // one-time payment fields. past_due subscribers are still subscribers.
@@ -399,7 +401,13 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     discord_user_id: discordUserId,
     amount_total: session.amount_total || 0,
     started_at: startedAt,
-    expires_at: hasLiveSubscription && !isSubscription ? existing.expires_at : null,
+    expires_at: activationExpiresAt(
+      hasLiveSubscription ? existing.expires_at : undefined,
+      isSubscription,
+      existing,
+      session.amount_total || 0,
+      contributionDate
+    ),
     updated_at: new Date().toISOString(),
   };
   const { data: activated, error } = await eventClient()
@@ -419,6 +427,17 @@ async function activateSupporterFromSession(session: any, source: string): Promi
   console.info(
     `[stripe-webhook] Supporter activated (${source}): ${userId} tier=${effectiveTier} type=${record.type}`
   );
+}
+function activationExpiresAt(
+  liveSubscriptionExpiry: string | null | undefined,
+  isSubscription: boolean,
+  existing: OneTimeSupporter,
+  amountCents: number,
+  contributionDate: string | null
+): string | null {
+  if (isSubscription) return null;
+  if (liveSubscriptionExpiry !== undefined) return liveSubscriptionExpiry;
+  return oneTimeExpiresAt(existing, amountCents, contributionDate, new Date());
 }
 async function verifyCheckoutSubscriptionPayment(
   subscription: StripeSubscription,
@@ -1281,7 +1300,11 @@ async function deliverEvent(event: StripeEvent, req: Request): Promise<Response>
   }
   return await respondToClaim(event, claim, req);
 }
-async function respondToClaim(event: StripeEvent, claim: EventClaim, req: Request): Promise<Response> {
+async function respondToClaim(
+  event: StripeEvent,
+  claim: EventClaim,
+  req: Request
+): Promise<Response> {
   if (['completed', 'terminal'].includes(claim.outcome)) {
     return jsonResponse({ received: true, duplicate: true }, 200, req);
   }
@@ -1294,7 +1317,11 @@ async function respondToClaim(event: StripeEvent, claim: EventClaim, req: Reques
   }
   return await processClaimedEvent(event, claim.token, req);
 }
-async function processClaimedEvent(event: StripeEvent, token: string, req: Request): Promise<Response> {
+async function processClaimedEvent(
+  event: StripeEvent,
+  token: string,
+  req: Request
+): Promise<Response> {
   try {
     await processingClient.run(fencedClient(event.id, token), () => dispatchEvent(event));
     await finishEvent(event.id, token, 'completed');
@@ -1303,7 +1330,12 @@ async function processClaimedEvent(event: StripeEvent, token: string, req: Reque
   }
   return jsonResponse({ received: true }, 200, req);
 }
-async function respondToFailure(event: StripeEvent, token: string, err: unknown, req: Request): Promise<Response> {
+async function respondToFailure(
+  event: StripeEvent,
+  token: string,
+  err: unknown,
+  req: Request
+): Promise<Response> {
   const outcome = err instanceof PermanentError ? 'terminal' : 'retryable';
   try {
     await finishEvent(event.id, token, outcome);
