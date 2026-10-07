@@ -619,6 +619,158 @@ References: [CREATE INDEX](https://www.postgresql.org/docs/17/sql-createindex.ht
 - Platform-managed extensions (`pg_graphql`, `pg_net`) differ between the local stack and prod;
   migrations do not control these and the difference is expected.
 
+### Platform-owned public relation defaults
+
+The client-access invariant in [progress storage](./systems/progress-storage.md#invariants)
+covers the reserved creating role tracked by [#1133](https://github.com/tarkovtracker-org/TarkovTracker/issues/1133).
+Customer migrations run as `postgres`; that role cannot change `supabase_admin` default ACLs
+without membership or superuser authority. Supabase's
+[existing-project opt-in procedure](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+targets only `postgres`. Its announced platform rollout is not evidence that this project's
+reserved-role defaults have changed. No supported customer operation for that change was found
+in the documented procedure. Do not grant reserved-role membership, escalate credentials, or
+install privileged hooks to work around the boundary.
+
+Platform extension installation is a relevant creation path, even when requested by `postgres`.
+[Supautils delegates privileged extension creation to its configured superuser](https://github.com/supabase/supautils/blob/df32bd65e4d13212bf812ee966a51132d034bc17/README.md#privileged-extensions);
+this project's installed configuration names `supabase_admin`. Extension member relations
+placed in `public` can therefore inherit that role's defaults. This is a possible future-object
+exposure, not evidence of an existing platform-owned public table. Supabase also uses the role
+for [internal upgrades and automations](https://supabase.com/docs/guides/database/postgres/roles#supabase_admin);
+the current inventory cannot guarantee the schemas or owners of future platform objects.
+
+**Operational policy**
+
+- Create application relations through reviewed `postgres` migrations with explicit client
+  grants, RLS where applicable, and the required service-role grants. The separate
+  [#1134](https://github.com/tarkovtracker-org/TarkovTracker/pull/1134) handles existing application
+  grants and `postgres` table/view defaults; do not infer its deployment from this audit.
+- Install extensions in a schema outside the configured Data API exposed schemas where supported;
+  review fixed-schema extensions individually. Check the target schema, dependencies and expected
+  creating role before enabling or upgrading an extension. Do not assume `extensions` is
+  unexposed merely because of its name. Supabase's
+  [PostGIS guide](https://supabase.com/docs/guides/database/extensions/postgis) recommends a
+  dedicated schema instead of `public`.
+- Repeat the catalog checks below before and after extension changes, platform/database upgrades,
+  restores, and any observation of a new platform-owned public relation. Compare owners and
+  extension membership, not only relation names. Also collect `scripts/ops/prod-db schema` for
+  column ACLs and effective inherited/PUBLIC grants, and inspect RLS policies and view security
+  settings before accepting client access.
+- If a platform-owned public relation appears, stop the related feature rollout until its actual
+  client access and service-role requirements are reviewed. Use a forward migration for
+  customer-authorized per-object grants/revokes only when the catalog confirms grant authority.
+  Otherwise request remediation through Supabase Support: provide the project ref, creating role,
+  global/public ACL readback, relation/extension identity and required service-role access; ask
+  whether the feature can use an unexposed schema and whether provider-side default changes are
+  supported. Do not report provider remediation as completed without a response and readback.
+- Preserve service-role DML on application tables and required view/sequence access. After any
+  approved remediation, rerun these checks and the affected feature smoke tests; absence of client
+  defaults alone is insufficient. A catalog grant does not prove a view is updatable or a request
+  succeeds through the Data API.
+
+**Read-only catalog checks**
+
+Verify the target using the [production inspection procedure](#database-migrations) first.
+Use authenticated Supabase MCP for the following catalog-only SELECTs when the dedicated observer
+does not expose default ACLs. Never pass privileged credentials to the observer. Record the project
+ref, Git revision, capture time and results. Query errors, missing expected roles or an unexpected
+inventory are incomplete evidence, not a passing audit.
+
+Confirm the role boundary and extension delegation:
+
+```sql
+SELECT current_timestamp AS captured_at, current_database() AS database_name,
+       current_user AS execution_role, r.rolsuper AS postgres_superuser,
+       pg_has_role('postgres', 'supabase_admin', 'MEMBER') AS postgres_member_of_supabase_admin,
+       pg_has_role('postgres', 'supabase_admin', 'SET') AS postgres_can_set_supabase_admin,
+       current_setting('supautils.privileged_extensions_superuser', true) AS extension_creating_role
+FROM pg_catalog.pg_roles r
+WHERE r.rolname = 'postgres';
+```
+
+Inventory table/view defaults for **every creating role**, both global and `public` scopes.
+Schema defaults add to global defaults; a schema-only revoke cannot cancel a global grant.
+[PostgreSQL default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html)
+apply when objects are created, not retrospectively. An absent `pg_default_acl` entry means
+PostgreSQL's built-in defaults, not missing owner privileges; for tables these do not grant client
+access. Check grants to `PUBLIC` and roles inherited by the client roles as well as direct grants.
+
+```sql
+SELECT pg_get_userbyid(d.defaclrole) AS creating_role,
+       CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
+       CASE WHEN a.grantee IS NULL THEN '(empty ACL)'
+            WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,
+       coalesce(array_agg(a.privilege_type ORDER BY a.privilege_type)
+         FILTER (WHERE a.privilege_type IS NOT NULL), ARRAY[]::text[]) AS privileges,
+       coalesce(bool_or(a.is_grantable), false) AS has_grant_option
+FROM pg_catalog.pg_default_acl d
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+LEFT JOIN LATERAL pg_catalog.aclexplode(nullif(d.defaclacl, '{}'::aclitem[])) a ON true
+WHERE d.defaclobjtype = 'r'
+  AND (d.defaclnamespace = 0 OR n.nspname = 'public')
+GROUP BY d.defaclrole, d.defaclnamespace, n.nspname, a.grantee
+ORDER BY creating_role, scope, grantee;
+```
+
+Inventory public tables, partitions, views, materialized views, foreign tables and sequences,
+including extension membership and effective relation-level access (schema USAGE included).
+This complements rather than replaces the observer's column-grant report.
+
+```sql
+SELECT c.relname AS relation, c.relkind AS kind,
+       pg_get_userbyid(c.relowner) AS owner, e.extname AS extension,
+       c.relrowsecurity AS rls_enabled,
+       (SELECT jsonb_object_agg(r.rolname, ARRAY(
+          SELECT p.privilege
+          FROM unnest(CASE WHEN c.relkind = 'S'
+            THEN ARRAY['SELECT', 'USAGE', 'UPDATE']
+            ELSE ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE',
+                       'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']
+          END) AS p(privilege)
+          WHERE pg_catalog.has_schema_privilege(r.oid, n.oid, 'USAGE')
+            AND CASE WHEN c.relkind = 'S'
+              THEN pg_catalog.has_sequence_privilege(r.oid, c.oid, p.privilege)
+              ELSE pg_catalog.has_table_privilege(r.oid, c.oid, p.privilege)
+            END
+          ORDER BY p.privilege
+        ))
+        FROM pg_catalog.pg_roles r
+        WHERE r.rolname IN ('anon', 'authenticated', 'service_role')
+       ) AS effective_relation_privileges
+FROM pg_catalog.pg_class c
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_catalog.pg_depend dep
+  ON dep.classid = 'pg_catalog.pg_class'::regclass AND dep.objid = c.oid
+ AND dep.objsubid = 0 AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
+ AND dep.deptype = 'e'
+LEFT JOIN pg_catalog.pg_extension e ON e.oid = dep.refobjid
+WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S')
+ORDER BY owner, relation;
+```
+
+**Production readback — 2026-10-07**
+
+Authenticated MCP project discovery verified `knptqelvsodccnoehmbj` as TarkovTracker.org,
+host `db.knptqelvsodccnoehmbj.supabase.co`, PostgreSQL 17.6.1.048. Catalog SELECTs at
+05:27–05:30 UTC were collected from checkout `3e5cab49`; no production mutation was performed.
+
+- Execution role `postgres`: not a superuser; neither MEMBER of nor able to SET ROLE to
+  `supabase_admin`. Privileged extension creation is configured to use `supabase_admin`.
+- No global table-default ACL entries. Both `postgres` and `supabase_admin` have `public`
+  table defaults granting SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER and
+  MAINTAIN to `anon`, `authenticated`, `postgres` and `service_role`, without grant option.
+  These are pre-#1134 defaults, not a successful hardening readback.
+- All 19 public tables and two views are owned by `postgres`; no public sequences or extension
+  member relations were found. Service-role schema USAGE and SELECT/INSERT/UPDATE/DELETE are
+  effective on all 21 relations. All 19 tables have RLS enabled; the two view RLS flags are false,
+  which does not describe the underlying tables' policies or the views' security settings.
+- Eight installed extensions: `hypopg`, `index_advisor`, `pg_cron`, `plpgsql` and
+  `supabase_vault` owned by `supabase_admin`; `pg_stat_statements`, `pgcrypto` and
+  `uuid-ossp` owned by `postgres`. None has `public` as its extension namespace.
+- Supported outcome for #1133: retain provider-owned defaults under this operational policy and
+  re-audit on the triggers above. No provider support response or reserved-role default change is
+  claimed. Application-grant rollout and readback remain owned by #663/#1134.
+
 ### Progress transfer and freshness rollout
 
 For `20260906174817_suppress_unchanged_progress_writes.sql` and
