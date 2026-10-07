@@ -61,6 +61,21 @@ sequenceDiagram
    infrastructure protection, not a customer quota, and fails open on binding errors.
 3. **Token auth.** `workers/api-gateway/src/auth.ts` validates the bearer token against
    `api_tokens` by hash and checks the permission (`GP`/`TP`/`WP`).
+   After successful validation, the request's `ExecutionContext.waitUntil` retains the entire
+   lifetime-accounting operation, including any permitted fallback, without blocking the response.
+   This attempts one atomic `increment_token_usage` RPC before daily-quota enforcement, so valid
+   tokens count even when later throttled or rejected by input validation. Invalid, inactive,
+   expired, mode-mismatched, or permission-denied tokens do not count. Calls without a Worker
+   execution context await accounting rather than leaving an unowned promise.
+   Each accounting request has a three-second timeout covering headers and body handling; only
+   a bounded error body (at most 1 KiB) is parsed. HTTP 404 with PostgREST code `PGRST202` confirms
+   a missing RPC and permits one timestamp-only PATCH. That fallback does not recover the lost
+   `usage_count` increment. Network errors, timeouts, authorization errors, other HTTP failures,
+   and malformed/oversized missing-RPC responses never trigger an increment retry or fallback:
+   the original increment may already have committed. Failures and timestamp-only outcomes emit
+   `token_usage_outcome` with a fixed operation/outcome and optional HTTP status, without tokens,
+   keys, user payloads, response bodies, or exception messages. Accounting stays best effort:
+   `waitUntil` is bounded by the runtime and does not provide durable or exactly-once delivery.
 4. **Tier + daily quota.** `resolveTier` reads `public.supporters` (cached 60s), then a single
    `ApiGatewayRateLimiter` Durable Object call (`daily-{kind}:{user_id}`, UTC-day anchor, retained)
    admits or denies the request. The quota counts admitted requests — downstream Supabase failures

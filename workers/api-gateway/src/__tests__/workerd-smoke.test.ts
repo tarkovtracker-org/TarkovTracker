@@ -134,6 +134,67 @@ describe('api-gateway workerd smoke', () => {
     await harness?.close();
     vi.unstubAllGlobals();
   }, 30_000);
+  it.each([204, 503])(
+    'retains delayed lifetime fallback after the response (PATCH %s)',
+    async (status) => {
+      if (!harness) throw new Error('Test harness did not start');
+      const requests: OutboundRequest[] = [];
+      const unhandledUrls: string[] = [];
+      const outbound = createOutboundFetchMock(requests, unhandledUrls);
+      let releaseIncrement!: () => void;
+      let releaseFallback!: () => void;
+      const incrementGate = new Promise<void>((resolve) => {
+        releaseIncrement = resolve;
+      });
+      const fallbackGate = new Promise<void>((resolve) => {
+        releaseFallback = resolve;
+      });
+      let fallbackStarted = false;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = requestUrl(input);
+          const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+          if (url.endsWith('/rpc/increment_token_usage')) {
+            await incrementGate;
+            return new Response(JSON.stringify({ code: 'PGRST202' }), { status: 404 });
+          }
+          if (method === 'PATCH' && url.includes('/api_tokens?')) {
+            fallbackStarted = true;
+            await fallbackGate;
+            return new Response(null, { status });
+          }
+          return outbound(input, init);
+        })
+      );
+      try {
+        const response = await harness.getWorker().fetch('https://api.tarkovtracker.org/token', {
+          headers: { Authorization: 'Bearer SZN_workerd_test', 'User-Agent': 'RuntimeSmoke/1.0' },
+        });
+        expect(response.status).toBe(200);
+        await response.text();
+        // Increment is still held upstream after the client has consumed the response.
+        expect(JSON.stringify(harness.getLogs())).not.toContain('token_usage_outcome');
+        releaseIncrement();
+        await vi.waitFor(() => expect(fallbackStarted).toBe(true));
+        // Workerd resumed the retained chain after the response, but it cannot report
+        // fallback completion while its upstream gate remains held.
+        expect(JSON.stringify(harness.getLogs())).not.toContain('timestamp_fallback');
+        releaseFallback();
+        await vi.waitFor(() => {
+          const logs = JSON.stringify(harness!.getLogs());
+          expect(logs).toContain('timestamp_fallback');
+          expect(logs).toContain(status === 204 ? 'timestamp_only' : 'transient');
+          expect(logs).not.toContain('service-key');
+        });
+        expect(unhandledUrls).toEqual([]);
+      } finally {
+        releaseIncrement();
+        releaseFallback();
+      }
+    },
+    30_000
+  );
   it('executes the Seasonal progress path with production configuration', async () => {
     if (!harness) throw new Error('Test harness did not start');
     const requests: OutboundRequest[] = [];
