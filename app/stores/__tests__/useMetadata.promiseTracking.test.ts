@@ -155,4 +155,86 @@ describe('useMetadataStore promise tracking', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(store.tasks.map((task) => task.id)).toEqual(['task-1']);
   });
+  it('passes cancellation to the network and rejects without applying data or errors', async () => {
+    const store = useMetadataStore();
+    const controller = new AbortController();
+    let resolveFetch!: (value: { data: TarkovTasksCoreQueryResult }) => void;
+    const fetchMock = vi.fn().mockImplementation((_endpoint, options) => {
+      expect(options.signal).toBe(controller.signal);
+      return new Promise((resolve) => {
+        resolveFetch = resolve;
+      });
+    });
+    vi.stubGlobal('$fetch', fetchMock);
+    const process = vi.spyOn(store, 'processTasksCoreData');
+    const request = store.fetchTasksCoreData(true, controller.signal);
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    resolveFetch({ data: tasksCorePayload() });
+    await rejected;
+    expect(process).not.toHaveBeenCalled();
+    expect(cacheUtils.setCachedData).not.toHaveBeenCalled();
+    expect(store.error).toBeNull();
+  });
+  it('never starts network work when aborted during an IndexedDB lookup', async () => {
+    const store = useMetadataStore();
+    const controller = new AbortController();
+    let resolveCache!: (value: null) => void;
+    vi.mocked(cacheUtils.getCachedData).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCache = resolve;
+      })
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal('$fetch', fetchMock);
+    const request = store.fetchTasksCoreData(false, controller.signal);
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    resolveCache(null);
+    await rejected;
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(store.error).toBeNull();
+  });
+  it('cancels a pending network request without reporting a fetch error', async () => {
+    const store = useMetadataStore();
+    const controller = new AbortController();
+    const fetchMock = vi.fn(
+      (_endpoint, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+            once: true,
+          });
+        })
+    );
+    vi.stubGlobal('$fetch', fetchMock);
+    const request = store.fetchHideoutData(true, controller.signal);
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await rejected;
+    expect(store.hideoutError).toBeNull();
+    expect(store.hideoutLoading).toBe(false);
+  });
+  it('checks the target locale cache without changing the active language', async () => {
+    const store = useMetadataStore();
+    const lookup = vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
+    expect(await store.hasCriticalLocaleCache('de')).toBe(false);
+    expect(lookup).toHaveBeenCalledWith('de');
+    expect(store.languageCode).toBe('en');
+  });
+  it('requires all switch datasets before treating a locale as cached', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue({ scope: 'regular-de' } as never);
+    vi.mocked(cacheUtils.getCachedData).mockImplementation(async (type) =>
+      type === 'tasks-rewards' ? null : {}
+    );
+    expect(await store.hasCriticalLocaleCache('de')).toBe(false);
+    vi.mocked(cacheUtils.getCachedData).mockResolvedValue({});
+    expect(await store.hasCriticalLocaleCache('de')).toBe(true);
+    expect(cacheUtils.getCachedData).toHaveBeenCalledWith(
+      'tasks-objectives',
+      'json-v3-regular',
+      'de'
+    );
+    expect(cacheUtils.getCachedData).toHaveBeenCalledWith('bootstrap', 'json-v2-regular', 'en');
+  });
 });

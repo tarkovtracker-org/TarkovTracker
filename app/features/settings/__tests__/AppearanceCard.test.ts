@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import AppearanceCard from '@/features/settings/AppearanceCard.vue';
 import type { ThemeMode } from '@/utils/theme';
 const { mockState, setters } = vi.hoisted(() => ({
@@ -24,6 +25,19 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (key: string) => key,
   }),
 }));
+const pending = ref(false);
+const status = ref('');
+const selectLocale = vi.fn();
+vi.mock('@/composables/useLocaleSwitch', () => ({
+  useLocaleSwitch: () => ({
+    locale: ref('en'),
+    availableLocales: ['en', 'de'],
+    pending,
+    status,
+    isDisabled: (code: string) => pending.value || (code === 'de' && status.value !== ''),
+    selectLocale,
+  }),
+}));
 const stubs = {
   GenericCard: {
     template: '<section><h2>{{ title }}</h2><slot name="content" /></section>',
@@ -44,6 +58,9 @@ describe('AppearanceCard', () => {
   beforeEach(() => {
     mockState.themeMode = 'dark';
     setters.setThemeMode.mockClear();
+    pending.value = false;
+    status.value = '';
+    selectLocale.mockClear();
   });
   it('renders dark and light options in a fieldset', () => {
     const wrapper = mountCard();
@@ -63,7 +80,7 @@ describe('AppearanceCard', () => {
   });
   it('uses a separate offset focus outline without replacing the selection ring', () => {
     const wrapper = mountCard();
-    const labels = wrapper.findAll('label');
+    const labels = wrapper.findAll('fieldset label');
     expect(labels).toHaveLength(2);
     for (const label of labels) {
       expect(label.classes()).toContain('focus-within:outline-2');
@@ -98,5 +115,26 @@ describe('AppearanceCard', () => {
     const wrapper = mountCard();
     await wrapper.findAll('input[type="radio"]')[0]!.trigger('change');
     expect(setters.setThemeMode).toHaveBeenCalledWith('dark');
+  });
+  it('renders native language options and uses the shared locale action', async () => {
+    const wrapper = mountCard();
+    expect(wrapper.findAll('option').map((option) => option.text())).toEqual([
+      'English',
+      'Deutsch',
+    ]);
+    await wrapper.get('select').setValue('de');
+    expect(selectLocale).toHaveBeenCalledWith('de');
+  });
+  it('disables the selector while loading and exposes shared feedback', async () => {
+    pending.value = true;
+    status.value = 'Loading language';
+    const wrapper = mountCard();
+    expect(wrapper.get('select').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[role="status"]').text()).toBe('Loading language');
+    pending.value = false;
+    status.value = 'Wait 10s';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('select').attributes('disabled')).toBeUndefined();
+    expect(wrapper.get('option[value="de"]').attributes('disabled')).toBeDefined();
   });
 });
