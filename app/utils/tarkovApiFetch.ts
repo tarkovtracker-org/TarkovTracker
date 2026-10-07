@@ -25,9 +25,9 @@ import { logger } from '@/utils/logger';
  * remembered, so the next caller-initiated request probes again.
  */
 /** Single-flight initial access probe, answered by the server with `{ ok: true }`. */
-export const ACCESS_CHECK_ENDPOINT = '/api/tarkov/access-check';
+const ACCESS_CHECK_ENDPOINT = '/api/tarkov/access-check';
 /** Siteverify relay; strictly verifies the gate's Turnstile token server-side. */
-export const TARKOV_VERIFY_ENDPOINT = '/api/security/tarkov-verify';
+const TARKOV_VERIFY_ENDPOINT = '/api/security/tarkov-verify';
 /** Turnstile widget action bound to the access gate.
  *
  * MUST equal the server-side `TARKOV_DATA_ACCESS_ACTION` (app/server/utils/turnstile.ts):
@@ -35,8 +35,8 @@ export const TARKOV_VERIFY_ENDPOINT = '/api/security/tarkov-verify';
  * as a mirrored literal because that server module is not bundled for the browser.
  */
 export const TARKOV_ACCESS_WIDGET_ACTION = 'tarkov_data_access';
-export const ACCESS_CHECK_TIMEOUT_MS = 15_000;
-export const SITEVERIFY_TIMEOUT_MS = 15_000;
+const ACCESS_CHECK_TIMEOUT_MS = 15_000;
+const SITEVERIFY_TIMEOUT_MS = 15_000;
 const CHALLENGE_MITIGATION_HEADER = 'cf-mitigated';
 const CHALLENGE_MITIGATION_VALUE = 'challenge';
 const STATUS_BODY_SNIPPET_MAX = 100;
@@ -64,7 +64,7 @@ export type TarkovAccessPhase =
   | 'failed';
 export type TarkovAccessFailureKind =
   'challenge' | 'challenge_exhausted' | 'blocked' | 'rate_limited' | 'failed';
-export interface TarkovAccessRuntimeConfig {
+interface TarkovAccessRuntimeConfig {
   /** Contract default is false; the config owner decides how it is provisioned. */
   tarkovAccessEnabled?: boolean | string;
   tarkovAccessSiteKey?: string;
@@ -189,7 +189,7 @@ export const buildTarkovApiUrl = (
   return url.toString();
 };
 /** True when Cloudflare mitigated the response with an interactive challenge. */
-export const isChallengeMitigated = (response: Response): boolean =>
+const isChallengeMitigated = (response: Response): boolean =>
   (response.headers.get(CHALLENGE_MITIGATION_HEADER) ?? '').trim().toLowerCase() ===
   CHALLENGE_MITIGATION_VALUE;
 const readStatusBodySnippet = async (response: Response): Promise<string> => {

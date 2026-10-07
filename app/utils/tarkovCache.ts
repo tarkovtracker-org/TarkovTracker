@@ -33,7 +33,7 @@ export type CacheType =
   | 'map-spawns'
   | 'prestige'
   | 'editions';
-export interface CachedData<T> {
+interface CachedData<T> {
   data: T;
   timestamp: number;
   ttl: number;

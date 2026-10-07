@@ -16,64 +16,8 @@
  * Only use these constants when the above scenarios apply.
  */
 /**
- * Core theme colors matching Tailwind v4 tokens.
- * HSL format for consistency with CSS custom properties.
- *
- * Source of truth: app/assets/css/tailwind.css @theme
- */
-export const THEME_COLORS = {
-  // Selection palette (violet) - for highlights, pinned states, focus rings
-  // CSS var: --color-selection-*
-  selection: {
-    500: 'hsl(262 83% 58%)',
-  },
-  // Status colors
-  // CSS var: --color-error-*
-  error: {
-    500: 'hsl(0 84.2% 60.2%)',
-  },
-  // CSS var: --color-warning-*
-  warning: {
-    500: 'hsl(38 92.1% 50.2%)',
-  },
-  // CSS var: --color-success-*
-  success: {
-    500: 'hsl(150 59.2% 41.4%)',
-  },
-  // CSS var: --color-info-*
-  info: {
-    400: 'hsl(205 70% 55%)',
-    500: 'hsl(205 70% 45%)',
-  },
-  // Accent colors (not in theme, but used for map markers)
-  sky: {
-    400: 'hsl(198 93.2% 59.6%)',
-    600: 'hsl(200 98% 39.4%)',
-  },
-  // Surface colors
-  // CSS var: --color-surface-*
-  surface: {
-    900: 'hsl(0 0% 7.1%)',
-    800: 'hsl(240 5.1% 11.6%)',
-    700: 'hsl(240 5.1% 19.4%)',
-  },
-  // Neutral colors
-  neutral: {
-    white: 'hsl(0 0% 100%)',
-    black: 'hsl(240 5.1% 4%)',
-    gray200: 'hsl(0 0% 90%)',
-  },
-  // Secondary
-  // CSS var: --color-secondary-*
-  secondary: {
-    400: 'hsl(185 50% 50%)',
-    500: 'hsl(185 50% 40%)',
-    600: 'hsl(185 50% 34%)',
-  },
-} as const;
-/**
  * Map-specific color constants for Leaflet markers and overlays.
- * These are derived from THEME_COLORS for semantic naming in map context.
+ * These mirror the Tailwind theme tokens with semantic naming for map context.
  *
  * Note: Leaflet's JS API requires raw color strings for options like `color`
  * and `fillColor`, not CSS variable references. These constants provide
@@ -113,7 +57,7 @@ export type MapMarkerColorKey = keyof typeof MAP_MARKER_COLORS;
 export type MapMarkerColors = Record<MapMarkerColorKey, string>;
 export type MapColorOption = { key: MapMarkerColorKey; label: string };
 type MapColorOptionTranslator = (key: string) => string;
-export const MAP_MARKER_COLOR_KEYS = Object.keys(MAP_MARKER_COLORS) as MapMarkerColorKey[];
+const MAP_MARKER_COLOR_KEYS = Object.keys(MAP_MARKER_COLORS) as MapMarkerColorKey[];
 // Frozen pre-PINNED_OBJECTIVE snapshot used by hasExactLegacyDefaults; persisted
 // legacy palettes lack newer keys, so never add new marker colors to this list.
 const LEGACY_MAP_MARKER_COLOR_KEYS: MapMarkerColorKey[] = [

@@ -1,4 +1,4 @@
-export const SETTINGS_ROUTE_PATHS = new Set([
+const SETTINGS_ROUTE_PATHS = new Set([
   '/settings',
   '/account',
   '/progression',

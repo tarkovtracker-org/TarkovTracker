@@ -12,7 +12,7 @@ const clearConfirmation = (): void => {
  * `revocation_unavailable`: the server could not be reached and this browser's session is
  * still active, so only an explicit device-only sign-out can end it.
  */
-export type SignOutFailure = 'session_changed' | 'revocation_unavailable';
+type SignOutFailure = 'session_changed' | 'revocation_unavailable';
 type SignOutOptions = { offerDeviceOnlyFallback?: boolean };
 const classifySignOutFailure = (error: unknown): SignOutFailure =>
   isSupabaseSessionChangedError(error) ? 'session_changed' : 'revocation_unavailable';

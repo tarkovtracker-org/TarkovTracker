@@ -1,8 +1,4 @@
-import type {
-  FinishRewards,
-  TarkovDataQueryResult,
-  TarkovTaskRewardsQueryResult,
-} from '~/types/tarkov';
+import type { FinishRewards, TarkovTaskRewardsQueryResult } from '~/types/tarkov';
 /**
  * Sanitizes rewards by filtering out skill level rewards with null skills
  */
@@ -38,19 +34,6 @@ function sanitizeTasksResponse<
       tasks: sanitizedTasks,
     },
   };
-}
-/**
- * Sanitizes full task data to remove invalid entries from the API response
- * This helps handle cases where the tarkov.dev API returns null values for non-nullable fields
- */
-export function sanitizeTaskData(response: { data: TarkovDataQueryResult }): {
-  data: TarkovDataQueryResult;
-} {
-  return sanitizeTasksResponse(response, (task) => ({
-    ...task,
-    finishRewards: sanitizeRewards(task.finishRewards),
-    startRewards: sanitizeRewards(task.startRewards),
-  }));
 }
 /**
  * Sanitizes task rewards data to remove invalid entries from the API response

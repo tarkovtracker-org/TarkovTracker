@@ -20,7 +20,7 @@ export function formatCompactNumber(num: number): string {
  * @param locale - Optional locale string (e.g., "en-US"). Falls back to browser default if not provided
  * @returns Locale-formatted string (e.g., "1,234,567")
  */
-export function formatLocaleNumber(num: number, locale?: string): string {
+function formatLocaleNumber(num: number, locale?: string): string {
   return num.toLocaleString(locale);
 }
 /**

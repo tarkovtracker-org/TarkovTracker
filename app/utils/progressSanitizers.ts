@@ -241,7 +241,7 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   manualActivityHistory: [],
   manualActivityEpoch: 0,
 });
-export const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
+const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }
@@ -290,7 +290,7 @@ const sanitizeHistory = <T extends { id: string }>(
     .sort((left, right) => getTimestamp(right) - getTimestamp(left))
     .slice(0, limit);
 };
-export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] =>
+const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] =>
   sanitizeHistory(value, sanitizeApiUpdateMeta, (entry) => entry.at, API_UPDATE_HISTORY_LIMIT);
 const sanitizeManualActivityType = (value: unknown): ManualActivityType | null =>
   MANUAL_ACTIVITY_TYPE_VALUES.has(value) ? (value as ManualActivityType) : null;
@@ -320,7 +320,7 @@ const sanitizeRequiredManualActivityFields = (
   };
   return Object.values(fields).includes(null) ? null : (fields as RequiredManualActivityFields);
 };
-export const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry | undefined => {
+const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }

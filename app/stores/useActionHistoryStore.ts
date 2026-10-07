@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { useSafeToast } from '@/composables/useSafeToast';
 import { logger } from '@/utils/logger';
-export interface ReversibleAction {
+interface ReversibleAction {
   id: string;
   description: string;
   undo: () => void | Promise<void>;

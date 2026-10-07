@@ -51,7 +51,7 @@ const MAP_TIME_STYLES: Record<MapTimePeriod, MapTimeStyle> = {
     valueClass: 'text-surface-100',
   },
 };
-export const resolveMapTimePeriod = (hour: number): MapTimePeriod => {
+const resolveMapTimePeriod = (hour: number): MapTimePeriod => {
   if (hour >= 5 && hour < 7) return 'dawn';
   if (hour >= 7 && hour < 18) return 'day';
   if (hour >= 18 && hour < 20) return 'dusk';
