@@ -166,6 +166,16 @@ describe('useSupporter', () => {
     expect(mockChannel).toHaveBeenCalledOnce();
     supporter.unsubscribe();
   });
+  it('clears the loaded marker when a refresh throws after a successful read', async () => {
+    const { supporter, subscribing, status, nextChannel } = await startInitialSubscription();
+    status('SUBSCRIBED');
+    await expect(subscribing).resolves.toBe(true);
+    expect(supporter.loadedUserId.value).toBe('user-1');
+    mockMaybeSingle.mockRejectedValueOnce(new Error('offline'));
+    nextChannel.on.mock.calls[0]?.[2]();
+    await vi.waitFor(() => expect(supporter.loadedUserId.value).toBeNull());
+    supporter.unsubscribe();
+  });
   it('does not apply a stale status response after reset', async () => {
     const deferred = createDeferred<{
       data: {
