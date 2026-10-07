@@ -128,9 +128,16 @@ function specifiersIn(file, code = readFileSync(file, 'utf8')) {
   return found;
 }
 const isWorkerFile = (file) => relative(join(ROOT, WORKER), file).split(sep)[0] !== '..';
+// The prerender validator loads this npm package during nuxt prepare. Its source is
+// pinned by the watched root lockfile; it is not a generated Nuxt path alias.
+function externalImportBase(fromFile, specifier) {
+  if (RUNTIME_PREFIXES.some((p) => specifier.startsWith(p))) return null;
+  return !isWorkerFile(fromFile) && specifier === 'parse5' ? join(ROOT, LOCKFILE) : undefined;
+}
 function specifierBase(fromFile, specifier, aliases) {
   if (specifier.startsWith('.')) return resolve(dirname(fromFile), specifier);
-  if (RUNTIME_PREFIXES.some((p) => specifier.startsWith(p))) return null;
+  const external = externalImportBase(fromFile, specifier);
+  if (external !== undefined) return external;
   // Outside WORKER, esbuild resolves bare specifiers with the root tsconfig's generated paths.
   assert.ok(
     isWorkerFile(fromFile),
@@ -360,6 +367,16 @@ test('bare imports outside workers/api-gateway are not resolved with Worker alia
   const shared = join(ROOT, 'shared', 'utils', '__fixture__.ts');
   assert.throws(() => specifierBase(shared, '@/utils/x', workerAliases()), /root tsconfig paths/);
   assert.equal(specifierBase(shared, './x', workerAliases()), join(ROOT, 'shared', 'utils', 'x'));
+  assert.equal(specifierBase(shared, 'parse5', workerAliases()), join(ROOT, LOCKFILE));
+  const worker = join(ROOT, WORKER, 'src', '__fixture__.ts');
+  assert.equal(
+    specifierBase(worker, 'parse5', [['parse5', join(ROOT, 'shared')]]),
+    join(ROOT, 'shared')
+  );
+  assert.throws(
+    () => specifierBase(shared, 'unknown-package', workerAliases()),
+    /root tsconfig paths/
+  );
 });
 test('every import form is found, prose is ignored and computed imports fail', () => {
   const file = join(ROOT, WORKER, 'src', '__fixture__.ts');

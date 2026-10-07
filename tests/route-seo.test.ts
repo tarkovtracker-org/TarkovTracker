@@ -16,6 +16,22 @@ describe('route SEO registry', () => {
     );
     expect(resolveRouteSeo('/kappa').title).toBe('Kappa & Lightkeeper Tracker · TarkovTracker.org');
   });
+  it('keeps browser titles while avoiding a repeated brand in social titles', () => {
+    const head = createRouteSeoHead('/tasks');
+    expect(head.title).toBe('Tarkov Quest Tracker · TarkovTracker.org');
+    expect(head.meta).toContainEqual(
+      expect.objectContaining({ property: 'og:title', content: 'Tarkov Quest Tracker' })
+    );
+    expect(head.meta).toContainEqual(
+      expect.objectContaining({ name: 'twitter:title', content: 'Tarkov Quest Tracker' })
+    );
+    expect(head.meta).toContainEqual(
+      expect.objectContaining({ property: 'og:site_name', content: 'TarkovTracker' })
+    );
+    expect(createRouteSeoHead('/supporter').meta).toContainEqual(
+      expect.objectContaining({ property: 'og:title', content: 'Support TarkovTracker.org' })
+    );
+  });
   it('includes exactly the public pages and every available guide', () => {
     expect(PUBLIC_SEO_ROUTES).toHaveLength(18);
     expect(new Set(PUBLIC_SEO_ROUTES).size).toBe(18);
@@ -77,6 +93,16 @@ describe('route SEO registry', () => {
       expect(guideHead.meta).toContainEqual(
         expect.objectContaining({ property: 'og:image:width', content: '1200' })
       );
+      expect(guideHead.meta).toContainEqual(
+        expect.objectContaining({ name: 'twitter:image:width', content: '1200' })
+      );
+      expect(guideHead.meta).toContainEqual(
+        expect.objectContaining({ name: 'twitter:image:height', content: '630' })
+      );
+      const twitterImageIndex = guideHead.meta.findIndex((tag) => tag.key === 'twitter:image');
+      expect(
+        guideHead.meta.slice(twitterImageIndex + 1, twitterImageIndex + 3).map((tag) => tag.key)
+      ).toEqual(['twitter:image:width', 'twitter:image:height']);
       const appHead = createRouteSeoHead('/tasks');
       expect(appHead.meta.some((tag) => tag.key?.includes('image'))).toBe(false);
       expect(appHead.meta).toContainEqual(

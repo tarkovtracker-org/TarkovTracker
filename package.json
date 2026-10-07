@@ -27,6 +27,7 @@
     "mdast-util-from-markdown": "2.0.3",
     "nuxt": "^4.5.1",
     "ofetch": "^1.5.1",
+    "parse5": "8.0.1",
     "pinia": "^4.0.2",
     "pinia-plugin-persistedstate": "^4.7.1",
     "stripe": "^22.3.1",
