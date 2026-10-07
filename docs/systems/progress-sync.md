@@ -136,7 +136,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   request per store/source until a subsequent successful write includes it or an explicit reset/session
   invalidation discards it. Failure is registered before releasing the lock so queued undo and live
   edits remain ordered. An unrelated save cannot clear another source's failed-save warning.
-  A failed reset restores the original memory edit baseline, separate from retry baselines folded
+  Successful adoption transforms each remaining queued before/after pair and its memory edit
+  baseline together before exposing the rebased memory. Imported unchanged fields and clocks
+  therefore remain unchanged intent through a later failure, compaction or reset. The earliest
+  outstanding memory baseline covers the ordered queued intent and uncaptured live edits.
+  A failed reset restores that memory edit baseline, separate from retry baselines folded
   against newer observed storage. Thus untouched stale memory cannot become edits that undo another
   tab's corrections; unsaved memory edits remain available for the next save. A newer reset epoch
   still discards obsolete mode intent.

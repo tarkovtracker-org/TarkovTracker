@@ -1,11 +1,11 @@
 {
   "originalHead": "7a8fb7eff9612dffb9332c839bf7b49befba882b",
   "scope": "Actual production reset/persistence modules and real Pinia plugin in separate native renderers; synthetic local guest flows, no hosted UI/account/provider acceptance.",
-  "harnessSha256": "80fb897adbabf998690700e99294c9b873bd69fd3001e4459af289ade3fb0487",
-  "entrySha256": "03a1831104b085e8cf49335a737ba0c22df175e03de26c701218ae78235135fc",
-  "bundleSha256": "cf04eccf418bfdca5f318487aa2a42b23ae462a02f4a477628e41b9c8b712d9a",
+  "harnessSha256": "2a1e7a8ddec29dccba82f660996ff328fdcb842d9be15d3c6d5bbc7448803ce8",
+  "entrySha256": "6906aef9c60816c8f43fc2b08e78eecaa76c9aa335113153b7fc86e95beea531",
+  "bundleSha256": "fe11234d7813d99ae8c99203470f046f059f57e8ebfa2607af5f03f84d4f43c6",
   "browser": "Chrome/154.0.8037.97",
-  "rendererPids": [28640, 44660],
+  "rendererPids": [28316, 44312],
   "visibility": "Exact raw storage-event/read barrier before stale-reset tests; not a cure/proof for #1092 immediate-release cache gap.",
   "sourceSha256": [
     {
@@ -74,7 +74,7 @@
     },
     {
       "path": "app/stores/tarkov/localStorage.ts",
-      "sha256": "02136d210b50e77e26380d1b0c35f4ccad57c01e91aa665104a2ffc95a8591f0"
+      "sha256": "fba3a3bd24adb5d78e06ab163efb4aa3da3411f5a2ab97976d869094969b3102"
     },
     {
       "path": "app/stores/tarkov/supersededProgress.ts",
@@ -364,8 +364,8 @@
     }
   ],
   "baselineDefectsReproduced": 4,
-  "focusedTests": 369,
-  "newRegressionControls": 11,
+  "focusedTests": 373,
+  "newRegressionControls": 15,
   "noRuntimeAuthorityCutover": true,
   "sourceCompleteness": "Preserves existing PR history; completeness of original Linux staged/unstaged work is unverified without manifests.",
   "combinedRecoveryBaselineHead": "738a5f4f1217bf0931e11e0ea0c68ebe64193ceb",
@@ -401,5 +401,181 @@
       "finalStatus": "saved",
       "finalUnsaved": false
     }
-  ]
+  ],
+  "integratedBase": "0a5ff981c25efe51e12dfcd16a3a6b06e8f84aef",
+  "nativeObservedHead": "74e07d885d162a1279bc7490efaae53409d2c366",
+  "queuedAdoptionBaselineHead": "31c6ee3d0fa6bb165d1bae9a666117889b4ffeed",
+  "queuedAdoptionBaselineDefectsReproduced": 4,
+  "queuedAdoptionBaselineSuccessControls": 4,
+  "queuedAdoptionResults": [
+    {
+      "actor": 0,
+      "failQueued": true,
+      "failReset": true,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 0,
+      "failQueued": false,
+      "failReset": true,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 0,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 0,
+      "failQueued": true,
+      "failReset": false,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 0,
+      "failQueued": true,
+      "failReset": true,
+      "queuedWrites": 3,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": "Live"
+    },
+    {
+      "actor": 1,
+      "failQueued": true,
+      "failReset": true,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 1,
+      "failQueued": false,
+      "failReset": true,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 0,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 1,
+      "failQueued": true,
+      "failReset": false,
+      "queuedWrites": 2,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": null
+    },
+    {
+      "actor": 1,
+      "failQueued": true,
+      "failReset": true,
+      "queuedWrites": 3,
+      "preserved": true,
+      "adoptedSkills": {
+        "strength": 3,
+        "endurance": 9
+      },
+      "retainedFailedRequests": 1,
+      "finalSkills": {
+        "strength": 2,
+        "endurance": 7
+      },
+      "unchangedPveClock": true,
+      "finalStatus": "saved",
+      "finalUnsaved": false,
+      "finalPending": 0,
+      "liveDisplayName": "Live"
+    }
+  ],
+  "originalBaselineHarnessSha256": "80fb897adbabf998690700e99294c9b873bd69fd3001e4459af289ade3fb0487"
 }

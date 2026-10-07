@@ -540,7 +540,9 @@ type ProgressWriteRequest = {
   expected?: PersistedProgressSnapshot | null;
   handoffBaseline?: PersistedProgressSnapshot | null;
   baseline: PersistedProgressSnapshot | null;
+  /** Before-state for replaying captured intent against observed storage; failure may fold it. */
   guestBaseline: PersistedProgressSnapshot | null;
+  /** Before-state in visible memory's representation; only adoption may rebase it. */
   guestMemoryBaseline: PersistedProgressSnapshot | null;
   source?: GuestProgressSource;
   failedGuest?: { error: unknown };
@@ -742,6 +744,19 @@ const laterGuestWrites = (request: ProgressWriteRequest): ProgressWriteRequest[]
   if (index < 0) return [];
   return writes.slice(index + 1).filter((pending) => pending.source?.key === request.source?.key);
 };
+/** Adoption transforms the intent pair and its memory coordinates together, before exposure. */
+const rebaseQueuedGuestWrite = (
+  request: ProgressWriteRequest,
+  previous: PersistedProgressSnapshot,
+  incoming: PersistedProgressSnapshot
+): PersistedProgressSnapshot => {
+  const next = rebaseGuestSnapshot(previous, request.guestBaseline!, incoming);
+  request.baseline = cloneStateSnapshot(previous);
+  request.guestBaseline = cloneStateSnapshot(previous);
+  request.guestMemoryBaseline = cloneStateSnapshot(previous);
+  request.value = encodeProgressSnapshot(next);
+  return next;
+};
 const rebaseQueuedGuestWrites = (
   request: ProgressWriteRequest,
   accepted: PersistedProgressSnapshot
@@ -751,12 +766,8 @@ const rebaseQueuedGuestWrites = (
   for (const pending of laterGuestWrites(request)) {
     const incoming = parsePersistedProgressState(pending.value, null);
     if (!incoming || !pending.guestBaseline) continue;
-    const next = rebaseGuestSnapshot(previous, pending.guestBaseline, incoming);
     captured = incoming;
-    pending.baseline = cloneStateSnapshot(previous);
-    pending.guestBaseline = cloneStateSnapshot(previous);
-    pending.value = encodeProgressSnapshot(next);
-    previous = next;
+    previous = rebaseQueuedGuestWrite(pending, previous, incoming);
   }
   return { previous, captured };
 };
