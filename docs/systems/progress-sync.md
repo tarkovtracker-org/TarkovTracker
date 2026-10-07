@@ -114,8 +114,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   The online profile reset logs such a failure for its still-current session.
   Delayed signed-in reset responses are fenced by session generation and owner identity before
   applying local state, acknowledging the save, or clearing active storage, including A→B→A switches.
-  Guest Settings resets instead atomically replace the guest envelope under the shared Web Lock,
-  preserving unrelated modes and their clocks. All-mode resets retain a default envelope with
+  Guest Settings resets instead replace the guest envelope in one write under the shared Web Lock.
+  Captured queued/failed intent and changes made while waiting apply only edited fields to the
+  observed saved envelope before selected modes reset; unchanged stale fields cannot undo saved
+  decreases, false/null/zero values or removals in unrelated modes. All-mode resets retain a default envelope with
   increased reset epochs. Ordinary guest writes reconcile the entire envelope under the same lock,
   so a stale tab cannot restore an older reset epoch or overwrite newer unrelated modes. Memory
   and serializer clocks adopt committed guest writes without stamping imported fields as edits.
@@ -130,6 +132,17 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   their original bytes when reconciliation changes
   no state or clocks. Failed
   reads, writes, retention checks, session fences, or unavailable locks reject before memory changes.
+  A failed ordinary guest write remains unacknowledged intent, folded into at most one failed
+  request per store/source until a subsequent successful write includes it or an explicit reset/session
+  invalidation discards it. Failure is registered before releasing the lock so queued undo and live
+  edits remain ordered. An unrelated save cannot clear another source's failed-save warning.
+  A failed reset restores the original memory edit baseline, separate from retry baselines folded
+  against newer observed storage. Thus untouched stale memory cannot become edits that undo another
+  tab's corrections; unsaved memory edits remain available for the next save. A newer reset epoch
+  still discards obsolete mode intent.
+  These checks use the bytes observed by the current renderer. Web Locks serialize cooperating
+  operations but do not prove immediate cross-renderer localStorage cache visibility (#1092);
+  this change does not resolve that boundary or enable the inactive IndexedDB authority.
   These guarantees require the current client; an older cached client that writes raw envelopes
   does not participate in this reconciliation. Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
