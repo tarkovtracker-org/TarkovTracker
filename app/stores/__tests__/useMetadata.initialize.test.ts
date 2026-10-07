@@ -298,6 +298,6 @@ it('does not resume an initializer superseded by a same-mode force refresh', asy
   expect(getPromiseStore(store).isInitializing).toBe(true);
   newBootstrap.resolve(undefined);
   await fresh;
-  expect(taskFetch).toHaveBeenCalledExactlyOnceWith(true);
+  expect(taskFetch).toHaveBeenCalledExactlyOnceWith(true, undefined);
   expect(store.tasks[0]?.id).toBe('fresh');
 });

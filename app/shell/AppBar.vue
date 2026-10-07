@@ -52,7 +52,10 @@
               />
             </span>
           </AppTooltip>
-          <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
+          <AppTooltip
+            v-if="dataLoading || hideoutLoading || localeSwitchPending"
+            :text="t('app_bar.loading')"
+          >
             <span class="flex h-8 w-8 items-center justify-center">
               <UIcon
                 name="i-heroicons-arrow-path"
@@ -234,6 +237,7 @@
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import { useKeybinds } from '@/composables/useKeybinds';
+  import { useLocaleSwitch } from '@/composables/useLocaleSwitch';
   import { useSignOut } from '@/composables/useSignOut';
   import { useSupporter } from '@/composables/useSupporter';
   import { useTheme } from '@/composables/useTheme';
@@ -245,10 +249,9 @@
   import { GAME_MODES } from '@/utils/constants';
   import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
   import { getLocaleNativeName } from '@/utils/locales';
-  import { logger } from '@/utils/logger';
   import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
   import type { DropdownMenuItem } from '@nuxt/ui';
-  const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
+  const { t, te } = useI18n({ useScope: 'global' });
   const { isLightTheme, toggleThemeMode } = useTheme();
   const themeToggleLabel = computed(() =>
     isLightTheme.value
@@ -350,7 +353,6 @@
         return 'border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500';
     }
   });
-  const skillCalculation = useSkillCalculation();
   const { $supabase } = useNuxtApp();
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
   const avatarSrc = computed(() => {
@@ -414,6 +416,8 @@
       {
         icon: 'i-mdi-translate',
         label: t('settings.locale'),
+        description: localeStatus.value || undefined,
+        disabled: localeSwitchPending.value,
         children: localeMenuItems.value,
       },
       {
@@ -453,7 +457,15 @@
   });
   const NAV_BAR_ICON = 'i-mdi-menu-open';
   const { loading: dataLoading, hideoutLoading } = storeToRefs(metadataStore);
-  const dataError = ref(false);
+  const {
+    locale,
+    availableLocales,
+    pending: localeSwitchPending,
+    error: dataError,
+    status: localeStatus,
+    isDisabled: isLocaleDisabled,
+    selectLocale,
+  } = useLocaleSwitch();
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && appStore.mobileDrawerExpanded && mdAndDown.value) {
       event.preventDefault();
@@ -473,62 +485,20 @@
       appStore.toggleDrawerRail();
     }
   }
-  const isAvailableLocale = (value: string): value is typeof locale.value =>
-    (availableLocales as readonly string[]).includes(value);
-  // Languages are listed by their own names, so they stay findable in any UI language.
+  // Native names remain findable in every interface language.
   const localeMenuItems = computed<DropdownMenuItem[][]>(() => [
-    (availableLocales as readonly string[]).map((localeCode) => ({
+    availableLocales.map((localeCode) => ({
       label: getLocaleNativeName(localeCode),
       type: 'checkbox' as const,
       checked: localeCode === locale.value,
+      disabled: isLocaleDisabled(localeCode),
       onSelect: () => {
-        void applyLocaleSelection(localeCode);
+        if (!isLocaleDisabled(localeCode)) void selectLocale(localeCode);
       },
     })),
+    ...(localeStatus.value ? [[{ label: localeStatus.value, disabled: true }]] : []),
   ]);
   const localeTooltip = computed(
-    () => `${t('settings.locale')}: ${getLocaleNativeName(locale.value)}`
+    () => localeStatus.value || `${t('settings.locale')}: ${getLocaleNativeName(locale.value)}`
   );
-  // A switch reloads localized game data; block another switch until this one settles.
-  const localeSwitchPending = ref(false);
-  let latestLocaleSwitchRequestId = 0;
-  async function applyLocaleSelection(newLocale: string) {
-    if (!isAvailableLocale(newLocale) || newLocale === locale.value) return;
-    if (localeSwitchPending.value) return;
-    localeSwitchPending.value = true;
-    const requestId = ++latestLocaleSwitchRequestId;
-    logger.debug('[AppBar] Setting locale to:', newLocale);
-    const previousLocale = locale.value;
-    const previousLocaleOverride = preferencesStore.getLocaleOverride;
-    let localeStateApplied = false;
-    try {
-      await setLocale(newLocale);
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      preferencesStore.setLocaleOverride(newLocale);
-      metadataStore.updateLanguageAndGameMode(newLocale);
-      localeStateApplied = true;
-      await metadataStore.fetchAllData(false);
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      skillCalculation.migrateLegacySkillOffsets();
-      dataError.value = false;
-    } catch (err) {
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      logger.error('[AppBar] Error switching locale:', err);
-      if (localeStateApplied) {
-        if (locale.value !== previousLocale) {
-          await setLocale(previousLocale).catch((rollbackError) => {
-            logger.debug('[AppBar] rollback to previousLocale failed', {
-              previousLocale,
-              rollbackError,
-            });
-          });
-        }
-        preferencesStore.setLocaleOverride(previousLocaleOverride);
-        metadataStore.updateLanguageAndGameMode(previousLocaleOverride ?? previousLocale);
-      }
-      dataError.value = true;
-    } finally {
-      if (requestId === latestLocaleSwitchRequestId) localeSwitchPending.value = false;
-    }
-  }
 </script>

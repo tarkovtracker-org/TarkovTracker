@@ -110,8 +110,6 @@ vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     getTasksRequireTraderLevels: true,
     getUseAutomaticLevelCalculation: false,
-    getProfileSharePvpPublic: false,
-    getProfileSharePvePublic: false,
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({

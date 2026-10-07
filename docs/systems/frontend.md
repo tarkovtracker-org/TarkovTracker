@@ -2,6 +2,23 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Language selection
+
+The app bar uses a compact translation icon with native language names and a checked current
+language; phones retain the language submenu in More. Settings > Preferences > Appearance provides
+the same language menu. `useLocaleSwitch` shares pending, cooldown, and error feedback across
+these controls. One shared cache watcher and countdown timer remain active until the last selector
+unmounts. All menu entries are disabled during a switch.
+
+A locale switch passes an `AbortSignal` through metadata loading to the Tarkov proxy requests.
+A superseding programmatic selection aborts the prior load, and only the current selection may
+commit success or restore the previous locale and reload its metadata after failure. Aborted responses cannot update
+metadata or its cache.
+
+An uncached language starts a ten-second cooldown. Other uncached languages stay disabled until it
+expires; languages with a complete, fresh IndexedDB switch cache for the current game mode remain available.
+The cooldown does not apply server-side or prevent direct calls to the public proxy.
+
 ## Promoted Twitch configuration
 
 **Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but

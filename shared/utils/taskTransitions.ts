@@ -17,11 +17,11 @@ export type TaskTransitionOptions = {
   updates?: Map<string, TransitionTaskState>;
   protectedTaskIds?: ReadonlySet<string>;
 };
-export const toTransitionTaskState = (completion?: TransitionCompletion): TransitionTaskState => {
+const toTransitionTaskState = (completion?: TransitionCompletion): TransitionTaskState => {
   if (completion?.failed === true) return 'failed';
   return completion?.complete === true ? 'completed' : 'uncompleted';
 };
-export function setTaskState(
+function setTaskState(
   completions: Completions,
   taskId: string,
   state: TransitionTaskState,

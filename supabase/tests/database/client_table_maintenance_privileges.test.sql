@@ -15,7 +15,7 @@ CROSS JOIN unnest(ARRAY[
 ]) AS table_name;
 
 SELECT table_privs_are('public', 'user_preferences', 'authenticated',
-  ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'], 'client preferences access remains');
+  ARRAY['SELECT', 'INSERT', 'UPDATE'], 'client preferences sync access remains');
 SELECT ok(has_table_privilege('authenticated', 'public.user_progress', 'SELECT'),
   'client progress reads remain');
 SELECT ok(has_table_privilege('authenticated', 'public.team_memberships', 'SELECT'),

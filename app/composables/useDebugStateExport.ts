@@ -3,7 +3,7 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import type { TaskCompletion, UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
-export interface DebugTaskEntry {
+interface DebugTaskEntry {
   id: string;
   name: string;
   complete: boolean;
@@ -13,7 +13,7 @@ export interface DebugTaskEntry {
   prerequisiteIds: string[];
   prerequisiteStates: Record<string, { complete: boolean; failed: boolean }>;
 }
-export interface DebugStateSnapshot {
+interface DebugStateSnapshot {
   exportedAt: string;
   appVersion: string;
   gameMode: string;

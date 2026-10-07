@@ -2,40 +2,8 @@
  * Map coordinate transformation utilities for Leaflet integration.
  * Uses tarkov.dev's approach with custom CRS and L.Transformation.
  */
+import type { MapSvgConfig, MapTileConfig } from '@/types/tarkov';
 import type L from 'leaflet';
-export interface MapBounds {
-  /** [x, z] coordinate of first corner */
-  corner1: [number, number];
-  /** [x, z] coordinate of second corner */
-  corner2: [number, number];
-}
-export interface MapSvgConfig {
-  file: string;
-  floors: string[];
-  defaultFloor: string;
-  coordinateRotation: number;
-  transform?: [number, number, number, number];
-  bounds: number[][];
-  /** Separate bounds for SVG overlay (if different from marker bounds) */
-  svgBounds?: number[][];
-  /** Whether lower floors should remain visible when a higher floor is selected */
-  stackFloors?: boolean;
-  minZoom?: number;
-  maxZoom?: number;
-}
-export interface MapTileConfig {
-  tilePath: string;
-  tileFallbacks?: string[];
-  coordinateRotation: number;
-  transform?: [number, number, number, number];
-  bounds: number[][];
-  minZoom?: number;
-  maxZoom?: number;
-  tileSize?: number;
-  floors?: string[];
-  defaultFloor?: string;
-  floorTilePaths?: Record<string, string>;
-}
 export type MapRenderConfig = MapSvgConfig | MapTileConfig;
 export function rotateGameCoordinates(
   x: number,
@@ -84,7 +52,7 @@ export function applyRotation(
  * @param config Map render configuration with transform and rotation
  * @returns Custom CRS for the map
  */
-export function createMapCRS(L: typeof import('leaflet'), config: MapRenderConfig): L.CRS {
+function createMapCRS(L: typeof import('leaflet'), config: MapRenderConfig): L.CRS {
   let scaleX = 1;
   let scaleY = 1;
   let marginX = 0;
@@ -111,16 +79,6 @@ export function createMapCRS(L: typeof import('leaflet'), config: MapRenderConfi
       },
     }),
   }) as L.CRS;
-}
-/**
- * Converts game position to Leaflet LatLng using tarkov.dev's approach.
- * Simply swaps z and x: lat = z, lng = x
- * The CRS transformation handles scaling and rotation.
- * @param position Game position with x and z coordinates
- * @returns Leaflet-compatible [lat, lng] array
- */
-export function pos(position: { x: number; z: number }): [number, number] {
-  return [position.z, position.x];
 }
 /**
  * Converts game coordinates to Leaflet LatLng.
@@ -337,22 +295,4 @@ export function getMapSvgCdnUrl(mapName: string, floor: string): string {
  */
 export function getMapSvgFallbackUrl(filename: string): string {
   return `https://tarkovtracker.github.io/tarkovdata/maps/${encodeURIComponent(filename)}`;
-}
-/**
- * Gets the URL for Factory floor-specific SVG files.
- * Factory uses separate files per floor.
- * @param floor Floor name
- * @returns URL for the Factory floor SVG
- */
-export function getFactoryFloorUrl(floor: string): string {
-  // Try CDN first for Factory
-  return `https://assets.tarkov.dev/maps/svg/Factory-${floor}.svg`;
-}
-/**
- * Gets the fallback URL for Factory floor-specific SVG files.
- * @param floor Floor name
- * @returns Fallback URL for the Factory floor SVG
- */
-export function getFactoryFloorFallbackUrl(floor: string): string {
-  return `/img/maps/Factory-${floor}.svg`;
 }
