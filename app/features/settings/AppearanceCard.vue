@@ -63,7 +63,7 @@
             :aria-busy="pending"
             aria-describedby="settings-appearance-locale-status"
             class="bg-surface-800 border-surface-700 text-surface-200 block min-h-9 rounded-md border px-3 text-sm disabled:opacity-50"
-            @change="selectLocale(($event.target as HTMLSelectElement).value)"
+            @change="handleLocaleChange"
           >
             <option
               v-for="code in availableLocales"
@@ -91,6 +91,11 @@
   const { t } = useI18n({ useScope: 'global' });
   const { themeMode, setThemeMode } = useTheme();
   const { locale, availableLocales, pending, status, isDisabled, selectLocale } = useLocaleSwitch();
+  const handleLocaleChange = async (event: Event) => {
+    const element = event.target as HTMLSelectElement;
+    await selectLocale(element.value);
+    element.value = locale.value;
+  };
   const themeLabelId = 'settings-appearance-theme-label';
   const themeOptions = computed<{ value: ThemeMode; icon: string; label: string }[]>(() => [
     {

@@ -717,7 +717,7 @@ export const useMetadataStore = defineStore('metadata', {
         LOCALE_TO_API_MAPPING[locale as keyof typeof LOCALE_TO_API_MAPPING] ??
         extractLanguageCode(locale);
       const mode = this.getApiGameMode();
-      const [critical, bootstrap, items, objectives, rewards] = await Promise.all([
+      const cached = await Promise.all([
         this.loadCriticalCacheData(language),
         getCachedData<TarkovBootstrapQueryResult>(
           'bootstrap',
@@ -739,8 +739,8 @@ export const useMetadataStore = defineStore('metadata', {
           `${TASK_REWARDS_CACHE_VERSION}-${mode}`,
           language
         ),
-      ]);
-      return Boolean(critical && bootstrap && items && objectives && rewards);
+      ]).catch(() => null);
+      return cached?.every(Boolean) ?? false;
     },
     async loadCriticalCacheData(language?: string): Promise<CriticalCacheData | null> {
       language ??= this.languageCode;

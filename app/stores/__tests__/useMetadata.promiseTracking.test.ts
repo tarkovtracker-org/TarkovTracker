@@ -245,6 +245,12 @@ describe('useMetadataStore promise tracking', () => {
     expect(lookup).toHaveBeenCalledWith('de');
     expect(store.languageCode).toBe('en');
   });
+  it('treats a failed cache lookup as uncached so network switching remains available', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
+    vi.mocked(cacheUtils.getCachedData).mockRejectedValue(new Error('IndexedDB unavailable'));
+    expect(await store.hasCriticalLocaleCache('de')).toBe(false);
+  });
   it('requires all switch datasets before treating a locale as cached', async () => {
     const store = useMetadataStore();
     vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue({ scope: 'regular-de' } as never);

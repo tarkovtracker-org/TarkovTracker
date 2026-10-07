@@ -125,6 +125,11 @@ describe('AppearanceCard', () => {
     await wrapper.get('select').setValue('de');
     expect(selectLocale).toHaveBeenCalledWith('de');
   });
+  it('restores the active language when a selection does not change the locale', async () => {
+    const wrapper = mountCard();
+    await wrapper.get('select').setValue('de');
+    expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('en');
+  });
   it('disables the selector while loading and exposes shared feedback', async () => {
     pending.value = true;
     status.value = 'Loading language';
