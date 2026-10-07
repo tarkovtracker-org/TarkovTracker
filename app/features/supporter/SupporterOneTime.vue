@@ -139,7 +139,7 @@
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const { createCheckout, error: composableError } = useSupporter();
-  const ONE_TIME_BASE = 3;
+  const ONE_TIME_BASE = 4;
   const ONE_TIME_MAX = 500;
   const amountId = useId();
   const amountErrorId = useId();

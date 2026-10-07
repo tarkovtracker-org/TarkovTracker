@@ -5,17 +5,21 @@ const days = (count: number, from = now) =>
   new Date(from.getTime() + count * 86_400_000).toISOString();
 const paidAt = now.toISOString();
 describe('one-time supporter duration', () => {
-  it('grants one 30-day period per $3, capped at twelve', () => {
+  it('grants one 30-day period per full $4, capped at twelve', () => {
     expect(oneTimePeriods(0)).toBe(0);
-    expect(oneTimePeriods(150)).toBe(1);
-    expect(oneTimePeriods(339)).toBe(1);
-    expect(oneTimePeriods(1000)).toBe(3);
+    expect(oneTimePeriods(399)).toBe(0);
+    expect(oneTimePeriods(443)).toBe(1);
+    expect(oneTimePeriods(1000)).toBe(2);
     expect(oneTimePeriods(50_000)).toBe(12);
   });
-  it('starts a new or lapsed supporter from now', () => {
-    expect(oneTimeExpiresAt(null, 600, paidAt, now)).toBe(days(60));
+  it('starts the period from the payment date', () => {
+    const later = new Date(days(5));
+    expect(oneTimeExpiresAt(null, 400, days(2), later)).toBe(days(32));
+  });
+  it('starts a new or lapsed supporter at payment', () => {
+    expect(oneTimeExpiresAt(null, 800, paidAt, now)).toBe(days(60));
     const lapsed = { type: 'subscription', status: 'expired', expires_at: days(-5) };
-    expect(oneTimeExpiresAt(lapsed, 300, paidAt, now)).toBe(days(30));
+    expect(oneTimeExpiresAt(lapsed, 400, paidAt, now)).toBe(days(30));
   });
   it('stacks onto remaining one-time access', () => {
     const active = {
@@ -24,7 +28,7 @@ describe('one-time supporter duration', () => {
       expires_at: days(20),
       last_contribution_at: days(-10),
     };
-    expect(oneTimeExpiresAt(active, 300, paidAt, now)).toBe(days(50));
+    expect(oneTimeExpiresAt(active, 400, paidAt, now)).toBe(days(50));
   });
   it('does not stack a replayed payment twice', () => {
     const applied = {
@@ -49,10 +53,10 @@ describe('one-time supporter duration', () => {
       expires_at: days(30),
       last_contribution_at: days(1),
     };
-    expect(oneTimeExpiresAt(newer, 300, paidAt, now)).toBe(days(60));
+    expect(oneTimeExpiresAt(newer, 400, paidAt, now)).toBe(days(60));
   });
   it('does not extend from an expired or revoked one-time row', () => {
     const expired = { type: 'one_time', status: 'expired', expires_at: days(10) };
-    expect(oneTimeExpiresAt(expired, 300, paidAt, now)).toBe(days(30));
+    expect(oneTimeExpiresAt(expired, 400, paidAt, now)).toBe(days(30));
   });
 });

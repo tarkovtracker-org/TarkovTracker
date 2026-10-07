@@ -1,4 +1,4 @@
-const CENTS_PER_PERIOD = 300;
+const CENTS_PER_PERIOD = 400;
 const PERIOD_DAYS = 30;
 const MAX_PERIODS = 12;
 const DAY_MS = 86_400_000;
@@ -14,10 +14,10 @@ function timestampMs(value: unknown): number | null {
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : null;
 }
-/** One 30-day period per $3 contributed, from one period up to a year. */
+/** One 30-day period per full $4 contributed, up to twelve periods. */
 export function oneTimePeriods(amountCents: number): number {
   if (!Number.isFinite(amountCents) || amountCents <= 0) return 0;
-  return Math.min(MAX_PERIODS, Math.max(1, Math.floor(amountCents / CENTS_PER_PERIOD)));
+  return Math.min(MAX_PERIODS, Math.floor(amountCents / CENTS_PER_PERIOD));
 }
 /** Rows and payments from before one-time perks expired keep open-ended access. */
 function isGrandfathered(existing: OneTimeSupporter, paidAt: string | null): boolean {
@@ -36,9 +36,9 @@ function isAlreadyApplied(existing: OneTimeSupporter, paidAt: string | null): bo
     existing?.type === 'one_time' && timestampMs(existing.expires_at) !== null && lastMs === paidMs
   );
 }
-function remainingExpiryMs(existing: OneTimeSupporter, nowMs: number): number {
-  if (existing?.type !== 'one_time' || existing.status !== 'active') return nowMs;
-  return Math.max(nowMs, timestampMs(existing.expires_at) ?? nowMs);
+function remainingExpiryMs(existing: OneTimeSupporter, paidMs: number): number {
+  if (existing?.type !== 'one_time' || existing.status !== 'active') return paidMs;
+  return Math.max(paidMs, timestampMs(existing.expires_at) ?? paidMs);
 }
 export function oneTimeExpiresAt(
   existing: OneTimeSupporter,
@@ -48,6 +48,6 @@ export function oneTimeExpiresAt(
 ): string | null {
   if (isGrandfathered(existing, paidAt)) return null;
   if (isAlreadyApplied(existing, paidAt)) return existing!.expires_at as string;
-  const startMs = remainingExpiryMs(existing, now.getTime());
+  const startMs = remainingExpiryMs(existing, timestampMs(paidAt) ?? now.getTime());
   return new Date(startMs + oneTimePeriods(amountCents) * PERIOD_DAYS * DAY_MS).toISOString();
 }

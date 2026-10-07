@@ -303,7 +303,7 @@ describe('payment-specific webhook fulfillment', () => {
   it('limits one-time checkout perks by amount and keeps grandfathered open access', async () => {
     const resources = resourcesForPayments();
     resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const paid = { ...session, amount_total: 900, created: 1791374400 };
+    const paid = { ...session, amount_total: 1200, created: 1791374400 };
     const harness = createHarness(supporter, resources);
     const before = Date.now();
     await harness.dispatch('checkout.session.completed', paid);

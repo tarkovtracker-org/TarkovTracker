@@ -822,9 +822,9 @@
                 <li class="leading-relaxed">
                   Higher daily API read and write quotas than standard accounts while supporter
                   status is active. A one-time contribution made on or after October 7, 2026
-                  activates these quotas for 30 days per $3 contributed, up to one year, added to
-                  any remaining one-time period; earlier one-time contributions keep their existing
-                  access
+                  activates these quotas for 30 days per full $4 contributed, starting on the
+                  payment date, up to one year, added to any remaining one-time period; earlier
+                  one-time contributions keep their existing access
                 </li>
                 <li class="leading-relaxed">
                   {{ t('page.account_retention.perk_summary') }}
