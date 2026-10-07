@@ -1,4 +1,4 @@
-export const STORAGE_PREFIX = 'v2_';
+const STORAGE_PREFIX = 'v2_';
 export const STORAGE_VERSION = '2';
 export const STORAGE_KEYS = {
   storageVersion: `${STORAGE_PREFIX}storage_version`,

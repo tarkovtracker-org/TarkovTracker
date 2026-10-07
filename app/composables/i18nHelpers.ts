@@ -114,7 +114,7 @@ export function extractLanguageCode(
 /**
  * Gets the browser's language preference as a fallback (SSR-safe)
  */
-export function getBrowserLanguage(): string {
+function getBrowserLanguage(): string {
   // SSR-safe check: ensure we're in a browser environment with navigator available
   if (typeof navigator !== 'undefined' && typeof navigator.language === 'string') {
     return navigator.language.split(/[-_]/)[0] || 'en';

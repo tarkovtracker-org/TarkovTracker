@@ -1,7 +1,7 @@
 export const GITHUB_IMAGE_DOMAINS = ['avatars.githubusercontent.com', 'github.com'] as const;
 export const TARKOV_IMAGE_DOMAINS = ['assets.tarkov.dev'] as const;
 export const YOUTUBE_IMAGE_DOMAINS = ['i.ytimg.com'] as const;
-export const PRIMARY_APP_HOSTNAMES = ['tarkovtracker.org', 'www.tarkovtracker.org'] as const;
+const PRIMARY_APP_HOSTNAMES = ['tarkovtracker.org', 'www.tarkovtracker.org'] as const;
 const PRODUCTION_APP_URL = 'https://tarkovtracker.org';
 const LOCAL_APP_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
 const resolveEnvValue = (...values: Array<string | undefined>) =>

@@ -8,6 +8,7 @@ import {
   resolveTarkovAccessSiteKey,
   submitGateToken,
   TARKOV_ACCESS_WIDGET_ACTION,
+  type TarkovAccessPhase,
 } from '@/utils/tarkovApiFetch';
 export interface UseTarkovAccessReturn {
   /** Last known lifecycle phase of the shared access controller. */
