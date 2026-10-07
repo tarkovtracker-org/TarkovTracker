@@ -28,12 +28,15 @@ const supporterTierRef = ref<string | null>(null);
 const mockUseSupporter = vi.fn(() => ({
   activeTier: supporterTierRef,
 }));
-const mockMetadataStore = reactive({
-  loading: false,
-  hideoutLoading: false,
-  updateLanguageAndGameMode: vi.fn(),
-  fetchAllData: vi.fn(async () => {}),
-});
+const createMetadataStore = () =>
+  reactive({
+    loading: false,
+    hideoutLoading: false,
+    updateLanguageAndGameMode: vi.fn(),
+    fetchAllData: vi.fn(async () => {}),
+    hasCriticalLocaleCache: vi.fn(async () => true),
+  });
+let mockMetadataStore = createMetadataStore();
 const mockPreferencesStore = {
   getStreamerMode: false,
   getLocaleOverride: 'en' as string | null,
@@ -155,7 +158,7 @@ const mountAppBar = async () => {
         UDropdownMenu: {
           props: ['items'],
           data: () => ({ expandedSubmenu: '' }),
-          template: `<div data-dropdown-menu><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : item.onSelect?.()">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
+          template: `<div data-dropdown-menu><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :disabled="item.disabled" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : item.onSelect?.()">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :disabled="child.disabled" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
         },
         UIcon: {
           props: ['name'],
@@ -175,6 +178,7 @@ const chooseLocale = async (wrapper: Awaited<ReturnType<typeof mountAppBar>>, na
 };
 describe('AppBar locale switching', () => {
   beforeEach(async () => {
+    mockMetadataStore = createMetadataStore();
     windowWidthRef.value = 1280;
     localeRef.value = 'en';
     setLocale.mockClear();
@@ -217,7 +221,9 @@ describe('AppBar locale switching', () => {
     expect(setLocale).toHaveBeenCalledWith('de');
     expect(mockPreferencesStore.setLocaleOverride).toHaveBeenCalledWith('de');
     expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('de');
-    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false, {
+      signal: expect.any(AbortSignal),
+    });
     expect(mockSkillCalculation.migrateLegacySkillOffsets).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
@@ -244,7 +250,10 @@ describe('AppBar locale switching', () => {
     expect(mockMetadataStore.fetchAllData).not.toHaveBeenCalled();
     expect(mockSkillCalculation.migrateLegacySkillOffsets).not.toHaveBeenCalled();
     const { logger } = await import('@/utils/logger');
-    expect(logger.error).toHaveBeenCalledWith('[AppBar] Error switching locale:', localeError);
+    expect(logger.error).toHaveBeenCalledWith(
+      '[LocaleSwitch] Error switching locale:',
+      localeError
+    );
     wrapper.unmount();
   });
   it('rolls back locale when fetchAllData rejects after setLocale succeeds', async () => {
@@ -265,10 +274,11 @@ describe('AppBar locale switching', () => {
       'de',
       'en',
     ]);
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledTimes(2);
     expect(mockPreferencesStore.getLocaleOverride).toBe('en');
     expect(localeRef.value).toBe(previousLocale);
     const { logger } = await import('@/utils/logger');
-    expect(logger.error).toHaveBeenCalledWith('[AppBar] Error switching locale:', fetchError);
+    expect(logger.error).toHaveBeenCalledWith('[LocaleSwitch] Error switching locale:', fetchError);
     wrapper.unmount();
   });
   it('lists languages by native name and marks the active one', async () => {
@@ -304,7 +314,9 @@ describe('AppBar locale switching', () => {
     expect(setLocale).toHaveBeenCalledWith('de');
     expect(mockPreferencesStore.setLocaleOverride).toHaveBeenCalledWith('de');
     expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('de');
-    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false, {
+      signal: expect.any(AbortSignal),
+    });
     expect(submenu.get('[data-menu-item="Deutsch"]').attributes('data-checked')).toBe('true');
     wrapper.unmount();
   });
@@ -318,6 +330,10 @@ describe('AppBar locale switching', () => {
     await flushPromises();
     const trigger = wrapper.get('[data-testid="app-locale-menu"]');
     expect(trigger.attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-menu-item="settings.locale"]').attributes('disabled')).toBeDefined();
+    for (const item of wrapper.findAll('[data-locale-item]')) {
+      expect(item.attributes('disabled')).toBeDefined();
+    }
     await chooseLocale(wrapper, 'Français');
     await flushPromises();
     expect(setLocale.mock.calls.map(([value]) => value)).toEqual(['de']);

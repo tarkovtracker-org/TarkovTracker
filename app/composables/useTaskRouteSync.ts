@@ -1,6 +1,6 @@
 import { storeToRefs } from 'pinia';
 import { useRouteFilters } from '@/composables/useRouteFilters';
-import { usePreferencesStore } from '@/stores/usePreferences';
+import { type PreferencesStore, usePreferencesStore } from '@/stores/usePreferences';
 import { isValidPrimaryView, isValidSecondaryView } from '@/types/taskFilter';
 import { isValidSortDirection, isValidSortMode } from '@/types/taskSort';
 import { logger } from '@/utils/logger';
@@ -43,7 +43,6 @@ type TaskRouteParams = {
   sort: string;
   sortDir: string;
 };
-type PreferencesStore = ReturnType<typeof usePreferencesStore>;
 const TASK_ROUTE_CONFIGS: FilterParamConfigs<TaskRouteParams> = {
   view: { default: 'all', validate: isValidPrimaryView },
   status: { default: 'available', validate: isValidSecondaryView },

@@ -1,7 +1,5 @@
 import { API_SUPPORTED_LANGUAGES } from '~/utils/constants';
-export function isSupportedLanguage(
-  lang: string
-): lang is (typeof API_SUPPORTED_LANGUAGES)[number] {
+function isSupportedLanguage(lang: string): lang is (typeof API_SUPPORTED_LANGUAGES)[number] {
   return (API_SUPPORTED_LANGUAGES as readonly string[]).includes(lang);
 }
 export function getValidatedLanguage(

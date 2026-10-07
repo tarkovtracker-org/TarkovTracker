@@ -8,8 +8,8 @@ import {
   isValidMapSvgConfig,
   resolveFloorTilePath,
   rotateGameCoordinates,
-  type MapTileConfig,
 } from '@/utils/mapCoordinates';
+import type { MapSvgConfig, MapTileConfig } from '@/types/tarkov';
 describe('mapCoordinates', () => {
   describe('rotateGameCoordinates', () => {
     it('normalizes negative rotations', () => {
@@ -64,7 +64,7 @@ describe('mapCoordinates', () => {
         floors: ['Ground'],
         defaultFloor: 'Ground',
         coordinateRotation: 0,
-        bounds: [],
+        bounds: [] as unknown as MapSvgConfig['bounds'],
       });
       expect(bounds).toEqual([
         [0, 0],
@@ -77,7 +77,7 @@ describe('mapCoordinates', () => {
         floors: ['Ground'],
         defaultFloor: 'Ground',
         coordinateRotation: 0,
-        bounds: [[10, 20]],
+        bounds: [[10, 20]] as unknown as MapSvgConfig['bounds'],
       });
       expect(bounds).toEqual([
         [0, 0],

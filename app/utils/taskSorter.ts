@@ -228,7 +228,7 @@ export function sortTasksByTeammatesAvailable(
 /**
  * Sort tasks by XP reward
  */
-export function sortTasksByXp(tasks: Task[], direction: TaskSortDirection): Task[] {
+function sortTasksByXp(tasks: Task[], direction: TaskSortDirection): Task[] {
   const factor = getDirectionFactor(direction);
   return [...tasks].sort((a, b) => {
     const xpA = a.experience ?? 0;
