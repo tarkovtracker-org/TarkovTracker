@@ -1913,6 +1913,9 @@
   },
   "settings": {
     "locale": "Language",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Manage your account, game progression, and application preferences.",
     "tabs": {
       "progression": "Progression",
