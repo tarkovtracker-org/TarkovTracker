@@ -531,6 +531,8 @@ export default defineNuxtConfig({
       ],
     },
   },
+  // Nuxt default; lets Fallow model auto-imports and report unused utils/composables.
+  imports: {},
   components: [
     {
       path: '~/components',
