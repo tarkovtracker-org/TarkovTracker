@@ -1305,13 +1305,58 @@ test('tampered manifests, missing or expired artifacts and malicious archives fa
   });
   assert.deepEqual(statusStates(fake.state.statuses), ['a:failure']);
 });
+test('pull_request builds verify against the test-merge tree when the head is behind base', async (t) => {
+  // A PR behind main builds a test merge whose tree differs from the head commit's tree.
+  const mergeTree = sha('7');
+  const behind = await plan(t, workflowRunContext(), {
+    mergeTree,
+    manifest: { treeSha: mergeTree },
+  });
+  assert.equal(behind.decision.action, 'request', behind.decision.description);
+  const headTree = await plan(t, workflowRunContext(), { mergeTree });
+  assert.equal(headTree.decision.action, 'fail');
+  assert.match(headTree.decision.description, /treeSha/);
+  for (const [label, parents] of [
+    ['base parent', [{ sha: sha('f') }, { sha: HEAD }]],
+    ['head parent', [{ sha: BASE }, { sha: sha('e') }]],
+  ]) {
+    const unrelated = await plan(t, workflowRunContext(), {
+      mergeTree,
+      manifest: { treeSha: mergeTree },
+      commits: { [MERGE]: { tree: { sha: mergeTree }, parents } },
+    });
+    assert.equal(unrelated.decision.action, 'fail', label);
+    assert.match(unrelated.decision.description, /treeSha/, label);
+  }
+  const regenerated = sha('9');
+  const behindMerge = { tree: { sha: mergeTree }, parents: [{ sha: BASE }, { sha: HEAD }] };
+  const rewritten = await plan(t, workflowRunContext(), {
+    pull: pullFixture({ merge_commit_sha: regenerated }),
+    manifest: { treeSha: mergeTree },
+    commits: { [MERGE]: behindMerge, [regenerated]: behindMerge },
+  });
+  assert.equal(rewritten.decision.action, 'request', rewritten.decision.description);
+  const drifted = await plan(t, workflowRunContext(), {
+    pull: pullFixture({ merge_commit_sha: regenerated }),
+    manifest: { treeSha: mergeTree },
+    commits: { [MERGE]: behindMerge, [regenerated]: { ...behindMerge, tree: { sha: sha('e') } } },
+  });
+  assert.equal(drifted.decision.action, 'fail');
+  const missing = await plan(t, workflowRunContext(), {
+    manifest: { treeSha: mergeTree },
+    commits: { [MERGE]: Object.assign(new Error('No commit found'), { status: 404 }) },
+  });
+  assert.equal(missing.decision.action, 'fail');
+  assert.match(missing.decision.description, /treeSha/);
+});
 test('a matching earlier success is reused instead of redeploying', async (t) => {
   const first = await plan(t, workflowRunContext());
   const marker = successMarker(first.manifest.digest);
-  // Pull-request and dispatch runs carry their commit's tree on run.head_commit.tree_id; the
-  // manifest's treeSha claim verifies against it. A degraded API response without a usable tree
+  // Pull-request builds claim the test-merge tree. A degraded API response without a usable tree
   // yields a null expectation that no real manifest can match, so verification fails closed.
-  const treeless = await plan(t, workflowRunContext(), { run: { head_commit: {} }, manifest: {} });
+  const treeless = await plan(t, workflowRunContext(), {
+    commits: { [MERGE]: { tree: {}, parents: [{ sha: BASE }, { sha: HEAD }] } },
+  });
   assert.equal(treeless.decision.action, 'fail');
   assert.match(treeless.decision.description, /treeSha/);
   const reused = await plan(t, workflowRunContext(), {
