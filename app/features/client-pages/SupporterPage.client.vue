@@ -29,7 +29,7 @@
   const toast = useToast();
   const { $supabase } = useNuxtApp();
   const { fetchStatus } = useSupporter();
-  const interval = ref<BillingInterval>('monthly');
+  const interval = ref<BillingInterval>('yearly');
   let returnRefreshTimeout: number | undefined;
   const refreshSupporterStatus = () => {
     const userId = $supabase.user?.id;
