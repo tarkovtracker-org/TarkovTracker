@@ -819,6 +819,10 @@ describe('active progress across tabs', () => {
     'pending successor',
     'failed successor',
     'dirty cancel',
+    'dirty successor',
+    'dirty pending successor',
+    'dirty failed successor',
+    'dirty live',
   ] as const)(
     'review regression: reset status settles without replacing real intent: %s',
     async (kind) => {
@@ -828,7 +832,7 @@ describe('active progress across tabs', () => {
       const original = guestEnvelope(state);
       values.set(STORAGE_KEYS.progress, original);
       tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
-      if (kind === 'dirty cancel') {
+      if (kind.startsWith('dirty')) {
         vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
           throw new DOMException('Injected failure', 'QuotaExceededError');
         });
@@ -850,7 +854,7 @@ describe('active progress across tabs', () => {
       );
       if (kind !== 'successful') tab.invalidateActiveProgressWrites();
       let releaseSuccessor: (() => void) | undefined;
-      if (kind === 'pending successor') {
+      if (kind.endsWith('pending successor')) {
         const successorGate = new Promise<void>((resolve) => {
           releaseSuccessor = resolve;
         });
@@ -859,7 +863,7 @@ describe('active progress across tabs', () => {
       let successor: Promise<boolean> | undefined;
       if (kind.includes('successor')) {
         state.pve.level = 55;
-        if (kind === 'failed successor')
+        if (kind.endsWith('failed successor'))
           vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
             throw new DOMException('Injected failure', 'QuotaExceededError');
           });
@@ -867,6 +871,7 @@ describe('active progress across tabs', () => {
           tab.progressStorageSerializer.serialize(state, null, 300)
         );
       }
+      if (kind === 'dirty live') state.pve.level = 55;
       release();
       if (kind === 'successful') await reset;
       else await expect(reset).rejects.toThrow('could not be saved');
@@ -875,25 +880,34 @@ describe('active progress across tabs', () => {
         expect(tab.status.hasUnsavedProgressChanges()).toBe(true);
         releaseSuccessor();
       }
-      if (successor) expect(await successor).toBe(kind !== 'failed successor');
+      if (successor) expect(await successor).toBe(!kind.endsWith('failed successor'));
       await tab.flushActiveProgressWrites();
       expect(tab.status.progressSaveStatus.local).toBe(
-        ['successful', 'successor', 'pending successor'].includes(kind) ? 'saved' : 'failed'
+        kind === 'successful' || (kind.includes('successor') && !kind.endsWith('failed successor'))
+          ? 'saved'
+          : 'failed'
       );
       expect(tab.status.hasUnsavedProgressChanges()).toBe(
-        ['dirty cancel', 'failed successor'].includes(kind)
+        ['dirty cancel', 'dirty live'].includes(kind) || kind.endsWith('failed successor')
       );
       expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(
-        kind === 'failed successor' ? 1 : 0
+        kind.endsWith('failed successor') ? 1 : 0
       );
-      if (kind === 'dirty cancel') {
-        state.pve.level = 55;
-        await tab.persistActiveProgressValue(
-          tab.progressStorageSerializer.serialize(state, null, 400)
-        );
+      if (kind.startsWith('dirty')) {
+        if (!successor || kind.endsWith('failed successor')) {
+          state.seasonal.level = 55;
+          await tab.persistActiveProgressValue(
+            tab.progressStorageSerializer.serialize(state, null, 400)
+          );
+        }
         expect(
           tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pvp.level
         ).toBe(3);
+        if (kind !== 'dirty cancel')
+          expect(
+            tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pve
+              .level
+          ).toBe(55);
       }
     }
   );
@@ -940,6 +954,54 @@ describe('active progress across tabs', () => {
       expect(state.pvp.level).toBe(20);
       expect(other.pve.level).toBe(55);
       expect(tab.status.progressSaveStatus.local).toBe('saved');
+    }
+  );
+  it.each(['owner', 'source'] as const)(
+    'review regression: dirty canceled reset cannot borrow a replacement %s baseline',
+    async (replacement) => {
+      const tab = await openTab();
+      let state = structuredClone(defaultState);
+      state.pvp.level = 20;
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+        throw new DOMException('Injected failure', 'QuotaExceededError');
+      });
+      state.pvp.level = 3;
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 200)
+      );
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      const reset = tab.resetGuestProgress(
+        ['pve'],
+        false,
+        () => state,
+        (next) => Object.assign(state, next.state)
+      );
+      tab.invalidateActiveProgressWrites();
+      state = structuredClone(defaultState);
+      state.pvp.level = 42;
+      if (replacement === 'owner') auth.owner = 'next-owner';
+      const nextOwner = auth.owner;
+      const next = JSON.stringify({ ...JSON.parse(guestEnvelope(state)), _userId: nextOwner });
+      values.set(STORAGE_KEYS.progress, next);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(next, nextOwner));
+      state.pve.level = 55;
+      const edit = tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, nextOwner, 300)
+      );
+      release();
+      await expect(reset).rejects.toThrow('could not be saved');
+      expect(await edit).toBe(true);
+      const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), nextOwner)!;
+      expect(saved.state.pvp.level).toBe(42);
+      expect(saved.state.pve.level).toBe(55);
+      expect(state.pvp.level).toBe(42);
     }
   );
   it('review regression: failed reset continuation cannot rewind a newer adopted baseline', async () => {

@@ -3,9 +3,9 @@
   "scope": "Actual production reset/persistence modules and real Pinia plugin in separate native renderers; synthetic local guest flows, no hosted UI/account/provider acceptance.",
   "harnessSha256": "b043d090c4315cea5cee2cb3b6ec167942fc7db8e937cfcfc27043cd292c7ebe",
   "entrySha256": "cddf2b56663f76ccecd66fa2c3717cd8218d87667a9e00a4f2f7e6ae3b567d48",
-  "bundleSha256": "e78a90096af411eac8c97f2f4770da2c38a277e5219299b256d86278ee70e567",
+  "bundleSha256": "44c5fa40be4034714992227be415997a0b34c96fec15dae8486b428afd33ed71",
   "browser": "Chrome/154.0.8037.97",
-  "rendererPids": [45132, 43996],
+  "rendererPids": [28936, 40432],
   "visibility": "Exact raw storage-event/read barrier before stale-reset tests; not a cure/proof for #1092 immediate-release cache gap.",
   "sourceSha256": [
     {
@@ -66,7 +66,7 @@
     },
     {
       "path": "app/stores/tarkov/localStorage.ts",
-      "sha256": "3da9250b4869cd1ce96e4496cc74fc0a48030928ad1c2d2495f2fe4626c7a802"
+      "sha256": "4c990e5396730deae33668b1dcda36d8cb3d7226370a13a3541a0d6063fbba86"
     },
     {
       "path": "app/stores/tarkov/metadataEchoes.ts",
@@ -364,8 +364,8 @@
     }
   ],
   "baselineDefectsReproduced": 4,
-  "focusedTests": 386,
-  "newRegressionControls": 28,
+  "focusedTests": 392,
+  "newRegressionControls": 34,
   "noRuntimeAuthorityCutover": true,
   "sourceCompleteness": "Preserves existing PR history; completeness of original Linux staged/unstaged work is unverified without manifests.",
   "combinedRecoveryBaselineHead": "738a5f4f1217bf0931e11e0ea0c68ebe64193ceb",
@@ -403,7 +403,7 @@
     }
   ],
   "integratedBase": "bf7bafeba9bdfe455e77918bce1fdc314b2e9ea3",
-  "nativeObservedHead": "d92adb051e1cd2b7beda4ae644112aaa47b336f1",
+  "nativeObservedHead": "2c3c3b4076d54361c7102928eee7a162370019ec",
   "queuedAdoptionBaselineHead": "31c6ee3d0fa6bb165d1bae9a666117889b4ffeed",
   "queuedAdoptionBaselineDefectsReproduced": 4,
   "queuedAdoptionBaselineSuccessControls": 4,
@@ -578,7 +578,7 @@
     }
   ],
   "originalBaselineHarnessSha256": "80fb897adbabf998690700e99294c9b873bd69fd3001e4459af289ade3fb0487",
-  "nativeCases": 36,
+  "nativeCases": 42,
   "nativeObservedHeadIncludesUncommittedSource": true,
   "resetTransitionBaselineHead": "c836c25f877c07ecbe715a4876da62e571d1629c",
   "resetTransitionBaselineRendererPids": [8672, 10704],
@@ -827,5 +827,105 @@
       "sha256": "1d233333792de4bc19da9c5b97f0fef6e010e4dd52371d1d0fb6eeee76a4ad23"
     }
   ],
-  "independentHarnessSha256": "ae0308e1a53bca65514c9a5c9c2020a8564e1a2922e043544920a7819f79fa2a"
+  "independentHarnessSha256": "ae0308e1a53bca65514c9a5c9c2020a8564e1a2922e043544920a7819f79fa2a",
+  "dirtyCancellation": {
+    "baselineHead": "2c3c3b4076d54361c7102928eee7a162370019ec",
+    "harnessSha256": "0556ec9e24f60287d703729a4a17a01c3103f2d090d0c0ec1b24ad929ceeab11",
+    "greenRendererPids": [28476, 32036],
+    "redRendererPids": [23548, 27868],
+    "nativeCases": 6,
+    "moduleCases": 5,
+    "unitRedFailed": 4,
+    "unitRedControlsPassed": 15,
+    "ownership": "Reset-owned captured prefix is recovered inside the canceled lock callback before same-source successor execution; no successor retains serializer prefix for live edits; account/source guards and status ownership remain separate.",
+    "results": [
+      {
+        "kind": "dirty-canceled-successor",
+        "actor": 0,
+        "preserved": true,
+        "finalPvpLevel": 3,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      },
+      {
+        "kind": "clean-canceled-successor",
+        "actor": 0,
+        "preserved": true,
+        "finalPvpLevel": 20,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      },
+      {
+        "kind": "dirty-failed-reset-successor",
+        "actor": 0,
+        "preserved": true,
+        "finalPvpLevel": 3,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      },
+      {
+        "kind": "dirty-canceled-successor",
+        "actor": 1,
+        "preserved": true,
+        "finalPvpLevel": 3,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      },
+      {
+        "kind": "clean-canceled-successor",
+        "actor": 1,
+        "preserved": true,
+        "finalPvpLevel": 20,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      },
+      {
+        "kind": "dirty-failed-reset-successor",
+        "actor": 1,
+        "preserved": true,
+        "finalPvpLevel": 3,
+        "finalStatus": "saved",
+        "finalUnsaved": false
+      }
+    ]
+  },
+  "dirtyCancellationReceipts": [
+    {
+      "file": "w1129-native-dirty-source-final-green.json",
+      "sha256": "67a430775477efb45766ae8bc6d84277264d83666c39d3c739d4ae29cbd1441e"
+    },
+    {
+      "file": "w1129-dirty-combinations-red.log",
+      "sha256": "3e0e04217c803af867dc6de5dd8b31ed5d8b0040a6cbdcf37f6998fb3ce72210"
+    },
+    {
+      "file": "w1129-dirty-transition-final-red.log",
+      "sha256": "0b5ce8fdac842fe8b7f9d6512b9e3858ca9cfae30b24730f147618bdcaa789f8"
+    },
+    {
+      "file": "w1129-dirty-focused-final.log",
+      "sha256": "a3ef20df4582513c44725c1a1c98e84e120f9484fc0c2ffc8758a3286945b913"
+    },
+    {
+      "file": "w1129-dirty-focused-source-final.log",
+      "sha256": "d43d3f94f1cf0a9834d2ec24cbfb3fff50b2feb2c08d04669fe8077f88453c4b"
+    },
+    {
+      "file": "..\\task-7\\temp\\author-dirty-cancellation-native-red.json",
+      "sha256": "3043a7b11810a434d5ca6e5ab8c05086f6364284b643870389f20f87994a48ae"
+    },
+    {
+      "file": "..\\task-7\\temp\\author-dirty-cancellation-native-final-green.json",
+      "sha256": "66e28f734a0a586dc9a3a0dd3b5aac391869cfebbd44121e6c6635080055ad94"
+    },
+    {
+      "file": "..\\task-7\\temp\\author-dirty-cancellation-module-red.json",
+      "sha256": "750b2ee74577a2cee146442a060ebe11e0227cce48f1b0032886607d200ddd67"
+    },
+    {
+      "file": "..\\task-7\\temp\\author-dirty-cancellation-module-final-green.json",
+      "sha256": "8187e2cc39c8aed04c02ef18dab5b87823f4dca5b1ee3106280e6c87db6fa092"
+    }
+  ],
+  "fallowEvidenceRule": "Repository audit JSON uses synthetic materialized .nuxt commits and default threshold 20; source base/head binding requires raw stderr. Separate raw health --max-cyclomatic 4 report and original-owner function comparison verify author-introduced functions without suppressions."
 }

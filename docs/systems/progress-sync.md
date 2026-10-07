@@ -154,9 +154,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   The guest source key is the stable Pinia state object. Resets reject mixed captured sources
   before mutation rather than borrowing another store's baseline. A failed reset continuation
   restores serializer coordinates only while its revision and guest session still own them.
-  A canceled reset retains earlier failed intent only while its status ticket still owns the
-  operation and the same guest state object still holds exactly its captured memory; a successor
-  save or replacement memory prevents that restoration.
+  The reset owns its captured uncommitted prefix until commit. Cancellation transfers that
+  prefix under the lock into the first same-source queued edit before it can execute. With no
+  successor, the same guest state's serializer retains the prefix for uncaptured live edits
+  and a later retry. Status ownership cannot discard intent or rewind a successor's baseline;
+  another owner or captured source prevents recovery.
   These checks use the bytes observed by the current renderer. Web Locks serialize cooperating
   operations but do not prove immediate cross-renderer localStorage cache visibility (#1092);
   this change does not resolve that boundary or enable the inactive IndexedDB authority.
