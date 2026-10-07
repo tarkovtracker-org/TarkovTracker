@@ -11,13 +11,20 @@ reset implementation remains separate, and draft #1086 must retain its cached-cl
 Source audit base: main `abb4e9b1a8abb9fa0f8807a909d009926db8c236` on 2026-10-06. Root
 `AGENTS.md` and `supabase/AGENTS.md` apply; no `.agents` directory exists at this revision. Open
 PRs were #1086, #715 and #517. Issues #1091 and #1092 remain open. #1091's owner work is preserved
-in another environment at `/home/lab/.worktrees/tt-guest-reset-proof`; it is not present in this
+in another environment on branch `fix/1091-guest-reset-persistence` (see #1091); it is not present in this
 Windows clone and must be transferred with its staged and unstaged deltas before reuse.
 
 `scripts/checks/progress-renderer-repro.mjs` starts an isolated Chromium profile and loopback
 server. It uses unmodified native storage getters, setters, locks, and transactions. It does not
 load the application, emulate its merge rules, or contact production services. Each receipt
 records the script SHA-256 and native trace marks linking actors to separate renderer PIDs.
+
+The 2026-10-07 review follow-up strengthens the native reset control: its unselected PvE
+input is 999 while the previously committed PvE level is 55. Both renderer orders retain
+55, including the subsequent read after an aborted write. A compact receipt retaining source
+hashes, renderer marks and transaction results is in `docs/evidence/w10-native-review-delta.json`.
+Invalid `activateOwner` arguments now reject with a caller `TypeError` before opening a
+transaction; corrupt stored records retain their separate record error and untouched-original contract.
 
 On Chrome 154.0.8037.97, the final run made 50 immediate write/release attempts in each
 order. Six of 100 trials lost a preceding PvE 55 write: the next native lock callback read PvE

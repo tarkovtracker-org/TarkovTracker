@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
+import { IDBDatabase as FakeIDBDatabase, IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
 import {
@@ -47,7 +47,22 @@ describe('inactive progress transaction repository', () => {
     repository = await openProgressRepository(factory, 'progress-test');
     token = await repository.activateOwner(null);
   });
-  afterEach(() => repository.close());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    repository.close();
+  });
+  it.each(['', undefined, 42, false])(
+    'rejects invalid owner argument %j before opening a transaction or classifying stored data',
+    async (owner) => {
+      const before = await rawRecords();
+      const transaction = vi.spyOn(FakeIDBDatabase.prototype, 'transaction');
+      await expect(repository.activateOwner(owner as string)).rejects.toBeInstanceOf(TypeError);
+      expect(transaction).not.toHaveBeenCalled();
+      transaction.mockRestore();
+      expect(await rawRecords()).toEqual(before);
+      expect(await repository.activateOwner(null)).toEqual(token);
+    }
+  );
   it.each([
     {
       label: 'logical version 2 under database version 1',

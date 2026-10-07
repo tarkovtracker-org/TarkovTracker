@@ -65,6 +65,8 @@ const requireOwner = (value: unknown, kind: RecordKind): void => {
   if (value === null) return;
   requireShape(typeof value === 'string' && value.length > 0, kind);
 };
+const isOwnerArgument = (value: unknown): value is Owner =>
+  value === null || (typeof value === 'string' && value.length > 0);
 const requireCounter = (value: unknown, kind: RecordKind): void => {
   requireShape(typeof value === 'number' && Number.isSafeInteger(value) && value >= 0, kind);
 };
@@ -487,13 +489,13 @@ export const openProgressRepository = async (factory: IDBFactory, name: string) 
       })
     );
   };
-  const activateOwner = (owner: Owner, renew = false) =>
-    transaction<ProgressOwnerToken>(db, 'readwrite', (store, finish, fail) => {
+  const activateOwner = (owner: Owner, renew = false) => {
+    if (!isOwnerArgument(owner)) return Promise.reject(new TypeError('Invalid progress owner'));
+    return transaction<ProgressOwnerToken>(db, 'readwrite', (store, finish, fail) => {
       readEntry(
         store,
         sessionKey,
         (entry) => {
-          requireOwner(owner, 'session');
           const token = nextOwnerToken(decodeSession(entry), owner, renew);
           if (!Number.isSafeInteger(token.generation))
             throw new ProgressRepositoryConflict('session');
@@ -511,5 +513,6 @@ export const openProgressRepository = async (factory: IDBFactory, name: string) 
         fail
       );
     });
+  };
   return { activateOwner, read, commit, remove, close: () => db.close() };
 };

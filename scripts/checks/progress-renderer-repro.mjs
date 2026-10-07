@@ -338,10 +338,12 @@ try {
     assert.deepEqual(rejected, { saved: false, reason: 'revision' });
     const reset = await evaluate(
       reader,
-      `(async()=>{window.current=await repo.read(token);window.next=structuredClone(current.state);next.pvp.progressEpoch=1;return await repo.commit({token,expectedRevision:current.revision,kind:'reset',resetModes:['pvp'],state:next})})()`
+      `(async()=>{window.current=await repo.read(token);window.next=structuredClone(current.state);next.pvp.progressEpoch=1;next.pve.level=999;return await repo.commit({token,expectedRevision:current.revision,kind:'reset',resetModes:['pvp'],state:next})})()`
     );
     assert.equal(reset.state.pve.level, 55);
     assert.equal(reset.epochs.pvp, 1);
+    const resetInputPveLevel = await evaluate(reader, 'next.pve.level');
+    assert.equal(resetInputPveLevel, 999);
     const abort = await evaluate(
       writer,
       `(async()=>{window.originalPut=IDBObjectStore.prototype.put;window.putSucceeded=false;IDBObjectStore.prototype.put=function(...args){const request=originalPut.apply(this,args);request.addEventListener('success',()=>{putSucceeded=true;this.transaction.abort()});return request};window.saved=false;window.baseline=2;window.latest=await repo.read(token);window.failure=await repo.commit({token,expectedRevision:latest.revision,kind:'edit',state:latest.state}).then(result=>{saved=true;baseline=result.revision;return null},error=>error.name);IDBObjectStore.prototype.put=originalPut;return {failure,putSucceeded,saved,baseline}})()`
@@ -366,7 +368,16 @@ try {
       `repo.commit({token,expectedRevision:3,kind:'import',legacyRaw:'retained legacy bytes',state:${JSON.stringify(fixture)}}).then(()=>({saved:true}),e=>({saved:false,reason:e.reason}))`
     );
     assert.deepEqual(reimport, { saved: false, reason: 'deleted' });
-    receipt.repository.push({ order, rejected, reset, abort, afterAbort, removal, reimport });
+    receipt.repository.push({
+      order,
+      rejected,
+      resetInputPveLevel,
+      reset,
+      abort,
+      afterAbort,
+      removal,
+      reimport,
+    });
   }
   await call('Tracing.end');
   await traceFinished;

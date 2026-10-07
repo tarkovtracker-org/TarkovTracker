@@ -1,0 +1,120 @@
+{
+  "scope": "Native browser boundary only; not application acceptance",
+  "browser": "Chrome/154.0.8037.97",
+  "sourceSha256": "69b7a6fe4238426c0df6901111e40125eda0327dc1ded8042a3c8d484e024b06",
+  "repositorySha256": "d69aa40a18a30a529f763fd95cfff3514cea814ef6d15b63550e3a1bad406fae",
+  "fullNativeReceiptSha256": "324acc29cc9938ed7b9686476010ac97bc894e4469f7a7d04f7dbaf737d69b8e",
+  "roundsPerOrder": 10,
+  "trials": 20,
+  "lostUpdates": 2,
+  "actorMarks": [
+    {
+      "args": {
+        "data": {
+          "callTime": 219904151899,
+          "navigationId": "FB5C1DCAD687963E1FC29FDF139128FB",
+          "sampleTraceId": 8526175258129845,
+          "startTime": 74.80000001192093
+        }
+      },
+      "cat": "blink.user_timing",
+      "name": "w10-actor-a",
+      "ph": "I",
+      "pid": 33788,
+      "s": "t",
+      "tid": 41356,
+      "ts": 219904151890,
+      "tts": 61624
+    },
+    {
+      "args": {
+        "data": {
+          "callTime": 219904281658,
+          "navigationId": "B3F63E04E3A7B8D4E1EDF0A7A73D833A",
+          "sampleTraceId": 7342392524186343,
+          "startTime": 73.5
+        }
+      },
+      "cat": "blink.user_timing",
+      "name": "w10-actor-b",
+      "ph": "I",
+      "pid": 38272,
+      "s": "t",
+      "tid": 45532,
+      "ts": 219904281635,
+      "tts": 60353
+    }
+  ],
+  "repository": [
+    {
+      "order": [0, 1],
+      "rejected": {
+        "saved": false,
+        "reason": "revision"
+      },
+      "resetInputPveLevel": 999,
+      "reset": {
+        "revision": 2,
+        "epochs": {
+          "pvp": 1,
+          "pve": 0,
+          "seasonal": 0
+        },
+        "pveLevel": 55
+      },
+      "abort": {
+        "failure": "AbortError",
+        "putSucceeded": true,
+        "saved": false,
+        "baseline": 2
+      },
+      "afterAbort": {
+        "revision": 2,
+        "pveLevel": 55
+      },
+      "removal": {
+        "deleted": true,
+        "revision": 3
+      },
+      "reimport": {
+        "saved": false,
+        "reason": "deleted"
+      }
+    },
+    {
+      "order": [1, 0],
+      "rejected": {
+        "saved": false,
+        "reason": "revision"
+      },
+      "resetInputPveLevel": 999,
+      "reset": {
+        "revision": 2,
+        "epochs": {
+          "pvp": 1,
+          "pve": 0,
+          "seasonal": 0
+        },
+        "pveLevel": 55
+      },
+      "abort": {
+        "failure": "AbortError",
+        "putSucceeded": true,
+        "saved": false,
+        "baseline": 2
+      },
+      "afterAbort": {
+        "revision": 2,
+        "pveLevel": 55
+      },
+      "removal": {
+        "deleted": true,
+        "revision": 3
+      },
+      "reimport": {
+        "saved": false,
+        "reason": "deleted"
+      }
+    }
+  ]
+}
