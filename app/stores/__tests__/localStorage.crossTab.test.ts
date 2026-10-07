@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defaultState } from '@/stores/progressState';
-import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { defaultState, type UserState } from '@/stores/progressState';
+import { GAME_MODE_VALUES } from '@/utils/constants';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 const envelope = (owner: string, level: number) =>
   JSON.stringify({
     _userId: owner,
@@ -28,6 +29,18 @@ const openTab = async () => {
   tab.setActiveProgressRetentionGuard(retain);
   return { ...tab, status: await import('@/stores/tarkov/progressSaveStatus') };
 };
+const guestEnvelope = (
+  state: UserState,
+  modeTimestamps = { pvp: 100, pve: 100, seasonal: 100 },
+  metadataTimestamp = 100
+) =>
+  JSON.stringify({
+    _userId: null,
+    _timestamp: Math.max(...Object.values(modeTimestamps)),
+    _metadataTimestamp: metadataTimestamp,
+    _modeTimestamps: modeTimestamps,
+    data: state,
+  });
 describe('active progress across tabs', () => {
   let values: Map<string, string>;
   let lockTail: Promise<unknown>;
@@ -55,6 +68,668 @@ describe('active progress across tabs', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it.each(['{"data":{}}', JSON.stringify({ _userId: null, data: defaultState })])(
+    'preserves unchanged raw guest envelope bytes %s',
+    async (value) => {
+      const tab = await openTab();
+      expect(await tab.persistActiveProgressValue(value)).toBe(true);
+      expect(values.get(STORAGE_KEYS.progress)).toBe(value);
+      expect(await tab.persistActiveProgressValue(value)).toBe(true);
+      expect(values.get(STORAGE_KEYS.progress)).toBe(value);
+    }
+  );
+  it.each(['traderLevel', 'traderReputation', 'skillLevel', 'prestigeLevel'] as const)(
+    'persists a captured guest %s decrease while preserving unrelated concurrent fields',
+    async (kind) => {
+      const tab = await openTab();
+      const state = structuredClone(defaultState);
+      state.pvp.traders.prapor = { level: 4, reputation: 1 };
+      state.pvp.skills.strength = 10;
+      state.pvp.prestigeLevel = 2;
+      const original = guestEnvelope(state);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      const concurrent = structuredClone(state);
+      concurrent.pvp.xpOffset = 50;
+      concurrent.pvp.skills.endurance = 9;
+      concurrent.pve.level = 42;
+      values.set(
+        STORAGE_KEYS.progress,
+        guestEnvelope(concurrent, { pvp: 150, pve: 150, seasonal: 100 })
+      );
+      if (kind === 'traderLevel') state.pvp.traders.prapor.level = 1;
+      if (kind === 'traderReputation') state.pvp.traders.prapor.reputation = 0;
+      if (kind === 'skillLevel') state.pvp.skills.strength = 3;
+      if (kind === 'prestigeLevel') state.pvp.prestigeLevel = 0;
+      const expected = { ...structuredClone(state.pvp), xpOffset: 50 };
+      expected.skills.endurance = 9;
+      expect(
+        await tab.persistActiveProgressValue(
+          tab.progressStorageSerializer.serialize(state, null, 200)
+        )
+      ).toBe(true);
+      const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+      expect(saved.state.pvp).toEqual(expected);
+      expect(saved.state.pve.level).toBe(42);
+      expect(saved.modeTimestamps).toEqual({ pvp: 200, pve: 150, seasonal: 100 });
+      expect(tab.status.progressSaveStatus.local).toBe('saved');
+    }
+  );
+  it.each(['queued', 'after commit'])(
+    'orders captured first guest writes %s against their initial zero-clock baseline',
+    async (timing) => {
+      const first = await openTab();
+      const second = await openTab();
+      const stateA = structuredClone(defaultState);
+      const stateB = structuredClone(defaultState);
+      stateA.pvp.traders.prapor = { level: 4, reputation: 1 };
+      stateA.pvp.skills.strength = 10;
+      stateA.pve.level = 42;
+      stateB.pvp.traders.prapor = { level: 1, reputation: 0 };
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      const writeA = first.persistActiveProgressValue(
+        first.progressStorageSerializer.serialize(stateA, null, 100)
+      );
+      if (timing === 'after commit') {
+        release();
+        await writeA;
+      }
+      const writeB = second.persistActiveProgressValue(
+        second.progressStorageSerializer.serialize(stateB, null, 200)
+      );
+      release();
+      expect(await Promise.all([writeA, writeB])).toEqual([true, true]);
+      const saved = second.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+      expect(saved.state.pvp.traders.prapor).toEqual({ level: 1, reputation: 0 });
+      expect(saved.state.pvp.skills.strength).toBe(10);
+      expect(saved.state.pve.level).toBe(42);
+      expect(saved.modeTimestamps).toEqual({ pvp: 200, pve: 100, seasonal: 0 });
+      expect(saved.metadataTimestamp).toBe(0);
+      expect(second.status.progressSaveStatus.local).toBe('saved');
+    }
+  );
+  it('does not infer captured first guest intent from a concurrently changed shared slot', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.traders.prapor = { level: 1, reputation: 0 };
+    const concurrent = structuredClone(defaultState);
+    concurrent.pvp.skills.strength = 10;
+    values.set(
+      STORAGE_KEYS.progress,
+      guestEnvelope(concurrent, { pvp: 150, pve: 0, seasonal: 0 }, 0)
+    );
+    expect(
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 200)
+      )
+    ).toBe(true);
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp.traders.prapor).toEqual({ level: 1, reputation: 0 });
+    expect(saved.state.pvp.skills.strength).toBe(10);
+    expect(saved.modeTimestamps).toEqual({ pvp: 200, pve: 0, seasonal: 0 });
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('rebases captured same-epoch corrections beyond a newer durable clock before reporting saved', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.traders.prapor = { level: 4, reputation: 1 };
+    state.gameEdition = 4;
+    const original = guestEnvelope(state);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    const concurrent = structuredClone(state);
+    concurrent.pvp.skills.endurance = 9;
+    concurrent.tarkovUid = 123;
+    values.set(
+      STORAGE_KEYS.progress,
+      guestEnvelope(concurrent, { pvp: 10_000, pve: 100, seasonal: 100 }, 10_000)
+    );
+    state.pvp.traders.prapor.level = 1;
+    state.gameEdition = 1;
+    expect(
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 500)
+      )
+    ).toBe(true);
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp.traders.prapor?.level).toBe(1);
+    expect(saved.state.pvp.skills.endurance).toBe(9);
+    expect(saved.state.gameEdition).toBe(1);
+    expect(saved.state.tarkovUid).toBe(123);
+    expect(saved.modeTimestamps).toEqual({ pvp: 10_001, pve: 100, seasonal: 100 });
+    expect(saved.metadataTimestamp).toBe(10_001);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('persists captured guest false, deletion and history removal without replacing concurrent entries', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.taskCompletions.old = { complete: true, failed: true, timestamp: 100 };
+    state.pvp.taskCompletions.removed = { complete: true, timestamp: 100 };
+    state.pvp.skills.strength = 10;
+    state.pvp.manualActivityHistory = [
+      { id: 'old', timestamp: 100, type: 'task', action: 'complete', title: 'Old' },
+    ];
+    const original = guestEnvelope(state);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    const concurrent = structuredClone(state);
+    concurrent.pvp.taskCompletions.remote = { complete: true, timestamp: 150 };
+    concurrent.pvp.manualActivityHistory!.push({
+      id: 'remote',
+      timestamp: 150,
+      type: 'task',
+      action: 'complete',
+      title: 'Remote',
+    });
+    values.set(
+      STORAGE_KEYS.progress,
+      guestEnvelope(concurrent, { pvp: 150, pve: 100, seasonal: 100 })
+    );
+    state.pvp.taskCompletions.old = { complete: false, failed: false, timestamp: 200 };
+    delete state.pvp.taskCompletions.removed;
+    delete state.pvp.skills.strength;
+    state.pvp.manualActivityHistory = [];
+    expect(
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, null, 200)
+      )
+    ).toBe(true);
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp.taskCompletions).toEqual({
+      old: { complete: false, failed: false, timestamp: 200 },
+      remote: { complete: true, timestamp: 150 },
+    });
+    expect(saved.state.pvp.skills).toEqual({});
+    expect(saved.state.pvp.manualActivityHistory?.map((row) => row.id)).toEqual(['remote']);
+    expect(saved.modeTimestamps).toEqual({ pvp: 200, pve: 100, seasonal: 100 });
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('adopts a guest reset from another tab before saving a subsequent legitimate edit', async () => {
+    const first = await openTab();
+    const second = await openTab();
+    const stateA = structuredClone(defaultState);
+    stateA.pvp.level = 20;
+    const stateB = structuredClone(stateA);
+    const original = guestEnvelope(stateA);
+    values.set(STORAGE_KEYS.progress, original);
+    first.progressStorageSerializer.reset(first.parsePersistedProgressState(original, null));
+    second.progressStorageSerializer.reset(second.parsePersistedProgressState(original, null));
+    await first.resetGuestProgress(
+      ['pvp'],
+      false,
+      () => stateA,
+      (accepted) => Object.assign(stateA, accepted.state)
+    );
+    stateB.pve.level = 2;
+    await second.persistActiveProgressValue(
+      second.progressStorageSerializer.serialize(stateB, null, Date.now() + 10)
+    );
+    expect(stateB.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 1 });
+    stateB.pvp.level = 2;
+    await second.persistActiveProgressValue(
+      second.progressStorageSerializer.serialize(stateB, null, Date.now() + 20)
+    );
+    expect(
+      second.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pvp.level
+    ).toBe(2);
+    expect(second.status.progressSaveStatus.local).toBe('saved');
+  });
+  it.each([
+    [3, 5],
+    [5, 3],
+  ])('keeps same-clock guest scalar edits %s then %s ordered', async (first, second) => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    const original = guestEnvelope(state, { pvp: 900, pve: 900, seasonal: 900 }, 900);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    state.pvp.level = first!;
+    await tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 1000)
+    );
+    state.pvp.level = second!;
+    await tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 1000)
+    );
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp.level).toBe(second);
+    expect(saved.modeTimestamps).toEqual({ pvp: 1001, pve: 900, seasonal: 900 });
+    expect(saved.metadataTimestamp).toBe(900);
+  });
+  it('advances changed guest clocks beyond future baseline clocks without making raw equal ties authoritative', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    const original = guestEnvelope(state, { pvp: 10_000, pve: 10_000, seasonal: 10_000 }, 10_000);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    state.pvp.level = 3;
+    state.gameEdition = 4;
+    const captured = tab.progressStorageSerializer.serialize(state, null, 1000);
+    // Auth handoffs can transfer queued bytes before ordinary guest reconciliation runs.
+    const queued = tab.parsePersistedProgressState(captured, null)!;
+    expect(queued.modeTimestamps).toEqual({ pvp: 10_001, pve: 10_000, seasonal: 10_000 });
+    expect(queued.metadataTimestamp).toBe(10_001);
+    await tab.persistActiveProgressValue(captured);
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.modeTimestamps).toEqual({ pvp: 10_001, pve: 10_000, seasonal: 10_000 });
+    expect(saved.metadataTimestamp).toBe(10_001);
+    const stale = structuredClone(state);
+    stale.pvp.level = 5;
+    stale.gameEdition = 1;
+    const adopt = vi.fn();
+    await tab.persistActiveProgressValue(
+      guestEnvelope(stale, { pvp: 10_001, pve: 10_000, seasonal: 10_000 }, 10_001),
+      false,
+      undefined,
+      undefined,
+      { key: state, readState: () => state, acceptState: adopt }
+    );
+    expect(adopt).not.toHaveBeenCalled();
+    expect(
+      tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pvp.level
+    ).toBe(3);
+    expect(
+      tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.gameEdition
+    ).toBe(4);
+  });
+  it('keeps guest intent clocks separate from the prior owner baseline needed for auth handoff', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    const acceptedGuest = guestEnvelope(state);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(acceptedGuest, null));
+    const prior = envelope('prior-owner', 20);
+    values.set(STORAGE_KEYS.progress, prior);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    state.pve.level = 2;
+    const write = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    const pending = tab.getPendingProgressWritesForOwners([null]);
+    try {
+      expect(pending[0]?.baseline?.storedUserId).toBe('prior-owner');
+      expect(pending[0]?.guestBaseline?.storedUserId).toBeNull();
+      expect(pending[0]?.guestBaseline?.state.pve.level).toBe(1);
+    } finally {
+      release();
+    }
+    expect(await write).toBe(true);
+    expect(values.get('retained:prior-owner')).toBe(prior);
+    expect(
+      tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pve.level
+    ).toBe(2);
+    expect(pending[0]?.source).toBeUndefined();
+  });
+  it('releases captured guest source bindings when queued writes expire with their session', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    state.pvp.level = 20;
+    const readState = vi.fn(() => state);
+    const acceptState = vi.fn();
+    const write = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300),
+      false,
+      undefined,
+      undefined,
+      { key: state, readState, acceptState }
+    );
+    const pending = tab.getPendingProgressWritesForOwners([null]);
+    expect(pending[0]?.source).toBeDefined();
+    auth.owner = 'new-owner';
+    tab.invalidateActiveProgressWrites();
+    try {
+      expect(pending[0]?.source).toBeUndefined();
+    } finally {
+      release();
+    }
+    expect(await write).toBe(false);
+    expect(readState).not.toHaveBeenCalled();
+    expect(acceptState).not.toHaveBeenCalled();
+    expect(values.get(STORAGE_KEYS.progress)).toBe(original);
+  });
+  it('fences already queued old-epoch task edits while adopting the reset into their live source', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 20;
+    state.pvp.taskCompletions.old = { complete: true, timestamp: 100 };
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    const reset = structuredClone(state);
+    reset.pvp = { ...defaultState.pvp, progressEpoch: 1 };
+    values.set(STORAGE_KEYS.progress, guestEnvelope(reset, { pvp: 200, pve: 100, seasonal: 100 }));
+    state.pve.level = 2;
+    const first = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    state.pvp.taskCompletions.stale = { complete: true, timestamp: 400 };
+    const second = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 400)
+    );
+    release();
+    await Promise.all([first, second]);
+    await tab.flushActiveProgressWrites();
+    expect(state.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 1 });
+    expect(
+      tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)?.state.pvp
+    ).toEqual(state.pvp);
+    expect(state.pve.level).toBe(2);
+  });
+  it('persists uncaptured live intent after adopting a future-clock reset without resurrecting old maps or history', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 20;
+    state.pvp.taskCompletions.old = { complete: true, timestamp: 100 };
+    state.pvp.manualActivityHistory = [
+      { id: 'old', timestamp: 100, type: 'task', action: 'complete', title: 'Old' },
+    ];
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    let release!: () => void;
+    let releaseFollowup!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const followupGate = new Promise<void>((resolve) => {
+      releaseFollowup = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    const reset = structuredClone(state);
+    reset.pvp = { ...defaultState.pvp, progressEpoch: 1 };
+    const future = Date.now() + 100_000;
+    values.set(
+      STORAGE_KEYS.progress,
+      guestEnvelope(reset, { pvp: future, pve: 100, seasonal: 100 })
+    );
+    state.pve.level = 2;
+    const write = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 300)
+    );
+    void navigator.locks.request('held followup', { mode: 'exclusive' }, () => followupGate);
+    state.pvp.level = 2;
+    state.pvp.taskCompletions.fresh = { complete: true, timestamp: 400 };
+    state.pvp.manualActivityHistory.push({
+      id: 'fresh',
+      timestamp: 400,
+      type: 'task',
+      action: 'complete',
+      title: 'Fresh',
+    });
+    release();
+    try {
+      await write;
+      expect(tab.status.progressSaveStatus.local).toBe('pending');
+      expect(state.pvp.level).toBe(2);
+      expect(state.pvp.progressEpoch).toBe(1);
+      expect(state.pvp.taskCompletions.old).toBeUndefined();
+      expect(state.pvp.manualActivityHistory?.map((row) => row.id)).toEqual(['fresh']);
+    } finally {
+      releaseFollowup();
+    }
+    await tab.flushActiveProgressWrites();
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp).toEqual(state.pvp);
+    expect(saved.modeTimestamps?.pvp).toBeGreaterThan(future);
+    expect(saved.modeTimestamps?.seasonal).toBe(100);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('preserves same-epoch queued undo, false, null, zero and removal intent in order', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 5;
+    state.pvp.displayName = 'Old';
+    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.strength = 3;
+    state.pvp.taskCompletions.old = { complete: true, timestamp: 100 };
+    state.pvp.manualActivityHistory = [
+      { id: 'old', timestamp: 100, type: 'task', action: 'complete', title: 'Old' },
+    ];
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    state.pvp.level = 3;
+    const first = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 1000)
+    );
+    state.pvp.level = 5;
+    state.pvp.displayName = null;
+    state.pvp.xpOffset = 0;
+    state.pvp.skillOffsets.strength = 0;
+    state.pvp.taskCompletions.old = { complete: false, timestamp: 1001 };
+    state.pvp.manualActivityEpoch = 1;
+    state.pvp.manualActivityHistory = [];
+    const second = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, null, 1000)
+    );
+    delete state.pvp.skillOffsets.strength;
+    release();
+    await Promise.all([first, second]);
+    await tab.flushActiveProgressWrites();
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state.pvp).toMatchObject({
+      level: 5,
+      displayName: null,
+      xpOffset: 0,
+      taskCompletions: { old: { complete: false } },
+      manualActivityEpoch: 1,
+      manualActivityHistory: [],
+    });
+    expect(saved.state.pvp.skillOffsets.strength).toBeUndefined();
+    expect(state.pvp).toEqual(saved.state.pvp);
+  });
+  it.each(['pvp', 'pve', 'seasonal', 'all'] as const)(
+    'reconciles a queued guest %s reset with newer durable modes and fences a stale tab write',
+    async (mode) => {
+      const first = await openTab();
+      const second = await openTab();
+      const state = structuredClone(defaultState);
+      for (const other of GAME_MODE_VALUES) state[other].level = 40;
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      first.progressStorageSerializer.reset(first.parsePersistedProgressState(original, null));
+      const newer = structuredClone(state);
+      for (const other of GAME_MODE_VALUES) newer[other].level = 3;
+      newer.gameEdition = 4;
+      const clocks = { pvp: 200, pve: 200, seasonal: 200 };
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      const intervening = second.persistActiveProgressValue(guestEnvelope(newer, clocks, 200));
+      const modes = mode === 'all' ? GAME_MODE_VALUES : [mode];
+      const adopt = vi.fn((accepted) => Object.assign(state, accepted.state));
+      const reset = first.resetGuestProgress(modes, mode === 'all', () => state, adopt);
+      const stale = structuredClone(defaultState);
+      for (const other of GAME_MODE_VALUES) {
+        stale[other].level = 40;
+        stale[other].displayName = 'Old name';
+        stale[other].pmcFaction = 'BEAR';
+        stale[other].xpOffset = 500;
+        stale[other].skillOffsets = { strength: 4 };
+        stale[other].taskCompletions.old = { complete: true, timestamp: 900 };
+        stale[other].storyChapters.old = {
+          objectives: { old: { complete: true, timestamp: 900 } },
+        };
+        stale[other].taskAvailability = {
+          old: { requirements: 'old requirements', timestamp: 900 },
+        };
+        stale[other].manualActivityHistory = [
+          { id: 'old', timestamp: 900, type: 'task', action: 'complete', title: 'Old' },
+        ];
+      }
+      // The obsolete reset-mode payload has a later scalar clock than the reset.
+      const staleClocks = { pvp: 100, pve: 100, seasonal: 100 };
+      for (const resetMode of modes) staleClocks[resetMode] = Date.now() + 100_000;
+      const trailing = second.persistActiveProgressValue(guestEnvelope(stale, staleClocks));
+      expect(adopt).not.toHaveBeenCalled();
+      release();
+      expect(await intervening).toBe(true);
+      await reset;
+      expect(await trailing).toBe(true);
+      const saved = first.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+      expect(adopt).toHaveBeenCalledOnce();
+      for (const other of GAME_MODE_VALUES) {
+        if (modes.includes(other)) {
+          expect(saved.state[other]).toEqual({ ...defaultState[other], progressEpoch: 1 });
+          expect(saved.modeTimestamps?.[other]).toBe(adopt.mock.calls[0]![0].modeTimestamps[other]);
+        } else {
+          expect(saved.state[other].level).toBe(3);
+          expect(saved.modeTimestamps?.[other]).toBe(200);
+        }
+      }
+      expect(saved.state.gameEdition).toBe(mode === 'all' ? defaultState.gameEdition : 4);
+      expect(saved.metadataTimestamp).toBe(
+        mode === 'all' ? adopt.mock.calls[0]![0].metadataTimestamp : 200
+      );
+    }
+  );
+  it("cancels this tab's earlier pending guest write before committing a reset", async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.level = 40;
+    state.pve.level = 5;
+    const original = guestEnvelope(state);
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    const pending = tab.persistActiveProgressValue(original);
+    const adopt = vi.fn((snapshot) => Object.assign(state, snapshot.state));
+    const reset = tab.resetGuestProgress(['pvp'], false, () => state, adopt);
+    release();
+    expect(await pending).toBe(false);
+    await reset;
+    expect(state.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 1 });
+    expect(state.pve.level).toBe(5);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
+  it('bases guest reset epochs on the newer stored epoch and includes live edits made while waiting', async () => {
+    const tab = await openTab();
+    const state = structuredClone(defaultState);
+    state.pvp.progressEpoch = 2;
+    values.set(STORAGE_KEYS.progress, guestEnvelope(state));
+    tab.progressStorageSerializer.reset(
+      tab.parsePersistedProgressState(guestEnvelope(state), null)
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+    const adopt = vi.fn((snapshot) => Object.assign(state, snapshot.state));
+    const reset = tab.resetGuestProgress(['pvp'], false, () => state, adopt);
+    state.pve.level = 5;
+    const current = structuredClone(defaultState);
+    current.pvp.progressEpoch = 7;
+    current.pvp.level = 9;
+    values.set(STORAGE_KEYS.progress, guestEnvelope(current));
+    release();
+    await reset;
+    expect(state.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 8 });
+    expect(state.pve.level).toBe(5);
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), null)!;
+    expect(saved.state).toEqual(state);
+    expect(saved.modeTimestamps?.seasonal).toBe(100);
+  });
+  it.each([
+    'foreign',
+    'unparseable',
+    'read',
+    'quota',
+    'inaccessible',
+    'blocked',
+    'retention',
+    'locks',
+    'session',
+    'generation',
+  ] as const)(
+    'refuses a guest reset without adopting memory or reporting success when %s prevents commit',
+    async (failure) => {
+      const tab = await openTab();
+      const state = structuredClone(defaultState);
+      state.pvp.level = 40;
+      const original = guestEnvelope(state);
+      values.set(STORAGE_KEYS.progress, original);
+      tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
+      const adopt = vi.fn();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      void navigator.locks.request('held', { mode: 'exclusive' }, () => gate);
+      if (failure === 'locks') vi.stubGlobal('navigator', {});
+      values.set(LEGACY_STORAGE_KEYS.progress, original);
+      const reset = tab.resetGuestProgress(['pvp'], false, () => state, adopt);
+      if (failure === 'foreign') values.set(STORAGE_KEYS.progress, envelope('foreign', 9));
+      if (failure === 'unparseable') values.set(STORAGE_KEYS.progress, '{opaque');
+      if (failure === 'read')
+        vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+          throw new Error('read failed');
+        });
+      if (failure === 'quota')
+        vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+          throw new DOMException('full', 'QuotaExceededError');
+        });
+      if (failure === 'inaccessible')
+        vi.stubGlobal(
+          'localStorage',
+          new Proxy(
+            {},
+            {
+              get: () => {
+                throw new DOMException('blocked', 'SecurityError');
+              },
+            }
+          )
+        );
+      if (failure === 'blocked') tab.setActiveProgressWritesBlocked(true);
+      if (failure === 'retention') tab.setActiveProgressRetentionGuard(() => false);
+      if (failure === 'session') auth.owner = 'new-owner';
+      if (failure === 'generation') tab.invalidateActiveProgressWrites();
+      release();
+      await expect(reset).rejects.toThrow('Local guest progress could not be saved');
+      expect(values.get(STORAGE_KEYS.progress)).toBe(
+        failure === 'foreign'
+          ? envelope('foreign', 9)
+          : failure === 'unparseable'
+            ? '{opaque'
+            : original
+      );
+      expect(values.get(LEGACY_STORAGE_KEYS.progress)).toBe(original);
+      expect(adopt).not.toHaveBeenCalled();
+      expect(state.pvp.level).toBe(40);
+      expect(tab.status.progressSaveStatus.local).toBe(
+        ['session', 'generation', 'blocked'].includes(failure) ? 'pending' : 'failed'
+      );
+    }
+  );
   it('retains every owner when a second tab writes between the first read and write', async () => {
     const first = await openTab();
     const second = await openTab();
@@ -363,6 +1038,41 @@ describe('active progress across tabs', () => {
       expect(tab.status.hasUnsavedProgressChanges()).toBe(fail);
     }
   );
+  it.each(['missing', 'rejected', 'throw', 'no-op'] as const)(
+    'reports active clear failure without releasing durable bytes: %s',
+    async (failure) => {
+      const tab = await openTab();
+      const original = envelope('owner', 10);
+      values.set(STORAGE_KEYS.progress, original);
+      if (failure === 'missing') vi.stubGlobal('navigator', {});
+      if (failure === 'rejected')
+        vi.mocked(navigator.locks.request).mockRejectedValue(
+          new DOMException('denied', 'SecurityError')
+        );
+      if (failure === 'throw')
+        vi.spyOn(localStorage, 'removeItem').mockImplementation(() => {
+          throw new DOMException('denied', 'SecurityError');
+        });
+      if (failure === 'no-op') vi.spyOn(localStorage, 'removeItem').mockImplementation(() => {});
+      expect(await tab.clearActiveProgressStorage('owner', true)).toBe(false);
+      expect(values.get(STORAGE_KEYS.progress)).toBe(original);
+      expect(tab.status.progressSaveStatus.local).toBe('failed');
+      expect(tab.status.hasUnsavedProgressChanges()).toBe(false);
+    }
+  );
+  it('keeps newer pending save status when an older clear fails', async () => {
+    const tab = await openTab();
+    values.set(STORAGE_KEYS.progress, envelope('owner', 10));
+    vi.mocked(navigator.locks.request).mockRejectedValueOnce(
+      new DOMException('denied', 'SecurityError')
+    );
+    const clear = tab.clearActiveProgressStorage('owner');
+    const newer = tab.persistActiveProgressValue(envelope('owner', 20));
+    expect(await clear).toBe(false);
+    expect(tab.status.progressSaveStatus.local).not.toBe('failed');
+    expect(await newer).toBe(true);
+    expect(tab.status.progressSaveStatus.local).toBe('saved');
+  });
   it('reports unavailable locking without making an unlocked write', async () => {
     const tab = await openTab();
     const original = envelope('owner', 10);

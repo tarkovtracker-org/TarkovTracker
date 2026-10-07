@@ -7,9 +7,12 @@ import {
 import {
   clearActiveProgressStorage,
   cloneStateSnapshot,
+  parsePersistedProgressState,
   progressPersistStorage,
   progressStorageSerializer,
   setActiveProgressWritesBlocked,
+  type PersistedProgressSnapshot,
+  type GuestProgressSource,
 } from '@/stores/tarkov/localStorage';
 import { hasRetainableModeProgress } from '@/stores/tarkov/progressMerge';
 import { relieveProgressStoragePressure } from '@/stores/tarkov/storageQuota';
@@ -19,10 +22,12 @@ import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
-import type { StateTree } from 'pinia';
+import type { StateTree, PiniaPluginContext } from 'pinia';
 const QUOTA_CHECK_INTERVAL_MS = 60000;
 let lastQuotaCheckTime = 0;
 let resettingProgressMemory = false;
+const guestProgressSources = new WeakMap<StateTree, GuestProgressSource>();
+let serializedGuestSource: { value: string; source?: GuestProgressSource } | null = null;
 /** Session reset clears memory; its caller separately retains, restores, or clears durable progress. */
 export const resetProgressStoreMemory = (store: {
   $patch: (mutator: (state: UserState) => void) => void;
@@ -30,6 +35,19 @@ export const resetProgressStoreMemory = (store: {
   resettingProgressMemory = true;
   try {
     store.$patch((state) => Object.assign(state, structuredClone(defaultState)));
+  } finally {
+    resettingProgressMemory = false;
+  }
+};
+/** Durable guest reset state is already saved; adopting it is not a fresh local edit. */
+export const applyPersistedProgressSnapshot = (
+  store: { $patch: (mutator: (state: UserState) => void) => void },
+  snapshot: PersistedProgressSnapshot
+): void => {
+  resettingProgressMemory = true;
+  try {
+    progressStorageSerializer.reset(snapshot);
+    store.$patch((state) => Object.assign(state, snapshot.state));
   } finally {
     resettingProgressMemory = false;
   }
@@ -76,6 +94,7 @@ const serialize = (state: StateTree): string => {
     getCurrentSupabaseUserId(),
     now
   );
+  serializedGuestSource = { value: serialized, source: guestProgressSources.get(state) };
   manageQuota(now, serialized.length);
   return serialized;
 };
@@ -114,7 +133,10 @@ const restoreScopedState = (value: string): UserState => {
 const deserialize = (value: string): UserState => {
   progressStorageSerializer.reset();
   try {
-    return restoreScopedState(value);
+    const restored = restoreScopedState(value);
+    if (getCurrentSupabaseUserId() === null)
+      progressStorageSerializer.reset(parsePersistedProgressState(value, null));
+    return restored;
   } catch (e) {
     logger.error('[TarkovStore] Error deserializing localStorage:', e);
     return structuredClone(defaultState);
@@ -123,12 +145,22 @@ const deserialize = (value: string): UserState => {
 /** User-scoped localStorage persistence; the userId wrapper prevents cross-user contamination. */
 export const progressStorePersist = {
   key: STORAGE_KEYS.progress,
+  afterHydrate: ({ store }: PiniaPluginContext) => {
+    guestProgressSources.set(store.$state, {
+      key: store,
+      readState: () => sanitizeOwnedUserState(store.$state as UserState),
+      acceptState: (snapshot) => applyPersistedProgressSnapshot(store, snapshot),
+    });
+  },
   storage:
     typeof window !== 'undefined'
       ? {
           getItem: progressPersistStorage.getItem,
           setItem: (key: string, value: string) => {
-            if (!resettingProgressMemory) progressPersistStorage.setItem(key, value);
+            const source =
+              serializedGuestSource?.value === value ? serializedGuestSource.source : undefined;
+            serializedGuestSource = null;
+            if (!resettingProgressMemory) progressPersistStorage.setItem(key, value, source);
           },
         }
       : undefined,

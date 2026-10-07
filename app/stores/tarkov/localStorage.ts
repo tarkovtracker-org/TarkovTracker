@@ -1,5 +1,7 @@
-import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
+import { defaultState, migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
+import { resolveInitialSyncState } from '@/stores/tarkov/initialSyncState';
+import { getNextProgressEpoch, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import {
   classifyLocalSaveFailure,
   progressSaveStatus,
@@ -34,6 +36,11 @@ export type PersistedProgressSnapshot = {
 const metadataKeys = ['currentGameMode', 'gameEdition', 'tarkovUid'] as const;
 const sameMetadata = (left: Partial<UserState>, right: Partial<UserState>) =>
   metadataKeys.every((key) => deepEqual(left[key], right[key]));
+export type GuestProgressSource = {
+  key: object;
+  readState: () => UserState;
+  acceptState: (snapshot: PersistedProgressSnapshot) => void;
+};
 type RemoteProgressSnapshot = {
   state: UserState;
   userId: string;
@@ -117,17 +124,46 @@ const acceptRemoteMode = (
   );
   accepted.state[mode] = cloneStateSnapshot(next);
 };
+const initialGuestProgressSnapshot = (): PersistedProgressSnapshot => ({
+  state: cloneStateSnapshot(defaultState),
+  storedUserId: null,
+  timestamp: 0,
+  metadataTimestamp: 0,
+  modeTimestamps: { pvp: 0, pve: 0, seasonal: 0 },
+  hadDeprecatedProgressData: false,
+});
 export const createProgressStorageSerializer = (
   readPrevious: (userId: string | null) => PersistedProgressSnapshot | null,
   persistAccepted?: (value: string, expected: PersistedProgressSnapshot | null) => void
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
+  let guestSerialization: {
+    value: string;
+    state: UserState;
+    baseline: PersistedProgressSnapshot | null;
+  } | null = null;
   const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
-    if (previous?.storedUserId !== userId) previous = readPrevious(userId);
+    if (previous?.storedUserId !== userId)
+      previous = userId === null ? initialGuestProgressSnapshot() : readPrevious(userId);
+    const baseline = previous ? cloneStateSnapshot(previous) : null;
+    const editTimestamp = (clock: number) =>
+      userId === null ? Math.max(timestamp, clock + 1) : timestamp;
     const modeTimestamps = Object.fromEntries(
-      GAME_MODE_VALUES.map((mode) => [mode, nextModeTimestamp(previous, state, mode, timestamp)])
+      GAME_MODE_VALUES.map((mode) => [
+        mode,
+        nextModeTimestamp(
+          previous,
+          state,
+          mode,
+          editTimestamp(previous ? retainedModeTimestamp(previous, mode) : 0)
+        ),
+      ])
     );
-    const metadataTimestamp = nextMetadataTimestamp(previous, state, timestamp);
+    const metadataTimestamp = nextMetadataTimestamp(
+      previous,
+      state,
+      editTimestamp(previous ? retainedMetadataTimestamp(previous) : 0)
+    );
     previous = {
       metadataTimestamp,
       state: cloneStateSnapshot(state),
@@ -137,15 +173,25 @@ export const createProgressStorageSerializer = (
       seasonalSourceSeasonNumber: state.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
       hadDeprecatedProgressData: false,
     };
-    return JSON.stringify({
+    const value = JSON.stringify({
       _timestamp: timestamp,
       _metadataTimestamp: metadataTimestamp,
       _modeTimestamps: modeTimestamps,
       _userId: userId,
       data: state,
     });
+    guestSerialization = userId === null ? { value, state, baseline } : null;
+    return value;
   };
   return {
+    clearGuestSource: () => {
+      guestSerialization = null;
+    },
+    takeGuestSource: (value: string) => {
+      const captured = guestSerialization?.value === value ? guestSerialization : null;
+      guestSerialization = null;
+      return captured;
+    },
     retainBaseline: (userId: string, state: UserState) => {
       if (previous?.storedUserId === userId) return;
       previous = {
@@ -161,6 +207,7 @@ export const createProgressStorageSerializer = (
       };
     },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {
+      guestSerialization = null;
       previous = snapshot
         ? cloneStateSnapshot({ ...snapshot, confirmationCandidates: undefined })
         : null;
@@ -232,16 +279,7 @@ let localWriteRevision = 0;
 let progressValueRevision = 0;
 let pendingValueRevision: number | null = null;
 let pendingEditRevision: number | null = null;
-const pendingProgressWrites = new Map<
-  number,
-  {
-    value: string;
-    cloudHeld: boolean;
-    expected?: PersistedProgressSnapshot | null;
-    baseline: PersistedProgressSnapshot | null;
-    handoff: boolean;
-  }
->();
+const pendingProgressWrites = new Map<number, ProgressWriteRequest>();
 const sameProgressWriteState = (left: string, right: string): boolean => {
   const a = parseUserScopedStorage<unknown>(left);
   const b = parseUserScopedStorage<unknown>(right);
@@ -266,19 +304,26 @@ export const getPendingProgressWritesForOwners = (owners: (string | null)[]) => 
       handoff || owners.includes(parseUserScopedStorage<unknown>(value)?._userId ?? null)
   );
 };
+const discardPendingProgressWrite = (revision: number): void => {
+  const request = pendingProgressWrites.get(revision);
+  if (request) request.source = undefined;
+  pendingProgressWrites.delete(revision);
+};
 const discardPendingProgressWrites = (owner?: string): void => {
   if (!owner) {
+    for (const request of pendingProgressWrites.values()) request.source = undefined;
     pendingProgressWrites.clear();
     return;
   }
   for (const [revision, { value }] of pendingProgressWrites)
     if (parseUserScopedStorage<unknown>(value)?._userId === owner)
-      pendingProgressWrites.delete(revision);
+      discardPendingProgressWrite(revision);
 };
 const activeProgressOperations = new Set<Promise<StorageWriteResult>>();
 /** Cancel queued writes before changing the session or intentionally clearing its progress. */
 export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false): void => {
   const pending = latestPendingProgressWrite();
+  progressStorageSerializer.clearGuestSource();
   discardPendingProgressWrites(owner);
   if (owner) {
     ownerGenerations.set(owner, ownerGenerationFor(owner) + 1);
@@ -494,29 +539,402 @@ type ProgressWriteRequest = {
   cloudHeld: boolean;
   expected?: PersistedProgressSnapshot | null;
   handoffBaseline?: PersistedProgressSnapshot | null;
+  baseline: PersistedProgressSnapshot | null;
+  guestBaseline: PersistedProgressSnapshot | null;
+  source?: GuestProgressSource;
+  handoff: boolean;
 };
 const queueProgressWrite = (request: ProgressWriteRequest): number => {
-  const baseline =
-    request.handoffBaseline === undefined
-      ? parseHandoffBaseline(readActiveProgressValue())
-      : request.handoffBaseline;
   const valueRevision = ++progressValueRevision;
-  pendingProgressWrites.set(valueRevision, {
-    value: request.value,
-    cloudHeld: request.cloudHeld,
-    expected: request.expected,
-    baseline,
-    handoff: request.handoffBaseline !== undefined,
-  });
+  pendingProgressWrites.set(valueRevision, request);
   pendingValueRevision = valueRevision;
   if (request.expected === undefined) pendingEditRevision = valueRevision;
   return valueRevision;
 };
 const finishPendingProgressWrite = (valueRevision: number): void => {
-  pendingProgressWrites.delete(valueRevision);
+  discardPendingProgressWrite(valueRevision);
   if (pendingValueRevision === valueRevision) pendingValueRevision = null;
   if (pendingEditRevision === valueRevision) pendingEditRevision = null;
 };
+const encodeProgressSnapshot = (snapshot: PersistedProgressSnapshot): string =>
+  JSON.stringify({
+    _userId: snapshot.storedUserId,
+    _timestamp: snapshot.timestamp,
+    _metadataTimestamp: snapshot.metadataTimestamp,
+    _modeTimestamps: snapshot.modeTimestamps,
+    data: snapshot.state,
+  });
+const reconciledModeTimestamp = (
+  incoming: PersistedProgressSnapshot,
+  current: PersistedProgressSnapshot,
+  mode: GameMode
+): number => {
+  const incomingEpoch = toProgressEpoch(incoming.state[mode]);
+  const currentEpoch = toProgressEpoch(current.state[mode]);
+  if (incomingEpoch > currentEpoch) return retainedModeTimestamp(incoming, mode);
+  if (currentEpoch > incomingEpoch) return retainedModeTimestamp(current, mode);
+  return Math.max(retainedModeTimestamp(incoming, mode), retainedModeTimestamp(current, mode));
+};
+/** Equal epochs merge edits; a reset epoch selects the entire winning mode, including its clock. */
+const reconcileGuestSnapshots = (
+  incoming: PersistedProgressSnapshot,
+  current: PersistedProgressSnapshot | null
+): PersistedProgressSnapshot => {
+  if (!current) return incoming;
+  return {
+    ...incoming,
+    timestamp: Math.max(incoming.timestamp ?? 0, current.timestamp ?? 0),
+    metadataTimestamp: Math.max(
+      retainedMetadataTimestamp(incoming),
+      retainedMetadataTimestamp(current)
+    ),
+    modeTimestamps: Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [mode, reconciledModeTimestamp(incoming, current, mode)])
+    ),
+    state: resolveInitialSyncState(
+      incoming.state,
+      current.state,
+      retainedMetadataTimestamp(incoming),
+      retainedMetadataTimestamp(current),
+      0,
+      0,
+      {
+        mergeModeSnapshots: true,
+        localModeTimestamps: Object.fromEntries(
+          GAME_MODE_VALUES.map((mode) => [mode, retainedModeTimestamp(incoming, mode)])
+        ),
+        modeUpdatedAt: Object.fromEntries(
+          GAME_MODE_VALUES.map((mode) => [mode, retainedModeTimestamp(current, mode)])
+        ),
+      }
+    ),
+  };
+};
+const rebaseGuestField = (
+  next: Record<string, unknown>,
+  key: string,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+): void => {
+  if (!Object.hasOwn(after, key)) {
+    Reflect.deleteProperty(next, key);
+    return;
+  }
+  const value = rebaseGuestValue(next[key], before[key], after[key]);
+  if (value === undefined) Reflect.deleteProperty(next, key);
+  else next[key] = value;
+};
+/** Transfer only changes made after capture; unchanged old-epoch fields stay discarded. */
+const rebaseGuestRecord = (
+  accepted: unknown,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+) => {
+  const next = { ...(isRecord(accepted) ? accepted : {}) };
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)]))
+    rebaseGuestField(next, key, before, after);
+  return next;
+};
+const historyById = (rows: unknown[]) =>
+  Object.fromEntries(rows.filter(isRecord).map((row) => [String(row.id), row]));
+const hasHistoryIds = (rows: unknown[]): boolean =>
+  rows.every((row) => isRecord(row) && typeof row.id === 'string');
+const rebaseGuestHistory = (accepted: unknown, before: unknown[], after: unknown[]) => {
+  const current = Array.isArray(accepted) ? accepted : [];
+  if (![current, before, after].every(hasHistoryIds)) return cloneStateSnapshot(after);
+  return Object.values(
+    rebaseGuestRecord(historyById(current), historyById(before), historyById(after))
+  );
+};
+const rebaseGuestValue = (accepted: unknown, before: unknown, after: unknown): unknown => {
+  if (deepEqual(before, after)) return accepted;
+  const pair = [before, after];
+  if (pair.every(isRecord)) return rebaseGuestRecord(accepted, pair[0]!, pair[1]!);
+  if (pair.every(Array.isArray)) return rebaseGuestHistory(accepted, pair[0]!, pair[1]!);
+  return cloneStateSnapshot(after);
+};
+const rebaseGuestMode = (
+  accepted: UserState[GameMode],
+  before: UserState[GameMode],
+  after: UserState[GameMode],
+  live: boolean
+): UserState[GameMode] => {
+  if (!live && toProgressEpoch(after) < toProgressEpoch(accepted))
+    return cloneStateSnapshot(accepted);
+  if (toProgressEpoch(after) > Math.max(toProgressEpoch(before), toProgressEpoch(accepted)))
+    return cloneStateSnapshot(after);
+  const next = cloneStateSnapshot(rebaseGuestValue(accepted, before, after)) as UserState[GameMode];
+  next.progressEpoch = Math.max(toProgressEpoch(accepted), toProgressEpoch(after));
+  rebaseGuestManualHistory(next, accepted, before, after, live);
+  return next;
+};
+const manualHistoryEpoch = (mode: UserState[GameMode]): number => mode.manualActivityEpoch ?? 0;
+const guestManualHistorySource = (
+  accepted: UserState[GameMode],
+  before: UserState[GameMode],
+  after: UserState[GameMode],
+  live: boolean
+): UserState[GameMode] | null => {
+  if (!live && manualHistoryEpoch(after) < manualHistoryEpoch(accepted)) return accepted;
+  return manualHistoryEpoch(after) >
+    Math.max(manualHistoryEpoch(before), manualHistoryEpoch(accepted))
+    ? after
+    : null;
+};
+const rebaseGuestManualHistory = (
+  next: UserState[GameMode],
+  accepted: UserState[GameMode],
+  before: UserState[GameMode],
+  after: UserState[GameMode],
+  live: boolean
+): void => {
+  next.manualActivityEpoch = Math.max(manualHistoryEpoch(after), manualHistoryEpoch(accepted));
+  const source = guestManualHistorySource(accepted, before, after, live);
+  if (source) next.manualActivityHistory = cloneStateSnapshot(source.manualActivityHistory);
+};
+const rebasedEditClock = (same: boolean, accepted: number, incoming: number): number =>
+  same ? accepted : Math.max(Date.now(), accepted + 1, incoming);
+const rebaseGuestSnapshot = (
+  accepted: PersistedProgressSnapshot,
+  before: PersistedProgressSnapshot,
+  after: PersistedProgressSnapshot,
+  live = false
+): PersistedProgressSnapshot => {
+  const state = {
+    ...(rebaseGuestRecord(
+      accepted.state,
+      before.state as unknown as Record<string, unknown>,
+      after.state as unknown as Record<string, unknown>
+    ) as unknown as UserState),
+    ...Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [
+        mode,
+        rebaseGuestMode(accepted.state[mode], before.state[mode], after.state[mode], live),
+      ])
+    ),
+  };
+  return {
+    ...after,
+    state,
+    metadataTimestamp: rebasedEditClock(
+      sameMetadata(accepted.state, state),
+      retainedMetadataTimestamp(accepted),
+      retainedMetadataTimestamp(after)
+    ),
+    modeTimestamps: Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [
+        mode,
+        rebasedEditClock(
+          deepEqual(accepted.state[mode], state[mode]),
+          retainedModeTimestamp(accepted, mode),
+          retainedModeTimestamp(after, mode)
+        ),
+      ])
+    ),
+  };
+};
+const laterGuestWrites = (request: ProgressWriteRequest): ProgressWriteRequest[] => {
+  const writes = [...pendingProgressWrites.values()];
+  const index = writes.indexOf(request);
+  if (index < 0) return [];
+  return writes.slice(index + 1).filter((pending) => pending.source?.key === request.source?.key);
+};
+const rebaseQueuedGuestWrites = (
+  request: ProgressWriteRequest,
+  accepted: PersistedProgressSnapshot
+) => {
+  let previous = accepted;
+  let captured = parsePersistedProgressState(request.value, null)!;
+  for (const pending of laterGuestWrites(request)) {
+    const incoming = parsePersistedProgressState(pending.value, null);
+    if (!incoming || !pending.guestBaseline) continue;
+    const next = rebaseGuestSnapshot(previous, pending.guestBaseline, incoming);
+    captured = incoming;
+    pending.baseline = cloneStateSnapshot(previous);
+    pending.guestBaseline = cloneStateSnapshot(previous);
+    pending.value = encodeProgressSnapshot(next);
+    previous = next;
+  }
+  return { previous, captured };
+};
+const adoptGuestWrite = (
+  request: ProgressWriteRequest,
+  accepted: PersistedProgressSnapshot
+): void => {
+  const source = request.source;
+  if (!source) return;
+  const { previous, captured } = rebaseQueuedGuestWrites(request, accepted);
+  const serializer = createProgressStorageSerializer(() => captured);
+  serializer.reset(captured);
+  const live = parsePersistedProgressState(
+    serializer.serialize(cloneStateSnapshot(source.readState()), null, Date.now()),
+    null
+  )!;
+  const next = rebaseGuestSnapshot(previous, captured, live, true);
+  progressStorageSerializer.reset(next);
+  source.acceptState(next);
+  // Only an unqueued post-capture edit needs another write; downloaded state never does.
+  if (!deepEqual(next.state, previous.state)) {
+    progressStorageSerializer.reset(previous);
+    const value = progressStorageSerializer.serialize(next.state, null, Date.now());
+    void persistActiveProgressValue(value, false, undefined, undefined, source);
+  }
+};
+const hasSameEpochCapturedGuestMode = (
+  incoming: PersistedProgressSnapshot,
+  current: PersistedProgressSnapshot,
+  mode: GameMode
+): boolean => toProgressEpoch(incoming.state[mode]) === toProgressEpoch(current.state[mode]);
+const applyCapturedGuestModes = (
+  before: PersistedProgressSnapshot,
+  incoming: PersistedProgressSnapshot,
+  current: PersistedProgressSnapshot,
+  accepted: PersistedProgressSnapshot
+) => {
+  const state = cloneStateSnapshot(accepted.state);
+  const modeTimestamps = { ...accepted.modeTimestamps };
+  for (const mode of GAME_MODE_VALUES) {
+    if (!hasSameEpochCapturedGuestMode(incoming, current, mode)) continue;
+    state[mode] = rebaseGuestMode(
+      current.state[mode],
+      before.state[mode],
+      incoming.state[mode],
+      false
+    );
+    modeTimestamps[mode] = deepEqual(state[mode], current.state[mode])
+      ? retainedModeTimestamp(current, mode)
+      : Math.max(retainedModeTimestamp(current, mode) + 1, retainedModeTimestamp(incoming, mode));
+  }
+  return { state, modeTimestamps };
+};
+/** Captured intent changes only its edited fields; unchanged concurrent fields stay durable. */
+const applyCapturedGuestIntent = (
+  request: ProgressWriteRequest,
+  incoming: PersistedProgressSnapshot,
+  current: PersistedProgressSnapshot | null,
+  accepted: PersistedProgressSnapshot
+): PersistedProgressSnapshot => {
+  const before = request.guestBaseline;
+  if (!current || !before) return accepted;
+  const modes = applyCapturedGuestModes(before, incoming, current, accepted);
+  const state = {
+    ...modes.state,
+    ...Object.fromEntries(
+      metadataKeys.map((key) => [
+        key,
+        rebaseGuestValue(current.state[key], before.state[key], incoming.state[key]),
+      ])
+    ),
+  };
+  const metadataTimestamp = sameMetadata(current.state, state)
+    ? retainedMetadataTimestamp(current)
+    : Math.max(retainedMetadataTimestamp(current) + 1, retainedMetadataTimestamp(incoming));
+  return { ...accepted, ...modes, state, metadataTimestamp };
+};
+const applyGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+  const incoming = parsePersistedProgressState(request.value, null)!;
+  const current = parsePersistedProgressState(localStorage.getItem(STORAGE_KEYS.progress), null);
+  const accepted = applyCapturedGuestIntent(
+    request,
+    incoming,
+    current,
+    reconcileGuestSnapshots(incoming, current)
+  );
+  const result = writeStorageItem(
+    STORAGE_KEYS.progress,
+    matchesPersistedSnapshot(accepted, incoming) ? request.value : encodeProgressSnapshot(accepted),
+    request.cloudHeld
+  );
+  if (result.ok) adoptGuestWrite(request, accepted);
+  return result;
+};
+const captureGuestProgress = (readState: () => UserState): PersistedProgressSnapshot =>
+  parsePersistedProgressState(
+    progressStorageSerializer.serialize(cloneStateSnapshot(readState()), null, Date.now()),
+    null
+  )!;
+const assertGuestResetSession = (): void => {
+  if (getCurrentSupabaseUserId() !== null)
+    throw new Error('Guest reset belongs to an expired session');
+};
+const readGuestProgressForReset = (): PersistedProgressSnapshot | null => {
+  assertGuestResetSession();
+  // Read durable bytes, never this tab's pending overlay. Failed reads must abort the reset.
+  const raw = localStorage.getItem(STORAGE_KEYS.progress);
+  if (raw === null) return null;
+  const current = parsePersistedProgressState(raw, null);
+  if (isUnparseableProgressStorageValue(raw) || !current)
+    throw new Error('Guest reset cannot replace foreign or unreadable progress');
+  return current;
+};
+const resetGuestModes = (
+  snapshot: PersistedProgressSnapshot,
+  resetModes: readonly GameMode[],
+  timestamp: number
+): void => {
+  for (const mode of resetModes) {
+    snapshot.state[mode] = {
+      ...cloneStateSnapshot(defaultState[mode]),
+      progressEpoch: getNextProgressEpoch(snapshot.state[mode]),
+    };
+    snapshot.modeTimestamps = { ...snapshot.modeTimestamps, [mode]: timestamp };
+  }
+};
+const buildGuestResetSnapshot = (
+  snapshot: PersistedProgressSnapshot,
+  resetModes: readonly GameMode[],
+  resetAll: boolean
+): PersistedProgressSnapshot => {
+  const now = Date.now();
+  resetGuestModes(snapshot, resetModes, now);
+  if (resetAll) {
+    for (const key of metadataKeys) Object.assign(snapshot.state, { [key]: defaultState[key] });
+    snapshot.metadataTimestamp = now;
+  }
+  snapshot.timestamp = now;
+  return snapshot;
+};
+const recordGuestResetResult = (revision: number, result: StorageWriteResult): void => {
+  if (revision !== localWriteRevision || getCurrentSupabaseUserId() !== null) return;
+  recordLocalSave(result.ok, result.ok ? null : classifyLocalSaveFailure(result.error));
+};
+/** Guest resets replace one envelope under the same lock as ordinary guest writes. */
+export const resetGuestProgress = async (
+  resetModes: readonly GameMode[],
+  resetAll: boolean,
+  readState: () => UserState,
+  acceptState: (snapshot: PersistedProgressSnapshot) => void
+): Promise<PersistedProgressSnapshot> => {
+  const captured = captureGuestProgress(readState);
+  invalidateActiveProgressWrites();
+  const revision = localWriteRevision;
+  let accepted: PersistedProgressSnapshot | null = null;
+  recordLocalSavePending();
+  const result = await mutateActiveProgress(() => {
+    const current = readGuestProgressForReset();
+    const latest = reconcileGuestSnapshots(captureGuestProgress(readState), captured);
+    const next = buildGuestResetSnapshot(
+      reconcileGuestSnapshots(latest, current),
+      resetModes,
+      resetAll
+    );
+    const written = writeStorageItem(STORAGE_KEYS.progress, encodeProgressSnapshot(next));
+    if (written.ok) {
+      accepted = next;
+      // Adopt inside the lock: no newer writer or auth continuation can intervene after commit.
+      acceptState(next);
+    }
+    return written;
+  }, null);
+  recordGuestResetResult(revision, result);
+  if (!result.ok) throw new Error('Local guest progress could not be saved after reset');
+  safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
+  return accepted!;
+};
+const isOrdinaryGuestWrite = (request: ProgressWriteRequest): boolean =>
+  request.expected === undefined &&
+  request.handoffBaseline === undefined &&
+  parseUserScopedStorage<unknown>(request.value)?._userId === null;
 const applyProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
   const required = request.expected === undefined ? request.handoffBaseline : request.expected;
   if (
@@ -524,6 +942,7 @@ const applyProgressWrite = (request: ProgressWriteRequest): StorageWriteResult =
     !matchesExpectedProgress(localStorage.getItem(STORAGE_KEYS.progress), required)
   )
     return { ok: false, error: null, canceled: true };
+  if (isOrdinaryGuestWrite(request)) return applyGuestProgressWrite(request);
   return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
 };
 const shouldReportProgressWriteFailure = (
@@ -546,10 +965,31 @@ export const persistActiveProgressValue = async (
   value: ProgressWriteRequest['value'],
   cloudHeld = false,
   expected?: PersistedProgressSnapshot | null,
-  handoffBaseline?: PersistedProgressSnapshot | null
+  handoffBaseline?: PersistedProgressSnapshot | null,
+  guestSource?: GuestProgressSource
 ): Promise<boolean> => {
   const revision = expected === undefined ? ++localWriteRevision : localWriteRevision;
-  const request = { value, cloudHeld, expected, handoffBaseline };
+  const captured = progressStorageSerializer.takeGuestSource(value);
+  const request: ProgressWriteRequest = {
+    value,
+    cloudHeld,
+    expected,
+    handoffBaseline,
+    baseline:
+      handoffBaseline === undefined
+        ? parseHandoffBaseline(readActiveProgressValue())
+        : handoffBaseline,
+    guestBaseline: captured?.baseline ?? null,
+    handoff: handoffBaseline !== undefined,
+    source: captured
+      ? (guestSource ?? {
+          key: captured.state,
+          readState: () => captured.state,
+          acceptState: (snapshot) => Object.assign(captured.state, snapshot.state),
+        })
+      : undefined,
+  };
+  if (!isOrdinaryGuestWrite(request)) request.source = undefined;
   const valueRevision = queueProgressWrite(request);
   if (expected === undefined) recordLocalSavePending(cloudHeld);
   const result = await mutateActiveProgress(
@@ -575,8 +1015,9 @@ const matchesExpectedProgress = (
 export const progressPersistStorage = {
   getItem: (key: string): string | null =>
     key === STORAGE_KEYS.progress ? readActiveProgressValue() : safeGetItem(key),
-  setItem: (key: string, value: string): void => {
-    if (key === STORAGE_KEYS.progress) void persistActiveProgressValue(value);
+  setItem: (key: string, value: string, guestSource?: GuestProgressSource): void => {
+    if (key === STORAGE_KEYS.progress)
+      void persistActiveProgressValue(value, false, undefined, undefined, guestSource);
     else safeSetItem(key, value);
   },
 };
@@ -611,7 +1052,7 @@ const removeStorageItem = (
     )
       return false;
     target.removeItem(key);
-    return true;
+    return target.getItem(key) === null;
   } catch (error) {
     logger.error(`[TarkovStore] Failed to remove localStorage key "${key}":`, error);
     return false;
@@ -636,6 +1077,14 @@ export const removeActiveProgressValue = async (
 const clearActiveSlot = (explicitOwner?: string): boolean =>
   localStorage.getItem(STORAGE_KEYS.progress) === null ||
   removeStorageItem(STORAGE_KEYS.progress, explicitOwner);
+const reportActiveClearFailure = (
+  result: StorageWriteResult,
+  revision: number,
+  cloudHeld: boolean
+): void => {
+  if (!result.ok && result.canceled) return;
+  if (localWriteRevision === revision) recordLocalSave(false, 'unknown', cloudHeld);
+};
 /**
  * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
  * decided before the reset, so the active copy is removed without keeping a recovery copy.
@@ -648,12 +1097,15 @@ export const clearActiveProgressStorage = async (
 ): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
   invalidateActiveProgressWrites(undefined, cloudHeld);
+  const revision = localWriteRevision;
   const result = await mutateActiveProgress(() => {
     const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
     return clearActiveSlot(explicitOwner) ? { ok: true } : { ok: false, error: null };
   });
-  safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
-  return result.ok || isLocalStorageInaccessible();
+  const cleared =
+    (result.ok && safeRemoveItem(LEGACY_STORAGE_KEYS.progress)) || isLocalStorageInaccessible();
+  if (!cleared) reportActiveClearFailure(result, revision, cloudHeld);
+  return cleared;
 };
 const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;
 const legacyModeEvidence = (data: Record<string, unknown>, mode: GameMode): unknown => {

@@ -105,12 +105,33 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   reset delivered over Realtime while local changes await acknowledgement does the same before it
   replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
   blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
-  the next startup load retries the retention. A deliberate reset clears the owner's active copy
-  without creating an account recovery copy of the pre-reset progress. A Settings reset reports
+  the next startup load retries the retention. A deliberate signed-in reset clears the owner's active copy
+  without creating an account recovery copy of the pre-reset progress. A signed-in Settings reset reports
   completion only once the clear confirms that no active copy remains for a reload to restore;
   otherwise (for example without cross-tab locking, or when a session change cancels the clear) it
-  reports failure. The online profile reset logs such a failure for its still-current session.
-  Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
+  reports failure. Removal is verified by reading the slot after deletion; failure status is fenced
+  by the local write revision so an older clear cannot replace a newer pending save.
+  The online profile reset logs such a failure for its still-current session.
+  Delayed signed-in reset responses are fenced by session generation and owner identity before
+  applying local state, acknowledging the save, or clearing active storage, including A→B→A switches.
+  Guest Settings resets instead atomically replace the guest envelope under the shared Web Lock,
+  preserving unrelated modes and their clocks. All-mode resets retain a default envelope with
+  increased reset epochs. Ordinary guest writes reconcile the entire envelope under the same lock,
+  so a stale tab cannot restore an older reset epoch or overwrite newer unrelated modes. Memory
+  and serializer clocks adopt committed guest writes without stamping imported fields as edits.
+  Guest intent baselines use the captured hydration bytes or initial defaults with zero clocks,
+  rather than a subsequently changed shared slot. Captured guest sources keep queued intent bound
+  to its original tab/store; already serialized
+  old-epoch edits remain fenced, while uncaptured later live changes are persisted separately
+  before local status becomes saved. Changed guest clocks advance beyond their accepted baseline,
+  including when consecutive edits share a timestamp or another tab has a future clock; unchanged clocks remain exact.
+  Captured same-epoch changes, including decreases and removals, apply only their edited fields
+  to the durable snapshot; unproven raw copies remain conservatively merged. Raw envelopes retain
+  their original bytes when reconciliation changes
+  no state or clocks. Failed
+  reads, writes, retention checks, session fences, or unavailable locks reject before memory changes.
+  These guarantees require the current client; an older cached client that writes raw envelopes
+  does not participate in this reconciliation. Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
