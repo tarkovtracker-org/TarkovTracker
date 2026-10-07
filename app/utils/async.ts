@@ -6,7 +6,7 @@
 /**
  * Maximum safe timeout value for setTimeout (2^31 - 1 ms, ~24.8 days).
  */
-export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 /**
  * Simple delay utility for async operations with optional cancellation.
  *

@@ -4,8 +4,8 @@ import {
   type TaskSecondaryView,
 } from '@/types/taskFilter';
 import { TASK_SORT_MODES, type TaskSortMode } from '@/types/taskSort';
-export const VALID_SORT_MODES = new Set<TaskSortMode>(TASK_SORT_MODES);
-export const VALID_SECONDARY_VIEWS = new Set<TaskSecondaryView>(TASK_SECONDARY_VIEWS);
+const VALID_SORT_MODES = new Set<TaskSortMode>(TASK_SORT_MODES);
+const VALID_SECONDARY_VIEWS = new Set<TaskSecondaryView>(TASK_SECONDARY_VIEWS);
 const extractNormalizationCandidate = (value: unknown): unknown => {
   if (typeof value === 'string') {
     return value;

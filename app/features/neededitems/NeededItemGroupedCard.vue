@@ -191,6 +191,7 @@
 </template>
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
+  import { formatCompactNumber } from '@/utils/formatters';
   import type {
     GroupedNeededItem,
     NeededItemHideoutModule,

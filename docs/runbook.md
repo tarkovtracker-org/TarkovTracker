@@ -688,7 +688,8 @@ FROM pg_catalog.pg_roles r
 WHERE r.rolname = 'postgres';
 ```
 
-Inventory table/view defaults for **every creating role**, both global and `public` scopes.
+Inventory table/view and sequence defaults for **every creating role**, both global and `public`
+scopes. Keep the object types separate: sequence privileges differ from table privileges.
 Schema defaults add to global defaults; a schema-only revoke cannot cancel a global grant.
 [PostgreSQL default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html)
 apply when objects are created, not retrospectively. An absent `pg_default_acl` entry means
@@ -697,6 +698,7 @@ access. Check grants to `PUBLIC` and roles inherited by the client roles as well
 
 ```sql
 SELECT pg_get_userbyid(d.defaclrole) AS creating_role,
+       CASE d.defaclobjtype WHEN 'r' THEN 'table/view' WHEN 'S' THEN 'sequence' END AS object_type,
        CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
        CASE WHEN a.grantee IS NULL THEN '(empty ACL)'
             WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,
@@ -706,10 +708,10 @@ SELECT pg_get_userbyid(d.defaclrole) AS creating_role,
 FROM pg_catalog.pg_default_acl d
 LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
 LEFT JOIN LATERAL pg_catalog.aclexplode(nullif(d.defaclacl, '{}'::aclitem[])) a ON true
-WHERE d.defaclobjtype = 'r'
+WHERE d.defaclobjtype IN ('r', 'S')
   AND (d.defaclnamespace = 0 OR n.nspname = 'public')
-GROUP BY d.defaclrole, d.defaclnamespace, n.nspname, a.grantee
-ORDER BY creating_role, scope, grantee;
+GROUP BY d.defaclrole, d.defaclobjtype, d.defaclnamespace, n.nspname, a.grantee
+ORDER BY creating_role, object_type, scope, grantee;
 ```
 
 Inventory public tables, partitions, views, materialized views, foreign tables and sequences,
@@ -770,6 +772,18 @@ host `db.knptqelvsodccnoehmbj.supabase.co`, PostgreSQL 17.6.1.048. Catalog SELEC
 - Supported outcome for #1133: retain provider-owned defaults under this operational policy and
   re-audit on the triggers above. No provider support response or reserved-role default change is
   claimed. Application-grant rollout and readback remain owned by #663/#1134.
+
+**Default-ACL follow-up — 2026-10-07 06:03 UTC**
+
+The expanded table/view-and-sequence query was executed through authenticated MCP for the same
+verified project after merging main `35ffee6d` into this branch. It returned no global entries for
+either object type. `postgres` public table/view defaults now grant only `postgres` and
+`service_role` all eight privileges; the client grants removed by #1134 are absent.
+`supabase_admin` public table/view defaults are unchanged. Public sequence defaults for both creating
+roles grant SELECT, UPDATE and USAGE to `anon`, `authenticated`, `postgres` and `service_role`,
+without grant option. Sequence defaults were outside #1134's table/view hardening and remain
+unchanged by this documentation-only PR. This follow-up checks defaults, not application-table
+grants, feature behavior or the full migration ledger.
 
 ### Progress transfer and freshness rollout
 

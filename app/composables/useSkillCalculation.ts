@@ -21,7 +21,7 @@ import {
   readSkillObjective,
   resolveSkillKey as resolveSkillAliasKey,
 } from '@/utils/skillHelpers';
-export interface SkillMetadata {
+interface SkillMetadata {
   key: string;
   id?: string;
   name: string;

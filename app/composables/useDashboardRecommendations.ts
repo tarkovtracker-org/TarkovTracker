@@ -87,12 +87,6 @@ const getDashboardRecommendationBlockerPriority = (blocker: DashboardRecommendat
   const index = DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY.indexOf(blocker.type);
   return index === -1 ? DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY.length : index;
 };
-export const compareDashboardRecommendationBlockers = (
-  left: DashboardRecommendationBlocker,
-  right: DashboardRecommendationBlocker
-) =>
-  getDashboardRecommendationBlockerPriority(left) -
-  getDashboardRecommendationBlockerPriority(right);
 export const getPrimaryDashboardRecommendationBlocker = (
   blockers: DashboardRecommendationBlocker[]
 ): DashboardRecommendationBlocker => {

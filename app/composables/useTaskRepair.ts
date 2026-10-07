@@ -3,7 +3,6 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { MANUAL_FAIL_TASK_IDS } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { Ref } from '#imports';
-export type RepairConfirmResolver = (confirmed: boolean) => void;
 export type RequestRepairConfirm = () => Promise<boolean>;
 export interface RepairableTask {
   id: string;

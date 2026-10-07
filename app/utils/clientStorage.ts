@@ -64,7 +64,7 @@ export const clearPreferencesStorage = (storage?: Storage | null): void => {
   storage.removeItem(STORAGE_KEYS.preferences);
   storage.removeItem(LEGACY_STORAGE_KEYS.preferences);
 };
-export const clearSessionScopedStorage = async (
+const clearSessionScopedStorage = async (
   localStorageArea: Storage | null = getDefaultLocalStorageArea(),
   sessionStorageArea: Storage | null = getDefaultSessionStorageArea()
 ): Promise<void> => {

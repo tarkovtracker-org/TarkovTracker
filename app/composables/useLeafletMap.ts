@@ -11,10 +11,8 @@ import {
   normalizeTileConfig,
   resolveFloorTilePath,
   type MapRenderConfig,
-  type MapSvgConfig,
-  type MapTileConfig,
 } from '@/utils/mapCoordinates';
-import type { TarkovMap } from '@/types/tarkov';
+import type { MapSvgConfig, MapTileConfig, TarkovMap } from '@/types/tarkov';
 import type L from 'leaflet';
 import type { ShallowRef } from 'vue';
 export interface UseLeafletMapOptions {
