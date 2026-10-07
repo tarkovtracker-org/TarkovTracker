@@ -59,10 +59,7 @@ const requirementId = (raw: unknown, index: number): string =>
   isRecord(raw) && typeof raw.id === 'string' ? raw.id : `trader-requirement-${index}`;
 // The server calls this after reference adaptation, and again when an overlay replaces requirements.
 // Missing types are never guessed from a trader, sign or value. Missing comparison is the legacy >=.
-export const normalizeTraderRequirement = (
-  raw: unknown,
-  index: number
-): NormalizedTraderRequirement => {
+const normalizeTraderRequirement = (raw: unknown, index: number): NormalizedTraderRequirement => {
   const id = requirementId(raw, index);
   if (!isRecord(raw)) return { id, requirementType: 'unknown', reason: 'shape' };
   const adapted: Record<string, unknown> = { ...raw, trader: normalizeTraderReference(raw.trader) };

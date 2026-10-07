@@ -353,4 +353,3 @@ export function useGraphBuilder() {
     processHideoutData,
   };
 }
-export type UseGraphBuilderReturn = ReturnType<typeof useGraphBuilder>;

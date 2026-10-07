@@ -1,5 +1,5 @@
 import type { ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
-export interface TaskObjective {
+export interface TaskObjectiveProgress {
   count?: number;
   complete?: boolean;
   timestamp?: number;
@@ -25,7 +25,7 @@ export interface HideoutPart {
   complete?: boolean;
   timestamp?: number;
 }
-export interface HideoutModule {
+export interface HideoutModuleProgress {
   complete?: boolean;
   timestamp?: number;
 }
@@ -72,11 +72,11 @@ export interface UserProgressData {
   pmcFaction: 'USEC' | 'BEAR';
   displayName: string | null;
   xpOffset: number;
-  taskObjectives: { [objectiveId: string]: TaskObjective };
+  taskObjectives: { [objectiveId: string]: TaskObjectiveProgress };
   taskCompletions: { [taskId: string]: TaskCompletion };
   taskAvailability?: { [taskId: string]: TaskAvailabilityConfirmation };
   hideoutParts: { [objectiveId: string]: HideoutPart };
-  hideoutModules: { [hideoutId: string]: HideoutModule };
+  hideoutModules: { [hideoutId: string]: HideoutModuleProgress };
   traders: { [traderId: string]: TraderProgress };
   skills: { [skillName: string]: number };
   prestigeLevel: number;

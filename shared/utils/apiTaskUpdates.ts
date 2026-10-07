@@ -5,7 +5,7 @@
  *
  * Runtime-independent: must not import Nuxt, Vue, or Worker modules.
  */
-export const API_TASK_UPDATE_STATES = ['active', 'completed', 'failed', 'uncompleted'] as const;
+const API_TASK_UPDATE_STATES = ['active', 'completed', 'failed', 'uncompleted'] as const;
 export type ApiTaskUpdateState = (typeof API_TASK_UPDATE_STATES)[number];
 export interface ApiTaskUpdateEntry {
   id: string;

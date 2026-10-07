@@ -37,7 +37,7 @@ export interface AccountDeletionClient {
   };
   rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
 }
-export interface DeletionJobState {
+interface DeletionJobState {
   attempts: number;
   maxAttempts: number;
   status: string | null;
@@ -158,7 +158,7 @@ export const cleanupUserData = async (supabase: AccountDeletionClient, userId: s
   });
   return cleanupErrors;
 };
-export const getDeletionJobState = async (
+const getDeletionJobState = async (
   supabase: AccountDeletionClient,
   userId: string,
   logPrefix: string

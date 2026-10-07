@@ -1,6 +1,6 @@
 import { logger } from '@/utils/logger';
 import type { SupabaseClient } from '@supabase/supabase-js';
-export const REALTIME_BACKGROUND_GRACE_MS = 60_000;
+const REALTIME_BACKGROUND_GRACE_MS = 60_000;
 type RealtimeTransport = Pick<SupabaseClient['realtime'], 'connect' | 'disconnect' | 'getChannels'>;
 const suspendedTransports = new WeakSet<RealtimeTransport>();
 export const isRealtimeSuspended = (transport: RealtimeTransport): boolean =>

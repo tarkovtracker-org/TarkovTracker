@@ -124,7 +124,7 @@ function toLogRecord(text: string, match: RegExpExecArray, end: number): LogReco
   };
 }
 /** Parses log timestamps as UTC when no explicit offset is present; invalid values return null. */
-export function eftLogTimestampMillis(timestamp: string | null): number | null {
+function eftLogTimestampMillis(timestamp: string | null): number | null {
   if (!timestamp) return null;
   const normalized = timestamp.replace(' ', 'T').replace(/ ([+-])/, '$1');
   const millis = Date.parse(/[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
