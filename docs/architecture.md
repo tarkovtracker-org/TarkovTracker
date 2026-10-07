@@ -35,15 +35,10 @@ validates UUID/mode paths and reads the static profile shell without querying a 
 `index.html` stays the prerendered homepage; top-level `404.html` gives unknown paths and invalid
 resource slugs real 404 responses. Legacy aliases remain HTTP 301 redirects.
 
-Application link previews are text-only `summary` cards. Social titles omit the repeated
-`· TarkovTracker.org` suffix and its preceding space because Discord displays the site name above them; browser titles
-and canonicals keep their existing values. The global `theme-color` supplies the brand tan accent. Guides also default to text-only. To select
-an image, set `guide.shareImage` in [`resourceData.ts`](../app/features/resources/resourceData.ts)
-with `src`, the asset's actual `width` and `height`, and an `altKey` pointing to English copy in
-`app/locales/en.json`. Use a representative guide asset; logos, article images, and video thumbnails
-are never selected automatically. Replace those fields to change the selection, or remove
-`shareImage` to disable it. Only explicitly selected images receive `summary_large_image` cards. Both Open Graph and Twitter
-image tags include dimensions immediately after their image URL.
+Preview title, card, and image-tag behavior is implemented in
+[`routeSeo.ts`](../app/utils/routeSeo.ts). The global `theme-color` is configured in
+[`nuxt.config.ts`](../nuxt.config.ts). Guide image settings are declared in
+[`resourceData.ts`](../app/features/resources/resourceData.ts).
 
 The [prerender validator](../app/utils/prerenderOutput.ts) checks initial link-preview metadata
 at build time. The [SEO preview smoke suite](../scripts/preview/smoke/seo.smoke.mjs) checks deployed
