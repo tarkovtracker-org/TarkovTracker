@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, ref } from 'vue';
+import { defineComponent, reactive, ref } from 'vue';
 import { useLocaleSwitch } from '@/composables/useLocaleSwitch';
 import { createDeferred } from '@/utils/test-helpers';
 const locale = ref('en');
@@ -57,12 +57,12 @@ describe('shared locale switch', () => {
     preferences.setLocaleOverride.mockImplementation((code) => {
       preferences.getLocaleOverride = code;
     });
-    metadata = {
+    metadata = reactive({
       currentGameMode: 'pvp',
       hasCriticalLocaleCache: vi.fn(async () => false),
       fetchAllData: vi.fn(async () => {}),
       updateLanguageAndGameMode: vi.fn(),
-    };
+    });
   });
   afterEach(() => {
     mounted.splice(0).forEach((wrapper) => wrapper.unmount());
@@ -160,6 +160,49 @@ describe('shared locale switch', () => {
     expect(metadata.fetchAllData.mock.calls[2]![1].signal.aborted).toBe(false);
     expect(first.error.value).toBe(true);
     expect(first.pending.value).toBe(false);
+  });
+  it('reloads original-language metadata when a superseding return to baseline fails', async () => {
+    const oldFetch = createDeferred<undefined>();
+    let tasks = ['original'];
+    metadata.fetchAllData
+      .mockReturnValueOnce(oldFetch.promise)
+      .mockImplementationOnce(async () => {
+        tasks = [];
+        throw new Error('failed');
+      })
+      .mockImplementationOnce(async () => {
+        tasks = ['restored'];
+      });
+    const first = controller();
+    const oldSwitch = first.selectLocale('de');
+    await flushPromises();
+    await first.selectLocale('en');
+    oldFetch.resolve(undefined);
+    await oldSwitch;
+    expect(metadata.fetchAllData).toHaveBeenCalledTimes(3);
+    expect(tasks).toEqual(['restored']);
+    expect(first.error.value).toBe(true);
+  });
+  it('shares cache scanning and keeps it alive until the last selector unmounts', async () => {
+    controller();
+    await flushPromises();
+    expect(metadata.hasCriticalLocaleCache).toHaveBeenCalledTimes(3);
+    controller();
+    await flushPromises();
+    expect(metadata.hasCriticalLocaleCache).toHaveBeenCalledTimes(3);
+    mounted.shift()!.unmount();
+    metadata.hasCriticalLocaleCache.mockClear();
+    metadata.currentGameMode = 'pve';
+    await flushPromises();
+    expect(metadata.hasCriticalLocaleCache).toHaveBeenCalledTimes(3);
+    mounted.shift()!.unmount();
+    metadata.hasCriticalLocaleCache.mockClear();
+    metadata.currentGameMode = 'pvp';
+    await flushPromises();
+    expect(metadata.hasCriticalLocaleCache).not.toHaveBeenCalled();
+    controller();
+    await flushPromises();
+    expect(metadata.hasCriticalLocaleCache).toHaveBeenCalledTimes(3);
   });
   it('reports an i18n failure and releases pending without fetching metadata', async () => {
     setLocale.mockRejectedValueOnce(new Error('failed'));

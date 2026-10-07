@@ -7,7 +7,8 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 The app bar uses a compact translation icon with native language names and a checked current
 language; phones retain the language submenu in More. Settings > Preferences > Appearance provides
 the same language menu. `useLocaleSwitch` shares pending, cooldown, and error feedback across
-these controls. All menu entries are disabled during a switch.
+these controls. One shared cache watcher and countdown timer remain active until the last selector
+unmounts. All menu entries are disabled during a switch.
 
 A locale switch passes an `AbortSignal` through metadata loading to the Tarkov proxy requests.
 A superseding programmatic selection aborts the prior load, and only the current selection may

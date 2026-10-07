@@ -82,6 +82,7 @@ import type {
 } from '@/types/tarkov';
 // Player levels carry no translatable text, so bootstrap is cached once per game mode.
 const requestSignals = new WeakMap<Promise<unknown>, AbortSignal>();
+const liveEditionRequests = new WeakSet<Promise<void>>();
 const throwIfAborted = (signal?: AbortSignal) => signal?.throwIfAborted();
 const matchesOptionalRequestValue = <T>(
   requested: T | undefined,
@@ -98,6 +99,14 @@ const canReuseMetadataRequest = (
 ): existing is Promise<void> => {
   if (!existing || forceRefresh) return false;
   return hasReusableRequestSignal(existing, signal);
+};
+const canJoinEditionRequest = (
+  existing: Promise<void> | null,
+  forceRefresh: boolean,
+  options: { revalidate?: boolean; signal?: AbortSignal }
+): existing is Promise<void> => {
+  if (!canReuseMetadataRequest(existing, forceRefresh, options.signal)) return false;
+  return !options.revalidate || liveEditionRequests.has(existing);
 };
 const canApplyRequestSignal = (signal: AbortSignal | undefined, ignoreAbort: boolean): boolean =>
   ignoreAbort || !signal?.aborted;
@@ -427,7 +436,7 @@ const loadProgressionCatalog = async (
     mode: string;
     scope: string;
   }
-): Promise<void> => {
+): Promise<boolean> => {
   try {
     const overlay = await fetchProgressionCatalog(
       context.mode,
@@ -436,15 +445,17 @@ const loadProgressionCatalog = async (
       context.signal
     );
     throwIfAborted(context.signal);
-    if (!context.isCurrent()) return;
+    if (!context.isCurrent()) return false;
     applyProgressionCatalog(state, overlay, context.mode);
     promiseStore.editionsSettledScope = context.scope;
     cacheProgressionCatalog(state, context.mode, context.language);
+    return true;
   } catch (err) {
     throwIfAborted(context.signal);
-    if (!context.isCurrent()) return;
+    if (!context.isCurrent()) return false;
     logger.error('[MetadataStore] Error fetching editions data:', err);
     state.editionsError = err as Error;
+    return false;
   }
 };
 export const useMetadataStore = defineStore('metadata', {
@@ -1803,12 +1814,7 @@ export const useMetadataStore = defineStore('metadata', {
       const scope = `${requestMode}-${requestLanguage}`;
       promiseStore.editionsRequestVersion += 1;
       const existingPromise = editionsPromiseForScope(promiseStore, scope);
-      if (
-        existingPromise &&
-        !skipBrowserCache &&
-        requestSignals.get(existingPromise) === options.signal &&
-        !options.signal?.aborted
-      ) {
+      if (canJoinEditionRequest(existingPromise, forceRefresh, options)) {
         return existingPromise;
       }
       prepareEditionScope(this, promiseStore, scope);
@@ -1827,7 +1833,6 @@ export const useMetadataStore = defineStore('metadata', {
         ) {
           // Revalidate a cached scope once per session; repeat locale/mode switches reuse it.
           if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
-            promiseStore.editionsRevalidatedScopes.add(scope);
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
               (error) =>
                 options.signal?.aborted
@@ -1840,7 +1845,8 @@ export const useMetadataStore = defineStore('metadata', {
         throwIfAborted(options.signal);
         if (!isCurrent()) return;
         this.editionsLoading = true;
-        await loadProgressionCatalog(this, promiseStore, {
+        liveEditionRequests.add(promise);
+        const loaded = await loadProgressionCatalog(this, promiseStore, {
           forceRefresh,
           signal: options.signal,
           isCurrent,
@@ -1849,20 +1855,20 @@ export const useMetadataStore = defineStore('metadata', {
           scope,
         });
         // A successful live load is as fresh as a revalidation.
-        if (promiseStore.editionsSettledScope === scope) {
+        if (loaded) {
           promiseStore.editionsRevalidatedScopes.add(scope);
         }
       });
       if (options.signal) requestSignals.set(promise, options.signal);
+      if (skipBrowserCache) liveEditionRequests.add(promise);
       promiseStore.editionsPromise = promise;
       try {
         await promise;
       } finally {
         if (promiseStore.editionsPromise === promise) {
-          promiseStore.editionsSettledScope = settledEditionScope(
-            scope,
-            `${this.getApiGameMode()}-${this.languageCode}`
-          );
+          promiseStore.editionsSettledScope = options.signal?.aborted
+            ? ''
+            : settledEditionScope(scope, `${this.getApiGameMode()}-${this.languageCode}`);
           this.editionsLoading = false;
           promiseStore.editionsPromise = null;
         }

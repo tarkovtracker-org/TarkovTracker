@@ -2,6 +2,7 @@ import { useIntervalFn } from '@vueuse/core';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { logger } from '@/utils/logger';
+import type { EffectScope } from 'vue';
 type LocaleState = {
   pending: boolean;
   error: boolean;
@@ -15,6 +16,9 @@ type LocaleRuntime = {
   baseline?: { locale: string; override: string | null };
   localeQueue: Promise<void>;
   cacheRevision: number;
+  consumers: number;
+  observers?: EffectScope;
+  metadataChanged: boolean;
 };
 // Store identity isolates SSR requests while sharing every mounted locale selector.
 const runtimes = new WeakMap<object, LocaleRuntime>();
@@ -25,9 +29,49 @@ const getRuntime = (store: object): LocaleRuntime => {
     state: reactive({ pending: false, error: false, deadline: 0, now: Date.now(), cached: {} }),
     localeQueue: Promise.resolve(),
     cacheRevision: 0,
+    consumers: 0,
+    metadataChanged: false,
   };
   runtimes.set(store, runtime);
   return runtime;
+};
+const releaseLocaleObservers = (runtime: LocaleRuntime) => {
+  runtime.consumers -= 1;
+  if (runtime.consumers !== 0) return;
+  runtime.observers?.stop();
+  runtime.observers = undefined;
+  runtime.cacheRevision += 1;
+};
+const retainLocaleObservers = (
+  runtime: LocaleRuntime,
+  metadata: ReturnType<typeof useMetadataStore>,
+  locale: Ref<string>,
+  locales: readonly string[]
+) => {
+  runtime.consumers += 1;
+  onScopeDispose(() => releaseLocaleObservers(runtime));
+  if (runtime.observers) return;
+  runtime.observers = effectScope(true);
+  runtime.observers.run(() => {
+    const state = runtime.state;
+    useIntervalFn(() => {
+      state.now = Date.now();
+    }, 250);
+    watch(
+      () => [state.pending, locale.value, metadata.currentGameMode],
+      async () => {
+        const revision = ++runtime.cacheRevision;
+        const entries = await Promise.all(
+          locales.map(
+            async (code) =>
+              [code, await metadata.hasCriticalLocaleCache(code).catch(() => false)] as const
+          )
+        );
+        if (revision === runtime.cacheRevision) state.cached = Object.fromEntries(entries);
+      },
+      { immediate: true }
+    );
+  });
 };
 export const useLocaleSwitch = () => {
   const { locale, availableLocales, setLocale, t } = useI18n({ useScope: 'global' });
@@ -38,23 +82,7 @@ export const useLocaleSwitch = () => {
   const state = runtime.state;
   const locales = availableLocales as readonly string[];
   const remaining = computed(() => Math.max(0, Math.ceil((state.deadline - state.now) / 1000)));
-  useIntervalFn(() => {
-    state.now = Date.now();
-  }, 250);
-  watch(
-    () => [state.pending, locale.value, metadata.currentGameMode],
-    async () => {
-      const revision = ++runtime.cacheRevision;
-      const entries = await Promise.all(
-        locales.map(
-          async (code) =>
-            [code, await metadata.hasCriticalLocaleCache(code).catch(() => false)] as const
-        )
-      );
-      if (revision === runtime.cacheRevision) state.cached = Object.fromEntries(entries);
-    },
-    { immediate: true }
-  );
+  retainLocaleObservers(runtime, metadata, locale, locales);
   const isDisabled = (code: string) =>
     state.pending || (code !== locale.value && remaining.value > 0 && !state.cached[code]);
   const status = computed(() => {
@@ -73,7 +101,9 @@ export const useLocaleSwitch = () => {
     return operation;
   };
   const isBaselineRestored = (baseline: { locale: string; override: string | null }) =>
-    locale.value === baseline.locale && preferences.getLocaleOverride === baseline.override;
+    !runtime.metadataChanged &&
+    locale.value === baseline.locale &&
+    preferences.getLocaleOverride === baseline.override;
   const rollback = async (controller: AbortController) => {
     const baseline = runtime.baseline;
     if (!baseline) return;
@@ -91,6 +121,7 @@ export const useLocaleSwitch = () => {
   const refreshLocale = async (code: string, controller: AbortController, cached: boolean) => {
     await applyLocale(code, controller);
     if (controller.signal.aborted) return;
+    runtime.metadataChanged = true;
     preferences.setLocaleOverride(code);
     metadata.updateLanguageAndGameMode(code);
     if (!cached) state.deadline = Date.now() + 10_000;
@@ -115,6 +146,7 @@ export const useLocaleSwitch = () => {
     if (runtime.controller !== controller) return;
     state.pending = false;
     runtime.baseline = undefined;
+    runtime.metadataChanged = false;
   };
   const runSelection = async (code: string, controller: AbortController, wasPending: boolean) => {
     const cached = await metadata.hasCriticalLocaleCache(code);
