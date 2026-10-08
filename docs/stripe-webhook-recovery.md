@@ -37,7 +37,8 @@ client is required when adding future webhook write paths.
 
 Retries may repeat committed effects after partial progress or lost completion. One-time
 checkout fulfillment uses `fulfill_one_time_supporter(text,timestamptz,jsonb)`: it fences the
-current event, locks the user, reads the current supporter row, records the PaymentIntent ID in
+current event, locks the user and current/incoming customers before the supporter row, and records
+the PaymentIntent ID in
 `private.stripe_one_time_payments`, and writes the entitlement in one transaction. Distinct
 payments stack even when their event timestamps match. A replay returns the current row without
 updating it, including after a later purchase or revocation. Receipt and entitlement writes roll
@@ -57,8 +58,10 @@ optimistic comparisons, durable chargeback denial and live Stripe resource looku
 responsible for current-state reconciliation. Event ID fencing does not establish global Stripe
 event ordering or serialize every subscription/refund path; do not infer exactly-once delivery.
 
-Discord is outside the database transaction. Grants already re-read current supporter denial
-before applying roles. Ordinary role failures are best effort; chargeback denial removal failures
+Discord is outside the database transaction. Checkout grants re-read current supporter state
+before and after applying roles. Expired replays retain only the base Supporter role; they do not
+restore the paid tier. Grants also re-read current supporter denial. Ordinary role failures are
+best effort; chargeback denial removal failures
 remain retryable. Role PUT/DELETE calls can repeat after recovery. An already-in-flight older
 Discord request can arrive after a newer one and cause role drift; set-operation idempotence does
 not prevent this ordering race. Use existing admin role reconciliation after a billing incident.
@@ -85,7 +88,15 @@ parsing or claiming. The existing secret and API version contract are unchanged.
    have no direct execution grants. Existing table and chargeback RPC grants remain unchanged.
 2. Replay and test in an isolated database, then verify the target identity, migration history,
    function definitions, trigger coverage and grants using the database migration runbook.
-3. Merge the migration and handler together through the approved `main` change. Repository Actions
+3. The one-time ledger migration takes a table lock and refuses rollout if any legacy one-time
+   row has a finite expiry. Old payments have no stored PaymentIntent identity: do not infer it
+   from a timestamp or silently apply a second period. If the gate fails, stop and reconcile
+   those payments using Stripe evidence and explicit production write approval before retrying.
+   The installed migration also fences timed grants from the old webhook during the migration /
+   Edge Function deployment interval. Those writes roll back with a retryable error; redelivery
+   through the new handler commits the payment receipt and entitlement together. Trusted
+   non-webhook operations retain their existing permission and approval requirements.
+4. Merge the migration and handler together through the approved `main` change. Repository Actions
    only validate the local database; the external Supabase GitHub integration deploys production.
    Its [deployment workflow](https://supabase.com/docs/guides/deployment/branching) applies migrations
    at step 5 before deploying changed Edge Functions at step 7; dependent steps skip on failure.
@@ -94,10 +105,10 @@ parsing or claiming. The existing secret and API version contract are unchanged.
    during the deployment interval, but they become unknown; reconcile those deliveries. Deploying
    the new handler first fails closed because the new RPCs are absent. Per-PR Supabase previews are
    disabled in this repository; a skipped preview check does not verify a database deployment.
-4. Test signed requests in an approved isolated Stripe/Supabase environment. Local mocked-service
+5. Test signed requests in an approved isolated Stripe/Supabase environment. Local mocked-service
    checks are not authenticated Stripe or production acceptance. Observe `in_progress`, unknown
    receipts, processing errors and lease recovery after rollout.
-5. The existing cleanup job now deletes only completed/terminal receipts older than 30 days from
+6. The existing cleanup job now deletes only completed/terminal receipts older than 30 days from
    completion, using a partial completion-time index for resolved receipts. Unresolved receipts remain available for investigation. Alert and disposition them;
    growth is an operational signal, not permission to replay them automatically.
 

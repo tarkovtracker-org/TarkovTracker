@@ -1,3 +1,16 @@
+BEGIN;
+
+-- Establish the cutover while legacy billing writes are blocked by this table lock.
+-- Old finite payments have no stable identity and must be reconciled before rollout.
+LOCK TABLE public.supporters IN SHARE ROW EXCLUSIVE MODE;
+DO $cutover$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.supporters WHERE type = 'one_time' AND expires_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Reconcile legacy timed one-time payments before installing the payment ledger';
+  END IF;
+END;
+$cutover$;
+
 -- PaymentIntent identity survives different Checkout event deliveries and timestamps.
 -- Keep receipts for the life of the account; event receipt retention is independent.
 CREATE TABLE private.stripe_one_time_payments (
@@ -34,8 +47,10 @@ DECLARE
   receipt_user uuid;
   live_subscription boolean;
   expiry timestamptz;
+  expected_customer text;
+  customer text;
 BEGIN
-  -- Always event -> user -> supporter: stale claims fail before any billing lock.
+  -- Always event -> user -> customer -> supporter: stale claims fail before any billing lock.
   PERFORM private.assert_one_time_stripe_event_claim();
   target_user := (p_record->>'user_id')::uuid;
   amount := (p_record->>'amount_total')::integer;
@@ -56,7 +71,18 @@ BEGIN
     SELECT * INTO fulfilled FROM public.supporters WHERE user_id = target_user;
     RETURN fulfilled;
   END IF;
+  SELECT stripe_customer_id INTO expected_customer FROM public.supporters WHERE user_id = target_user;
+  -- Chargebacks take the customer lock before updating supporters. Lock both
+  -- the current and incoming customer in deterministic order before the row.
+  FOR customer IN SELECT DISTINCT value FROM unnest(ARRAY[
+      expected_customer, nullif(p_record->>'stripe_customer_id', '')]) AS customers(value)
+      WHERE value IS NOT NULL ORDER BY value LOOP
+    PERFORM pg_advisory_xact_lock(hashtext('supporter-chargeback'), hashtext(customer));
+  END LOOP;
   SELECT * INTO existing FROM public.supporters WHERE user_id = target_user FOR UPDATE;
+  IF existing.stripe_customer_id IS DISTINCT FROM expected_customer THEN
+    RAISE EXCEPTION 'Supporter customer changed during fulfillment' USING ERRCODE = '40001';
+  END IF;
   -- Also protect identity if different users race to redeem the same payment.
   INSERT INTO private.stripe_one_time_payments(payment_id, user_id, paid_at, amount_total)
     VALUES (p_payment_id, target_user, p_paid_at, amount) ON CONFLICT (payment_id) DO NOTHING;
@@ -68,6 +94,7 @@ BEGIN
     SELECT * INTO fulfilled FROM public.supporters WHERE user_id = target_user;
     RETURN fulfilled;
   END IF;
+  PERFORM set_config('stripe.one_time_payment_id', p_payment_id, true);
   live_subscription := coalesce(existing.type = 'subscription'
     AND existing.status IN ('active', 'past_due') AND existing.stripe_subscription_id IS NOT NULL, false);
   -- A smaller contribution must not replace an already active paid tier.
@@ -108,3 +135,30 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.fulfill_one_time_supporter(text, timestamptz, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fulfill_one_time_supporter(text, timestamptz, jsonb) TO service_role;
+
+-- An old webhook can still be running after migrations and before function deployment.
+-- Its timed grant must roll back and retry through the identity-bearing RPC.
+CREATE FUNCTION private.fence_legacy_one_time_grant()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  changed boolean := true;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    changed := NEW.expires_at IS DISTINCT FROM OLD.expires_at
+      OR NEW.last_contribution_at IS DISTINCT FROM OLD.last_contribution_at
+      OR NEW.type IS DISTINCT FROM OLD.type;
+  END IF;
+  IF NEW.type = 'one_time' AND NEW.status = 'active' AND NEW.expires_at IS NOT NULL AND changed
+    AND (current_setting('request.headers', true)::jsonb->>'x-stripe-event-id') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM private.stripe_one_time_payments
+      WHERE payment_id = current_setting('stripe.one_time_payment_id', true) AND user_id = NEW.user_id) THEN
+    RAISE EXCEPTION 'Timed one-time grants must use payment-identity fulfillment' USING ERRCODE = '40001';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.fence_legacy_one_time_grant() FROM PUBLIC, anon, authenticated, service_role;
+CREATE TRIGGER fence_legacy_one_time_grant BEFORE INSERT OR UPDATE ON public.supporters
+  FOR EACH ROW EXECUTE FUNCTION private.fence_legacy_one_time_grant();
+
+COMMIT;

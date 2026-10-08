@@ -97,10 +97,60 @@ async function race(label, id, totalDays, rollback = false) {
   );
   console.log(`PASS ${label}: actual per-user advisory lock wait; ${totalDays} days retained`);
 }
+function verifyCutover() {
+  const migration = readFileSync(
+    'supabase/migrations/20261007063801_atomic_one_time_supporter_fulfillment.sql',
+    'utf8'
+  );
+  const gate = migration.match(/DO \$cutover\$[\s\S]*?\$cutover\$;/)?.[0];
+  assert.ok(gate, 'Cutover precondition must exist');
+  query(gate);
+  query(`INSERT INTO public.supporters(user_id, tier, status, type, expires_at)
+    VALUES ('${user}', 'scav', 'active', 'one_time', now() + interval '30 days')`);
+  const rejected = spawnSync('docker', [...psql, '-c', gate], { encoding: 'utf8' });
+  assert.notEqual(
+    rejected.status,
+    0,
+    'A previously fulfilled legacy timed payment must block rollout'
+  );
+  assert.match(rejected.stderr, /Reconcile legacy timed one-time payments/);
+  query(`DELETE FROM public.supporters WHERE user_id='${user}'`);
+  console.log(
+    'PASS cutover accepts an empty timed-payment history and rejects a legacy fulfilled payment'
+  );
+}
+async function chargebackRace() {
+  const customer = `cus_concurrency_${user.replaceAll('-', '')}`;
+  query(`UPDATE public.supporters SET stripe_customer_id='${customer}' WHERE user_id='${user}'`);
+  const holder = connection(`BEGIN; SET application_name='${application}';
+    SELECT pg_advisory_xact_lock(hashtext('supporter-chargeback'), hashtext('${customer}'));
+    SELECT pg_sleep(3); SELECT public.disqualify_supporter_customer('${customer}', '${user}'); COMMIT;`);
+  await until(
+    `SELECT count(*) FROM pg_stat_activity WHERE application_name='${application}' AND wait_event='PgSleep'`,
+    '1'
+  );
+  const payment = connection(
+    `SET application_name='${waiter}'; SET ROLE service_role; ${fulfill('chargeback')}`
+  );
+  await until(
+    `SELECT count(*) FROM pg_stat_activity WHERE application_name='${waiter}' AND wait_event='advisory'`,
+    '1'
+  );
+  const [denied, paid] = await Promise.all([holder, payment]);
+  assert.equal(denied.code, 0, denied.stderr);
+  assert.equal(paid.code, 0, paid.stderr);
+  assert.equal(
+    query(`SELECT has_ever_supported FROM public.supporters WHERE user_id='${user}'`),
+    'f'
+  );
+  query(`DELETE FROM private.supporter_chargebacks WHERE customer_id='${customer}'`);
+  console.log('PASS chargeback and fulfillment serialize without deadlock; denial remains durable');
+}
 let created = false;
 try {
   query(`INSERT INTO auth.users(id,email) VALUES ('${user}','one-time-${user}@example.invalid')`);
   created = true;
+  verifyCutover();
   await race('simultaneous first payments', 'first', 60);
   await race('simultaneous existing-row payments', 'existing', 120);
   await race('failed holder rolls back its receipt and entitlement', 'rollback', 150, true);
@@ -138,8 +188,10 @@ try {
     '0'
   );
   console.log('PASS stale claim fails before waiting on a held per-user advisory lock');
+  await chargebackRace();
 } finally {
   if (created)
-    query(`DELETE FROM public.supporters WHERE user_id='${user}';
+    query(`DELETE FROM private.supporter_chargebacks WHERE customer_id='cus_concurrency_${user.replaceAll('-', '')}';
+     DELETE FROM public.supporters WHERE user_id='${user}';
     DELETE FROM auth.users WHERE id='${user}'; DELETE FROM public.stripe_events WHERE event_id='${event}'`);
 }

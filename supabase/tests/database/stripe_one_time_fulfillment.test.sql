@@ -124,7 +124,12 @@ SELECT throws_ok($$SELECT pg_temp.fulfill('pi_missing_paid', 807, 400, NULL)$$, 
 CREATE TEMP TABLE fulfillment_claim AS SELECT public.claim_stripe_event('evt_one_time_claim', 'test') AS claim;
 SELECT set_config('request.headers', jsonb_build_object('x-stripe-event-id', 'evt_one_time_claim',
   'x-stripe-claim-token', claim->>'token')::text, true) FROM fulfillment_claim;
+SELECT set_config('stripe.one_time_payment_id', '', true);
 SET LOCAL ROLE service_role;
+SELECT throws_ok($$INSERT INTO public.supporters(user_id, tier, status, type, expires_at)
+  VALUES ('00000000-0000-0000-0000-000000000807', 'scav', 'active', 'one_time', now() + interval '30 days')$$,
+  '40001', 'Timed one-time grants must use payment-identity fulfillment',
+  'in-flight legacy handler cannot apply a timed grant after the cutover');
 SELECT lives_ok($$SELECT pg_temp.fulfill('pi_current_claim', 807)$$, 'service-role RPC fences and accepts current claim');
 RESET ROLE;
 UPDATE public.stripe_events SET lease_expires_at = clock_timestamp() - interval '1 second'

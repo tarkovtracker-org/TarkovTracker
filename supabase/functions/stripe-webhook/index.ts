@@ -390,7 +390,7 @@ async function activateSubscriptionSupporter(
     updated_at: new Date().toISOString(),
   };
   const activated = await upsertSubscriptionSupporter(record, userId);
-  await syncActivatedSupporterRoles(activated, { userId, discordUserId, tier, source });
+  await syncActivatedSupporterRoles(activated, { userId, discordUserId, source });
   console.info(
     `[stripe-webhook] Supporter activated (${source}): ${userId} tier=${tier} type=subscription`
   );
@@ -435,7 +435,6 @@ async function fulfillOneTimeSupporter(
   await syncActivatedSupporterRoles(supporter, {
     userId: supporter.user_id,
     discordUserId: supporter.discord_user_id,
-    tier: supporter.tier,
     source,
   });
 }
@@ -483,7 +482,6 @@ type SupporterRow = NonNullable<Awaited<ReturnType<typeof findSupporterBy>>>;
 type CheckoutRoleContext = {
   userId: string;
   discordUserId: string | null;
-  tier: string;
   source: string;
 };
 async function syncActivatedSupporterRoles(
@@ -494,7 +492,7 @@ async function syncActivatedSupporterRoles(
     await revokeSupporter(supporter, true, 'disqualified checkout');
     return;
   }
-  const { userId, discordUserId, tier, source } = context;
+  const { userId, discordUserId, source } = context;
   if (!discordUserId) return;
   await withFreshStripeRoleGrant(
     () => findFreshRoleSupporter(userId),
@@ -502,12 +500,44 @@ async function syncActivatedSupporterRoles(
       await safeDiscordCall(`linked role sync (${source})`, { userId, discordUserId }, () =>
         syncLinkedAccountRole(discordUserId)
       );
-      await safeDiscordCall(`role sync (${source})`, { userId, discordUserId, tier }, () =>
-        syncRolesForSupporter(discordUserId, tier, true)
-      );
+      await syncCurrentCheckoutRoles(userId, discordUserId, source);
+      await removeExpiredCheckoutTier(userId, discordUserId, source);
     },
     () => removeDeniedStripeRoles(discordUserId)
   );
+}
+async function syncCurrentCheckoutRoles(
+  userId: string,
+  discordUserId: string,
+  source: string
+): Promise<void> {
+  const current = await findFreshRoleSupporter(userId);
+  if (!current || current.has_ever_supported === false || isSupporterDisqualified(current)) {
+    await removeDeniedStripeRoles(discordUserId);
+    return;
+  }
+  const tier = currentCheckoutRoleTier(current);
+  await safeDiscordCall(`role sync (${source})`, { userId, discordUserId, tier }, () =>
+    syncRolesForSupporter(discordUserId, tier, true)
+  );
+}
+async function removeExpiredCheckoutTier(
+  userId: string,
+  discordUserId: string,
+  source: string
+): Promise<void> {
+  const current = await findFreshRoleSupporter(userId);
+  if (!current || currentCheckoutRoleTier(current) !== 'supporter') return;
+  // Expiry can pass while Discord is processing the first grant. Never grant
+  // another paid role after the outer chargeback guard has completed.
+  await safeDiscordCall(`expired tier removal (${source})`, { userId, discordUserId }, () =>
+    removeAllTierRoles(discordUserId)
+  );
+}
+function currentCheckoutRoleTier(supporter: SupporterRow): string {
+  if (!['active', 'past_due'].includes(supporter.status)) return 'supporter';
+  const expiry = supporter.expires_at ?? (supporter.status === 'active' ? '9999-01-01' : '');
+  return Date.parse(expiry) > Date.now() ? supporter.tier : 'supporter';
 }
 /**
  * Look up a supporter by an exact column match. Returns null if not found

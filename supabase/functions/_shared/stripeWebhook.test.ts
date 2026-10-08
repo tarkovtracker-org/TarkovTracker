@@ -36,6 +36,7 @@ function createHarness(
     remove?: () => Promise<void>;
     readError?: string;
     fulfillmentError?: string;
+    fulfillmentReplay?: boolean;
   } = {}
 ) {
   let row: Row = { ...initial };
@@ -107,6 +108,8 @@ function createHarness(
                     data: null,
                     error: { message: options.fulfillmentError },
                   });
+                if (options.fulfillmentReplay)
+                  return Promise.resolve({ data: { ...row }, error: null });
                 const record = params.p_record as Row;
                 const live =
                   row.type === 'subscription' &&
@@ -149,6 +152,7 @@ function createHarness(
           await options.grant?.();
           roles.add('supporter');
           if (tier !== 'supporter') roles.add('tier');
+          else roles.delete('tier');
         },
       };
     },
@@ -363,6 +367,53 @@ describe('payment-specific webhook fulfillment', () => {
     );
     expect(harness.writes).toEqual([]);
     expect(harness.fulfillmentCalls).toEqual([]);
+  });
+  it.each(['active', 'expired'])(
+    'keeps only the base Discord role on an expired %s receipt replay',
+    async (status) => {
+      const harness = createHarness(
+        {
+          ...supporter,
+          status,
+          tier: 'chad',
+          expires_at: '2026-10-07T00:00:00Z',
+          discord_user_id: 'discord_1',
+        },
+        {
+          ...resourcesForPayments(),
+          '/charges/ch_new': { ...charge, amount_refunded: 0, refunded: false },
+        },
+        { discord: true, fulfillmentReplay: true }
+      );
+      harness.roles.add('tier');
+      await harness.dispatch('checkout.session.completed', session);
+      expect(harness.writes).toHaveLength(0);
+      expect(harness.roles).toEqual(new Set(['supporter']));
+    }
+  );
+  it('removes the paid tier when access expires while Discord applies a replay grant', async () => {
+    const harness = createHarness(
+      {
+        ...supporter,
+        status: 'active',
+        tier: 'chad',
+        expires_at: new Date(Date.now() + 60000).toISOString(),
+        discord_user_id: 'discord_1',
+      },
+      {
+        ...resourcesForPayments(),
+        '/charges/ch_new': { ...charge, amount_refunded: 0, refunded: false },
+      },
+      {
+        discord: true,
+        fulfillmentReplay: true,
+        grant: async () => {
+          harness.current().expires_at = '2026-10-07T00:00:00Z';
+        },
+      }
+    );
+    await harness.dispatch('checkout.session.completed', session);
+    expect(harness.roles).toEqual(new Set(['supporter']));
   });
   it('propagates failed atomic fulfillment for retry without a fallback upsert', async () => {
     const resources = resourcesForPayments();
