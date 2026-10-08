@@ -4,18 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/prepare-contracts.mjs && pnpm --parallel --filter api-gateway --filter @tarkovtracker/progress-contracts run dev:watch",
-    "deploy": "node scripts/prepare-contracts.mjs && wrangler deploy",
-    "types": "node scripts/prepare-contracts.mjs && wrangler types --env-file .env.example --env-interface CloudflareEnv --strict-vars=false worker-configuration.d.ts",
-    "types:check": "node scripts/prepare-contracts.mjs && wrangler types --env-file .env.example --env-interface CloudflareEnv --strict-vars=false --check worker-configuration.d.ts",
-    "typecheck": "node scripts/prepare-contracts.mjs && pnpm run check:boundaries && tsc --noEmit",
-    "validate:openapi": "node scripts/prepare-contracts.mjs && tsx scripts/validate-openapi.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types --env-file .env.example --env-interface CloudflareEnv --strict-vars=false worker-configuration.d.ts",
+    "types:check": "wrangler types --env-file .env.example --env-interface CloudflareEnv --strict-vars=false --check worker-configuration.d.ts",
+    "typecheck": "pnpm run check:boundaries && tsc --noEmit",
+    "validate:openapi": "tsx scripts/validate-openapi.ts",
     "test": "vitest run",
-    "build": "node scripts/prepare-contracts.mjs && wrangler deploy --config wrangler.toml --dry-run",
+    "build": "wrangler deploy --config wrangler.toml --dry-run",
     "check:boundaries": "node scripts/check-boundaries.mjs",
-    "dev:watch": "wrangler dev",
-    "test:watch": "node scripts/prepare-contracts.mjs && pnpm --parallel --filter api-gateway --filter @tarkovtracker/progress-contracts run watch:tests",
-    "watch:tests": "vitest --watch"
+    "test:watch": "vitest --watch"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "13.0.0",
@@ -27,7 +25,7 @@
     "wrangler": "4.143.0"
   },
   "dependencies": {
-    "@tarkovtracker/progress-contracts": "workspace:*"
+    "@tarkovtracker/progress-contracts": "https://github.com/tarkovtracker-org/TarkovTracker-API/releases/download/v0.1.0/tarkovtracker-progress-contracts-0.1.0.tgz"
   },
   "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85",
   "engines": {

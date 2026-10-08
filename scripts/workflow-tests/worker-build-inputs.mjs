@@ -9,8 +9,6 @@ import { test } from 'node:test';
 import ts from 'typescript';
 const ROOT = realpathSync('.');
 const WORKER = 'workers/api-gateway';
-const CONTRACTS = `${WORKER}/progress-contracts`;
-const CONTRACTS_PREFIX = '@tarkovtracker/progress-contracts/';
 const repoPath = (file) => relative(ROOT, file).replaceAll(sep, '/');
 const RUNBOOK = 'docs/runbook.md';
 // The Worker is a pnpm workspace member, so every install of it (Workers Builds runs
@@ -148,8 +146,6 @@ function aliasedImportBase(fromFile, specifier, aliases) {
 }
 function specifierBase(fromFile, specifier, aliases) {
   if (specifier.startsWith('.')) return resolve(dirname(fromFile), specifier);
-  if (specifier.startsWith(CONTRACTS_PREFIX))
-    return join(ROOT, CONTRACTS, 'src', specifier.slice(CONTRACTS_PREFIX.length));
   const external = externalImportBase(fromFile, specifier);
   return external === undefined ? aliasedImportBase(fromFile, specifier, aliases) : external;
 }
@@ -299,11 +295,16 @@ test('runbook lists every api-gateway build input and nothing stale', () => {
     );
   }
 });
-test('the closure follows versioned contracts sources inside the watched gateway tree', () => {
-  assert.ok(
-    workerBuildInputs().files.some((file) => file.startsWith(`${CONTRACTS}/src/`)),
-    'Worker bundle follows the versioned contracts sources'
+test('released contracts exports are pinned through watched manifests and the lockfile', () => {
+  const file = join(ROOT, WORKER, 'src/handlers/progress.ts');
+  assert.equal(
+    resolveImport(file, '@tarkovtracker/progress-contracts/apiTaskUpdates', workerAliases()),
+    realpathSync(LOCKFILE)
   );
+  const { files } = workerBuildInputs();
+  assert.ok(files.includes(`${WORKER}/package.json`));
+  assert.ok(files.includes(LOCKFILE));
+  assert.ok(!files.some((input) => input.includes('/progress-contracts/src/')));
 });
 test('toolchain and esbuild configs are inputs regardless of what the Worker imports', () => {
   const { files } = workerBuildInputs();

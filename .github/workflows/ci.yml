@@ -287,12 +287,14 @@ jobs:
     if: needs.changes.outputs.full == 'true'
     name: Workers
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+      - name: Check released contracts ownership and pins
+        run: pnpm run check:progress-contracts
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: |
@@ -306,6 +308,8 @@ jobs:
       - name: Prove standalone api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run verify:api-standalone
+      - name: Check versioned API and frontend parity in every mode
+        run: pnpm run verify:api-parity
   # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable
   # workflow's scanner errors, cancellations, or missing jobs surface as a non-success result here.
   security:

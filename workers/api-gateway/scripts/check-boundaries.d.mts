@@ -4,4 +4,4 @@ export function inspectImports(
   root: string,
   allowed: (specifier: string) => boolean
 ): string[];
-export function checkBoundaries(gatewayRoot: string): string[];
+export function checkBoundaries(gatewayRoot: string, contractsEntry?: string): string[];

@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 const patterns = [
   'app/**/*.{js,ts,tsx,vue,css,md}',
-  'workers/api-gateway/progress-contracts/**/*.{ts,json,md}',
   'app/**/!(*locales)/*.json',
   'app/locales/en.json',
   'docs/**/*.{md,markdown}',
