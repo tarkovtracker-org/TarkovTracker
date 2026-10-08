@@ -5,16 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
 import { adaptTaskObjectivesResponse, adaptTasksCoreResponse } from '@/server/utils/tarkov-json';
-import type { GameMode } from '~~/workers/api-gateway/src/types';
+import type { GameMode } from '@/utils/constants';
 import fixture from '@tarkovtracker/progress-contracts/fixtures/task-failure-branches.json';
-import { getHideoutStations, getTasks } from '~~/workers/api-gateway/src/services/tarkov';
-import { deleteMemoryCache } from '~~/workers/api-gateway/src/utils/memory-cache';
-import { getTaskCatalogInvalidator } from '~~/workers/api-gateway/src/utils/task-catalog';
+import { getHideoutStations, getTasks } from 'virtual:versioned-api/services/tarkov';
+import { deleteMemoryCache } from 'virtual:versioned-api/utils/memory-cache';
+import { getTaskCatalogInvalidator } from 'virtual:versioned-api/utils/task-catalog';
 vi.mock('cloudflare:workers', () => ({
   waitUntil: (promise: Promise<unknown>) => {
     void promise.catch(() => {});
   },
 }));
+const source = process.env.TARKOV_VERSIONED_API_DIRECTORY;
+if (!source) throw new Error('Run through pnpm run verify:api-parity to select the versioned API.');
 type Payload = Parameters<typeof adaptTasksCoreResponse>[0];
 const sourceId = '597a0f5686f774273b74f676';
 const targetId = '597a160786f77477531d39d2';

@@ -6,8 +6,6 @@ const testPattern =
   /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
 const gatewayTestPattern =
   /^workers\/api-gateway\/(?:src\/(?:.*\/)?__tests__\/.*|scripts\/[^/]+)\.test\.ts$/;
-const contractsRoot = 'workers/api-gateway/progress-contracts/';
-const contractsTestPattern = /^workers\/api-gateway\/progress-contracts\/src\/[^/]+\.test\.ts$/;
 // Literal references outside import edges, including executable config and file-reading tests.
 const pathReferenceSpecs = [
   '.github/',
@@ -44,10 +42,9 @@ const alwaysOutsideGraph =
   'Never in any graph: runtime string lookups (i18n keys, Supabase RPC/table names, KV keys, upstream field names).';
 export const isCodePath = (path) => codePattern.test(path);
 export const isTestPath = (path) =>
-  contractsTestPattern.test(path) ||
-  (path.startsWith('workers/api-gateway/')
+  path.startsWith('workers/api-gateway/')
     ? gatewayTestPattern.test(path)
-    : isCodePath(path) && testPattern.test(path));
+    : isCodePath(path) && testPattern.test(path);
 const isSourcePath = (path) => !isTestPath(path);
 const stripExtension = (path) => path.replace(/\.[^./]+$/, '');
 const stem = (path) => stripExtension(path.split('/').pop());
@@ -124,29 +121,26 @@ export function scopedInstructions(paths, instructionFiles) {
     .map(({ instruction }) => instruction);
   return unique(['AGENTS.md', ...scoped, ...semantic]);
 }
+const scopedRunners = [
+  ['workers/contract-tests/', 'parity'],
+  ['workers/api-gateway/', 'gateway'],
+];
 const runnerFor = (path) => {
-  if (path.startsWith('workers/api-gateway/')) return gatewayRunner(path);
+  const scoped = scopedRunners.find(([prefix]) => path.startsWith(prefix));
+  if (scoped) return scoped[1];
   if (path.endsWith('.deno.test.ts')) return 'deno';
   return /^scripts\/(?:workflow-tests\/|codex-review\/.*-tests\.mjs$)/.test(path)
     ? 'node'
     : 'vitest';
 };
-const gatewayRunner = (path) => (path.startsWith(contractsRoot) ? 'contracts' : 'gateway');
 const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
 const DENO_TEST_FLAGS = ['--config', 'supabase/functions/deno.json', '--frozen'];
 // Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
 const testOperands = (files) => files.map((file) => `./${file}`);
 const runnerCommands = {
-  contracts: (files) => ({
+  parity: () => ({
     executable: 'pnpm',
-    args: [
-      'exec',
-      'vitest',
-      'run',
-      '--config',
-      `${contractsRoot}vitest.config.ts`,
-      ...testOperands(files.map((file) => file.replace(contractsRoot, ''))),
-    ],
+    args: ['run', 'verify:api-parity'],
   }),
   vitest: (files) => ({
     executable: 'pnpm',
