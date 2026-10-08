@@ -70,6 +70,23 @@ SELECT ok((SELECT status = 'past_due' AND type = 'subscription' AND stripe_subsc
   AND started_at = now() - interval '50 days' FROM public.supporters WHERE user_id =
   '00000000-0000-0000-0000-000000000806'), 'live subscription and original start override stale record');
 SELECT is((pg_temp.fulfill('pi_live_no_downgrade', 806)).tier, 'chad', 'donation cannot downgrade live subscription');
+INSERT INTO public.supporters(user_id, tier, status, type, expires_at) VALUES
+  ('00000000-0000-0000-0000-000000000808', 'chad', 'active', 'one_time', now() + interval '10 days'),
+  ('00000000-0000-0000-0000-000000000809', 'chad', 'active', 'one_time', NULL);
+SELECT is((pg_temp.fulfill('pi_keep_active_tier', 808)).tier, 'chad',
+  'lower donation preserves already purchased active one-time tier');
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id =
+  '00000000-0000-0000-0000-000000000808'), now() + interval '40 days',
+  'higher-tier preservation still stacks purchased time');
+SELECT is((pg_temp.fulfill('pi_keep_lifetime_tier', 809)).tier, 'chad',
+  'lower donation preserves grandfathered one-time tier');
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id =
+  '00000000-0000-0000-0000-000000000809'), NULL::timestamptz,
+  'higher-tier preservation keeps grandfathered access');
+UPDATE public.supporters SET expires_at = now() - interval '1 day'
+  WHERE user_id = '00000000-0000-0000-0000-000000000808';
+SELECT is((pg_temp.fulfill('pi_fresh_tier', 808)).tier, 'scav',
+  'lapsed one-time access restarts at the newly purchased tier');
 SELECT throws_ok($$SELECT pg_temp.fulfill('pi_write_failure', 801, 400, '2026-10-07 00:00:00+00',
   '{"stripe_customer_id":"cus_live"}')$$, '23505', NULL, 'supporter write failure propagates');
 SELECT is((SELECT count(*)::integer FROM private.stripe_one_time_payments WHERE payment_id = 'pi_write_failure'),

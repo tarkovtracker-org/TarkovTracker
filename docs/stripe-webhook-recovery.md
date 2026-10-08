@@ -48,7 +48,8 @@ event's `created` timestamp decides the October 7, 2026 UTC cutoff, including la
 creation time does not decide grandfathering. Earlier payments and existing active open-ended
 one-time rows retain unlimited access; new payments add one 30-day period per $4 (minimum one,
 maximum twelve per payment) to remaining active one-time time. Active/past-due subscriptions keep
-their subscription fields. Database lookup or fulfillment errors fail the event for retry;
+their subscription fields. Smaller contributions preserve a higher existing active one-time tier;
+expired access restarts at the newly purchased tier. Database lookup or fulfillment errors fail the event for retry;
 there is no fallback upsert that replaces previously purchased time.
 
 Other write paths assign state or upsert unique chargeback references. Existing supporter

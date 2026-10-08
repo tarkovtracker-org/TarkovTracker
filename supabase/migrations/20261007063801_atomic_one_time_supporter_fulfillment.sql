@@ -70,12 +70,15 @@ BEGIN
   END IF;
   live_subscription := coalesce(existing.type = 'subscription'
     AND existing.status IN ('active', 'past_due') AND existing.stripe_subscription_id IS NOT NULL, false);
+  -- A smaller contribution must not replace an already active paid tier.
+  IF (live_subscription OR (existing.type = 'one_time' AND existing.status = 'active'
+      AND (existing.expires_at IS NULL OR existing.expires_at > now())))
+    AND array_position(ARRAY['supporter', 'scav', 'timmy', 'chad'], existing.tier)
+      > array_position(ARRAY['supporter', 'scav', 'timmy', 'chad'], incoming_tier) THEN
+    incoming_tier := existing.tier;
+  END IF;
   IF live_subscription THEN
     expiry := existing.expires_at;
-    IF array_position(ARRAY['supporter', 'scav', 'timmy', 'chad'], existing.tier)
-      > array_position(ARRAY['supporter', 'scav', 'timmy', 'chad'], incoming_tier) THEN
-      incoming_tier := existing.tier;
-    END IF;
   ELSIF p_paid_at < timestamptz '2026-10-07 00:00:00+00'
     OR (existing.type = 'one_time' AND existing.status = 'active' AND existing.expires_at IS NULL) THEN
     expiry := NULL;
