@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTaskFailureAlternatives } from '../taskFailureEdges';
+import { buildTaskFailureAlternatives } from './taskFailureEdges';
 const task = (id: string, failConditions: unknown = [], status?: string[]) => ({
   id,
   failConditions,

@@ -1,12 +1,12 @@
 // Cross-runtime tests remain outside app TypeScript: Worker ambient globals and Nuxt aliases differ.
 import { readFileSync } from 'node:fs';
-import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
+import { computeInvalidProgress } from '@tarkovtracker/progress-contracts/progressInvalidation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
 import { adaptTaskObjectivesResponse, adaptTasksCoreResponse } from '@/server/utils/tarkov-json';
 import type { GameMode } from '~~/workers/api-gateway/src/types';
-import fixture from '~~/tests/fixtures/task-failure-branches.json';
+import fixture from '@tarkovtracker/progress-contracts/fixtures/task-failure-branches.json';
 import { getHideoutStations, getTasks } from '~~/workers/api-gateway/src/services/tarkov';
 import { deleteMemoryCache } from '~~/workers/api-gateway/src/utils/memory-cache';
 import { getTaskCatalogInvalidator } from '~~/workers/api-gateway/src/utils/task-catalog';

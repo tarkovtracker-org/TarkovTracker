@@ -1,7 +1,7 @@
 import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
-} from '@shared/utils/userMetadata';
+} from '@tarkovtracker/progress-contracts/userMetadata';
 import type { User } from '@supabase/supabase-js';
 /**
  * User object structure for hydration.

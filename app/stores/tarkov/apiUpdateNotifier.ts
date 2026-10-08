@@ -1,4 +1,4 @@
-import { countApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
+import { countApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 import {
   normalizeApiTaskUpdates,
   normalizeApiUpdateMetaEntry,

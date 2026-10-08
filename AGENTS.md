@@ -14,11 +14,14 @@ Merges follow the merge class below.
   `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/api-gateway/`: public
   API Worker. `scripts/precompute/`: scheduled KV pipeline.
 - `app/locales/en.json` is the translation source; other locale files are Crowdin-owned.
+- `workers/api-gateway/progress-contracts/`: versioned runtime-free rules shared by browser, Nitro and
+  gateway. Ownership and downstream updates: `docs/api-ownership.md`.
 
 ## Commands
 
 - Install `pnpm install` | Dev `pnpm run dev` | Build `pnpm run build` | Static `pnpm run generate`
 - Test `pnpm run test` | Gateway `pnpm run test:api-gateway` | Supabase `pnpm run supabase:check`
+- Contracts `pnpm run test:progress-contracts` | Standalone API `pnpm run verify:api-standalone`
 - Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
 - Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
 - i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi`

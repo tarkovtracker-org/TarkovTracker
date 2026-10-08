@@ -1,4 +1,4 @@
-import { isFailedOnlyRequirement } from '@shared/utils/requirementStatus';
+import { isFailedOnlyRequirement } from '@tarkovtracker/progress-contracts/requirementStatus';
 import { describe, expect, it, vi } from 'vitest';
 import {
   applyTaskAvailabilityRequirements,

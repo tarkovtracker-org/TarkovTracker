@@ -303,6 +303,9 @@ jobs:
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway
+      - name: Prove standalone api-gateway
+        if: hashFiles('workers/api-gateway/package.json') != ''
+        run: pnpm run verify:api-standalone
   # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable
   # workflow's scanner errors, cancellations, or missing jobs surface as a non-success result here.
   security:

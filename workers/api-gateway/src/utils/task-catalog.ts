@@ -1,4 +1,4 @@
-import { createProgressInvalidator } from '@shared/utils/progressInvalidation';
+import { createProgressInvalidator } from '@tarkovtracker/progress-contracts/progressInvalidation';
 import type { TarkovTask } from '../types';
 const catalogInvalidators = new WeakMap<
   readonly TarkovTask[],

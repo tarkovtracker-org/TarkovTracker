@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 const migrationPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../supabase/migrations/20260710120000_enforce_active_api_token_cap.sql'
+  '../migrations/20260710120000_enforce_active_api_token_cap.sql'
 );
 const migrationSql = readFileSync(migrationPath, 'utf-8');
 describe('active API token cap migration', () => {

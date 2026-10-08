@@ -1,4 +1,8 @@
-import { capApiTaskUpdates, isApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
+import {
+  capApiTaskUpdates,
+  isApiTaskUpdateEntry,
+} from '@tarkovtracker/progress-contracts/apiTaskUpdates';
+import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import {
   defaultState,
   type ApiTaskUpdate,
@@ -9,7 +13,6 @@ import {
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgress';
 import {
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,

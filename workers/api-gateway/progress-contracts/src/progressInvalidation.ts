@@ -13,7 +13,7 @@ import {
   isFailedOnlyStatus,
   normalizeRequirementStatuses,
   requiresCompletionOrActive as requiresNormalizedCompletionOrActive,
-} from './requirementStatus';
+} from './requirementStatus.js';
 export type InvalidationTaskCompletion = { complete?: boolean; failed?: boolean };
 export type InvalidationTaskRequirement = { task?: { id: string }; status?: string[] };
 export type InvalidationTask = {

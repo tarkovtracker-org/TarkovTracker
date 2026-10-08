@@ -1,3 +1,4 @@
+import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import { useToastI18n } from '@/composables/useToastI18n';
 import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
 import {
@@ -30,7 +31,6 @@ import {
 import { useMetadataStore } from '@/stores/useMetadata';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgress';
 import {
   createPendingStateTracker,
   type RemoteStateMerge,

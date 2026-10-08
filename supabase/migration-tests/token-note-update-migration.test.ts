@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 const migrationPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../supabase/migrations/20260810140000_limit_api_token_updates_to_note.sql'
+  '../migrations/20260810140000_limit_api_token_updates_to_note.sql'
 );
 const migrationSql = readFileSync(migrationPath, 'utf-8');
 describe('API token note update migration', () => {

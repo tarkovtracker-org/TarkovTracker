@@ -85,7 +85,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { countApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
+  import { countApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useMetadataStore } from '@/stores/useMetadata';
   import type { ApiTaskUpdate, ApiUpdateMeta } from '@/stores/progressState';

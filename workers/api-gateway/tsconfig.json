@@ -5,8 +5,7 @@
     "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/*"],
-      "~/*": ["./src/*"],
-      "@shared/*": ["../../shared/*"]
+      "~/*": ["./src/*"]
     },
     "lib": ["ES2022"],
     "types": ["node"],
@@ -17,6 +16,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["worker-configuration.d.ts", "src/**/*.ts", "scripts/**/*.ts"],
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"],
   "exclude": ["node_modules"]
 }

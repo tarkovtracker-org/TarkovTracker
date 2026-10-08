@@ -1,10 +1,10 @@
+import { describe, expect, it } from 'vitest';
 import {
   applyTaskTransition,
   type TransitionCompletion,
   type TransitionTask,
   type TransitionTaskState,
-} from '@shared/utils/taskTransitions';
-import { describe, expect, it } from 'vitest';
+} from './taskTransitions';
 const tasks: TransitionTask[] = [
   { id: 'root' },
   { id: 'other' },

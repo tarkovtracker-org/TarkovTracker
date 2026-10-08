@@ -9,6 +9,9 @@ import { test } from 'node:test';
 import ts from 'typescript';
 const ROOT = realpathSync('.');
 const WORKER = 'workers/api-gateway';
+const CONTRACTS = `${WORKER}/progress-contracts`;
+const CONTRACTS_PREFIX = '@tarkovtracker/progress-contracts/';
+const repoPath = (file) => relative(ROOT, file).replaceAll(sep, '/');
 const RUNBOOK = 'docs/runbook.md';
 // The Worker is a pnpm workspace member, so every install of it (Workers Builds runs
 // `npx wrangler deploy` in WORKER) resolves Wrangler, esbuild and all packages through the
@@ -80,7 +83,7 @@ function workerEntry(wrangler = readFileSync(join(WORKER, 'wrangler.toml'), 'utf
   assertModeledWrangler(wrangler);
   const main = wrangler.match(/^main\s*=\s*"([^"]+)"/m);
   assert.ok(main, `${WORKER}/wrangler.toml must declare main`);
-  return join(WORKER, main[1]);
+  return join(WORKER, main[1]).replaceAll(sep, '/');
 }
 /** tsconfig `paths` as [specifier prefix, absolute target prefix], longest prefix first. */
 function workerAliases() {
@@ -134,10 +137,7 @@ function externalImportBase(fromFile, specifier) {
   if (RUNTIME_PREFIXES.some((p) => specifier.startsWith(p))) return null;
   return !isWorkerFile(fromFile) && specifier === 'parse5' ? join(ROOT, LOCKFILE) : undefined;
 }
-function specifierBase(fromFile, specifier, aliases) {
-  if (specifier.startsWith('.')) return resolve(dirname(fromFile), specifier);
-  const external = externalImportBase(fromFile, specifier);
-  if (external !== undefined) return external;
+function aliasedImportBase(fromFile, specifier, aliases) {
   // Outside WORKER, esbuild resolves bare specifiers with the root tsconfig's generated paths.
   assert.ok(
     isWorkerFile(fromFile),
@@ -145,6 +145,13 @@ function specifierBase(fromFile, specifier, aliases) {
   );
   const alias = aliases.find(([prefix]) => specifier.startsWith(prefix));
   return alias ? join(alias[1], specifier.slice(alias[0].length)) : join(ROOT, LOCKFILE);
+}
+function specifierBase(fromFile, specifier, aliases) {
+  if (specifier.startsWith('.')) return resolve(dirname(fromFile), specifier);
+  if (specifier.startsWith(CONTRACTS_PREFIX))
+    return join(ROOT, CONTRACTS, 'src', specifier.slice(CONTRACTS_PREFIX.length));
+  const external = externalImportBase(fromFile, specifier);
+  return external === undefined ? aliasedImportBase(fromFile, specifier, aliases) : external;
 }
 function resolveImport(fromFile, specifier, aliases) {
   const base = specifierBase(fromFile, specifier, aliases);
@@ -206,7 +213,7 @@ function tsconfigChains(files) {
     if (!seen.has(file)) pending.push(...relativeBases(file));
     seen.add(file);
   }
-  const all = [...seen].map((file) => relative(ROOT, file));
+  const all = [...seen].map(repoPath);
   return { tracked: all.filter(isTracked), generated: all.filter((file) => !isTracked(file)) };
 }
 /** Whether a workspace install's root `postinstall` regenerates `.nuxt/`. */
@@ -224,7 +231,11 @@ function generatorsOf(generated) {
 function shadowingWranglerConfigs(exists = isFile) {
   const found = [];
   for (let dir = WORKER; ; dir = dirname(dir)) {
-    found.push(...SHADOWING_WRANGLER_CONFIGS.map((name) => join(dir, name)).filter(exists));
+    found.push(
+      ...SHADOWING_WRANGLER_CONFIGS.map((name) => join(dir, name).replaceAll(sep, '/')).filter(
+        exists
+      )
+    );
     if (dir === '.') return found;
   }
 }
@@ -250,7 +261,7 @@ function workerBuildInputs() {
     new Set(sources.flatMap((file) => ancestorConfigs(file, TS_CONFIGS)))
   );
   const files = [
-    ...[...sources, ...packages].map((file) => relative(ROOT, file)),
+    ...[...sources, ...packages].map(repoPath),
     ...tracked,
     ...generatorsOf(generated),
     ...workspaceInputs(),
@@ -288,11 +299,10 @@ test('runbook lists every api-gateway build input and nothing stale', () => {
     );
   }
 });
-test('the closure follows imports outside workers/api-gateway', () => {
-  const outside = workerBuildInputs().files.filter((file) => !file.startsWith(`${WORKER}/`));
+test('the closure follows versioned contracts sources inside the watched gateway tree', () => {
   assert.ok(
-    outside.some((file) => file.startsWith('shared/')),
-    'Worker imports shared/ today'
+    workerBuildInputs().files.some((file) => file.startsWith(`${CONTRACTS}/src/`)),
+    'Worker bundle follows the versioned contracts sources'
   );
 });
 test('toolchain and esbuild configs are inputs regardless of what the Worker imports', () => {
@@ -361,7 +371,10 @@ test('wrangler.toml settings that can read more files must be modeled first', ()
   for (const setting of unmodeled) {
     assert.throws(() => workerEntry(`main = "x"\n${setting}\n`), /settings first/, setting);
   }
-  assert.equal(workerEntry('main = "src/index.ts"\n'), join(WORKER, 'src', 'index.ts'));
+  assert.equal(
+    workerEntry('main = "src/index.ts"\n'),
+    join(WORKER, 'src', 'index.ts').replaceAll(sep, '/')
+  );
 });
 test('bare imports outside workers/api-gateway are not resolved with Worker aliases', () => {
   const shared = join(ROOT, 'shared', 'utils', '__fixture__.ts');

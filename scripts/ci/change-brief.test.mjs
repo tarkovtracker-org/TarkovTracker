@@ -320,6 +320,36 @@ describe('path helpers', () => {
       expect(typeof command.executable).toBe('string');
     }
   });
+  it('selects the independent contracts runner and gateway tooling tests', () => {
+    const contracts = 'workers/api-gateway/progress-contracts/src/modeProgress.test.ts';
+    const tooling = 'workers/api-gateway/scripts/check-boundaries.test.ts';
+    expect(isTestPath(contracts)).toBe(true);
+    expect(isTestPath(tooling)).toBe(true);
+    expect(testCommands([contracts, tooling])).toEqual([
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/progress-contracts/vitest.config.ts',
+          './src/modeProgress.test.ts',
+        ],
+      },
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './scripts/check-boundaries.test.ts',
+        ],
+      },
+    ]);
+  });
   it('keeps Deno file selection before its script-argument delimiter', () => {
     const [command] = testCommands(['-selected space.deno.test.ts']);
     expect(command).toEqual({

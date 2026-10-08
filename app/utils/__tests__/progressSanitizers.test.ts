@@ -1,4 +1,4 @@
-import { API_UPDATE_TASK_LIMIT } from '@shared/utils/apiTaskUpdates';
+import { API_UPDATE_TASK_LIMIT } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 import { describe, expect, it } from 'vitest';
 import { ACTIVE_SEASON_NUMBER, MAX_SKILL_LEVEL } from '@/utils/constants';
 import {

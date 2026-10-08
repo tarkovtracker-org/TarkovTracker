@@ -132,7 +132,7 @@ vi.mock('@/utils/tarkovDevProfileUrl', () => ({
 vi.mock('@/utils/taskTypeFilters', () => ({
   filterTasksByTypeSettings: (tasks: Task[]) => tasks,
 }));
-vi.mock('@shared/utils/progressInvalidation', () => ({
+vi.mock('@tarkovtracker/progress-contracts/progressInvalidation', () => ({
   computeInvalidProgress: () => ({ invalidTasks: [], invalidObjectives: [] }),
 }));
 vi.mock('@/composables/useCopyToClipboard', () => ({

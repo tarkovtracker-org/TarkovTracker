@@ -2,7 +2,13 @@
 const codeExtension = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testDirectory = /(?:^|\/)(?:__tests__|tests)\//;
 const testFilename = /\.(?:test|spec)\.[^/]+$/;
-const runtimeRoots = [/^app\//, /^shared\//, /^workers\/[^/]+\/src\//, /^supabase\/functions\//];
+const runtimeRoots = [
+  /^app\//,
+  /^shared\//,
+  /^workers\/api-gateway\/progress-contracts\/src\//,
+  /^workers\/[^/]+\/src\//,
+  /^supabase\/functions\//,
+];
 const categoryRules = [
   [
     'tests',

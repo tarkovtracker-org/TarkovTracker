@@ -151,8 +151,6 @@ imports the install's `postinstall` evaluates. Its inputs, kept in sync with the
 <!-- api-gateway-build-inputs:start -->
 
 - `workers/api-gateway/**` — watched
-- `shared/**` — watched (bundled)
-- `app/utils/modeProgress.ts` — watched (bundled)
 - `app/features/resources/resourceData.ts` — watched (`nuxt prepare` import)
 - `app/locales/en.json` — watched (`nuxt prepare` import)
 - `app/utils/apiProtectionConfig.ts` — watched (`nuxt prepare` import)
@@ -179,6 +177,10 @@ imports the install's `postinstall` evaluates. Its inputs, kept in sync with the
   scripts)
 
 <!-- api-gateway-build-inputs:end -->
+
+Progress contracts now live under the already-watched `workers/api-gateway/**` path. The
+existing trigger still also watches the retired `shared/**` and `app/utils/modeProgress.ts`
+paths; this preparatory change does not modify the integration.
 
 A new build input must be added to the trigger's watch paths in the same change, or production
 keeps the previous Worker build until a watched file changes.

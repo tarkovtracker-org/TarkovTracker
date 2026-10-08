@@ -1,0 +1,57 @@
+{
+  "name": "@tarkovtracker/progress-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "fixtures",
+    "README.md"
+  ],
+  "exports": {
+    "./apiTaskUpdates": {
+      "types": "./dist/apiTaskUpdates.d.ts",
+      "import": "./dist/apiTaskUpdates.js"
+    },
+    "./progressInvalidation": {
+      "types": "./dist/progressInvalidation.d.ts",
+      "import": "./dist/progressInvalidation.js"
+    },
+    "./requirementStatus": {
+      "types": "./dist/requirementStatus.d.ts",
+      "import": "./dist/requirementStatus.js"
+    },
+    "./seasonNumber": {
+      "types": "./dist/seasonNumber.d.ts",
+      "import": "./dist/seasonNumber.js"
+    },
+    "./taskFailureEdges": {
+      "types": "./dist/taskFailureEdges.d.ts",
+      "import": "./dist/taskFailureEdges.js"
+    },
+    "./taskTransitions": {
+      "types": "./dist/taskTransitions.d.ts",
+      "import": "./dist/taskTransitions.js"
+    },
+    "./userMetadata": {
+      "types": "./dist/userMetadata.d.ts",
+      "import": "./dist/userMetadata.js"
+    },
+    "./modeProgress": {
+      "types": "./dist/modeProgress.d.ts",
+      "import": "./dist/modeProgress.js"
+    },
+    "./fixtures/task-failure-branches.json": "./fixtures/task-failure-branches.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

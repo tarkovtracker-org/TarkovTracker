@@ -4,7 +4,10 @@ import { classifyPaths } from './validation-plan.mjs';
 const codePattern = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testPattern =
   /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
-const gatewayTestPattern = /^workers\/api-gateway\/src\/(?:.*\/)?__tests__\/.*\.test\.ts$/;
+const gatewayTestPattern =
+  /^workers\/api-gateway\/(?:src\/(?:.*\/)?__tests__\/.*|scripts\/[^/]+)\.test\.ts$/;
+const contractsRoot = 'workers/api-gateway/progress-contracts/';
+const contractsTestPattern = /^workers\/api-gateway\/progress-contracts\/src\/[^/]+\.test\.ts$/;
 // Literal references outside import edges, including executable config and file-reading tests.
 const pathReferenceSpecs = [
   '.github/',
@@ -33,7 +36,7 @@ const pathReferenceSpecs = [
 ];
 // Markdown that can own behavior. `.cubic/` and the changelog are not sources (root AGENTS.md).
 const docSpecs = ['*.md', ':!.cubic/', ':!CHANGELOG.md', ':!app/locales/'];
-const codeSearchSpecs = ['app', 'shared', 'workers/api-gateway/src', 'tests', 'scripts'];
+const codeSearchSpecs = ['app', 'workers/api-gateway', 'tests', 'scripts'];
 const maxListed = 12;
 const maxBroaderTests = 25;
 const maxReferenceSeeds = 60;
@@ -41,9 +44,10 @@ const alwaysOutsideGraph =
   'Never in any graph: runtime string lookups (i18n keys, Supabase RPC/table names, KV keys, upstream field names).';
 export const isCodePath = (path) => codePattern.test(path);
 export const isTestPath = (path) =>
-  path.startsWith('workers/api-gateway/')
+  contractsTestPattern.test(path) ||
+  (path.startsWith('workers/api-gateway/')
     ? gatewayTestPattern.test(path)
-    : isCodePath(path) && testPattern.test(path);
+    : isCodePath(path) && testPattern.test(path));
 const isSourcePath = (path) => !isTestPath(path);
 const stripExtension = (path) => path.replace(/\.[^./]+$/, '');
 const stem = (path) => stripExtension(path.split('/').pop());
@@ -121,17 +125,29 @@ export function scopedInstructions(paths, instructionFiles) {
   return unique(['AGENTS.md', ...scoped, ...semantic]);
 }
 const runnerFor = (path) => {
-  if (path.startsWith('workers/api-gateway/')) return 'gateway';
+  if (path.startsWith('workers/api-gateway/')) return gatewayRunner(path);
   if (path.endsWith('.deno.test.ts')) return 'deno';
   return /^scripts\/(?:workflow-tests\/|codex-review\/.*-tests\.mjs$)/.test(path)
     ? 'node'
     : 'vitest';
 };
+const gatewayRunner = (path) => (path.startsWith(contractsRoot) ? 'contracts' : 'gateway');
 const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
 const DENO_TEST_FLAGS = ['--config', 'supabase/functions/deno.json', '--frozen'];
 // Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
 const testOperands = (files) => files.map((file) => `./${file}`);
 const runnerCommands = {
+  contracts: (files) => ({
+    executable: 'pnpm',
+    args: [
+      'exec',
+      'vitest',
+      'run',
+      '--config',
+      `${contractsRoot}vitest.config.ts`,
+      ...testOperands(files.map((file) => file.replace(contractsRoot, ''))),
+    ],
+  }),
   vitest: (files) => ({
     executable: 'pnpm',
     args: ['exec', 'vitest', 'run', ...testOperands(files)],

@@ -1,4 +1,4 @@
-import type { ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
+import type { ApiTaskUpdateEntry } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 export interface TaskObjectiveProgress {
   count?: number;
   complete?: boolean;
