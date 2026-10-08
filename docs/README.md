@@ -21,6 +21,7 @@ instead of restating it.
 | Understand the deeper architecture, state model, and data flows                   | [`architecture.md`](./architecture.md)                  |
 | Read the Tarkov data architecture decision and implementation plan                | [`decision-tarkov-data.md`](./decision-tarkov-data.md)  |
 | Use or extend the HTTP/API surface                                                | [`api.md`](./api.md)                                    |
+| Decide whether an API/frontend change belongs here or in the gateway              | [`api-ownership.md`](./api-ownership.md)                |
 | Understand rate limits / abuse controls by layer                                  | [`rate-limiting.md`](./rate-limiting.md)                |
 | Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                            |
 | Understand CI/CD, hooks, and releases                                             | [`workflow-automation.md`](./workflow-automation.md)    |

@@ -1,7 +1,7 @@
 import {
   acceptsCompletionStatus,
   normalizeRequirementStatuses,
-} from '@shared/utils/requirementStatus';
+} from '@tarkovtracker/progress-contracts/requirementStatus';
 import { GAME_MODE_VALUES, MANUAL_FAIL_TASK_IDS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { nextClock } from '@/utils/taskAvailabilityConfirmation';

@@ -404,7 +404,7 @@
   </UCard>
 </template>
 <script setup lang="ts">
-  import { isFailedOnlyRequirement } from '@shared/utils/requirementStatus';
+  import { isFailedOnlyRequirement } from '@tarkovtracker/progress-contracts/requirementStatus';
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';

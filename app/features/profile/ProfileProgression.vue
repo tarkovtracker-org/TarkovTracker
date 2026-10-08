@@ -239,7 +239,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
+  import { computeInvalidProgress } from '@tarkovtracker/progress-contracts/progressInvalidation';
   import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
   import {
     computeConfidence,

@@ -1,4 +1,8 @@
-import { capApiTaskUpdates, type ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
+import {
+  capApiTaskUpdates,
+  type ApiTaskUpdateEntry,
+} from '@tarkovtracker/progress-contracts/apiTaskUpdates';
+import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import {
   createError,
   defineEventHandler,
@@ -21,7 +25,6 @@ import {
 } from '@/server/utils/sharedEdgeStore';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
-import { hasMaterializedProgress } from '@/utils/modeProgress';
 import {
   isRecord,
   sanitizeDisplayName,

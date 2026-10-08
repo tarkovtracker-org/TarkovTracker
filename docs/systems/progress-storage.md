@@ -66,7 +66,7 @@ flowchart LR
    Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
    requested tasks before cascaded dependents) and records the pre-truncation total as `taskCount`
    only when updates were dropped. The gateway, client, and database apply the same rules
-   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
+   (`workers/api-gateway/progress-contracts/src/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
    resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
    from a client built before the cap), the database keeps the larger stored count.
 3. Realtime listens to both the account row and normalized rows. Recognized account metadata
@@ -167,7 +167,7 @@ Teams, save status and recovery, and progress imports build on this storage; see
   second runtime constant.
 - Both season resolvers (Nitro and the Worker's `workers/api-gateway/src/utils/gameMode.ts`) accept
   the RPC's `SMALLINT` only as a JSON number that is a positive integer
-  (`shared/utils/seasonNumber.ts`); strings, booleans, arrays, objects, null, zero, negatives and
+  (`workers/api-gateway/progress-contracts/src/seasonNumber.ts`); strings, booleans, arrays, objects, null, zero, negatives and
   fractions are rejected without coercion and fail closed.
 - Own and teammate hydration, shared profiles and overlays, team summaries, and public progress/team
   API reads use normalized rows only. A materialized row carries a finite numeric `level`; missing

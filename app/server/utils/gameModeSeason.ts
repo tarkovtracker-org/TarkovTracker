@@ -1,4 +1,4 @@
-import { isSeasonNumber } from '@shared/utils/seasonNumber';
+import { isSeasonNumber } from '@tarkovtracker/progress-contracts/seasonNumber';
 import { createError } from 'h3';
 import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { fetchWithTimeout } from '@/server/utils/fetchWithTimeout';

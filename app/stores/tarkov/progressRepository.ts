@@ -1,7 +1,7 @@
 import type { UserState } from '@/stores/progressState';
 import type { UserProgressData, ManualActivityAction, ManualActivityType } from '@/types/progress';
 import type { GameMode } from '@/utils/constants';
-import type { ApiTaskUpdateState } from '@shared/utils/apiTaskUpdates';
+import type { ApiTaskUpdateState } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 // Inactive transaction substrate. No application caller uses this database yet.
 const modes: readonly GameMode[] = ['pvp', 'pve', 'seasonal'];
 const storeName = 'records';

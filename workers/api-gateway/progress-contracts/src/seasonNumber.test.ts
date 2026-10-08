@@ -1,5 +1,5 @@
-import { isSeasonNumber } from '@shared/utils/seasonNumber';
 import { describe, expect, it } from 'vitest';
+import { isSeasonNumber } from './seasonNumber';
 describe('isSeasonNumber', () => {
   it.each([1, 2, 32767])('accepts the positive integer %j', (value) => {
     expect(isSeasonNumber(value)).toBe(true);

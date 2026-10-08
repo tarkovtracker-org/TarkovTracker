@@ -1,9 +1,5 @@
-import {
-  API_UPDATE_TASK_LIMIT,
-  capApiTaskUpdates,
-  countApiTaskUpdates,
-} from '@shared/utils/apiTaskUpdates';
 import { describe, expect, it } from 'vitest';
+import { API_UPDATE_TASK_LIMIT, capApiTaskUpdates, countApiTaskUpdates } from './apiTaskUpdates';
 const updates = (length: number) =>
   Array.from({ length }, (_, index) => ({ id: `task-${index}`, state: 'completed' as const }));
 describe('capApiTaskUpdates', () => {

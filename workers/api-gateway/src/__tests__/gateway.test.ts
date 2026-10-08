@@ -1,4 +1,4 @@
-import branchFixture from '../../../../tests/fixtures/task-failure-branches.json';
+import branchFixture from '@tarkovtracker/progress-contracts/fixtures/task-failure-branches.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';

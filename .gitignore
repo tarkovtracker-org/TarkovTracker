@@ -48,3 +48,5 @@ __pycache__/
 
 # Deno runs with supabase/functions/deno.json; a root lockfile only snapshots package.json.
 /deno.lock
+
+workers/api-gateway/progress-contracts/dist/

@@ -1,5 +1,7 @@
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { prepareWorkspaceContracts } from './scripts/prepare-contracts.mjs';
+prepareWorkspaceContracts();
 const gatewayRoot = fileURLToPath(new URL('.', import.meta.url));
 const workerShim = fileURLToPath(new URL('./src/__tests__/cloudflare-workers.ts', import.meta.url));
 export default defineConfig({
@@ -8,14 +10,14 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       'cloudflare:workers': workerShim,
-      '@shared': fileURLToPath(new URL('../../shared', import.meta.url)),
     },
   },
   test: {
     environment: 'node',
+    maxWorkers: 2,
     globals: true,
     clearMocks: true,
-    include: ['src/**/__tests__/**/*.test.ts'],
+    include: ['src/**/__tests__/**/*.test.ts', 'scripts/*.test.ts'],
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],
   },
 });

@@ -1,4 +1,4 @@
-import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
+import { capApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 import {
   MANUAL_ACTIVITY_ACTIONS,
   MANUAL_ACTIVITY_TYPES,

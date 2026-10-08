@@ -1,7 +1,7 @@
-import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
-import { applyTaskTransition } from '@shared/utils/taskTransitions';
+import { capApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
+import { applyTaskTransition } from '@tarkovtracker/progress-contracts/taskTransitions';
 import { getUserDisplayName } from '@/utils/user-display-name';
-import { hasMaterializedProgress } from '../../../../app/utils/modeProgress';
+import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { logger } from '../utils/logger';

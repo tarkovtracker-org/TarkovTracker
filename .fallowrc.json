@@ -24,7 +24,8 @@
     "scripts/preview/smoke/playwright.config.mjs",
     "scripts/preview/smoke/*.smoke.mjs",
     "app/server/plugins/**/*.ts",
-    "app/features/seo-pages/*.vue"
+    "app/features/seo-pages/*.vue",
+    "workers/api-gateway/progress-contracts/src/*.test.ts"
   ],
   "ignoreDependencies": [
     "shared",

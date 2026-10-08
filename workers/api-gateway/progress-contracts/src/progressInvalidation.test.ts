@@ -1,11 +1,11 @@
+import { describe, expect, it } from 'vitest';
 import {
   computeInvalidProgress,
   createProgressInvalidator,
   type InvalidationInput,
   type InvalidationTask,
   type InvalidationTaskCompletion,
-} from '@shared/utils/progressInvalidation';
-import { describe, expect, it } from 'vitest';
+} from './progressInvalidation';
 type Requirement = { on: string; status: string[] };
 /** Builds a task with one objective (`<id>Obj`) and, optionally, a single task requirement. */
 const task = (

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeModeProgressData } from '@/utils/modeProgress';
+import { hasMaterializedProgress, summarizeModeProgressData } from './modeProgress';
 describe('mode progress', () => {
+  it.each([null, false, [], {}, { level: '1' }, { level: NaN }, { level: Infinity }])(
+    'retains nonmaterialized progress handling for %j',
+    (progress) => expect(hasMaterializedProgress(progress)).toBe(false)
+  );
+  it.each([0, -1, 42])('recognizes the existing finite level %s', (level) => {
+    expect(hasMaterializedProgress({ level })).toBe(true);
+  });
   it('summarizes normalized progress without exposing the blob', () => {
     expect(
       summarizeModeProgressData({

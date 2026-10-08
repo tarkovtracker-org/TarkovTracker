@@ -1,4 +1,4 @@
-import { buildTaskFailureAlternatives } from '@shared/utils/taskFailureEdges';
+import { buildTaskFailureAlternatives } from '@tarkovtracker/progress-contracts/taskFailureEdges';
 import {
   createGraph,
   type TaskGraph,

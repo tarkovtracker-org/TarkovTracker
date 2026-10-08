@@ -2,7 +2,7 @@ import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
   getUserMetadataString,
-} from '@shared/utils/userMetadata';
+} from '@tarkovtracker/progress-contracts/userMetadata';
 import { logger } from '@/utils/logger';
 import { getMemoryCache, setMemoryCache } from '@/utils/memory-cache';
 import type { Env } from '@/types';

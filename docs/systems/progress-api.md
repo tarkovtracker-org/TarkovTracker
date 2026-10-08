@@ -96,10 +96,10 @@ sequenceDiagram
    evaluate task rules and retain their existing behavior. Expired catalogs are not used as a
    last-good fallback.
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   public array format, applies invalidation (`workers/api-gateway/progress-contracts/src/progressInvalidation.ts`, the same
    algorithm the app uses) and game-edition hideout auto-completes.
    Browser and Worker catalogs compile completion-triggered failure edges through
-   `shared/utils/taskFailureEdges.ts`. The existing internal `alternatives` projection remains
+   `workers/api-gateway/progress-contracts/src/taskFailureEdges.ts`. The existing internal `alternatives` projection remains
    compatible with repair/action consumers; it is derived from `failConditions`, not upstream
    `alternatives`. Missing references do not create edges, and a reverse edge is inferred only
    for the existing active-only requirement pattern backed by an explicit completion failure.
@@ -128,15 +128,15 @@ sequenceDiagram
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
 - `workers/api-gateway/src/utils/transform.ts`
-- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+- `workers/api-gateway/progress-contracts/src/progressInvalidation.ts` — runtime-independent task/objective invalidation
   (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
   app progress store, public profile/streamer views, and the Worker transform
-- `shared/utils/requirementStatus.ts` — runtime-independent task-requirement status predicates,
+- `workers/api-gateway/progress-contracts/src/requirementStatus.ts` — runtime-independent task-requirement status predicates,
   shared by invalidation, app task actions, failed-state repair, and the Worker
-- `shared/utils/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
+- `workers/api-gateway/progress-contracts/src/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
   lock/unlock) used by Worker task writes
-- `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
-  user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
+- `workers/api-gateway/progress-contracts/src/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
+  user hydration through `@tarkovtracker/progress-contracts/userMetadata` in Nuxt and the Worker
 - `workers/api-gateway/src/utils/user-display-name.ts` — cached Auth metadata lookup shared by
   personal and team API progress
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs

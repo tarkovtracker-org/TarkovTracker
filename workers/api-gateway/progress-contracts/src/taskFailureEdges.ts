@@ -3,7 +3,7 @@ import {
   acceptsCompletionStatus,
   acceptsFailedStatus,
   normalizeRequirementStatuses,
-} from './requirementStatus';
+} from './requirementStatus.js';
 type FailureRule = { task?: unknown; status?: string[] };
 type FailureSource = {
   id: string;

@@ -1,4 +1,4 @@
-import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
+import { computeInvalidProgress } from '@tarkovtracker/progress-contracts/progressInvalidation';
 import { defineStore } from 'pinia';
 import { registerProgressMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
 import {

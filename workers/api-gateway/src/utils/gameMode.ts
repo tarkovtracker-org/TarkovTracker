@@ -1,4 +1,4 @@
-import { isSeasonNumber } from '@shared/utils/seasonNumber';
+import { isSeasonNumber } from '@tarkovtracker/progress-contracts/seasonNumber';
 import type { Env, GameMode } from '@/types';
 // Resolved fresh from the database on every seasonal request. Caching the value risks returning a
 // stale season during the rollover window while the write path (merge_progress_data) resolves the

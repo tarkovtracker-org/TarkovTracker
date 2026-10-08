@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineVitestConfig } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
+import { prepareWorkspaceContracts } from './workers/api-gateway/scripts/prepare-contracts.mjs';
+prepareWorkspaceContracts();
 const logLevel = process.env.NUXT_PUBLIC_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
 const ciReporters = isSharded ? ['default', 'junit', 'github-actions'] : ['default', 'junit'];

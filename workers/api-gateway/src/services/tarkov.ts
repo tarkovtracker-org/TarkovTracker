@@ -1,4 +1,7 @@
-import { buildTaskFailureAlternatives, getTaskReferenceId } from '@shared/utils/taskFailureEdges';
+import {
+  buildTaskFailureAlternatives,
+  getTaskReferenceId,
+} from '@tarkovtracker/progress-contracts/taskFailureEdges';
 import { waitUntil } from 'cloudflare:workers';
 import { CatalogUnavailableError } from './catalog-error';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';

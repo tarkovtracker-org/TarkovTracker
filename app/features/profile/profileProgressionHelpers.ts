@@ -1,4 +1,4 @@
-import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
+import { capApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 import { isGameMode, type GameMode } from '@/utils/constants';
 import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
