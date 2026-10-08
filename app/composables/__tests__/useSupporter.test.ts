@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { effectScope, reactive } from 'vue';
 import { resolveSupportBanner } from '@/features/dashboard/supportBanner';
 import { createDeferred } from '@/utils/test-helpers';
 const userState = reactive({
@@ -80,6 +80,31 @@ describe('useSupporter', () => {
       status: nextChannel.subscribe.mock.calls[0]?.[0],
     };
   };
+  it('updates the badge tier and active subscription when loaded access expires', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));
+    const scope = effectScope();
+    try {
+      const { useSupporter } = await import('@/composables/useSupporter');
+      const status = scope.run(() => useSupporter())!;
+      status.supporter.value = {
+        status: 'active',
+        type: 'subscription',
+        tier: 'scav',
+        hasEverSupported: true,
+        startedAt: '2026-01-01T00:00:00Z',
+        expiresAt: '2026-10-07T00:00:01Z',
+      };
+      expect(status.activeTier.value).toBe('scav');
+      expect(status.isActiveSubscriber.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(status.activeTier.value).toBe('supporter');
+      expect(status.isActiveSubscriber.value).toBe(false);
+    } finally {
+      scope.stop();
+      vi.useRealTimers();
+    }
+  });
   it('refreshes status after the first join and each rejoin to close the read/join gap', async () => {
     const { supporter, subscribing, status } = await startInitialSubscription();
     expect(mockMaybeSingle).not.toHaveBeenCalled();

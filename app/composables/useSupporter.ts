@@ -1,4 +1,4 @@
-import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
+import { useSupporterActivity } from '@/composables/useSupporterActivity';
 import { logger } from '@/utils/logger';
 import {
   createChannelReleaseLatch,
@@ -40,15 +40,14 @@ export function useSupporter() {
     const currentUserId = $supabase.user?.id ?? null;
     return !currentUserId || currentUserId === userId;
   };
+  const isActiveStatus = useSupporterActivity(supporterState);
   const isSupporter = computed(() => supporterState.value?.hasEverSupported === true);
   const isActiveSubscriber = computed(
-    () =>
-      supporterState.value?.type === 'subscription' &&
-      isSupporterActivityActive(supporterState.value)
+    () => supporterState.value?.type === 'subscription' && isActiveStatus.value
   );
   const activeTier = computed(() => {
     if (!supporterState.value) return null;
-    if (isSupporterActivityActive(supporterState.value)) {
+    if (isActiveStatus.value) {
       return supporterState.value.tier;
     }
     if (supporterState.value.hasEverSupported) return 'supporter';
