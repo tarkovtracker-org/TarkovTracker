@@ -147,6 +147,15 @@ Seasonal events outside the active season are skipped; assigning unresolved out-
 events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
 guard shows the date warning and disables confirmation immediately for an invalid selection.
 Malformed/skipped records are reported in the preview.
-Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
+Accounts are separated by the `AccountId` on `SelectProfile`, `PrepareSelectedProfileLocally`,
+and `CompleteSelectedProfile` lines in the `application` and `output` channels (`ProfileId`
+differs per mode, so it is never the key). Each event belongs to the latest preceding selection
+in its session, so an account switch inside one session splits correctly. The preview defaults
+to the most recently played account and imports one account at a time (`account: null` selects
+every account and is used only to discover destination modes). Sessions with no recorded
+selection form an `unidentified` bucket: it joins the only identified account, but stays
+separate when two or more accounts exist. Account IDs stay in memory and are shown only as a
+four-character suffix. Switching accounts resets version selection to that account's defaults.
+Version filters are compatibility filters, not wipe/prestige boundaries: users must
 select the character sessions they intend to restore. Missing logs, objective handovers, XP,
 skills, and hideout progress cannot be reconstructed from these quest notifications.

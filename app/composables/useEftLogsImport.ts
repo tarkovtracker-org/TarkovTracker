@@ -48,6 +48,7 @@ export interface UseEftLogsImportReturn {
   parseFiles: (files: File[]) => Promise<void>;
   previewData: Ref<EftLogsImportPreviewData | null>;
   setIncludedVersions: (versions: string[]) => void;
+  setAccount: (accountId: string) => void;
   confirmImport: (targetMode: GameMode) => Promise<void>;
   reset: () => void;
 }
@@ -322,6 +323,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const parseProgress = ref<EftLogReadProgress>({ bytesRead: 0, totalBytes: 0 });
   const sourceFiles = shallowRef<EftParsedLogFile[]>([]);
   const selectedVersions = ref<string[]>([]);
+  const requestedAccount = ref<string | undefined>(undefined);
   const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
   let parseFilesRequestId = 0;
@@ -334,6 +336,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   function buildPreviewData(taskIds: string[]): EftLogsImportPreviewData {
     const parsed = parseEftLogsForQuestImport(sourceFiles.value, taskIds, {
       includedVersions: selectedVersions.value,
+      account: requestedAccount.value,
       taskIdsByMode: Object.fromEntries(
         [...catalogs].map(([mode, tasks]) => [mode, tasks.map((task) => task.id)])
       ),
@@ -356,6 +359,20 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     previewData.value = buildPreviewData(getTaskIds());
     importError.value = null;
   }
+  /** Switches the account whose sessions are previewed and resets versions to that account's defaults. */
+  function setAccount(accountId: string): void {
+    if (!canEditPreview()) return;
+    const preview = previewData.value;
+    if (!preview || preview.selectedAccount === accountId) return;
+    if (!preview.availableAccounts.some((account) => account.id === accountId)) return;
+    requestedAccount.value = accountId;
+    selectedVersions.value = [];
+    const switched = buildPreviewData(getTaskIds());
+    const defaults = selectDefaultIncludedVersions(switched.availableVersions);
+    selectedVersions.value = defaults.length > 0 ? defaults : switched.availableVersions;
+    previewData.value = buildPreviewData(getTaskIds());
+    importError.value = null;
+  }
   /** Invalidates pending parsing and clears transient import state unless progress application is active. */
   function reset(): void {
     if (isImporting.value) return;
@@ -368,6 +385,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     importError.value = null;
     sourceFiles.value = [];
     selectedVersions.value = [];
+    requestedAccount.value = undefined;
     sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
     isParsing.value = false;
@@ -407,7 +425,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         return;
       }
       const taskIds = tasks.map((task) => task.id);
-      const parsed = parseEftLogsForQuestImport(importFiles, taskIds);
+      const parsed = parseEftLogsForQuestImport(importFiles, taskIds, { account: null });
       const modes = new Set<GameMode>();
       for (const event of parsed.events) {
         if (event.mode === UNKNOWN_MODE) GAME_MODE_VALUES.forEach((mode) => modes.add(mode));
@@ -449,10 +467,10 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         files.length === 1
           ? (files[0]?.name ?? t('settings.log_import.selected_files'))
           : t('settings.log_import.selected_files_count', { count: files.length });
-      selectedVersions.value = selectDefaultIncludedVersions(parsed.availableVersions);
-      if (selectedVersions.value.length === 0) {
-        selectedVersions.value = parsed.availableVersions;
-      }
+      selectedVersions.value = [];
+      const initial = buildPreviewData(getTaskIds());
+      const defaults = selectDefaultIncludedVersions(initial.availableVersions);
+      selectedVersions.value = defaults.length > 0 ? defaults : initial.availableVersions;
       previewData.value = buildPreviewData(getTaskIds());
       importState.value = 'preview';
     } catch (error) {
@@ -539,6 +557,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     parseFiles,
     previewData,
     setIncludedVersions,
+    setAccount,
     confirmImport,
     reset,
   };

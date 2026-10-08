@@ -9,8 +9,11 @@ const LOG_LINE_TIMESTAMP_PATTERN =
 const RECORD_PATTERN =
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|([^\r\n]*)/gm;
 const SESSION_VERSION_PATTERN = /(?:^|[_\s-])(\d+\.\d+\.\d+\.\d+\.\d+)(?=$|[_\s-])/;
+const ACCOUNT_SIGNAL_PATTERN =
+  /\b(?:SelectProfile|PrepareSelectedProfileLocally|CompleteSelectedProfile)\b[^\r\n]*?\bAccountId:\s*(\d+)/;
 const UNKNOWN_MODE = 'unknown' as const;
 export const UNKNOWN_LOG_VERSION = 'unknown';
+export const UNIDENTIFIED_LOG_ACCOUNT = 'unidentified';
 export type EftQuestEventMode = GameMode | typeof UNKNOWN_MODE;
 export interface EftLogInputFile {
   name: string;
@@ -64,9 +67,18 @@ export interface EftQuestImportPreview {
   availableVersions: string[];
   includedVersions: string[];
   versionSessionCounts: Record<string, number>;
+  availableAccounts: EftLogAccountSummary[];
+  hasMultipleAccounts: boolean;
+  selectedAccount: string | null;
+}
+export interface EftLogAccountSummary {
+  id: string;
+  sessionCount: number;
+  lastSeen: number | null;
 }
 export interface ParseEftLogsForQuestImportOptions {
   includedVersions?: Iterable<string> | null;
+  account?: string | null;
   taskIdsByMode?: Partial<Record<GameMode, Iterable<string>>>;
 }
 interface ChatMessagePayload {
@@ -91,7 +103,12 @@ export interface EftParsedLogFile {
   version: string;
   timeline: BackendModeSignal[];
   legacy: BackendModeSignal[];
+  accounts: AccountSignal[];
   notifications: EftLogTextParseResult | null;
+}
+interface AccountSignal {
+  accountId: string;
+  timestamp: number;
 }
 interface BackendModeSignals {
   timeline: BackendModeSignal[];
@@ -333,15 +350,29 @@ function collectDeclaredModeSignal(
     timeline.push({ mode: declared, timestamp });
   }
 }
+/** Reads the numeric account ID from profile-selection records; profile IDs differ per mode. */
+function collectAccountSignal(
+  record: LogRecord,
+  timestamp: number,
+  accounts: AccountSignal[],
+  budget?: EftLogImportBudget
+): void {
+  if (!['application', 'output'].includes(record.channel)) return;
+  const accountId = ACCOUNT_SIGNAL_PATTERN.exec(record.message)?.[1];
+  if (!accountId) return;
+  budget?.retain(accountId.length);
+  accounts.push({ accountId: copyEvidenceString(accountId), timestamp });
+}
 /** Rejects invalid timestamps before collecting declarations and eligible connection URLs. */
 function collectRecordModeSignals(
   record: LogRecord,
-  timeline: BackendModeSignal[],
-  legacy: BackendModeSignal[],
+  source: Pick<EftParsedLogFile, 'timeline' | 'legacy' | 'accounts'>,
   budget?: EftLogImportBudget
 ): void {
+  const { timeline, legacy, accounts } = source;
   const timestamp = eftLogTimestampMillis(record.timestamp);
   if (timestamp === null) return;
+  collectAccountSignal(record, timestamp, accounts, budget);
   collectDeclaredModeSignal(record, timeline, timestamp, budget);
   // Delayed responses and URLs inside JSON chat text are not mode switches.
   if (!isModeSignalRecord(record)) return;
@@ -507,7 +538,7 @@ function updateSourceVersion(
 function appendLogText(source: EftParsedLogFile, text: string, budget?: EftLogImportBudget): void {
   updateSourceVersion(source, text, budget);
   for (const record of readLogRecords(text)) {
-    collectRecordModeSignals(record, source.timeline, source.legacy, budget);
+    collectRecordModeSignals(record, source, budget);
   }
   if (source.notifications)
     appendNotificationResult(source.notifications, parseEftNotificationLogText(text, budget));
@@ -519,6 +550,7 @@ export function createEftLogFileParser(name: string, budget?: EftLogImportBudget
     version: extractSessionVersion(name) ?? UNKNOWN_LOG_VERSION,
     timeline: [],
     legacy: [],
+    accounts: [],
     notifications: isEftNotificationLogFileName(name) ? parseEftNotificationLogText('') : null,
   };
   const reader = createEftLogRecordReader((text) => appendLogText(source, text, budget), name);
@@ -670,6 +702,88 @@ function groupLogSources(files: (EftLogInputFile | EftParsedLogFile)[]): Session
   }
   return [...groups.values()];
 }
+/** Orders a session's profile selections so events resolve to the latest preceding login. */
+function collectSessionAccountSignals(group: SessionLogs): AccountSignal[] {
+  return group.files.flatMap((file) => file.accounts).sort((a, b) => a.timestamp - b.timestamp);
+}
+/** Attributes an event to the latest preceding profile selection; future selections never apply. */
+function resolveEventAccount(timestamp: string | null, signals: AccountSignal[]): string {
+  const time = eftLogTimestampMillis(timestamp);
+  if (time === null) return UNIDENTIFIED_LOG_ACCOUNT;
+  let resolved = UNIDENTIFIED_LOG_ACCOUNT;
+  for (const signal of signals) {
+    if (signal.timestamp > time) break;
+    resolved = signal.accountId;
+  }
+  return resolved;
+}
+/** Lists the accounts a session contains, or the unidentified bucket when no login was logged. */
+function sessionAccountIds(group: SessionLogs): string[] {
+  const ids = [...new Set(collectSessionAccountSignals(group).map((signal) => signal.accountId))];
+  return ids.length > 0 ? ids : [UNIDENTIFIED_LOG_ACCOUNT];
+}
+/** Keeps the newest known login time, treating a missing time as unknown. */
+function mergeLastSeen(current: number | null, candidate: number | null): number | null {
+  if (current === null) return candidate;
+  if (candidate === null) return current;
+  return Math.max(current, candidate);
+}
+/** Adds one session to each account it contains, tracking that account's latest login. */
+function addSessionToSummaries(
+  summaries: Map<string, EftLogAccountSummary>,
+  group: SessionLogs
+): void {
+  const signals = collectSessionAccountSignals(group);
+  for (const id of sessionAccountIds(group)) {
+    const summary = summaries.get(id) ?? { id, sessionCount: 0, lastSeen: null };
+    const latest = signals.filter((signal) => signal.accountId === id).at(-1);
+    summary.sessionCount++;
+    summary.lastSeen = mergeLastSeen(summary.lastSeen, latest?.timestamp ?? null);
+    summaries.set(id, summary);
+  }
+}
+/** Summarizes notification sessions per account, newest account first and unidentified last. */
+function summarizeAccounts(groups: SessionLogs[]): EftLogAccountSummary[] {
+  const summaries = new Map<string, EftLogAccountSummary>();
+  for (const group of groups) {
+    if (group.files.some((file) => file.notifications)) addSessionToSummaries(summaries, group);
+  }
+  return [...summaries.values()].sort(compareAccountSummaries);
+}
+/** Puts identified accounts first by recency, with the unidentified bucket always last. */
+function compareAccountSummaries(left: EftLogAccountSummary, right: EftLogAccountSummary): number {
+  const leftUnidentified = left.id === UNIDENTIFIED_LOG_ACCOUNT;
+  if (leftUnidentified !== (right.id === UNIDENTIFIED_LOG_ACCOUNT))
+    return leftUnidentified ? 1 : -1;
+  return (
+    (right.lastSeen ?? -Infinity) - (left.lastSeen ?? -Infinity) || left.id.localeCompare(right.id)
+  );
+}
+interface AccountSelection {
+  selected: string | null;
+  hasMultiple: boolean;
+  includes: (accountId: string) => boolean;
+}
+/** Chooses the requested account, defaulting to the most recent; null requests every account. */
+function selectAccount(
+  available: EftLogAccountSummary[],
+  requested?: string | null
+): AccountSelection {
+  const identified = available.filter((account) => account.id !== UNIDENTIFIED_LOG_ACCOUNT);
+  const hasMultiple = identified.length > 1;
+  const all = { selected: null, hasMultiple, includes: () => true };
+  if (requested === null || identified.length === 0) return all;
+  const selected = available.some((account) => account.id === requested)
+    ? requested!
+    : identified[0]!.id;
+  // A lone account owns logs that never recorded a login; with several accounts they stay separate.
+  const includesUnidentified = !hasMultiple && selected !== UNIDENTIFIED_LOG_ACCOUNT;
+  return {
+    selected,
+    hasMultiple,
+    includes: (id) => id === selected || (includesUnidentified && id === UNIDENTIFIED_LOG_ACCOUNT),
+  };
+}
 /** Counts sessions with notification files, including empty logs, for the version selector. */
 function countVersionSessions(groups: SessionLogs[]): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -712,7 +826,7 @@ function retainImportEvent(
 /** Routes each file's events against the complete session timeline, regardless of file order. */
 function collectFileEvents(
   file: EftParsedLogFile,
-  timeline: BackendModeSignal[],
+  context: SessionContext,
   seen: Map<string, EftQuestImportEvent>,
   counts: ImportCounts
 ): void {
@@ -726,13 +840,24 @@ function collectFileEvents(
   };
   for (const status of ['completed', 'started', 'failed'] as const) {
     for (const event of buckets[status]) {
-      const mode = resolveEventModeFromTimeline(event.timestamp, timeline);
+      if (!context.includesAccount(resolveEventAccount(event.timestamp, context.accounts)))
+        continue;
+      const mode = resolveEventModeFromTimeline(event.timestamp, context.timeline);
       retainImportEvent(seen, { ...event, mode, status });
     }
   }
 }
+interface SessionContext {
+  timeline: BackendModeSignal[];
+  accounts: AccountSignal[];
+  includesAccount: (accountId: string) => boolean;
+}
 /** Collects evidence only from the selected versions before applying season or catalog guards. */
-function collectImportEvents(groups: SessionLogs[], included: Set<string>) {
+function collectImportEvents(
+  groups: SessionLogs[],
+  included: Set<string>,
+  includesAccount: (accountId: string) => boolean
+) {
   const seen = new Map<string, EftQuestImportEvent>();
   const counts: ImportCounts = {
     chatMessageCount: 0,
@@ -744,8 +869,12 @@ function collectImportEvents(groups: SessionLogs[], included: Set<string>) {
   };
   for (const group of groups) {
     if (!included.has(group.version)) continue;
-    const signals = collectBackendModeSignals(group.files);
-    for (const file of group.files) collectFileEvents(file, signals.timeline, seen, counts);
+    const context: SessionContext = {
+      timeline: collectBackendModeSignals(group.files).timeline,
+      accounts: collectSessionAccountSignals(group),
+      includesAccount,
+    };
+    for (const file of group.files) collectFileEvents(file, context, seen, counts);
   }
   return { counts, events: [...seen.values()] };
 }
@@ -828,11 +957,14 @@ export function parseEftLogsForQuestImport(
   taskIds: Iterable<string>,
   options: ParseEftLogsForQuestImportOptions = {}
 ): EftQuestImportPreview {
-  const groups = groupLogSources(files);
+  const allGroups = groupLogSources(files);
+  const availableAccounts = summarizeAccounts(allGroups);
+  const account = selectAccount(availableAccounts, options.account);
+  const groups = allGroups.filter((group) => sessionAccountIds(group).some(account.includes));
   const versionSessionCounts = countVersionSessions(groups);
   const availableVersions = sortVersionKeys(Object.keys(versionSessionCounts));
   const includedVersions = selectIncludedVersions(availableVersions, options.includedVersions);
-  const collected = collectImportEvents(groups, new Set(includedVersions));
+  const collected = collectImportEvents(groups, new Set(includedVersions), account.includes);
   const seasonal = filterSeasonEvents(collected.events);
   matchEventModes(seasonal.events, options.taskIdsByMode);
   return {
@@ -842,5 +974,8 @@ export function parseEftLogsForQuestImport(
     availableVersions,
     includedVersions,
     versionSessionCounts,
+    availableAccounts,
+    hasMultipleAccounts: account.hasMultiple,
+    selectedAccount: account.selected,
   };
 }

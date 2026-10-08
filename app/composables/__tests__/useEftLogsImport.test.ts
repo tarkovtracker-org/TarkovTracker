@@ -659,6 +659,47 @@ describe('useEftLogsImport', () => {
     expect(composable.previewData.value?.includedVersions).toEqual(['0.16.8.1.38114']);
     expect(composable.previewData.value?.matchedTaskIds).toEqual(['61604635c725987e815b1a46']);
   });
+  it('separates accounts, defaults to the latest, and imports only the chosen account', async () => {
+    metadataStore.tasks = [{ id: '61604635c725987e815b1a46' }, { id: '5ac2426c86f774138762edfe' }];
+    const composable = await loadComposable();
+    const login = (date: string, account: string) =>
+      `${date} 09:00:00.000|1.2.0.0.47888|Info|application|PrepareSelectedProfileLocally ProfileId:5c0d2e5f1a2b3c4d5e6f7a8b AccountId:${account}`;
+    const withPath = (file: File, path: string) => {
+      Object.defineProperty(file, 'webkitRelativePath', { configurable: true, value: path });
+      return file;
+    };
+    const first = 'Logs/log_2026.02.20_09-00-00_1.2.0.0.47888';
+    const second = 'Logs/log_2026.02.21_09-00-00_1.2.0.0.47888';
+    await composable.parseFiles([
+      withPath(
+        new File([login('2026-02-20', '1111111')], 'application_000.log'),
+        `${first}/application_000.log`
+      ),
+      withPath(
+        new File([completionLog('61604635c725987e815b1a46')], 'push-notifications_000.log'),
+        `${first}/push-notifications_000.log`
+      ),
+      withPath(
+        new File([login('2026-02-21', '2222222')], 'application_000.log'),
+        `${second}/application_000.log`
+      ),
+      withPath(
+        new File([completionLog('5ac2426c86f774138762edfe')], 'push-notifications_000.log'),
+        `${second}/push-notifications_000.log`
+      ),
+    ]);
+    expect(composable.previewData.value?.hasMultipleAccounts).toBe(true);
+    expect(composable.previewData.value?.selectedAccount).toBe('2222222');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual(['5ac2426c86f774138762edfe']);
+    composable.setAccount('1111111');
+    expect(composable.previewData.value?.selectedAccount).toBe('1111111');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual(['61604635c725987e815b1a46']);
+    composable.setAccount('unknown-account');
+    expect(composable.previewData.value?.selectedAccount).toBe('1111111');
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
+  });
 });
 describe('expanded log import', () => {
   beforeEach(() => {
