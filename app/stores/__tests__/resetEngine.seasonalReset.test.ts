@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
 import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
+import { invalidateStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const {
   clearProgressStorageMock,
@@ -31,13 +32,15 @@ mockNuxtImport('useNuxtApp', () => () => ({ $supabase: supabaseContext }));
 vi.mock('@/stores/tarkov/progressPersistence', () => ({
   syncProgressState: syncProgressStateMock,
 }));
-vi.mock('@/stores/tarkov/localStorage', () => ({
+vi.mock('@/stores/tarkov/localStorage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stores/tarkov/localStorage')>()),
   clearActiveProgressStorage: clearProgressStorageMock,
 }));
 vi.mock('@/stores/tarkov/realtimeListener', () => ({
   getRegisteredSyncController: () => registeredController.value,
 }));
-vi.mock('@/stores/tarkov/progressSaveStatus', () => ({
+vi.mock('@/stores/tarkov/progressSaveStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stores/tarkov/progressSaveStatus')>()),
   hasPendingCloudChanges: () => pendingCloudChanges.value,
   hasUnsavedProgressChanges: () => unsavedProgressChanges.value,
 }));
@@ -62,6 +65,8 @@ const createStore = () => {
 describe('performReset seasonal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    clearProgressStorageMock.mockReset().mockResolvedValue(true);
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
@@ -70,6 +75,23 @@ describe('performReset seasonal', () => {
     registeredController.value = null;
     saveSupersededProgressCopyMock.mockClear();
   });
+  it.each(['different-owner', 'A-B-A'] as const)(
+    'does not apply or clear a delayed cloud reset after %s session replacement',
+    async (transition) => {
+      const store = createStore();
+      const before = structuredClone(store.$state);
+      const gate = Promise.withResolvers<{ error: null }>();
+      syncProgressStateMock.mockReturnValueOnce(gate.promise);
+      const reset = performReset('seasonal', store);
+      supabaseContext.user.id = 'user-2';
+      invalidateStartupOwnership();
+      if (transition === 'A-B-A') supabaseContext.user.id = 'user-1';
+      gate.resolve({ error: null });
+      await reset;
+      expect(store.$state).toEqual(before);
+      expect(clearProgressStorageMock).not.toHaveBeenCalled();
+    }
+  );
   it.each(['pvp', 'pve', 'seasonal'] as const)(
     'keeps a preferred lower %s level when startup merges timestamped progress',
     (mode) => {
@@ -295,17 +317,12 @@ describe('performReset seasonal', () => {
     await performReset('pvp', store);
     expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1', true);
   });
-  it.each([true, false])(
-    'does not complete a reset whose active copy could not be cleared: signed in=%s',
-    async (loggedIn) => {
-      supabaseContext.user.loggedIn = loggedIn;
-      supabaseContext.user.id = loggedIn ? 'user-1' : null;
-      clearProgressStorageMock.mockResolvedValueOnce(false);
-      await expect(performReset('seasonal', createStore())).rejects.toThrow(
-        'Local progress could not be cleared after reset'
-      );
-    }
-  );
+  it('does not complete a signed-in reset whose active copy could not be cleared', async () => {
+    clearProgressStorageMock.mockResolvedValueOnce(false);
+    await expect(performReset('seasonal', createStore())).rejects.toThrow(
+      'Local progress could not be cleared after reset'
+    );
+  });
   it('keeps no superseded copy for modes that are still at their defaults', async () => {
     pendingCloudChanges.value = true;
     const store = createStore();

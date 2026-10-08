@@ -1024,6 +1024,187 @@ describe('useTarkov sync integration', () => {
     );
     expect(getLastSyncPayload().p_tarkov_uid).toBeNull();
   });
+  it('captures guest hydration bytes before a later shared-slot change when persisting a correction', async () => {
+    const { progressSaveStatus } = await import('@/stores/tarkov/progressSaveStatus');
+    supabaseContext.user.id = null;
+    supabaseContext.user.loggedIn = false;
+    const original = structuredClone(defaultState);
+    original.pvp.level = 20;
+    original.pvp.traders.prapor = { level: 4, reputation: 1 };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _userId: null,
+        _timestamp: 100,
+        _metadataTimestamp: 0,
+        _modeTimestamps: { pvp: 100, pve: 0, seasonal: 0 },
+        data: original,
+      })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    expect(store.pvp.level).toBe(20);
+    const external = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    external.data.pvp.level = 25;
+    external.data.pvp.skills.strength = 10;
+    external._modeTimestamps.pvp = Date.now() + 100_000;
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(external));
+    store.$patch((state) => {
+      state.pvp.traders.prapor!.level = 1;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    expect(saved.data.pvp.traders.prapor.level).toBe(1);
+    expect(saved.data.pvp.level).toBe(25);
+    expect(saved.data.pvp.skills.strength).toBe(10);
+    expect(saved._modeTimestamps.pvp).toBeGreaterThan(external._modeTimestamps.pvp);
+    expect(saved._modeTimestamps.pve).toBe(0);
+    expect(progressSaveStatus.local).toBe('saved');
+  });
+  it('binds an older guest source to its own store after a later store hydrates', async () => {
+    supabaseContext.user.id = null;
+    supabaseContext.user.loggedIn = false;
+    const makeStore = () => {
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      return useTarkovStore();
+    };
+    const older = makeStore();
+    older.$patch((state) => {
+      state.pvp.level = 20;
+      state.pve.level = 42;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    const later = makeStore();
+    expect(later.pvp.level).toBe(20);
+    const external = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    external.data.pvp = { ...structuredClone(defaultState.pvp), progressEpoch: 1 };
+    external._modeTimestamps.pvp = Date.now();
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(external));
+    older.$patch((state) => {
+      state.pve.level = 43;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    expect(older.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 1 });
+    expect(older.pve.level).toBe(43);
+    expect(later.pvp.level).toBe(20);
+    expect(later.pve.level).toBe(42);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pve.level).toBe(43);
+  });
+  it('adopts an external guest reset through real Pinia persistence before saving later progress', async () => {
+    supabaseContext.user.id = null;
+    supabaseContext.user.loggedIn = false;
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pvp.level = 20;
+      state.pvp.taskCompletions.old = { complete: true, timestamp: 100 };
+      state.pve.level = 42;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    const external = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    external.data.pvp = { ...structuredClone(defaultState.pvp), progressEpoch: 1 };
+    external._modeTimestamps.pvp = Date.now() + 100_000;
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(external));
+    const writes = vi.spyOn(localStorage, 'setItem');
+    store.$patch((state) => {
+      state.pve.level = 43;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    expect(store.pvp).toEqual({ ...defaultState.pvp, progressEpoch: 1 });
+    expect(store.pve.level).toBe(43);
+    expect(writes.mock.calls.filter(([key]) => key === STORAGE_KEYS.progress)).toHaveLength(1);
+    store.$patch((state) => {
+      state.pvp.level = 2;
+    });
+    await nextTick();
+    await flushActiveProgressWrites();
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    expect(saved.data.pvp).toEqual({ ...defaultState.pvp, level: 2, progressEpoch: 1 });
+    expect(saved._modeTimestamps.pvp).toBeGreaterThan(external._modeTimestamps.pvp);
+    expect(saved._modeTimestamps.seasonal).toBe(external._modeTimestamps.seasonal);
+    expect(writes.mock.calls.filter(([key]) => key === STORAGE_KEYS.progress)).toHaveLength(2);
+    expect(rpc).not.toHaveBeenCalled();
+    writes.mockRestore();
+  });
+  it.each(['pvp', 'pve', 'seasonal', 'all'] as const)(
+    'retains guest modes and clocks across a persisted %s reset and reload',
+    async (mode) => {
+      supabaseContext.user.id = null;
+      supabaseContext.user.loggedIn = false;
+      const makePersistedStore = () => {
+        const pinia = createPinia().use(piniaPluginPersistedstate);
+        createApp({}).use(pinia);
+        setActivePinia(pinia);
+        return useTarkovStore();
+      };
+      const store = makePersistedStore();
+      store.$patch((state) => {
+        state.pvp.level = 20;
+        state.pve.level = 42;
+        state.seasonal.level = 33;
+        state.gameEdition = 4;
+        state.tarkovUid = 123;
+      });
+      await nextTick();
+      await flushActiveProgressWrites();
+      const before = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+      const reset = {
+        pvp: () => store.resetPvPData(),
+        pve: () => store.resetPvEData(),
+        seasonal: () => store.resetSeasonalData(),
+        all: () => store.resetAllData(),
+      };
+      await expect(reset[mode]()).resolves.toBeUndefined();
+      await nextTick();
+      await flushActiveProgressWrites();
+      const after = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+      expect(after).not.toBeNull();
+      for (const resetMode of mode === 'all' ? GAME_MODE_VALUES : [mode]) {
+        expect(after.data[resetMode]).toEqual({ ...defaultState[resetMode], progressEpoch: 1 });
+      }
+      // A later local edit must retain adopted clocks for the other modes.
+      store.$patch((state) => {
+        state.pvp.level = 2;
+      });
+      await nextTick();
+      await flushActiveProgressWrites();
+      const edited = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+      expect(edited._modeTimestamps.pve).toBe(after._modeTimestamps.pve);
+      expect(edited._modeTimestamps.seasonal).toBe(after._modeTimestamps.seasonal);
+      const reloaded = makePersistedStore();
+      for (const other of GAME_MODE_VALUES) {
+        if (mode === 'all' || mode === other) {
+          expect(reloaded[other]).toEqual({
+            ...defaultState[other],
+            progressEpoch: 1,
+            ...(other === 'pvp' ? { level: 2 } : {}),
+          });
+        } else {
+          expect(reloaded[other]).toEqual({
+            ...before.data[other],
+            ...(other === 'pvp' ? { level: 2 } : {}),
+          });
+          expect(after._modeTimestamps[other]).toBe(before._modeTimestamps[other]);
+        }
+      }
+      expect(after._userId).toBeNull();
+      expect(after.data.gameEdition).toBe(mode === 'all' ? defaultState.gameEdition : 4);
+      expect(after.data.tarkovUid).toBe(mode === 'all' ? null : 123);
+      if (mode !== 'all') expect(after._metadataTimestamp).toBe(before._metadataTimestamp);
+      expect(rpc).not.toHaveBeenCalled();
+    }
+  );
   beforeEach(async () => {
     await flushActiveProgressWrites();
     resetTarkovSync('test setup');
@@ -3971,10 +4152,10 @@ describe('useTarkov sync integration', () => {
     );
   });
   it.each([
-    { scenario: 'cleared', locking: true },
-    { scenario: 'clear failed', locking: false },
+    { scenario: 'saved', locking: true },
+    { scenario: 'save failed', locking: false },
   ])(
-    'reports a signed-out Seasonal reset only once its active copy is cleared: $scenario',
+    'reports a signed-out Seasonal reset only once its replacement is saved: $scenario',
     async ({ locking }) => {
       supabaseContext.user.id = null;
       supabaseContext.user.loggedIn = false;
@@ -3995,11 +4176,14 @@ describe('useTarkov sync integration', () => {
       try {
         const reset = store.resetSeasonalData();
         if (locking) await expect(reset).resolves.toBeUndefined();
-        else await expect(reset).rejects.toThrow('Local progress could not be cleared after reset');
+        else
+          await expect(reset).rejects.toThrow(
+            'Local guest progress could not be saved after reset'
+          );
       } finally {
         Object.defineProperty(navigator, 'locks', locks);
       }
-      expect(store.seasonal.level).toBe(defaultState.seasonal.level);
+      expect(store.seasonal.level).toBe(locking ? defaultState.seasonal.level : 17);
       const completion = expect(loggerMock.debug);
       (locking ? completion : completion.not).toHaveBeenCalledWith(
         '[TarkovStore] Seasonal data reset complete'
