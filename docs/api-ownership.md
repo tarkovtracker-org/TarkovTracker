@@ -42,8 +42,7 @@ archive without frontend source. Do not retire this directory or its watch paths
 production source cutover is separately approved. Coordinate any urgent legacy API fix with the
 new owner so the two gateway sources do not silently diverge.
 
-This consumption PR is stacked on foundation PR #1145: merge the foundation first, then this
-dependency update after independent review. API PR #1 and production cutover are separate held
-actions. Cutover preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
+API source ownership and frontend release consumption are established separately from production
+source cutover. The production cutover still requires explicit approval and preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
 existing namespace/state, Pages `script_name = "api-gateway"` and the current DO protocol.
 Supabase ownership, W10 authority activation and #1086 remain outside this extraction stage.
