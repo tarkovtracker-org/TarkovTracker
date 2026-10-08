@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
@@ -12,6 +12,21 @@ export function inspectReleasePins(version, frontend, gateway, lock) {
       'Legacy gateway contracts pin differs.',
     lock.includes(resolution) || 'Contracts URL/integrity differs in pnpm-lock.yaml.',
   ].filter((result) => typeof result === 'string');
+}
+export function compareCompiledContracts(installed, api) {
+  const files = readdirSync(resolve(installed, 'dist')).sort();
+  const apiFiles = readdirSync(resolve(api, 'dist')).sort();
+  if (JSON.stringify(files) !== JSON.stringify(apiFiles))
+    throw new Error('Versioned API and released contracts compiled file sets differ.');
+  const compared = files.map((file) => `dist/${file}`);
+  compared.push('fixtures/task-failure-branches.json');
+  for (const file of compared) {
+    if (!readFileSync(resolve(installed, file)).equals(readFileSync(resolve(api, file))))
+      throw new Error(
+        `Versioned API contracts differ from the released frontend dependency: ${file}`
+      );
+  }
+  return compared;
 }
 export function checkProgressContracts(root) {
   const version = readJson(resolve(root, 'workers/contract-tests/api-version.json'));

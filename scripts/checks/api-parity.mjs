@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkProgressContracts } from './progress-contracts.mjs';
+import { checkProgressContracts, compareCompiledContracts } from './progress-contracts.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const version = checkProgressContracts(root);
 const pnpmCli = process.env.npm_execpath;
@@ -42,18 +42,7 @@ for (const packageRoot of [installed, join(destination, 'progress-contracts')]) 
   if (manifest.version !== version.contracts.version)
     throw new Error('API source and frontend contracts version differ.');
 }
-const files = readdirSync(join(installed, 'dist')).map((file) => `dist/${file}`);
-files.push('fixtures/task-failure-branches.json');
-for (const file of files) {
-  if (
-    !readFileSync(join(installed, file)).equals(
-      readFileSync(join(destination, 'progress-contracts', file))
-    )
-  )
-    throw new Error(
-      `Versioned API contracts differ from the released frontend dependency: ${file}`
-    );
-}
+const files = compareCompiledContracts(installed, join(destination, 'progress-contracts'));
 run(destination, ['--filter', '@tarkovtracker/progress-contracts', 'run', 'test', '--silent']);
 for (const command of ['typecheck', 'types:check', 'validate:openapi', 'test', 'build'])
   run(destination, ['run', command, ...(command === 'test' ? ['--silent'] : [])]);

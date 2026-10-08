@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkProgressContracts, inspectReleasePins } from './progress-contracts.mjs';
+import {
+  checkProgressContracts,
+  compareCompiledContracts,
+  inspectReleasePins,
+} from './progress-contracts.mjs';
 const contracts = {
   url: 'https://example.test/v0.1.0/contracts.tgz',
   integrity: 'sha512-reviewed',
@@ -40,4 +44,43 @@ describe('published progress contract pins', () => {
       ).toHaveLength(1);
     }
   );
+});
+function withCompiledFixture(check) {
+  const root = mkdtempSync(join(tmpdir(), 'contracts-parity-'));
+  const owners = { installed: join(root, 'installed'), api: join(root, 'api') };
+  try {
+    for (const owner of Object.values(owners)) {
+      mkdirSync(join(owner, 'dist'), { recursive: true });
+      mkdirSync(join(owner, 'fixtures'));
+      writeFileSync(join(owner, 'dist/rule.js'), 'export const rule = 1;');
+      writeFileSync(join(owner, 'fixtures/task-failure-branches.json'), '{}');
+    }
+    check(owners);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+describe('compiled API release parity', () => {
+  it('compares the same compiled files and fixture bytes', () => {
+    withCompiledFixture(({ installed, api }) => {
+      expect(compareCompiledContracts(installed, api)).toEqual([
+        'dist/rule.js',
+        'fixtures/task-failure-branches.json',
+      ]);
+    });
+  });
+  it.each(['installed', 'api'])('rejects an extra compiled file in %s', (owner) => {
+    withCompiledFixture((owners) => {
+      writeFileSync(join(owners[owner], 'dist/newRule.js'), 'export const newRule = 1;');
+      expect(() => compareCompiledContracts(owners.installed, owners.api)).toThrow(
+        'compiled file sets differ'
+      );
+    });
+  });
+  it('rejects changed bytes even when compiled file inventories agree', () => {
+    withCompiledFixture(({ installed, api }) => {
+      writeFileSync(join(api, 'dist/rule.js'), 'export const rule = 2;');
+      expect(() => compareCompiledContracts(installed, api)).toThrow('contracts differ');
+    });
+  });
 });
