@@ -320,22 +320,15 @@ describe('path helpers', () => {
       expect(typeof command.executable).toBe('string');
     }
   });
-  it('selects the independent contracts runner and gateway tooling tests', () => {
-    const contracts = 'workers/api-gateway/progress-contracts/src/modeProgress.test.ts';
+  it('selects versioned API parity and the legacy gateway tooling runner', () => {
+    const contracts = 'workers/contract-tests/taskFailureParity.test.ts';
     const tooling = 'workers/api-gateway/scripts/check-boundaries.test.ts';
     expect(isTestPath(contracts)).toBe(true);
     expect(isTestPath(tooling)).toBe(true);
     expect(testCommands([contracts, tooling])).toEqual([
       {
         executable: 'pnpm',
-        args: [
-          'exec',
-          'vitest',
-          'run',
-          '--config',
-          'workers/api-gateway/progress-contracts/vitest.config.ts',
-          './src/modeProgress.test.ts',
-        ],
+        args: ['run', 'verify:api-parity'],
       },
       {
         executable: 'pnpm',

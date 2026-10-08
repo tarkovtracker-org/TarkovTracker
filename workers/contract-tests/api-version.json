@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/tarkovtracker-org/TarkovTracker-API.git",
+  "sourceRef": "refs/tags/v0.1.0",
+  "commit": "0b413206b3d4ee50fd4a2f7b4092c0711dea99e9",
+  "contracts": {
+    "version": "0.1.0",
+    "url": "https://github.com/tarkovtracker-org/TarkovTracker-API/releases/download/v0.1.0/tarkovtracker-progress-contracts-0.1.0.tgz",
+    "integrity": "sha512-KqV8x2v71RjHZdY3QArWfLWbso1xmluIqwM1ZwOFvHdeh0HrMtpDhBCVOqQxbqIvx1u/sUuUEV1ELKlnMYvvaA=="
+  }
+}

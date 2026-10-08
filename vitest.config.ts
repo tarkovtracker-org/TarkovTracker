@@ -1,18 +1,21 @@
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineVitestConfig } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
-import { prepareWorkspaceContracts } from './workers/api-gateway/scripts/prepare-contracts.mjs';
-prepareWorkspaceContracts();
+const versionedApi = process.env.TARKOV_VERSIONED_API_DIRECTORY;
 const logLevel = process.env.NUXT_PUBLIC_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
 const ciReporters = isSharded ? ['default', 'junit', 'github-actions'] : ['default', 'junit'];
 export default defineVitestConfig({
   resolve: {
     alias: {
+      ...(versionedApi ? { 'virtual:versioned-api': join(versionedApi, 'src') } : {}),
       // Cross-runtime catalog regressions use the same Node lifetime shim as gateway tests.
-      'cloudflare:workers': fileURLToPath(
-        new URL('./workers/api-gateway/src/__tests__/cloudflare-workers.ts', import.meta.url)
-      ),
+      'cloudflare:workers': versionedApi
+        ? join(versionedApi, 'src/__tests__/cloudflare-workers.ts')
+        : fileURLToPath(
+            new URL('./workers/api-gateway/src/__tests__/cloudflare-workers.ts', import.meta.url)
+          ),
     },
   },
   define: {
@@ -25,6 +28,7 @@ export default defineVitestConfig({
     exclude: [
       ...configDefaults.exclude,
       'workers/api-gateway/**',
+      ...(versionedApi ? [] : ['workers/contract-tests/**']),
       '**/*.deno.test.ts',
       '**/node_modules/**',
       '**/.codex/**',

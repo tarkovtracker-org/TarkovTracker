@@ -1,0 +1,32 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+export function inspectReleasePins(version, frontend, gateway, lock) {
+  const dependency = '@tarkovtracker/progress-contracts';
+  const resolution = `resolution: {integrity: ${version.contracts.integrity}, tarball: ${version.contracts.url}}`;
+  return [
+    frontend.dependencies[dependency] === version.contracts.url ||
+      'Frontend contracts pin differs.',
+    gateway.dependencies[dependency] === version.contracts.url ||
+      'Legacy gateway contracts pin differs.',
+    lock.includes(resolution) || 'Contracts URL/integrity differs in pnpm-lock.yaml.',
+  ].filter((result) => typeof result === 'string');
+}
+export function checkProgressContracts(root) {
+  const version = readJson(resolve(root, 'workers/contract-tests/api-version.json'));
+  const violations = inspectReleasePins(
+    version,
+    readJson(resolve(root, 'package.json')),
+    readJson(resolve(root, 'workers/api-gateway/package.json')),
+    readFileSync(resolve(root, 'pnpm-lock.yaml'), 'utf8')
+  );
+  if (existsSync(resolve(root, 'workers/api-gateway/progress-contracts')))
+    violations.push('Progress rules have a second source owner in the frontend checkout.');
+  if (violations.length) throw new Error(violations.join('\n'));
+  return version;
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  checkProgressContracts(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
+  console.log('Frontend and legacy gateway use the same immutable contracts URL/integrity.');
+}
