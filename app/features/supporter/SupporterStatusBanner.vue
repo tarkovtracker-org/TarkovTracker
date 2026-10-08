@@ -59,13 +59,13 @@
 </template>
 <script setup lang="ts">
   import { useSupporter } from '@/composables/useSupporter';
-  import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
+  import { useSupporterActivity } from '@/composables/useSupporterActivity';
   import { logger } from '@/utils/logger';
   const { t, te, locale } = useI18n({ useScope: 'global' });
   const { supporter, openBillingPortal, error: composableError } = useSupporter();
   const portalLoading = ref(false);
   const portalError = ref<string | null>(null);
-  const isActive = computed(() => isSupporterActivityActive(supporter.value));
+  const isActive = useSupporterActivity(supporter);
   const isSubscription = computed(() => supporter.value?.type === 'subscription');
   const canManage = computed(() => isSubscription.value && supporter.value !== null);
   const canUpgrade = computed(() => !isActive.value && supporter.value?.hasEverSupported === true);

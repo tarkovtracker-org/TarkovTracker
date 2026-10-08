@@ -34,24 +34,24 @@ function createHarness(
     discord?: boolean;
     grant?: () => Promise<void>;
     remove?: () => Promise<void>;
-    readError?: boolean;
+    readError?: string;
+    fulfillmentError?: string;
   } = {}
 ) {
   let row: Row = { ...initial };
   const writes: Row[] = [];
+  const fulfillmentCalls: Row[] = [];
   const roles = new Set<string>();
   const from = (table: string) => {
     let values: Row | null = null;
     let filters: Array<[string, unknown]> = [];
     let action = 'read';
-    let columns = '';
     const result = () => {
       if (table === 'discord_account_links' && options.discord) {
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
       if (table !== 'supporters') return { data: null, error: null };
-      if (options.readError && columns.includes('last_contribution_at'))
-        return { data: null, error: { message: 'down' } };
+      if (options.readError) return { data: null, error: { message: options.readError } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
@@ -60,10 +60,7 @@ function createHarness(
       return { data: { ...row }, error: null };
     };
     const builder = {
-      select: (selected = '') => {
-        columns = selected;
-        return builder;
-      },
+      select: () => builder,
       eq: (key: string, value: unknown) => {
         filters.push([key, value]);
         return builder;
@@ -102,7 +99,31 @@ function createHarness(
         return {
           createClient: () => ({
             from,
-            rpc: () => {
+            rpc: (name: string, params: Row) => {
+              if (name === 'fulfill_one_time_supporter') {
+                fulfillmentCalls.push(params);
+                if (options.fulfillmentError)
+                  return Promise.resolve({
+                    data: null,
+                    error: { message: options.fulfillmentError },
+                  });
+                const record = params.p_record as Row;
+                const live =
+                  row.type === 'subscription' &&
+                  ['active', 'past_due'].includes(String(row.status));
+                row = {
+                  ...row,
+                  ...record,
+                  has_ever_supported: true,
+                  retention_history_verified: true,
+                  status: live ? row.status : 'active',
+                  type: live ? 'subscription' : 'one_time',
+                  last_contribution_at: params.p_paid_at,
+                  updated_at: `revision_${writes.length + 1}`,
+                };
+                writes.push({ ...row });
+                return Promise.resolve({ data: { ...row }, error: null });
+              }
               row = { ...row, supporter_disqualified_at: '2026-09-29T12:00:00Z' };
               return Promise.resolve({ error: null });
             },
@@ -138,10 +159,11 @@ function createHarness(
     console: { info: () => {}, warn: () => {}, error: () => {} },
   });
   return {
-    dispatch: (type: string, object: unknown) =>
-      exports.dispatchForTest!({ id: 'evt_1', type, data: { object } }),
+    dispatch: (type: string, object: unknown, created = Math.floor(Date.now() / 1000)) =>
+      exports.dispatchForTest!({ created, id: 'evt_1', type, data: { object } }),
     current: () => row,
     writes,
+    fulfillmentCalls,
     fetch,
     roles,
   };
@@ -300,35 +322,58 @@ describe('payment-specific webhook fulfillment', () => {
     });
     expect(harness.fetch.mock.calls.some(([url]) => url.includes('/charges?'))).toBe(false);
   });
-  it('limits one-time checkout perks by amount and keeps grandfathered open access', async () => {
+  it.each(['checkout.session.completed', 'checkout.session.async_payment_succeeded'])(
+    'fulfills %s with stable payment identity and successful event date, not checkout creation',
+    async (type) => {
+      const resources = resourcesForPayments();
+      resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
+      const harness = createHarness(supporter, resources);
+      const paidAt = Date.parse('2026-10-07T01:00:00Z') / 1000;
+      await harness.dispatch(type, { ...session, amount_total: 400 }, paidAt);
+      expect(harness.fulfillmentCalls).toEqual([
+        {
+          p_payment_id: 'pi_new',
+          p_paid_at: '2026-10-07T01:00:00.000Z',
+          p_record: {
+            user_id: userId,
+            tier: 'chad',
+            stripe_customer_id: 'cus_1',
+            discord_user_id: null,
+            amount_total: 400,
+          },
+        },
+      ]);
+    }
+  );
+  it('preserves the successful event date on a late delivery from before the cutoff', async () => {
     const resources = resourcesForPayments();
-    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const paid = { ...session, amount_total: 1200, created: 1791331260 };
+    resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
     const harness = createHarness(supporter, resources);
-    await harness.dispatch('checkout.session.completed', paid);
-    expect(harness.current().expires_at).toBe(
-      new Date((paid.created + 90 * 86_400) * 1000).toISOString()
+    await harness.dispatch(
+      'checkout.session.completed',
+      { ...session, amount_total: 400 },
+      Date.parse('2026-10-06T23:59:59Z') / 1000
     );
-    const legacy = { ...supporter, status: 'active', expires_at: null };
-    const grandfathered = createHarness(legacy, resources);
-    await grandfathered.dispatch('checkout.session.completed', paid);
-    expect(grandfathered.current()).toMatchObject({ status: 'active', expires_at: null });
+    expect(harness.fulfillmentCalls[0]?.p_paid_at).toBe('2026-10-06T23:59:59.000Z');
   });
-  it('retries instead of overwriting purchased time when the supporter read fails', async () => {
+  it('does not write when the existing supporter lookup fails', async () => {
+    const harness = createHarness(supporter, resourcesForPayments(), { readError: 'offline' });
+    await expect(harness.dispatch('checkout.session.completed', session)).rejects.toThrow(
+      'Lookup by user_id failed'
+    );
+    expect(harness.writes).toEqual([]);
+    expect(harness.fulfillmentCalls).toEqual([]);
+  });
+  it('propagates failed atomic fulfillment for retry without a fallback upsert', async () => {
     const resources = resourcesForPayments();
-    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const harness = createHarness(supporter, resources, { readError: true });
+    resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
+    const harness = createHarness(supporter, resources, {
+      fulfillmentError: 'database unavailable',
+    });
     await expect(
-      harness.dispatch('checkout.session.completed', { ...session, created: 1791374400 })
-    ).rejects.toThrow('Supporter lookup failed');
-    expect(harness.writes).toHaveLength(0);
-  });
-  it('keeps open-ended one-time access for checkouts paid before the change', async () => {
-    const resources = resourcesForPayments();
-    resources['/charges/ch_new'] = { ...charge, refunded: false, amount_refunded: 0 };
-    const harness = createHarness(supporter, resources);
-    await harness.dispatch('checkout.session.completed', { ...session, amount_total: 300 });
-    expect(harness.current()).toMatchObject({ status: 'active', expires_at: null });
+      harness.dispatch('checkout.session.completed', { ...session, amount_total: 400 })
+    ).rejects.toThrow('One-time fulfillment failed');
+    expect(harness.writes).toEqual([]);
   });
 });
 describe('webhook Discord chargeback fencing', () => {
