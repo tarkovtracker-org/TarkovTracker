@@ -8,7 +8,7 @@ repository root.
 Gateway changes require, in addition to the root validation rules:
 
 - `pnpm --filter api-gateway run types:check`
-- `pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run`
+- `pnpm --filter api-gateway run build` (prepares contracts, then Wrangler dry-run)
 
 Focused tests: `pnpm run test:api-gateway`.
 

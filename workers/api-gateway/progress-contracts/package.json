@@ -7,7 +7,11 @@
     "dist",
     "src",
     "fixtures",
-    "README.md"
+    "README.md",
+    "LICENSE.md",
+    "scripts/watch.mjs",
+    "tsconfig.json",
+    "vitest.config.ts"
   ],
   "exports": {
     "./apiTaskUpdates": {
@@ -48,7 +52,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "dev:watch": "node scripts/watch.mjs",
+    "watch:tests": "pnpm run dev:watch"
   },
   "devDependencies": {
     "typescript": "6.0.3",

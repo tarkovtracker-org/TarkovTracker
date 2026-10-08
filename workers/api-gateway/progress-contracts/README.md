@@ -12,7 +12,11 @@ Node tests plus the repository's browser/Worker parity tests. SQL implementation
 by `supabase/`; a package change does not authorize changing an applied migration.
 
 From this directory: `pnpm install`, `pnpm run build`, `pnpm run test`, `pnpm pack`.
-The tarball contains compiled ESM, declarations, original sources/tests and the common fixture.
+Root and gateway development commands watch this compiler alongside their own server. Consumer
+build/typecheck commands and Vitest prepare changed contracts automatically; there is no manual
+reinstall step after editing a rule. Unchanged inputs/outputs reuse a local unpublished cache.
+The tarball contains compiled ESM, declarations, original sources/tests, the common fixture and
+the repository's unchanged license. The local license makes isolated and workspace packs agree.
 The version describes these existing contracts; it does not change the HTTP API version.
 
 This preparatory workspace uses `workspace:*`. After an approved repository split, the proposed
@@ -21,3 +25,7 @@ distribution is an immutable versioned GitHub Release tarball from
 No registry publication or cross-repository symlink is needed. Each release must bump the
 package version, run package/gateway/parity checks, and supply a frontend dependency-update PR;
 the frontend continues using its pinned version until that PR is validated and merged.
+
+Standalone validation generates and then freezes its own install lock to prove isolation. The
+eventual extracted repository must commit its exact validated lockfile; this fresh-lock check
+does not establish that final repository's reproducible toolchain.

@@ -136,7 +136,7 @@ sequenceDiagram
 - `workers/api-gateway/progress-contracts/src/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
   lock/unlock) used by Worker task writes
 - `workers/api-gateway/progress-contracts/src/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
-  user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
+  user hydration through `@tarkovtracker/progress-contracts/userMetadata` in Nuxt and the Worker
 - `workers/api-gateway/src/utils/user-display-name.ts` — cached Auth metadata lookup shared by
   personal and team API progress
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs

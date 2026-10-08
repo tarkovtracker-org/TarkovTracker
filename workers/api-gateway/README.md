@@ -10,6 +10,11 @@ dependency, run `pnpm run typecheck`, `pnpm run types:check`, `pnpm run validate
 `pnpm run test` (Node and workerd), and `pnpm run build` (Wrangler dry-run).
 The import boundary check is part of typecheck.
 
+Workspace commands prepare compiled contracts when source/configuration or outputs change;
+unchanged commands reuse the cache. `pnpm run dev` runs the gateway and contracts compiler watch
+together. Vitest configuration also prepares contracts, including focused `pnpm exec vitest`
+invocations. Packed installs keep their supplied compiled exports and need no source checkout.
+
 At the repository root, `pnpm run verify:api-standalone` exports only this gateway and a packed
 progress-contracts dependency into a fresh temporary directory. It independently installs and
 tests the contracts, checks that two packs are byte-identical, installs the tarball in the

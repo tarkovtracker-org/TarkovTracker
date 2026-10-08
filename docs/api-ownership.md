@@ -15,6 +15,12 @@ frontend. A pure rule used by both runtimes belongs in progress-contracts, with 
 and its tests. The repository's `workers/contract-tests/taskFailureParity.test.ts` checks
 browser/Worker agreement in PvP, PvE and Seasonal modes.
 
+Root `pnpm run dev` starts the frontend and shared compiler watch; it does not start the public
+gateway server. From `workers/api-gateway/`, the same command starts the gateway and compiler.
+Consumer builds, typechecks and Vitest refresh changed compiled contracts automatically, while
+unchanged commands reuse a local cache. Use `pnpm run test:watch` for tests with compiler watch;
+edit the package's `src/`, never its generated `dist/`.
+
 This first stage makes the gateway installable/testable on its own and gives the shared rules
 an explicit versioned boundary. It keeps the frontend, Supabase and precompute ownership in
 this repository. It does not activate W10 authority, include #1086, rewrite behavior, move
