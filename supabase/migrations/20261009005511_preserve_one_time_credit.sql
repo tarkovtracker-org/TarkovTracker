@@ -125,6 +125,7 @@ DECLARE
   fulfilled public.supporters%ROWTYPE;
   receipt_user uuid;
   live_subscription boolean;
+  legacy_unlimited boolean;
   expiry timestamptz;
   expected_customer text;
   customer text;
@@ -165,6 +166,12 @@ BEGIN
   IF existing.stripe_customer_id IS DISTINCT FROM expected_customer THEN
     RAISE EXCEPTION 'Supporter customer changed during fulfillment' USING ERRCODE = '40001';
   END IF;
+  -- Capture pre-ledger lifetime provenance before this payment enters the ledger.
+  legacy_unlimited := coalesce(existing.one_time_legacy_unlimited, false) OR
+    coalesce(existing.type = 'one_time' AND existing.status = 'active' AND existing.has_ever_supported
+      AND existing.expires_at IS NULL AND NOT EXISTS (
+        SELECT 1 FROM private.stripe_one_time_payments WHERE user_id = target_user
+          AND paid_at < timestamptz '2026-10-07 00:00:00+00' AND refunded_at IS NULL), false);
   -- Also protect identity if different users race to redeem the same payment.
   INSERT INTO private.stripe_one_time_payments(payment_id, user_id, paid_at, amount_total, credit_tier, banked_duration)
     VALUES (p_payment_id, target_user, p_paid_at, amount, incoming_tier,
@@ -231,13 +238,13 @@ BEGIN
   END IF;
   INSERT INTO public.supporters(user_id, tier, status, type, stripe_customer_id, stripe_subscription_id,
     has_ever_supported, retention_history_verified, last_contribution_at, discord_user_id,
-    amount_total, started_at, expires_at, updated_at, one_time_tier, one_time_expires_at, one_time_remaining)
+    amount_total, started_at, expires_at, updated_at, one_time_tier, one_time_expires_at, one_time_remaining, one_time_legacy_unlimited)
   VALUES (target_user, incoming_tier, CASE WHEN live_subscription THEN existing.status ELSE 'active' END,
     CASE WHEN live_subscription THEN 'subscription' ELSE 'one_time' END,
     coalesce(nullif(p_record->>'stripe_customer_id', ''), existing.stripe_customer_id),
     CASE WHEN live_subscription THEN existing.stripe_subscription_id END,
     true, true, greatest(existing.last_contribution_at, p_paid_at), p_record->>'discord_user_id',
-    amount, coalesce(existing.started_at, (p_record->>'started_at')::timestamptz, now()), expiry, now(), credit_tier, credit_expiry, credit_remaining)
+    amount, coalesce(existing.started_at, (p_record->>'started_at')::timestamptz, now()), expiry, now(), credit_tier, credit_expiry, credit_remaining, legacy_unlimited)
   ON CONFLICT (user_id) DO UPDATE SET
     tier = EXCLUDED.tier, status = EXCLUDED.status, type = EXCLUDED.type,
     stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
@@ -246,7 +253,8 @@ BEGIN
     amount_total = EXCLUDED.amount_total, started_at = EXCLUDED.started_at, expires_at = EXCLUDED.expires_at,
     updated_at = EXCLUDED.updated_at,
     one_time_tier = EXCLUDED.one_time_tier, one_time_expires_at = EXCLUDED.one_time_expires_at,
-    one_time_remaining = EXCLUDED.one_time_remaining
+    one_time_remaining = EXCLUDED.one_time_remaining,
+    one_time_legacy_unlimited = EXCLUDED.one_time_legacy_unlimited
   RETURNING * INTO fulfilled;
   RETURN fulfilled;
 END;
@@ -341,17 +349,24 @@ GRANT EXECUTE ON FUNCTION public.refund_one_time_supporter(text,uuid,timestamptz
 -- Read-time projection resumes expired grace even when Stripe sends no more events.
 -- Invoker security preserves the underlying supporter RLS for browser reads.
 CREATE VIEW public.supporter_entitlements WITH (security_invoker = true) AS
-SELECT effective.* FROM public.supporters s CROSS JOIN LATERAL jsonb_populate_record(
-  NULL::public.supporters, to_jsonb(s) || CASE WHEN
+SELECT s.user_id,
+  CASE WHEN credit.resumes THEN s.one_time_tier ELSE s.tier END AS tier,
+  CASE WHEN credit.resumes THEN 'active'::text ELSE s.status END AS status,
+  CASE WHEN credit.resumes THEN 'one_time'::text ELSE s.type END AS type,
+  s.stripe_customer_id, s.stripe_subscription_id, s.has_ever_supported, s.discord_user_id,
+  s.amount_total, s.started_at,
+  CASE WHEN credit.resumes THEN credit.expiry ELSE s.expires_at END AS expires_at,
+  s.updated_at, s.last_contribution_at, s.subscription_ended_at, s.retention_history_verified,
+  s.supporter_disqualified_at, s.one_time_tier, s.one_time_expires_at, s.one_time_remaining,
+  s.one_time_remaining_seconds, s.one_time_legacy_unlimited
+FROM public.supporters s CROSS JOIN LATERAL (
+  SELECT coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining) AS expiry,
     s.type = 'subscription' AND s.status IN ('active','past_due')
-    AND s.expires_at IS NOT NULL AND s.expires_at <= now()
-    AND s.one_time_tier IS NOT NULL AND s.has_ever_supported AND s.supporter_disqualified_at IS NULL
-    AND (coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining) > now()
-      OR (s.one_time_expires_at IS NULL AND s.one_time_remaining IS NULL))
-  THEN jsonb_build_object('tier',s.one_time_tier,'type','one_time','status','active',
-    'expires_at', coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining))
-  ELSE '{}'::jsonb END
-) effective;
+      AND s.expires_at IS NOT NULL AND s.expires_at <= now()
+      AND s.one_time_tier IS NOT NULL AND s.has_ever_supported AND s.supporter_disqualified_at IS NULL
+      AND (coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining) > now()
+        OR (s.one_time_expires_at IS NULL AND s.one_time_remaining IS NULL)) AS resumes
+) credit;
 GRANT SELECT ON public.supporter_entitlements TO authenticated, service_role;
 REVOKE ALL ON public.supporter_entitlements FROM PUBLIC, anon;
 

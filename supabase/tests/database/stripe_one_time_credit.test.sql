@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,912) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,913) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -255,5 +255,31 @@ SELECT ok((SELECT type='subscription' AND status='past_due' AND one_time_remaini
  AND one_time_expires_at IS NULL FROM public.supporters
  WHERE user_id='00000000-0000-0000-0000-000000000911'),
  'unknown resume anchor without subscription identity cannot turn finite credit unlimited');
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+INSERT INTO public.supporters(user_id,type,status,tier,has_ever_supported,expires_at)
+VALUES ('00000000-0000-0000-0000-000000000913','one_time','active','scav',true,NULL);
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+SELECT pg_temp.pay(913,'pi_legacy_extra','2026-10-06 00:00:00+00');
+SELECT ok((SELECT one_time_legacy_unlimited FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000913'),
+ 'fulfillment captures pre-ledger lifetime provenance before inserting another receipt');
+UPDATE public.supporters SET type='subscription',status='active',tier='chad',expires_at=NULL,
+ stripe_subscription_id='sub_legacy_extra' WHERE user_id='00000000-0000-0000-0000-000000000913';
+SELECT public.refund_one_time_supporter('pi_legacy_extra',
+ '00000000-0000-0000-0000-000000000913','2026-10-06 00:00:00+00',400,'scav');
+UPDATE public.supporters SET status='expired',tier='supporter',expires_at=now(),stripe_subscription_id=NULL
+ WHERE user_id='00000000-0000-0000-0000-000000000913';
+SELECT ok((SELECT type='one_time' AND status='active' AND tier='scav' AND expires_at IS NULL
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000913'),
+ 'refund of a later receipt preserves independently verified original lifetime access');
+CREATE FUNCTION pg_temp.entitlement_lookup_plan() RETURNS text LANGUAGE plpgsql AS $$
+DECLARE plan json;
+BEGIN
+ EXECUTE 'EXPLAIN (FORMAT JSON) SELECT tier FROM public.supporter_entitlements WHERE user_id=''00000000-0000-0000-0000-000000000913''' INTO plan;
+ RETURN plan::text;
+END; $$;
+SET LOCAL enable_seqscan=off;
+SELECT ok(pg_temp.entitlement_lookup_plan() LIKE '%Index Cond%',
+ 'service-role entitlement lookup pushes user identity into an index condition');
 SELECT * FROM finish();
 ROLLBACK;
