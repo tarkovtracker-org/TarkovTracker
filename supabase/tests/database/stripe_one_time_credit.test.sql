@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,908) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,909) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -175,7 +175,7 @@ SELECT set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*)::integer FROM public.supporter_entitlements),1,'entitlement view preserves owner RLS');
 RESET ROLE;
-SELECT ok(NOT has_function_privilege('authenticated','public.refund_one_time_supporter(text,uuid,timestamptz,integer)','EXECUTE'),
+SELECT ok(NOT has_function_privilege('authenticated','public.refund_one_time_supporter(text,uuid,timestamptz,integer,text)','EXECUTE'),
   'browser cannot apply bank refunds');
 SELECT set_config('request.headers','{}',true);
 SELECT throws_ok($$SELECT public.finish_stripe_event('evt_credit_rollout',
@@ -193,5 +193,28 @@ SELECT public.refund_one_time_supporter('pi_lifetime_refunded','00000000-0000-00
 SELECT ok((SELECT one_time_tier='scav' AND one_time_remaining IS NULL AND status='active' AND tier='chad'
  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000906'),
  'refund removes the higher lifetime tier while preserving another lifetime payment and subscription');
+INSERT INTO public.supporters(user_id,type,status,tier,has_ever_supported,stripe_subscription_id)
+VALUES ('00000000-0000-0000-0000-000000000909','subscription','active','chad',true,'sub_legacy_refund');
+UPDATE public.supporters SET one_time_tier='chad',one_time_remaining=NULL,one_time_legacy_unlimited=true
+ WHERE user_id='00000000-0000-0000-0000-000000000909';
+SELECT public.refund_one_time_supporter('pi_before_ledger','00000000-0000-0000-0000-000000000909',
+ '2026-10-05 00:00:00+00',1000,'scav');
+SELECT ok((SELECT one_time_tier='scav' AND one_time_legacy_unlimited AND one_time_remaining IS NULL
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000909'),
+ 'verified other legacy payment keeps its own lifetime tier');
+SELECT public.refund_one_time_supporter('pi_last_before_ledger','00000000-0000-0000-0000-000000000909',
+ '2026-10-05 00:00:00+00',400);
+SELECT ok((SELECT one_time_tier IS NULL AND NOT one_time_legacy_unlimited AND status='active' AND tier='chad'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000909'),
+ 'refund of last pre-ledger payment clears lifetime bank without revoking subscription');
+UPDATE public.supporters SET one_time_tier='chad',one_time_remaining=NULL,one_time_legacy_unlimited=true
+ WHERE user_id='00000000-0000-0000-0000-000000000909';
+SELECT pg_temp.pay(909,'pi_legacy_timed_kept');
+SELECT public.refund_one_time_supporter('pi_legacy_last_with_prepaid','00000000-0000-0000-0000-000000000909',
+ '2026-10-05 00:00:00+00',1000);
+SELECT ok((SELECT one_time_tier='scav' AND one_time_remaining=interval '30 days'
+ AND NOT one_time_legacy_unlimited AND status='active' AND tier='chad'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000909'),
+ 'last legacy refund preserves independently purchased prepaid days');
 SELECT * FROM finish();
 ROLLBACK;

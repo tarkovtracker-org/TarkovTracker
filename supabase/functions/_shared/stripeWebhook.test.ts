@@ -962,3 +962,53 @@ describe('one-time refunds during a subscription', () => {
     expect(harness.refundCalls).toEqual([]);
   });
 });
+describe('pre-ledger lifetime refunds', () => {
+  const legacy = {
+    ...supporter,
+    type: 'subscription',
+    status: 'active',
+    tier: 'chad',
+    stripe_subscription_id: 'sub_1',
+    one_time_tier: 'chad',
+    one_time_remaining: null,
+    one_time_legacy_unlimited: true,
+  };
+  it('passes only another valid lifetime payment tier as verified history', async () => {
+    const harness = createHarness(legacy, {
+      '/charges?customer=cus_1&limit=100': {
+        data: [charge, { ...priorCharge, payment_intent: 'pi_kept' }],
+        has_more: false,
+      },
+      '/checkout/sessions?payment_intent=pi_kept&limit=100': {
+        data: [{ metadata: { tier: 'scav' } }],
+        has_more: false,
+      },
+    });
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: 'scav' });
+  });
+  it('clears the legacy bank when no other lifetime payment remains', async () => {
+    const harness = createHarness(legacy, {
+      '/charges?customer=cus_1&limit=100': { data: [charge], has_more: false },
+    });
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: null });
+  });
+  it('defers destructive refund reconciliation when Stripe history is unavailable', async () => {
+    const harness = createHarness(legacy, {});
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Unable to verify legacy payment history');
+    expect(harness.refundCalls).toEqual([]);
+    expect(harness.writes).toEqual([]);
+  });
+  it('requires complete checkout evidence rather than guessing a legacy tier', async () => {
+    const harness = createHarness(legacy, {
+      '/charges?customer=cus_1&limit=100': { data: [priorCharge], has_more: false },
+    });
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Unable to verify legacy checkout tier');
+    expect(harness.refundCalls).toEqual([]);
+  });
+});

@@ -252,7 +252,7 @@ GRANT EXECUTE ON FUNCTION public.fulfill_one_time_supporter(text, timestamptz, j
 
 -- Refund receipts also fence a refund that arrives before checkout fulfillment.
 CREATE FUNCTION public.refund_one_time_supporter(p_payment_id text, p_user_id uuid,
-  p_paid_at timestamptz, p_amount integer)
+  p_paid_at timestamptz, p_amount integer, p_legacy_tier text DEFAULT NULL)
 RETURNS public.supporters LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
   existing public.supporters%ROWTYPE;
@@ -260,6 +260,7 @@ DECLARE
   expected_customer text;
   credit_tier text;
   remaining interval;
+  new_receipt boolean;
 BEGIN
   PERFORM private.assert_one_time_stripe_event_claim();
   IF p_payment_id IS NULL OR p_payment_id !~ '^pi_[A-Za-z0-9_]+$' OR length(p_payment_id) > 255
@@ -278,7 +279,26 @@ BEGIN
   END IF;
   INSERT INTO private.stripe_one_time_payments(payment_id,user_id,paid_at,amount_total,refunded_at)
     VALUES (p_payment_id,p_user_id,p_paid_at,p_amount,now()) ON CONFLICT (payment_id) DO NOTHING;
-  IF FOUND THEN RETURN existing; END IF;
+  new_receipt := FOUND;
+  IF p_legacy_tier IS NOT NULL AND p_legacy_tier NOT IN ('supporter','scav','timmy','chad') THEN
+    RAISE EXCEPTION 'Invalid verified legacy tier';
+  END IF;
+  IF existing.one_time_legacy_unlimited AND p_paid_at < timestamptz '2026-10-07 00:00:00+00' THEN
+    SELECT coalesce(sum(banked_duration),interval '0') INTO remaining
+      FROM private.stripe_one_time_payments WHERE user_id=p_user_id AND refunded_at IS NULL;
+    SELECT p.credit_tier INTO credit_tier FROM private.stripe_one_time_payments p
+      WHERE p.user_id=p_user_id AND p.refunded_at IS NULL AND p.banked_duration > interval '0'
+      ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC NULLS LAST LIMIT 1;
+    UPDATE public.supporters SET one_time_legacy_unlimited=p_legacy_tier IS NOT NULL,
+      one_time_remaining=CASE WHEN p_legacy_tier IS NULL THEN nullif(remaining,interval '0') END,
+      one_time_tier=CASE WHEN p_legacy_tier IS NOT NULL THEN
+        (SELECT t FROM unnest(ARRAY[p_legacy_tier,credit_tier]) t
+          ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],t) DESC NULLS LAST LIMIT 1)
+        WHEN remaining > interval '0' THEN coalesce(credit_tier,existing.one_time_tier) END,
+      one_time_expires_at=NULL,updated_at=now()
+      WHERE user_id=p_user_id RETURNING * INTO existing;
+  END IF;
+  IF new_receipt THEN RETURN existing; END IF;
   SELECT * INTO STRICT receipt FROM private.stripe_one_time_payments WHERE payment_id = p_payment_id FOR UPDATE;
   IF receipt.user_id <> p_user_id THEN RAISE EXCEPTION 'Stripe payment belongs to another supporter'; END IF;
   IF receipt.refunded_at IS NOT NULL THEN RETURN existing; END IF;
@@ -311,8 +331,8 @@ BEGIN
   RETURN existing;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.refund_one_time_supporter(text,uuid,timestamptz,integer) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.refund_one_time_supporter(text,uuid,timestamptz,integer) TO service_role;
+REVOKE ALL ON FUNCTION public.refund_one_time_supporter(text,uuid,timestamptz,integer,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.refund_one_time_supporter(text,uuid,timestamptz,integer,text) TO service_role;
 
 -- Read-time projection resumes expired grace even when Stripe sends no more events.
 -- Invoker security preserves the underlying supporter RLS for browser reads.

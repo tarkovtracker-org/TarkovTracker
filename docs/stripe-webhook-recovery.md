@@ -160,3 +160,9 @@ The legacy production API gateway mirrors the entitlement reader from
 (commit `d46e7df5457e5d9e008271a66d6617257bd1bb91`). It bounds paid-tier cache lifetime at
 entitlement expiry. Only a missing-view `404/PGRST205` permits the existing table read during
 schema rollout. The progress-contracts release remains v0.1.0; no pure rules changed.
+
+For pre-ledger lifetime refunds, the current handler verifies all remaining valid pre-cutoff
+one-time charges and their Checkout Session tiers before reconciling the legacy bank.
+Subscription charges do not qualify. Missing history, incomplete pagination or missing checkout
+evidence causes a retry; a verified empty lifetime history clears legacy credit while preserving
+current subscription access and independently recorded prepaid days.

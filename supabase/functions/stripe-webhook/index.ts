@@ -38,6 +38,7 @@ import { oneTimePaymentDate } from '../_shared/stripeOneTime.ts';
 import {
   getTierPriceConfig,
   isSupporterTier,
+  SUPPORTER_TIERS,
   resolveSubscriptionTier,
 } from '../_shared/stripeTier.ts';
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
@@ -920,7 +921,13 @@ async function stripeGet<T>(path: string): Promise<T | null> {
  * defer destructive actions instead of assuming a single-payment history.
  */
 type StripeChargePage = {
-  data: Array<Parameters<typeof isRetainedStripeContribution>[0]>;
+  data: Array<
+    Parameters<typeof isRetainedStripeContribution>[0] & {
+      created?: number;
+      invoice?: unknown;
+      payment_intent?: unknown;
+    }
+  >;
   has_more: boolean;
 };
 type ChargeHistoryPageState = {
@@ -1187,14 +1194,72 @@ async function refundUnrelatedSubscriptionPayment(
       `${supporter.stripe_subscription_id} for ${supporter.user_id}; skipping revocation`
   );
 }
+type LegacyCharge = StripeChargePage['data'][number];
+const isLegacyOneTimeCharge = (charge: LegacyCharge, excluded: string): boolean =>
+  isRetainedStripeContribution(charge, excluded) &&
+  !charge.invoice &&
+  Number(charge.created) < Date.parse('2026-10-07T00:00:00Z') / 1000;
+async function legacyChargeTier(charge: LegacyCharge): Promise<string> {
+  const id = requireOneTimePaymentId(charge.payment_intent);
+  const page = await stripeGet<{
+    data: Array<{ metadata?: Record<string, string> }>;
+    has_more: boolean;
+  }>(`/checkout/sessions?payment_intent=${encodeURIComponent(id)}&limit=100`);
+  if (!page || page.has_more !== false) throw new Error('Unable to verify legacy checkout tier');
+  const session = page.data[0];
+  if (!session) throw new Error('Legacy payment has no checkout evidence');
+  return resolveTier(session.metadata);
+}
+const assertLegacyHistoryContinuation = (page: StripeChargePage, pagesLeft: number): void => {
+  if (pagesLeft === 1 || page.data.length === 0)
+    throw new Error('Legacy payment history is incomplete');
+};
+async function collectLegacyTiers(state: ChargeHistoryPageState): Promise<string[]> {
+  const page = await fetchCustomerChargePage(state);
+  if (!page) throw new Error('Unable to verify legacy payment history');
+  if (typeof page.has_more !== 'boolean') throw new Error('Legacy payment history is incomplete');
+  const tiers = await Promise.all(
+    page.data
+      .filter((charge) => isLegacyOneTimeCharge(charge, state.excludedChargeId))
+      .map(legacyChargeTier)
+  );
+  if (!page.has_more) return tiers;
+  assertLegacyHistoryContinuation(page, state.pagesLeft);
+  return [
+    ...tiers,
+    ...(await collectLegacyTiers({
+      ...state,
+      pagesLeft: state.pagesLeft - 1,
+      startingAfter: page.data.at(-1)!.id,
+    })),
+  ];
+}
+// deno-lint-ignore no-explicit-any
+async function verifiedLegacyRefundTier(
+  supporter: SupporterRow,
+  charge: any
+): Promise<{ p_legacy_tier?: string | null }> {
+  if (supporter.one_time_legacy_unlimited !== true) return {};
+  if (oneTimePaymentDate(charge.created) >= '2026-10-07T00:00:00.000Z') return {};
+  const tiers = await collectLegacyTiers({
+    customerId: supporter.stripe_customer_id!,
+    excludedChargeId: charge.id,
+    pagesLeft: 5,
+    count: 0,
+  });
+  const tier = [...SUPPORTER_TIERS].reverse().find((value) => tiers.includes(value)) ?? null;
+  return { p_legacy_tier: tier };
+}
 // deno-lint-ignore no-explicit-any
 async function refundBankedPayment(supporter: SupporterRow, charge: any): Promise<void> {
   const paymentId = requireOneTimePaymentId(charge.payment_intent);
+  const legacy = await verifiedLegacyRefundTier(supporter, charge);
   const { error } = await eventClient().rpc('refund_one_time_supporter', {
     p_payment_id: paymentId,
     p_user_id: supporter.user_id,
     p_paid_at: oneTimePaymentDate(charge.created),
     p_amount: charge.amount,
+    ...legacy,
   });
   if (error) throw new Error(`Failed to refund banked payment: ${error.message}`);
   const current = await findSupporterBy('user_id', supporter.user_id);
