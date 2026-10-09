@@ -809,49 +809,58 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
-### Normalized PvP/PvE progress backfill (#1028)
+### Legacy PvP/PvE storage retirement (#1028)
 
-`20261002090000_side_effect_free_mode_progress_backfill.sql` ships the helper only; running it is
-separately approved operational maintenance under the rules above. The helper writes only rows whose
-legacy payload has a numeric level while the normalized row is missing or has none. It never locks
-or rewrites materialized rows; repairing a placeholder takes its row lock. It keeps source timestamps,
-records unknown freshness, and records no
-account activity, so retention deadlines and pending inactivity deletions are unchanged.
+The historical backfill was completed before #1072 removed normalized-reader fallbacks.
+After #1086 retired legacy writes, its frozen JSON must never seed newer normalized state.
+The forward migration `20261009085500_drop_legacy_progress_columns.sql` removes the range
+helper, completion gate and flag helper with the old columns. Do not run historical backfill
+commands or use their old numeric-level gate as a cleanup precondition.
 
-1. Measure remaining work per range with the completion gate (read-only):
+The approved client-support boundary accepts normalized readers from #1072 onward, retaining
+account timestamps and Realtime for pre-#1087 clients. Older callers requesting `pvp_data`,
+`pve_data`, `get_teammate_legacy_progress` or `team_member_summary` must update. This approval
+does not authorize production deletion.
 
-   ```sql
-   SELECT game_mode, count(*) FROM private.unmaterialized_mode_progress(
-     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000')
-   GROUP BY game_mode;
-   ```
+The destructive target is only `public.user_progress.pvp_data` and `pve_data`. Preserve every
+account row and its seven metadata fields, normalized mode rows, all Seasonal history,
+prestige archives, preferences, team data and account-retention records. Legacy-shaped API and
+prestige RPC arguments are mode/payload contracts and remain unchanged.
 
-2. Run one range per SQL Editor operation so each commits on its own. Start with a two-hex-digit
-   range (`00…`–`01…`) to measure duration, then widen only while it stays well under the timeout.
-   The last range passes `NULL` as the upper bound.
+Before an explicitly approved merge, verify a fresh recovery point for the target values and
+a contained restore receipt, exact pending SQL/history, immutable independent review and CI.
+The migration uses one transaction, a one-second lock timeout, a twenty-second statement
+timeout and explicit dependency removal followed by `DROP COLUMN RESTRICT`. An unexpected
+dependency or active reader aborts the complete transaction. It performs no data rewrite,
+row deletion, privilege change or physical reclamation. Supabase's normal integration deploys
+migrations and all Edge Functions; do not use an out-of-band production push.
 
-   ```sql
-   BEGIN;
-   SET LOCAL statement_timeout = '60s';
-   SELECT private.backfill_game_mode_progress_range(
-     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000');
-   COMMIT;
-   ```
+Prefer a scoped logical recovery rehearsal where an approved operator connection is available:
+a consistent custom-format PostgreSQL 17 dump selecting only `public.user_progress`, followed
+by a local restore of only pre-data and data into an isolated destination with no network,
+app/Auth access or scheduled extensions. Exclude post-data triggers, FKs, grants and publication
+from this extraction destination; compare count and full-row aggregate fingerprints, including
+both legacy JSON values. This target recovery copy is not a complete Auth/normalized-history
+backup. It avoids exporting Auth password/session data, jobs, payment tables and secrets.
+Exporting production account identifiers, Tarkov UIDs, metadata and progress still requires
+explicit privacy/destination approval and an approved existing connection; the telemetry
+observer is not a raw-data export route. Synthetic rehearsal is not production recovery proof.
 
-   The transaction-local timeout cannot leak into later maintenance. The helper sets
-   `lock_timeout = '2s'`; a range that meets a live write fails and rolls back whole. If an error
-   leaves the session in an aborted transaction, run `ROLLBACK;` before retrying. Re-run the range
-   later; completed rows are no-ops.
+A provider physical clone copies jobs that begin immediately and cannot be paused before restore
+([Supabase clone documentation](https://supabase.com/docs/guides/platform/clone-project)).
+The seven live schedules perform local deletions/retention/team changes even without external
+calls; a physical clone needs separately approved resource cost and safe scheduler containment.
+Do not assume an after-restore pause proves the copied data was untouched.
 
-3. Record each completed range in the change log and stop on rising latency, CPU, lock waits, or
-   I/O pressure.
-4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
+Before commit, transaction rollback restores the old schema/data automatically. After commit,
+re-adding empty columns is not recovery. Restore required legacy values into an isolated recovery
+target and reconcile through a separately reviewed forward correction. Keep newer normalized
+data; never reinstate the bridge or frozen-JSON backfill. Full production restore is a separate
+outage and loss-of-newer-writes decision.
 
-After `20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` deploys, nothing writes the legacy
-columns, so the gate stays a read-only check and the helper must not run: it would copy frozen
-legacy progress over newer normalized rows. A non-zero gate after that point (for example a
-normalized row saved without a `level`) does not mean missing data, and Phase 4 must not use the
-gate as its precondition; Phase 4 removes the helper and gate with the columns.
+`DROP COLUMN` does not immediately shrink files. Measure relation sizes after release; any
+`VACUUM FULL`/rewrite needs a distinct low-traffic maintenance approval, disk headroom and a
+bounded lock/outage plan. Avoid bulk NULL updates and retain normal autovacuum.
 
 ### Manual activity history rollout
 

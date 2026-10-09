@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(16);
+SELECT plan(15);
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000000893', 'manual-history@example.invalid');
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000893', true);
@@ -28,8 +28,6 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   '{"pvp":{"level":11,"manualActivityEpoch":1,"manualActivityHistory":[{"id":"after-clear","timestamp":3000,"type":"task","action":"complete","title":"After"}]}}', private.active_season_number());
 SELECT is((SELECT progress_data->'manualActivityHistory'->0->>'id' FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000893' AND game_mode = 'pvp'), 'after-clear', 'new entries after a clear are retained');
-SELECT is((SELECT pvp_data->'manualActivityHistory' FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000000893'),
-  '[]'::jsonb, 'history syncs no longer reach the legacy column');
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   '{"pvp":{"level":1,"progressEpoch":1}}', private.active_season_number());
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
@@ -42,14 +40,10 @@ SELECT is(public.sanitize_user_progress_manual_activity_history(
   '[{"id":"x","timestamp":1,"type":"task","action":"complete","title":"Z"},{"id":"x","timestamp":1,"type":"task","action":"complete","title":"A"}]')->0->>'title', 'A', 'same-ID ties use deterministic text ordering');
 SELECT is(public.sanitize_user_progress_manual_activity_history(
   '[{"id":"z","timestamp":1,"type":"task","action":"complete","title":"Z"},{"id":"a","timestamp":1,"type":"task","action":"complete","title":"A"}]')->0->>'id', 'a', 'timestamp ties sort by ID inside the aggregate');
--- An account whose normalized row is an unmaterialized placeholder merges from that row alone:
--- the frozen legacy column is never a merge base (#1028), and the account row is not rewritten.
+-- An account with an empty normalized placeholder merges from that row alone.
+-- Accepted cached clients still require the account-clock update.
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000000894', 'manual-history-placeholder@example.invalid');
--- handle_new_user() already created the account row; give it frozen legacy progress.
-UPDATE public.user_progress
-SET pvp_data = '{"level":42,"progressEpoch":3,"taskCompletions":{"kept":{"complete":true}},"manualActivityHistory":[{"id":"legacy","timestamp":5000,"type":"task","action":"complete","title":"Legacy"}]}'
-WHERE user_id = '00000000-0000-0000-0000-000000000894';
 -- Create the placeholder shape the visibility RPC leaves behind. Only an INSERT reaches that
 -- shape, because the row trigger merges every UPDATE.
 DELETE FROM public.user_game_mode_progress
@@ -65,10 +59,10 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   private.active_season_number());
 SELECT is((SELECT progress_data->>'level' FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000894' AND game_mode = 'pvp'), '1',
-  'a placeholder row does not seed from the frozen legacy reset epoch');
+  'a placeholder row merges its own normalized level');
 SELECT is((SELECT progress_data->'manualActivityHistory'->0->>'id' FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000894' AND game_mode = 'pvp'), 'stale',
-  'a placeholder row does not union the frozen legacy history');
+  'a placeholder row retains the incoming normalized history');
 SELECT isnt((SELECT ctid::text FROM public.user_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000894'),
   (SELECT row_version FROM placeholder_account_row),
