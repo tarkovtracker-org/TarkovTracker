@@ -34,6 +34,7 @@ const {
   },
   backupState: {
     legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
+    legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -126,6 +127,7 @@ vi.mock('@/composables/useDataBackup', () => ({
     exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
     reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
     legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -221,6 +223,7 @@ describe('DataManagementCard', () => {
     backupFns.exportProgress.mockReset();
     backupFns.exportDeviceProgressRecovery.mockReset();
     backupState.legacyProgressRecoveryCount.value = 0;
+    backupState.legacyProgressRecoveryOverflow.value = false;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -1035,6 +1038,14 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper();
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);
+  });
+  it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
+    backupState.legacyProgressRecoveryOverflow.value = true;
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(wrapper.text()).toContain('settings.data_management.older_tab_recovery_full');
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith(true);
   });
   it('requires confirmation before exporting and clearing older copies', async () => {
     backupState.legacyProgressRecoveryCount.value = 2;

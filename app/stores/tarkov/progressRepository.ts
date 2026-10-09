@@ -568,6 +568,7 @@ export type ActiveProgressRecord = {
   legacyRaw: string | null;
   legacyUpdates?: Array<string | null>;
   lastLegacyRaw?: string | null;
+  legacyRecoveryOverflow?: boolean;
 };
 const activeKey = 'active-envelope';
 const initialActiveRecord = (legacyRaw: string | null): ActiveProgressRecord => {
@@ -582,29 +583,59 @@ const decodeActiveRecord = (entry: RecordEntry, legacyRaw: string | null): Activ
   requireNullableText(value.raw, 'owner');
   requireNullableText(value.legacyRaw, 'owner');
   if (value.lastLegacyRaw !== undefined) requireNullableText(value.lastLegacyRaw, 'owner');
+  validateLegacyOverflow(value.legacyRecoveryOverflow);
   validateLegacyUpdates(value.legacyUpdates);
   return value as ActiveProgressRecord;
+};
+const validateLegacyOverflow = (value: unknown): void => {
+  if (value !== undefined && typeof value !== 'boolean') {
+    throw new TypeError('Invalid legacy recovery overflow');
+  }
+};
+const MAX_LEGACY_SNAPSHOTS = 20;
+const MAX_LEGACY_CHARACTERS = 5 * 1024 * 1024;
+const exceedsLegacyRecoveryLimits = (updates: Array<string | null>, raw: string): boolean =>
+  updates.length >= MAX_LEGACY_SNAPSHOTS ||
+  updates.reduce((total, copy) => total + (copy?.length ?? 0), raw.length) > MAX_LEGACY_CHARACTERS;
+const appendLegacySnapshot = (current: ActiveProgressRecord, raw: string): ActiveProgressRecord => {
+  const updates = current.legacyUpdates ?? [];
+  if (exceedsLegacyRecoveryLimits(updates, raw)) {
+    return current.legacyRecoveryOverflow ? current : { ...current, legacyRecoveryOverflow: true };
+  }
+  return { ...current, lastLegacyRaw: raw, legacyUpdates: [...updates, raw] };
 };
 const validateLegacyUpdates = (values: unknown): void => {
   if (values === undefined) return;
   if (!Array.isArray(values)) throw new TypeError('Invalid legacy progress recovery');
   values.forEach((value) => requireNullableText(value, 'owner'));
 };
+const isKnownLegacySnapshot = (current: ActiveProgressRecord, raw: string | null): boolean =>
+  raw === current.legacyRaw || (current.legacyUpdates ?? []).includes(raw);
 const observeLegacyRecord = (
   current: ActiveProgressRecord,
   source: string | null | (() => string | null)
 ): ActiveProgressRecord => {
-  let raw: string | null;
   try {
-    raw = resolveLegacyRaw(source);
+    return captureLegacyRecord(current, resolveLegacyRaw(source));
   } catch {
     return current;
   }
+};
+const captureLegacyRecord = (
+  current: ActiveProgressRecord,
+  raw: string | null
+): ActiveProgressRecord => {
   const last = current.lastLegacyRaw === undefined ? current.legacyRaw : current.lastLegacyRaw;
   if (raw === last) return current;
-  const updates = current.legacyUpdates ?? [];
-  if (raw === current.legacyRaw || updates.includes(raw)) return { ...current, lastLegacyRaw: raw };
-  return { ...current, lastLegacyRaw: raw, legacyUpdates: [...updates, raw] };
+  return captureChangedLegacyRecord(current, raw);
+};
+const captureChangedLegacyRecord = (
+  current: ActiveProgressRecord,
+  raw: string | null
+): ActiveProgressRecord => {
+  if (isKnownLegacySnapshot(current, raw)) return { ...current, lastLegacyRaw: raw };
+  if (raw === null) return { ...current, lastLegacyRaw: raw };
+  return appendLegacySnapshot(current, raw);
 };
 const resolveLegacyRaw = (source: string | null | (() => string | null)): string | null =>
   typeof source === 'function' ? source() : source;
@@ -614,7 +645,7 @@ const withActiveRecord = <T>(
   legacyRaw: string | null | (() => string | null),
   finish: (value: T) => void,
   fail: (error: unknown) => void,
-  operation: (current: ActiveProgressRecord) => T,
+  operation: (current: ActiveProgressRecord, exists: boolean) => T,
   initialized = false
 ): void => {
   readEntry(
@@ -628,7 +659,10 @@ const withActiveRecord = <T>(
         (entry) => {
           if (initialized && !entry.exists) throw new ProgressRepositoryConflict('import');
           finish(
-            operation(decodeActiveRecord(entry, entry.exists ? null : resolveLegacyRaw(legacyRaw)))
+            operation(
+              decodeActiveRecord(entry, entry.exists ? null : resolveLegacyRaw(legacyRaw)),
+              entry.exists
+            )
           );
         },
         fail
@@ -667,10 +701,10 @@ export const openActiveProgressRepository = async (factory: IDBFactory, name: st
   ): Promise<ActiveProgressRecord> => {
     const token = structuredClone(request);
     return transaction(db, 'readwrite', (store, finish, fail) => {
-      withActiveRecord(store, token, legacyRaw, finish, fail, (current) => {
+      withActiveRecord(store, token, legacyRaw, finish, fail, (current, exists) => {
         const observed =
           typeof legacyRaw === 'function' ? observeLegacyRecord(current, legacyRaw) : current;
-        store.put(observed, activeKey);
+        if (!exists || observed !== current) store.put(observed, activeKey);
         return observed;
       });
     });
@@ -680,7 +714,10 @@ export const openActiveProgressRepository = async (factory: IDBFactory, name: st
     operation: (current: ActiveProgressRecord) => {
       raw: string | null;
       result: T;
-      recovery?: Pick<ActiveProgressRecord, 'legacyRaw' | 'legacyUpdates' | 'lastLegacyRaw'>;
+      recovery?: Pick<
+        ActiveProgressRecord,
+        'legacyRaw' | 'legacyUpdates' | 'lastLegacyRaw' | 'legacyRecoveryOverflow'
+      >;
     }
   ): Promise<{ committed: ActiveProgressRecord; result: T }> => {
     const token = structuredClone(request);

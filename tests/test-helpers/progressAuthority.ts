@@ -24,6 +24,8 @@ export const createProgressPolicyAuthority = () => {
     observeProgressAuthority: () => () => {},
     refreshProgressAuthority: async () => {},
     legacyProgressRecoveryCount: ref(0),
+    legacyProgressRecoveryOverflow: ref(false),
+    exportableLegacyUpdates: () => [],
     ownedLegacyUpdates: () => [],
     isOwnedProgressRecovery: (raw: string | null, owner: string | null) =>
       raw !== null && (parseUserScopedStorage(raw)?._userId ?? null) === owner,

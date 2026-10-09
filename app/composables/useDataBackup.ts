@@ -11,6 +11,8 @@ import {
   isOwnedProgressRecovery,
   legacyProgressRecoveryCount,
   discardExportedLegacyProgress,
+  exportableLegacyUpdates,
+  legacyProgressRecoveryOverflow,
 } from '@/stores/tarkov/progressAuthority';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
@@ -135,6 +137,7 @@ export interface UseDataBackupReturn {
   exportSupersededProgress: () => Promise<void>;
   exportDeviceProgressRecovery: (clearOlderCopies?: boolean) => Promise<void>;
   legacyProgressRecoveryCount: Ref<number>;
+  legacyProgressRecoveryOverflow: Ref<boolean>;
   reviewOlderTabProgress: (index: number) => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
@@ -364,11 +367,27 @@ function parseOlderTabRaw(raw: string): unknown {
   if (raw.length > 5 * 1024 * 1024) throw new Error('Older edit is too large');
   return parseUserScopedStorage(raw)?.data ?? JSON.parse(raw);
 }
+const olderTabMetadataKeys = [
+  'currentGameMode',
+  'gameEdition',
+  'tarkovUid',
+  'seasonalSeasonNumber',
+] as const;
+function normalizeOlderTabSource(source: Record<string, unknown>): Record<string, unknown> {
+  if ('pvp' in source || 'pve' in source) return source;
+  const progress = sanitizeProgressData(source);
+  if (!progress.ok) throw new Error(progress.error);
+  const migrated = migrateToGameModeStructure(source);
+  const metadata = Object.fromEntries(
+    olderTabMetadataKeys.filter((key) => key in source).map((key) => [key, source[key]])
+  );
+  return { ...migrated, ...metadata };
+}
 function buildOlderTabBackup(raw: string): TarkovTrackerExport {
   const source: unknown = parseOlderTabRaw(raw);
   if (!isPlainObject(source)) throw new Error('Invalid older edit');
   const candidate = {
-    ...source,
+    ...normalizeOlderTabSource(source),
     _format: BACKUP_FORMAT,
     _version: 2,
     exportedAt: Date.now(),
@@ -822,9 +841,9 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   async function exportDeviceProgressRecovery(clearOlderCopies = false): Promise<void> {
     const owner = $supabase.user.id ?? null;
-    const record = await readCommittedProgressAuthority();
+    const record = await readCommittedProgressAuthority(false);
     const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
-    const copies = ownedLegacyUpdates(record, owner);
+    const copies = exportableLegacyUpdates(record, owner);
     await downloadJsonFile('tarkovtracker-device-progress', {
       _format: 'tarkovtracker-device-progress',
       _version: 1,
@@ -1005,6 +1024,7 @@ export function useDataBackup(): UseDataBackupReturn {
     exportDeviceProgressRecovery,
     reviewOlderTabProgress,
     legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow,
     exportError,
     exportDebugSnapshot,
     debugExportError,

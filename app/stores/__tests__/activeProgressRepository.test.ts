@@ -30,6 +30,40 @@ describe('active progress envelope authority', () => {
       revision: 1,
     });
   });
+  it('imports the missing active key once and skips puts for unchanged reads', async () => {
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put');
+    await repository.read(token, () => 'original');
+    expect(put).toHaveBeenCalledOnce();
+    put.mockClear();
+    await repository.read(token, () => 'original');
+    await repository.read(token, null);
+    expect(put).not.toHaveBeenCalled();
+  });
+  it('bounds distinct recovery copies without eviction or blocking primary saves', async () => {
+    await repository.read(token, () => 'original');
+    for (let index = 0; index < 20; index++) await repository.read(token, () => `older-${index}`);
+    const full = await repository.read(token, () => 'older-20');
+    expect(full.legacyUpdates).toHaveLength(20);
+    expect(full.legacyRecoveryOverflow).toBe(true);
+    expect(full.lastLegacyRaw).toBe('older-19');
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put');
+    expect(await repository.read(token, () => 'older-20')).toEqual(full);
+    expect(put).not.toHaveBeenCalled();
+    await repository.mutate(token, () => ({ raw: 'primary save', result: true }));
+    expect(await repository.read(token, null)).toMatchObject({
+      raw: 'primary save',
+      legacyUpdates: full.legacyUpdates,
+    });
+  });
+  it('bounds recovery characters and retains oversized pending bytes outside the archive', async () => {
+    await repository.read(token, () => 'original');
+    const exactlyFull = 'a'.repeat(5 * 1024 * 1024);
+    await repository.read(token, () => exactlyFull);
+    const record = await repository.read(token, () => 'over-limit');
+    expect(record.legacyUpdates).toEqual([exactlyFull]);
+    expect(record.lastLegacyRaw).toBe(exactlyFull);
+    expect(record.legacyRecoveryOverflow).toBe(true);
+  });
   it('serializes competing mutations against the latest committed envelope', async () => {
     await repository.read(token, '{"pvp":20,"pve":42}');
     const edit = repository.mutate(token, (current) => ({

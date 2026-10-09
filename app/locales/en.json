@@ -2069,6 +2069,7 @@
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
       "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
+      "older_tab_recovery_full": "Recovery storage is full. Export recovery copies for this account, then clear the exported copies to make room. Keep older tabs open until their edits have been recovered.",
       "review_older_edit": "Review older edit {index}",
       "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
       "export_device_recovery": "Export saved device data and recovery copies",

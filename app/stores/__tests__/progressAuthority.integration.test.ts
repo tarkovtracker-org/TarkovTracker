@@ -290,6 +290,110 @@ describe('native progress authority integration', () => {
     expect(await a.removeOwnedProgressRecovery('a')).toEqual({ complete: false, released: false });
     expect((await a.readCommittedProgressAuthority()).raw).toBe(raw);
   });
+  it('reads existing archives at quota without putting and includes owned pending overflow in export', async () => {
+    const original = JSON.stringify({ _userId: 'a', data: {} });
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    const a = await open('a');
+    const pending = JSON.stringify({ _userId: 'a', data: { level: 25 } });
+    localStorage.setItem(STORAGE_KEYS.progress, pending);
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const record = await a.readCommittedProgressAuthority(false);
+    expect(put).not.toHaveBeenCalled();
+    expect(a.exportableLegacyUpdates(record, 'a')).toEqual([pending]);
+    expect(a.exportableLegacyUpdates(record, 'b')).toEqual([]);
+    put.mockRestore();
+    await a.discardExportedLegacyProgress('a', [pending]);
+    expect(await a.readCommittedProgressAuthority()).toMatchObject({
+      raw: original,
+      legacyRaw: original,
+      lastLegacyRaw: pending,
+      legacyRecoveryOverflow: false,
+    });
+    expect((await a.readCommittedProgressAuthority()).legacyUpdates ?? []).toEqual([]);
+  });
+  it('exports captured copies when legacy storage is blocked and keeps unexported pending edits', async () => {
+    const original = JSON.stringify({ _userId: 'a', data: { level: 1 } });
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    const a = await open('a');
+    const captured = JSON.stringify({ _userId: 'a', data: { level: 20 } });
+    localStorage.setItem(STORAGE_KEYS.progress, captured);
+    await a.refreshProgressAuthority();
+    const pending = JSON.stringify({ _userId: 'a', data: { level: 25 } });
+    localStorage.setItem(STORAGE_KEYS.progress, pending);
+    const record = await a.readCommittedProgressAuthority(false);
+    const read = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    expect(a.exportableLegacyUpdates(record, 'a')).toEqual([captured]);
+    read.mockRestore();
+    await a.discardExportedLegacyProgress('a', [captured]);
+    expect((await a.readCommittedProgressAuthority(false)).lastLegacyRaw).toBe(captured);
+    expect((await a.readCommittedProgressAuthority()).legacyUpdates).toEqual([pending]);
+  });
+  it('clears a fresh-account retained failure only after a later native commit', async () => {
+    const a = await open('a');
+    a.configureProgressSession(() => 'a');
+    const storage = await import('@/stores/tarkov/localStorage');
+    const { defaultState } = await import('@/stores/progressState');
+    const status = await import('@/stores/tarkov/progressSaveStatus');
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (_name: unknown, _options: unknown, callback: () => unknown) => callback(),
+      },
+    });
+    storage.setActiveProgressRetentionGuard(() => true);
+    const state = structuredClone(defaultState);
+    state.pvp.level = 20;
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    expect(
+      await storage.persistActiveProgressValue(
+        storage.progressStorageSerializer.serialize(state, 'a', 200)
+      )
+    ).toBe(false);
+    expect(a.readAuthoritativeProgress()).toBeNull();
+    expect(status.progressSaveStatus.local).toBe('failed');
+    put.mockRestore();
+    state.pvp.level = 23;
+    const nativePut = IDBObjectStore.prototype.put;
+    const abort = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      const request = nativePut.apply(this, args);
+      request.addEventListener('success', () => this.transaction.abort());
+      return request;
+    });
+    expect(
+      await storage.persistActiveProgressValue(
+        storage.progressStorageSerializer.serialize(state, 'a', 250)
+      )
+    ).toBe(false);
+    expect(a.readAuthoritativeProgress()).toBeNull();
+    expect(status.progressSaveStatus.local).toBe('failed');
+    abort.mockRestore();
+    state.pvp.level = 25;
+    expect(
+      await storage.persistActiveProgressValue(
+        storage.progressStorageSerializer.serialize(state, 'a', 300)
+      )
+    ).toBe(true);
+    expect(status.progressSaveStatus.local).toBe('saved');
+    state.pvp.xpOffset = 50;
+    expect(
+      await storage.persistActiveProgressValue(
+        storage.progressStorageSerializer.serialize(state, 'a', 400)
+      )
+    ).toBe(true);
+    expect(
+      storage.parsePersistedProgressState((await a.readCommittedProgressAuthority(false)).raw, 'a')!
+        .state.pvp
+    ).toMatchObject({ level: 25, xpOffset: 50 });
+    expect(status.progressSaveStatus.local).toBe('saved');
+  });
   it('rebases each concurrent runtime mutation on the committed envelope', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ pvp: 20, pve: 42 }));
     const a = await open();

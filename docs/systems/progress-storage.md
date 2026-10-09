@@ -325,7 +325,7 @@ Saved and memory adoption follow transaction completion, and account generations
 callbacks while same-owner tabs share their generation. Failed account intent survives retry.
 
 Existing localStorage progress keys remain available to older clients. Their later edits are
-retained as recovery copies, with preview and export in Settings. Explicit export-and-clear removes
+retained as recovery copies, with preview and export in Settings. Capture has a count/size cap and reports overflow without evicting retained copies; export includes the latest uncaptured owned edit and reads committed data without writes. Explicit export-and-clear removes
 only owned copies included in that archive; explicit device removal checks committed active data
 inside the native transaction. Unknown ownership remains quarantined and reports incomplete removal.
 See the [browser authority checkpoint](../decision-browser-progress.md#1092-runtime-integration-contract)

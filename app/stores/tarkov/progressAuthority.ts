@@ -12,6 +12,7 @@ let token: ProgressOwnerToken | undefined;
 let accepted: ActiveProgressRecord | undefined;
 let draft: Draft | undefined;
 export const legacyProgressRecoveryCount = ref(0);
+export const legacyProgressRecoveryOverflow = ref(false);
 let announcements: BroadcastChannel | undefined;
 let activationRevision = 0;
 let readSessionOwner: (() => string | null) | undefined;
@@ -50,8 +51,30 @@ export const ownedLegacyUpdates = (record: ActiveProgressRecord, owner: string |
   (record.legacyUpdates ?? []).filter((raw): raw is string => isOwnedProgressRecovery(raw, owner));
 const legacySource = (): string | null =>
   localStorage.getItem(STORAGE_KEYS.progress) ?? localStorage.getItem('progress');
+const readPendingLegacySource = (): string | null => {
+  try {
+    return legacySource();
+  } catch {
+    return null;
+  }
+};
+const isExportablePendingLegacy = (
+  record: ActiveProgressRecord,
+  raw: string | null,
+  owner: string | null
+): raw is string => isOwnedProgressRecovery(raw, owner) && raw !== record.legacyRaw;
+export const exportableLegacyUpdates = (
+  record: ActiveProgressRecord,
+  owner: string | null
+): string[] => {
+  const captured = ownedLegacyUpdates(record, owner);
+  const pending = readPendingLegacySource();
+  if (!isExportablePendingLegacy(record, pending, owner)) return captured;
+  return [...new Set([...captured, pending])];
+};
 const acceptAuthority = (record: ActiveProgressRecord): void => {
   accepted = record;
+  legacyProgressRecoveryOverflow.value = record.legacyRecoveryOverflow === true;
   legacyProgressRecoveryCount.value = ownedLegacyUpdates(record, token?.owner ?? null).length;
 };
 export const refreshProgressAuthority = async (source = legacySource): Promise<void> => {
@@ -169,9 +192,11 @@ export const commitProgressMutation = async (
     throw error;
   }
 };
-export const readCommittedProgressAuthority = async (): Promise<ActiveProgressRecord> => {
+export const readCommittedProgressAuthority = async (
+  observeLegacy = true
+): Promise<ActiveProgressRecord> => {
   if (!token) throw new DOMException('Progress authority is not hydrated', 'InvalidStateError');
-  return (await openRepository()).read(structuredClone(token), legacySource);
+  return (await openRepository()).read(structuredClone(token), observeLegacy ? legacySource : null);
 };
 /** Explicit device removal also covers the immutable import and older-tab recovery copies. */
 export const removeOwnedProgressRecovery = async (
@@ -208,6 +233,11 @@ export const removeOwnedProgressRecovery = async (
   acceptAuthority(receipt.committed);
   return { complete, released: receipt.result };
 };
+const isExportedPendingLegacy = (
+  raw: string | null,
+  owner: string | null,
+  exported: Set<string>
+): boolean => isOwnedProgressRecovery(raw, owner) && exported.has(raw);
 /** Explicit cleanup removes only snapshots included in the completed export. */
 export const discardExportedLegacyProgress = async (
   owner: string | null,
@@ -219,6 +249,7 @@ export const discardExportedLegacyProgress = async (
   const isCurrent = () =>
     token?.generation === request.generation && (!readSessionOwner || readSessionOwner() === owner);
   const exported = new Set(copies);
+  const pending = readPendingLegacySource();
   const keep = (raw: string | null) => !isOwnedProgressRecovery(raw, owner) || !exported.has(raw);
   const receipt = await (
     await openRepository()
@@ -229,6 +260,10 @@ export const discardExportedLegacyProgress = async (
       result: true,
       recovery: {
         legacyRaw: current.legacyRaw,
+        legacyRecoveryOverflow: false,
+        lastLegacyRaw: isExportedPendingLegacy(pending, owner, exported)
+          ? pending
+          : current.lastLegacyRaw,
         legacyUpdates: (current.legacyUpdates ?? []).filter(keep),
       },
     };

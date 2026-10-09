@@ -1558,6 +1558,46 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it('migrates a pre-mode flat recovery archive into preview without applying it', async () => {
+    const flat = { ...tarkovStore.$state.pvp, gameEdition: 2, level: 36 };
+    const backup = useDataBackup();
+    const before = JSON.stringify(tarkovStore.$state);
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: JSON.stringify(flat),
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.importPreview.value?.pvp.level).toBe(36);
+    expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+  });
+  it('migrates an owned flat older-tab snapshot without applying it', async () => {
+    const raw = JSON.stringify({
+      _userId: 'user-123',
+      data: { ...tarkovStore.$state.pvp, level: 37 },
+    });
+    const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockResolvedValue({
+      version: 1,
+      revision: 1,
+      raw: null,
+      legacyRaw: null,
+      legacyUpdates: [raw],
+    });
+    const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+    try {
+      const backup = useDataBackup();
+      await backup.reviewOlderTabProgress(0);
+      expect(backup.importState.value).toBe('preview');
+      expect(backup.importPreview.value?.pvp.level).toBe(37);
+    } finally {
+      read.mockRestore();
+      owned.mockRestore();
+    }
+  });
   it.each([false, true])(
     'clears exported copies only after download starts (download failure: %s)',
     async (fails) => {
@@ -1569,7 +1609,7 @@ describe('older-tab recovery review', () => {
         legacyRaw: raw,
         legacyUpdates: [raw],
       });
-      const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+      const owned = vi.spyOn(progressAuthority, 'exportableLegacyUpdates').mockReturnValue([raw]);
       const clear = vi
         .spyOn(progressAuthority, 'discardExportedLegacyProgress')
         .mockResolvedValue();
@@ -1588,6 +1628,8 @@ describe('older-tab recovery review', () => {
           expect(clear).not.toHaveBeenCalled();
         } else {
           await exportResult;
+          expect(read).toHaveBeenCalledWith(false);
+          expect(owned).toHaveBeenCalledWith(expect.any(Object), 'user-123');
           expect(click).toHaveBeenCalledOnce();
           expect(clear).toHaveBeenCalledWith('user-123', [raw]);
           expect(click.mock.invocationCallOrder[0]).toBeLessThan(

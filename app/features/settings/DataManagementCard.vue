@@ -753,6 +753,13 @@
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
           <div class="bg-surface-900/80 space-y-2 rounded-md border border-white/10 p-3">
+            <p
+              v-if="legacyProgressRecoveryOverflow"
+              class="text-warning-300 text-sm"
+              data-testid="older-tab-recovery-overflow"
+            >
+              {{ $t('settings.data_management.older_tab_recovery_full') }}
+            </p>
             <p v-if="legacyProgressRecoveryCount" class="text-warning-300 text-sm">
               {{
                 $t('settings.data_management.older_tab_recovery_available', {
@@ -780,7 +787,10 @@
               {{ $t('settings.data_management.export_device_recovery') }}
             </UButton>
             <UButton
-              v-if="legacyProgressRecoveryCount && !confirmRecoveryCleanup"
+              v-if="
+                (legacyProgressRecoveryCount || legacyProgressRecoveryOverflow) &&
+                !confirmRecoveryCleanup
+              "
               color="neutral"
               variant="soft"
               data-testid="older-tab-cleanup"
@@ -1120,6 +1130,7 @@
     exportDeviceProgressRecovery,
     reviewOlderTabProgress,
     legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow,
     exportError: backupExportError,
     exportDebugSnapshot,
     debugExportError,

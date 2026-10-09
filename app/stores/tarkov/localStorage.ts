@@ -1380,9 +1380,22 @@ const applyAccountProgressWrite = (request: ProgressWriteRequest): StorageWriteR
   const owner = parseUserScopedStorage<unknown>(request.value)?._userId ?? null;
   const incoming = parsePersistedProgressState(request.value, owner);
   const current = parsePersistedProgressState(readAuthoritativeProgress(), owner);
-  if (!request.source || !incoming || !current)
-    return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
+  if (!request.source || !incoming || !current) return commitDirectAccountProgressWrite(request);
   return commitAccountProgressWrite(request, current, incoming);
+};
+const commitDirectAccountProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+  const result = writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
+  if (result.ok && request.source) {
+    const key = request.source.key;
+    afterProgressCommit(() => clearMatchingAccountFailure(key, request.value));
+  }
+  return result;
+};
+const clearMatchingAccountFailure = (key: object, value: string): void => {
+  const failure = retainedAccountFailures.get(key);
+  if (!failure) return;
+  if (failure.intent.after.storedUserId !== parseUserScopedStorage(value)?._userId) return;
+  retainedAccountFailures.delete(key);
 };
 const acceptedAccountWriteBaseline = (
   request: ProgressWriteRequest,

@@ -6,7 +6,7 @@ native boundary investigation and the #1092 runtime integration. The application
 transactional active-envelope repository; the earlier typed substrate remains available for tests. Issue #1091's preserved
 reset implementation remains separate, and draft #1086 must retain its cached-client hold.
 
-## Verified source and native boundary evidence
+## Historical investigation and native boundary evidence
 
 Source audit base: main `abb4e9b1a8abb9fa0f8807a909d009926db8c236` on 2026-10-06. Root
 `AGENTS.md` and `supabase/AGENTS.md` apply; no `.agents` directory exists at this revision. Open
@@ -84,7 +84,7 @@ The race is timing-sensitive, not a deterministic claim. Focused decoder tests c
 missing optionals and competing queued revision-CAS writes. Trial counts outside 1–1000 are
 rejected before browser launch.
 
-The inactive substrate stores session control and owner-scoped progress in one object store.
+At the original checkpoint, the inactive typed substrate stored session control and owner-scoped progress in one object store.
 Native readwrite transactions serialize the session check, latest-record read, revision check
 and replacement. A transaction result resolves only on `complete`, never on put-request
 success. `abort`, quota and unavailable errors leave revision/state unchanged and propagate to
@@ -115,7 +115,7 @@ known map/history entries and present optionals, and allows missing optionals wi
 Malformed known fields are rejected even when opaque extensions are retained. Revision zero is
 empty-only. Dictionaries must be plain records; Map/Date values are rejected and retained.
 Existing coercive sanitizers are unsuitable for this retain-and-reject boundary.
-Recovery/export UI remains an integration gate. Conflict retry must never just increment `expectedRevision` on a stale
+At that checkpoint, recovery/export UI remained an integration gate; the runtime bridge below now provides it. Conflict retry must never just increment `expectedRevision` on a stale
 envelope: reread accepted state and reapply the original intent.
 
 An owner token includes a persisted generation. A transition A to B to A invalidates old A
@@ -137,9 +137,9 @@ commit; a queued undo still applies after that prefix. Conditional remote acknow
 the expected snapshot inside the transaction. Memory adoption and Saved acknowledgement remain
 deferred until commit completion.
 
-The substrate does not yet own serializer baselines, field-level intent reconstruction, recovery
-archives, cloud acknowledgements, startup UI, or network operations. Those remain integration
-gates. Unsupported/newer database versions, blocked upgrade, versionchange and unavailable
+The original typed substrate did not own serializer baselines, field-level intent reconstruction, recovery
+archives, cloud acknowledgements, startup UI, or network operations. The runtime integration below
+now owns browser authority and recovery; cloud retirement remains separate. Unsupported/newer database versions, blocked upgrade, versionchange and unavailable
 storage must become visible unavailable/pending states with no silent old-key fallback.
 
 ## Recommended coexistence and recovery policy
@@ -231,17 +231,15 @@ prove cached clients stopped writing. Legacy deletion or server rejection remain
 authorized action. #1086's cached-client hold concerns its own database retirement and is not
 released by this browser bridge.
 
-## Rollback and remaining acceptance
+## Historical rollback requirements and remaining acceptance
 
 Untouched legacy snapshots cannot restore changes committed only to IDB. Before old-code
 rollback, a new-aware exporter must read committed owner/mode records and retained recovery
 material, produce a validated native backup with original season targeting, and verify its
 round trip through the supported importer. A schema-compatible repair deployment that can
-still read IDB is safer than deploying code that ignores it. No tested rollback exporter exists
-in this stage; rollback is an integration gate.
+still read IDB is safer than deploying code that ignores it. At the original substrate checkpoint, no tested rollback exporter existed. The runtime bridge now exports exact committed device data and retained recovery bytes, with archive-import preview validation.
 
-The next PR should integrate the agreed surface coherently rather than a sequence of partial
-authority switches. Its acceptance must use actual app stores in separate native renderers:
+The original checkpoint required the runtime bridge to integrate the agreed surface coherently. Its acceptance must use actual app stores in separate native renderers:
 immediate write/release in both orders, ordinary edits, first save, same-time scalar changes,
 selected/all resets and unrelated mode reload, reset epoch adoption followed by a valid edit,
 put-success then transaction abort, quota/unavailable/blocked/newer-version failures,
@@ -281,8 +279,7 @@ and an offline local server at `PROGRESS_APP_URL` (default localhost:3102). Its 
 separate renderer processes, held/pending native locks, both write/reset orders, reload, quota
 failure/retry, recovery export and explicit preview without adoption. Repository integration tests
 cover transaction abort, account generations, blocked storage and corrupt/newer logical records.
-Signed-in browser behavior and server compatibility retirement remain outside this guest browser
-receipt; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
+That guest receipt does not cover signed-in behavior or server compatibility retirement. Separate signed-in native-browser acceptance covers A/B/A login and reload, same-owner two-tab edits, a queued stale activation, and an actual delayed cloud save response across an account switch. Server compatibility retirement remains outside this change; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
 import/recovery copies, retaining unattributable bytes and reporting incomplete removal.
 
-Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the completed export are removed. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted.
+Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the completed export are removed. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted. Recovery capture is capped at 20 snapshots and 5 Mi UTF-16 characters; overflow leaves current saved progress and existing copies untouched, and Settings reports it. Export includes the latest uncaptured owned legacy bytes and uses a read without writes, so capture quota failures do not prevent archive export.
