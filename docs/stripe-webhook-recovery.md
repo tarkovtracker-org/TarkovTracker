@@ -48,8 +48,16 @@ The successful `checkout.session.completed` (paid) or `checkout.session.async_pa
 event's `created` timestamp decides the October 7, 2026 UTC cutoff, including late retries. Session
 creation time does not decide grandfathering. Earlier payments and existing active open-ended
 one-time rows retain unlimited access; new payments add one 30-day period per $4 (minimum one,
-maximum twelve per payment) to remaining active one-time time. Active/past-due subscriptions keep
-their subscription fields. Smaller contributions preserve a higher existing active one-time tier;
+maximum twelve per payment) to remaining active one-time time. During subscription access,
+one-time time is banked in `one_time_remaining` instead of counting down. Starting a subscription
+pauses the unused balance; additional payments stack onto it. Subscription end resumes the balance
+from the actual end timestamp (including delayed webhook delivery), using `one_time_expires_at`.
+The bank owns its paid tier independently of the subscription tier; unlimited grandfathered credit
+stays unlimited. Refund/chargeback revocation clears the balance. The migration captures existing
+one-time rows lazily; it does not reconstruct credit already lost before rollout. Active/past-due
+subscriptions with current access keep their subscription fields. During deployment, credit-bearing
+webhook writes require `x-supporter-credit-version: 1`; older handlers fail for retry until the new
+handler is deployed, preventing inconsistent refund or Discord role effects. Smaller contributions preserve a higher existing active one-time tier;
 expired access restarts at the newly purchased tier. Database lookup or fulfillment errors fail the event for retry;
 there is no fallback upsert that replaces previously purchased time.
 
@@ -139,3 +147,52 @@ retry driver and adds the database fence necessary for safe lease replacement.
 The app checks a reactive clock every second, and on focus, pageshow and visibility changes,
 so open supporter pages and badges reflect expiry without needing a database event. Server quota
 checks remain authoritative.
+
+The credit rollout also fences event completion: `finish_stripe_event` accepts a completed
+outcome only from clients sending `x-supporter-credit-version: 1`. Older deployed handlers
+can still fail/release an event, but cannot permanently acknowledge a refund they skipped.
+Recovery tooling that completes an event must use the current header. The read-only
+`supporter_entitlements` view projects prepaid access after subscription grace expires,
+including when no further Stripe event arrives; its underlying supporter RLS still applies.
+
+The legacy production API gateway mirrors the entitlement reader from
+[TarkovTracker-API PR #4](https://github.com/tarkovtracker-org/TarkovTracker-API/pull/4)
+(commit `d46e7df5457e5d9e008271a66d6617257bd1bb91`). It bounds paid-tier cache lifetime at
+entitlement expiry. Only a missing-view `404/PGRST205` permits the existing table read during
+schema rollout. The progress-contracts release remains v0.1.0; no pure rules changed.
+
+For pre-ledger lifetime refunds, the current handler verifies all remaining valid pre-cutoff
+one-time charges and their Checkout Session tiers before reconciling the legacy bank.
+Subscription charges do not qualify. Missing history, incomplete pagination or missing checkout
+evidence causes a retry; a verified empty lifetime history clears legacy credit while preserving
+current subscription access and independently recorded prepaid days.
+
+Full refunds of finite one-time payments use the same atomic receipt ledger while credit is
+paused and after it resumes. The current unspent tail is allocated newest payment first;
+refunding a spent payment removes no other payment's days. Refunds retain the highest remaining
+paid tier, and ordinary payments added after resumption use their original finite duration when
+no paused receipt allocation exists. Partial monetary refunds keep the existing entitlement.
+Refund receipts fence later checkout delivery and replay. When running credit is exhausted,
+the handler verifies remaining Stripe contributions before clearing retained Supporter history;
+unavailable history retries, and refunded subscription invoices cannot revoke independent credit.
+
+Subscription recovery re-banks only the unused tail after read-time grace expiry, preventing previously used prepaid days from being granted again.
+
+Ordinary subscription invoice refunds and rejected new payment grants preserve independently
+paid one-time credit and retained history. The handler reads the effective entitlement before
+revocation so already used days after grace are not restored, resumes a live subscription's bank
+from revocation time, and reconciles Discord roles from the resulting entitlement. Chargeback
+and disqualification still clear all credit. Untouched pre-migration one-time rows without credit
+metadata continue through ordinary refund revocation rather than the bank refund RPC.
+
+The original pre-ledger lifetime tier is captured in `one_time_legacy_tier` before modern
+upgrades merge into the effective tier. Refunding a modern upgrade preserves that original
+lifetime grant and the highest remaining receipt tier; it does not infer its absence from
+current-customer Stripe history or fabricate a payment receipt. Already overwritten historical
+tiers cannot be reconstructed from missing provenance and keep their existing lifetime tier.
+The existing bounded verification policy still applies to refunds of pre-cutoff payments.
+Before a delayed lifetime grant discards a finite expiry, its actual unused time is allocated
+to finite receipts using the same newest-first rule as subscription pauses. Refunding the
+lifetime payment then restores only those unused days, including zero for exhausted receipts.
+
+Billing controls use the raw subscription identity and status independently of projected prepaid access. A past-due subscriber using banked days can still manage the existing subscription. If a revocation read crosses grace expiry, the write retains that original deadline; the database trigger resumes only the unused bank or clears spent credit under its row lock.

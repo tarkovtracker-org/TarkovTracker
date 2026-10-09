@@ -854,7 +854,7 @@
       "one_time_give_cta": "Give {total}",
       "one_time_login_cta": "Log in to contribute",
       "one_time_net_note": "{net} reaches us after fees",
-      "one_time_perks_heading": "Includes supporter perks for 30 days per $4, up to one year",
+      "one_time_perks_heading": "Includes supporter perks for 30 days per $4, up to one year per payment. Days pause during a subscription and start after it ends.",
       "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
       "perk_api_rate_limit": "Higher daily API read and write quotas",
       "perk_subscription_retention": "Exempt from routine inactivity cleanup while a qualifying subscription is active",

@@ -18,6 +18,8 @@ const charge = {
   amount_refunded: 100,
   refunded: true,
   disputed: false,
+  payment_intent: 'pi_new',
+  created: Math.floor(new Date(contributionAt).getTime() / 1000),
 };
 const priorCharge = { ...charge, id: 'ch_prior', amount_refunded: 0, refunded: false };
 const source = readFileSync(new URL('../stripe-webhook/index.ts', import.meta.url), 'utf8');
@@ -36,12 +38,17 @@ function createHarness(
     remove?: () => Promise<void>;
     readError?: string;
     fulfillmentError?: string;
+    refundError?: string;
+    refundResult?: Row;
+    entitlementResult?: Row;
     fulfillmentReplay?: boolean;
+    writeResult?: Row;
   } = {}
 ) {
   let row: Row = { ...initial };
   const writes: Row[] = [];
   const fulfillmentCalls: Row[] = [];
+  const refundCalls: Row[] = [];
   const roles = new Set<string>();
   const from = (table: string) => {
     let values: Row | null = null;
@@ -51,14 +58,23 @@ function createHarness(
       if (table === 'discord_account_links' && options.discord) {
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
-      if (table !== 'supporters') return { data: null, error: null };
+      if (!['supporters', 'supporter_entitlements'].includes(table))
+        return { data: null, error: null };
       if (options.readError) return { data: null, error: { message: options.readError } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
-        row = { ...row, ...values, updated_at: `revision_${writes.length}` };
+        row = {
+          ...row,
+          ...values,
+          updated_at: `revision_${writes.length}`,
+          ...options.writeResult,
+        };
       }
-      return { data: { ...row }, error: null };
+      return {
+        data: { ...row, ...(table === 'supporter_entitlements' ? options.entitlementResult : {}) },
+        error: null,
+      };
     };
     const builder = {
       select: () => builder,
@@ -101,6 +117,13 @@ function createHarness(
           createClient: () => ({
             from,
             rpc: (name: string, params: Row) => {
+              if (name === 'refund_one_time_supporter') {
+                refundCalls.push(params);
+                if (options.refundError)
+                  return Promise.resolve({ data: null, error: { message: options.refundError } });
+                row = { ...row, ...options.refundResult };
+                return Promise.resolve({ data: row, error: null });
+              }
               if (name === 'fulfill_one_time_supporter') {
                 fulfillmentCalls.push(params);
                 if (options.fulfillmentError)
@@ -168,6 +191,7 @@ function createHarness(
     current: () => row,
     writes,
     fulfillmentCalls,
+    refundCalls,
     fetch,
     roles,
   };
@@ -494,6 +518,51 @@ describe('webhook Discord chargeback fencing', () => {
     ).resolves.toBeUndefined();
     expect(harness.current().has_ever_supported).toBe(false);
   });
+});
+describe('independent one-time credit after subscription end', () => {
+  it.each(['customer.subscription.deleted', 'customer.subscription.updated'])(
+    'syncs the database-restored entitlement after %s',
+    async (type) => {
+      const expiry = new Date(Date.now() + 86400000).toISOString();
+      const resources = {
+        ...resourcesForPayments(),
+        '/subscriptions/sub_1': { ...subscription, status: 'canceled' },
+      };
+      const harness = createHarness(
+        {
+          ...supporter,
+          type: 'subscription',
+          status: 'active',
+          tier: 'chad',
+          stripe_subscription_id: 'sub_1',
+          discord_user_id: 'discord_1',
+          one_time_tier: 'scav',
+          one_time_expires_at: null,
+          one_time_remaining: '1 day',
+        },
+        resources,
+        {
+          discord: true,
+          writeResult: {
+            type: 'one_time',
+            status: 'active',
+            tier: 'scav',
+            expires_at: expiry,
+            stripe_subscription_id: null,
+          },
+        }
+      );
+      harness.roles.add('supporter');
+      await harness.dispatch(type, subscription);
+      expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+      expect(harness.current()).toMatchObject({
+        type: 'one_time',
+        status: 'active',
+        tier: 'scav',
+        expires_at: expiry,
+      });
+    }
+  );
 });
 describe('subscription grace contribution fence', () => {
   it.each(['customer.subscription.updated', 'invoice.payment_failed'])(
@@ -850,4 +919,401 @@ describe('rejected guest checkout retained history', () => {
     expect(harness.current()).toMatchObject({ status: 'cancelled', has_ever_supported: false });
     expect(harness.roles.size).toBe(0);
   });
+});
+describe('one-time refunds during a subscription', () => {
+  const subscribed = {
+    ...supporter,
+    type: 'subscription',
+    status: 'active',
+    tier: 'chad',
+    stripe_subscription_id: 'sub_1',
+    one_time_tier: 'scav',
+    one_time_remaining: '60 days',
+  };
+  it('routes the payment refund to the bank RPC while preserving subscription access', async () => {
+    const harness = createHarness(subscribed, {}, { discord: true });
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls).toEqual([
+      { p_payment_id: 'pi_new', p_user_id: userId, p_paid_at: contributionAt, p_amount: 100 },
+    ]);
+    expect(harness.current()).toMatchObject({
+      type: 'subscription',
+      status: 'active',
+      tier: 'chad',
+      stripe_subscription_id: 'sub_1',
+      one_time_tier: 'scav',
+      one_time_remaining: '60 days',
+    });
+    expect(
+      harness.writes.every((write) => !('status' in write) && !('one_time_remaining' in write))
+    ).toBe(true);
+    expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+  });
+  it.each([0, 1])(
+    'preserves paid bank and Discord roles when the current invoice is refunded with %s other Stripe contributions',
+    async (count) => {
+      const harness = createHarness(
+        subscribed,
+        {
+          '/invoices/in_new': { subscription: 'sub_1' },
+          '/charges?customer=cus_1&limit=100': {
+            data: count ? [priorCharge] : [charge],
+            has_more: false,
+          },
+        },
+        {
+          discord: true,
+          writeResult: {
+            type: 'one_time',
+            status: 'active',
+            tier: 'scav',
+            expires_at: '2100-01-01T00:00:00Z',
+            one_time_expires_at: '2100-01-01T00:00:00Z',
+            one_time_remaining: null,
+          },
+        }
+      );
+      await harness.dispatch('charge.refunded', {
+        ...charge,
+        customer: 'cus_1',
+        invoice: 'in_new',
+      });
+      expect(harness.writes[0]).toMatchObject({ has_ever_supported: true });
+      expect(harness.writes[0]).not.toHaveProperty('one_time_tier');
+      expect(harness.writes[0]).not.toHaveProperty('one_time_remaining');
+      expect(harness.current()).toMatchObject({ one_time_tier: 'scav', has_ever_supported: true });
+      expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+    }
+  );
+  it('preserves running credit when a different subscription checkout is rejected', async () => {
+    const running = {
+      ...subscribed,
+      type: 'one_time',
+      stripe_subscription_id: null,
+      one_time_remaining: null,
+      tier: 'scav',
+      expires_at: '2100-01-01T00:00:00Z',
+      one_time_expires_at: '2100-01-01T00:00:00Z',
+    };
+    const harness = createHarness(running, resourcesForPayments(), { discord: true });
+    await harness.dispatch('checkout.session.completed', {
+      ...session,
+      mode: 'subscription',
+      subscription: 'sub_1',
+      invoice: 'in_new',
+    });
+    expect(harness.current()).toMatchObject({ ...running, updated_at: expect.any(String) });
+    expect(harness.current().has_ever_supported).toBe(true);
+    expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+  });
+  it('preserves only projected unspent credit when a subscription invoice is refunded after grace', async () => {
+    const resumedExpiry = new Date(Date.now() + 50 * 86400000).toISOString();
+    const harness = createHarness(
+      {
+        ...subscribed,
+        status: 'past_due',
+        expires_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+      },
+      {
+        '/invoices/in_new': { subscription: 'sub_1' },
+        '/charges?customer=cus_1&limit=100': { data: [charge, priorCharge], has_more: false },
+      },
+      {
+        entitlementResult: {
+          type: 'one_time',
+          status: 'active',
+          tier: 'scav',
+          expires_at: resumedExpiry,
+        },
+      }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_new' });
+    expect(harness.current()).toMatchObject({
+      type: 'one_time',
+      status: 'active',
+      tier: 'scav',
+      expires_at: resumedExpiry,
+      one_time_remaining: null,
+      one_time_expires_at: resumedExpiry,
+    });
+  });
+  it('preserves a pre-grace entitlement snapshot delivered after the grace deadline', async () => {
+    const deadline = new Date(Date.now() - 1).toISOString();
+    const harness = createHarness(
+      { ...subscribed, status: 'past_due', expires_at: deadline },
+      {
+        '/invoices/in_new': { subscription: 'sub_1' },
+        '/charges?customer=cus_1&limit=100': { data: [charge, priorCharge], has_more: false },
+      },
+      { entitlementResult: { type: 'subscription', status: 'past_due', expires_at: deadline } }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_new' });
+    expect(harness.writes[0]).toMatchObject({ subscription_ended_at: deadline });
+    expect(harness.writes[0]).not.toHaveProperty('one_time_tier');
+    expect(harness.writes[0]).not.toHaveProperty('one_time_remaining');
+  });
+  it('leaves spent projected credit cleanup to the original database deadline', async () => {
+    const deadline = new Date(Date.now() - 61 * 86400000).toISOString();
+    const harness = createHarness(
+      {
+        ...subscribed,
+        status: 'past_due',
+        expires_at: deadline,
+      },
+      {
+        '/invoices/in_new': { subscription: 'sub_1' },
+        '/charges?customer=cus_1&limit=100': { data: [charge, priorCharge], has_more: false },
+      }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_new' });
+    expect(harness.writes[0]).toMatchObject({
+      status: 'expired',
+      subscription_ended_at: deadline,
+      has_ever_supported: true,
+    });
+    expect(Date.parse(String(harness.writes[0].subscription_ended_at))).toBeLessThan(
+      Date.now() - 60 * 86400000
+    );
+    expect(harness.writes[0]).not.toHaveProperty('one_time_remaining');
+  });
+  it('clears independent credit and Discord roles for a chargeback', async () => {
+    const resources = {
+      ...resourcesForPayments(),
+      '/charges/ch_new': { ...charge, customer: 'cus_1', metadata: { user_id: userId } },
+    };
+    const harness = createHarness(
+      {
+        ...subscribed,
+        one_time_remaining: null,
+        one_time_legacy_tier: 'scav',
+        one_time_legacy_unlimited: true,
+      },
+      resources,
+      { discord: true }
+    );
+    harness.roles.add('supporter');
+    harness.roles.add('tier');
+    await harness.dispatch('charge.dispute.created', { charge: 'ch_new', customer: 'cus_1' });
+    expect(harness.current()).toMatchObject({
+      one_time_tier: null,
+      one_time_legacy_tier: null,
+      one_time_legacy_unlimited: false,
+      one_time_remaining: null,
+      one_time_expires_at: null,
+      has_ever_supported: false,
+    });
+    expect(harness.roles.size).toBe(0);
+  });
+  it('uses ordinary revocation for an untouched pre-migration row instead of calling the bank refund RPC', async () => {
+    const harness = createHarness(
+      { ...supporter, type: 'one_time', status: 'active', tier: 'scav', one_time_tier: null },
+      {
+        '/charges?customer=cus_1&limit=100': { data: [charge], has_more: false },
+      }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls).toEqual([]);
+    expect(harness.current()).toMatchObject({
+      status: 'cancelled',
+      has_ever_supported: false,
+      tier: 'supporter',
+    });
+  });
+  it('routes resumed one-time credit through the same receipt-aware refund', async () => {
+    const running = {
+      ...subscribed,
+      type: 'one_time',
+      stripe_subscription_id: null,
+      one_time_remaining: null,
+      one_time_expires_at: '2026-11-01T00:00:00Z',
+    };
+    const harness = createHarness(running, {});
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls).toHaveLength(1);
+    expect(harness.writes).toEqual([]);
+  });
+  it.each([0, 1])(
+    'preserves verified contribution history after credit exhaustion with %s other payments',
+    async (count) => {
+      const harness = createHarness(
+        { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+        {
+          '/charges?customer=cus_1&limit=100': {
+            data: count ? [priorCharge] : [charge],
+            has_more: false,
+          },
+        },
+        {
+          refundResult: {
+            one_time_tier: null,
+            one_time_expires_at: null,
+            one_time_remaining: null,
+            status: 'expired',
+            tier: 'supporter',
+          },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.current().has_ever_supported).toBe(count > 0);
+      expect(harness.current().status).toBe(count ? 'expired' : 'cancelled');
+    }
+  );
+  it('defers exhausted credit history revocation when Stripe history is unavailable', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      {},
+      { refundResult: { one_time_tier: null, one_time_remaining: null } }
+    );
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Unable to verify refunded credit contribution history');
+    expect(harness.current().has_ever_supported).toBe(true);
+    expect(harness.writes).toEqual([]);
+  });
+  it('preserves running credit after a refund of an ended subscription invoice', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      { '/invoices/in_old': { subscription: 'sub_old' } }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_old' });
+    expect(harness.refundCalls).toEqual([]);
+    expect(harness.writes).toEqual([]);
+  });
+  it('preserves a subscription that starts before exhausted refund history is reconciled', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      {},
+      {
+        refundResult: {
+          type: 'subscription',
+          status: 'active',
+          stripe_subscription_id: 'sub_new',
+          one_time_tier: null,
+        },
+      }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.current().status).toBe('active');
+    expect(harness.writes).toEqual([]);
+  });
+  it('defers the event if bank refund persistence fails', async () => {
+    const harness = createHarness(subscribed, {}, { refundError: 'offline' });
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Failed to refund banked payment: offline');
+    expect(harness.current()).toMatchObject(subscribed);
+    expect(harness.writes).toEqual([]);
+  });
+  it('leaves the bank intact for partial refunds', async () => {
+    const harness = createHarness(subscribed, {});
+    await harness.dispatch('charge.refunded', {
+      ...charge,
+      customer: 'cus_1',
+      amount_refunded: 20,
+      refunded: false,
+    });
+    expect(harness.refundCalls).toEqual([]);
+  });
+});
+describe('pre-ledger lifetime refunds', () => {
+  const legacy = {
+    ...supporter,
+    type: 'subscription',
+    status: 'active',
+    tier: 'chad',
+    stripe_subscription_id: 'sub_1',
+    one_time_tier: 'chad',
+    one_time_remaining: null,
+    one_time_legacy_unlimited: true,
+  };
+  it.each(['subscription', 'one_time'])(
+    'preserves original unknown lifetime history for a modern refund of %s credit',
+    async (type) => {
+      const harness = createHarness(
+        {
+          ...legacy,
+          type,
+          stripe_subscription_id: type === 'subscription' ? 'sub_1' : null,
+          one_time_legacy_tier: 'scav',
+        },
+        {}
+      );
+      await harness.dispatch('charge.refunded', {
+        ...charge,
+        customer: 'cus_1',
+        invoice: null,
+        created: Date.parse('2026-10-07T12:00:00Z') / 1000,
+      });
+      expect(harness.refundCalls).toHaveLength(1);
+      expect(harness.refundCalls[0]).not.toHaveProperty('p_legacy_tier');
+      expect(harness.current()).toMatchObject({
+        one_time_legacy_tier: 'scav',
+        one_time_legacy_unlimited: true,
+        has_ever_supported: true,
+      });
+      expect(harness.fetch).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'passes only verified lifetime payment tier for %s credit',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': {
+            data: [charge, { ...priorCharge, payment_intent: 'pi_kept' }],
+            has_more: false,
+          },
+          '/checkout/sessions?payment_intent=pi_kept&limit=100': {
+            data: [{ metadata: { tier: 'scav' } }],
+            has_more: false,
+          },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: 'scav' });
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'clears %s legacy credit when no lifetime payment remains',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': { data: [charge], has_more: false },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: null });
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'defers %s legacy refunds when history is unavailable',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {}
+      );
+      await expect(
+        harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+      ).rejects.toThrow('Unable to verify legacy payment history');
+      expect(harness.refundCalls).toEqual([]);
+      expect(harness.writes).toEqual([]);
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'requires complete checkout evidence for %s legacy credit',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': { data: [priorCharge], has_more: false },
+        }
+      );
+      await expect(
+        harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+      ).rejects.toThrow('Unable to verify legacy checkout tier');
+      expect(harness.refundCalls).toEqual([]);
+    }
+  );
 });
