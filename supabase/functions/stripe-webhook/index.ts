@@ -1044,12 +1044,89 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
     );
   }
 }
+const clearedOneTimeCredit = {
+  one_time_tier: null,
+  one_time_expires_at: null,
+  one_time_remaining: null,
+  one_time_legacy_tier: null,
+  one_time_legacy_unlimited: false,
+};
+async function preservedCreditRevocationUpdates(
+  supporter: SupporterRow,
+  preserveCredit: boolean
+): Promise<Record<string, unknown>> {
+  if (!preserveCredit) return {};
+  const current = await findFreshRoleSupporter(supporter.user_id);
+  if (!current) throw new Error('Unable to read independent credit before revocation');
+  return preservedCreditAccess(current);
+}
+function preservedCreditAccess(current: SupporterRow): Record<string, unknown> {
+  if (current.type === 'one_time')
+    return {
+      type: 'one_time',
+      status: current.status,
+      tier: current.tier,
+      expires_at: current.expires_at,
+      one_time_expires_at: current.expires_at,
+      one_time_remaining: null,
+    };
+  if (current.expires_at && Date.parse(current.expires_at) <= Date.now())
+    return clearedOneTimeCredit;
+  return { subscription_ended_at: new Date().toISOString() };
+}
+async function syncRetainedCreditRoles(supporter: SupporterRow): Promise<void> {
+  const current = await findSupporterBy('user_id', supporter.user_id);
+  if (current)
+    await syncReconciledSubscriptionRoles(current, supporter, {
+      userId: supporter.user_id,
+      discordUserId: null,
+    });
+}
+async function syncRevokedSupporterRoles(
+  supporter: SupporterRow,
+  fullRevoke: boolean,
+  reason: string,
+  disqualifiedAt: string | null,
+  preserveCredit: boolean
+): Promise<void> {
+  if (preserveCredit) {
+    await syncRetainedCreditRoles(supporter);
+    return;
+  }
+  await removeRevokedSupporterRoles(supporter, fullRevoke, reason, disqualifiedAt);
+}
+async function removeRevokedSupporterRoles(
+  supporter: SupporterRow,
+  fullRevoke: boolean,
+  reason: string,
+  disqualifiedAt: string | null
+): Promise<void> {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (!discordUserId) return;
+  if (disqualifiedAt) {
+    await removeDeniedStripeRoles(discordUserId);
+    return;
+  }
+  await safeDiscordCall(
+    `remove tier roles (${reason})`,
+    { userId: supporter.user_id, discordUserId },
+    () => removeAllTierRoles(discordUserId)
+  );
+  if (fullRevoke) {
+    await safeDiscordCall(
+      `remove supporter role (${reason})`,
+      { userId: supporter.user_id, discordUserId },
+      () => removeSupporterRole(discordUserId)
+    );
+  }
+}
 /**
  * Revoke supporter access following a refund or chargeback.
  * - fullRevoke=true clears has_ever_supported and removes the base Supporter
  *   role (chargeback or refund with no remaining valid payment).
  * - fullRevoke=false keeps the base Supporter role and only drops tier roles
- *   (long-time supporter refunding latest charge).
+ *   (long-time supporter refunding latest charge). Independently paid credit
+ *   preserves its effective access, history, and roles for ordinary revocations.
  *
  * Uses an optimistic lock on `updated_at` so concurrent webhook events
  * (e.g., refund + new checkout arriving in parallel) can't flip-flop state.
@@ -1066,8 +1143,10 @@ async function revokeSupporter(
     reason === 'chargeback',
     new Date()
   );
+  const preserveCredit = !disqualifiedAt && Boolean(supporter.one_time_tier);
+  const creditUpdates = await preservedCreditRevocationUpdates(supporter, preserveCredit);
   const history = {
-    ...supporterRevocationEvidence(fullRevoke, disqualifiedAt),
+    ...supporterRevocationEvidence(fullRevoke && !preserveCredit, disqualifiedAt),
     ...(preserveHistoryVerification
       ? { retention_history_verified: supporter.retention_history_verified }
       : {}),
@@ -1092,9 +1171,8 @@ async function revokeSupporter(
     .update({
       ...updates,
       ...history,
-      one_time_tier: null,
-      one_time_expires_at: null,
-      one_time_remaining: null,
+      ...creditUpdates,
+      ...(disqualifiedAt ? clearedOneTimeCredit : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', supporter.user_id)
@@ -1109,24 +1187,7 @@ async function revokeSupporter(
     // retry if state still warrants revocation. Treat as transient.
     throw new Error(`Supporter row for ${supporter.user_id} changed during ${reason}; will retry`);
   }
-  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
-  if (!discordUserId) return;
-  if (disqualifiedAt) {
-    await removeDeniedStripeRoles(discordUserId);
-    return;
-  }
-  await safeDiscordCall(
-    `remove tier roles (${reason})`,
-    { userId: supporter.user_id, discordUserId },
-    () => removeAllTierRoles(discordUserId)
-  );
-  if (fullRevoke) {
-    await safeDiscordCall(
-      `remove supporter role (${reason})`,
-      { userId: supporter.user_id, discordUserId },
-      () => removeSupporterRole(discordUserId)
-    );
-  }
+  await syncRevokedSupporterRoles(supporter, fullRevoke, reason, disqualifiedAt, preserveCredit);
 }
 // deno-lint-ignore no-explicit-any
 async function handleChargeRefunded(charge: any): Promise<void> {
@@ -1287,12 +1348,7 @@ async function refundBankedPayment(supporter: SupporterRow, charge: any): Promis
     ...legacy,
   });
   if (error) throw new Error(`Failed to refund banked payment: ${error.message}`);
-  const current = await findSupporterBy('user_id', supporter.user_id);
-  if (current)
-    await syncReconciledSubscriptionRoles(current, supporter, {
-      userId: supporter.user_id,
-      discordUserId: null,
-    });
+  await syncRetainedCreditRoles(supporter);
 }
 /**
  * Resolve the customer for a dispute. `dispute.charge` is a charge ID string

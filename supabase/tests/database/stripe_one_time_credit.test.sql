@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,922) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,929) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -393,6 +393,122 @@ SELECT is((SELECT expires_at FROM public.supporter_entitlements
 SELECT ok((SELECT one_time_tier IS NULL AND NOT(status='active' AND (expires_at IS NULL OR expires_at>now()))
  FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000922'),
  'ending recovered subscription cannot resurrect fully spent projected credit');
+-- Ordinary subscription revocation preserves its independently purchased bank.
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id)
+VALUES ('00000000-0000-0000-0000-000000000923','subscription','active','chad','sub_invoice_refund');
+SELECT pg_temp.pay(923,'pi_invoice_refund_bank');
+UPDATE public.supporters SET status='expired',tier='supporter',expires_at=now(),subscription_ended_at=now(),
+ stripe_subscription_id=NULL,has_ever_supported=true,retention_history_verified=true
+ WHERE user_id='00000000-0000-0000-0000-000000000923';
+SELECT ok((SELECT type='one_time' AND status='active' AND tier='scav' AND one_time_tier='scav'
+ AND expires_at=now()+interval '30 days' AND one_time_remaining IS NULL AND has_ever_supported
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000923'),
+ 'ordinary subscription invoice refund resumes independently paid credit');
+-- Keep the original open-ended tier separate from modern upgrades, without inventing a receipt.
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+INSERT INTO public.supporters(user_id,type,status,tier,has_ever_supported,expires_at)
+VALUES ('00000000-0000-0000-0000-000000000924','one_time','active','scav',true,NULL),
+ ('00000000-0000-0000-0000-000000000925','one_time','active','scav',true,NULL);
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+SELECT public.fulfill_one_time_supporter('pi_original_upgrade','2026-10-07',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000924','tier','chad','amount_total',1200));
+SELECT public.refund_one_time_supporter('pi_original_upgrade','00000000-0000-0000-0000-000000000924','2026-10-07',1200);
+SELECT ok((SELECT tier='scav' AND expires_at IS NULL AND one_time_legacy_unlimited AND has_ever_supported
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000924'),
+ 'modern refund restores original unknown-provenance Scav lifetime without Stripe history');
+SELECT public.fulfill_one_time_supporter('pi_original_timmy','2026-10-07',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000924','tier','timmy','amount_total',800));
+SELECT public.fulfill_one_time_supporter('pi_original_chad_again','2026-10-07',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000924','tier','chad','amount_total',1200));
+SELECT public.refund_one_time_supporter('pi_original_chad_again','00000000-0000-0000-0000-000000000924','2026-10-07',1200);
+SELECT is((SELECT tier FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000924'),
+ 'timmy','original lifetime coexists with the highest remaining modern upgrade');
+SELECT public.refund_one_time_supporter('pi_original_timmy','00000000-0000-0000-0000-000000000924','2026-10-07',800);
+SELECT is((SELECT tier FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000924'),
+ 'scav','refunding all modern upgrades preserves only original lifetime tier');
+CREATE TEMP TABLE legacy_upgrade_snapshot AS SELECT to_jsonb(s) value FROM public.supporters s
+ WHERE user_id='00000000-0000-0000-0000-000000000924';
+SELECT is(to_jsonb(public.refund_one_time_supporter('pi_original_timmy',
+ '00000000-0000-0000-0000-000000000924','2026-10-07',800)),(SELECT value FROM legacy_upgrade_snapshot),
+ 'modern lifetime-upgrade refund replay preserves the complete current row');
+UPDATE public.supporters SET type='subscription',status='active',tier='chad',stripe_subscription_id='sub_original_tier'
+ WHERE user_id='00000000-0000-0000-0000-000000000925';
+SELECT public.fulfill_one_time_supporter('pi_original_paused_upgrade','2026-10-07',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000925','tier','chad','amount_total',1200));
+SELECT public.refund_one_time_supporter('pi_original_paused_upgrade','00000000-0000-0000-0000-000000000925','2026-10-07',1200);
+SELECT ok((SELECT tier='chad' AND one_time_tier='scav' AND one_time_legacy_unlimited
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000925'),
+ 'modern refund preserves original lifetime tier independently of live subscription');
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+ WHERE user_id='00000000-0000-0000-0000-000000000925';
+SELECT ok((SELECT type='one_time' AND tier='scav' AND expires_at IS NULL
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000925'),
+ 'subscription end restores original lifetime tier after modern refund');
+-- A delayed lifetime payment cannot erase how much finite time was already spent.
+SELECT pg_temp.pay(926,'pi_before_delayed_lifetime');
+UPDATE public.supporters SET expires_at=now()+interval '29 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000926';
+SELECT pg_temp.pay(926,'pi_delayed_lifetime','2026-10-06');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_before_delayed_lifetime'),
+ interval '29 days','lifetime transition banks actual remaining finite days before discarding expiry');
+SELECT public.refund_one_time_supporter('pi_delayed_lifetime','00000000-0000-0000-0000-000000000926','2026-10-06',400);
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000926'),
+ now()+interval '29 days','delayed lifetime refund restores twenty-nine finite days instead of thirty');
+CREATE TEMP TABLE delayed_lifetime_snapshot AS SELECT to_jsonb(s) value FROM public.supporters s
+ WHERE user_id='00000000-0000-0000-0000-000000000926';
+SELECT is(to_jsonb(public.refund_one_time_supporter('pi_delayed_lifetime',
+ '00000000-0000-0000-0000-000000000926','2026-10-06',400)),(SELECT value FROM delayed_lifetime_snapshot),
+ 'delayed lifetime refund replay cannot restore spent days');
+SELECT pg_temp.pay(927,'pi_delayed_stack_old');
+SELECT pg_temp.pay(927,'pi_delayed_stack_new');
+UPDATE public.supporters SET expires_at=now()+interval '20 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000927';
+SELECT pg_temp.pay(927,'pi_delayed_stack_lifetime','2026-10-06');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_delayed_stack_old'),
+ interval '0','lifetime transition records zero for a fully spent older receipt');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_delayed_stack_new'),
+ interval '20 days','lifetime transition allocates the actual unspent tail newest first');
+SELECT public.refund_one_time_supporter('pi_delayed_stack_lifetime','00000000-0000-0000-0000-000000000927','2026-10-06',400);
+SELECT public.refund_one_time_supporter('pi_delayed_stack_old','00000000-0000-0000-0000-000000000927','2026-10-07',400);
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000927'),
+ now()+interval '20 days','refunding a spent older receipt after lifetime refund preserves newer days');
+SELECT pg_temp.pay(928,'pi_delayed_exhausted_finite');
+UPDATE public.supporters SET expires_at=now()-interval '1 day'
+ WHERE user_id='00000000-0000-0000-0000-000000000928';
+SELECT pg_temp.pay(928,'pi_delayed_exhausted_lifetime','2026-10-06');
+SELECT public.refund_one_time_supporter('pi_delayed_exhausted_lifetime','00000000-0000-0000-0000-000000000928','2026-10-06',400);
+SELECT ok((SELECT one_time_tier IS NULL AND status='expired' AND expires_at<=now()
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000928'),
+ 'refunding delayed lifetime cannot resurrect an exhausted finite payment');
+SELECT pg_temp.pay(928,'pi_delayed_exhausted_lifetime','2026-10-06');
+SELECT ok((SELECT one_time_tier IS NULL AND status='expired' AND expires_at<=now()
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000928'),
+ 'refunded delayed lifetime checkout replay cannot resurrect access');
+SELECT pg_temp.pay(929,'pi_delayed_paused_finite');
+UPDATE public.supporters SET expires_at=now()+interval '17 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000929';
+UPDATE public.supporters SET type='subscription',status='active',tier='chad',expires_at=NULL,
+ stripe_subscription_id='sub_delayed_paused' WHERE user_id='00000000-0000-0000-0000-000000000929';
+SELECT pg_temp.pay(929,'pi_delayed_paused_lifetime','2026-10-06');
+SELECT public.refund_one_time_supporter('pi_delayed_paused_lifetime','00000000-0000-0000-0000-000000000929','2026-10-06',400);
+SELECT is((SELECT one_time_remaining FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000929'),
+ interval '17 days','delayed lifetime refund keeps actual finite balance paused during valid subscription');
+SELECT is((SELECT one_time_legacy_tier FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000924'),'scav',
+ 'original lifetime tier is durable after repeated modern upgrade refunds');
+SELECT is((SELECT count(*) FROM private.stripe_one_time_payments
+ WHERE user_id='00000000-0000-0000-0000-000000000924'),3::bigint,
+ 'unknown lifetime provenance is preserved without inventing a Stripe receipt');
+SELECT ok(NOT has_column_privilege('authenticated','public.supporters','one_time_legacy_tier','UPDATE'),
+ 'browser cannot change durable original lifetime tier');
+SELECT ok(NOT has_function_privilege('authenticated','private.allocate_one_time_credit(uuid,interval,text)','EXECUTE'),
+ 'browser cannot reallocate payment credit');
+SELECT ok(has_function_privilege('service_role','private.allocate_one_time_credit(uuid,interval,text)','EXECUTE'),
+ 'billing service can allocate credit inside supporter writes');
+SELECT public.disqualify_supporter_customer('cus_original_denial','00000000-0000-0000-0000-000000000924');
+SELECT ok((SELECT one_time_legacy_tier IS NULL AND NOT one_time_legacy_unlimited AND NOT has_ever_supported
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000924'),
+ 'chargeback clears durable lifetime provenance as well as current credit');
 CREATE FUNCTION pg_temp.entitlement_lookup_plan() RETURNS text LANGUAGE plpgsql AS $$
 DECLARE plan json;
 BEGIN

@@ -5,11 +5,14 @@ ALTER TABLE public.supporters
   ADD COLUMN one_time_remaining interval,
   ADD COLUMN one_time_remaining_seconds double precision GENERATED ALWAYS AS (extract(epoch FROM one_time_remaining)) STORED,
   ADD COLUMN one_time_legacy_unlimited boolean NOT NULL DEFAULT false,
+  ADD COLUMN one_time_legacy_tier text CHECK (one_time_legacy_tier IN ('supporter','scav','timmy','chad')),
+  ADD CONSTRAINT one_time_legacy_tier_shape CHECK (one_time_legacy_tier IS NULL OR one_time_legacy_unlimited),
   ADD CONSTRAINT one_time_credit_shape CHECK (one_time_tier IS NOT NULL OR (one_time_expires_at IS NULL AND one_time_remaining IS NULL)),
   ADD CONSTRAINT one_time_credit_balance CHECK (one_time_remaining IS NULL OR
     (one_time_expires_at IS NULL AND one_time_remaining > interval '0' AND isfinite(one_time_remaining))),
   ADD CONSTRAINT one_time_credit_finite CHECK (one_time_expires_at IS NULL OR isfinite(one_time_expires_at));
 COMMENT ON COLUMN public.supporters.one_time_tier IS 'Independent one-time entitlement; NULL means no credit.';
+COMMENT ON COLUMN public.supporters.one_time_legacy_tier IS 'Original pre-ledger lifetime tier, captured before upgrades independently of the merged entitlement.';
 COMMENT ON COLUMN public.supporters.one_time_expires_at IS 'Running credit expiry; NULL while paused or unlimited.';
 
 COMMENT ON COLUMN public.supporters.one_time_remaining IS 'Unused purchased time paused during subscription access; NULL with no expiry means unlimited.';
@@ -25,6 +28,29 @@ ALTER TABLE private.stripe_one_time_payments
 ALTER TABLE private.stripe_one_time_payments ALTER COLUMN credit_order SET DEFAULT nextval('private.stripe_one_time_credit_order');
 GRANT UPDATE (credit_tier, banked_duration, refunded_at) ON private.stripe_one_time_payments TO service_role;
 
+-- The caller holds the supporter row lock; keep actual unspent receipt caps
+-- both when pausing finite time and when a lifetime grant removes its expiry.
+CREATE FUNCTION private.allocate_one_time_credit(p_user_id uuid, p_remaining interval, p_tier text)
+RETURNS void LANGUAGE sql SECURITY INVOKER SET search_path = '' AS $$
+  WITH durations AS (
+    SELECT payment_id, credit_order, fulfilled_at,
+      coalesce(banked_duration, interval '30 days' * least(12, greatest(1, amount_total / 400))) AS duration
+    FROM private.stripe_one_time_payments
+    WHERE user_id = p_user_id AND paid_at >= timestamptz '2026-10-07 00:00:00+00' AND refunded_at IS NULL
+  ), allocations AS (
+    SELECT payment_id, duration, coalesce(sum(duration) OVER (
+      ORDER BY credit_order DESC NULLS LAST, fulfilled_at DESC, payment_id DESC
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), interval '0') AS newer
+    FROM durations
+  )
+  UPDATE private.stripe_one_time_payments p SET
+    banked_duration = greatest(interval '0', least(a.duration, p_remaining - a.newer)),
+    credit_tier = coalesce(p.credit_tier, p_tier)
+  FROM allocations a WHERE p.payment_id = a.payment_id;
+$$;
+REVOKE ALL ON FUNCTION private.allocate_one_time_credit(uuid,interval,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION private.allocate_one_time_credit(uuid,interval,text) TO service_role;
+
 -- Derive the effective row under its existing row lock, including old-handler writes.
 -- Reads keep using tier/status/type/expires_at; no bulk historical rewrite is needed.
 CREATE FUNCTION private.preserve_one_time_credit()
@@ -32,6 +58,8 @@ RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
   subscription_access boolean;
   resume_at timestamptz;
+  old_credit_expiry timestamptz;
+  old_credit_remaining interval;
   headers jsonb := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::jsonb;
 BEGIN
   -- During the schema/function deployment gap, old handlers retry instead of
@@ -48,6 +76,7 @@ BEGIN
     NEW.one_time_expires_at := NULL;
     NEW.one_time_remaining := NULL;
     NEW.one_time_legacy_unlimited := false;
+    NEW.one_time_legacy_tier := NULL;
     RETURN NEW;
   END IF;
   subscription_access := NEW.type = 'subscription' AND NEW.status IN ('active','past_due')
@@ -65,6 +94,32 @@ BEGIN
     NEW.one_time_expires_at := NEW.expires_at;
     NEW.one_time_remaining := NULL;
   END IF;
+  IF NEW.one_time_legacy_unlimited AND NEW.one_time_legacy_tier IS NULL THEN
+    NEW.one_time_legacy_tier := coalesce(
+      CASE WHEN TG_OP = 'UPDATE' THEN OLD.one_time_legacy_tier END,
+      CASE WHEN TG_OP = 'UPDATE' THEN OLD.one_time_tier END,
+      CASE WHEN TG_OP = 'UPDATE' AND OLD.type = 'one_time' AND OLD.status = 'active' AND OLD.expires_at IS NULL THEN OLD.tier END,
+      NEW.one_time_tier, NEW.tier);
+  ELSIF NOT NEW.one_time_legacy_unlimited THEN
+    NEW.one_time_legacy_tier := NULL;
+  END IF;
+  -- Lifetime fulfillment removes the running clock, not the fact that some
+  -- finite purchased time was already spent. Snapshot its actual tail first.
+  IF TG_OP = 'UPDATE' AND NEW.one_time_tier IS NOT NULL
+    AND NEW.one_time_expires_at IS NULL AND NEW.one_time_remaining IS NULL THEN
+    old_credit_expiry := coalesce(OLD.one_time_expires_at,
+      CASE WHEN OLD.type = 'one_time' THEN OLD.expires_at
+        WHEN OLD.one_time_remaining IS NOT NULL THEN
+          (CASE WHEN OLD.status IN ('active','past_due') THEN OLD.expires_at
+            ELSE coalesce(OLD.subscription_ended_at,OLD.expires_at) END) + OLD.one_time_remaining END);
+    old_credit_remaining := CASE WHEN OLD.type = 'subscription' AND OLD.one_time_remaining IS NOT NULL
+      AND ((OLD.status IN ('active','past_due') AND (OLD.expires_at IS NULL OR OLD.expires_at > now()))
+        OR old_credit_expiry IS NULL) THEN OLD.one_time_remaining
+      WHEN old_credit_expiry IS NOT NULL THEN greatest(interval '0',old_credit_expiry - now()) END;
+    IF old_credit_remaining IS NOT NULL THEN
+      PERFORM private.allocate_one_time_credit(NEW.user_id,old_credit_remaining,coalesce(OLD.one_time_tier,OLD.tier));
+    END IF;
+  END IF;
   -- Read-time entitlement projection spends paused credit after grace ends,
   -- even without another webhook. Recovery must pause that actual remaining tail.
   -- Explicit credit writes already supply their own expiry/balance; preserve them.
@@ -79,20 +134,7 @@ BEGIN
   IF subscription_access AND NEW.one_time_expires_at IS NOT NULL THEN
     IF NEW.one_time_expires_at > now() THEN
       NEW.one_time_remaining := NEW.one_time_expires_at - now();
-      -- Finite credit started with the durable payment ledger; allocate the
-      -- unspent tail to receipts, newest first, so a refund removes only its days.
-      WITH allocations AS (
-        SELECT payment_id, interval '30 days' * least(12, greatest(1, amount_total / 400)) AS duration,
-          coalesce(sum(interval '30 days' * least(12, greatest(1, amount_total / 400))) OVER (
-            ORDER BY credit_order DESC NULLS LAST, fulfilled_at DESC, payment_id DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),
-            interval '0') AS newer
-        FROM private.stripe_one_time_payments
-        WHERE user_id = NEW.user_id AND paid_at >= timestamptz '2026-10-07 00:00:00+00' AND refunded_at IS NULL
-      )
-      UPDATE private.stripe_one_time_payments p SET
-        banked_duration = greatest(interval '0', least(a.duration, NEW.one_time_remaining - a.newer)),
-        credit_tier = coalesce(p.credit_tier, NEW.one_time_tier)
-      FROM allocations a WHERE p.payment_id = a.payment_id;
+      PERFORM private.allocate_one_time_credit(NEW.user_id,NEW.one_time_remaining,NEW.one_time_tier);
     ELSE
       NEW.one_time_tier := NULL;
       NEW.one_time_remaining := NULL;
@@ -110,6 +152,7 @@ BEGIN
       NEW.one_time_tier := NULL;
       NEW.one_time_expires_at := NULL;
       NEW.one_time_legacy_unlimited := false;
+      NEW.one_time_legacy_tier := NULL;
     ELSIF NEW.one_time_remaining IS NULL THEN
       NEW.type := 'one_time';
       NEW.status := 'active';
@@ -137,6 +180,7 @@ DECLARE
   receipt_user uuid;
   live_subscription boolean;
   legacy_unlimited boolean;
+  legacy_tier text;
   expiry timestamptz;
   expected_customer text;
   customer text;
@@ -183,6 +227,9 @@ BEGIN
       AND existing.expires_at IS NULL AND NOT EXISTS (
         SELECT 1 FROM private.stripe_one_time_payments WHERE user_id = target_user
           AND paid_at < timestamptz '2026-10-07 00:00:00+00' AND refunded_at IS NULL), false);
+  IF legacy_unlimited THEN
+    legacy_tier := coalesce(existing.one_time_legacy_tier,existing.one_time_tier,existing.tier);
+  END IF;
   -- Also protect identity if different users race to redeem the same payment.
   INSERT INTO private.stripe_one_time_payments(payment_id, user_id, paid_at, amount_total, credit_tier, banked_duration)
     VALUES (p_payment_id, target_user, p_paid_at, amount, incoming_tier,
@@ -249,13 +296,13 @@ BEGIN
   END IF;
   INSERT INTO public.supporters(user_id, tier, status, type, stripe_customer_id, stripe_subscription_id,
     has_ever_supported, retention_history_verified, last_contribution_at, discord_user_id,
-    amount_total, started_at, expires_at, updated_at, one_time_tier, one_time_expires_at, one_time_remaining, one_time_legacy_unlimited)
+    amount_total, started_at, expires_at, updated_at, one_time_tier, one_time_expires_at, one_time_remaining, one_time_legacy_unlimited, one_time_legacy_tier)
   VALUES (target_user, incoming_tier, CASE WHEN live_subscription THEN existing.status ELSE 'active' END,
     CASE WHEN live_subscription THEN 'subscription' ELSE 'one_time' END,
     coalesce(nullif(p_record->>'stripe_customer_id', ''), existing.stripe_customer_id),
     CASE WHEN live_subscription THEN existing.stripe_subscription_id END,
     true, true, greatest(existing.last_contribution_at, p_paid_at), p_record->>'discord_user_id',
-    amount, coalesce(existing.started_at, (p_record->>'started_at')::timestamptz, now()), expiry, now(), credit_tier, credit_expiry, credit_remaining, legacy_unlimited)
+    amount, coalesce(existing.started_at, (p_record->>'started_at')::timestamptz, now()), expiry, now(), credit_tier, credit_expiry, credit_remaining, legacy_unlimited, legacy_tier)
   ON CONFLICT (user_id) DO UPDATE SET
     tier = EXCLUDED.tier, status = EXCLUDED.status, type = EXCLUDED.type,
     stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
@@ -265,7 +312,8 @@ BEGIN
     updated_at = EXCLUDED.updated_at,
     one_time_tier = EXCLUDED.one_time_tier, one_time_expires_at = EXCLUDED.one_time_expires_at,
     one_time_remaining = EXCLUDED.one_time_remaining,
-    one_time_legacy_unlimited = EXCLUDED.one_time_legacy_unlimited
+    one_time_legacy_unlimited = EXCLUDED.one_time_legacy_unlimited,
+    one_time_legacy_tier = EXCLUDED.one_time_legacy_tier
   RETURNING * INTO fulfilled;
   RETURN fulfilled;
 END;
@@ -358,12 +406,15 @@ BEGIN
   END IF;
   IF verified_legacy_refund THEN
     lifetime_tier := p_legacy_tier;
-  ELSIF existing.one_time_legacy_unlimited THEN
-    lifetime_tier := existing.one_time_tier;
   ELSE
     SELECT coalesce(p.credit_tier,existing.one_time_tier) INTO lifetime_tier FROM private.stripe_one_time_payments p
       WHERE p.user_id=p_user_id AND p.refunded_at IS NULL AND p.paid_at < timestamptz '2026-10-07 00:00:00+00'
       ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC NULLS LAST LIMIT 1;
+    IF existing.one_time_legacy_unlimited THEN
+      SELECT t INTO lifetime_tier FROM unnest(ARRAY[lifetime_tier,
+        coalesce(existing.one_time_legacy_tier,existing.one_time_tier)]) t WHERE t IS NOT NULL
+        ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],t) DESC LIMIT 1;
+    END IF;
   END IF;
   -- A finite expiry cannot regain lifetime access from stale historical receipts.
   IF total_remaining IS NOT NULL THEN lifetime_tier := NULL; END IF;
@@ -374,6 +425,7 @@ BEGIN
   UPDATE public.supporters SET
     one_time_legacy_unlimited=existing.one_time_legacy_unlimited AND
       (NOT verified_legacy_refund OR p_legacy_tier IS NOT NULL),
+    one_time_legacy_tier=CASE WHEN verified_legacy_refund THEN p_legacy_tier ELSE existing.one_time_legacy_tier END,
     one_time_tier=credit_tier,
     one_time_remaining=CASE WHEN paused AND lifetime_tier IS NULL AND credit_tier IS NOT NULL THEN remaining END,
     one_time_expires_at=CASE WHEN NOT paused AND lifetime_tier IS NULL AND credit_tier IS NOT NULL THEN now()+remaining END,
@@ -402,7 +454,7 @@ SELECT s.user_id,
   CASE WHEN credit.resumes THEN credit.expiry ELSE s.expires_at END AS expires_at,
   s.updated_at, s.last_contribution_at, s.subscription_ended_at, s.retention_history_verified,
   s.supporter_disqualified_at, s.one_time_tier, s.one_time_expires_at, s.one_time_remaining,
-  s.one_time_remaining_seconds, s.one_time_legacy_unlimited
+  s.one_time_remaining_seconds, s.one_time_legacy_unlimited, s.one_time_legacy_tier
 FROM public.supporters s CROSS JOIN LATERAL (
   SELECT coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining) AS expiry,
     s.type = 'subscription' AND s.status IN ('active','past_due')

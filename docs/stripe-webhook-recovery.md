@@ -177,3 +177,20 @@ the handler verifies remaining Stripe contributions before clearing retained Sup
 unavailable history retries, and refunded subscription invoices cannot revoke independent credit.
 
 Subscription recovery re-banks only the unused tail after read-time grace expiry, preventing previously used prepaid days from being granted again.
+
+Ordinary subscription invoice refunds and rejected new payment grants preserve independently
+paid one-time credit and retained history. The handler reads the effective entitlement before
+revocation so already used days after grace are not restored, resumes a live subscription's bank
+from revocation time, and reconciles Discord roles from the resulting entitlement. Chargeback
+and disqualification still clear all credit. Untouched pre-migration one-time rows without credit
+metadata continue through ordinary refund revocation rather than the bank refund RPC.
+
+The original pre-ledger lifetime tier is captured in `one_time_legacy_tier` before modern
+upgrades merge into the effective tier. Refunding a modern upgrade preserves that original
+lifetime grant and the highest remaining receipt tier; it does not infer its absence from
+current-customer Stripe history or fabricate a payment receipt. Already overwritten historical
+tiers cannot be reconstructed from missing provenance and keep their existing lifetime tier.
+The existing bounded verification policy still applies to refunds of pre-cutoff payments.
+Before a delayed lifetime grant discards a finite expiry, its actual unused time is allocated
+to finite receipts using the same newest-first rule as subscription pauses. Refunding the
+lifetime payment then restores only those unused days, including zero for exhausted receipts.
