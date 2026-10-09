@@ -879,6 +879,23 @@ the synthetic pre-cleanup custom archive whose SHA-256 is pinned in the script. 
 other archive bytes and uses only new secondary local databases. No production host, URL or
 credential is accepted. Archives and aggregate receipts stay outside Git.
 
+The pinned synthetic baseline is retained with the owner's local task artifacts at
+`../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump` relative to this
+cleanup checkout. Its SHA-256 is
+`18673d23b70f698cf73dfd4dbde0fe953bdc229f587941ae7e21d119c0964572`.
+Use that retained artifact through authorized local access; a teammate without it must
+obtain the synthetic baseline from the task owner before running this rehearsal. It is
+not downloadable from Git and must not be replaced with a production dump or a newly
+generated archive. The existing local PostgreSQL 17 container must also be available.
+
+From this checkout in the local Linux shell:
+
+```bash
+sha256sum ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
+python3 scripts/checks/legacy-progress-cleanup-rehearsal.py "$PWD" \
+  ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
+```
+
 `DROP COLUMN` does not immediately shrink files. Measure relation sizes after release; any
 `VACUUM FULL`/rewrite needs a distinct low-traffic maintenance approval, disk headroom and a
 bounded lock/outage plan. Avoid bulk NULL updates and retain normal autovacuum.
