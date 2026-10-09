@@ -72,7 +72,7 @@
   const portalError = ref<string | null>(null);
   const isActive = useSupporterActivity(supporter);
   const isSubscription = computed(() => supporter.value?.type === 'subscription');
-  const canManage = computed(() => billingSubscription.value !== null);
+  const canManage = computed(() => Boolean(billingSubscription.value?.stripeSubscriptionId));
   const canUpgrade = computed(() => !isActive.value && supporter.value?.hasEverSupported === true);
   const tierLabel = computed(() => {
     const tier = supporter.value?.tier;

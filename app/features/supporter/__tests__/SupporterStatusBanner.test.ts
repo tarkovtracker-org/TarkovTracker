@@ -91,6 +91,7 @@ describe('SupporterStatusBanner', () => {
       ...supporterRef.value,
       type: 'subscription',
       status: 'past_due',
+      stripeSubscriptionId: 'sub_past_due',
       tier: 'chad',
       expiresAt: '2020-01-01T00:00:00Z',
     };
@@ -109,6 +110,7 @@ describe('SupporterStatusBanner', () => {
       status: 'active',
       tier: 'chad',
       type: 'subscription',
+      stripeSubscriptionId: 'sub_active',
     };
     const wrapper = await mountBanner();
     expect(wrapper.text()).toContain('Active subscription');
@@ -150,6 +152,7 @@ describe('SupporterStatusBanner', () => {
       status: 'active',
       tier: 'timmy',
       type: 'subscription',
+      stripeSubscriptionId: 'sub_portal',
     };
     mockOpenBillingPortal.mockResolvedValue('https://billing.stripe.com/p/x');
     const originalLocation = window.location;
@@ -178,6 +181,7 @@ describe('SupporterStatusBanner', () => {
       status: 'cancelled',
       tier: 'scav',
       type: 'subscription',
+      stripeSubscriptionId: 'sub_cancelled',
     };
     const wrapper = await mountBanner();
     expect(wrapper.text()).toContain('Subscription cancelled');
@@ -202,4 +206,24 @@ describe('SupporterStatusBanner', () => {
     expect(upgradeBtn.attributes('data-to')).toBe('#tiers');
     wrapper.unmount();
   });
+  it.each(['expired', 'cancelled'] as const)(
+    'keeps renewal available for an ended %s subscription row without a Stripe ID',
+    async (status) => {
+      supporterRef.value = {
+        expiresAt: '2020-01-01T00:00:00Z',
+        hasEverSupported: true,
+        startedAt: '2019-01-01T00:00:00Z',
+        status,
+        tier: 'supporter',
+        type: 'subscription',
+        stripeSubscriptionId: null,
+      };
+      const wrapper = await mountBanner();
+      const button = wrapper.get('button');
+      expect(button.text()).toContain('Pick a tier');
+      expect(button.attributes('data-to')).toBe('#tiers');
+      expect(wrapper.text()).not.toContain('Manage subscription');
+      wrapper.unmount();
+    }
+  );
 });
