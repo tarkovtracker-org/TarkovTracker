@@ -194,3 +194,5 @@ The existing bounded verification policy still applies to refunds of pre-cutoff 
 Before a delayed lifetime grant discards a finite expiry, its actual unused time is allocated
 to finite receipts using the same newest-first rule as subscription pauses. Refunding the
 lifetime payment then restores only those unused days, including zero for exhausted receipts.
+
+Billing controls use the raw subscription identity and status independently of projected prepaid access. A past-due subscriber using banked days can still manage the existing subscription. If a revocation read crosses grace expiry, the write retains that original deadline; the database trigger resumes only the unused bank or clears spent credit under its row lock.

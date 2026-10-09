@@ -1037,12 +1037,28 @@ describe('one-time refunds during a subscription', () => {
       one_time_expires_at: resumedExpiry,
     });
   });
-  it('cannot resurrect spent projected credit when revoking a subscription invoice', async () => {
+  it('preserves a pre-grace entitlement snapshot delivered after the grace deadline', async () => {
+    const deadline = new Date(Date.now() - 1).toISOString();
+    const harness = createHarness(
+      { ...subscribed, status: 'past_due', expires_at: deadline },
+      {
+        '/invoices/in_new': { subscription: 'sub_1' },
+        '/charges?customer=cus_1&limit=100': { data: [charge, priorCharge], has_more: false },
+      },
+      { entitlementResult: { type: 'subscription', status: 'past_due', expires_at: deadline } }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_new' });
+    expect(harness.writes[0]).toMatchObject({ subscription_ended_at: deadline });
+    expect(harness.writes[0]).not.toHaveProperty('one_time_tier');
+    expect(harness.writes[0]).not.toHaveProperty('one_time_remaining');
+  });
+  it('leaves spent projected credit cleanup to the original database deadline', async () => {
+    const deadline = new Date(Date.now() - 61 * 86400000).toISOString();
     const harness = createHarness(
       {
         ...subscribed,
         status: 'past_due',
-        expires_at: new Date(Date.now() - 61 * 86400000).toISOString(),
+        expires_at: deadline,
       },
       {
         '/invoices/in_new': { subscription: 'sub_1' },
@@ -1050,13 +1066,15 @@ describe('one-time refunds during a subscription', () => {
       }
     );
     await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_new' });
-    expect(harness.current()).toMatchObject({
+    expect(harness.writes[0]).toMatchObject({
       status: 'expired',
-      one_time_tier: null,
-      one_time_remaining: null,
-      one_time_expires_at: null,
+      subscription_ended_at: deadline,
       has_ever_supported: true,
     });
+    expect(Date.parse(String(harness.writes[0].subscription_ended_at))).toBeLessThan(
+      Date.now() - 60 * 86400000
+    );
+    expect(harness.writes[0]).not.toHaveProperty('one_time_remaining');
   });
   it('clears independent credit and Discord roles for a chargeback', async () => {
     const resources = {

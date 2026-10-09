@@ -80,6 +80,72 @@ describe('useSupporter', () => {
       status: nextChannel.subscribe.mock.calls[0]?.[0],
     };
   };
+  it('keeps past-due billing management separate from projected prepaid access', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-09T00:00:00Z'));
+    const scope = effectScope();
+    try {
+      const { useSupporter } = await import('@/composables/useSupporter');
+      const status = scope.run(() => useSupporter())!;
+      mockMaybeSingle.mockResolvedValue({
+        data: {
+          type: 'subscription',
+          status: 'past_due',
+          tier: 'chad',
+          stripe_subscription_id: 'sub_past_due',
+          has_ever_supported: true,
+          started_at: '2026-01-01T00:00:00Z',
+          expires_at: '2026-10-08T00:00:00Z',
+          one_time_tier: 'scav',
+          one_time_remaining_seconds: 30 * 86400,
+        },
+        error: null,
+      });
+      await status.fetchStatus('user-1');
+      expect(mockSupabase.client.from).toHaveBeenLastCalledWith('supporters');
+      expect(status.supporter.value).toMatchObject({ type: 'one_time', tier: 'scav' });
+      expect(status.isActiveSubscriber.value).toBe(false);
+      expect(status.isSubscribed.value).toBe(true);
+      expect(status.billingSubscription.value).toMatchObject({
+        type: 'subscription',
+        status: 'past_due',
+        tier: 'chad',
+        stripeSubscriptionId: 'sub_past_due',
+      });
+      vi.setSystemTime(new Date('2026-11-08T00:00:00Z'));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(status.activeTier.value).toBe('supporter');
+      expect(status.isSubscribed.value).toBe(true);
+      status.reset();
+      expect(status.billingSubscription.value).toBeNull();
+      expect(status.isSubscribed.value).toBe(false);
+    } finally {
+      scope.stop();
+      vi.useRealTimers();
+    }
+  });
+  it.each(['expired', 'cancelled'] as const)(
+    'allows a new subscription after the recorded subscription is %s',
+    async (subscriptionStatus) => {
+      const { useSupporter } = await import('@/composables/useSupporter');
+      const status = useSupporter();
+      mockMaybeSingle.mockResolvedValue({
+        data: {
+          type: 'subscription',
+          status: subscriptionStatus,
+          tier: 'chad',
+          stripe_subscription_id: 'sub_ended',
+          has_ever_supported: true,
+          started_at: '2026-01-01T00:00:00Z',
+          expires_at: '2026-01-01T00:00:00Z',
+        },
+        error: null,
+      });
+      await status.fetchStatus('user-1');
+      expect(status.isSubscribed.value).toBe(false);
+      expect(status.billingSubscription.value?.stripeSubscriptionId).toBe('sub_ended');
+    }
+  );
   it('updates the badge tier and active subscription when loaded access expires', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));

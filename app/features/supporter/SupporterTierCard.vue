@@ -122,12 +122,12 @@
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
-        :loading="(isActiveSubscriber ? manageLoading : checkoutLoading) || !authResolved"
+        :loading="(isSubscribed ? manageLoading : checkoutLoading) || !authResolved"
         :disabled="!authResolved"
-        @click="isActiveSubscriber ? handleManage() : handleCheckout()"
+        @click="isSubscribed ? handleManage() : handleCheckout()"
       >
         {{
-          isActiveSubscriber
+          isSubscribed
             ? t('page.supporter.tier_change_cta', 'Change plan in billing portal')
             : t('page.supporter.tier_cta')
         }}
@@ -158,8 +158,8 @@
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const {
-    activeTier,
-    isActiveSubscriber,
+    billingSubscription,
+    isSubscribed,
     openBillingPortal,
     createCheckout,
     error: composableError,
@@ -171,7 +171,7 @@
   const authResolved = ref(false);
   const loginLink = '/login?redirect=/supporter';
   const isCurrentTier = computed(
-    () => isActiveSubscriber.value && activeTier.value === props.tier.id
+    () => isSubscribed.value && billingSubscription.value?.tier === props.tier.id
   );
   onMounted(async () => {
     try {

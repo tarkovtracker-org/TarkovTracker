@@ -1,9 +1,15 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import type { SupporterStatus } from '@/composables/useSupporter';
 const supporterRef = ref<SupporterStatus | null>(null);
+const rawSubscriptionRef = ref<SupporterStatus | null>(null);
+const billingSubscription = computed(
+  () =>
+    rawSubscriptionRef.value ??
+    (supporterRef.value?.type === 'subscription' ? supporterRef.value : null)
+);
 const composableErrorRef = ref<string | null>(null);
 const mockOpenBillingPortal = vi.fn();
 vi.mock('@/composables/useSupporter', () => ({
@@ -11,6 +17,7 @@ vi.mock('@/composables/useSupporter', () => ({
     error: composableErrorRef,
     openBillingPortal: mockOpenBillingPortal,
     supporter: supporterRef,
+    billingSubscription,
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -62,12 +69,36 @@ const mountBanner = async () => {
 describe('SupporterStatusBanner', () => {
   beforeEach(() => {
     supporterRef.value = null;
+    rawSubscriptionRef.value = null;
     composableErrorRef.value = null;
     mockOpenBillingPortal.mockReset();
   });
   it('renders nothing when there is no supporter row', async () => {
     const wrapper = await mountBanner();
     expect(wrapper.find('section').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps billing management visible while prepaid access replaces past-due grace', async () => {
+    supporterRef.value = {
+      type: 'one_time',
+      status: 'active',
+      tier: 'scav',
+      hasEverSupported: true,
+      startedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2030-01-15T00:00:00Z',
+    };
+    rawSubscriptionRef.value = {
+      ...supporterRef.value,
+      type: 'subscription',
+      status: 'past_due',
+      tier: 'chad',
+      expiresAt: '2020-01-01T00:00:00Z',
+    };
+    const wrapper = await mountBanner();
+    expect(wrapper.text()).toContain('Active supporter');
+    expect(wrapper.text()).toContain('Scav');
+    expect(wrapper.text()).toContain('Perks until');
+    expect(wrapper.get('button').text()).toContain('Manage subscription');
     wrapper.unmount();
   });
   it('renders an active subscription banner with manage action and renewal date', async () => {

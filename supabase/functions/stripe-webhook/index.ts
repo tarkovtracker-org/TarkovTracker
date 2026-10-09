@@ -1070,8 +1070,10 @@ function preservedCreditAccess(current: SupporterRow): Record<string, unknown> {
       one_time_expires_at: current.expires_at,
       one_time_remaining: null,
     };
+  // The response may cross grace expiry. Preserve its original anchor and let
+  // the row-locked trigger resume or exhaust independent credit at that deadline.
   if (current.expires_at && Date.parse(current.expires_at) <= Date.now())
-    return clearedOneTimeCredit;
+    return { subscription_ended_at: current.expires_at };
   return { subscription_ended_at: new Date().toISOString() };
 }
 async function syncRetainedCreditRoles(supporter: SupporterRow): Promise<void> {

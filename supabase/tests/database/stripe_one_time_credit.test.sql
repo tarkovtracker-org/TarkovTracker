@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,929) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,931) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -404,6 +404,20 @@ SELECT ok((SELECT type='one_time' AND status='active' AND tier='scav' AND one_ti
  AND expires_at=now()+interval '30 days' AND one_time_remaining IS NULL AND has_ever_supported
  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000923'),
  'ordinary subscription invoice refund resumes independently paid credit');
+-- A pre-grace read delivered after grace keeps the database's original resume anchor.
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id,expires_at,one_time_tier,one_time_remaining)
+VALUES ('00000000-0000-0000-0000-000000000930','subscription','past_due','chad','sub_read_race',now()-interval '1 day','scav',interval '30 days'),
+ ('00000000-0000-0000-0000-000000000931','subscription','past_due','chad','sub_spent_read_race',now()-interval '31 days','scav',interval '30 days');
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET status='expired',tier='supporter',subscription_ended_at=expires_at,expires_at=now(),stripe_subscription_id=NULL
+ WHERE user_id IN ('00000000-0000-0000-0000-000000000930','00000000-0000-0000-0000-000000000931');
+SELECT ok((SELECT type='one_time' AND tier='scav' AND expires_at=now()+interval '29 days'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000930'),
+ 'late revocation resumes only unused bank at original grace deadline');
+SELECT ok((SELECT one_time_tier IS NULL AND status='expired' AND expires_at<=now()
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000931'),
+ 'late revocation leaves fully spent credit expired under the row lock');
 -- Keep the original open-ended tier separate from modern upgrades, without inventing a receipt.
 ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
 INSERT INTO public.supporters(user_id,type,status,tier,has_ever_supported,expires_at)
