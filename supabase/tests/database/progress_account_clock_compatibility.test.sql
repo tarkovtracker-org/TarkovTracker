@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(11);
 -- Accepted pre-#1087 clients compare the aggregate normalized clock to the account clock.
 -- A persistent write must keep that contract without restoring the legacy JSON mirror.
 INSERT INTO auth.users (id, email) VALUES
@@ -49,6 +49,29 @@ SELECT ok((SELECT a.updated_at >= m.progress_updated_at
   FROM public.user_progress a JOIN public.user_game_mode_progress m USING (user_id)
   WHERE a.user_id = '00000000-0000-0000-0000-000000001086' AND m.game_mode = 'pve'),
   'PvE API write retains the account clock contract');
+-- Each API call is normally its own transaction. These fixtures share one timestamp/marker,
+-- so take a fresh tuple snapshot before each identical request to prove an account write.
+CREATE TEMP TABLE api_noop_account_before AS SELECT ctid::text AS row_version
+FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001086';
+SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001086', 'pvp_data',
+  NULL, NULL, '{"level":19}');
+SELECT isnt((SELECT ctid::text FROM public.user_progress
+  WHERE user_id = '00000000-0000-0000-0000-000000001086'),
+  (SELECT row_version FROM api_noop_account_before), 'identical PvP API request still writes the account clock');
+UPDATE api_noop_account_before SET row_version = (SELECT ctid::text FROM public.user_progress
+  WHERE user_id = '00000000-0000-0000-0000-000000001086');
+SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001086', 'pve_data',
+  NULL, NULL, '{"level":9}');
+SELECT isnt((SELECT ctid::text FROM public.user_progress
+  WHERE user_id = '00000000-0000-0000-0000-000000001086'),
+  (SELECT row_version FROM api_noop_account_before), 'identical PvE API request still writes the account clock');
+UPDATE api_noop_account_before SET row_version = (SELECT ctid::text FROM public.user_progress
+  WHERE user_id = '00000000-0000-0000-0000-000000001086');
+SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001086', 'seasonal_data',
+  NULL, NULL, '{"level":3}');
+SELECT isnt((SELECT ctid::text FROM public.user_progress
+  WHERE user_id = '00000000-0000-0000-0000-000000001086'),
+  (SELECT row_version FROM api_noop_account_before), 'identical Seasonal API request still writes the account clock');
 SELECT is((SELECT current_game_mode FROM public.user_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001086'), 'pvp',
   'API clock advancement does not change selected mode');

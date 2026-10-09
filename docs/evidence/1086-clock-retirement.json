@@ -8,7 +8,8 @@
     "cli": "2.117.0",
     "replayed_migrations": 144,
     "original_clock_regression": "3 of 8 assertions fail: persistent sync, PvP API, PvE API",
-    "corrected_full_suite": "32 files, 722 assertions pass",
+    "corrected_full_suite": "32 files, 725 assertions pass",
+    "api_clock_negative_controls": "Old tests pass both local suppressed-Seasonal and suppressed-no-op API mutations. Strengthened fresh-tuple checks reject both mutations; unchanged production SQL passes. No mutation was applied outside the isolated local database.",
     "lint": "No errors; existing merge_manual_activity_progress IMMUTABLE/STABLE warning remains"
   },
   "cached_policy": {
@@ -65,7 +66,7 @@
     "limitation": "Cumulative snapshots, not measured savings. No production changes, data reads, fixture writes or statistics reset."
   },
   "remaining_gates": [
-    "Independent review of the final immutable migration and integration",
+    "Independent functional SQL review cleared 76ae39ac against 5ddedb03; production migration is unchanged in subsequent docs/test follow-ups",
     "Fresh all-16-range materialization gate and no-backfill confirmation immediately before approved merge",
     "Exact-head CI/preview; catalog/history and observer CLI dry-run collected successfully",
     "Explicit authorization for production fixture QA and merge-triggered deployment"

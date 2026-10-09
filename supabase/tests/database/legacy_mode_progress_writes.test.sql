@@ -134,13 +134,17 @@ SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
 DELETE FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029';
 INSERT INTO private.account_retention (user_id, last_active_at, pending_since)
 VALUES ('00000000-0000-0000-0000-000000001029', now() - interval '2 days', now() - interval '1 day');
+CREATE TEMP TABLE seasonal_api_account_before AS
+SELECT ctid::text AS row_version FROM public.user_progress
+WHERE user_id = '00000000-0000-0000-0000-000000001029';
 SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'seasonal_data',
   NULL, NULL, '{"level":4}');
 SELECT ok((SELECT pending_since IS NULL AND last_active_at > now() - interval '1 hour'
   FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write still records account activity');
 SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
-    AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029')
+    AND (SELECT ctid::text IS DISTINCT FROM (SELECT row_version FROM seasonal_api_account_before)
+         FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001029')
     AND (SELECT (current_game_mode, game_edition, tarkov_uid) IS NOT DISTINCT FROM ('pvp', 1, NULL::bigint)
          FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write advances only the account clock, as before');

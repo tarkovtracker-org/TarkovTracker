@@ -74,9 +74,9 @@ flowchart LR
 3. Realtime listens to both the account row, for metadata, and normalized rows. Recognized account metadata
    echoes advance the listener's timestamp watermark before being discarded, so older metadata
    cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
-   A sync that leaves metadata unchanged returns the stored `metadata_write_id`. Persistent
-   PvP/PvE changes still advance the account clock; only a sync with neither metadata nor
-   persistent progress changes avoids an account-row write. An echo matches only that marker together with the same values, so a
+   A sync returns the account row's current `metadata_write_id`. The row and marker stay unchanged
+   only when neither metadata nor persistent PvP/PvE progress changes; persistent changes still
+   advance the account clock. An echo matches only that marker together with the same values, so a
    foreign metadata change is never mistaken for one.
    A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
@@ -275,8 +275,8 @@ Teams, save status and recovery, and progress imports build on this storage; see
   clamping: `jsonb` rejects the whole `p_modes` document at parameter binding, before the SQL
   sanitizer can run, so no client-sanitized string can carry one.
 - The sync RPC merges each mode against the persisted normalized payload for that mode, under the
-  account row lock, before its unchanged-write comparison. The account row is compared and written
-  for metadata only, so a placeholder normalized row cannot cause account-row rewrites.
+  account row lock, before its unchanged-write comparison. The account row updates when metadata
+  or persistent PvP/PvE progress changes; an unchanged persistent payload avoids a compatibility-clock write.
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.
