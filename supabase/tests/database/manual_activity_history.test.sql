@@ -69,10 +69,10 @@ SELECT is((SELECT progress_data->>'level' FROM public.user_game_mode_progress
 SELECT is((SELECT progress_data->'manualActivityHistory'->0->>'id' FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000894' AND game_mode = 'pvp'), 'stale',
   'a placeholder row does not union the frozen legacy history');
-SELECT is((SELECT ctid::text FROM public.user_progress
+SELECT isnt((SELECT ctid::text FROM public.user_progress
   WHERE user_id = '00000000-0000-0000-0000-000000000894'),
   (SELECT row_version FROM placeholder_account_row),
-  'a placeholder sync does not rewrite the account row');
+  'a placeholder sync retains the cached-client compatibility clock');
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000893', true);
 SET LOCAL ROLE authenticated;
 SELECT lives_ok($$SELECT public.sync_user_game_mode_progress('pvp', 1, NULL, '{"pvp":{"progressEpoch":1}}')$$, 'authenticated RPC retains helper permissions');

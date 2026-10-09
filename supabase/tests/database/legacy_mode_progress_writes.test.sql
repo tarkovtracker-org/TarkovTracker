@@ -59,7 +59,7 @@ SELECT ok(NOT EXISTS (
       '00000000-0000-0000-0000-000000001030')),
   'a legacy column write no longer reaches normalized progress');
 
--- Client sync: mode progress reaches only normalized rows; the account row changes only for metadata.
+-- Client sync: normalized progress only, with metadata and cached-client compatibility clocks.
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000001028', true);
 CREATE TEMP TABLE sync_outcome AS
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
@@ -67,8 +67,8 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   private.active_season_number()) AS data;
 SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001028'),
   'a sync leaves the legacy mode columns unchanged');
-SELECT ok(pg_temp.account_unchanged('00000000-0000-0000-0000-000000001028'),
-  'a mode-only sync does not rewrite the account row or its Realtime stream');
+SELECT ok(NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001028'),
+  'a persistent mode sync retains the cached-client account clock');
 SELECT results_eq(
   $$SELECT game_mode, progress_data->>'level' FROM public.user_game_mode_progress
     WHERE user_id = '00000000-0000-0000-0000-000000001028' ORDER BY game_mode$$,
@@ -113,10 +113,10 @@ SELECT is((SELECT jsonb_array_length(progress_data->'manualActivityHistory')
   FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001030' AND game_mode = 'pvp'), 0,
   'legacy manual history is not unioned into a placeholder');
-SELECT ok(pg_temp.account_unchanged('00000000-0000-0000-0000-000000001030'),
-  'a first sync of an existing account does not rewrite its account row');
+SELECT ok(NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001030'),
+  'first persistent sync of an existing account retains its compatibility clock');
 
--- Public API writes: normalized only, created empty when missing, no account-row write.
+-- Public API writes: normalized only, created empty when missing, retaining the account clock.
 SELECT is(public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'pvp_data',
   '{"task-a":{"complete":true,"timestamp":1}}', NULL, NULL), 1, 'an API write applies');
 SELECT results_eq(
@@ -128,8 +128,8 @@ SELECT results_eq(
 SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'pve_data',
   NULL, NULL, '{"level":12}');
 SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
-    AND pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
-  'PvP and PvE API writes leave the account row and legacy columns untouched');
+    AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
+  'PvP and PvE API writes freeze legacy JSON while retaining the account clock');
 -- Account activity comes from the normalized write.
 DELETE FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029';
 INSERT INTO private.account_retention (user_id, last_active_at, pending_since)

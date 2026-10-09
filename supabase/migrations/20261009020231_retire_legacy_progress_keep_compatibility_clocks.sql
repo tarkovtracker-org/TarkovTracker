@@ -1,26 +1,22 @@
--- #1028 Phase 3: retire the legacy PvP/PvE dual writes.
+-- #1028 Phase 3: retire legacy PvP/PvE JSON mirrors, retaining the accepted v1 clock contract.
+-- Both RPCs merge from normalized rows only. Legacy columns remain frozen until Phase 4.
+-- Before deployment, verify private.unmaterialized_mode_progress is zero in all 16 UUID ranges.
 --
--- user_game_mode_progress is the only progress store; user_progress keeps account metadata
--- (selected mode, edition, Tarkov UID). The production completion gate
--- private.unmaterialized_mode_progress returned zero rows for both modes in every UUID range
--- (2026-10-04), and Phase 2 (#1072) removed every application, server and gateway legacy reader,
--- so no write path still needs the legacy columns as a merge base.
+-- Cached pre-#1087 startup compares aggregate mode freshness with user_progress.updated_at.
+-- A persistent-mode write must still advance that account clock, or stale trader/skill maxima
+-- can replace newer decreases. Client sync advances it once when PvP/PvE progress or metadata
+-- changes; identical syncs and Seasonal-only client syncs keep their prior behavior. API writes
+-- advance it in every mode, including no-op requests, as the original RPC did.
+-- This stops JSON dual writes; account-row Realtime suppression is a later protocol transition.
+-- Remove compatibility clocks only after server-enforced old-writer retirement and real cached
+-- client read/reload/reconnect tests establish that an old writer cannot resurrect progress.
+-- No client clock flag is trusted, and no second progress store is maintained.
 --
--- After this migration:
--- * sync_user_game_mode_progress writes only account metadata to user_progress, and only when it
---   changed, so a mode-only sync no longer rewrites the account row or emits a user_progress
---   Realtime change; its normalized merge base is the normalized row alone.
--- * merge_progress_data creates a missing normalized row empty and never seeds from or mirrors to
---   the legacy columns; only a Seasonal write still advances the account clock, as before.
--- * The sync_legacy_user_progress_modes trigger and the unused legacy-only update_task_completion
---   writer are dropped, so a legacy column write can no longer reach normalized progress.
--- Signatures, grants and return contracts are unchanged for rolling clients and the deployed
--- Worker. pvp_data / pve_data remain in place (frozen) until Phase 4 drops them.
---
--- Irreversible: there is no down migration. Once deployed the legacy columns go stale, so a revert
--- must not reinstate sync_legacy_user_progress_modes or the legacy-writing function bodies; that
--- would let frozen legacy data overwrite newer normalized progress. Fix forward, or first re-sync
--- the legacy columns from normalized rows in a separately reviewed migration. Requires #1087.
+-- Signatures, grants and responses are unchanged. The legacy-to-normalized bridge and unused
+-- legacy-only update_task_completion writer are dropped. #1087's new-client policy remains.
+-- Irreversible: frozen columns cannot restore newer normalized changes. Do not reinstate the
+-- bridge or legacy-writing bodies without a reviewed normalized-to-legacy reconciliation first.
+-- Prefer a forward fix; data deletion and production migration execution require separate approval.
 
 CREATE OR REPLACE FUNCTION public.sync_user_game_mode_progress(
   p_current_game_mode text,
@@ -49,6 +45,8 @@ DECLARE
   v_stored_uid BIGINT;
   v_uid_conflict BOOLEAN := false;
   v_constraint TEXT;
+  v_rows_changed INTEGER;
+  v_persistent_changed BOOLEAN := false;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -107,15 +105,6 @@ BEGIN
         COALESCE(v_existing_mode, v_empty_object), v_progress));
   END LOOP;
 
-  -- Unchanged metadata leaves the account row, its timestamps and its Realtime stream untouched.
-  UPDATE public.user_progress
-  SET
-    current_game_mode = p_current_game_mode,
-    game_edition = COALESCE(p_game_edition, 1)
-  WHERE user_id = v_user_id
-    AND (current_game_mode, game_edition)
-      IS DISTINCT FROM (p_current_game_mode, COALESCE(p_game_edition, 1));
-
   FOR v_mode, v_progress IN SELECT key, value FROM jsonb_each(p_modes) LOOP
     IF v_mode = v_seasonal_mode
       AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
@@ -144,7 +133,19 @@ BEGIN
     ON CONFLICT (user_id, game_mode, season_number) DO UPDATE
     SET progress_data = EXCLUDED.progress_data
     WHERE user_game_mode_progress.progress_data IS DISTINCT FROM EXCLUDED.progress_data;
+    GET DIAGNOSTICS v_rows_changed = ROW_COUNT;
+    v_persistent_changed := v_persistent_changed
+      OR (v_mode IN (v_pvp_mode, v_pve_mode) AND v_rows_changed > 0);
   END LOOP;
+
+  -- Preserve the accepted v1 account-clock contract once per sync, without writing legacy JSON.
+  -- Seasonal-only syncs still leave this clock alone; identical persistent syncs do as well.
+  UPDATE public.user_progress
+  SET current_game_mode = p_current_game_mode,
+    game_edition = COALESCE(p_game_edition, 1), updated_at = now()
+  WHERE user_id = v_user_id
+    AND (v_persistent_changed OR (current_game_mode, game_edition)
+      IS DISTINCT FROM (p_current_game_mode, COALESCE(p_game_edition, 1)));
 
   -- Link last, in its own savepoint: a UID owned by another account leaves this account's link
   -- unchanged and is reported, instead of rolling back the progress written above.
@@ -271,11 +272,9 @@ BEGIN
   WHERE user_id = p_user_id
     AND game_mode = v_game_mode
     AND season_number = v_season_number;
-  -- As before, a Seasonal write advances the account clock (and only that). Startup treats a
-  -- mode newer than both that clock and the PvP/PvE clocks as independently advanced.
-  IF v_game_mode = 'seasonal' THEN
-    UPDATE public.user_progress SET updated_at = now() WHERE user_id = p_user_id;
-  END IF;
+  -- Every API write advanced the account clock before mirror retirement. Preserve that v1
+  -- contract for cached clients, including no-op API requests, without rewriting legacy JSON.
+  UPDATE public.user_progress SET updated_at = now() WHERE user_id = p_user_id;
   RETURN 1;
 END;
 $function$;
