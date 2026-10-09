@@ -39,6 +39,7 @@ const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
     providers: ['discord'],
   },
 }));
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: supabaseUser } }));
 const tarkovStore = {
   $state: {
@@ -1558,6 +1559,23 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it.each([
+    [1, null, 'empty_device_archive'],
+    [2, null, 'invalid_device_archive'],
+    [1, 42, 'invalid_device_archive'],
+    [1, 'not-json', 'invalid_device_archive'],
+  ])('explains an unpreviewable device archive (%s, %s)', async (version, current, error) => {
+    const backup = useDataBackup();
+    const before = JSON.stringify(tarkovStore.$state);
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: version, current })
+      )
+    );
+    expect(backup.importState.value).toBe('error');
+    expect(backup.importError.value).toBe(`settings.data_management.${error}`);
+    expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+  });
   it('migrates a pre-mode flat recovery archive into preview without applying it', async () => {
     const flat = { ...tarkovStore.$state.pvp, gameEdition: 2, level: 36 };
     const backup = useDataBackup();

@@ -1,3 +1,4 @@
+import { useI18n } from 'vue-i18n';
 import { useAnalyticsConsent, type AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
 import {
   migrateToGameModeStructure,
@@ -399,11 +400,26 @@ function buildOlderTabBackup(raw: string): TarkovTrackerExport {
   const migrated = sanitizeOwnedUserState(migrateToGameModeStructure(source));
   return { ...checked.data.export, ...migrated };
 }
-function resolveRecoveryArchive(json: unknown): unknown {
-  if (!isPlainObject(json) || json._format !== 'tarkovtracker-device-progress') return json;
-  if (json._version !== 1 || typeof json.current !== 'string')
-    throw new Error('Invalid device archive');
-  return buildOlderTabBackup(json.current);
+type RecoveryArchiveResult =
+  | { ok: true; value: unknown }
+  | { ok: false; error: 'empty_device_archive' | 'invalid_device_archive' };
+function parseRecoveryProgress(raw: string): RecoveryArchiveResult {
+  try {
+    return { ok: true, value: buildOlderTabBackup(raw) };
+  } catch {
+    return { ok: false, error: 'invalid_device_archive' };
+  }
+}
+function resolveRecoveryProgress(raw: unknown): RecoveryArchiveResult {
+  if (raw === null) return { ok: false, error: 'empty_device_archive' };
+  if (typeof raw !== 'string') return { ok: false, error: 'invalid_device_archive' };
+  return parseRecoveryProgress(raw);
+}
+function resolveRecoveryArchive(json: unknown): RecoveryArchiveResult {
+  if (!isPlainObject(json) || json._format !== 'tarkovtracker-device-progress')
+    return { ok: true, value: json };
+  if (json._version !== 1) return { ok: false, error: 'invalid_device_archive' };
+  return resolveRecoveryProgress(json.current);
 }
 function buildPreview(
   exportData: TarkovTrackerExport,
@@ -775,6 +791,7 @@ export function useDataBackup(): UseDataBackupReturn {
   const preferencesStore = usePreferencesStore();
   const analyticsConsent = useAnalyticsConsent();
   const { $supabase } = useNuxtApp();
+  const { t } = useI18n();
   const exportError = ref<string | null>(null);
   const debugExportError = ref<string | null>(null);
   const importState = ref<BackupImportState>('idle');
@@ -944,7 +961,13 @@ export function useDataBackup(): UseDataBackupReturn {
         importError.value = 'Failed to parse JSON — file may be corrupted';
         return;
       }
-      const result = validateBackup(resolveRecoveryArchive(json));
+      const resolved = resolveRecoveryArchive(json);
+      if (!resolved.ok) {
+        importState.value = 'error';
+        importError.value = t(`settings.data_management.${resolved.error}`);
+        return;
+      }
+      const result = validateBackup(resolved.value);
       if (!result.ok) {
         importState.value = 'error';
         importError.value = result.error;

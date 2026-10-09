@@ -77,6 +77,25 @@ const acceptAuthority = (record: ActiveProgressRecord): void => {
   legacyProgressRecoveryOverflow.value = record.legacyRecoveryOverflow === true;
   legacyProgressRecoveryCount.value = ownedLegacyUpdates(record, token?.owner ?? null).length;
 };
+const matchesReceiptToken = (request: ProgressOwnerToken): boolean => {
+  if (!token) return false;
+  return token.owner === request.owner && token.generation === request.generation;
+};
+const ownsReceiptSession = (request: ProgressOwnerToken): boolean =>
+  matchesReceiptToken(request) && (!readSessionOwner || readSessionOwner() === request.owner);
+const announceCommittedRevision = (revision: number): void => {
+  announcements?.postMessage({ revision });
+};
+/** Every durable commit announces; stale receipts cannot replace the current session cache. */
+const adoptCommittedReceipt = (
+  request: ProgressOwnerToken,
+  record: ActiveProgressRecord
+): boolean => {
+  announceCommittedRevision(record.revision);
+  if (!ownsReceiptSession(request)) return false;
+  if (!accepted || record.revision > accepted.revision) acceptAuthority(record);
+  return record.revision === accepted!.revision;
+};
 export const refreshProgressAuthority = async (source = legacySource): Promise<void> => {
   if (!token) return;
   const request = structuredClone(token);
@@ -182,9 +201,9 @@ export const commitProgressMutation = async (
       actions = next.actions;
       return { raw: next.raw, result: next.result };
     });
-    if (!canContinue()) return { ok: false, error: null, canceled: true };
-    acceptAuthority(receipt.committed);
-    announcements?.postMessage({ revision: receipt.committed.revision });
+    if (!adoptCommittedReceipt(request, receipt.committed) || !canContinue()) {
+      return { ok: false, error: null, canceled: true };
+    }
     actions.forEach((action) => action());
     return receipt.result;
   } catch (error) {
@@ -229,8 +248,9 @@ export const removeOwnedProgressRecovery = async (
       },
     };
   });
-  if (!canContinue()) return { complete: false, released: false };
-  acceptAuthority(receipt.committed);
+  if (!adoptCommittedReceipt(request, receipt.committed) || !canContinue()) {
+    return { complete: false, released: false };
+  }
   return { complete, released: receipt.result };
 };
 const isExportedPendingLegacy = (
@@ -268,7 +288,7 @@ export const discardExportedLegacyProgress = async (
       },
     };
   });
-  if (!isCurrent()) throw new DOMException('Progress owner changed', 'InvalidStateError');
-  acceptAuthority(receipt.committed);
-  announcements?.postMessage({ revision: receipt.committed.revision });
+  if (!adoptCommittedReceipt(request, receipt.committed) || !isCurrent()) {
+    throw new DOMException('Progress owner changed', 'InvalidStateError');
+  }
 };

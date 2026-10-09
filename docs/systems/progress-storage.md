@@ -321,6 +321,7 @@ revoked grants: any rollback requires a separately reviewed forward migration, n
 The active browser envelope is stored in IndexedDB through `progressRepository.ts` and
 `progressAuthority.ts`. Pinia hydration awaits its read; local edits apply their captured field
 changes to the latest committed envelope. Cloud hydration retains its original source clocks.
+Durable revisions are announced even when the original caller is canceled after commit. Cache adoption checks the live owner, session generation and a newer revision, so a delayed receipt cannot overwrite a newer account or recovery observation.
 Saved and memory adoption follow transaction completion, and account generations fence stale
 callbacks while same-owner tabs share their generation. Failed account intent survives retry.
 

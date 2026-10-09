@@ -190,6 +190,161 @@ describe('native progress authority integration', () => {
     ).resolves.toEqual({ ok: true });
     db.close();
   });
+  it.each(['write', 'purge'] as const)(
+    'adopts and announces a durable %s canceled after put success',
+    async (kind) => {
+      const original = JSON.stringify({ _userId: 'a', data: {} });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      const a = await open('a');
+      a.configureProgressSession(() => 'a');
+      const postMessage = vi.fn();
+      vi.stubGlobal(
+        'BroadcastChannel',
+        class {
+          postMessage = postMessage;
+          addEventListener() {}
+          close() {}
+        }
+      );
+      const stop = a.observeProgressAuthority(vi.fn());
+      let current = true;
+      const action = vi.fn();
+      const nativePut = IDBObjectStore.prototype.put;
+      vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+        this: IDBObjectStore,
+        ...args
+      ) {
+        const request = nativePut.apply(this, args);
+        request.addEventListener('success', () => {
+          current = false;
+        });
+        return request;
+      });
+      const result =
+        kind === 'write'
+          ? await a.commitProgressMutation(
+              () => {
+                a.writeAuthoritativeProgress('durable');
+                a.afterProgressCommit(action);
+                return { ok: true };
+              },
+              () => current,
+              'a'
+            )
+          : await a.removeOwnedProgressRecovery('a', () => current);
+      expect(a.readAuthoritativeProgress()).toBe(kind === 'write' ? 'durable' : null);
+      expect(postMessage).toHaveBeenCalledWith({ revision: 1 });
+      expect(action).not.toHaveBeenCalled();
+      expect(result).toMatchObject(
+        kind === 'write' ? { canceled: true } : { complete: false, released: false }
+      );
+      stop();
+    }
+  );
+  it.each([
+    ['owner', 'write'],
+    ['revision', 'write'],
+    ['owner', 'purge'],
+    ['revision', 'purge'],
+  ] as const)(
+    'does not regress a newer %s when an old durable %s receipt resolves late',
+    async (change, kind) => {
+      const module = await import('@/stores/tarkov/progressRepository');
+      const db = await module.openActiveProgressRepository(
+        factory,
+        'tarkovtracker-active-progress-v1'
+      );
+      let release!: () => void;
+      let didCommit!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const committed = new Promise<void>((resolve) => {
+        didCommit = resolve;
+      });
+      let delay = true;
+      vi.spyOn(module, 'openActiveProgressRepository').mockResolvedValue({
+        ...db,
+        mutate: async (...args) => {
+          const receipt = await db.mutate(...args);
+          if (delay) {
+            delay = false;
+            didCommit();
+            await gate;
+          }
+          return receipt;
+        },
+      });
+      const a = await open('a');
+      let owner = 'a';
+      a.configureProgressSession(() => owner);
+      const action = vi.fn();
+      const old =
+        kind === 'write'
+          ? a.commitProgressMutation(
+              () => {
+                a.writeAuthoritativeProgress('old');
+                a.afterProgressCommit(action);
+                return { ok: true };
+              },
+              () => true,
+              'a'
+            )
+          : a.removeOwnedProgressRecovery('a');
+      await committed;
+      if (change === 'owner') {
+        owner = 'b';
+        await a.initializeProgressAuthority('b');
+      }
+      await a.commitProgressMutation(
+        () => {
+          a.writeAuthoritativeProgress('newer');
+          return { ok: true };
+        },
+        () => true,
+        owner
+      );
+      release();
+      expect(await old).toMatchObject(
+        kind === 'write' ? { canceled: true } : { complete: false, released: false }
+      );
+      expect(a.readAuthoritativeProgress()).toBe('newer');
+      expect(action).not.toHaveBeenCalled();
+      db.close();
+    }
+  );
+  it('announces exported cleanup even when identity changes after put success', async () => {
+    const a = await open('a');
+    let owner = 'a';
+    a.configureProgressSession(() => owner);
+    const postMessage = vi.fn();
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class {
+        postMessage = postMessage;
+        addEventListener() {}
+        close() {}
+      }
+    );
+    const stop = a.observeProgressAuthority(vi.fn());
+    const nativePut = IDBObjectStore.prototype.put;
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      const request = nativePut.apply(this, args);
+      request.addEventListener('success', () => {
+        owner = 'b';
+      });
+      return request;
+    });
+    await expect(a.discardExportedLegacyProgress('a', [])).rejects.toThrow(
+      'Progress owner changed'
+    );
+    expect(postMessage).toHaveBeenCalledWith({ revision: 1 });
+    expect(a.isProgressAuthorityReady()).toBe(false);
+    stop();
+  });
   it('rejects an old tab after A to B to A before invoking its mutation', async () => {
     const a = await open('a');
     vi.resetModules();

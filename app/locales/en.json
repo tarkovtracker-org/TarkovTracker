@@ -2069,6 +2069,8 @@
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
       "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
+      "empty_device_archive": "This recovery archive has no current saved progress to preview. Its recovery copies remain in the exported file.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
       "older_tab_recovery_full": "Recovery storage is full. Export recovery copies for this account, then clear the exported copies to make room. Keep older tabs open until their edits have been recovered.",
       "review_older_edit": "Review older edit {index}",
       "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
