@@ -39,6 +39,7 @@ function createHarness(
     readError?: string;
     fulfillmentError?: string;
     refundError?: string;
+    refundResult?: Row;
     fulfillmentReplay?: boolean;
     writeResult?: Row;
   } = {}
@@ -116,6 +117,7 @@ function createHarness(
                 refundCalls.push(params);
                 if (options.refundError)
                   return Promise.resolve({ data: null, error: { message: options.refundError } });
+                row = { ...row, ...options.refundResult };
                 return Promise.resolve({ data: row, error: null });
               }
               if (name === 'fulfill_one_time_supporter') {
@@ -943,6 +945,83 @@ describe('one-time refunds during a subscription', () => {
     ).toBe(true);
     expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
   });
+  it('routes resumed one-time credit through the same receipt-aware refund', async () => {
+    const running = {
+      ...subscribed,
+      type: 'one_time',
+      stripe_subscription_id: null,
+      one_time_remaining: null,
+      one_time_expires_at: '2026-11-01T00:00:00Z',
+    };
+    const harness = createHarness(running, {});
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls).toHaveLength(1);
+    expect(harness.writes).toEqual([]);
+  });
+  it.each([0, 1])(
+    'preserves verified contribution history after credit exhaustion with %s other payments',
+    async (count) => {
+      const harness = createHarness(
+        { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+        {
+          '/charges?customer=cus_1&limit=100': {
+            data: count ? [priorCharge] : [charge],
+            has_more: false,
+          },
+        },
+        {
+          refundResult: {
+            one_time_tier: null,
+            one_time_expires_at: null,
+            one_time_remaining: null,
+            status: 'expired',
+            tier: 'supporter',
+          },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.current().has_ever_supported).toBe(count > 0);
+      expect(harness.current().status).toBe(count ? 'expired' : 'cancelled');
+    }
+  );
+  it('defers exhausted credit history revocation when Stripe history is unavailable', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      {},
+      { refundResult: { one_time_tier: null, one_time_remaining: null } }
+    );
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Unable to verify refunded credit contribution history');
+    expect(harness.current().has_ever_supported).toBe(true);
+    expect(harness.writes).toEqual([]);
+  });
+  it('preserves running credit after a refund of an ended subscription invoice', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      { '/invoices/in_old': { subscription: 'sub_old' } }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: 'in_old' });
+    expect(harness.refundCalls).toEqual([]);
+    expect(harness.writes).toEqual([]);
+  });
+  it('preserves a subscription that starts before exhausted refund history is reconciled', async () => {
+    const harness = createHarness(
+      { ...subscribed, type: 'one_time', stripe_subscription_id: null },
+      {},
+      {
+        refundResult: {
+          type: 'subscription',
+          status: 'active',
+          stripe_subscription_id: 'sub_new',
+          one_time_tier: null,
+        },
+      }
+    );
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.current().status).toBe('active');
+    expect(harness.writes).toEqual([]);
+  });
   it('defers the event if bank refund persistence fails', async () => {
     const harness = createHarness(subscribed, {}, { refundError: 'offline' });
     await expect(
@@ -973,42 +1052,66 @@ describe('pre-ledger lifetime refunds', () => {
     one_time_remaining: null,
     one_time_legacy_unlimited: true,
   };
-  it('passes only another valid lifetime payment tier as verified history', async () => {
-    const harness = createHarness(legacy, {
-      '/charges?customer=cus_1&limit=100': {
-        data: [charge, { ...priorCharge, payment_intent: 'pi_kept' }],
-        has_more: false,
-      },
-      '/checkout/sessions?payment_intent=pi_kept&limit=100': {
-        data: [{ metadata: { tier: 'scav' } }],
-        has_more: false,
-      },
-    });
-    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
-    expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: 'scav' });
-  });
-  it('clears the legacy bank when no other lifetime payment remains', async () => {
-    const harness = createHarness(legacy, {
-      '/charges?customer=cus_1&limit=100': { data: [charge], has_more: false },
-    });
-    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
-    expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: null });
-  });
-  it('defers destructive refund reconciliation when Stripe history is unavailable', async () => {
-    const harness = createHarness(legacy, {});
-    await expect(
-      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
-    ).rejects.toThrow('Unable to verify legacy payment history');
-    expect(harness.refundCalls).toEqual([]);
-    expect(harness.writes).toEqual([]);
-  });
-  it('requires complete checkout evidence rather than guessing a legacy tier', async () => {
-    const harness = createHarness(legacy, {
-      '/charges?customer=cus_1&limit=100': { data: [priorCharge], has_more: false },
-    });
-    await expect(
-      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
-    ).rejects.toThrow('Unable to verify legacy checkout tier');
-    expect(harness.refundCalls).toEqual([]);
-  });
+  it.each(['subscription', 'one_time'])(
+    'passes only verified lifetime payment tier for %s credit',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': {
+            data: [charge, { ...priorCharge, payment_intent: 'pi_kept' }],
+            has_more: false,
+          },
+          '/checkout/sessions?payment_intent=pi_kept&limit=100': {
+            data: [{ metadata: { tier: 'scav' } }],
+            has_more: false,
+          },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: 'scav' });
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'clears %s legacy credit when no lifetime payment remains',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': { data: [charge], has_more: false },
+        }
+      );
+      await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+      expect(harness.refundCalls[0]).toMatchObject({ p_legacy_tier: null });
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'defers %s legacy refunds when history is unavailable',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {}
+      );
+      await expect(
+        harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+      ).rejects.toThrow('Unable to verify legacy payment history');
+      expect(harness.refundCalls).toEqual([]);
+      expect(harness.writes).toEqual([]);
+    }
+  );
+  it.each(['subscription', 'one_time'])(
+    'requires complete checkout evidence for %s legacy credit',
+    async (type) => {
+      const harness = createHarness(
+        { ...legacy, type, stripe_subscription_id: type === 'subscription' ? 'sub_1' : null },
+        {
+          '/charges?customer=cus_1&limit=100': { data: [priorCharge], has_more: false },
+        }
+      );
+      await expect(
+        harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+      ).rejects.toThrow('Unable to verify legacy checkout tier');
+      expect(harness.refundCalls).toEqual([]);
+    }
+  );
 });

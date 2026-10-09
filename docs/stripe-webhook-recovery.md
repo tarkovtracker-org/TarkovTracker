@@ -166,3 +166,14 @@ one-time charges and their Checkout Session tiers before reconciling the legacy 
 Subscription charges do not qualify. Missing history, incomplete pagination or missing checkout
 evidence causes a retry; a verified empty lifetime history clears legacy credit while preserving
 current subscription access and independently recorded prepaid days.
+
+Full refunds of finite one-time payments use the same atomic receipt ledger while credit is
+paused and after it resumes. The current unspent tail is allocated newest payment first;
+refunding a spent payment removes no other payment's days. Refunds retain the highest remaining
+paid tier, and ordinary payments added after resumption use their original finite duration when
+no paused receipt allocation exists. Partial monetary refunds keep the existing entitlement.
+Refund receipts fence later checkout delivery and replay. When running credit is exhausted,
+the handler verifies remaining Stripe contributions before clearing retained Supporter history;
+unavailable history retries, and refunded subscription invoices cannot revoke independent credit.
+
+Subscription recovery re-banks only the unused tail after read-time grace expiry, preventing previously used prepaid days from being granted again.

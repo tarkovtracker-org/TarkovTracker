@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,913) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,922) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -240,7 +240,7 @@ SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE pa
 SELECT pg_temp.pay(912,'pi_refund_exhausted_first');
 SELECT pg_temp.pay(912,'pi_refund_exhausted_second');
 ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
-UPDATE public.supporters SET status='past_due',expires_at=now()-interval '40 days'
+UPDATE public.supporters SET status='past_due',expires_at=now()-interval '61 days'
  WHERE user_id='00000000-0000-0000-0000-000000000912';
 ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
 SELECT public.refund_one_time_supporter('pi_refund_exhausted_first',
@@ -272,6 +272,127 @@ UPDATE public.supporters SET status='expired',tier='supporter',expires_at=now(),
 SELECT ok((SELECT type='one_time' AND status='active' AND tier='scav' AND expires_at IS NULL
  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000913'),
  'refund of a later receipt preserves independently verified original lifetime access');
+-- Actual unspent credit, rather than original paused allocations, controls running refunds.
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id)
+SELECT ('00000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'subscription','active','chad','sub_running_'||n
+FROM generate_series(914,920) n;
+SELECT pg_temp.pay(914,'pi_running_old');
+SELECT pg_temp.pay(914,'pi_running_new');
+UPDATE public.supporters SET status='expired',expires_at=now()-interval '40 days',stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000914';
+SELECT public.refund_one_time_supporter('pi_running_old','00000000-0000-0000-0000-000000000914','2026-10-07',400);
+SELECT ok((SELECT type='one_time' AND status='active' AND expires_at=now()+interval '20 days'
+ AND one_time_expires_at=expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000914'),
+ 'refund of fully spent oldest receipt preserves remaining newer running credit');
+SELECT public.refund_one_time_supporter('pi_running_new','00000000-0000-0000-0000-000000000914','2026-10-07',400);
+SELECT ok((SELECT one_time_tier IS NULL AND status='expired' AND expires_at<=now()
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000914'),
+ 'refund of partially spent newest receipt removes its actual remaining credit');
+SELECT pg_temp.pay(915,'pi_running_partial_old');
+SELECT pg_temp.pay(915,'pi_running_partial_new');
+UPDATE public.supporters SET status='expired',expires_at=now()-interval '10 days',stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000915';
+SELECT public.refund_one_time_supporter('pi_running_partial_old','00000000-0000-0000-0000-000000000915','2026-10-07',400);
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000915'),
+ now()+interval '30 days','partly spent oldest running refund preserves all newer days');
+SELECT pg_temp.pay(915,'pi_running_added');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_running_added'),
+ NULL::interval,'ordinary running payment keeps its original receipt shape');
+SELECT public.refund_one_time_supporter('pi_running_added','00000000-0000-0000-0000-000000000915','2026-10-07',400);
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000915'),
+ now()+interval '30 days','post-resumption receipt without bank allocation refunds its purchased days');
+SELECT public.refund_one_time_supporter('pi_running_added','00000000-0000-0000-0000-000000000915','2026-10-07',400);
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000915'),
+ now()+interval '30 days','running refund replay subtracts no additional days');
+SELECT pg_temp.pay(916,'pi_running_exhausted');
+UPDATE public.supporters SET status='expired',expires_at=now()-interval '31 days',stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000916';
+SELECT public.refund_one_time_supporter('pi_running_exhausted','00000000-0000-0000-0000-000000000916','2026-10-07',400);
+SELECT ok((SELECT one_time_tier IS NULL AND NOT(status='active' AND (expires_at IS NULL OR expires_at>now()))
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000916'),
+ 'refund of exhausted bank cannot recreate running access');
+SELECT pg_temp.pay(917,'pi_running_fenced_kept');
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000917';
+SELECT public.refund_one_time_supporter('pi_running_fenced','00000000-0000-0000-0000-000000000917','2026-10-07',400);
+SELECT pg_temp.pay(917,'pi_running_fenced');
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000917'),
+ now()+interval '30 days','refund before checkout preserves other running credit and fences replay');
+-- Known lifetime receipts and verified pre-ledger history must update the effective running tier.
+SELECT pg_temp.pay(918,'pi_running_lifetime_kept','2026-10-06');
+SELECT public.fulfill_one_time_supporter('pi_running_lifetime_refunded','2026-10-06',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000918','tier','chad','amount_total',1200));
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000918';
+SELECT public.refund_one_time_supporter('pi_running_lifetime_refunded','00000000-0000-0000-0000-000000000918','2026-10-06',1200);
+SELECT ok((SELECT tier='scav' AND one_time_tier='scav' AND expires_at IS NULL AND status='active'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000918'),
+ 'running lifetime refund downgrades to remaining payment tier');
+UPDATE public.supporters SET one_time_tier='chad',one_time_legacy_unlimited=true
+WHERE user_id='00000000-0000-0000-0000-000000000919';
+SELECT pg_temp.pay(919,'pi_running_legacy_finite');
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000919';
+SELECT public.refund_one_time_supporter('pi_running_legacy_high','00000000-0000-0000-0000-000000000919','2026-10-06',1200,'scav');
+SELECT ok((SELECT tier='scav' AND one_time_tier='scav' AND expires_at IS NULL AND one_time_legacy_unlimited
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000919'),
+ 'verified running pre-ledger refund preserves another lifetime tier without trigger overwrite');
+SELECT public.refund_one_time_supporter('pi_running_legacy_original','00000000-0000-0000-0000-000000000919','2026-10-06',1200,NULL);
+SELECT ok((SELECT tier='scav' AND one_time_tier='scav' AND expires_at=now()+interval '30 days'
+ AND NOT one_time_legacy_unlimited AND one_time_expires_at=expires_at
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000919'),
+ 'last running pre-ledger lifetime refund starts independently purchased finite credit');
+SELECT pg_temp.pay(920,'pi_running_tier_low');
+SELECT public.fulfill_one_time_supporter('pi_running_tier_high','2026-10-07',
+ jsonb_build_object('user_id','00000000-0000-0000-0000-000000000920','tier','chad','amount_total',400));
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+WHERE user_id='00000000-0000-0000-0000-000000000920';
+SELECT public.refund_one_time_supporter('pi_running_tier_high','00000000-0000-0000-0000-000000000920','2026-10-07',400);
+SELECT ok((SELECT tier='scav' AND one_time_tier='scav' AND expires_at=now()+interval '30 days'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000920'),
+ 'running finite refund uses highest remaining paid tier without trigger overwrite');
+-- Recovery must pause only credit left after read-time use beyond the grace deadline.
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id)
+VALUES ('00000000-0000-0000-0000-000000000921','subscription','active','chad','sub_recover_partial'),
+ ('00000000-0000-0000-0000-000000000922','subscription','active','chad','sub_recover_exhausted');
+SELECT pg_temp.pay(921,'pi_recover_partial_old');
+SELECT pg_temp.pay(921,'pi_recover_partial_new');
+SELECT pg_temp.pay(922,'pi_recover_exhausted_old');
+SELECT pg_temp.pay(922,'pi_recover_exhausted_new');
+-- Time passes without another webhook or write, leaving the original raw paused balance.
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET status='past_due',expires_at=now()-interval '10 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000921';
+UPDATE public.supporters SET status='past_due',expires_at=now()-interval '61 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000922';
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+SELECT is((SELECT expires_at FROM public.supporter_entitlements
+ WHERE user_id='00000000-0000-0000-0000-000000000921'),now()+interval '50 days',
+ 'read-time credit has already spent ten days before subscription recovery');
+UPDATE public.supporters SET status='active',expires_at=NULL
+ WHERE user_id IN ('00000000-0000-0000-0000-000000000921','00000000-0000-0000-0000-000000000922');
+SELECT is((SELECT one_time_remaining FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000921'),interval '50 days',
+ 'recovering subscription pauses only actual unspent projected credit');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_recover_partial_old'),
+ interval '20 days','recovery updates the partly spent receipt allocation');
+UPDATE public.supporters SET updated_at=now()
+ WHERE user_id='00000000-0000-0000-0000-000000000921';
+SELECT is((SELECT one_time_remaining FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000921'),interval '50 days',
+ 'replayed recovery does not spend the projected days again');
+SELECT ok((SELECT type='subscription' AND status='active' AND one_time_tier IS NULL
+ AND one_time_remaining IS NULL AND one_time_expires_at IS NULL
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000922'),
+ 'recovery clears fully spent credit while preserving current subscription access');
+UPDATE public.supporters SET status='expired',expires_at=now(),stripe_subscription_id=NULL
+ WHERE user_id IN ('00000000-0000-0000-0000-000000000921','00000000-0000-0000-0000-000000000922');
+SELECT is((SELECT expires_at FROM public.supporter_entitlements
+ WHERE user_id='00000000-0000-0000-0000-000000000921'),now()+interval '50 days',
+ 'ending recovered subscription resumes fifty days instead of double-granting sixty');
+SELECT ok((SELECT one_time_tier IS NULL AND NOT(status='active' AND (expires_at IS NULL OR expires_at>now()))
+ FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000922'),
+ 'ending recovered subscription cannot resurrect fully spent projected credit');
 CREATE FUNCTION pg_temp.entitlement_lookup_plan() RETURNS text LANGUAGE plpgsql AS $$
 DECLARE plan json;
 BEGIN

@@ -65,6 +65,17 @@ BEGIN
     NEW.one_time_expires_at := NEW.expires_at;
     NEW.one_time_remaining := NULL;
   END IF;
+  -- Read-time entitlement projection spends paused credit after grace ends,
+  -- even without another webhook. Recovery must pause that actual remaining tail.
+  -- Explicit credit writes already supply their own expiry/balance; preserve them.
+  IF TG_OP = 'UPDATE' AND subscription_access AND OLD.type = 'subscription'
+    AND OLD.status IN ('active','past_due') AND OLD.expires_at <= now()
+    AND OLD.one_time_remaining IS NOT NULL
+    AND NEW.one_time_remaining IS NOT DISTINCT FROM OLD.one_time_remaining
+    AND NEW.one_time_expires_at IS NULL AND NEW.one_time_tier IS NOT NULL THEN
+    NEW.one_time_expires_at := OLD.expires_at + OLD.one_time_remaining;
+    NEW.one_time_remaining := NULL;
+  END IF;
   IF subscription_access AND NEW.one_time_expires_at IS NOT NULL THEN
     IF NEW.one_time_expires_at > now() THEN
       NEW.one_time_remaining := NEW.one_time_expires_at - now();
@@ -273,6 +284,12 @@ DECLARE
   credit_tier text;
   remaining interval;
   new_receipt boolean;
+  paused boolean;
+  resume_at timestamptz;
+  total_remaining interval;
+  refunded_remaining interval;
+  lifetime_tier text;
+  verified_legacy_refund boolean;
 BEGIN
   PERFORM private.assert_one_time_stripe_event_claim();
   IF p_payment_id IS NULL OR p_payment_id !~ '^pi_[A-Za-z0-9_]+$' OR length(p_payment_id) > 255
@@ -295,51 +312,78 @@ BEGIN
   IF p_legacy_tier IS NOT NULL AND p_legacy_tier NOT IN ('supporter','scav','timmy','chad') THEN
     RAISE EXCEPTION 'Invalid verified legacy tier';
   END IF;
-  IF existing.one_time_legacy_unlimited AND p_paid_at < timestamptz '2026-10-07 00:00:00+00' THEN
-    SELECT coalesce(sum(banked_duration),interval '0') INTO remaining
-      FROM private.stripe_one_time_payments WHERE user_id=p_user_id AND refunded_at IS NULL;
-    SELECT p.credit_tier INTO credit_tier FROM private.stripe_one_time_payments p
-      WHERE p.user_id=p_user_id AND p.refunded_at IS NULL AND p.banked_duration > interval '0'
-      ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC NULLS LAST LIMIT 1;
-    UPDATE public.supporters SET one_time_legacy_unlimited=p_legacy_tier IS NOT NULL,
-      one_time_remaining=CASE WHEN p_legacy_tier IS NULL THEN nullif(remaining,interval '0') END,
-      one_time_tier=CASE WHEN p_legacy_tier IS NOT NULL THEN
-        (SELECT t FROM unnest(ARRAY[p_legacy_tier,credit_tier]) t
-          ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],t) DESC NULLS LAST LIMIT 1)
-        WHEN remaining > interval '0' THEN coalesce(credit_tier,existing.one_time_tier) END,
-      one_time_expires_at=NULL,updated_at=now()
-      WHERE user_id=p_user_id RETURNING * INTO existing;
-  END IF;
-  IF new_receipt THEN RETURN existing; END IF;
   SELECT * INTO STRICT receipt FROM private.stripe_one_time_payments WHERE payment_id = p_payment_id FOR UPDATE;
   IF receipt.user_id <> p_user_id THEN RAISE EXCEPTION 'Stripe payment belongs to another supporter'; END IF;
-  IF receipt.refunded_at IS NOT NULL THEN RETURN existing; END IF;
+  IF NOT new_receipt AND receipt.refunded_at IS NOT NULL THEN RETURN existing; END IF;
+  verified_legacy_refund := existing.one_time_legacy_unlimited
+    AND p_paid_at < timestamptz '2026-10-07 00:00:00+00';
   UPDATE private.stripe_one_time_payments SET refunded_at = now(), banked_duration = interval '0'
     WHERE payment_id = p_payment_id;
-  IF existing.type <> 'subscription' OR existing.one_time_tier IS NULL THEN RETURN existing; END IF;
-  remaining := greatest(interval '0', existing.one_time_remaining - coalesce(receipt.banked_duration, interval '0'));
-  IF existing.one_time_remaining IS NULL AND NOT existing.one_time_legacy_unlimited
-    AND receipt.paid_at < timestamptz '2026-10-07 00:00:00+00'
-    AND NOT EXISTS (SELECT 1 FROM private.stripe_one_time_payments WHERE user_id = p_user_id
-      AND paid_at < timestamptz '2026-10-07 00:00:00+00' AND refunded_at IS NULL) THEN
-    SELECT coalesce(sum(banked_duration),interval '0') INTO remaining
-      FROM private.stripe_one_time_payments WHERE user_id = p_user_id AND refunded_at IS NULL;
-  ELSIF existing.one_time_remaining IS NULL THEN
-    IF existing.one_time_legacy_unlimited THEN RETURN existing; END IF;
-    SELECT p.credit_tier INTO credit_tier FROM private.stripe_one_time_payments p
-      WHERE p.user_id = p_user_id AND p.refunded_at IS NULL
-        AND (p.banked_duration > interval '0' OR p.paid_at < timestamptz '2026-10-07 00:00:00+00')
-      ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC NULLS LAST LIMIT 1;
-    UPDATE public.supporters SET one_time_tier = coalesce(credit_tier,existing.one_time_tier),
-      updated_at = now() WHERE user_id = p_user_id RETURNING * INTO existing;
-    RETURN existing;
+  IF existing.one_time_tier IS NULL OR (new_receipt AND NOT verified_legacy_refund) THEN RETURN existing; END IF;
+
+  resume_at := CASE WHEN existing.status IN ('active','past_due') THEN existing.expires_at
+    ELSE coalesce(existing.subscription_ended_at,existing.expires_at) END;
+  paused := existing.type = 'subscription' AND existing.one_time_expires_at IS NULL
+    AND ((existing.status IN ('active','past_due') AND (existing.expires_at IS NULL OR existing.expires_at > now()))
+      OR resume_at IS NULL);
+  total_remaining := CASE WHEN paused THEN existing.one_time_remaining
+    WHEN existing.one_time_remaining IS NOT NULL THEN greatest(interval '0',resume_at + existing.one_time_remaining - now())
+    WHEN coalesce(existing.one_time_expires_at,CASE WHEN existing.type='one_time' THEN existing.expires_at END) IS NOT NULL
+      THEN greatest(interval '0',coalesce(existing.one_time_expires_at,existing.expires_at) - now()) END;
+
+  -- Original duration is only a fallback for ordinary finite receipts that were
+  -- never paused. Paused receipts already record their actual unspent allocation.
+  -- Allocate the actual remaining tail before removing this receipt, newest first.
+  WITH capacities AS (
+    SELECT p.payment_id,p.credit_tier,p.paid_at,p.credit_order,p.fulfilled_at,
+      CASE WHEN p.payment_id=p_payment_id THEN receipt.banked_duration ELSE p.banked_duration END AS banked,
+      p.amount_total
+    FROM private.stripe_one_time_payments p WHERE p.user_id=p_user_id
+      AND (p.refunded_at IS NULL OR (p.payment_id=p_payment_id AND NOT new_receipt))
+  ), durations AS (
+    SELECT *,coalesce(banked,interval '30 days' * least(12,greatest(1,amount_total / 400))) AS duration
+    FROM capacities WHERE paid_at >= timestamptz '2026-10-07 00:00:00+00'
+  ), allocations AS (
+    SELECT *,CASE WHEN total_remaining IS NULL THEN duration ELSE greatest(interval '0',least(duration,total_remaining -
+      coalesce(sum(duration) OVER (ORDER BY credit_order DESC NULLS LAST,fulfilled_at DESC,payment_id DESC
+        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),interval '0'))) END AS unspent FROM durations
+  )
+  SELECT coalesce(sum(a.unspent) FILTER (WHERE a.payment_id=p_payment_id),interval '0'),
+    coalesce(sum(a.unspent) FILTER (WHERE a.payment_id<>p_payment_id),interval '0'),
+    (array_agg(a.credit_tier ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],a.credit_tier) DESC NULLS LAST)
+      FILTER (WHERE a.payment_id<>p_payment_id AND a.unspent > interval '0'))[1]
+  INTO refunded_remaining,remaining,credit_tier FROM allocations a;
+  IF total_remaining IS NOT NULL THEN
+    remaining := greatest(interval '0',total_remaining - refunded_remaining);
   END IF;
-  SELECT p.credit_tier INTO credit_tier FROM private.stripe_one_time_payments p
-    WHERE p.user_id = p_user_id AND p.refunded_at IS NULL AND p.banked_duration > interval '0'
-    ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC LIMIT 1;
-  UPDATE public.supporters SET one_time_remaining = nullif(remaining,interval '0'),
-    one_time_tier = CASE WHEN remaining > interval '0' THEN coalesce(credit_tier,existing.one_time_tier) END,
-    one_time_expires_at = NULL, updated_at = now() WHERE user_id = p_user_id RETURNING * INTO existing;
+  IF verified_legacy_refund THEN
+    lifetime_tier := p_legacy_tier;
+  ELSIF existing.one_time_legacy_unlimited THEN
+    lifetime_tier := existing.one_time_tier;
+  ELSE
+    SELECT coalesce(p.credit_tier,existing.one_time_tier) INTO lifetime_tier FROM private.stripe_one_time_payments p
+      WHERE p.user_id=p_user_id AND p.refunded_at IS NULL AND p.paid_at < timestamptz '2026-10-07 00:00:00+00'
+      ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],p.credit_tier) DESC NULLS LAST LIMIT 1;
+  END IF;
+  -- A finite expiry cannot regain lifetime access from stale historical receipts.
+  IF total_remaining IS NOT NULL THEN lifetime_tier := NULL; END IF;
+  SELECT t INTO credit_tier FROM unnest(ARRAY[credit_tier,lifetime_tier]) t WHERE t IS NOT NULL
+    ORDER BY array_position(ARRAY['supporter','scav','timmy','chad'],t) DESC LIMIT 1;
+  IF credit_tier IS NULL AND remaining > interval '0' THEN credit_tier := existing.one_time_tier; END IF;
+  IF lifetime_tier IS NULL AND remaining <= interval '0' THEN credit_tier := NULL; END IF;
+  UPDATE public.supporters SET
+    one_time_legacy_unlimited=existing.one_time_legacy_unlimited AND
+      (NOT verified_legacy_refund OR p_legacy_tier IS NOT NULL),
+    one_time_tier=credit_tier,
+    one_time_remaining=CASE WHEN paused AND lifetime_tier IS NULL AND credit_tier IS NOT NULL THEN remaining END,
+    one_time_expires_at=CASE WHEN NOT paused AND lifetime_tier IS NULL AND credit_tier IS NOT NULL THEN now()+remaining END,
+    -- Keep the effective running row in sync; the compatibility trigger mirrors it.
+    tier=CASE WHEN existing.type='one_time' THEN coalesce(credit_tier,'supporter') ELSE existing.tier END,
+    status=CASE WHEN existing.type='one_time' AND credit_tier IS NULL THEN 'expired' ELSE existing.status END,
+    expires_at=CASE WHEN existing.type='one_time' THEN
+      CASE WHEN credit_tier IS NULL THEN now() WHEN lifetime_tier IS NULL THEN now()+remaining END
+      ELSE existing.expires_at END,
+    updated_at=now() WHERE user_id=p_user_id RETURNING * INTO existing;
   RETURN existing;
 END;
 $$;

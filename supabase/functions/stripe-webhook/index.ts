@@ -341,8 +341,8 @@ function canVerifyLiveSubscription(
     Boolean(supporter.stripe_subscription_id) && ['active', 'past_due'].includes(supporter.status)
   );
 }
-// deno-lint-ignore no-explicit-any
 async function activateSupporterFromSession(
+  // deno-lint-ignore no-explicit-any
   session: any,
   source: string,
   paidAt: string
@@ -1149,6 +1149,7 @@ async function handleChargeRefunded(charge: any): Promise<void> {
       `charge.refunded for customer=${customerId} charge=${charge.id} has no supporter row yet; deferring`
     );
   }
+  if (await refundRunningOneTimePayment(supporter, charge)) return;
   // Determine if the refunded charge is tied to the active subscription.
   // If the supporter has an active subscription and this charge belongs to a
   // different payment (one-time, old invoice, etc.), skip revocation to avoid
@@ -1182,9 +1183,33 @@ async function handleChargeRefunded(charge: any): Promise<void> {
     `[stripe-webhook] ${fullRevoke ? 'Full' : 'Partial'} revoke on refund: ${supporter.user_id}`
   );
 }
+const hasRunningOneTimeCredit = (supporter: SupporterRow): boolean =>
+  supporter.type === 'one_time' && Boolean(supporter.one_time_tier);
+const needsRefundedCreditHistory = (supporter: SupporterRow | null): supporter is SupporterRow =>
+  supporter !== null && supporter.type === 'one_time' && !supporter.one_time_tier;
 // deno-lint-ignore no-explicit-any
+async function refundRunningOneTimePayment(supporter: SupporterRow, charge: any): Promise<boolean> {
+  if (!hasRunningOneTimeCredit(supporter)) return false;
+  const subscriptionId = await resolveChargeSubscription(charge);
+  if (subscriptionId === undefined) throw new Error('Unable to resolve refunded credit payment');
+  if (subscriptionId !== null) return true;
+  await refundBankedPayment(supporter, charge);
+  await reconcileRefundedCreditHistory(supporter, charge.id);
+  return true;
+}
+async function reconcileRefundedCreditHistory(
+  supporter: SupporterRow,
+  chargeId: string
+): Promise<void> {
+  const current = await findSupporterBy('user_id', supporter.user_id);
+  if (!needsRefundedCreditHistory(current)) return;
+  const count = await getCustomerPaymentCount(supporter.stripe_customer_id!, chargeId);
+  if (count === null) throw new Error('Unable to verify refunded credit contribution history');
+  if (count === 0) await revokeSupporter(current, true, 'refund (first)');
+}
 async function refundUnrelatedSubscriptionPayment(
   supporter: SupporterRow,
+  // deno-lint-ignore no-explicit-any
   charge: any,
   subscriptionId: string | null
 ): Promise<void> {
@@ -1234,9 +1259,9 @@ async function collectLegacyTiers(state: ChargeHistoryPageState): Promise<string
     })),
   ];
 }
-// deno-lint-ignore no-explicit-any
 async function verifiedLegacyRefundTier(
   supporter: SupporterRow,
+  // deno-lint-ignore no-explicit-any
   charge: any
 ): Promise<{ p_legacy_tier?: string | null }> {
   if (supporter.one_time_legacy_unlimited !== true) return {};
