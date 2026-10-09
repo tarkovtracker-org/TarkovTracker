@@ -613,12 +613,12 @@ describe('useTarkov sync integration', () => {
     const ready = vi.spyOn(authority, 'isProgressAuthorityReady').mockReturnValue(false);
     single.mockClear();
     rpc.mockClear();
-    channel.mockClear();
+    channel.subscribe.mockClear();
     try {
       await initializeTarkovSync();
       expect(single).not.toHaveBeenCalled();
       expect(rpc).not.toHaveBeenCalled();
-      expect(channel).not.toHaveBeenCalled();
+      expect(channel.subscribe).not.toHaveBeenCalled();
     } finally {
       ready.mockRestore();
     }
