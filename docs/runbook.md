@@ -869,6 +869,10 @@ not recreated. Nonempty preferences, retention state, normalized progress, histo
 are fingerprinted alongside newer account metadata. This test does not authorize a production
 correction or restore any retired reader/writer contract.
 
+Before any production field-only correction, verify the current trigger definitions and the
+complete bodies of both trigger functions against the separately reviewed correction. A guard
+on trigger names and enabled states alone cannot detect changed function behavior.
+
 Run the rehearsal with Python 3, Docker, the existing isolated
 `supabase_db_TarkovTracker1086` PostgreSQL 17 container (empty Auth source), checkout path and
 the synthetic pre-cleanup custom archive whose SHA-256 is pinned in the script. It refuses
