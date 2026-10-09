@@ -858,6 +858,23 @@ target and reconcile through a separately reviewed forward correction. Keep newe
 data; never reinstate the bridge or frozen-JSON backfill. Full production restore is a separate
 outage and loss-of-newer-writes decision.
 
+A field-only correction must preserve newer account timestamps and `metadata_write_id` too.
+An ordinary two-column UPDATE fires both metadata triggers. The local-only rehearsal
+`scripts/checks/legacy-progress-cleanup-rehearsal.py` demonstrates a separately committed
+correction under a bounded exclusive account-table lock, checking the exact two enabled
+metadata triggers, temporarily disabling only those triggers, updating only the two legacy
+fields of matching existing accounts, and restoring the triggers before commit. Errors roll
+back fields and trigger states together. New accounts are untouched and deleted accounts are
+not recreated. Nonempty preferences, retention state, normalized progress, history and teams
+are fingerprinted alongside newer account metadata. This test does not authorize a production
+correction or restore any retired reader/writer contract.
+
+Run the rehearsal with Python 3, Docker, the existing isolated
+`supabase_db_TarkovTracker1086` PostgreSQL 17 container (empty Auth source), checkout path and
+the synthetic pre-cleanup custom archive whose SHA-256 is pinned in the script. It refuses
+other archive bytes and uses only new secondary local databases. No production host, URL or
+credential is accepted. Archives and aggregate receipts stay outside Git.
+
 `DROP COLUMN` does not immediately shrink files. Measure relation sizes after release; any
 `VACUUM FULL`/rewrite needs a distinct low-traffic maintenance approval, disk headroom and a
 bounded lock/outage plan. Avoid bulk NULL updates and retain normal autovacuum.
