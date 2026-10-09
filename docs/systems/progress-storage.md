@@ -74,8 +74,9 @@ flowchart LR
 3. Realtime listens to both the account row, for metadata, and normalized rows. Recognized account metadata
    echoes advance the listener's timestamp watermark before being discarded, so older metadata
    cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
-   A sync that leaves metadata unchanged writes no account row and returns the stored
-   `metadata_write_id`; an echo matches only that marker together with the same values, so a
+   A sync that leaves metadata unchanged returns the stored `metadata_write_id`. Persistent
+   PvP/PvE changes still advance the account clock; only a sync with neither metadata nor
+   persistent progress changes avoids an account-row write. An echo matches only that marker together with the same values, so a
    foreign metadata change is never mistaken for one.
    A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
