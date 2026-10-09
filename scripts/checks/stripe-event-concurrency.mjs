@@ -48,7 +48,11 @@ function runConnection(statement) {
   });
 }
 function startHolder(token, rollback) {
-  const headers = JSON.stringify({ 'x-stripe-event-id': event, 'x-stripe-claim-token': token });
+  const headers = JSON.stringify({
+    'x-stripe-event-id': event,
+    'x-stripe-claim-token': token,
+    'x-supporter-credit-version': '1',
+  });
   return runConnection(`BEGIN; SET application_name='${application}';
     SELECT set_config('request.headers','${headers}',true);
     UPDATE public.supporters SET tier='chad' WHERE user_id='${user}';
@@ -62,7 +66,11 @@ async function waitFor(statement, expected) {
   }
 }
 function assertStaleRejected(token) {
-  const headers = JSON.stringify({ 'x-stripe-event-id': event, 'x-stripe-claim-token': token });
+  const headers = JSON.stringify({
+    'x-stripe-event-id': event,
+    'x-stripe-claim-token': token,
+    'x-supporter-credit-version': '1',
+  });
   const statement = `BEGIN; SELECT set_config('request.headers','${headers}',true);
     UPDATE public.supporters SET tier='timmy' WHERE user_id='${user}'; COMMIT;`;
   const result = spawnSync('docker', [...psql, '-c', statement], { encoding: 'utf8' });

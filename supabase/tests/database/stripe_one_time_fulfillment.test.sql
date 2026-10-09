@@ -122,7 +122,7 @@ SELECT throws_ok($$SELECT pg_temp.fulfill('cs_not_a_payment', 807)$$, 'P0001',
 SELECT throws_ok($$SELECT pg_temp.fulfill('pi_missing_paid', 807, 400, NULL)$$, 'P0001',
   'Invalid one-time supporter payment', 'successful payment time is mandatory');
 CREATE TEMP TABLE fulfillment_claim AS SELECT public.claim_stripe_event('evt_one_time_claim', 'test') AS claim;
-SELECT set_config('request.headers', jsonb_build_object('x-stripe-event-id', 'evt_one_time_claim',
+SELECT set_config('request.headers', jsonb_build_object('x-supporter-credit-version', '1', 'x-stripe-event-id', 'evt_one_time_claim',
   'x-stripe-claim-token', claim->>'token')::text, true) FROM fulfillment_claim;
 SELECT set_config('stripe.one_time_payment_id', '', true);
 SET LOCAL ROLE service_role;

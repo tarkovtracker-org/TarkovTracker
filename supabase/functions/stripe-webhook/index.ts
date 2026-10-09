@@ -166,7 +166,13 @@ async function finishEvent(
 function fencedClient(eventId: string, token: string): typeof supabase {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-    global: { headers: { 'x-stripe-event-id': eventId, 'x-stripe-claim-token': token } },
+    global: {
+      headers: {
+        'x-stripe-event-id': eventId,
+        'x-stripe-claim-token': token,
+        'x-supporter-credit-version': '1',
+      },
+    },
   });
 }
 /**
@@ -750,21 +756,11 @@ async function reconcileSubscription(
   await syncReconciledSubscriptionRoles(reconciled, supporter, {
     userId,
     discordUserId,
-    isActive,
-    status,
-    newTier,
-    entitlementTier,
-    hasEverSupported,
   });
 }
 type SubscriptionRoleContext = {
   userId: string;
   discordUserId: string | null;
-  isActive: boolean;
-  status: string;
-  newTier: string;
-  entitlementTier: string;
-  hasEverSupported: boolean;
 };
 async function resolveSubscriptionDiscordUserId(
   supporter: SupporterRow | null,
@@ -792,7 +788,10 @@ async function syncReconciledSubscriptionRoles(
   if (!discordUserId) return;
   await withFreshStripeRoleGrant(
     () => findFreshRoleSupporter(context.userId),
-    () => applySubscriptionRoleState(context, discordUserId),
+    async () => {
+      await syncCurrentCheckoutRoles(context.userId, discordUserId, 'subscription reconciled');
+      await removeExpiredCheckoutTier(context.userId, discordUserId, 'subscription reconciled');
+    },
     () => removeDeniedStripeRoles(discordUserId)
   );
 }
@@ -808,44 +807,6 @@ async function removeDeniedStripeRoles(discordUserId: string): Promise<void> {
     if (!isDiscordNotInGuildError(error)) throw error;
   }
 }
-async function applySubscriptionRoleState(
-  context: SubscriptionRoleContext,
-  discordUserId: string
-): Promise<void> {
-  const { userId, isActive, status, newTier, entitlementTier, hasEverSupported } = context;
-  if (isActive) {
-    await safeDiscordCall(
-      'role sync (subscription updated)',
-      { userId, discordUserId, tier: newTier },
-      () => syncRolesForSupporter(discordUserId, newTier, true)
-    );
-    return;
-  }
-  if (status === 'past_due') {
-    await safeDiscordCall(
-      'role sync (subscription grace period)',
-      { userId, discordUserId, tier: entitlementTier },
-      () => syncRolesForSupporter(discordUserId, entitlementTier, true)
-    );
-    return;
-  }
-  if (hasEverSupported) {
-    await safeDiscordCall(
-      'lifetime role sync (subscription inactive)',
-      { userId, discordUserId },
-      () => syncRolesForSupporter(discordUserId, 'supporter', true)
-    );
-    return;
-  }
-  await safeDiscordCall('remove tier roles (subscription updated)', { userId, discordUserId }, () =>
-    removeAllTierRoles(discordUserId)
-  );
-  await safeDiscordCall(
-    'remove supporter role (subscription updated)',
-    { userId, discordUserId },
-    () => removeSupporterRole(discordUserId)
-  );
-}
 // deno-lint-ignore no-explicit-any
 async function handleSubscriptionDeleted(subscription: any): Promise<void> {
   const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
@@ -853,7 +814,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
   const currentSubscription = await fetchLatestSubscription(subscription.id);
   if (hasSubscriptionAccess(currentSubscription)) return;
   if (!(await expireDeletedSubscription(supporter, currentSubscription))) return;
-  await removeDeletedSubscriptionRoles(supporter);
+  const current = await findSupporterBy('user_id', supporter.user_id);
+  if (current)
+    await syncReconciledSubscriptionRoles(current, supporter, {
+      userId: supporter.user_id,
+      discordUserId: null,
+    });
   console.info(`[stripe-webhook] Subscription expired: ${supporter.user_id}`);
 }
 function hasSubscriptionAccess(subscription: StripeSubscription): boolean {
@@ -885,15 +851,6 @@ async function expireDeletedSubscription(
     Boolean(updated?.length),
     () => findSupporterBy('user_id', supporter.user_id),
     subscription.id
-  );
-}
-async function removeDeletedSubscriptionRoles(supporter: SupporterRow): Promise<void> {
-  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
-  if (!discordUserId) return;
-  await safeDiscordCall(
-    'remove tier roles (subscription deleted)',
-    { userId: supporter.user_id, discordUserId },
-    () => removeAllTierRoles(discordUserId)
   );
 }
 // deno-lint-ignore no-explicit-any
@@ -1121,6 +1078,9 @@ async function revokeSupporter(
     .update({
       ...updates,
       ...history,
+      one_time_tier: null,
+      one_time_expires_at: null,
+      one_time_remaining: null,
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', supporter.user_id)

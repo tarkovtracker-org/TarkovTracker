@@ -119,6 +119,51 @@ function verifyCutover() {
     'PASS cutover accepts an empty timed-payment history and rejects a legacy fulfilled payment'
   );
 }
+async function subscriptionPair(label, holderSql, waiterSql) {
+  const baseline = Number(
+    query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
+    FROM public.supporters WHERE user_id='${user}'`)
+  );
+  const holder =
+    connection(`BEGIN; SET application_name='${application}'; SET LOCAL ROLE service_role;
+    ${holderSql}; SELECT pg_sleep(3); COMMIT;`);
+  await until(
+    `SELECT count(*) FROM pg_stat_activity WHERE application_name='${application}' AND wait_event='PgSleep'`,
+    '1'
+  );
+  const other = connection(`SET application_name='${waiter}'; SET ROLE service_role; ${waiterSql}`);
+  await until(
+    `SELECT count(*) FROM pg_stat_activity WHERE application_name='${waiter}'
+    AND wait_event IN ('transactionid','tuple')`,
+    '1'
+  );
+  const [first, second] = await Promise.all([holder, other]);
+  assert.equal(first.code, 0, first.stderr);
+  assert.equal(second.code, 0, second.stderr);
+  const expiry = Number(
+    query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
+    FROM public.supporters WHERE user_id='${user}'`)
+  );
+  assert.ok(
+    Math.abs(expiry - baseline - 30 * 86400) < 5,
+    'Subscription transition preserves every committed paid period'
+  );
+  console.log(`PASS ${label}: actual row-lock wait; independent credit retains the payment`);
+}
+async function subscriptionRaces() {
+  const activate = `UPDATE public.supporters SET type='subscription',status='active',tier='chad',
+    expires_at=NULL,stripe_subscription_id='sub_concurrency_${user.replaceAll('-', '')}' WHERE user_id='${user}'`;
+  const end = `UPDATE public.supporters SET status='expired',tier='supporter',expires_at=now(),
+    stripe_subscription_id=NULL WHERE user_id='${user}'`;
+  await subscriptionPair('subscription starts before donation', activate, fulfill('sub_start'));
+  await subscriptionPair('donation commits before subscription end', fulfill('sub_end_after'), end);
+  query(activate);
+  await subscriptionPair('subscription ends before donation', end, fulfill('sub_end_before'));
+  assert.equal(
+    query(`SELECT type || ':' || status FROM public.supporters WHERE user_id='${user}'`),
+    'one_time:active'
+  );
+}
 async function chargebackRace() {
   const customer = `cus_concurrency_${user.replaceAll('-', '')}`;
   query(`UPDATE public.supporters SET stripe_customer_id='${customer}' WHERE user_id='${user}'`);
@@ -188,6 +233,7 @@ try {
     '0'
   );
   console.log('PASS stale claim fails before waiting on a held per-user advisory lock');
+  await subscriptionRaces();
   await chargebackRace();
 } finally {
   if (created)

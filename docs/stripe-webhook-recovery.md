@@ -48,8 +48,16 @@ The successful `checkout.session.completed` (paid) or `checkout.session.async_pa
 event's `created` timestamp decides the October 7, 2026 UTC cutoff, including late retries. Session
 creation time does not decide grandfathering. Earlier payments and existing active open-ended
 one-time rows retain unlimited access; new payments add one 30-day period per $4 (minimum one,
-maximum twelve per payment) to remaining active one-time time. Active/past-due subscriptions keep
-their subscription fields. Smaller contributions preserve a higher existing active one-time tier;
+maximum twelve per payment) to remaining active one-time time. During subscription access,
+one-time time is banked in `one_time_remaining` instead of counting down. Starting a subscription
+pauses the unused balance; additional payments stack onto it. Subscription end resumes the balance
+from the actual end timestamp (including delayed webhook delivery), using `one_time_expires_at`.
+The bank owns its paid tier independently of the subscription tier; unlimited grandfathered credit
+stays unlimited. Refund/chargeback revocation clears the balance. The migration captures existing
+one-time rows lazily; it does not reconstruct credit already lost before rollout. Active/past-due
+subscriptions with current access keep their subscription fields. During deployment, credit-bearing
+webhook writes require `x-supporter-credit-version: 1`; older handlers fail for retry until the new
+handler is deployed, preventing inconsistent refund or Discord role effects. Smaller contributions preserve a higher existing active one-time tier;
 expired access restarts at the newly purchased tier. Database lookup or fulfillment errors fail the event for retry;
 there is no fallback upsert that replaces previously purchased time.
 

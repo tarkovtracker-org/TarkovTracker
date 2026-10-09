@@ -37,6 +37,7 @@ function createHarness(
     readError?: string;
     fulfillmentError?: string;
     fulfillmentReplay?: boolean;
+    writeResult?: Row;
   } = {}
 ) {
   let row: Row = { ...initial };
@@ -56,7 +57,12 @@ function createHarness(
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
-        row = { ...row, ...values, updated_at: `revision_${writes.length}` };
+        row = {
+          ...row,
+          ...values,
+          updated_at: `revision_${writes.length}`,
+          ...options.writeResult,
+        };
       }
       return { data: { ...row }, error: null };
     };
@@ -494,6 +500,51 @@ describe('webhook Discord chargeback fencing', () => {
     ).resolves.toBeUndefined();
     expect(harness.current().has_ever_supported).toBe(false);
   });
+});
+describe('independent one-time credit after subscription end', () => {
+  it.each(['customer.subscription.deleted', 'customer.subscription.updated'])(
+    'syncs the database-restored entitlement after %s',
+    async (type) => {
+      const expiry = new Date(Date.now() + 86400000).toISOString();
+      const resources = {
+        ...resourcesForPayments(),
+        '/subscriptions/sub_1': { ...subscription, status: 'canceled' },
+      };
+      const harness = createHarness(
+        {
+          ...supporter,
+          type: 'subscription',
+          status: 'active',
+          tier: 'chad',
+          stripe_subscription_id: 'sub_1',
+          discord_user_id: 'discord_1',
+          one_time_tier: 'scav',
+          one_time_expires_at: null,
+          one_time_remaining: '1 day',
+        },
+        resources,
+        {
+          discord: true,
+          writeResult: {
+            type: 'one_time',
+            status: 'active',
+            tier: 'scav',
+            expires_at: expiry,
+            stripe_subscription_id: null,
+          },
+        }
+      );
+      harness.roles.add('supporter');
+      await harness.dispatch(type, subscription);
+      expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+      expect(harness.current()).toMatchObject({
+        type: 'one_time',
+        status: 'active',
+        tier: 'scav',
+        expires_at: expiry,
+      });
+    }
+  );
 });
 describe('subscription grace contribution fence', () => {
   it.each(['customer.subscription.updated', 'invoice.payment_failed'])(
