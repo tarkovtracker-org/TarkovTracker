@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(10);
+SELECT plan(8);
 
 SELECT ok(
   (SELECT proconfig @> ARRAY['search_path=pg_catalog, public']::text[]
@@ -50,12 +50,6 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   NULL);
 RESET ROLE;
 
-SELECT is((SELECT pvp_data->'lastApiUpdate'->'tasks'->0->>'state'
-  FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000000968'),
-  'active', 'authenticated progress sync persists active lastApiUpdate task state');
-SELECT is((SELECT pvp_data->'apiUpdateHistory'->0->'tasks'->0->>'state'
-  FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000000968'),
-  'active', 'authenticated progress sync persists active apiUpdateHistory task state');
 SELECT is((SELECT progress_data->'lastApiUpdate'->'tasks'->0->>'state'
   FROM public.user_game_mode_progress WHERE user_id = '00000000-0000-0000-0000-000000000968'
     AND game_mode = 'pvp'),

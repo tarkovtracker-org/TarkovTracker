@@ -1,0 +1,81 @@
+{
+  "original_pr_head": "a17db297ed5e0eee726b982c8864226e5dd53daa",
+  "integrated_main": "5ddedb03aeaf3dd17f0d8ec7a36911db02bb94fb",
+  "migration": "supabase/migrations/20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql",
+  "migration_sha256": "282883558c786fa5ccc7ab0dafc952f19f735ead46019b6cd911e9d27338a01d",
+  "database": {
+    "target": "isolated local Supabase, TarkovTracker1086, port 55422",
+    "cli": "2.117.0",
+    "replayed_migrations": 144,
+    "original_clock_regression": "3 of 8 assertions fail: persistent sync, PvP API, PvE API",
+    "corrected_full_suite": "32 files, 725 assertions pass",
+    "api_clock_negative_controls": "Old tests pass both local suppressed-Seasonal and suppressed-no-op API mutations. Strengthened fresh-tuple checks reject both mutations; unchanged production SQL passes. No mutation was applied outside the isolated local database.",
+    "lint": "No errors; existing merge_manual_activity_progress IMMUTABLE/STABLE warning remains"
+  },
+  "cached_policy": {
+    "source": "startupLoad.ts from immutable original_pr_head, with current production store dependencies",
+    "scope": "Real initializeTarkovSync, Pinia state, persisted envelope and outgoing RPC payload assertions; Supabase transport is mocked using actual isolated-DB RPC readback",
+    "original_sql": "Both PvP/PvE cases fail; account clock is one day behind normalized progress",
+    "corrected_sql": "Both PvP/PvE cases pass; account clock equals normalized progress clocks",
+    "readbacks": [
+      {
+        "label": "original",
+        "account_updated_at": "2026-10-08T02:09:58.852994+00:00",
+        "mode_updated_at": "2026-10-09T02:09:58.852994+00:00",
+        "readback_sha256": "0fe14e96ab869362eea851f6b76ea06c3ae6f98d041e752d7eff84dbad96b88d"
+      },
+      {
+        "label": "corrected",
+        "account_updated_at": "2026-10-09T02:11:17.562137+00:00",
+        "mode_updated_at": "2026-10-09T02:11:17.562137+00:00",
+        "readback_sha256": "2923b1bb51097f67f9e91bebe9bdd41531a99ca368f79802904dc274f7d6dbff"
+      }
+    ],
+    "limitation": "This is the reproduced pre-1087 policy path, not an exhaustive oldest-client/browser or production QA certification. It preserves the existing server contract, including the pre-existing old-client cross-mode policy."
+  },
+  "current_client": {
+    "focused_store_flows": "3 files, 311 assertions pass: sync integration, seasonal reset and PvP prestige",
+    "startup_decrease_control": "24 current per-mode startup assertions pass"
+  },
+  "production_read_only": {
+    "project": "knptqelvsodccnoehmbj",
+    "capture_window_utc": "2026-10-09 01:58-02:31; table size at 02:01:41, write counters at 02:01:44, Realtime statements at 02:14:14",
+    "applied_migrations": 143,
+    "original_retirement_applied": false,
+    "branch_inventory": "Only main; per-PR Supabase databases are disabled by repository deployment policy",
+    "observer": "pi_prod_observer; read-only; no table writes, RLS bypass, schema creation or stored migration statement access; 15s statement timeout, 5s lock timeout",
+    "user_progress": {
+      "total_size": "470 MB",
+      "estimated_rows": 22859,
+      "cumulative_write_tuples": 1260794
+    },
+    "user_game_mode_progress": {
+      "total_size": "413 MB",
+      "estimated_rows": 55075,
+      "cumulative_write_tuples": 3325332
+    },
+    "realtime_list_changes": {
+      "cumulative_calls": 11571401,
+      "cumulative_execution_time": "68:43:16.084393",
+      "share_of_recorded_execution": "44.7%"
+    },
+    "statistics_reset": "Database and statement reset timestamps are null; I/O reset is 2026-08-06T12:48:09.464164Z",
+    "preflight": "Incomplete, operational risk unknown; cannot certify PL/pgSQL semantics",
+    "cli_dry_run": "Migration list and db push --dry-run --skip-vault both exit 0; only this new migration is pending",
+    "materialization_gate": "Blocked at the dedicated observer permission check, 2026-10-09T02:30:46Z: no private schema usage, gate execution, required column reads or RLS bypass. No application rows read, privilege changes or privileged fallback attempted. The all-16-range count remains a pre-merge gate.",
+    "limitation": "Cumulative snapshots, not measured savings. No production changes, data reads, fixture writes or statistics reset."
+  },
+  "remaining_gates": [
+    "Independent functional SQL review cleared 76ae39ac against 5ddedb03; production migration is unchanged in subsequent docs/test follow-ups",
+    "Fresh all-16-range materialization gate and no-backfill confirmation immediately before approved merge",
+    "Exact-head CI/preview; catalog/history and observer CLI dry-run collected successfully",
+    "Explicit authorization for production fixture QA and merge-triggered deployment"
+  ],
+  "later_cleanup": {
+    "scope": "Drop frozen columns, unused legacy teammate RPC/view, materialization gate/helper, and legacy-specific sanitization/history triggers and functions in a separately reviewed forward migration",
+    "client_boundary": "Verify the oldest accepted reader does not select physical legacy columns, or approve and enforce its retirement. Calendar age and missing traffic do not prove retirement.",
+    "recovery": "Verify a normalized-data backup/import round trip before destructive cleanup; frozen columns are not a rollback copy",
+    "account_clock": "Retaining an aggregate account clock does not retain a second progress store. Suppressing it is a separate accepted-client protocol change, not required to delete the JSON mirror.",
+    "api_cutover": "After this lane; production deployment-source cutover remains separately approval-owned"
+  }
+}
