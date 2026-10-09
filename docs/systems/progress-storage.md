@@ -7,9 +7,12 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 **Summary.** Persistent PvP, PvE, and numbered Seasonal PvP progress share one normalized table.
 `user_game_mode_progress` has primary key `(user_id, game_mode, season_number)`; PvP and PvE use
 season `0`, while Seasonal uses the active positive season number. Season 1 is active. The
-`user_progress` row holds account-wide metadata and the accepted client account-clock contract. Its legacy `pvp_data` / `pve_data` columns are
-no longer written (#1028 Phase 3) and remain, frozen, until they are dropped; Seasonal progress was
-never stored there.
+`user_progress` row holds account-wide metadata and the accepted client account-clock contract.
+The forward cleanup migration removes its frozen legacy `pvp_data` / `pve_data` columns;
+Seasonal progress was never stored there. Support is limited to normalized-reader clients
+from #1072 onward. Older clients explicitly requesting the retired columns, legacy teammate RPC
+or summary view must update. Account timestamps and Realtime remain compatible with accepted
+pre-#1087 normalized readers.
 
 ### Diagram
 
@@ -123,14 +126,11 @@ Teams, save status and recovery, and progress imports build on this storage; see
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
 - `supabase/migrations/20260830130000_harden_client_progress_access.sql` — authenticated progress
   sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
-- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — original
-  backfill helper, superseded by `20261002090000`
-- `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` — current
-  revoked one-range backfill helper and its completion gate `private.unmaterialized_mode_progress`.
-  While its transaction-local `tarkovtracker.mode_progress_backfill` flag is set, the prepare trigger
-  keeps source timestamps and records unknown freshness, and `track_account_mutation` records no
-  activity. Correctness does not depend on running it until the legacy fallbacks are removed (#1028);
-  see _Normalized PvP/PvE progress backfill_ in `docs/runbook.md`
+- `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` - historical
+  range backfill and completion gate, retired by the physical legacy cleanup migration
+- `supabase/migrations/20261009085500_drop_legacy_progress_columns.sql` - removes only the two
+  legacy columns and their reader/trigger/backfill dependencies; keeps account metadata,
+  compatibility clocks, normalized progress, all Seasonal history and prestige archives
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — former
   legacy seed of an unmaterialized persistent row inside `merge_progress_data`'s row lock
 - `supabase/migrations/20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` — stops every
@@ -184,11 +184,9 @@ Teams, save status and recovery, and progress imports build on this storage; see
   regardless of legacy sharing preferences. Visibility on an existing normalized row remains authoritative.
   The production completion gate was verified zero across all 16 UUID ranges for PvP and PvE on
   2026-10-04 before removing database reader fallbacks (#1028).
-- The operational backfill only fills rows whose normalized progress has no numeric `level`; it
-  cannot overwrite an already materialized row or change its visibility. Missing rows use
-  `ON CONFLICT DO NOTHING`; placeholder repairs lock and recheck after concurrent writes. It preserves
-  source timestamps and records no account activity. Schema rollout and data completion are separate
-  checks; see the runbook for bounded verification.
+- The legacy backfill, completion gate and transaction flag helper are retired with the
+  frozen columns. A non-zero old gate after write retirement was not proof of missing normalized
+  data; copying frozen JSON could resurrect reset progress. No normal write path checks the flag.
 - No runtime path writes `user_progress.pvp_data` / `pve_data` or merges from them (#1028 Phase 3).
   `merge_progress_data` creates a missing normalized row empty under the account row lock and
   merges into the normalized row only; as before, every API write also advances
@@ -220,9 +218,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
   Older accepted clients use a global predicate instead, so Phase 3 retains the account-clock
   updates they already require. This preserves their existing contract; it does not correct their
   pre-existing cross-mode policy. Account-row Realtime events therefore remain until that contract
-  is separately retired. The read-only
-  `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
-  still read the frozen columns until they are dropped (#1028 Phase 4).
+  is separately retired. The cleanup migration removes `get_teammate_legacy_progress`, `team_member_summary`, and
+  the backfill helpers at the approved normalized-reader cutoff. This contract retirement does
+  not reload old tabs or preserve unsaved old-client state. It is independent of browser
+  authority/cross-renderer work (#1092).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside

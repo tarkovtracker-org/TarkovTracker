@@ -797,8 +797,6 @@ export type Database = {
           current_game_mode: string | null
           game_edition: number | null
           metadata_write_id: string | null
-          pve_data: Json | null
-          pvp_data: Json | null
           tarkov_uid: number | null
           updated_at: string | null
           user_id: string
@@ -808,8 +806,6 @@ export type Database = {
           current_game_mode?: string | null
           game_edition?: number | null
           metadata_write_id?: string | null
-          pve_data?: Json | null
-          pvp_data?: Json | null
           tarkov_uid?: number | null
           updated_at?: string | null
           user_id: string
@@ -819,8 +815,6 @@ export type Database = {
           current_game_mode?: string | null
           game_edition?: number | null
           metadata_write_id?: string | null
-          pve_data?: Json | null
-          pvp_data?: Json | null
           tarkov_uid?: number | null
           updated_at?: string | null
           user_id?: string
@@ -907,39 +901,6 @@ export type Database = {
           level?: never
           season_number?: number | null
           tasks_completed?: never
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      team_member_summary: {
-        Row: {
-          current_game_mode: string | null
-          pve_display_name: string | null
-          pve_level: number | null
-          pve_tasks_completed: number | null
-          pvp_display_name: string | null
-          pvp_level: number | null
-          pvp_tasks_completed: number | null
-          user_id: string | null
-        }
-        Insert: {
-          current_game_mode?: string | null
-          pve_display_name?: never
-          pve_level?: never
-          pve_tasks_completed?: never
-          pvp_display_name?: never
-          pvp_level?: never
-          pvp_tasks_completed?: never
-          user_id?: string | null
-        }
-        Update: {
-          current_game_mode?: string | null
-          pve_display_name?: never
-          pve_level?: never
-          pve_tasks_completed?: never
-          pvp_display_name?: never
-          pvp_level?: never
-          pvp_tasks_completed?: never
           user_id?: string | null
         }
         Relationships: []

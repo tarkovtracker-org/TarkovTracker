@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(27);
+SELECT plan(26);
 
 CREATE TEMP TABLE client_progress_fixture AS
 SELECT
@@ -92,11 +92,12 @@ VALUES (
 GRANT SELECT ON client_progress_fixture, client_progress_privilege_fixture,
   client_progress_realtime_fixture TO authenticated;
 
-UPDATE public.user_progress
-SET
-  pvp_data = '{"displayName":"PvP teammate","level":10}'::JSONB,
-  pve_data = '{"displayName":"PvE teammate","level":20}'::JSONB
-WHERE user_id = (SELECT teammate_id FROM client_progress_fixture);
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+VALUES
+  ((SELECT teammate_id FROM client_progress_fixture),'pvp',0,
+    '{"displayName":"PvP teammate","level":10}'::JSONB),
+  ((SELECT teammate_id FROM client_progress_fixture),'pve',0,
+    '{"displayName":"PvE teammate","level":20}'::JSONB);
 
 SELECT ok(
   (SELECT bool_and(
@@ -143,22 +144,10 @@ SELECT ok(
   ) FROM client_progress_protected_tables),
   'service-role workflows retain table access'
 );
-SELECT ok(
-  has_function_privilege(
-    (SELECT authenticated_role FROM client_progress_privilege_fixture),
-    'public.get_teammate_legacy_progress(uuid,text)',
-    (SELECT execute_privilege FROM client_progress_privilege_fixture)
-  ),
-  'authenticated clients can use the mode-scoped legacy progress RPC'
-);
-SELECT ok(
-  NOT has_function_privilege(
-    (SELECT anon_role FROM client_progress_privilege_fixture),
-    'public.get_teammate_legacy_progress(uuid,text)',
-    (SELECT execute_privilege FROM client_progress_privilege_fixture)
-  ),
-  'anonymous clients cannot use the legacy progress RPC'
-);
+SELECT is(to_regprocedure('public.get_teammate_legacy_progress(uuid,text)'), NULL,
+  'the retired legacy teammate RPC is absent');
+SELECT is(to_regclass('public.team_member_summary'), NULL,
+  'the retired legacy teammate view is absent');
 SELECT ok(
   has_function_privilege(
     (SELECT authenticated_role FROM client_progress_privilege_fixture),
@@ -193,18 +182,16 @@ SELECT set_config(
   TRUE
 );
 SELECT ok(
-  public.get_teammate_legacy_progress(
-    (SELECT teammate_id FROM client_progress_fixture),
-    'pvp'
-  )->>'displayName' = 'PvP teammate',
-  'a same-mode teammate can read only the requested legacy mode'
+  (SELECT progress_data FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT teammate_id FROM client_progress_fixture)
+      AND game_mode = 'pvp' AND season_number = 0)->>'displayName' = 'PvP teammate',
+  'a same-mode teammate can read normalized progress'
 );
 SELECT ok(
-  public.get_teammate_legacy_progress(
-    (SELECT teammate_id FROM client_progress_fixture),
-    'pve'
-  ) IS NULL,
-  'a teammate cannot read a legacy mode they do not share'
+  (SELECT progress_data FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT teammate_id FROM client_progress_fixture)
+      AND game_mode = 'pve' AND season_number = 0) IS NULL,
+  'a teammate cannot read a normalized mode they do not share'
 );
 SELECT set_config(
   (SELECT request_claim_name FROM client_progress_privilege_fixture),
@@ -212,10 +199,9 @@ SELECT set_config(
   TRUE
 );
 SELECT is(
-  public.get_teammate_legacy_progress(
-    (SELECT teammate_id FROM client_progress_fixture),
-    'pvp'
-  ),
+  (SELECT progress_data FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT teammate_id FROM client_progress_fixture)
+      AND game_mode = 'pvp' AND season_number = 0),
   NULL::JSONB,
   'users outside the team cannot read teammate progress'
 );
@@ -243,15 +229,6 @@ SELECT lives_ok(
     0::SMALLINT
   )$$,
   'a stale seasonal season number does not abort a multi-mode sync'
-);
-SELECT is(
-  (
-    SELECT pvp_data->>'level'
-    FROM public.user_progress
-    WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
-  ),
-  NULL,
-  'the multi-mode sync leaves the legacy PvP column unwritten'
 );
 SELECT is(
   (
