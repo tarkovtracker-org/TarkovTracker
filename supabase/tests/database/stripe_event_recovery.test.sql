@@ -1,5 +1,6 @@
 BEGIN;
 SELECT plan(29);
+SELECT set_config('request.headers', '{"x-supporter-credit-version":"1"}', true);
 SELECT ok(EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND tablename='stripe_events'
   AND indexname='stripe_events_resolved_completion_idx' AND indexdef LIKE '%completed_at%'
   AND indexdef LIKE '%completed%terminal%'), 'resolved-only completion index supports retention');

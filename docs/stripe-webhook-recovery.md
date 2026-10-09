@@ -147,3 +147,16 @@ retry driver and adds the database fence necessary for safe lease replacement.
 The app checks a reactive clock every second, and on focus, pageshow and visibility changes,
 so open supporter pages and badges reflect expiry without needing a database event. Server quota
 checks remain authoritative.
+
+The credit rollout also fences event completion: `finish_stripe_event` accepts a completed
+outcome only from clients sending `x-supporter-credit-version: 1`. Older deployed handlers
+can still fail/release an event, but cannot permanently acknowledge a refund they skipped.
+Recovery tooling that completes an event must use the current header. The read-only
+`supporter_entitlements` view projects prepaid access after subscription grace expires,
+including when no further Stripe event arrives; its underlying supporter RLS still applies.
+
+The legacy production API gateway mirrors the entitlement reader from
+[TarkovTracker-API PR #4](https://github.com/tarkovtracker-org/TarkovTracker-API/pull/4)
+(commit `d46e7df5457e5d9e008271a66d6617257bd1bb91`). It bounds paid-tier cache lifetime at
+entitlement expiry. Only a missing-view `404/PGRST205` permits the existing table read during
+schema rollout. The progress-contracts release remains v0.1.0; no pure rules changed.

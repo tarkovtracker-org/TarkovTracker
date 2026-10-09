@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
   try {
     await syncLinkedAccountRole(link.discord_user_id);
     const { data: supporter, error: supporterError } = await auth.supabase
-      .from('supporters')
+      .from('supporter_entitlements')
       .select('tier, status, expires_at, has_ever_supported')
       .eq('user_id', auth.user.id)
       .maybeSingle<Supporter>();

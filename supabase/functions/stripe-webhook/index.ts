@@ -73,6 +73,7 @@ if (missingRequiredEnvVars.length > 0) {
   );
 }
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  global: { headers: { 'x-supporter-credit-version': '1' } },
   auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
 });
 const processingClient = new AsyncLocalStorage<typeof supabase>();
@@ -796,7 +797,13 @@ async function syncReconciledSubscriptionRoles(
   );
 }
 async function findFreshRoleSupporter(userId: string): Promise<SupporterRow | null> {
-  return await findSupporterBy('user_id', userId);
+  const { data, error } = await eventClient()
+    .from('supporter_entitlements')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Unable to read current supporter entitlement: ${error.message}`);
+  return data;
 }
 /** Chargeback denial must retry failed removals; an absent guild member has no roles. */
 async function removeDeniedStripeRoles(discordUserId: string): Promise<void> {
@@ -1150,10 +1157,7 @@ async function handleChargeRefunded(charge: any): Promise<void> {
       );
     }
     if (chargeSubscription !== supporter.stripe_subscription_id) {
-      console.info(
-        `[stripe-webhook] Refund for charge ${charge.id} is not tied to active subscription ` +
-          `${supporter.stripe_subscription_id} for ${supporter.user_id}; skipping revocation`
-      );
+      await refundUnrelatedSubscriptionPayment(supporter, charge, chargeSubscription);
       return;
     }
   }
@@ -1170,6 +1174,35 @@ async function handleChargeRefunded(charge: any): Promise<void> {
   console.info(
     `[stripe-webhook] ${fullRevoke ? 'Full' : 'Partial'} revoke on refund: ${supporter.user_id}`
   );
+}
+// deno-lint-ignore no-explicit-any
+async function refundUnrelatedSubscriptionPayment(
+  supporter: SupporterRow,
+  charge: any,
+  subscriptionId: string | null
+): Promise<void> {
+  if (subscriptionId === null) await refundBankedPayment(supporter, charge);
+  console.info(
+    `[stripe-webhook] Refund for charge ${charge.id} is not tied to active subscription ` +
+      `${supporter.stripe_subscription_id} for ${supporter.user_id}; skipping revocation`
+  );
+}
+// deno-lint-ignore no-explicit-any
+async function refundBankedPayment(supporter: SupporterRow, charge: any): Promise<void> {
+  const paymentId = requireOneTimePaymentId(charge.payment_intent);
+  const { error } = await eventClient().rpc('refund_one_time_supporter', {
+    p_payment_id: paymentId,
+    p_user_id: supporter.user_id,
+    p_paid_at: oneTimePaymentDate(charge.created),
+    p_amount: charge.amount,
+  });
+  if (error) throw new Error(`Failed to refund banked payment: ${error.message}`);
+  const current = await findSupporterBy('user_id', supporter.user_id);
+  if (current)
+    await syncReconciledSubscriptionRoles(current, supporter, {
+      userId: supporter.user_id,
+      discordUserId: null,
+    });
 }
 /**
  * Resolve the customer for a dispute. `dispute.charge` is a charge ID string

@@ -87,14 +87,18 @@ describe('useSupporter', () => {
     try {
       const { useSupporter } = await import('@/composables/useSupporter');
       const status = scope.run(() => useSupporter())!;
-      status.supporter.value = {
-        status: 'active',
-        type: 'subscription',
-        tier: 'scav',
-        hasEverSupported: true,
-        startedAt: '2026-01-01T00:00:00Z',
-        expiresAt: '2026-10-07T00:00:01Z',
-      };
+      mockMaybeSingle.mockResolvedValue({
+        data: {
+          status: 'active',
+          type: 'subscription',
+          tier: 'scav',
+          has_ever_supported: true,
+          started_at: '2026-01-01T00:00:00Z',
+          expires_at: '2026-10-07T00:00:01Z',
+        },
+        error: null,
+      });
+      await status.fetchStatus('user-1');
       expect(status.activeTier.value).toBe('scav');
       expect(status.isActiveSubscriber.value).toBe(true);
       await vi.advanceTimersByTimeAsync(1000);

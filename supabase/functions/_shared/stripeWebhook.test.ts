@@ -18,6 +18,8 @@ const charge = {
   amount_refunded: 100,
   refunded: true,
   disputed: false,
+  payment_intent: 'pi_new',
+  created: Math.floor(new Date(contributionAt).getTime() / 1000),
 };
 const priorCharge = { ...charge, id: 'ch_prior', amount_refunded: 0, refunded: false };
 const source = readFileSync(new URL('../stripe-webhook/index.ts', import.meta.url), 'utf8');
@@ -36,6 +38,7 @@ function createHarness(
     remove?: () => Promise<void>;
     readError?: string;
     fulfillmentError?: string;
+    refundError?: string;
     fulfillmentReplay?: boolean;
     writeResult?: Row;
   } = {}
@@ -43,6 +46,7 @@ function createHarness(
   let row: Row = { ...initial };
   const writes: Row[] = [];
   const fulfillmentCalls: Row[] = [];
+  const refundCalls: Row[] = [];
   const roles = new Set<string>();
   const from = (table: string) => {
     let values: Row | null = null;
@@ -52,7 +56,8 @@ function createHarness(
       if (table === 'discord_account_links' && options.discord) {
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
-      if (table !== 'supporters') return { data: null, error: null };
+      if (!['supporters', 'supporter_entitlements'].includes(table))
+        return { data: null, error: null };
       if (options.readError) return { data: null, error: { message: options.readError } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
@@ -107,6 +112,12 @@ function createHarness(
           createClient: () => ({
             from,
             rpc: (name: string, params: Row) => {
+              if (name === 'refund_one_time_supporter') {
+                refundCalls.push(params);
+                if (options.refundError)
+                  return Promise.resolve({ data: null, error: { message: options.refundError } });
+                return Promise.resolve({ data: row, error: null });
+              }
               if (name === 'fulfill_one_time_supporter') {
                 fulfillmentCalls.push(params);
                 if (options.fulfillmentError)
@@ -174,6 +185,7 @@ function createHarness(
     current: () => row,
     writes,
     fulfillmentCalls,
+    refundCalls,
     fetch,
     roles,
   };
@@ -900,5 +912,53 @@ describe('rejected guest checkout retained history', () => {
     await harness.dispatch('checkout.session.completed', { ...session, customer: null });
     expect(harness.current()).toMatchObject({ status: 'cancelled', has_ever_supported: false });
     expect(harness.roles.size).toBe(0);
+  });
+});
+describe('one-time refunds during a subscription', () => {
+  const subscribed = {
+    ...supporter,
+    type: 'subscription',
+    status: 'active',
+    tier: 'chad',
+    stripe_subscription_id: 'sub_1',
+    one_time_tier: 'scav',
+    one_time_remaining: '60 days',
+  };
+  it('routes the payment refund to the bank RPC while preserving subscription access', async () => {
+    const harness = createHarness(subscribed, {}, { discord: true });
+    await harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null });
+    expect(harness.refundCalls).toEqual([
+      { p_payment_id: 'pi_new', p_user_id: userId, p_paid_at: contributionAt, p_amount: 100 },
+    ]);
+    expect(harness.current()).toMatchObject({
+      type: 'subscription',
+      status: 'active',
+      tier: 'chad',
+      stripe_subscription_id: 'sub_1',
+      one_time_tier: 'scav',
+      one_time_remaining: '60 days',
+    });
+    expect(
+      harness.writes.every((write) => !('status' in write) && !('one_time_remaining' in write))
+    ).toBe(true);
+    expect(harness.roles).toEqual(new Set(['supporter', 'tier']));
+  });
+  it('defers the event if bank refund persistence fails', async () => {
+    const harness = createHarness(subscribed, {}, { refundError: 'offline' });
+    await expect(
+      harness.dispatch('charge.refunded', { ...charge, customer: 'cus_1', invoice: null })
+    ).rejects.toThrow('Failed to refund banked payment: offline');
+    expect(harness.current()).toMatchObject(subscribed);
+    expect(harness.writes).toEqual([]);
+  });
+  it('leaves the bank intact for partial refunds', async () => {
+    const harness = createHarness(subscribed, {});
+    await harness.dispatch('charge.refunded', {
+      ...charge,
+      customer: 'cus_1',
+      amount_refunded: 20,
+      refunded: false,
+    });
+    expect(harness.refundCalls).toEqual([]);
   });
 });

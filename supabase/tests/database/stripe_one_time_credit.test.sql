@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,904) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,908) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -125,5 +125,73 @@ SELECT lives_ok($$UPDATE public.supporters SET updated_at=now()
   WHERE user_id='00000000-0000-0000-0000-000000000901'$$,
   'updated claimed webhook can reconcile credit-bearing entitlement');
 SELECT set_config('request.headers','{}',true);
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id)
+VALUES ('00000000-0000-0000-0000-000000000905','subscription','active','chad','sub_refund_bank'),
+  ('00000000-0000-0000-0000-000000000906','subscription','active','chad','sub_refund_first');
+SELECT pg_temp.pay(905,'pi_bank_refunded');
+SELECT pg_temp.pay(905,'pi_bank_kept');
+SELECT public.refund_one_time_supporter('pi_bank_refunded','00000000-0000-0000-0000-000000000905',
+  '2026-10-07 00:00:00+00',400);
+SELECT ok((SELECT type='subscription' AND status='active' AND tier='chad' AND one_time_remaining=interval '30 days'
+  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000905'),
+  'refund removes only its banked days and preserves both subscription and other payment');
+SELECT public.refund_one_time_supporter('pi_bank_refunded','00000000-0000-0000-0000-000000000905',
+  '2026-10-07 00:00:00+00',400);
+SELECT is((SELECT one_time_remaining FROM public.supporters
+  WHERE user_id='00000000-0000-0000-0000-000000000905'),interval '30 days','refund replay subtracts no additional days');
+SELECT public.refund_one_time_supporter('pi_refund_before_checkout','00000000-0000-0000-0000-000000000906',
+  '2026-10-07 00:00:00+00',400);
+SELECT pg_temp.pay(906,'pi_refund_before_checkout');
+SELECT ok((SELECT one_time_tier IS NULL AND type='subscription' AND status='active'
+  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000906'),
+  'refund before checkout permanently fences later fulfillment without revoking valid subscription');
+SELECT pg_temp.pay(907,'pi_partly_used');
+UPDATE public.supporters SET expires_at=now()+interval '10 days'
+  WHERE user_id='00000000-0000-0000-0000-000000000907';
+UPDATE public.supporters SET type='subscription',status='active',expires_at=NULL,stripe_subscription_id='sub_partial_bank'
+  WHERE user_id='00000000-0000-0000-0000-000000000907';
+SELECT pg_temp.pay(907,'pi_other_prepaid');
+SELECT public.refund_one_time_supporter('pi_partly_used','00000000-0000-0000-0000-000000000907',
+  '2026-10-07 00:00:00+00',400);
+SELECT is((SELECT one_time_remaining FROM public.supporters
+  WHERE user_id='00000000-0000-0000-0000-000000000907'),interval '30 days',
+  'refund of partly consumed pre-subscription time preserves all of the other prepaid payment');
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id,expires_at,has_ever_supported)
+VALUES ('00000000-0000-0000-0000-000000000908','subscription','past_due','chad','sub_no_more_events',
+  now()+interval '1 day',true);
+SELECT pg_temp.pay(908,'pi_after_grace');
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET expires_at=now()-interval '1 day'
+  WHERE user_id='00000000-0000-0000-0000-000000000908';
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+CREATE TEMP TABLE no_event_snapshot AS SELECT to_jsonb(s) AS value FROM public.supporters s
+  WHERE user_id='00000000-0000-0000-0000-000000000908';
+SELECT ok((SELECT type='one_time' AND status='active' AND tier='scav' AND expires_at=now()+interval '29 days'
+  FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000908'),
+  'read-time entitlement resumes after grace without a write or another event');
+SELECT is((SELECT to_jsonb(s) FROM public.supporters s WHERE user_id='00000000-0000-0000-0000-000000000908'),
+  (SELECT value FROM no_event_snapshot),'entitlement projection does not mutate the billing row');
+SELECT set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000908","role":"authenticated"}',true);
+SET LOCAL ROLE authenticated;
+SELECT is((SELECT count(*)::integer FROM public.supporter_entitlements),1,'entitlement view preserves owner RLS');
+RESET ROLE;
+SELECT ok(NOT has_function_privilege('authenticated','public.refund_one_time_supporter(text,uuid,timestamptz,integer)','EXECUTE'),
+  'browser cannot apply bank refunds');
+SELECT set_config('request.headers','{}',true);
+SELECT throws_ok($$SELECT public.finish_stripe_event('evt_credit_rollout',
+  (SELECT (claim->>'token')::uuid FROM credit_claim),'completed')$$,'40001',
+  'Stripe completion requires updated webhook','old handler cannot acknowledge a read-only skipped bank refund');
+-- A remaining lifetime receipt keeps unlimited duration, but not a refunded higher tier.
+SELECT set_config('request.headers','{}',true);
+INSERT INTO private.stripe_one_time_payments(payment_id,user_id,paid_at,amount_total,credit_tier)
+VALUES ('pi_lifetime_kept','00000000-0000-0000-0000-000000000906','2026-10-06 00:00:00+00',400,'scav'),
+ ('pi_lifetime_refunded','00000000-0000-0000-0000-000000000906','2026-10-06 00:00:00+00',1000,'chad');
+UPDATE public.supporters SET one_time_tier='chad',one_time_remaining=NULL,one_time_legacy_unlimited=false
+ WHERE user_id='00000000-0000-0000-0000-000000000906';
+SELECT public.refund_one_time_supporter('pi_lifetime_refunded','00000000-0000-0000-0000-000000000906',
+ '2026-10-06 00:00:00+00',1000);
+SELECT ok((SELECT one_time_tier='scav' AND one_time_remaining IS NULL AND status='active' AND tier='chad'
+ FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000906'),
+ 'refund removes the higher lifetime tier while preserving another lifetime payment and subscription');
 SELECT * FROM finish();
 ROLLBACK;
