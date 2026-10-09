@@ -44,7 +44,7 @@ export function inspectImports(source, file, root, allowed) {
 const isTestSource = (file) => file.includes('__tests__') || file.endsWith('.test.ts');
 function inspectTree(root, allowed, includeTests = true) {
   return sourceFiles(root)
-    .filter((file) => file.endsWith('.ts') && (includeTests || !isTestSource(file)))
+    .filter((file) => /\.[jt]s$/.test(file) && (includeTests || !isTestSource(file)))
     .flatMap((file) => {
       const permitted = (specifier) => allowed(specifier, file);
       const boundary = file.includes('__tests__') ? resolve(root, '..') : root;
@@ -62,11 +62,13 @@ const gatewayImport = (specifier, file, root) =>
     specifier === 'cloudflare:workers' || contractsImport(specifier),
     file.includes('__tests__') && /^(node:|vitest$|wrangler$)/.test(specifier),
   ].some(Boolean);
-export function checkBoundaries(gatewayRoot) {
-  const contractsEntry = fileURLToPath(
+export function checkBoundaries(
+  gatewayRoot,
+  contractsEntry = fileURLToPath(
     import.meta.resolve('@tarkovtracker/progress-contracts/apiTaskUpdates')
-  );
-  const contractsRoot = resolve(dirname(contractsEntry), '../src');
+  )
+) {
+  const contractsRoot = dirname(contractsEntry);
   const gatewaySource = resolve(gatewayRoot, 'src');
   const config = JSON.parse(readFileSync(resolve(gatewayRoot, 'tsconfig.json'), 'utf8'));
   const violations = Object.values(config.compilerOptions.paths)

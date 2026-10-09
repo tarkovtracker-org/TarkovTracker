@@ -1,42 +1,48 @@
 # Where changes belong
 
-| Change                                                                                            | Owner                                     |
-| ------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Pages, components, stores, composables, translations and browser Supabase access                  | `app/`                                    |
-| Browser-facing server routes, account/billing flows, Tarkov.dev proxy and streamer/profile routes | `app/server/` (Nitro)                     |
-| Public token/progress/team HTTP API, its OpenAPI spec and quotas                                  | `workers/api-gateway/`                    |
-| Pure progress rules shared by browser, Nitro and gateway                                          | `workers/api-gateway/progress-contracts/` |
-| Database schema/RLS/RPCs, migrations and Edge Functions                                           | `supabase/`                               |
-| Scheduled catalog/KV generation                                                                   | `scripts/precompute/`                     |
+| Change                                                                                            | Owner                                                                               |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Pages, components, stores, composables, translations and browser Supabase access                  | `app/` here                                                                         |
+| Browser-facing server routes, account/billing flows, Tarkov.dev proxy and streamer/profile routes | `app/server/` here (Nitro)                                                          |
+| Public token/progress/team HTTP API, OpenAPI and quotas                                           | [TarkovTracker-API](https://github.com/tarkovtracker-org/TarkovTracker-API), `src/` |
+| Pure progress rules shared by browser, Nitro and public API                                       | That API repository, `progress-contracts/src/`                                      |
+| Database schema/RLS/RPCs, migrations and Edge Functions                                           | `supabase/` here                                                                    |
+| Scheduled catalog/KV generation                                                                   | `scripts/precompute/` here                                                          |
 
-If you are working on the frontend, start in `app/`. The browser still talks to Supabase and
-Nitro; the public API is not its sole backend. A component or store change belongs in the
-frontend. A pure rule used by both runtimes belongs in progress-contracts, with one implementation
-and its tests. The repository's `workers/contract-tests/taskFailureParity.test.ts` checks
-browser/Worker agreement in PvP, PvE and Seasonal modes.
+For frontend work, start in `app/`. `pnpm run dev` starts Nuxt; it needs no API checkout or shared
+compiler watch. The browser continues using Supabase and Nitro directly. UI/store changes stay
+here. A shared rule change belongs in the API repository and reaches the frontend through a
+separate, reviewed dependency-update PR. Keep one implementation; never copy rules into `app/`.
 
-Root `pnpm run dev` starts the frontend and shared compiler watch; it does not start the public
-gateway server. From `workers/api-gateway/`, the same command starts the gateway and compiler.
-Consumer builds, typechecks and Vitest refresh changed compiled contracts automatically, while
-unchanged commands reuse a local cache. Use `pnpm run test:watch` for tests with compiler watch;
-edit the package's `src/`, never its generated `dist/`.
+The public API repository owns `@tarkovtracker/progress-contracts`. This checkout and its legacy
+gateway both pin the compiled ESM/types archive from the immutable
+[v0.1.0 release](https://github.com/tarkovtracker-org/TarkovTracker-API/releases/tag/v0.1.0).
+`workers/contract-tests/api-version.json` records the exact release URL, SHA-512 integrity and
+corresponding API tag/commit. `pnpm-lock.yaml` pins those same bytes. No registry publication or
+cross-repository symlink is involved. Edit source in the owning API repository, never installed
+package files or `dist`.
 
-This first stage makes the gateway installable/testable on its own and gives the shared rules
-an explicit versioned boundary. It keeps the frontend, Supabase and precompute ownership in
-this repository. It does not activate W10 authority, include #1086, rewrite behavior, move
-database ownership, or change production integrations.
+A dependency update changes both consumer manifests, the lockfile and `api-version.json` together.
+Run `pnpm run check:progress-contracts`, frontend tests/typecheck and `pnpm run verify:api-parity`.
+The parity command fetches only the recorded API commit into a fresh temporary checkout, uses its
+frozen lockfile, compares every compiled rule export and fixture to the installed release, runs
+its type/schema/API/DO tests and dry-run build, then checks real browser/Nitro adapters against
+that versioned API in PvP, PvE and Seasonal modes. CI runs this command explicitly; ordinary
+frontend unit tests do not fetch another repository. Optional full public-catalog captures remain
+opt-in. Supabase migration assertions continue running here with their schema owner.
 
-The proposed destination is **`tarkovtracker-org/TarkovTracker-API` (public)**, containing the
-gateway and progress-contracts package. The proposed shared-package distribution is compiled
-ESM/types in immutable versioned GitHub Release tarballs, consumed by exact URL with lockfile
-integrity. No new repository or release asset is created in this stage. Repository creation,
-release distribution and CI/hosting cutover need a separate approval and plan.
+The API source ref/commit can advance separately for an API-only update while the frontend keeps
+its contracts version. That update must pass the same checks; compiled API rule exports still
+have to match the pinned frontend package. Never follow the API's moving branch head implicitly.
 
-After cutover, API changes happen in that repository; frontend changes remain here. Shared-rule
-changes release a new contracts version there and arrive here as an explicit dependency-update
-PR that reruns frontend and all-mode parity checks. The same-commit workspace linkage used now
-is only the preparatory arrangement, not a cross-repository release dependency.
+`workers/api-gateway/` remains the **legacy production deployment source** during preparation.
+Its code, build commands, Worker Builds watch coverage and Pages DO binding remain functional.
+`pnpm run verify:api-standalone` independently installs and tests that gateway against the released
+archive without frontend source. Do not retire this directory or its watch paths until the
+production source cutover is separately approved. Coordinate any urgent legacy API fix with the
+new owner so the two gateway sources do not silently diverge.
 
-Deployment must retain Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration tag
-`v1`, existing namespace/state, Pages `script_name = "api-gateway"` and its current DO protocol.
-Schema/API/DO contract tests remain required through any later cutover.
+API source ownership and frontend release consumption are established separately from production
+source cutover. The production cutover still requires explicit approval and preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
+existing namespace/state, Pages `script_name = "api-gateway"` and the current DO protocol.
+Supabase ownership, W10 authority activation and #1086 remain outside this extraction stage.

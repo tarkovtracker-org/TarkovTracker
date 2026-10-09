@@ -35,7 +35,7 @@
     "vue": "^3.5.32",
     "vue-i18n": "catalog:",
     "vue-router": "^5.2.0",
-    "@tarkovtracker/progress-contracts": "workspace:*"
+    "@tarkovtracker/progress-contracts": "https://github.com/tarkovtracker-org/TarkovTracker-API/releases/download/v0.1.0/tarkovtracker-progress-contracts-0.1.0.tgz"
   },
   "devDependencies": {
     "@codecov/nuxt-plugin": "^2.0.1",
@@ -81,23 +81,23 @@
   "private": true,
   "scripts": {
     "brief": "node scripts/ci/change-brief.mjs",
-    "build": "node workers/api-gateway/scripts/prepare-contracts.mjs && nuxt build",
+    "build": "nuxt build",
     "design:lint": "designmd lint DESIGN.md",
-    "dev": "node workers/api-gateway/scripts/prepare-contracts.mjs && pnpm --parallel --filter tarkovtracker-nuxt --filter @tarkovtracker/progress-contracts run dev:watch",
+    "dev": "nuxt dev",
     "lint:fallow": "node scripts/checks/fallow-audit.mjs",
-    "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app workers/api-gateway/progress-contracts/src --fix && pnpm run format:blank-lines",
+    "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "format:blank-lines": "node scripts/checks/lint-blank-lines.mjs --fix",
     "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",
     "format:check:prettier": "node scripts/checks/format-files.mjs --check",
     "format:prettier": "node scripts/checks/format-files.mjs --write",
-    "generate": "node workers/api-gateway/scripts/prepare-contracts.mjs && nuxt generate",
+    "generate": "nuxt generate",
     "i18n:check": "node scripts/checks/lint-i18n.mjs",
-    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app workers/api-gateway/progress-contracts/src --max-warnings=0 && pnpm run lint:blank-lines",
+    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0 && pnpm run lint:blank-lines",
     "lint:blank-lines": "node scripts/checks/lint-blank-lines.mjs",
-    "typecheck": "node workers/api-gateway/scripts/prepare-contracts.mjs && NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
-    "lint:fix": "NODE_ENV=development nuxt prepare && eslint app workers/api-gateway/progress-contracts/src --fix && pnpm run format:blank-lines",
+    "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
+    "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "metrics": "node scripts/ci/metrics.mjs",
-    "postinstall": "node workers/api-gateway/scripts/prepare-contracts.mjs && nuxt prepare",
+    "postinstall": "nuxt prepare",
     "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
     "prod-db:test": "vitest run scripts/ops/prod-db.test.mjs",
@@ -106,23 +106,23 @@
     "setup": "bash scripts/setup/setup-dev-environment.sh",
     "supabase:check": "bash scripts/checks/check-supabase-db.sh",
     "supabase:test:concurrency": "node scripts/checks/stripe-event-concurrency.mjs",
+    "supabase:test:one-time-concurrency": "node scripts/checks/stripe-one-time-concurrency.mjs",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "systems:check": "node scripts/checks/check-systems-drift.mjs",
     "test": "vitest run",
     "test:progress-native": "node scripts/checks/progress-renderer-repro.mjs",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "node workers/api-gateway/scripts/prepare-contracts.mjs && pnpm --parallel --filter tarkovtracker-nuxt --filter @tarkovtracker/progress-contracts run watch:tests",
-    "test:api-gateway": "pnpm run test:progress-contracts && pnpm --filter api-gateway run test",
+    "test:watch": "vitest --watch",
+    "test:api-gateway": "pnpm --filter api-gateway run test",
     "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
     "validate:changes": "node scripts/ci/validate-changes.mjs",
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",
     "test:workflow": "node --test scripts/workflow-tests/*.mjs scripts/codex-review/*-tests.mjs",
     "check:api-boundaries": "pnpm --filter api-gateway run check:boundaries",
-    "test:progress-contracts": "pnpm --filter @tarkovtracker/progress-contracts run test",
     "verify:api-standalone": "node scripts/checks/api-standalone.mjs",
-    "dev:watch": "nuxt dev",
-    "watch:tests": "vitest --watch"
+    "check:progress-contracts": "node scripts/checks/progress-contracts.mjs",
+    "verify:api-parity": "node scripts/checks/api-parity.mjs"
   },
   "type": "module",
   "lint-staged": {
@@ -226,11 +226,6 @@
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "**/*.{yaml,yml}": [
-      "node scripts/checks/lint-blank-lines.mjs --fix"
-    ],
-    "workers/api-gateway/progress-contracts/src/*.ts": [
-      "prettier --write",
-      "eslint --fix",
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ]
   }

@@ -1,7 +1,6 @@
 packages:
   - .
   - workers/api-gateway
-  - workers/api-gateway/progress-contracts
 catalog:
   vue-i18n: ^11.4.10
 publicHoistPattern:

@@ -1,7 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { prepareWorkspaceContracts } from './scripts/prepare-contracts.mjs';
-prepareWorkspaceContracts();
 const gatewayRoot = fileURLToPath(new URL('.', import.meta.url));
 const workerShim = fileURLToPath(new URL('./src/__tests__/cloudflare-workers.ts', import.meta.url));
 export default defineConfig({
