@@ -13,9 +13,9 @@
           icon="i-mdi-help-circle-outline"
           :aria-label="helpCommunityAriaLabel"
           :class="buttonToneClass"
-          class="h-9"
+          class="h-8 min-w-8 justify-center px-2 sm:px-2.5"
           trailing-icon="i-mdi-chevron-down"
-          :ui="{ trailingIcon: 'size-3.5' }"
+          :ui="{ trailingIcon: 'hidden size-3.5 sm:inline-flex' }"
         >
           <span class="hidden text-[13px] leading-none font-medium md:inline">
             {{ helpButtonLabel }}
@@ -108,47 +108,6 @@
                 </span>
                 <UIcon name="i-mdi-open-in-new" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
               </a>
-            </div>
-            <div class="border-surface-700/60 space-y-2 border-t pt-3">
-              <div class="text-surface-400 text-[11px] font-semibold tracking-[0.18em] uppercase">
-                {{ communitySectionLabel }}
-              </div>
-              <div class="space-y-1.5">
-                <a
-                  href="https://discord.gg/M8nBgA2sT6"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex items-center gap-3 rounded-2xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                  :aria-label="discordLabel"
-                >
-                  <span
-                    class="border-discord/30 bg-discord/12 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                  >
-                    <DiscordIcon class="text-discord h-4 w-4" />
-                  </span>
-                  <span class="text-surface-50 min-w-0 flex-1 text-sm font-semibold">
-                    {{ discordLabel }}
-                  </span>
-                  <UIcon name="i-mdi-open-in-new" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
-                </a>
-                <a
-                  href="https://github.com/tarkovtracker-org/TarkovTracker"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex items-center gap-3 rounded-2xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                  :aria-label="githubLabel"
-                >
-                  <span
-                    class="border-surface-600/60 bg-surface-700/40 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                  >
-                    <UIcon name="i-mdi-github" class="text-surface-200 h-4 w-4" />
-                  </span>
-                  <span class="text-surface-50 min-w-0 flex-1 text-sm font-semibold">
-                    {{ githubLabel }}
-                  </span>
-                  <UIcon name="i-mdi-open-in-new" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
-                </a>
-              </div>
             </div>
           </div>
         </template>
@@ -328,11 +287,8 @@
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
   const helpButtonLabel = computed(() => t('page_help.button'));
   const helpCommunityAriaLabel = computed(() =>
-    copy('app_bar.help_community_aria', 'Help & community')
+    copy('app_bar.help_community_aria', 'Help & onboarding')
   );
-  const communitySectionLabel = computed(() => copy('app_bar.community_section', 'Community'));
-  const discordLabel = computed(() => copy('footer.call_to_action.discord', 'Discord'));
-  const githubLabel = computed(() => copy('footer.call_to_action.github', 'GitHub'));
   const keyboardShortcutsLabel = computed(() =>
     copy('app_bar.keyboard_shortcuts', 'Keyboard shortcuts')
   );

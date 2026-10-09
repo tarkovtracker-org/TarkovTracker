@@ -91,8 +91,7 @@
     "user_label": "User",
     "user_avatar_alt": "User avatar",
     "supporter_badge_aria": "Manage your supporter subscription ({tier})",
-    "help_community_aria": "Help & community",
-    "community_section": "Community",
+    "help_community_aria": "Help & onboarding",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
     "login_aria": "Log in to your account",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
-    "clear": "Clear",
     "empty": "No activity recorded yet.",
     "badge_api": "API Sync",
     "api_synced": "API Progress Synced",
@@ -158,11 +156,7 @@
       "uncompleted": "Uncompleted Task: {name}",
       "failed": "Failed Task: {name}",
       "reset_failed": "Reset Failed Task: {name}",
-      "available": "Unlocked Task: {name}",
-      "undo_completed": "Undid Task Completion: {name}",
-      "undo_uncompleted": "Undid Task Uncompletion: {name}",
-      "undo_reset_failed": "Undid Reset Failed Task: {name}",
-      "undo_failed": "Undid Task Failure: {name}"
+      "available": "Unlocked Task: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Support TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -821,7 +823,7 @@
     },
     "supporter": {
       "title": "Support TarkovTracker",
-      "subtitle": "Help keep the site running. Every contribution goes directly toward hosting, development, and keeping the lights on.",
+      "subtitle": "TarkovTracker is free, ad-free, and open source, and nearly all of its development is done by one person. Player support pays for hosting and for the time behind every fix, update, and new feature. Monthly support helps most because it makes that work sustainable.",
       "billing_monthly": "Monthly",
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
@@ -839,7 +841,6 @@
       "perk_badge": "Supporter badge",
       "perk_discord": "Supporter role in Discord (link your account and join our server)",
       "perk_tier_role": "{tier} Tier role in Discord",
-      "perk_early_access": "Early access to new features",
       "perk_priority_support": "Priority support",
       "perk_feature_voting": "Feature voting priority",
       "one_time_title": "One-Time Contribution",
@@ -853,7 +854,7 @@
       "one_time_give_cta": "Give {total}",
       "one_time_login_cta": "Log in to contribute",
       "one_time_net_note": "{net} reaches us after fees",
-      "one_time_perks_heading": "Includes supporter perks",
+      "one_time_perks_heading": "Includes supporter perks for 30 days per $4, up to one year",
       "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
       "perk_api_rate_limit": "Higher daily API read and write quotas",
       "perk_subscription_retention": "Exempt from routine inactivity cleanup while a qualifying subscription is active",
@@ -873,11 +874,6 @@
       "savings_note": "You save {amount} vs. monthly",
       "kofi_deprecation_title": "Ko-fi (backup option)",
       "kofi_deprecation_detail": "Subscriptions and one-time contributions above now run through Stripe, which means lower fees and more of your support reaches us directly. Ko-fi stays available as a backup for one-time tips only.",
-      "alt_payments_title": "More Payment Methods Coming Soon",
-      "alt_payments_coming_soon": "We're working on adding additional payment options so everyone can contribute in the way that works best for them.",
-      "alt_payment_crypto": "Crypto",
-      "alt_payment_gift_cards": "Gift Cards",
-      "alt_payments_more": "& More",
       "checkout_error_title": "Checkout failed",
       "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment.",
       "manage_subscription_cta": "Manage subscription",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "Language",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Manage your account, game progression, and application preferences.",
     "tabs": {
       "progression": "Progression",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Prestige Unavailable",
-      "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
       "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
       "current_level": "Current Prestige Level",
       "set_current": "Set Current Prestige",

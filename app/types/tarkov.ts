@@ -355,7 +355,9 @@ export interface MapSvgConfig {
   coordinateRotation: number;
   transform?: [number, number, number, number];
   bounds: [[number, number], [number, number]];
+  /** Separate bounds for SVG overlay (if different from marker bounds) */
   svgBounds?: [[number, number], [number, number]];
+  /** Whether lower floors should remain visible when a higher floor is selected */
   stackFloors?: boolean;
   minZoom?: number;
   maxZoom?: number;
@@ -368,6 +370,10 @@ export interface MapTileConfig {
   bounds: [[number, number], [number, number]];
   minZoom?: number;
   maxZoom?: number;
+  tileSize?: number;
+  floors?: string[];
+  defaultFloor?: string;
+  floorTilePaths?: Record<string, string>;
 }
 export interface TarkovMap {
   id: string;

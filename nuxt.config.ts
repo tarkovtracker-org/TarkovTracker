@@ -206,8 +206,6 @@ export default defineNuxtConfig({
       tarkovDevImportCooldownMinutes: Number(
         process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES?.trim() || '60'
       ),
-      allowDirectTokenCreateFallback:
-        process.env.NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK === 'true',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
       githubOwner: process.env.GITHUB_OWNER || 'tarkovtracker-org',
       githubRepo: process.env.GITHUB_REPO || 'TarkovTracker',
@@ -369,7 +367,6 @@ export default defineNuxtConfig({
   css: ['~/assets/css/tailwind.css'],
   alias: {
     '@': appDir,
-    '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
     '#tests': testsDir,
     '~': appDir,
   },
@@ -533,6 +530,8 @@ export default defineNuxtConfig({
       ],
     },
   },
+  // Nuxt default; lets Fallow model auto-imports and report unused utils/composables.
+  imports: {},
   components: [
     {
       path: '~/components',
@@ -565,7 +564,6 @@ export default defineNuxtConfig({
   postcss: {
     plugins: {
       '@tailwindcss/postcss': {},
-      autoprefixer: {},
     },
   },
   vite: {

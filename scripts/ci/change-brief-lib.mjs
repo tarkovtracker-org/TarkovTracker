@@ -4,7 +4,8 @@ import { classifyPaths } from './validation-plan.mjs';
 const codePattern = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testPattern =
   /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
-const gatewayTestPattern = /^workers\/api-gateway\/src\/(?:.*\/)?__tests__\/.*\.test\.ts$/;
+const gatewayTestPattern =
+  /^workers\/api-gateway\/(?:src\/(?:.*\/)?__tests__\/.*|scripts\/[^/]+)\.test\.ts$/;
 // Literal references outside import edges, including executable config and file-reading tests.
 const pathReferenceSpecs = [
   '.github/',
@@ -33,7 +34,7 @@ const pathReferenceSpecs = [
 ];
 // Markdown that can own behavior. `.cubic/` and the changelog are not sources (root AGENTS.md).
 const docSpecs = ['*.md', ':!.cubic/', ':!CHANGELOG.md', ':!app/locales/'];
-const codeSearchSpecs = ['app', 'shared', 'workers/api-gateway/src', 'tests', 'scripts'];
+const codeSearchSpecs = ['app', 'workers/api-gateway', 'tests', 'scripts'];
 const maxListed = 12;
 const maxBroaderTests = 25;
 const maxReferenceSeeds = 60;
@@ -120,17 +121,27 @@ export function scopedInstructions(paths, instructionFiles) {
     .map(({ instruction }) => instruction);
   return unique(['AGENTS.md', ...scoped, ...semantic]);
 }
+const scopedRunners = [
+  ['workers/contract-tests/', 'parity'],
+  ['workers/api-gateway/', 'gateway'],
+];
 const runnerFor = (path) => {
-  if (path.startsWith('workers/api-gateway/')) return 'gateway';
+  const scoped = scopedRunners.find(([prefix]) => path.startsWith(prefix));
+  if (scoped) return scoped[1];
   if (path.endsWith('.deno.test.ts')) return 'deno';
   return /^scripts\/(?:workflow-tests\/|codex-review\/.*-tests\.mjs$)/.test(path)
     ? 'node'
     : 'vitest';
 };
 const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
+const DENO_TEST_FLAGS = ['--config', 'supabase/functions/deno.json', '--frozen'];
 // Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
 const testOperands = (files) => files.map((file) => `./${file}`);
 const runnerCommands = {
+  parity: () => ({
+    executable: 'pnpm',
+    args: ['run', 'verify:api-parity'],
+  }),
   vitest: (files) => ({
     executable: 'pnpm',
     args: ['exec', 'vitest', 'run', ...testOperands(files)],
@@ -147,7 +158,10 @@ const runnerCommands = {
     ],
   }),
   node: (files) => ({ executable: 'node', args: ['--test', '--', ...testOperands(files)] }),
-  deno: (files) => ({ executable: 'deno', args: ['test', ...testOperands(files)] }),
+  deno: (files) => ({
+    executable: 'deno',
+    args: ['test', ...DENO_TEST_FLAGS, ...testOperands(files)],
+  }),
 };
 /** Groups test files into shell-independent executable/argv records; never executed by the brief. */
 export function testCommands(tests) {

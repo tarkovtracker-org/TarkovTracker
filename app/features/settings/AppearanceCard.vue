@@ -52,16 +52,50 @@
             </div>
           </fieldset>
         </div>
+        <div class="space-y-1">
+          <label for="settings-appearance-locale" class="text-surface-200 text-sm font-semibold">
+            {{ $t('settings.locale') }}
+          </label>
+          <select
+            id="settings-appearance-locale"
+            :value="locale"
+            :disabled="pending"
+            :aria-busy="pending"
+            aria-describedby="settings-appearance-locale-status"
+            class="bg-surface-800 border-surface-700 text-surface-200 block min-h-9 rounded-md border px-3 text-sm disabled:opacity-50"
+            @change="handleLocaleChange"
+          >
+            <option
+              v-for="code in availableLocales"
+              :key="code"
+              :value="code"
+              :disabled="isDisabled(code)"
+            >
+              {{ getLocaleNativeName(code) }}
+            </option>
+          </select>
+          <p id="settings-appearance-locale-status" class="text-surface-400 text-sm" role="status">
+            {{ status }}
+          </p>
+        </div>
       </div>
     </template>
   </GenericCard>
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useLocaleSwitch } from '@/composables/useLocaleSwitch';
   import { useTheme } from '@/composables/useTheme';
+  import { getLocaleNativeName } from '@/utils/locales';
   import type { ThemeMode } from '@/utils/theme';
   const { t } = useI18n({ useScope: 'global' });
   const { themeMode, setThemeMode } = useTheme();
+  const { locale, availableLocales, pending, status, isDisabled, selectLocale } = useLocaleSwitch();
+  const handleLocaleChange = async (event: Event) => {
+    const element = event.target as HTMLSelectElement;
+    await selectLocale(element.value);
+    element.value = locale.value;
+  };
   const themeLabelId = 'settings-appearance-theme-label';
   const themeOptions = computed<{ value: ThemeMode; icon: string; label: string }[]>(() => [
     {

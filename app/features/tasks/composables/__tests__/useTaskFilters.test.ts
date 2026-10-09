@@ -1,6 +1,6 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { computed, nextTick, reactive, ref } from 'vue';
+import { computed, effectScope, nextTick, reactive, ref } from 'vue';
 import { applySearchToTaskList, useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
 import type { Task } from '@/types/tarkov';
 import type { TaskFilterAndSortOptions } from '@/types/taskFilter';
@@ -54,6 +54,69 @@ describe('useTaskFilters', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each([true, false])(
+    'applies initial q before any timer, catalog loaded=%s',
+    async (loaded) => {
+      vi.useFakeTimers();
+      routeState.query.q = '  AlPhA  ';
+      const catalog = [createTask('1', 'Alpha Task'), createTask('2', 'Beta Task')];
+      const tasks = ref(loaded ? catalog : []);
+      const scope = effectScope();
+      const filters = scope.run(() =>
+        useTaskFilters({
+          calculateFilteredTasksForOptions: (inputTasks) => inputTasks,
+          getTaskMapView: ref('all'),
+          mapTaskVisibilityFilterOptions: computed(
+            () =>
+              ({
+                mapView: 'all',
+                mergedMaps: [],
+                primaryView: 'all',
+                secondaryView: 'available',
+                sortDirection: 'asc',
+                sortMode: 'none',
+                traderView: 'all',
+                userView: 'self',
+              }) as TaskFilterAndSortOptions
+          ),
+          showMapDisplay: computed(() => false),
+          tasks,
+          visibleTasks: tasks,
+        })
+      )!;
+      expect(filters.searchQuery.value).toBe('  AlPhA  ');
+      expect(filters.normalizedSearch.value).toBe('alpha');
+      expect(filters.isSearchActive.value).toBe(true);
+      expect(filters.filteredTasks.value.map((task) => task.id)).toEqual(loaded ? ['1'] : []);
+      tasks.value = catalog;
+      await nextTick();
+      expect(filters.filteredTasks.value.map((task) => task.id)).toEqual(['1']);
+      expect(filters.activeSearchCount.value).toBe(1);
+      routeState.query.q = 'beta';
+      await nextTick();
+      expect(filters.searchQuery.value).toBe('beta');
+      await vi.advanceTimersByTimeAsync(179);
+      expect(filters.filteredTasks.value.map((task) => task.id)).toEqual(['1']);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(filters.filteredTasks.value.map((task) => task.id)).toEqual(['2']);
+      routeState.query.q = undefined;
+      await nextTick();
+      expect(filters.isSearchActive.value).toBe(false);
+      expect(filters.filteredTasks.value.map((task) => task.id)).toEqual(['1', '2']);
+      filters.searchQuery.value = 'alpha';
+      await nextTick();
+      filters.searchQuery.value = '';
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(200);
+      expect(filters.isSearchActive.value).toBe(false);
+      filters.searchQuery.value = 'beta';
+      await nextTick();
+      filters.cleanup();
+      scope.stop();
+      await vi.advanceTimersByTimeAsync(200);
+      expect(filters.normalizedSearch.value).toBe('');
+    }
+  );
   it('keeps list order when search query is empty', () => {
     const tasks = [createTask('a', 'First'), createTask('b', 'Second')];
     expect(applySearchToTaskList(tasks, '')).toEqual(tasks);

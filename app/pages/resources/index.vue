@@ -120,9 +120,12 @@
             variant="soft"
             icon="i-mdi-lightbulb-on-outline"
             trailing-icon="i-mdi-open-in-new"
-            class="min-h-9 shrink-0"
-            :label="t('page.resources.suggest_cta', 'Suggest a resource')"
-          />
+            class="min-h-9 w-full shrink-0 justify-center sm:w-auto"
+          >
+            <span class="text-center sm:truncate">
+              {{ t('page.resources.suggest_cta', 'Suggest a resource') }}
+            </span>
+          </UButton>
         </div>
       </section>
     </div>

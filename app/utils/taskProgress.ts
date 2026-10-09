@@ -4,7 +4,7 @@ import {
   acceptsFailedStatus,
   isFailedOnlyRequirement,
   normalizeRequirementStatuses,
-} from '@shared/utils/requirementStatus';
+} from '@tarkovtracker/progress-contracts/requirementStatus';
 import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
 import {
   otherRequirementsSignature,

@@ -76,7 +76,8 @@ if (plan.full && options.mode !== 'local') {
       'wrangler.toml',
       '--dry-run',
     ],
-    ['run', 'test:api-gateway']
+    ['run', 'test:api-gateway'],
+    ['run', 'test:deno']
   );
 }
 for (const command of commands) {
@@ -84,16 +85,6 @@ for (const command of commands) {
   const result = spawnSync(process.execPath, [packageManagerEntry, ...command], {
     stdio: 'inherit',
   });
-  if (result.error || result.status !== 0) process.exit(result.status || 1);
-}
-if (plan.full && options.mode !== 'local') {
-  const result = spawnSync(
-    '/bin/bash',
-    ['-c', 'deno test supabase/functions/_shared/*.deno.test.ts'],
-    {
-      stdio: 'inherit',
-    }
-  );
   if (result.error || result.status !== 0) process.exit(result.status || 1);
 }
 if (options.mode === 'local')

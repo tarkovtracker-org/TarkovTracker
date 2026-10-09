@@ -18,15 +18,6 @@
         >
           {{ t('activity_log.mark_read', 'Mark read') }}
         </UButton>
-        <UButton
-          variant="ghost"
-          color="neutral"
-          size="xs"
-          class="text-xs"
-          @click="activityLogStore.clearLog"
-        >
-          {{ t('activity_log.clear', 'Clear') }}
-        </UButton>
       </div>
     </div>
     <div v-if="entries.length === 0" class="text-surface-400 py-8 text-center text-xs sm:text-sm">
@@ -94,7 +85,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { countApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
+  import { countApiTaskUpdates } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useMetadataStore } from '@/stores/useMetadata';
   import type { ApiTaskUpdate, ApiUpdateMeta } from '@/stores/progressState';

@@ -1,14 +1,14 @@
 import {
   acceptsCompletionStatus,
   normalizeRequirementStatuses,
-} from '@shared/utils/requirementStatus';
+} from '@tarkovtracker/progress-contracts/requirementStatus';
 import { GAME_MODE_VALUES, MANUAL_FAIL_TASK_IDS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
 import { provesStartGates } from '@/utils/taskProgress';
 import type { UserProgressData } from '@/stores/progressState';
-import type { TaskCompletion, TaskObjective } from '@/types/progress';
+import type { TaskCompletion, TaskObjectiveProgress } from '@/types/progress';
 import type { Task, TaskObjective as TaskObjectiveDefinition } from '@/types/tarkov';
 type TaskLookup = ReadonlyMap<string, Task>;
 type ModeStates = Partial<Record<GameMode, UserProgressData | undefined>>;
@@ -16,13 +16,16 @@ type Completions = Record<string, TaskCompletion>;
 type ModeRepair = (modeData: UserProgressData, tasks: TaskLookup) => number;
 const completionsOf = (modeData: UserProgressData): Completions =>
   (modeData.taskCompletions ??= {});
-const objectivesOf = (modeData: UserProgressData): Record<string, TaskObjective> =>
+const objectivesOf = (modeData: UserProgressData): Record<string, TaskObjectiveProgress> =>
   (modeData.taskObjectives ??= {});
 const isSuccessful = (completion?: TaskCompletion): boolean =>
   completion?.complete === true && completion.failed !== true;
-const hasCountedProgress = (existing: TaskObjective, objective: TaskObjectiveDefinition) =>
+const hasCountedProgress = (existing: TaskObjectiveProgress, objective: TaskObjectiveDefinition) =>
   existing.count !== undefined || (objective.count ?? 0) > 0;
-const zeroObjective = (existing: TaskObjective, objective: TaskObjectiveDefinition): void => {
+const zeroObjective = (
+  existing: TaskObjectiveProgress,
+  objective: TaskObjectiveDefinition
+): void => {
   existing.complete = false;
   if (hasCountedProgress(existing, objective)) existing.count = 0;
 };
@@ -171,7 +174,7 @@ const clearStaleFailures: ModeRepair = (modeData, tasks) => {
 export const repairModeFailedTasks: ModeRepair = (modeData, tasks) =>
   enforceBranchFailures(modeData, tasks) + clearStaleFailures(modeData, tasks);
 const clearObjectiveIfProgressed = (
-  objectives: Record<string, TaskObjective>,
+  objectives: Record<string, TaskObjectiveProgress>,
   objective: TaskObjectiveDefinition
 ): boolean => {
   const existing = objective?.id ? objectives[objective.id] : undefined;
@@ -193,7 +196,10 @@ const clearFailedTaskObjectives: ModeRepair = (modeData, tasks) => {
   }
   return cleared;
 };
-const fillObjective = (existing: TaskObjective, objective: TaskObjectiveDefinition): boolean => {
+const fillObjective = (
+  existing: TaskObjectiveProgress,
+  objective: TaskObjectiveDefinition
+): boolean => {
   const changed = existing.complete !== true;
   existing.complete = true;
   const requiredCount = objective.count ?? 0;
@@ -202,7 +208,7 @@ const fillObjective = (existing: TaskObjective, objective: TaskObjectiveDefiniti
   return true;
 };
 const completeTaskObjectives = (
-  objectives: Record<string, TaskObjective>,
+  objectives: Record<string, TaskObjectiveProgress>,
   task: Task,
   completion: TaskCompletion
 ): number => {

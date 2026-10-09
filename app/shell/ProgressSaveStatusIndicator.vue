@@ -11,7 +11,7 @@
         size="md"
         :icon="presentation.icon"
         :aria-label="t('progress_save_status.indicator_aria', { status: label })"
-        :class="['h-9 w-9', presentation.iconClass]"
+        :class="['h-8 w-8', presentation.iconClass]"
         data-testid="progress-save-status"
         :data-status="kind"
       />

@@ -1,5 +1,5 @@
 import { getUserDisplayName } from '@/utils/user-display-name';
-import { hasMaterializedProgress } from '../../../../app/utils/modeProgress';
+import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { extractGameModeData, transformProgress } from '../utils/transform';

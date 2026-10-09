@@ -4,10 +4,9 @@ export const SPECIAL_STATIONS = {
   STASH: 'stash',
   CULTIST_CIRCLE: 'cultist-circle',
 } as const;
-export const OFFLINE_ENV_FILE = '.env.example';
 // PMC faction values
 export const PMC_FACTIONS = ['USEC', 'BEAR'] as const;
-export const DEFAULT_PMC_FACTION = 'USEC' as const;
+const DEFAULT_PMC_FACTION = 'USEC' as const;
 export type PMCFaction = (typeof PMC_FACTIONS)[number]; // "USEC" | "BEAR"
 // Helper to normalize and validate PMC faction input
 export function normalizePMCFaction(input: string | undefined | null): PMCFaction {
@@ -15,16 +14,6 @@ export function normalizePMCFaction(input: string | undefined | null): PMCFactio
   const upper = input.toUpperCase();
   return PMC_FACTIONS.includes(upper as PMCFaction) ? (upper as PMCFaction) : DEFAULT_PMC_FACTION;
 }
-// Default values for game setup
-export const DEFAULT_GAME_EDITION = 1; // Standard Edition
-// Game edition string values for legacy data validation
-export const GAME_EDITION_STRING_VALUES = [
-  'standard',
-  'leftbehind',
-  'prepareescape',
-  'edgeofDarkness',
-  'unheard',
-] as const;
 // Map internal game modes to API game modes
 // Internal modes remain stable even when upstream endpoint slugs change.
 export const GAME_MODES = {
@@ -38,9 +27,7 @@ export const GAME_MODE_UI = {
   [GAME_MODES.PVE]: { color: 'pve' },
   [GAME_MODES.SEASONAL]: { color: 'warning' },
 } as const satisfies Record<GameMode, { color: 'pvp' | 'pve' | 'warning' }>;
-export type ImportableGameMode = Exclude<GameMode, typeof GAME_MODES.SEASONAL>;
 export const GAME_MODE_VALUES = Object.values(GAME_MODES) as GameMode[];
-export const IMPORTABLE_GAME_MODES = [GAME_MODES.PVP, GAME_MODES.PVE] as const;
 export const API_TOKEN_PREFIXES = {
   [GAME_MODES.PVP]: 'PVP_',
   [GAME_MODES.PVE]: 'PVE_',
@@ -106,8 +93,6 @@ export const getGameModeSeasonNumber = (mode: GameMode): number =>
   mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
 export const isGameMode = (value: unknown): value is GameMode =>
   typeof value === 'string' && GAME_MODE_VALUES.includes(value as GameMode);
-export const isImportableGameMode = (value: unknown): value is ImportableGameMode =>
-  value === GAME_MODES.PVP || value === GAME_MODES.PVE;
 export const TASK_STATE = {
   LOCKED: 'LOCKED',
   AVAILABLE: 'AVAILABLE',
@@ -124,7 +109,7 @@ export const CURRENCY_ITEM_IDS = [
   '569668774bdc2da2298b4568', // Euros (EUR)
 ] as const;
 export type CurrencyItemId = (typeof CURRENCY_ITEM_IDS)[number];
-export const CURRENCY_SYMBOLS = {
+const CURRENCY_SYMBOLS = {
   '5449016a4bdc2d6f028b456f': '₽',
   '5696686a4bdc2da3298b456a': '$',
   '569668774bdc2da2298b4568': '€',
@@ -212,12 +197,6 @@ export const LIMITS = {
   GAME_MAX_LEVEL: 79,
 } as const;
 export const MAX_SKILL_LEVEL = LIMITS.MAX_SKILL_LEVEL;
-// Cache configuration (sync with tarkovCache.ts)
-export const CACHE_CONSTANTS = {
-  // Cache TTL in hours
-  DEFAULT_TTL_HOURS: 12,
-  MAX_TTL_HOURS: 24,
-} as const;
 // Traders that don't have traditional loyalty levels (LL1-4)
 // Uses normalizedName for language-independent, stable identification
 export const TRADERS_WITHOUT_LOYALTY_LEVELS = [
@@ -246,9 +225,9 @@ export const TASK_ID_REGISTRY = {
   EASY_MONEY_PART_1_PVE: '6834145ebc1f443d7603c8a7',
   HOT_WHEELS: '673f4e956f1b89c7bc0f56ef',
 } as const;
-export type TraderUnlockTaskConfig = string | Partial<Record<GameMode, string>>;
+type TraderUnlockTaskConfig = string | Partial<Record<GameMode, string>>;
 // Traders that require a specific task to unlock
-export const TRADER_UNLOCK_TASKS: Record<string, TraderUnlockTaskConfig> = {
+const TRADER_UNLOCK_TASKS: Record<string, TraderUnlockTaskConfig> = {
   lightkeeper: TASK_ID_REGISTRY.GETTING_ACQUAINTED,
   'btr-driver': TASK_ID_REGISTRY.A_HELPING_HAND,
   ref: {
@@ -291,7 +270,7 @@ export const TRADER_ORDER = [
 export const HOT_WHEELS_TASK_ID = TASK_ID_REGISTRY.HOT_WHEELS;
 export const MANUAL_FAIL_TASK_IDS: readonly string[] = [HOT_WHEELS_TASK_ID];
 // Skill display order (matches in-game character screen order)
-export const SKILL_ORDER_ID = [
+const SKILL_ORDER_ID = [
   'Endurance',
   'Strength',
   'Vitality',
@@ -406,7 +385,7 @@ export function sortTraderStats<
 }
 // Map display order (matches typical task progression)
 // Uses static map keys from maps.json for stable identification
-export const MAP_ORDER = [
+const MAP_ORDER = [
   'groundzero', // Starting map
   'customs', // Early game, lots of early quests
   'woods', // Early-mid game

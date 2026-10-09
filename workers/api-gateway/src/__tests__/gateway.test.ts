@@ -1,3 +1,4 @@
+import branchFixture from '@tarkovtracker/progress-contracts/fixtures/task-failure-branches.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';
@@ -98,7 +99,7 @@ const createBaseFetchMock = ({
   onMerge,
   mergeResult,
   mergeStore,
-  tasks = [],
+  tasks = [{ id: 'unrelated' }],
   userProgress = {
     user_id: 'user-1',
     game_edition: 1,
@@ -228,12 +229,17 @@ const createBaseFetchMock = ({
     if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
       return jsonResponse({
         data: {
-          tasks: Object.fromEntries(tasks.map((task) => [String(task.id), task])),
+          tasks: Object.fromEntries(
+            tasks.map((task) => [
+              String(task.id),
+              { objectives: [], failConditions: [], taskRequirements: [], ...task },
+            ])
+          ),
         },
       });
     }
     if (url === `https://json.tarkov.dev/${apiGameMode}/hideout`) {
-      return jsonResponse({ data: {} });
+      return jsonResponse({ data: { stash: { id: 'stash', levels: [] } } });
     }
     return new Response('Not Found', { status: 404 });
   });
@@ -933,6 +939,7 @@ describe('api-gateway', () => {
                 name: 'Task One',
                 factionName: 'Any',
                 objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
+                failConditions: [],
                 taskRequirements: [],
               },
             },
@@ -1937,4 +1944,165 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
     expect(mock.store.has('state')).toBe(false);
     expect(mock.storage.setAlarm).not.toHaveBeenCalled();
   });
+});
+describe('required catalog availability', () => {
+  const failures = [
+    { name: '503', response: async () => new Response('', { status: 503 }) },
+    {
+      name: 'transport',
+      response: async () => {
+        throw new Error('offline');
+      },
+    },
+    {
+      name: 'timeout',
+      response: async () => {
+        throw new DOMException('deadline', 'TimeoutError');
+      },
+    },
+    { name: 'malformed JSON', response: async () => new Response('{') },
+    { name: 'absent rules', response: async () => jsonResponse({ data: {} }) },
+    { name: 'empty rules', response: async () => jsonResponse({ data: { tasks: {} } }) },
+    {
+      name: 'malformed rules',
+      response: async () =>
+        jsonResponse({ data: { tasks: { A: { id: 'A', objectives: [], taskRequirements: {} } } } }),
+    },
+    {
+      name: 'partial rules',
+      response: async () =>
+        jsonResponse({
+          data: {
+            tasks: {
+              A: { id: 'A', objectives: [], failConditions: [], taskRequirements: [] },
+              B: null,
+            },
+          },
+        }),
+    },
+  ];
+  const modes = ['pvp', 'pve', 'seasonal'] as const;
+  const headersFor = (mode: GameMode) => ({
+    ...AUTH_HEADERS,
+    Authorization: 'Bearer ' + { pvp: 'PVP', pve: 'PVE', seasonal: 'SZN' }[mode] + '_abc123',
+  });
+  const tasks = [
+    { id: 'A', taskRequirements: [] },
+    { id: 'B', taskRequirements: [{ task: 'A', status: ['complete'] }] },
+  ];
+  it.each(modes.flatMap((mode) => failures.map((failure) => ({ mode, ...failure }))))(
+    'blocks single and batch persistence for $mode/$name, then recovers',
+    async ({ mode, response }) => {
+      const initial = {
+        level: 1,
+        taskCompletions: { A: { complete: true }, B: { complete: true } },
+      };
+      const mergeStore = { data: structuredClone(initial) };
+      const merges = vi.fn();
+      const base = createBaseFetchMock({
+        gameMode: mode,
+        tasks,
+        onMerge: merges,
+        mergeStore,
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          progress_data: structuredClone(initial),
+        },
+      });
+      let unavailable = true;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+          String(input).endsWith('/tasks') && unavailable ? response() : base(input, init)
+        )
+      );
+      const single = () =>
+        buildRequest('/progress/task/A', {
+          method: 'POST',
+          headers: headersFor(mode),
+          body: JSON.stringify({ state: 'uncompleted' }),
+        });
+      const batch = () =>
+        buildRequest('/progress/tasks', {
+          method: 'POST',
+          headers: headersFor(mode),
+          body: JSON.stringify([{ id: 'A', state: 'uncompleted' }]),
+        });
+      for (const request of [single(), batch()]) {
+        const res = await worker.fetch(request, BASE_ENV);
+        await expectErrorResponse(res, 503, 'Game data temporarily unavailable');
+        expect(res.headers.get('X-RateLimit-Remaining')).not.toBeNull();
+      }
+      expect(merges).not.toHaveBeenCalled();
+      expect(mergeStore.data).toEqual(initial);
+      unavailable = false;
+      expect((await worker.fetch(single(), BASE_ENV)).status).toBe(200);
+      expect(merges).toHaveBeenCalledOnce();
+      expect(merges.mock.calls[0]![0].p_task_completions).toMatchObject({
+        A: { complete: false },
+        B: { complete: false },
+      });
+    }
+  );
+  it.each(['/progress', '/team/progress'])(
+    'fails %s reads when hideout rules are unavailable',
+    async (path) => {
+      const base = createBaseFetchMock({ tasks, permissions: ['GP', 'TP'], teamId: 'team-1' });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+          String(input).endsWith('/hideout') ? new Response('', { status: 503 }) : base(input, init)
+        )
+      );
+      const res = await worker.fetch(buildRequest(path, { headers: AUTH_HEADERS }), BASE_ENV);
+      await expectErrorResponse(res, 503, 'Game data temporarily unavailable');
+      expect(res.headers.get('ETag')).toBeNull();
+      expect(res.headers.get('X-RateLimit-Remaining')).not.toBeNull();
+    }
+  );
+});
+describe('failure branch response parity', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'applies hydrated branch rules to individual and team reads in %s',
+    async (mode) => {
+      const sourceId = '597a0f5686f774273b74f676';
+      const targetId = '597a160786f77477531d39d2';
+      vi.stubGlobal(
+        'fetch',
+        createBaseFetchMock({
+          gameMode: mode,
+          tasks: Object.values(branchFixture.data.tasks),
+          permissions: ['GP', 'TP'],
+          teamId: 'team-1',
+          userProgress: {
+            user_id: 'user-1',
+            game_edition: 1,
+            progress_data: {
+              level: 1,
+              pmcFaction: 'USEC',
+              taskCompletions: { [sourceId]: { complete: true }, [targetId]: { complete: false } },
+            },
+          },
+        })
+      );
+      const headers = {
+        Authorization: 'Bearer ' + { pvp: 'PVP', pve: 'PVE', seasonal: 'SZN' }[mode] + '_abc123',
+      };
+      const progress = await worker.fetch(buildRequest('/progress', { headers }), BASE_ENV);
+      expect(progress.status).toBe(200);
+      const single = (await progress.json()) as {
+        data: { tasksProgress: Array<{ id: string; invalid?: boolean }> };
+      };
+      expect(single.data.tasksProgress.find((task) => task.id === targetId)?.invalid).toBe(true);
+      const team = await worker.fetch(buildRequest('/team/progress', { headers }), BASE_ENV);
+      expect(team.status).toBe(200);
+      const members = (await team.json()) as {
+        data: Array<{ tasksProgress: Array<{ id: string; invalid?: boolean }> }>;
+      };
+      expect(members.data).toHaveLength(2);
+      for (const member of members.data)
+        expect(member.tasksProgress.find((task) => task.id === targetId)?.invalid).toBe(true);
+    }
+  );
 });

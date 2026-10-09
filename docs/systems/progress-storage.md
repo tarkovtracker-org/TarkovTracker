@@ -68,7 +68,7 @@ flowchart LR
    Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
    requested tasks before cascaded dependents) and records the pre-truncation total as `taskCount`
    only when updates were dropped. The gateway, client, and database apply the same rules
-   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
+   (`@tarkovtracker/progress-contracts/apiTaskUpdates`), so a client sync cannot flip a stored entry. When a sync
    resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
    from a client built before the cap), the database keeps the larger stored count.
 3. Realtime listens to both the account row, for metadata, and normalized rows. Recognized account metadata
@@ -102,8 +102,8 @@ flowchart LR
    deploys the matching application constants before the new season opens.
 6. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
-7. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
-   only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
+7. Prestige applies to persistent PvP and PvE (six levels each); Seasonal PvP does not support it,
+   so the archive RPC accepts only `pvp` and `pve` and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP. Prestige archives use the same account write queue as background
    syncs, supersede older splits, and acknowledge only the persistent modes the transaction writes.
@@ -152,10 +152,18 @@ Teams, save status and recovery, and progress imports build on this storage; see
   requires aligned application/gateway consumers and a verified database rollout first. The
   per-entry task cap and `taskCount` rules must stay identical across those three layers.
 - Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
-  `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
-  existing row and column access, including token-note updates. Billing events remain server-only;
-  supporters and admin audit logs expose only their RLS-filtered authenticated reads. New-table
-  default privileges require a separate creating-role audit; these revokes do not change defaults.
+  `MAINTAIN`) on account, progress, team, billing, or audit tables. The explicit client contract below
+  preserves legitimate row and column access, including token-note updates. Billing events remain
+  server-only; supporters and admin audit logs expose only their RLS-filtered authenticated reads.
+  Future `public` tables/views created by the migration role `postgres` require explicit client grants.
+  Reserved `supabase_admin` defaults are provider-owned: hosted `postgres` cannot alter them.
+  Application objects must use reviewed `postgres` migrations with explicit grants; platform
+  extensions must use a schema outside the configured Data API exposed schemas where supported.
+  Re-audit global/public table/view and sequence defaults, relation ownership and effective
+  client/service-role access before and after extension changes, platform upgrades, restores, or
+  a new platform-owned public relation. The
+  [platform-defaults runbook](../runbook.md#platform-owned-public-relation-defaults) records the
+  supported boundary, remediation policy and 2026-10-07 production readback for #1133.
 - Nitro shared-profile and team-member reads resolve Seasonal through the service-role-only
   `get_active_season_number` RPC on each request before cache lookup. Cache keys include the resolved
   season; missing credentials, failed lookups and invalid responses return 503 rather than falling
@@ -167,7 +175,7 @@ Teams, save status and recovery, and progress imports build on this storage; see
   second runtime constant.
 - Both season resolvers (Nitro and the Worker's `workers/api-gateway/src/utils/gameMode.ts`) accept
   the RPC's `SMALLINT` only as a JSON number that is a positive integer
-  (`shared/utils/seasonNumber.ts`); strings, booleans, arrays, objects, null, zero, negatives and
+  (`@tarkovtracker/progress-contracts/seasonNumber`); strings, booleans, arrays, objects, null, zero, negatives and
   fractions are rejected without coercion and fail closed.
 - Own and teammate hydration, shared profiles and overlays, team summaries, and public progress/team
   API reads use normalized rows only. A materialized row carries a finite numeric `level`; missing
@@ -222,7 +230,11 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in [EFT log import](./imports.md#eft-log-import); unresolved-mode events require an explicit destination choice.
-- Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
+- The activity feed and its unread badge show only API updates. Mark read acknowledges
+  updates without deleting history. Manual task actions and Undo
+  retain their immediate status messages without creating activity entries. Previously saved manual
+  entries remain compatible with progress sync and legacy adoption but are hidden from the feed.
+- Historical manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
   next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
   lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
   stable id in the equal-epoch branch, a reset/prestige epoch win discards the losing side's feed
@@ -267,3 +279,56 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.
+
+### Client table access contract
+
+All 11 tables below have RLS enabled. `PUBLIC` and `anon` have no table or column grants.
+Authenticated reads still obey the existing owner, team-membership, or admin policies. The only
+column-only client grant is `api_tokens.UPDATE(note)`. `service_role` keeps SELECT, INSERT, UPDATE
+and DELETE on every table; existing RPC/trigger owners keep their access.
+
+| Table                   | Authenticated grants         | Client consumer / server writer                                                                           |
+| ----------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `user_progress`         | SELECT                       | Account metadata listener; sync RPCs write progress                                                       |
+| `account_ip_audit`      | None                         | Discord/account lifecycle records IP hashes on the server                                                 |
+| `user_preferences`      | SELECT, INSERT, UPDATE       | `zz.preferences-sync.client.ts` and `useSupabaseSync` read/upsert; account-deletion Edge Function deletes |
+| `api_tokens`            | SELECT, DELETE, UPDATE(note) | `ApiTokens.vue` reads, renames and revokes; token-create Edge Function and gateway manage other fields    |
+| `user_prestige_runs`    | SELECT, DELETE               | `useTarkov.ts` reads/deletes history; archive/reset RPC inserts                                           |
+| `user_system`           | SELECT                       | `useSystemStore.ts` listener; auth triggers, team/account Edge Functions maintain the row                 |
+| `team_events`           | SELECT                       | Team-member reads (RLS); team mutation RPCs/Edge Functions read and create cooldown evidence              |
+| `discord_account_links` | SELECT                       | `DiscordLinkCard.vue` reads own link; auth trigger and Discord Edge Functions write                       |
+| `team_memberships`      | SELECT                       | `MyTeam.vue`, team store and realtime; team mutation RPCs/Edge Functions write                            |
+| `teams`                 | SELECT                       | Team store/listener; team mutation RPCs/Edge Functions write                                              |
+| `account_deletion_jobs` | SELECT (admins through RLS)  | Operational admin inspection; account-deletion Edge Function and claim/fencing RPCs write                 |
+
+`20261007050105_harden_remaining_client_table_access.sql` revokes both table and column access
+before restoring this contract. Preferences DELETE, direct prestige INSERT/UPDATE, and system
+DELETE have no current browser consumer; account cleanup and prestige archival use the server or
+RPC paths above. Existing progress/team mutation revocations and billing/audit restrictions remain.
+`client_table_access.test.sql` checks effective privileges (including PUBLIC/inherited grants), every
+column, service-role DML, and actual owner/outsider operations. The existing progress, team, prestige,
+and account-lifecycle suites exercise the RPC paths.
+
+`20261007050106_revoke_postgres_client_table_defaults.sql` removes all client/PUBLIC table defaults
+for `postgres` in `public`, including views. New relations require explicit role grants and RLS
+policies in their creating migration. Existing relations and service-role defaults are unaffected;
+function and sequence defaults are outside this table-grant change. The default regression creates
+both a table and a view as `postgres`, tests denial before opt-in, and tests explicit SELECT with RLS.
+
+The 2026-10-07 production creating-role audit found public-table defaults granting all eight table
+privileges to both client roles for `postgres` and `supabase_admin`, and no global table-default ACLs.
+All 21 existing public tables/views were owned by `postgres`; there were no public sequences.
+The hosted `postgres` role is neither superuser nor a member of `supabase_admin`. A migration cannot
+change the reserved role's defaults: [#1133](https://github.com/tarkovtracker-org/TarkovTracker/issues/1133)
+tracks supported provider remediation and monitoring for platform-owned public relations. Do not
+claim that every creating role has been hardened. See [Supabase's supported postgres opt-in SQL](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically).
+
+Before rollout, recapture global/public defaults by creating role, effective table/column grants,
+relation owners, migration history, and blocking sessions using the [database runbook](../runbook.md#database-migrations).
+A global default grant cannot be removed by a schema-only revoke; new global grants or a different
+application creating role require a revised migration and replay, not an assumed pass. The two
+forward migrations use one transaction each, a five-second lock timeout and a 30-second statement
+timeout. They perform no row rewrites or policy changes. After approved deployment, read back all
+effective privileges and the `postgres` defaults; close #663 only after rollout evidence and the
+explicitly linked reserved-role follow-up are recorded. An application rollback cannot restore
+revoked grants: any rollback requires a separately reviewed forward migration, never a bulk GRANT ALL.

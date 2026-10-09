@@ -11,9 +11,9 @@
  *
  * Both sides import this module so key format and envelope shape stay in sync.
  */
-export const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
-export const PRECOMPUTED_ENVELOPE_VERSION = 2;
-export const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
+const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
+const PRECOMPUTED_ENVELOPE_VERSION = 2;
+const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
 export type PrecomputedEnvelope<T> = {
   payload: T;
   overlay: { version: string; sha256: string } | null;

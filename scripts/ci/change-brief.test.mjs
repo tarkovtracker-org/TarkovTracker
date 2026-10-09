@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -283,7 +283,16 @@ describe('path helpers', () => {
         ],
       },
       { executable: 'node', args: ['--test', '--', './scripts/workflow-tests/c.mjs'] },
-      { executable: 'deno', args: ['test', './supabase/functions/_shared/d.deno.test.ts'] },
+      {
+        executable: 'deno',
+        args: [
+          'test',
+          '--config',
+          'supabase/functions/deno.json',
+          '--frozen',
+          './supabase/functions/_shared/d.deno.test.ts',
+        ],
+      },
     ]);
   });
   it('preserves inert filenames as separate arguments instead of shell text', () => {
@@ -311,17 +320,48 @@ describe('path helpers', () => {
       expect(typeof command.executable).toBe('string');
     }
   });
+  it('selects versioned API parity and the legacy gateway tooling runner', () => {
+    const contracts = 'workers/contract-tests/taskFailureParity.test.ts';
+    const tooling = 'workers/api-gateway/scripts/check-boundaries.test.ts';
+    expect(isTestPath(contracts)).toBe(true);
+    expect(isTestPath(tooling)).toBe(true);
+    expect(testCommands([contracts, tooling])).toEqual([
+      {
+        executable: 'pnpm',
+        args: ['run', 'verify:api-parity'],
+      },
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './scripts/check-boundaries.test.ts',
+        ],
+      },
+    ]);
+  });
   it('keeps Deno file selection before its script-argument delimiter', () => {
     const [command] = testCommands(['-selected space.deno.test.ts']);
     expect(command).toEqual({
       executable: 'deno',
-      args: ['test', './-selected space.deno.test.ts'],
+      args: [
+        'test',
+        '--config',
+        'supabase/functions/deno.json',
+        '--frozen',
+        './-selected space.deno.test.ts',
+      ],
     });
   });
   it.skipIf(!process.env.DENO_EXECUTABLE)('runs only the selected Deno fixture', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'change-brief-deno-'));
     const selected = '-selected space.deno.test.ts';
     const other = 'other.deno.test.ts';
+    mkdirSync(join(cwd, 'supabase/functions'), { recursive: true });
+    writeFileSync(join(cwd, 'supabase/functions/deno.json'), '{}');
     writeFileSync(
       join(cwd, selected),
       'Deno.test("selected", () => { if (Deno.args.length) throw new Error("unexpected script args"); });'
@@ -341,9 +381,7 @@ describe('path helpers', () => {
       expect(output).toContain('1 passed');
       expect(output).not.toContain('unselected');
     } finally {
-      unlinkSync(join(cwd, selected));
-      unlinkSync(join(cwd, other));
-      rmdirSync(cwd);
+      rmSync(cwd, { recursive: true, force: true });
     }
   });
 });

@@ -61,7 +61,7 @@ const getFontSrcSources = (): string[] => {
 const getOverlayScriptSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
   return getUniqueSources([options.allowUnsafeInlineScripts ? "'unsafe-inline'" : "'none'"]);
 };
-export const getScriptSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
+const getScriptSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
   const hasGoogleAnalytics = hasConfiguredValue(options.gaMeasurementId);
   const hasMicrosoftClarity = hasConfiguredValue(options.clarityInstrumentationKey);
   return getUniqueSources([
@@ -113,7 +113,7 @@ export const getImgSrcSources = (options: ContentSecurityPolicyOptions = {}): st
     'https://assets.tarkov.dev',
   ]);
 };
-export const getFrameSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
+const getFrameSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
   return getUniqueSources([
     "'self'",
     'https://player.twitch.tv',

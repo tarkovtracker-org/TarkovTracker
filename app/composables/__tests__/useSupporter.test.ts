@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { effectScope, reactive } from 'vue';
+import { resolveSupportBanner } from '@/features/dashboard/supportBanner';
 import { createDeferred } from '@/utils/test-helpers';
 const userState = reactive({
   id: 'user-1',
@@ -79,6 +80,31 @@ describe('useSupporter', () => {
       status: nextChannel.subscribe.mock.calls[0]?.[0],
     };
   };
+  it('updates the badge tier and active subscription when loaded access expires', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));
+    const scope = effectScope();
+    try {
+      const { useSupporter } = await import('@/composables/useSupporter');
+      const status = scope.run(() => useSupporter())!;
+      status.supporter.value = {
+        status: 'active',
+        type: 'subscription',
+        tier: 'scav',
+        hasEverSupported: true,
+        startedAt: '2026-01-01T00:00:00Z',
+        expiresAt: '2026-10-07T00:00:01Z',
+      };
+      expect(status.activeTier.value).toBe('scav');
+      expect(status.isActiveSubscriber.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(status.activeTier.value).toBe('supporter');
+      expect(status.isActiveSubscriber.value).toBe(false);
+    } finally {
+      scope.stop();
+      vi.useRealTimers();
+    }
+  });
   it('refreshes status after the first join and each rejoin to close the read/join gap', async () => {
     const { supporter, subscribing, status } = await startInitialSubscription();
     expect(mockMaybeSingle).not.toHaveBeenCalled();
@@ -164,6 +190,61 @@ describe('useSupporter', () => {
     await expect(supporter.subscribe('user-1')).resolves.toBe(true);
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
     expect(mockChannel).toHaveBeenCalledOnce();
+    supporter.unsubscribe();
+  });
+  it('hides the support banner after a rejected refresh clears a successful status read', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const banner = () =>
+      resolveSupportBanner({
+        userId: userState.id,
+        loadedUserId: supporter.loadedUserId.value,
+        supporter: supporter.supporter.value,
+        createdAt: null,
+        completedTasks: 20,
+        dismissedAt: null,
+      });
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(true);
+    expect(banner()).toBe('new');
+    mockMaybeSingle.mockRejectedValueOnce(new Error('offline'));
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(false);
+    expect(supporter.supporter.value).toBeNull();
+    expect(supporter.loadedUserId.value).toBeNull();
+    expect(banner()).toBeNull();
+  });
+  it('does not let a stale rejected refresh clear a newer successful status read', async () => {
+    const stale = createDeferred<{ data: null; error: null }>();
+    mockMaybeSingle.mockReturnValueOnce(stale.promise).mockResolvedValueOnce({
+      data: {
+        expires_at: '2030-01-01T00:00:00.000Z',
+        has_ever_supported: true,
+        started_at: '2026-01-01T00:00:00.000Z',
+        status: 'active',
+        tier: 'chad',
+        type: 'subscription',
+      },
+      error: null,
+    });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const staleRequest = supporter.fetchStatus('user-1');
+    await expect(supporter.fetchStatus('user-1')).resolves.toBe(true);
+    stale.reject(new Error('offline'));
+    await expect(staleRequest).resolves.toBe(false);
+    expect(supporter.loadedUserId.value).toBe('user-1');
+    expect(supporter.supporter.value?.tier).toBe('chad');
+    expect(supporter.error.value).toBeNull();
+    expect(supporter.loading.value).toBe(false);
+  });
+  it('clears the loaded marker when a refresh throws after a successful read', async () => {
+    const { supporter, subscribing, status, nextChannel } = await startInitialSubscription();
+    status('SUBSCRIBED');
+    await expect(subscribing).resolves.toBe(true);
+    expect(supporter.loadedUserId.value).toBe('user-1');
+    mockMaybeSingle.mockRejectedValueOnce(new Error('offline'));
+    nextChannel.on.mock.calls[0]?.[2]();
+    await vi.waitFor(() => expect(supporter.loadedUserId.value).toBeNull());
     supporter.unsubscribe();
   });
   it('does not apply a stale status response after reset', async () => {

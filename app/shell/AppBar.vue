@@ -13,45 +13,50 @@
           size="md"
           :aria-label="t('navigation_drawer.toggle')"
           :class="{ 'rotate-180': isDrawerCollapsed }"
-          class="transition-transform duration-200"
+          class="h-8 w-8 transition-transform duration-200"
           @click.stop="changeNavigationDrawer"
         />
       </AppTooltip>
       <!-- Center: Omnibar Search -->
-      <span class="flex min-w-0 flex-1 items-center">
+      <div class="flex min-w-0 flex-1 items-center">
         <button
           type="button"
-          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-full max-w-xs min-w-0 cursor-pointer items-center justify-between rounded-lg border px-3 text-left transition-colors"
+          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-0 text-left transition-colors sm:w-full sm:max-w-sm sm:min-w-0 sm:shrink sm:justify-between sm:px-2.5 lg:max-w-md"
           :aria-label="t('omnibar.open_aria', 'Open global search')"
           :aria-keyshortcuts="omnibarAriaKeyshortcuts"
           @click="openOmnibar"
         >
           <span class="text-surface-400 flex min-w-0 items-center gap-2 text-xs">
             <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4 shrink-0" />
-            <span class="truncate">{{ t('omnibar.trigger_label', 'Search...') }}</span>
+            <span class="hidden truncate sm:inline">
+              {{ t('omnibar.trigger_label', 'Search...') }}
+            </span>
           </span>
-          <span class="hidden items-center gap-0.5 sm:flex">
+          <span class="hidden shrink-0 items-center gap-0.5 lg:flex">
             <template v-for="(part, index) in omnibarShortcutParts" :key="index">
               <span v-if="index > 0" class="text-surface-500 text-[10px]">+</span>
               <UKbd size="sm">{{ part }}</UKbd>
             </template>
           </span>
         </button>
-      </span>
-      <!-- Right: Status indicators + two control groups -->
-      <div class="ml-auto flex items-center gap-3">
+      </div>
+      <!-- Right: Status indicators + grouped controls -->
+      <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
         <!-- Status indicators (non-interactive, shown only when active) -->
-        <div class="flex items-center justify-end gap-1">
+        <div class="flex items-center justify-end gap-0.5">
           <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
-            <span class="flex h-9 w-9 items-center justify-center">
+            <span class="flex h-8 w-8 items-center justify-center">
               <UIcon
                 name="i-mdi-database-alert"
                 class="text-error-500 light:text-error-800 h-4 w-4"
               />
             </span>
           </AppTooltip>
-          <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
-            <span class="flex h-9 w-9 items-center justify-center">
+          <AppTooltip
+            v-if="dataLoading || hideoutLoading || localeSwitchPending"
+            :text="t('app_bar.loading')"
+          >
+            <span class="flex h-8 w-8 items-center justify-center">
               <UIcon
                 name="i-heroicons-arrow-path"
                 class="text-primary-500 light:text-primary-800 h-4 w-4 animate-spin"
@@ -60,8 +65,8 @@
           </AppTooltip>
           <ProgressSaveStatusIndicator />
         </div>
-        <!-- Group 1: Utilities (Theme + Bell + Help) -->
-        <div class="flex items-center gap-1">
+        <!-- Utility group: Theme + Activity + Help + Language + community links -->
+        <div class="bg-surface-800/40 flex items-center rounded-lg">
           <AppTooltip :text="themeToggleLabel">
             <UButton
               color="neutral"
@@ -69,7 +74,7 @@
               size="md"
               :icon="isLightTheme ? 'i-heroicons-moon' : 'i-heroicons-sun'"
               :aria-label="themeToggleLabel"
-              class="hidden h-9 w-9 sm:inline-flex"
+              class="hidden h-8 w-8 sm:inline-flex"
               @click="toggleThemeMode"
             />
           </AppTooltip>
@@ -81,7 +86,7 @@
                 size="md"
                 icon="i-heroicons-bell"
                 :aria-label="t('common.activity_log', 'Activity Log')"
-                class="relative h-9 w-9"
+                class="relative h-8 w-8"
               >
                 <span v-if="activityLogStore.hasUnread" class="sr-only" aria-live="polite">
                   {{ t('activity_log.unread_indicator', 'You have unread activity') }}
@@ -89,7 +94,7 @@
                 <span
                   v-if="activityLogStore.hasUnread"
                   aria-hidden="true"
-                  class="bg-error-500 ring-surface-900 absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full ring-2"
+                  class="bg-error-500 ring-surface-900 absolute top-1 right-1 flex h-2 w-2 rounded-full ring-2"
                 />
               </UButton>
               <template #content>
@@ -98,29 +103,55 @@
             </UPopover>
           </AppTooltip>
           <GlobalHelpLauncher />
+          <AppTooltip :text="localeTooltip">
+            <UDropdownMenu :items="localeMenuItems" :content="{ align: 'end', sideOffset: 8 }">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                size="md"
+                icon="i-mdi-translate"
+                :aria-label="localeTooltip"
+                :loading="localeSwitchPending"
+                :disabled="localeSwitchPending"
+                data-testid="app-locale-menu"
+                class="hidden h-8 w-8 justify-center sm:inline-flex"
+              />
+            </UDropdownMenu>
+          </AppTooltip>
+          <AppTooltip :text="t('footer.call_to_action.discord', 'Discord')">
+            <a
+              href="https://discord.gg/M8nBgA2sT6"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-surface-400 hover:bg-surface-700/60 hover:text-discord hidden h-8 w-8 items-center justify-center rounded-md transition-colors sm:inline-flex"
+              :aria-label="t('footer.call_to_action.discord', 'Discord')"
+            >
+              <DiscordIcon class="h-4 w-4" />
+            </a>
+          </AppTooltip>
+          <AppTooltip :text="t('footer.call_to_action.github', 'GitHub')">
+            <a
+              href="https://github.com/tarkovtracker-org/TarkovTracker"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-surface-400 hover:bg-surface-700/60 hover:text-surface-50 hidden h-8 w-8 items-center justify-center rounded-md transition-colors sm:inline-flex"
+              :aria-label="t('footer.call_to_action.github', 'GitHub')"
+            >
+              <UIcon name="i-mdi-github" class="h-4 w-4" />
+            </a>
+          </AppTooltip>
         </div>
-        <!-- Group 2: Preferences & Actions (Language + Support + Account) -->
-        <div class="flex items-center gap-1.5">
-          <SelectMenuFixed
-            id="app-locale-select"
-            v-model="selectedLocale"
-            :items="localeItems"
-            :aria-label="t('settings.locale')"
-            value-key="value"
-            class="hidden shrink-0 sm:block"
-            :ui="localeSelectUi"
-          >
-            <template #leading>
-              <UIcon name="i-mdi-translate" class="text-surface-400 h-4 w-4 shrink-0" />
-            </template>
-          </SelectMenuFixed>
+        <!-- Visual separator between utility and account zones -->
+        <div class="bg-surface-700/60 hidden h-4 w-px sm:block" aria-hidden="true" />
+        <!-- Account zone: Support + Account -->
+        <div class="flex items-center gap-1 sm:gap-1.5">
           <span v-if="supporterTier" class="hidden sm:inline-flex">
             <AppTooltip :text="supporterBadgeAriaLabel">
               <NuxtLink
                 to="/supporter"
                 :class="[
-                  'inline-flex h-9 items-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold text-white transition-colors md:w-auto md:px-3',
-                  'w-9 justify-center',
+                  'inline-flex h-8 items-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold text-white transition-colors md:w-auto md:px-2.5',
+                  'w-8 justify-center',
                   supporterBadgeClass,
                 ]"
                 :aria-label="supporterBadgeAriaLabel"
@@ -134,7 +165,7 @@
             <AppTooltip :text="t('common.support')">
               <NuxtLink
                 to="/supporter"
-                class="border-success-500/50 bg-success-500/5 text-success-400 hover:bg-success-500/10 hover:border-success-500/70 inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold transition-colors md:w-auto md:px-3"
+                class="border-success-500/50 bg-success-500/5 text-success-400 hover:bg-success-500/10 hover:border-success-500/70 inline-flex h-8 w-8 items-center justify-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold transition-colors md:w-auto md:px-2.5"
                 :aria-label="t('common.support')"
               >
                 <UIcon name="i-mdi-heart" class="h-4 w-4 shrink-0" />
@@ -151,7 +182,7 @@
                   size="md"
                   icon="i-mdi-dots-horizontal"
                   :aria-label="t('common.more', 'More')"
-                  class="h-9 w-9"
+                  class="h-8 w-8"
                 />
               </UDropdownMenu>
             </AppTooltip>
@@ -164,7 +195,7 @@
             >
               <button
                 type="button"
-                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-56"
+                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-8 min-w-0 items-center gap-1.5 rounded-md border px-2 transition-colors sm:max-w-56"
                 :aria-label="t('navigation_drawer.account_menu')"
               >
                 <img
@@ -188,11 +219,11 @@
           <AppTooltip v-if="!isLoggedIn" :text="t('app_bar.login_aria', 'Log in to your account')">
             <NuxtLink
               to="/login"
-              class="bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 border-primary-500 light:border-primary-800 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
+              class="bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 border-primary-500 light:border-primary-800 text-surface-950 flex h-8 w-8 items-center justify-center gap-1.5 rounded-md border px-0 text-[13px] leading-none font-semibold transition-colors sm:w-auto sm:px-3"
               :aria-label="t('app_bar.login_aria', 'Log in to your account')"
             >
               <UIcon name="i-mdi-account-outline" class="h-4 w-4 shrink-0" />
-              <span class="leading-none">{{ t('navigation_drawer.login') }}</span>
+              <span class="hidden leading-none sm:inline">{{ t('navigation_drawer.login') }}</span>
             </NuxtLink>
           </AppTooltip>
         </div>
@@ -206,6 +237,7 @@
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import { useKeybinds } from '@/composables/useKeybinds';
+  import { useLocaleSwitch } from '@/composables/useLocaleSwitch';
   import { useSignOut } from '@/composables/useSignOut';
   import { useSupporter } from '@/composables/useSupporter';
   import { useTheme } from '@/composables/useTheme';
@@ -216,10 +248,10 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES } from '@/utils/constants';
   import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
-  import { logger } from '@/utils/logger';
+  import { getLocaleNativeName } from '@/utils/locales';
   import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
   import type { DropdownMenuItem } from '@nuxt/ui';
-  const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
+  const { t, te } = useI18n({ useScope: 'global' });
   const { isLightTheme, toggleThemeMode } = useTheme();
   const themeToggleLabel = computed(() =>
     isLightTheme.value
@@ -321,7 +353,6 @@
         return 'border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500';
     }
   });
-  const skillCalculation = useSkillCalculation();
   const { $supabase } = useNuxtApp();
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
   const avatarSrc = computed(() => {
@@ -385,12 +416,9 @@
       {
         icon: 'i-mdi-translate',
         label: t('settings.locale'),
-        children: (availableLocales as readonly string[]).map((localeCode) => ({
-          label: localeCode.toUpperCase(),
-          onSelect: () => {
-            void applyLocaleSelection(localeCode);
-          },
-        })),
+        description: localeStatus.value || undefined,
+        disabled: localeSwitchPending.value,
+        children: localeMenuItems.value,
       },
       {
         icon: 'i-mdi-heart-outline',
@@ -429,7 +457,15 @@
   });
   const NAV_BAR_ICON = 'i-mdi-menu-open';
   const { loading: dataLoading, hideoutLoading } = storeToRefs(metadataStore);
-  const dataError = ref(false);
+  const {
+    locale,
+    availableLocales,
+    pending: localeSwitchPending,
+    error: dataError,
+    status: localeStatus,
+    isDisabled: isLocaleDisabled,
+    selectLocale,
+  } = useLocaleSwitch();
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && appStore.mobileDrawerExpanded && mdAndDown.value) {
       event.preventDefault();
@@ -449,70 +485,20 @@
       appStore.toggleDrawerRail();
     }
   }
-  const isAvailableLocale = (value: string): value is typeof locale.value =>
-    (availableLocales as readonly string[]).includes(value);
-  const localeItems = computed(() => {
-    return availableLocales.map((localeCode) => ({
-      label: localeCode.toUpperCase(),
-      value: localeCode,
-    }));
-  });
-  const localeSelectUi = {
-    base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800/30 border-surface-700/40 hover:bg-surface-800/60 hover:border-surface-600/60 flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1 ring-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2',
-    content:
-      'max-h-80 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-(--reka-combobox-trigger-width)',
-    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white light:data-[highlighted]:text-surface-50 data-[state=checked]:bg-surface-700 data-[state=checked]:text-white light:data-[state=checked]:text-surface-50 data-[state=checked]:font-medium',
-    itemLabel: 'whitespace-nowrap uppercase',
-    itemTrailingIcon: 'text-surface-400 shrink-0 size-4',
-    leading: 'shrink-0 text-surface-400',
-    trailing: 'shrink-0 text-surface-400',
-    trailingIcon: 'text-surface-400 shrink-0 size-3.5',
-    value: 'text-surface-300 text-[13px] leading-none font-medium uppercase',
-    viewport: 'p-1 max-h-none overflow-visible',
-  } as const;
-  let latestLocaleSwitchRequestId = 0;
-  async function applyLocaleSelection(newLocale: string) {
-    if (!isAvailableLocale(newLocale) || newLocale === locale.value) return;
-    const requestId = ++latestLocaleSwitchRequestId;
-    logger.debug('[AppBar] Setting locale to:', newLocale);
-    const previousLocale = locale.value;
-    const previousLocaleOverride = preferencesStore.getLocaleOverride;
-    let localeStateApplied = false;
-    try {
-      await setLocale(newLocale);
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      preferencesStore.setLocaleOverride(newLocale);
-      metadataStore.updateLanguageAndGameMode(newLocale);
-      localeStateApplied = true;
-      await metadataStore.fetchAllData(false);
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      skillCalculation.migrateLegacySkillOffsets();
-      dataError.value = false;
-    } catch (err) {
-      if (requestId !== latestLocaleSwitchRequestId) return;
-      logger.error('[AppBar] Error switching locale:', err);
-      if (localeStateApplied) {
-        if (locale.value !== previousLocale) {
-          await setLocale(previousLocale).catch((rollbackError) => {
-            logger.debug('[AppBar] rollback to previousLocale failed', {
-              previousLocale,
-              rollbackError,
-            });
-          });
-        }
-        preferencesStore.setLocaleOverride(previousLocaleOverride);
-        metadataStore.updateLanguageAndGameMode(previousLocaleOverride ?? previousLocale);
-      }
-      dataError.value = true;
-    }
-  }
-  const selectedLocale = computed({
-    get() {
-      return locale.value;
-    },
-    set(newValue: string) {
-      if (!newValue) return;
-      void applyLocaleSelection(newValue);
-    },
-  });
+  // Native names remain findable in every interface language.
+  const localeMenuItems = computed<DropdownMenuItem[][]>(() => [
+    availableLocales.map((localeCode) => ({
+      label: getLocaleNativeName(localeCode),
+      type: 'checkbox' as const,
+      checked: localeCode === locale.value,
+      disabled: isLocaleDisabled(localeCode),
+      onSelect: () => {
+        if (!isLocaleDisabled(localeCode)) void selectLocale(localeCode);
+      },
+    })),
+    ...(localeStatus.value ? [[{ label: localeStatus.value, disabled: true }]] : []),
+  ]);
+  const localeTooltip = computed(
+    () => localeStatus.value || `${t('settings.locale')}: ${getLocaleNativeName(locale.value)}`
+  );
 </script>

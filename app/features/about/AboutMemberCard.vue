@@ -1,5 +1,5 @@
 <template>
-  <li class="bg-surface-900/80 flex flex-col gap-3 rounded-lg border border-white/10 p-5">
+  <li class="bg-surface-900/80 flex min-w-0 flex-col gap-3 rounded-lg border border-white/10 p-5">
     <div class="flex items-center gap-3.5">
       <span class="h-12 w-12 shrink-0">
         <NuxtImg
@@ -21,10 +21,12 @@
         </span>
       </span>
       <div class="min-w-0">
-        <p class="text-surface-50 truncate text-sm font-semibold">{{ member.displayName }}</p>
+        <p class="text-surface-50 text-sm font-semibold wrap-break-word sm:truncate">
+          {{ member.displayName }}
+        </p>
         <p class="mt-1.5">
           <span
-            class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
+            class="inline-flex max-w-full items-center rounded-full border px-2.5 py-0.5 text-xs font-medium wrap-break-word"
             :class="roleBadgeClasses"
           >
             {{ t(member.roleKey) }}

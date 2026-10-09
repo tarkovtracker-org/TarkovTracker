@@ -19,7 +19,7 @@
           <h3 class="text-surface-100 text-base font-semibold sm:text-lg">
             {{ t(`page.resources.guides.${resource.slug}.step_${n}_title`, '') }}
           </h3>
-          <p class="text-surface-300 text-base leading-relaxed">
+          <p class="text-surface-300 text-base leading-relaxed wrap-break-word">
             {{ t(`page.resources.guides.${resource.slug}.step_${n}_desc`, '') }}
           </p>
         </div>

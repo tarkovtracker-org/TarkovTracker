@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import * as billing from './stripeBilling.ts';
 import * as retention from './stripeRetention.ts';
+import * as oneTime from './stripeOneTime.ts';
 import * as tiers from './stripeTier.ts';
 type Row = Record<string, unknown>;
 const userId = '0bcd1234-1234-1234-1234-123456789abc';
@@ -19,16 +21,27 @@ const charge = {
 };
 const priorCharge = { ...charge, id: 'ch_prior', amount_refunded: 0, refunded: false };
 const source = readFileSync(new URL('../stripe-webhook/index.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(`${source}\nexport { dispatchEvent };`, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText;
+const compiled = ts.transpileModule(
+  `${source}\nexport const dispatchForTest = (event: StripeEvent) => processingClient.run(fencedClient(event.id, 'test_claim'), () => dispatchEvent(event));`,
+  {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }
+).outputText;
 function createHarness(
   initial: Row,
   resources: Record<string, unknown>,
-  options: { discord?: boolean; grant?: () => Promise<void>; remove?: () => Promise<void> } = {}
+  options: {
+    discord?: boolean;
+    grant?: () => Promise<void>;
+    remove?: () => Promise<void>;
+    readError?: string;
+    fulfillmentError?: string;
+    fulfillmentReplay?: boolean;
+  } = {}
 ) {
   let row: Row = { ...initial };
   const writes: Row[] = [];
+  const fulfillmentCalls: Row[] = [];
   const roles = new Set<string>();
   const from = (table: string) => {
     let values: Row | null = null;
@@ -39,6 +52,7 @@ function createHarness(
         return { data: { discord_user_id: 'discord_1' }, error: null };
       }
       if (table !== 'supporters') return { data: null, error: null };
+      if (options.readError) return { data: null, error: { message: options.readError } };
       if (filters.some(([key, value]) => row[key] !== value)) return { data: null, error: null };
       if (values) {
         writes.push(values);
@@ -77,15 +91,42 @@ function createHarness(
     if (!(path in resources)) return Promise.resolve(new Response('unavailable', { status: 503 }));
     return Promise.resolve(new Response(JSON.stringify(resources[path]), { status: 200 }));
   });
-  const exports: { dispatchEvent?: (event: unknown) => Promise<void> } = {};
+  const exports: { dispatchForTest?: (event: unknown) => Promise<void> } = {};
   runInNewContext(compiled, {
     exports,
     require: (name: string) => {
+      if (name === 'node:async_hooks') return { AsyncLocalStorage };
       if (name.startsWith('npm:')) {
         return {
           createClient: () => ({
             from,
-            rpc: () => {
+            rpc: (name: string, params: Row) => {
+              if (name === 'fulfill_one_time_supporter') {
+                fulfillmentCalls.push(params);
+                if (options.fulfillmentError)
+                  return Promise.resolve({
+                    data: null,
+                    error: { message: options.fulfillmentError },
+                  });
+                if (options.fulfillmentReplay)
+                  return Promise.resolve({ data: { ...row }, error: null });
+                const record = params.p_record as Row;
+                const live =
+                  row.type === 'subscription' &&
+                  ['active', 'past_due'].includes(String(row.status));
+                row = {
+                  ...row,
+                  ...record,
+                  has_ever_supported: true,
+                  retention_history_verified: true,
+                  status: live ? row.status : 'active',
+                  type: live ? 'subscription' : 'one_time',
+                  last_contribution_at: params.p_paid_at,
+                  updated_at: `revision_${writes.length + 1}`,
+                };
+                writes.push({ ...row });
+                return Promise.resolve({ data: { ...row }, error: null });
+              }
               row = { ...row, supporter_disqualified_at: '2026-09-29T12:00:00Z' };
               return Promise.resolve({ error: null });
             },
@@ -95,6 +136,7 @@ function createHarness(
       }
       if (name.endsWith('stripeBilling.ts')) return billing;
       if (name.endsWith('stripeRetention.ts')) return retention;
+      if (name.endsWith('stripeOneTime.ts')) return oneTime;
       if (name.endsWith('stripeTier.ts')) return tiers;
       if (name.endsWith('cors.ts')) return {};
       return {
@@ -110,6 +152,7 @@ function createHarness(
           await options.grant?.();
           roles.add('supporter');
           if (tier !== 'supporter') roles.add('tier');
+          else roles.delete('tier');
         },
       };
     },
@@ -120,10 +163,11 @@ function createHarness(
     console: { info: () => {}, warn: () => {}, error: () => {} },
   });
   return {
-    dispatch: (type: string, object: unknown) =>
-      exports.dispatchEvent!({ id: 'evt_1', type, data: { object } }),
+    dispatch: (type: string, object: unknown, created = Math.floor(Date.now() / 1000)) =>
+      exports.dispatchForTest!({ created, id: 'evt_1', type, data: { object } }),
     current: () => row,
     writes,
+    fulfillmentCalls,
     fetch,
     roles,
   };
@@ -281,6 +325,106 @@ describe('payment-specific webhook fulfillment', () => {
       has_ever_supported: true,
     });
     expect(harness.fetch.mock.calls.some(([url]) => url.includes('/charges?'))).toBe(false);
+  });
+  it.each(['checkout.session.completed', 'checkout.session.async_payment_succeeded'])(
+    'fulfills %s with stable payment identity and successful event date, not checkout creation',
+    async (type) => {
+      const resources = resourcesForPayments();
+      resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
+      const harness = createHarness(supporter, resources);
+      const paidAt = Date.parse('2026-10-07T01:00:00Z') / 1000;
+      await harness.dispatch(type, { ...session, amount_total: 400 }, paidAt);
+      expect(harness.fulfillmentCalls).toEqual([
+        {
+          p_payment_id: 'pi_new',
+          p_paid_at: '2026-10-07T01:00:00.000Z',
+          p_record: {
+            user_id: userId,
+            tier: 'chad',
+            stripe_customer_id: 'cus_1',
+            discord_user_id: null,
+            amount_total: 400,
+          },
+        },
+      ]);
+    }
+  );
+  it('preserves the successful event date on a late delivery from before the cutoff', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
+    const harness = createHarness(supporter, resources);
+    await harness.dispatch(
+      'checkout.session.completed',
+      { ...session, amount_total: 400 },
+      Date.parse('2026-10-06T23:59:59Z') / 1000
+    );
+    expect(harness.fulfillmentCalls[0]?.p_paid_at).toBe('2026-10-06T23:59:59.000Z');
+  });
+  it('does not write when the existing supporter lookup fails', async () => {
+    const harness = createHarness(supporter, resourcesForPayments(), { readError: 'offline' });
+    await expect(harness.dispatch('checkout.session.completed', session)).rejects.toThrow(
+      'Lookup by user_id failed'
+    );
+    expect(harness.writes).toEqual([]);
+    expect(harness.fulfillmentCalls).toEqual([]);
+  });
+  it.each(['active', 'expired'])(
+    'keeps only the base Discord role on an expired %s receipt replay',
+    async (status) => {
+      const harness = createHarness(
+        {
+          ...supporter,
+          status,
+          tier: 'chad',
+          expires_at: '2026-10-07T00:00:00Z',
+          discord_user_id: 'discord_1',
+        },
+        {
+          ...resourcesForPayments(),
+          '/charges/ch_new': { ...charge, amount_refunded: 0, refunded: false },
+        },
+        { discord: true, fulfillmentReplay: true }
+      );
+      harness.roles.add('tier');
+      await harness.dispatch('checkout.session.completed', session);
+      expect(harness.writes).toHaveLength(0);
+      expect(harness.roles).toEqual(new Set(['supporter']));
+    }
+  );
+  it('removes the paid tier when access expires while Discord applies a replay grant', async () => {
+    const harness = createHarness(
+      {
+        ...supporter,
+        status: 'active',
+        tier: 'chad',
+        expires_at: new Date(Date.now() + 60000).toISOString(),
+        discord_user_id: 'discord_1',
+      },
+      {
+        ...resourcesForPayments(),
+        '/charges/ch_new': { ...charge, amount_refunded: 0, refunded: false },
+      },
+      {
+        discord: true,
+        fulfillmentReplay: true,
+        grant: async () => {
+          harness.current().expires_at = '2026-10-07T00:00:00Z';
+        },
+      }
+    );
+    await harness.dispatch('checkout.session.completed', session);
+    expect(harness.roles).toEqual(new Set(['supporter']));
+  });
+  it('propagates failed atomic fulfillment for retry without a fallback upsert', async () => {
+    const resources = resourcesForPayments();
+    resources['/charges/ch_new'] = { ...priorCharge, id: 'ch_new' };
+    const harness = createHarness(supporter, resources, {
+      fulfillmentError: 'database unavailable',
+    });
+    await expect(
+      harness.dispatch('checkout.session.completed', { ...session, amount_total: 400 })
+    ).rejects.toThrow('One-time fulfillment failed');
+    expect(harness.writes).toEqual([]);
   });
 });
 describe('webhook Discord chargeback fencing', () => {

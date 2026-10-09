@@ -1,4 +1,4 @@
-import type { ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
+import type { ApiTaskUpdateEntry } from '@tarkovtracker/progress-contracts/apiTaskUpdates';
 type RequiredEnv = Pick<
   CloudflareEnv,
   'API_GATEWAY_LIMITER' | 'SUPABASE_URL' | 'SUPABASE_ANON_KEY' | 'SUPABASE_SERVICE_ROLE_KEY'
@@ -141,6 +141,9 @@ export interface TarkovTask {
   name: string;
   factionName?: string;
   objectives?: TarkovObjective[];
+  failConditions?: TarkovTaskRequirement[];
+  /** Internal projection of completion-triggered failure edges. */
+  alternatives?: string[];
   taskRequirements?: TarkovTaskRequirement[];
 }
 export interface TarkovObjective {

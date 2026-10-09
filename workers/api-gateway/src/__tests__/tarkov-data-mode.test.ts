@@ -18,7 +18,19 @@ describe('Tarkov data modes', () => {
       const url = String(input);
       if (url.endsWith('/tasks')) {
         const mode = url.includes('/pve/') ? 'pve' : 'regular';
-        return jsonResponse({ data: { tasks: { [mode]: { id: mode, name: mode } } } });
+        return jsonResponse({
+          data: {
+            tasks: {
+              [mode]: {
+                id: mode,
+                name: mode,
+                objectives: [],
+                failConditions: [],
+                taskRequirements: [],
+              },
+            },
+          },
+        });
       }
       const mode = url.includes('/pve/') ? 'pve' : 'regular';
       return jsonResponse({ data: { [mode]: { id: mode, levels: [] } } });
@@ -42,7 +54,7 @@ describe('Tarkov data modes', () => {
     await getTasks('pve');
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
-  it('skips malformed task metadata entries instead of throwing', async () => {
+  it('rejects malformed task rules instead of silently removing them', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/tasks')) {
@@ -63,14 +75,7 @@ describe('Tarkov data modes', () => {
       return jsonResponse({ data: {} });
     });
     vi.stubGlobal('fetch', fetchMock);
-    await expect(getTasks('pvp')).resolves.toEqual([
-      {
-        id: 'valid',
-        name: 'Valid',
-        objectives: [{ id: 'objective-1', type: 'find', count: 2 }],
-        taskRequirements: [{ task: { id: 'required-task' }, status: ['complete'] }],
-      },
-    ]);
+    await expect(getTasks('pvp')).rejects.toThrow('Game data temporarily unavailable');
   });
   it('maps hideout requirement rows to item template IDs', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -109,7 +114,7 @@ describe('Tarkov data modes', () => {
       },
     ]);
   });
-  it('skips malformed hideout levels and requirement entries', async () => {
+  it('rejects malformed hideout levels and requirement entries', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/hideout')) {
@@ -132,17 +137,6 @@ describe('Tarkov data modes', () => {
       return jsonResponse({ data: { tasks: {} } });
     });
     vi.stubGlobal('fetch', fetchMock);
-    await expect(getHideoutStations('pvp')).resolves.toEqual([
-      {
-        id: 'stash',
-        levels: [
-          {
-            id: 'stash-1',
-            level: 1,
-            itemRequirements: [{ id: 'item-template-1', count: 2 }],
-          },
-        ],
-      },
-    ]);
+    await expect(getHideoutStations('pvp')).rejects.toThrow('Game data temporarily unavailable');
   });
 });

@@ -17,7 +17,12 @@
             :title="
               $t('settings.prestige.persistent_mode_unsupported_title', 'Prestige Unavailable')
             "
-            :description="unsupportedModeDescription"
+            :description="
+              $t(
+                'settings.prestige.seasonal_mode_unsupported',
+                'Prestige is unavailable in Seasonal PvP.'
+              )
+            "
           />
         </div>
         <div v-else class="space-y-6 px-4 py-4">
@@ -455,7 +460,7 @@
   } from '@/stores/tarkov/prestige';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { type PrestigeRunRecord, useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES } from '@/utils/constants';
+  import { GAME_MODES, getGameModeLabel } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   type HistoryComparisonRow = {
     delta: number;
@@ -489,16 +494,8 @@
   const archiveConfirmText = ref('');
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn && $supabase?.user?.id));
   const currentMode = computed(() => tarkovStore.currentGameMode);
-  const isPrestigeMode = computed(() => currentMode.value === GAME_MODES.PVP);
-  const unsupportedModeDescription = computed(() =>
-    currentMode.value === GAME_MODES.SEASONAL
-      ? t('settings.prestige.seasonal_mode_unsupported', 'Prestige is unavailable in Seasonal PvP.')
-      : t(
-          'settings.prestige.persistent_mode_unsupported',
-          'Prestige is unavailable for persistent PvE mode.'
-        )
-  );
-  const currentModeLabel = computed(() => t('common.pvp', 'PvP'));
+  const isPrestigeMode = computed(() => currentMode.value !== GAME_MODES.SEASONAL);
+  const currentModeLabel = computed(() => t(getGameModeLabel(currentMode.value)));
   const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());
   const currentPrestigeLevel = computed(() => currentModeProgress.value.prestigeLevel ?? 0);
   const currentEdition = computed(() =>
@@ -946,14 +943,16 @@
     if (targetPrestigeLevel === null) {
       return;
     }
+    const archiveMode = currentMode.value;
+    const archiveModeLabel = currentModeLabel.value;
     archivingPrestige.value = true;
     try {
-      await tarkovStore.prestigeMode(currentMode.value);
+      await tarkovStore.prestigeMode(archiveMode);
       toast.add({
-        title: t('settings.prestige_pvp.success_title', { mode: currentModeLabel.value }),
+        title: t('settings.prestige_pvp.success_title', { mode: archiveModeLabel }),
         description: t('settings.prestige_pvp.success_description', {
           level: targetPrestigeLevel,
-          mode: currentModeLabel.value,
+          mode: archiveModeLabel,
         }),
         color: 'success',
       });
@@ -964,7 +963,7 @@
       logger.error('[PrestigeCard] Failed to prestige mode data:', error);
       toast.add({
         title: t('settings.prestige_pvp.error_title', 'Prestige Failed'),
-        description: t('settings.prestige_pvp.error_description', { mode: currentModeLabel.value }),
+        description: t('settings.prestige_pvp.error_description', { mode: archiveModeLabel }),
         color: 'error',
       });
     } finally {
@@ -975,6 +974,12 @@
     () => [$supabase.user.loggedIn, $supabase.user.id, currentMode.value] as const,
     ([loggedIn, userId, mode], previous) => {
       const [prevLoggedIn, prevUserId, prevMode] = previous ?? [false, null, GAME_MODES.PVE];
+      if (prevMode !== mode) {
+        selectedPrestigeLevel.value = currentPrestigeLevel.value;
+        showArchiveDialog.value = false;
+        showDeleteHistoryDialog.value = false;
+        archiveConfirmText.value = '';
+      }
       if (!loggedIn || !userId || !isPrestigeMode.value) {
         showArchiveDialog.value = false;
         showDeleteHistoryDialog.value = false;

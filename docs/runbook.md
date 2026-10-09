@@ -18,6 +18,9 @@ See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs 
 
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
+Receipt completion, fenced retries, migration-before-handler rollout and historical receipt
+disposition: [Stripe webhook recovery](./stripe-webhook-recovery.md).
+
 Set these in Supabase Dashboard → Project Settings → Edge Functions (canonical definitions in
 [`architecture.md` §Environment Variables](./architecture.md#environment-variables) and
 `supabase/functions/.env.example`):
@@ -82,7 +85,7 @@ collector URL.
 4. `pnpm run test`
 5. `pnpm run supabase:check`
 6. `pnpm run build`
-7. `pnpm audit --prod`
+7. `pnpm run audit:dependencies`
 8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
    destructive cleanup migration.
 
@@ -131,14 +134,15 @@ when it runs:
 
 The Worker build is path-filtered. Its `Deploy default branch` trigger runs `npx wrangler deploy`
 in root directory `workers/api-gateway`, with no build command. It builds `main` only when any
-commit in a push changes a file under its build watch path `workers/api-gateway/**`, or when
+commit in a push changes a file under one of its build watch paths (marked below), or when
 Cloudflare skips
 [watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
-(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch path gets no
+(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch paths gets no
 Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
 not a broken integration.
 
-Being a build input is not the same as being watched. Besides its directory, the build reads the
+Every build input is watched, plus `patches/**` and `.nvmrc`, so dependency and shared-code merges
+redeploy the Worker without a manual build. Besides its directory, the build reads the
 sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
 workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` and transitive local
 imports the install's `postinstall` evaluates. Its inputs, kept in sync with the code by
@@ -146,45 +150,47 @@ imports the install's `postinstall` evaluates. Its inputs, kept in sync with the
 
 <!-- api-gateway-build-inputs:start -->
 
-- `workers/api-gateway/**` — watched by the trigger
-- `shared/**` — **not** watched (bundled)
-- `app/utils/modeProgress.ts` — **not** watched (bundled)
-- `app/features/resources/resourceData.ts` — **not** watched (`nuxt prepare` import)
-- `app/locales/en.json` — **not** watched (`nuxt prepare` import)
-- `app/utils/apiProtectionConfig.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/buildCommit.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/csp.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/entryRecoveryScript.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/locales.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/nuxtSecurityConfig.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/prerenderOutput.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/routeSeo.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/runtimeConfig.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/shellConfig.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/stripBareNodeImports.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/theme.ts` — **not** watched (`nuxt prepare` import)
-- `app/utils/turnstileKeys.ts` — **not** watched (`nuxt prepare` import)
-- `package.json` — **not** watched (module type for the bundled files above; pnpm version and the
+- `workers/api-gateway/**` — watched
+- `app/features/resources/resourceData.ts` — watched (`nuxt prepare` import)
+- `app/locales/en.json` — watched (`nuxt prepare` import)
+- `app/utils/apiProtectionConfig.ts` — watched (`nuxt prepare` import)
+- `app/utils/buildCommit.ts` — watched (`nuxt prepare` import)
+- `app/utils/csp.ts` — watched (`nuxt prepare` import)
+- `app/utils/entryRecoveryScript.ts` — watched (`nuxt prepare` import)
+- `app/utils/locales.ts` — watched (`nuxt prepare` import)
+- `app/utils/nuxtSecurityConfig.ts` — watched (`nuxt prepare` import)
+- `app/utils/prerenderOutput.ts` — watched (`nuxt prepare` import)
+- `app/utils/routeSeo.ts` — watched (`nuxt prepare` import)
+- `app/utils/runtimeConfig.ts` — watched (`nuxt prepare` import)
+- `app/utils/shellConfig.ts` — watched (`nuxt prepare` import)
+- `app/utils/stripBareNodeImports.ts` — watched (`nuxt prepare` import)
+- `app/utils/theme.ts` — watched (`nuxt prepare` import)
+- `app/utils/turnstileKeys.ts` — watched (`nuxt prepare` import)
+- `package.json` — watched (module type for the bundled files above; pnpm version and the
   `postinstall` that workspace installs run)
-- `tsconfig.json` — **not** watched (compiles the bundled files above; extends the generated
+- `tsconfig.json` — watched (compiles the bundled files above; extends the generated
   `.nuxt/tsconfig.json`)
-- `nuxt.config.ts` — **not** watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
+- `nuxt.config.ts` — watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
   from it; the `app/utils/` modules it imports must also load for that install to succeed)
-- `pnpm-lock.yaml` — **not** watched (pins Wrangler, esbuild and every installed package)
-- `pnpm-workspace.yaml` — **not** watched (workspace membership, esbuild override, allowed build
+- `pnpm-lock.yaml` — watched (pins Wrangler, esbuild and every installed package)
+- `pnpm-workspace.yaml` — watched (workspace membership, esbuild override, allowed build
   scripts)
 
 <!-- api-gateway-build-inputs:end -->
 
-A merge that changes an unwatched input without touching `workers/api-gateway/` leaves production on
-the previous Worker build, unless its push bypassed watch-path matching. Until the trigger also
-watches those paths, treat such a merge, including a lockfile-only dependency update, as needing a
-Worker build of its exact SHA; starting one is a production deployment and needs authorization.
+The legacy gateway now consumes the immutable progress-contracts release through its watched
+`package.json` and root `pnpm-lock.yaml`. Keep `workers/api-gateway/**` and all existing trigger
+watch paths until the separately approved production source cutover. This preparation does not
+modify the integration. Source ownership and release updates: [where changes belong](api-ownership.md).
+
+A new build input must be added to the trigger's watch paths in the same change, or production
+keeps the previous Worker build until a watched file changes.
 The check also rejects a deploy redirect (`.wrangler/deploy/config.json`), `wrangler.json` or
 `wrangler.jsonc` in `workers/api-gateway`, `workers/` or the repository root, which that deploy
 command would use instead of `workers/api-gateway/wrangler.toml`, and `wrangler.toml` settings it
-does not model. The root `.nvmrc` is not listed: Cloudflare documents Node version files in the
-build's root directory, `workers/api-gateway`, which has none.
+does not model. The root `.nvmrc` is watched so a Node bump rebuilds the Worker, although
+Cloudflare documents Node version files only in the build's root directory, `workers/api-gateway`,
+which has none.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -615,6 +621,172 @@ References: [CREATE INDEX](https://www.postgresql.org/docs/17/sql-createindex.ht
   more reliable than dump text, which differs by harmless column/statement ordering.
 - Platform-managed extensions (`pg_graphql`, `pg_net`) differ between the local stack and prod;
   migrations do not control these and the difference is expected.
+
+### Platform-owned public relation defaults
+
+The client-access invariant in [progress storage](./systems/progress-storage.md#invariants)
+covers the reserved creating role tracked by [#1133](https://github.com/tarkovtracker-org/TarkovTracker/issues/1133).
+Customer migrations run as `postgres`; that role cannot change `supabase_admin` default ACLs
+without membership or superuser authority. Supabase's
+[existing-project opt-in procedure](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+targets only `postgres`. Its announced platform rollout is not evidence that this project's
+reserved-role defaults have changed. No supported customer operation for that change was found
+in the documented procedure. Do not grant reserved-role membership, escalate credentials, or
+install privileged hooks to work around the boundary.
+
+Platform extension installation is a relevant creation path, even when requested by `postgres`.
+[Supautils delegates privileged extension creation to its configured superuser](https://github.com/supabase/supautils/blob/df32bd65e4d13212bf812ee966a51132d034bc17/README.md#privileged-extensions);
+this project's installed configuration names `supabase_admin`. Extension member relations
+placed in `public` can therefore inherit that role's defaults. This is a possible future-object
+exposure, not evidence of an existing platform-owned public table. Supabase also uses the role
+for [internal upgrades and automations](https://supabase.com/docs/guides/database/postgres/roles#supabase_admin);
+the current inventory cannot guarantee the schemas or owners of future platform objects.
+
+**Operational policy**
+
+- Create application relations through reviewed `postgres` migrations with explicit client
+  grants, RLS where applicable, and the required service-role grants. The separate
+  [#1134](https://github.com/tarkovtracker-org/TarkovTracker/pull/1134) handles existing application
+  grants and `postgres` table/view defaults; do not infer its deployment from this audit.
+- Install extensions in a schema outside the configured Data API exposed schemas where supported;
+  review fixed-schema extensions individually. Check the target schema, dependencies and expected
+  creating role before enabling or upgrading an extension. Do not assume `extensions` is
+  unexposed merely because of its name. Supabase's
+  [PostGIS guide](https://supabase.com/docs/guides/database/extensions/postgis) recommends a
+  dedicated schema instead of `public`.
+- Repeat the catalog checks below before and after extension changes, platform/database upgrades,
+  restores, and any observation of a new platform-owned public relation. Compare owners and
+  extension membership, not only relation names. Also collect `scripts/ops/prod-db schema` for
+  column ACLs and effective inherited/PUBLIC grants, and inspect RLS policies and view security
+  settings before accepting client access.
+- If a platform-owned public relation appears, stop the related feature rollout until its actual
+  client access and service-role requirements are reviewed. Use a forward migration for
+  customer-authorized per-object grants/revokes only when the catalog confirms grant authority.
+  Otherwise request remediation through Supabase Support: provide the project ref, creating role,
+  global/public ACL readback, relation/extension identity and required service-role access; ask
+  whether the feature can use an unexposed schema and whether provider-side default changes are
+  supported. Do not report provider remediation as completed without a response and readback.
+- Preserve service-role DML on application tables and required view/sequence access. After any
+  approved remediation, rerun these checks and the affected feature smoke tests; absence of client
+  defaults alone is insufficient. A catalog grant does not prove a view is updatable or a request
+  succeeds through the Data API.
+
+**Read-only catalog checks**
+
+Verify the target using the [production inspection procedure](#database-migrations) first.
+Use authenticated Supabase MCP for the following catalog-only SELECTs when the dedicated observer
+does not expose default ACLs. Never pass privileged credentials to the observer. Record the project
+ref, Git revision, capture time and results. Query errors, missing expected roles or an unexpected
+inventory are incomplete evidence, not a passing audit.
+
+Confirm the role boundary and extension delegation:
+
+```sql
+SELECT current_timestamp AS captured_at, current_database() AS database_name,
+       current_user AS execution_role, r.rolsuper AS postgres_superuser,
+       pg_has_role('postgres', 'supabase_admin', 'MEMBER') AS postgres_member_of_supabase_admin,
+       pg_has_role('postgres', 'supabase_admin', 'SET') AS postgres_can_set_supabase_admin,
+       current_setting('supautils.privileged_extensions_superuser', true) AS extension_creating_role
+FROM pg_catalog.pg_roles r
+WHERE r.rolname = 'postgres';
+```
+
+Inventory table/view and sequence defaults for **every creating role**, both global and `public`
+scopes. Keep the object types separate: sequence privileges differ from table privileges.
+Schema defaults add to global defaults; a schema-only revoke cannot cancel a global grant.
+[PostgreSQL default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html)
+apply when objects are created, not retrospectively. An absent `pg_default_acl` entry means
+PostgreSQL's built-in defaults, not missing owner privileges; for tables these do not grant client
+access. Check grants to `PUBLIC` and roles inherited by the client roles as well as direct grants.
+
+```sql
+SELECT pg_get_userbyid(d.defaclrole) AS creating_role,
+       CASE d.defaclobjtype WHEN 'r' THEN 'table/view' WHEN 'S' THEN 'sequence' END AS object_type,
+       CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
+       CASE WHEN a.grantee IS NULL THEN '(empty ACL)'
+            WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,
+       coalesce(array_agg(a.privilege_type ORDER BY a.privilege_type)
+         FILTER (WHERE a.privilege_type IS NOT NULL), ARRAY[]::text[]) AS privileges,
+       coalesce(bool_or(a.is_grantable), false) AS has_grant_option
+FROM pg_catalog.pg_default_acl d
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+LEFT JOIN LATERAL pg_catalog.aclexplode(nullif(d.defaclacl, '{}'::aclitem[])) a ON true
+WHERE d.defaclobjtype IN ('r', 'S')
+  AND (d.defaclnamespace = 0 OR n.nspname = 'public')
+GROUP BY d.defaclrole, d.defaclobjtype, d.defaclnamespace, n.nspname, a.grantee
+ORDER BY creating_role, object_type, scope, grantee;
+```
+
+Inventory public tables, partitions, views, materialized views, foreign tables and sequences,
+including extension membership and effective relation-level access (schema USAGE included).
+This complements rather than replaces the observer's column-grant report.
+
+```sql
+SELECT c.relname AS relation, c.relkind AS kind,
+       pg_get_userbyid(c.relowner) AS owner, e.extname AS extension,
+       c.relrowsecurity AS rls_enabled,
+       (SELECT jsonb_object_agg(r.rolname, ARRAY(
+          SELECT p.privilege
+          FROM unnest(CASE WHEN c.relkind = 'S'
+            THEN ARRAY['SELECT', 'USAGE', 'UPDATE']
+            ELSE ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE',
+                       'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']
+          END) AS p(privilege)
+          WHERE pg_catalog.has_schema_privilege(r.oid, n.oid, 'USAGE')
+            AND CASE WHEN c.relkind = 'S'
+              THEN pg_catalog.has_sequence_privilege(r.oid, c.oid, p.privilege)
+              ELSE pg_catalog.has_table_privilege(r.oid, c.oid, p.privilege)
+            END
+          ORDER BY p.privilege
+        ))
+        FROM pg_catalog.pg_roles r
+        WHERE r.rolname IN ('anon', 'authenticated', 'service_role')
+       ) AS effective_relation_privileges
+FROM pg_catalog.pg_class c
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_catalog.pg_depend dep
+  ON dep.classid = 'pg_catalog.pg_class'::regclass AND dep.objid = c.oid
+ AND dep.objsubid = 0 AND dep.refclassid = 'pg_catalog.pg_extension'::regclass
+ AND dep.deptype = 'e'
+LEFT JOIN pg_catalog.pg_extension e ON e.oid = dep.refobjid
+WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S')
+ORDER BY owner, relation;
+```
+
+**Production readback — 2026-10-07**
+
+Authenticated MCP project discovery verified `knptqelvsodccnoehmbj` as TarkovTracker.org,
+host `db.knptqelvsodccnoehmbj.supabase.co`, PostgreSQL 17.6.1.048. Catalog SELECTs at
+05:27–05:30 UTC were collected from checkout `3e5cab49`; no production mutation was performed.
+
+- Execution role `postgres`: not a superuser; neither MEMBER of nor able to SET ROLE to
+  `supabase_admin`. Privileged extension creation is configured to use `supabase_admin`.
+- No global table-default ACL entries. Both `postgres` and `supabase_admin` have `public`
+  table defaults granting SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER and
+  MAINTAIN to `anon`, `authenticated`, `postgres` and `service_role`, without grant option.
+  These are pre-#1134 defaults, not a successful hardening readback.
+- All 19 public tables and two views are owned by `postgres`; no public sequences or extension
+  member relations were found. Service-role schema USAGE and SELECT/INSERT/UPDATE/DELETE are
+  effective on all 21 relations. All 19 tables have RLS enabled; the two view RLS flags are false,
+  which does not describe the underlying tables' policies or the views' security settings.
+- Eight installed extensions: `hypopg`, `index_advisor`, `pg_cron`, `plpgsql` and
+  `supabase_vault` owned by `supabase_admin`; `pg_stat_statements`, `pgcrypto` and
+  `uuid-ossp` owned by `postgres`. None has `public` as its extension namespace.
+- Supported outcome for #1133: retain provider-owned defaults under this operational policy and
+  re-audit on the triggers above. No provider support response or reserved-role default change is
+  claimed. Application-grant rollout and readback remain owned by #663/#1134.
+
+**Default-ACL follow-up — 2026-10-07 06:03 UTC**
+
+The expanded table/view-and-sequence query was executed through authenticated MCP for the same
+verified project after merging main `35ffee6d` into this branch. It returned no global entries for
+either object type. `postgres` public table/view defaults now grant only `postgres` and
+`service_role` all eight privileges; the client grants removed by #1134 are absent.
+`supabase_admin` public table/view defaults are unchanged. Public sequence defaults for both creating
+roles grant SELECT, UPDATE and USAGE to `anon`, `authenticated`, `postgres` and `service_role`,
+without grant option. Sequence defaults were outside #1134's table/view hardening and remain
+unchanged by this documentation-only PR. This follow-up checks defaults, not application-table
+grants, feature behavior or the full migration ledger.
 
 ### Progress transfer and freshness rollout
 

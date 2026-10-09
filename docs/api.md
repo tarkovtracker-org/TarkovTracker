@@ -344,13 +344,13 @@ Team mutations are invoked with an authenticated Supabase JWT through the client
 `team-disband` operation is owner-only and removes the team, memberships, and team-owned records in
 one database transaction after confirmation in the UI.
 
-| Function       | Purpose                                |
-| -------------- | -------------------------------------- |
-| `team-create`  | Create a team and its owner membership |
-| `team-join`    | Join a team with an invite code        |
-| `team-leave`   | Leave a team as a non-owner            |
-| `team-kick`    | Remove a member as the owner           |
-| `team-disband` | Atomically remove an owned team        |
+| Function       | Purpose                                                                     |
+| -------------- | --------------------------------------------------------------------------- |
+| `team-create`  | Create a team and its owner membership; join code must be 12–255 characters |
+| `team-join`    | Join a team with an invite code                                             |
+| `team-leave`   | Leave a team as a non-owner                                                 |
+| `team-kick`    | Remove a member as the owner                                                |
+| `team-disband` | Atomically remove an owned team                                             |
 
 ---
 
@@ -386,7 +386,7 @@ authentication.
 | `mode`     | string | Yes          | `subscription` or `payment`      |
 | `tier`     | string | Subscription | `scav`, `timmy`, or `chad`       |
 | `interval` | string | Subscription | `monthly`, `6month`, or `yearly` |
-| `amount`   | number | One-time     | USD amount (min 1, max 999)      |
+| `amount`   | number | One-time     | USD amount (min 4, max 520)      |
 
 **Response:**
 
@@ -572,7 +572,7 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/utils/constants.ts`); codes outside that allowlist fall back to `en` (`getValidatedLanguage` in `app/server/utils/language-helpers.ts`).
 
-`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](systems/game-data.md#data-fetching-pipeline).
+`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` path list (a restricted JSONPath subset). See [Data fetching pipeline](systems/game-data.md#data-fetching-pipeline).
 
 **Language codes accepted by `/api/tarkov/*`:**
 

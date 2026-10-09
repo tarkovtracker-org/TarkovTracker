@@ -61,6 +61,21 @@ sequenceDiagram
    infrastructure protection, not a customer quota, and fails open on binding errors.
 3. **Token auth.** `workers/api-gateway/src/auth.ts` validates the bearer token against
    `api_tokens` by hash and checks the permission (`GP`/`TP`/`WP`).
+   After successful validation, the request's `ExecutionContext.waitUntil` retains the entire
+   lifetime-accounting operation, including any permitted fallback, without blocking the response.
+   This attempts one atomic `increment_token_usage` RPC before daily-quota enforcement, so valid
+   tokens count even when later throttled or rejected by input validation. Invalid, inactive,
+   expired, mode-mismatched, or permission-denied tokens do not count. Calls without a Worker
+   execution context await accounting rather than leaving an unowned promise.
+   Each accounting request has a three-second timeout covering headers and body handling; only
+   a bounded error body (at most 1 KiB) is parsed. HTTP 404 with PostgREST code `PGRST202` confirms
+   a missing RPC and permits one timestamp-only PATCH. That fallback does not recover the lost
+   `usage_count` increment. Network errors, timeouts, authorization errors, other HTTP failures,
+   and malformed/oversized missing-RPC responses never trigger an increment retry or fallback:
+   the original increment may already have committed. Failures and timestamp-only outcomes emit
+   `token_usage_outcome` with a fixed operation/outcome and optional HTTP status, without tokens,
+   keys, user payloads, response bodies, or exception messages. Accounting stays best effort:
+   `waitUntil` is bounded by the runtime and does not provide durable or exactly-once delivery.
 4. **Tier + daily quota.** `resolveTier` reads `public.supporters` (cached 60s), then a single
    `ApiGatewayRateLimiter` Durable Object call (`daily-{kind}:{user_id}`, UTC-day anchor, retained)
    admits or denies the request. The quota counts admitted requests — downstream Supabase failures
@@ -74,9 +89,20 @@ sequenceDiagram
    The originating request retains that operation with `waitUntil`; streams are consumed there and
    only parsed public catalog data is shared. Every settled operation leaves the in-flight map;
    failures remain uncached and retryable, with the existing 30-second fetch timeout.
+   Missing, empty, or structurally malformed required catalogs return 503 with the ordinary error
+   envelope and any available quota headers. Progress and team reads do not return partial derived
+   state or ETags on this path. Single and batch task writes await validated task rules before
+   applying transitions or calling the progress merge RPC; level and objective patches do not
+   evaluate task rules and retain their existing behavior. Expired catalogs are not used as a
+   last-good fallback.
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   public array format, applies invalidation (`@tarkovtracker/progress-contracts/progressInvalidation`, the same
    algorithm the app uses) and game-edition hideout auto-completes.
+   Browser and Worker catalogs compile completion-triggered failure edges through
+   `@tarkovtracker/progress-contracts/taskFailureEdges`. The existing internal `alternatives` projection remains
+   compatible with repair/action consumers; it is derived from `failConditions`, not upstream
+   `alternatives`. Missing references do not create edges, and a reverse edge is inferred only
+   for the existing active-only requirement pattern backed by an explicit completion failure.
    Gateway task catalogs are frozen and registered with a prepared dependency graph once per catalog
    snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
    state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.
@@ -102,15 +128,15 @@ sequenceDiagram
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
 - `workers/api-gateway/src/utils/transform.ts`
-- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+- `@tarkovtracker/progress-contracts/progressInvalidation` — runtime-independent task/objective invalidation
   (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
   app progress store, public profile/streamer views, and the Worker transform
-- `shared/utils/requirementStatus.ts` — runtime-independent task-requirement status predicates,
+- `@tarkovtracker/progress-contracts/requirementStatus` — runtime-independent task-requirement status predicates,
   shared by invalidation, app task actions, failed-state repair, and the Worker
-- `shared/utils/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
+- `@tarkovtracker/progress-contracts/taskTransitions` — runtime-independent explicit task-state transitions (dependent
   lock/unlock) used by Worker task writes
-- `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
-  user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
+- `@tarkovtracker/progress-contracts/userMetadata` — runtime-independent provider metadata parsing, shared with app
+  user hydration through `@tarkovtracker/progress-contracts/userMetadata` in Nuxt and the Worker
 - `workers/api-gateway/src/utils/user-display-name.ts` — cached Auth metadata lookup shared by
   personal and team API progress
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs

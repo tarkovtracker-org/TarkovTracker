@@ -13,8 +13,10 @@ const {
   toastAddMock,
 } = vi.hoisted(() => ({
   deletePrestigeRunMock: vi.fn(async (_runId: string, _mode: GameMode) => undefined),
-  fetchPrestigeRunsMock: vi.fn(async (): Promise<PrestigeRunRecord[]> => []),
-  prestigeModeMock: vi.fn(async (_mode: GameMode) => undefined),
+  fetchPrestigeRunsMock: vi.fn(
+    async (_mode: GameMode, _limit: number): Promise<PrestigeRunRecord[]> => []
+  ),
+  prestigeModeMock: vi.fn(async (_mode: GameMode): Promise<void> => undefined),
   syncPrestigeLevelMock: vi.fn(async (_mode: GameMode, _level: number) => undefined),
   toastAddMock: vi.fn(),
 }));
@@ -299,16 +301,122 @@ describe('PrestigeCard', () => {
     expect(wrapper.text()).toContain(expected);
     expect(wrapper.text()).not.toContain(fallback);
   });
-  it('shows an unsupported-mode notice and skips history loading in PvE mode', async () => {
+  it('loads history, sets the level, and archives runs in PvE mode', async () => {
     mockState.currentGameMode = 'pve';
-    fetchPrestigeRunsMock.mockResolvedValue([createPrestigeRun('run-1')]);
+    fetchPrestigeRunsMock.mockResolvedValue([{ ...createPrestigeRun('run-1'), mode: 'pve' }]);
     const wrapper = createWrapper();
     await flushPromises();
-    expect(fetchPrestigeRunsMock).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported_title');
-    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported');
-    expect(wrapper.text()).not.toContain('settings.prestige.set_current');
+    expect(fetchPrestigeRunsMock).toHaveBeenCalledWith('pve', 20);
+    expect(wrapper.text()).not.toContain('settings.prestige.persistent_mode_unsupported_title');
+    await wrapper.find('select').setValue('2');
+    await findButtonByText(wrapper, 'settings.prestige.set_current')!.trigger('click');
+    await flushPromises();
+    expect(syncPrestigeLevelMock).toHaveBeenCalledWith('pve', 2);
+    await findButtonByText(wrapper, 'settings.prestige.archive_cta')!.trigger('click');
+    await wrapper.find('input').setValue('settings.prestige.confirm_word');
+    const archiveButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().includes('settings.prestige.archive_cta'));
+    await archiveButtons[archiveButtons.length - 1]!.trigger('click');
+    await flushPromises();
+    expect(prestigeModeMock).toHaveBeenCalledWith('pve');
   });
+  it.each([
+    ['pvp', 'pve'],
+    ['pve', 'pvp'],
+  ] as const)('clears archive confirmation when switching from %s to %s', async (from, to) => {
+    mockState.currentGameMode = from;
+    const wrapper = createWrapper();
+    await flushPromises();
+    await findButtonByText(wrapper, 'settings.prestige.archive_cta')!.trigger('click');
+    await wrapper.find('input').setValue('settings.prestige.confirm_word');
+    mockState.currentGameMode = to;
+    await nextTick();
+    await flushPromises();
+    expect(wrapper.find('input').exists()).toBe(false);
+    expect(prestigeModeMock).not.toHaveBeenCalled();
+    await findButtonByText(wrapper, 'settings.prestige.archive_cta')!.trigger('click');
+    expect(wrapper.find('input').element.value).toBe('');
+    const archiveButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().includes('settings.prestige.archive_cta'));
+    expect(archiveButtons[archiveButtons.length - 1]!.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+  it.each([
+    ['pvp', 'pve'],
+    ['pve', 'pvp'],
+  ] as const)('closes history deletion when switching from %s to %s', async (from, to) => {
+    mockState.currentGameMode = from;
+    fetchPrestigeRunsMock.mockImplementation(async (mode: GameMode) => [
+      { ...createPrestigeRun(`${mode}-run`), mode },
+    ]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    await findButtonByText(wrapper, 'settings.prestige.delete_history_cta')!.trigger('click');
+    expect(findButtonByText(wrapper, 'common.delete_archived_run')).toBeTruthy();
+    mockState.currentGameMode = to;
+    await nextTick();
+    await flushPromises();
+    expect(fetchPrestigeRunsMock).toHaveBeenLastCalledWith(to, 20);
+    expect(findButtonByText(wrapper, 'common.delete_archived_run')).toBeUndefined();
+    expect(deletePrestigeRunMock).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it.each([
+    ['pvp', 'pve'],
+    ['pve', 'pvp'],
+  ] as const)('resets an unsaved level when switching from %s to %s', async (from, to) => {
+    mockState.currentGameMode = from;
+    const wrapper = createWrapper();
+    await flushPromises();
+    await wrapper.find('select').setValue('2');
+    mockState.currentGameMode = to;
+    await nextTick();
+    expect(wrapper.find('select').element.value).toBe('4');
+    expect(
+      findButtonByText(wrapper, 'settings.prestige.set_current')!.attributes('disabled')
+    ).toBeDefined();
+    expect(syncPrestigeLevelMock).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it.each(['success', 'error'] as const)(
+    'keeps the archived mode in the %s toast after switching modes',
+    async (outcome) => {
+      mockState.currentGameMode = 'pve';
+      let finish!: () => void;
+      prestigeModeMock.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            finish = () =>
+              outcome === 'success' ? resolve() : reject(new Error('archive failed'));
+          })
+      );
+      const wrapper = createWrapper();
+      await flushPromises();
+      await findButtonByText(wrapper, 'settings.prestige.archive_cta')!.trigger('click');
+      await wrapper.find('input').setValue('settings.prestige.confirm_word');
+      const archiveButtons = wrapper
+        .findAll('button')
+        .filter((button) => button.text().includes('settings.prestige.archive_cta'));
+      await archiveButtons[archiveButtons.length - 1]!.trigger('click');
+      expect(prestigeModeMock).toHaveBeenCalledWith('pve');
+      mockState.currentGameMode = 'pvp';
+      await nextTick();
+      finish();
+      await flushPromises();
+      expect(toastAddMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          color: outcome,
+          description:
+            outcome === 'success'
+              ? 'settings.prestige_pvp.success_description:5|common.pve'
+              : 'settings.prestige_pvp.error_description:common.pve',
+        })
+      );
+      wrapper.unmount();
+    }
+  );
   it('reports prestige as unavailable in Seasonal PvP', async () => {
     mockState.currentGameMode = 'seasonal';
     fetchPrestigeRunsMock.mockResolvedValue([createPrestigeRun('run-1')]);

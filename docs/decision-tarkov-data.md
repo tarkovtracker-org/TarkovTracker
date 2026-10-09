@@ -137,12 +137,12 @@ Examples:
 
 Adding a third SQL implementation would increase drift. Extract one shared pure TypeScript engine.
 
-**Status 2026-09-25: resolved — shared `shared/utils/progressInvalidation.ts` is imported by both
+**Status 2026-09-25: resolved — shared `@tarkovtracker/progress-contracts/progressInvalidation` is imported by both
 the app (`app/stores/useProgress.ts`, `app/server/utils/streamerKappa.ts`) and the Worker
 (`workers/api-gateway/src/utils/transform.ts`).**
 
-**Status 2026-09-28:** requirement-status predicates (`shared/utils/requirementStatus.ts`) and
-Worker dependent-task transitions (`shared/utils/taskTransitions.ts`) are also shared. Postgres
+**Status 2026-09-28:** requirement-status predicates (`@tarkovtracker/progress-contracts/requirementStatus`) and
+Worker dependent-task transitions (`@tarkovtracker/progress-contracts/taskTransitions`) are also shared. Postgres
 validates state shape only and implements no progression rules. Remaining Phase 3 gap: app
 failed-state repair (`app/stores/tarkov/progressRepair.ts`) still reads legacy `alternatives`.
 
@@ -157,6 +157,8 @@ explicit failure edges (Phase 3) closes this gap.
 The Worker service, callers, and caches now select distinct `regular` and `pve` JSON data. Shared-profile failure metadata also uses the requested mode and the runtime-configurable Tarkov JSON base URL.
 
 The remaining limitation is architectural rather than mode correctness: the Worker still fetches directly from the upstream JSON service instead of consuming an immutable validated release. Phase 4 removes that runtime upstream dependency.
+
+**Status 2026-10-06:** browser graph preparation and the interim Worker adapter now share a runtime-free completion-failure edge builder (`@tarkovtracker/progress-contracts/taskFailureEdges`). The Worker preserves and validates task failure conditions before deriving the same internal `alternatives` projection used by existing repair/action consumers. Raw string and hydrated task references, completion aliases, and the existing active-only reciprocal pattern are normalized consistently. This closes runtime branch-input drift without claiming the Phase 3 representation migration or immutable release architecture is complete.
 
 ### P0: branch semantics depend on removed `alternatives`
 
@@ -320,6 +322,8 @@ Release ID should be content-derived or otherwise immutable and include a manife
 Do not fall back to raw tarkov.dev on a runtime miss. Use the previous validated release. If no validated release is available, reads may degrade explicitly, but progress writes should fail with 503 rather than accept unverifiable state.
 
 ---
+
+**Status 2026-10-06:** the interim Worker now rejects unavailable, empty, or structurally malformed task/hideout catalogs with a typed availability error. Task transitions load validated rules before persistence; progress/team reads return 503 rather than incomplete derived progress. The existing one-hour mode-specific cache remains bounded; expired data is not used as an unversioned last-good fallback. Immutable release publication and the Worker KV cutover remain open.
 
 ## Target runtime flows
 
@@ -561,9 +565,9 @@ The 5–200 character `User-Agent` requirement shipped directly in API version 2
 
 ### Frontend progression
 
-- `shared/utils/progressInvalidation.ts`
-- `shared/utils/requirementStatus.ts`
-- `shared/utils/taskTransitions.ts`
+- `@tarkovtracker/progress-contracts/progressInvalidation`
+- `@tarkovtracker/progress-contracts/requirementStatus`
+- `@tarkovtracker/progress-contracts/taskTransitions`
 - `app/stores/useProgress.ts`
 - `app/stores/useTarkov.ts`
 - `app/stores/tarkov/progressRepair.ts`

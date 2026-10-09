@@ -1,3 +1,7 @@
+import {
+  hasMaterializedProgress,
+  summarizeModeProgressData,
+} from '@tarkovtracker/progress-contracts/modeProgress';
 import { defineStore } from 'pinia';
 import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
@@ -10,7 +14,6 @@ import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgress';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import {
   createChannelReleaseLatch,

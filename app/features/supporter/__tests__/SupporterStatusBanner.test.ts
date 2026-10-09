@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import type { SupporterStatus } from '@/composables/useSupporter';
 const supporterRef = ref<SupporterStatus | null>(null);
 const composableErrorRef = ref<string | null>(null);
@@ -86,6 +86,30 @@ describe('SupporterStatusBanner', () => {
     const manageBtn = wrapper.get('button');
     expect(manageBtn.text()).toContain('Manage subscription');
     wrapper.unmount();
+  });
+  it('updates an open one-time banner when perks expire without a row update', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));
+    supporterRef.value = {
+      expiresAt: '2026-10-07T00:00:01.000Z',
+      hasEverSupported: true,
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'active',
+      tier: 'scav',
+      type: 'one_time',
+    };
+    const wrapper = await mountBanner();
+    try {
+      expect(wrapper.text()).toContain('Active supporter');
+      expect(wrapper.text()).not.toContain('Inactive supporter');
+      await vi.advanceTimersByTimeAsync(1000);
+      await nextTick();
+      expect(wrapper.text()).toContain('Inactive supporter');
+      expect(wrapper.text()).toContain('Your support has lapsed');
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
   it('opens the billing portal when manage is clicked', async () => {
     supporterRef.value = {

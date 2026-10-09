@@ -14,7 +14,7 @@ updates:
       default-days: 7
       semver-major-days: 30
       semver-minor-days: 7
-      semver-patch-days: 1
+      semver-patch-days: 3
     labels:
       - dependencies
       - javascript
@@ -28,7 +28,23 @@ updates:
       - dependency-name: fast-xml-parser
         update-types:
           - version-update:semver-major
+      # Direct dependencies pinned by a pnpm-workspace.yaml override: the override wins, so a
+      # package.json bump changes nothing and fails the whole grouped job (NoChangeError).
+      # vue-i18n and the @intlify core packages must move in lockstep; edit the override instead.
+      - dependency-name: vue-i18n
+      - dependency-name: '@intlify/message-compiler'
+      - dependency-name: lru-cache
     groups:
+      # Auth and billing clients are confirm-required: this group is never auto-merged.
+      auth-and-billing:
+        patterns:
+          - stripe
+          - '@stripe/*'
+          - '@supabase/*'
+          - supabase
+        update-types:
+          - minor
+          - patch
       nuxt-ecosystem:
         dependency-type: production
         patterns:
@@ -36,10 +52,8 @@ updates:
           - '@nuxt/*'
           - '@nuxtjs/*'
           - '@unhead/*'
-          - '@intlify/*'
           - '@vueuse/*'
           - vue
-          - vue-i18n
           - vue-router
         update-types:
           - minor
@@ -66,7 +80,6 @@ updates:
           - '@vue/test-utils'
           - happy-dom
           - fake-indexeddb
-          - wait-on
         update-types:
           - minor
           - patch
@@ -84,7 +97,6 @@ updates:
         patterns:
           - tailwindcss
           - '@tailwindcss/*'
-          - autoprefixer
           - postcss
           - prettier-plugin-tailwindcss
         update-types:

@@ -35,8 +35,9 @@ jobs:
           echo "audit_dir=$audit_dir" >> "$GITHUB_OUTPUT"
       - name: Audit production dependencies
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
-        # Blocking threshold: critical vulnerabilities in production dependencies fail CI.
-        run: pnpm audit --prod --audit-level=critical
+        # Blocking: any production advisory at any severity fails CI unless it is reviewed,
+        # unexpired, and listed in scripts/checks/audit-dependencies.mjs.
+        run: node "$GITHUB_WORKSPACE/scripts/checks/audit-dependencies.mjs"
       - name: Audit all dependencies (informational)
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         # Advisory only: development-dependency findings are reported, never gated.

@@ -73,7 +73,7 @@ describe('validateOneTimeAmount', () => {
     expect(validateOneTimeAmount(7.05)).toBe(705);
   });
   it('rejects sub-cent amounts instead of rounding them', () => {
-    expectH3Error(() => validateOneTimeAmount(3.001), 400);
+    expectH3Error(() => validateOneTimeAmount(4.001), 400);
     expectH3Error(() => validateOneTimeAmount(499.999), 400);
     expectH3Error(() => validateOneTimeAmount(7.005), 400);
   });

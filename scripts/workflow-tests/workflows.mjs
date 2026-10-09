@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
 import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
@@ -14,20 +16,27 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   const statuses = [
     ...wait.match(/expected_statuses=\(([\s\S]*?)\)/)[1].matchAll(/"([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.deepEqual(expected, ['CI Result', 'PR Meta']);
+  assert.deepEqual(expected, [
+    'CI Result|15368',
+    'PR Meta|15368',
+    'Socket Security: Pull Request Alerts|156372',
+  ]);
   assert.deepEqual(statuses, ['Preview Result']);
   // Individual CI and security job names are no longer a dependency of the merge gate.
   for (const name of ['Security Scan', 'CodeQL', 'Type Check', 'Validate', 'Fallow audit'])
     assert.ok(!expected.includes(name), name);
   const workflows = ['ci', 'pr-checks'].map((name) => read(`.github/workflows/${name}.yml`));
-  for (const name of expected)
+  for (const name of expected
+    .filter((entry) => entry.endsWith('|15368'))
+    .map((e) => e.split('|')[0]))
     assert.ok(
       workflows.some((w) => w.includes(`name: ${name}\n`)),
       name
     );
   assert.match(read('scripts/preview/profile.mjs'), /STATUS_CONTEXT = 'Preview Result'/);
   // Check runs must come from GitHub Actions; a foreign app cannot satisfy the aggregate name.
-  assert.match(wait, /select\(\.name == \$name and \.app\.id == 15368\)/);
+  assert.match(wait, /select\(\.name == \$name and \.app\.id == \$app\)/);
+  assert.match(wait, /--argjson app "\$check_app"/);
   assert.match(wait, /failing_status_count.*-gt 0/);
   for (const job of [
     'Refresh preview state',
@@ -49,6 +58,97 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   assert.match(jobBlock(gate, 'auto-merge'), /timeout-minutes: 90/);
   assert.match(read('.github/codecov.yml'), /absolute-floor:/);
 });
+const autoMergeJob = () =>
+  jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge');
+const npmGroups = (config) =>
+  [
+    ...config
+      .slice(
+        config.indexOf('package-ecosystem: npm'),
+        config.indexOf('package-ecosystem: github-actions')
+      )
+      .matchAll(/^ {6}([a-z-]+):\n {8}(?:patterns|dependency-type)/gm),
+  ].map((m) => m[1]);
+test('Dependabot auto-merge covers every npm group except auth and billing', () => {
+  const config = read('.github/dependabot.yml');
+  const eligible = autoMergeJob();
+  assert.match(eligible, /dependabot\/npm_and_yarn\/auth-and-billing-\*\)\n\s*;;/);
+  assert.match(
+    config,
+    /auth-and-billing:\n {8}patterns:\n {10}- stripe\n {10}- '@stripe\/\*'\n {10}- '@supabase\/\*'\n {10}- supabase/
+  );
+  const groups = npmGroups(config).filter((group) => group !== 'auth-and-billing');
+  assert.ok(groups.length >= 8, groups.join());
+  for (const group of groups)
+    assert.ok(eligible.includes(`dependabot/npm_and_yarn/${group}-*`), group);
+});
+test('Dependabot ignores direct dependencies that a pnpm override pins', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const direct = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+  const workspace = read('pnpm-workspace.yaml');
+  const overrides = workspace.slice(workspace.indexOf('\noverrides:\n') + 12).split(/\n\S/)[0];
+  const pinned = [...overrides.matchAll(/^ {2}'?([^:'\n]+?)'?:/gm)]
+    .map((m) => m[1])
+    .filter((key) => !key.includes('>'))
+    .map((key) => key.replace(/(?<=.)@[^@]*$/, ''))
+    .filter((name) => direct.has(name));
+  assert.ok(pinned.length > 0);
+  const config = read('.github/dependabot.yml');
+  const npm = config.slice(0, config.indexOf('package-ecosystem: github-actions'));
+  const ignore = npm.slice(npm.indexOf('    ignore:\n'), npm.indexOf('    groups:\n'));
+  const unconditional = new Set(
+    ignore
+      .split('\n      - ')
+      .slice(1)
+      .map((entry) =>
+        entry.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'))
+      )
+      .filter((lines) => lines.length === 1)
+      .map((lines) => lines[0].replace(/^dependency-name: /, '').replace(/^'(.*)'$/, '$1'))
+  );
+  for (const name of pinned) assert.ok(unconditional.has(name), name);
+});
+test('Dependabot auto-merge holds manifest changes to auth and billing clients', () => {
+  const sensitive = autoMergeJob().match(/grep -E '([^']+)'/)[1];
+  const grep = (line) => spawnSync('grep', ['-E', sensitive], { input: `${line}\n` }).status === 0;
+  const held = [
+    '+    "stripe": "^1.0.0",',
+    '-\t"@supabase/supabase-js": "2.0.0",',
+    '+  "supabase": "2.1.0"',
+  ];
+  for (const line of held) assert.ok(grep(line), line);
+  for (const line of ['+    "stripe-mock": "1.0.0",', ' "stripe": "^1.0.0",'])
+    assert.ok(!grep(line), line);
+});
+test('Dependabot auto-merge holds the PR when manifest changes cannot be read', () => {
+  const job = autoMergeJob();
+  const start = job.indexOf('# Defense in depth');
+  const end = job.indexOf('echo "eligible=true"', start);
+  const hold = job
+    .slice(start, end + 'echo "eligible=true" >> "$GITHUB_OUTPUT"'.length)
+    .replace(/^ {10}/gm, '');
+  const dir = mkdtempSync(join(tmpdir(), 'hold-'));
+  writeFileSync(join(dir, 'gh'), '#!/bin/sh\nprintf "%s" "$GH_OUT"\nexit "$GH_STATUS"\n', {
+    mode: 0o755,
+  });
+  const verdict = (out, status = 0) => {
+    const output = join(dir, `out-${Math.random()}`);
+    writeFileSync(output, '');
+    spawnSync('bash', ['-e', '-o', 'pipefail', '-c', hold], {
+      env: {
+        PATH: `${dir}:${process.env.PATH}`,
+        GITHUB_OUTPUT: output,
+        GH_OUT: out,
+        GH_STATUS: String(status),
+      },
+    });
+    return readFileSync(output, 'utf8').trim();
+  };
+  assert.equal(verdict('+  "vue": "3.5.0",'), 'eligible=true');
+  assert.equal(verdict('+  "stripe": "1.0.0",'), 'eligible=false');
+  assert.equal(verdict('MISSING_PATCH'), 'eligible=false');
+  assert.equal(verdict('', 1), 'eligible=false');
+});
 test('path selection applies to pull requests only; pushes, forks and Deno checks stay covered', () => {
   const ci = read('.github/workflows/ci.yml');
   const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
@@ -57,7 +157,7 @@ test('path selection applies to pull requests only; pushes, forks and Deno check
   assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
   assert.match(ci, /args\+=\(--full\)/);
   assert.match(ci, /vitest run --coverage --shard=/);
-  assert.match(ci, /deno test supabase\/functions\/_shared\/\*\.deno\.test\.ts/);
+  assert.match(ci, /run: pnpm run test:deno$/m);
   assert.match(ci, /github.event.pull_request.head.repo.fork != true/);
   // Coverage and bundle uploads need the org token, so they stay fork-gated.
   // The build needs no secrets and must run on fork pull requests.
@@ -184,4 +284,11 @@ test('CI job-level full gates match the classifier manifest', () => {
       jobs.some((match) => match[1] === job),
       job
     );
+});
+test('Deno resolves the functions config and fails on lockfile drift', () => {
+  const script = JSON.parse(read('package.json')).scripts['test:deno'];
+  assert.match(script, /^deno test --config supabase\/functions\/deno\.json --frozen /);
+  for (const file of ['.github/workflows/ci.yml', 'scripts/ci/validate-changes.mjs'])
+    assert.doesNotMatch(read(file), /\bdeno test\b/, file);
+  assert.match(read('.gitignore'), /^\/deno\.lock$/m);
 });

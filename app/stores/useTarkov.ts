@@ -108,7 +108,6 @@ type TarkovStoreInstance = UserState & {
 };
 const assertPrestigeMode = (mode: GameMode) => {
   if (mode === GAME_MODES.SEASONAL) throw new Error('Prestige is not supported for Seasonal PvP.');
-  if (mode === GAME_MODES.PVE) throw new Error('Prestige is not supported for PvE.');
 };
 const requirePrestigeSession = () => {
   const { $supabase } = useNuxtApp();

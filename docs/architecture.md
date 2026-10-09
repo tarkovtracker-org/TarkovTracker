@@ -35,12 +35,20 @@ validates UUID/mode paths and reads the static profile shell without querying a 
 `index.html` stays the prerendered homepage; top-level `404.html` gives unknown paths and invalid
 resource slugs real 404 responses. Legacy aliases remain HTTP 301 redirects.
 
-Application link previews are text-only `summary` cards. Guides also default to text-only. To select
-an image, set `guide.shareImage` in [`resourceData.ts`](../app/features/resources/resourceData.ts)
-with `src`, the asset's actual `width` and `height`, and an `altKey` pointing to English copy in
-`app/locales/en.json`. Use a representative guide asset; logos, article images, and video thumbnails
-are never selected automatically. Replace those fields to change the selection, or remove
-`shareImage` to disable it. Only explicitly selected images receive `summary_large_image` cards.
+Preview title, card, and image-tag behavior is implemented in
+[`routeSeo.ts`](../app/utils/routeSeo.ts). The global `theme-color` is configured in
+[`nuxt.config.ts`](../nuxt.config.ts). Guide image settings are declared in
+[`resourceData.ts`](../app/features/resources/resourceData.ts).
+
+The [prerender validator](../app/utils/prerenderOutput.ts) checks initial link-preview metadata
+at build time. The [SEO preview smoke suite](../scripts/preview/smoke/seo.smoke.mjs) checks deployed
+documents and metadata changes during navigation.
+
+Use [Discord's Embed Debugger](https://discord.com/developers/embeds) while signed in to inspect
+Discord's actual selected tags and layout. Previews are cached for about 30 minutes; append a fresh
+`?v=<revision>` when testing changed cards. The [link-preview reference](https://docs.discord.com/developers/link-previews/overview)
+defines the fetch requirements, supported layouts, limits, and cache behavior. Do not treat an
+HTML check or a local mockup as evidence of Discord's rendered card.
 
 Search Console indexing/canonical evidence and fresh Discord embeds require access to those
 services. Capture a 28-day query/page baseline before release; after release submit the registry's

@@ -3,8 +3,8 @@
 Repository contract for coding agents. Executable config (`package.json`, `nuxt.config.ts`,
 `tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Cloud agents and
 contributors may not load shared global rules, so two baselines stay here: preserve existing
-worktree changes, and get explicit authorization before production deploys, destructive actions,
-and merges.
+worktree changes, and get explicit authorization before production deploys and destructive actions.
+Merges follow the merge class below.
 
 ## Project map
 
@@ -14,14 +14,18 @@ and merges.
   `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/api-gateway/`: public
   API Worker. `scripts/precompute/`: scheduled KV pipeline.
 - `app/locales/en.json` is the translation source; other locale files are Crowdin-owned.
+- Shared pure progress rules are owned by `tarkovtracker-org/TarkovTracker-API` and consumed here
+  as `@tarkovtracker/progress-contracts` from an immutable release. Ownership: `docs/api-ownership.md`.
 
 ## Commands
 
 - Install `pnpm install` | Dev `pnpm run dev` | Build `pnpm run build` | Static `pnpm run generate`
 - Test `pnpm run test` | Gateway `pnpm run test:api-gateway` | Supabase `pnpm run supabase:check`
+- Contract pins `pnpm run check:progress-contracts` | Versioned API parity `pnpm run verify:api-parity`
+- Standalone legacy gateway `pnpm run verify:api-standalone`
 - Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
 - Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
-- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi` | Deps `pnpm run deps`
+- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi`
 - Brief `pnpm run brief --file <path>` (`--symbol <file:export>`, `--base <ref>`): consumers, docs,
   tests, and checks before editing; advisory, read its Uncertainty section
 
@@ -83,6 +87,14 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   bypass the guard; never run Codex reviews locally. Pending or unknown review is incomplete.
 - Auth, billing, migrations, and database or Durable Object concurrency control (locks, claims,
   fencing) need one independent review before merge: Codex, another provider, or a human.
+- Merge class: a green, low-risk PR may merge without asking when every change is docs, tests,
+  CI-only changes that keep every security control, patch/minor dependency updates outside
+  `auth-and-billing`, lockfile-only refreshes, or small fixes with no confirm-required surface.
+  Confirm-required (an explicit "merge" naming it, even when green): migrations or schema/RLS;
+  auth, sessions, permissions, or access checks; billing, payments, or entitlements (Stripe,
+  Supabase clients); secrets or credentials; major upgrades; production data scripts; deploy,
+  infra, DNS, or Worker trigger config; weakening any security control, check, or ruleset; and
+  public API or data-format contracts. Otherwise report it `READY` with the reason.
 - The PR body lists the validation commands and results.
 - Review risk areas and severity live in `docs/code-review.md`.
 

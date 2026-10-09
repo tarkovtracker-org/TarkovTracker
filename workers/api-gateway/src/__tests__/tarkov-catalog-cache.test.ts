@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CatalogUnavailableError } from '../services/catalog-error';
 import { getHideoutStations, getTasks } from '../services/tarkov';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import { getTaskCatalogInvalidator } from '../utils/task-catalog';
@@ -8,10 +9,17 @@ const MODES: GameMode[] = ['pvp', 'pve', 'seasonal'];
 const taskPayload = (id = 'root') => ({
   data: {
     tasks: {
-      [id]: { id, name: id, objectives: [{ id: `${id}-objective` }], taskRequirements: [] },
+      [id]: {
+        id,
+        name: id,
+        objectives: [{ id: `${id}-objective` }],
+        failConditions: [],
+        taskRequirements: [],
+      },
       child: {
         id: 'child',
         name: 'child',
+        failConditions: [],
         objectives: [{ id: 'child-objective' }],
         taskRequirements: [{ task: id, status: ['COMPLETE'] }],
       },
@@ -63,6 +71,33 @@ describe('gateway catalog cache', () => {
     { name: 'HTTP error', response: () => Promise.resolve(new Response('', { status: 503 })) },
     { name: 'network error', response: () => Promise.reject(new Error('offline')) },
     { name: 'malformed JSON', response: () => Promise.resolve(new Response('{')) },
+    {
+      name: 'absent failure rules',
+      response: () =>
+        Promise.resolve(
+          Response.json({
+            data: { tasks: { root: { id: 'root', objectives: [], taskRequirements: [] } } },
+          })
+        ),
+    },
+    {
+      name: 'malformed failure rules',
+      response: () =>
+        Promise.resolve(
+          Response.json({
+            data: {
+              tasks: {
+                root: {
+                  id: 'root',
+                  objectives: [],
+                  taskRequirements: [],
+                  failConditions: [{ task: 'child', status: 4 }],
+                },
+              },
+            },
+          })
+        ),
+    },
     { name: 'malformed envelope', response: () => Promise.resolve(Response.json({ data: null })) },
   ])('retries after a shared $name instead of caching failure', async ({ response }) => {
     const fetcher = vi
@@ -70,8 +105,12 @@ describe('gateway catalog cache', () => {
       .mockImplementationOnce(response)
       .mockResolvedValueOnce(Response.json(taskPayload()));
     vi.stubGlobal('fetch', fetcher);
-    const results = await Promise.all(Array.from({ length: 20 }, () => getTasks('pvp')));
-    expect(results.every((tasks) => tasks.length === 0)).toBe(true);
+    const results = await Promise.allSettled(Array.from({ length: 20 }, () => getTasks('pvp')));
+    expect(
+      results.every(
+        (result) => result.status === 'rejected' && result.reason instanceof CatalogUnavailableError
+      )
+    ).toBe(true);
     expect(fetcher).toHaveBeenCalledOnce();
     expect(await getTasks('pvp')).toHaveLength(2);
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -82,7 +121,7 @@ describe('gateway catalog cache', () => {
       .mockResolvedValueOnce(Response.json({ data: [] }))
       .mockResolvedValueOnce(Response.json(hideoutPayload));
     vi.stubGlobal('fetch', fetcher);
-    expect(await getHideoutStations('pve')).toEqual([]);
+    await expect(getHideoutStations('pve')).rejects.toBeInstanceOf(CatalogUnavailableError);
     expect(await getHideoutStations('pve')).toHaveLength(1);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
@@ -93,8 +132,8 @@ describe('gateway catalog cache', () => {
     });
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     vi.stubGlobal('fetch', fetcher);
-    expect(await getTasks('pvp')).toEqual([]);
-    expect(await getTasks('pvp')).toEqual([]);
+    await expect(getTasks('pvp')).rejects.toBeInstanceOf(CatalogUnavailableError);
+    await expect(getTasks('pvp')).rejects.toBeInstanceOf(CatalogUnavailableError);
     expect(timeout).toHaveBeenCalledWith(30_000);
     expect(fetcher).toHaveBeenCalledTimes(2);
     timeout.mockRestore();

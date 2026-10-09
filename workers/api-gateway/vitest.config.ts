@@ -8,14 +8,14 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       'cloudflare:workers': workerShim,
-      '@shared': fileURLToPath(new URL('../../shared', import.meta.url)),
     },
   },
   test: {
     environment: 'node',
+    maxWorkers: 2,
     globals: true,
     clearMocks: true,
-    include: ['src/**/__tests__/**/*.test.ts'],
+    include: ['src/**/__tests__/**/*.test.ts', 'scripts/*.test.ts'],
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],
   },
 });

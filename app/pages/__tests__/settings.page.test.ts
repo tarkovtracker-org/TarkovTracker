@@ -93,6 +93,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
+  AppearanceCard: { template: '<div data-testid="appearance-card" />' },
   AccountDeletionCard: { template: '<div data-testid="account-deletion-card" />' },
   ApiTokensCard: { template: '<div data-testid="api-tokens-card" />' },
   DataManagementCard: {

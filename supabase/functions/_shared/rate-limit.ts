@@ -1,30 +1,25 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeadersFor } from './cors.ts';
-export type MutationRateLimitAction =
-  | 'team-create'
-  | 'team-join'
-  | 'team-leave'
-  | 'team-kick'
-  | 'team-disband'
-  | 'token-create'
-  | 'token-revoke';
 type MutationRateLimitConfig = {
   limit: number;
+  scope?: string;
   windowSec: number;
 };
 type MutationRateLimitResult = {
   allowed?: boolean;
   reset_at?: string | null;
 };
-const MUTATION_RATE_LIMITS: Record<MutationRateLimitAction, MutationRateLimitConfig> = {
+const MUTATION_RATE_LIMITS = {
   'team-create': { limit: 10, windowSec: 3600 },
   'team-join': { limit: 30, windowSec: 600 },
   'team-leave': { limit: 30, windowSec: 3600 },
   'team-kick': { limit: 20, windowSec: 3600 },
   'team-disband': { limit: 10, windowSec: 3600 },
   'token-create': { limit: 3, windowSec: 3600 },
-  'token-revoke': { limit: 50, windowSec: 600 },
-};
+  'discord-role-sync': { limit: 10, windowSec: 600 },
+  'discord-unlink': { limit: 9, scope: 'discord-role-sync', windowSec: 600 },
+} satisfies Record<string, MutationRateLimitConfig>;
+export type MutationRateLimitAction = keyof typeof MUTATION_RATE_LIMITS;
 const createRateLimitResponse = (
   req: Request,
   status: number,
@@ -64,12 +59,12 @@ export const enforceUserMutationRateLimit = async (
   userId: string,
   action: MutationRateLimitAction
 ): Promise<Response | null> => {
-  const { limit, windowSec } = MUTATION_RATE_LIMITS[action];
+  const config: MutationRateLimitConfig = MUTATION_RATE_LIMITS[action];
   const { data, error } = await supabase.rpc('consume_mutation_rate_limit', {
-    p_limit: limit,
-    p_scope: action,
+    p_limit: config.limit,
+    p_scope: config.scope ?? action,
     p_subject: userId,
-    p_window_seconds: windowSec,
+    p_window_seconds: config.windowSec,
   });
   if (error) {
     console.error(`[rate-limit] Failed to consume ${action} limit for user ${userId}:`, error);

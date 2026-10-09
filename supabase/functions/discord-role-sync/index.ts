@@ -1,10 +1,5 @@
-import {
-  authenticateUser,
-  createErrorResponse,
-  createSuccessResponse,
-  handleCorsPreflight,
-  validateMethod,
-} from 'shared/auth';
+import { createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
+import { authenticateMutation } from '../_shared/authenticated-mutation.ts';
 import {
   isDiscordNotInGuildError,
   removeAllTierRoles,
@@ -23,20 +18,17 @@ type Supporter = {
 };
 function isActive(supporter: Supporter | null): boolean {
   if (!supporter) return false;
-  if (supporter.status === 'active') return true;
-  if (supporter.status !== 'past_due' || !supporter.expires_at) return false;
+  if (supporter.status === 'active' && !supporter.expires_at) return true;
+  if (!['active', 'past_due'].includes(supporter.status) || !supporter.expires_at) return false;
   const expiresAt = Date.parse(supporter.expires_at);
   return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }
+function activeTier(supporter: Supporter | null): Supporter['tier'] | null {
+  return supporter && isActive(supporter) ? supporter.tier : null;
+}
 Deno.serve(async (req: Request) => {
-  const cors = handleCorsPreflight(req);
-  if (cors) return cors;
-  const methodError = validateMethod(req, ['POST']);
-  if (methodError) return methodError;
-  const auth = await authenticateUser(req);
-  if ('error' in auth) {
-    return createErrorResponse(auth.error, auth.status, req);
-  }
+  const auth = await authenticateMutation(req, 'discord-role-sync');
+  if (auth.response) return auth.response;
   const { data: link, error: linkError } = await auth.supabase
     .from('discord_account_links')
     .select('discord_user_id')
@@ -60,8 +52,9 @@ Deno.serve(async (req: Request) => {
       console.error('[discord-role-sync] Supporter lookup failed:', supporterError);
       return createErrorResponse('Unable to load supporter status', 502, req);
     }
-    if (isActive(supporter)) {
-      await syncRolesForSupporter(link.discord_user_id, supporter.tier, true);
+    const tier = activeTier(supporter);
+    if (tier) {
+      await syncRolesForSupporter(link.discord_user_id, tier, true);
     } else {
       await removeAllTierRoles(link.discord_user_id);
       if (supporter?.has_ever_supported) {

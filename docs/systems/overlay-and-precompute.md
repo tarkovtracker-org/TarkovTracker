@@ -213,7 +213,10 @@ flowchart LR
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
-  `(lang, gameMode)` combo.
+  `(lang, gameMode)` combo. Each write retries transport failures, HTTP 429/5xx, and Cloudflare
+  error 7009 up to three total attempts, waiting one then two seconds with a fresh 30-second
+  request timeout per attempt. Retries reuse the same key, payload and TTL; permanent API errors
+  fail immediately, and exhausted retries retain the existing per-combination failure handling.
 
 ### Release verification
 

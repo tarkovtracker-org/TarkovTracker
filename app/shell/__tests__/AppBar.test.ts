@@ -28,12 +28,15 @@ const supporterTierRef = ref<string | null>(null);
 const mockUseSupporter = vi.fn(() => ({
   activeTier: supporterTierRef,
 }));
-const mockMetadataStore = reactive({
-  loading: false,
-  hideoutLoading: false,
-  updateLanguageAndGameMode: vi.fn(),
-  fetchAllData: vi.fn(async () => {}),
-});
+const createMetadataStore = () =>
+  reactive({
+    loading: false,
+    hideoutLoading: false,
+    updateLanguageAndGameMode: vi.fn(),
+    fetchAllData: vi.fn(async () => {}),
+    hasCriticalLocaleCache: vi.fn(async () => true),
+  });
+let mockMetadataStore = createMetadataStore();
 const mockPreferencesStore = {
   getStreamerMode: false,
   getLocaleOverride: 'en' as string | null,
@@ -127,12 +130,6 @@ mockNuxtImport('useNuxtApp', () => () => ({
 }));
 mockNuxtImport('useSkillCalculation', () => () => mockSkillCalculation);
 mockNuxtImport('useToast', () => () => mockToast);
-const SelectMenuFixedStub = {
-  props: ['items', 'modelValue'],
-  emits: ['update:modelValue'],
-  template:
-    '<label data-testid="select-menu-fixed"><slot name="leading" /><select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="item in (items || [])" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>',
-};
 const mountAppBar = async () => {
   const { default: AppBar } = await import('@/shell/AppBar.vue');
   return mount(AppBar, {
@@ -152,16 +149,16 @@ const mountAppBar = async () => {
         Omnibar: true,
         ProgressSaveStatusIndicator: true,
         SignOutConfirmModal: true,
-        SelectMenuFixed: SelectMenuFixedStub,
         UButton: {
-          props: ['icon'],
+          props: ['icon', 'disabled', 'loading'],
           emits: ['click'],
-          template: '<button :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
+          template:
+            '<button :data-icon="icon" :disabled="disabled || undefined" @click="$emit(\'click\')"><slot /></button>',
         },
         UDropdownMenu: {
           props: ['items'],
-          template:
-            '<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" @click="item.onSelect?.()">{{ item.label }}</button></template></div>',
+          data: () => ({ expandedSubmenu: '' }),
+          template: `<div data-dropdown-menu><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :disabled="item.disabled" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : item.onSelect?.()">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :disabled="child.disabled" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
         },
         UIcon: {
           props: ['name'],
@@ -175,8 +172,13 @@ const mountAppBar = async () => {
     },
   });
 };
+/** Picks a language from the app bar language menu by its native name. */
+const chooseLocale = async (wrapper: Awaited<ReturnType<typeof mountAppBar>>, name: string) => {
+  await wrapper.get(`[data-menu-item="${name}"]`).trigger('click');
+};
 describe('AppBar locale switching', () => {
   beforeEach(async () => {
+    mockMetadataStore = createMetadataStore();
     windowWidthRef.value = 1280;
     localeRef.value = 'en';
     setLocale.mockClear();
@@ -214,20 +216,20 @@ describe('AppBar locale switching', () => {
   });
   it('switches locale with setLocale and refreshes language-bound metadata', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
-    await select.setValue('de');
+    await chooseLocale(wrapper, 'Deutsch');
     await flushPromises();
     expect(setLocale).toHaveBeenCalledWith('de');
     expect(mockPreferencesStore.setLocaleOverride).toHaveBeenCalledWith('de');
     expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('de');
-    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false, {
+      signal: expect.any(AbortSignal),
+    });
     expect(mockSkillCalculation.migrateLegacySkillOffsets).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
   it('does not run locale switch flow when selecting the active locale', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
-    await select.setValue('en');
+    await chooseLocale(wrapper, 'English');
     await flushPromises();
     expect(setLocale).not.toHaveBeenCalled();
     expect(mockPreferencesStore.setLocaleOverride).not.toHaveBeenCalled();
@@ -238,10 +240,9 @@ describe('AppBar locale switching', () => {
   });
   it('handles setLocale errors without running metadata refresh side effects', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
     const localeError = new Error('locale switch failed');
     setLocale.mockRejectedValueOnce(localeError);
-    await select.setValue('de');
+    await chooseLocale(wrapper, 'Deutsch');
     await flushPromises();
     expect(setLocale).toHaveBeenCalledWith('de');
     expect(mockPreferencesStore.setLocaleOverride).not.toHaveBeenCalled();
@@ -249,7 +250,10 @@ describe('AppBar locale switching', () => {
     expect(mockMetadataStore.fetchAllData).not.toHaveBeenCalled();
     expect(mockSkillCalculation.migrateLegacySkillOffsets).not.toHaveBeenCalled();
     const { logger } = await import('@/utils/logger');
-    expect(logger.error).toHaveBeenCalledWith('[AppBar] Error switching locale:', localeError);
+    expect(logger.error).toHaveBeenCalledWith(
+      '[LocaleSwitch] Error switching locale:',
+      localeError
+    );
     wrapper.unmount();
   });
   it('rolls back locale when fetchAllData rejects after setLocale succeeds', async () => {
@@ -257,8 +261,7 @@ describe('AppBar locale switching', () => {
     const previousLocale = localeRef.value;
     mockMetadataStore.fetchAllData.mockRejectedValueOnce(fetchError);
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
-    await select.setValue('de');
+    await chooseLocale(wrapper, 'Deutsch');
     await flushPromises();
     expect(setLocale).toHaveBeenNthCalledWith(1, 'de');
     expect(setLocale).toHaveBeenNthCalledWith(2, previousLocale);
@@ -271,35 +274,76 @@ describe('AppBar locale switching', () => {
       'de',
       'en',
     ]);
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledTimes(2);
     expect(mockPreferencesStore.getLocaleOverride).toBe('en');
     expect(localeRef.value).toBe(previousLocale);
     const { logger } = await import('@/utils/logger');
-    expect(logger.error).toHaveBeenCalledWith('[AppBar] Error switching locale:', fetchError);
+    expect(logger.error).toHaveBeenCalledWith('[LocaleSwitch] Error switching locale:', fetchError);
     wrapper.unmount();
   });
-  it('ignores stale failures from older locale switch requests', async () => {
-    const staleFetch = createDeferred<undefined>();
+  it('lists languages by native name and marks the active one', async () => {
+    const wrapper = await mountAppBar();
+    const items = wrapper.findAll('[data-locale-item]');
+    expect(items.map((item) => item.text())).toEqual(['English', 'Deutsch', 'Français']);
+    expect(wrapper.get('[data-menu-item="English"]').attributes('data-checked')).toBe('true');
+    expect(wrapper.get('[data-menu-item="Deutsch"]').attributes('data-checked')).toBe('false');
+    const trigger = wrapper.get('[data-testid="app-locale-menu"]');
+    expect(trigger.attributes('aria-label')).toBe('settings.locale: English');
+    expect(trigger.classes()).toEqual(expect.arrayContaining(['h-8', 'w-8', 'hidden']));
+    wrapper.unmount();
+  });
+  it('switches language through the mobile More submenu', async () => {
+    windowWidthRef.value = 375;
+    const wrapper = await mountAppBar();
+    const moreMenu = wrapper
+      .findAll('[data-dropdown-menu]')
+      .find((menu) => menu.find('button[aria-label="common.more"]').exists());
+    expect(moreMenu).toBeDefined();
+    await moreMenu!.get('button[aria-label="common.more"]').trigger('click');
+    expect(moreMenu!.find('[data-submenu]').exists()).toBe(false);
+    await moreMenu!.get('[data-menu-item="settings.locale"]').trigger('click');
+    const submenu = moreMenu!.get('[data-submenu]');
+    expect(submenu.findAll('button').map((item) => item.text())).toEqual([
+      'English',
+      'Deutsch',
+      'Français',
+    ]);
+    expect(submenu.get('[data-menu-item="English"]').attributes('data-checked')).toBe('true');
+    await submenu.get('[data-menu-item="Deutsch"]').trigger('click');
+    await flushPromises();
+    expect(setLocale).toHaveBeenCalledWith('de');
+    expect(mockPreferencesStore.setLocaleOverride).toHaveBeenCalledWith('de');
+    expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('de');
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false, {
+      signal: expect.any(AbortSignal),
+    });
+    expect(submenu.get('[data-menu-item="Deutsch"]').attributes('data-checked')).toBe('true');
+    wrapper.unmount();
+  });
+  it('ignores another switch while one is still loading, then allows it', async () => {
+    const pendingFetch = createDeferred<undefined>();
     mockMetadataStore.fetchAllData
-      .mockImplementationOnce(() => staleFetch.promise)
+      .mockImplementationOnce(() => pendingFetch.promise)
       .mockResolvedValueOnce(undefined);
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
-    await select.setValue('de');
+    await chooseLocale(wrapper, 'Deutsch');
     await flushPromises();
-    await select.setValue('fr');
+    const trigger = wrapper.get('[data-testid="app-locale-menu"]');
+    expect(trigger.attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-menu-item="settings.locale"]').attributes('disabled')).toBeDefined();
+    for (const item of wrapper.findAll('[data-locale-item]')) {
+      expect(item.attributes('disabled')).toBeDefined();
+    }
+    await chooseLocale(wrapper, 'Français');
     await flushPromises();
-    staleFetch.reject(new Error('stale fetch failed'));
+    expect(setLocale.mock.calls.map(([value]) => value)).toEqual(['de']);
+    pendingFetch.resolve(undefined);
     await flushPromises();
-    expect(localeRef.value).toBe('fr');
+    expect(trigger.attributes('disabled')).toBeUndefined();
+    await chooseLocale(wrapper, 'Français');
+    await flushPromises();
     expect(setLocale.mock.calls.map(([value]) => value)).toEqual(['de', 'fr']);
-    expect(mockPreferencesStore.setLocaleOverride.mock.calls.map(([value]) => value)).toEqual([
-      'de',
-      'fr',
-    ]);
-    expect(mockMetadataStore.updateLanguageAndGameMode.mock.calls.map(([value]) => value)).toEqual([
-      'de',
-      'fr',
-    ]);
+    expect(localeRef.value).toBe('fr');
     wrapper.unmount();
   });
 });
@@ -424,6 +468,50 @@ describe('AppBar responsive layout', () => {
     expect(labels).toContain('footer.call_to_action.github');
     wrapper.unmount();
   });
+  it('renders Discord and GitHub as top-level external links with safe rel attributes', async () => {
+    const wrapper = await mountAppBar();
+    const discord = wrapper.find('a[aria-label="footer.call_to_action.discord"]');
+    expect(discord.exists()).toBe(true);
+    expect(discord.attributes('href')).toBe('https://discord.gg/M8nBgA2sT6');
+    expect(discord.attributes('target')).toBe('_blank');
+    expect(discord.attributes('rel')).toContain('noopener');
+    const github = wrapper.find('a[aria-label="footer.call_to_action.github"]');
+    expect(github.exists()).toBe(true);
+    expect(github.attributes('href')).toBe('https://github.com/tarkovtracker-org/TarkovTracker');
+    expect(github.attributes('target')).toBe('_blank');
+    expect(github.attributes('rel')).toContain('noopener');
+    wrapper.unmount();
+  });
+  it('hides top-level Discord and GitHub links below sm (the More menu covers them)', async () => {
+    const wrapper = await mountAppBar();
+    for (const label of ['footer.call_to_action.discord', 'footer.call_to_action.github']) {
+      const classAttr = wrapper.find(`a[aria-label="${label}"]`).attributes('class') || '';
+      expect(classAttr.split(/\s+/)).toContain('hidden');
+      expect(classAttr).toContain('sm:inline-flex');
+    }
+    wrapper.unmount();
+  });
+  it('collapses the search trigger to a 32x32 icon button below sm', async () => {
+    const wrapper = await mountAppBar();
+    const search = wrapper.find('button[aria-label="omnibar.open_aria"]');
+    expect(search.exists()).toBe(true);
+    const classes = (search.attributes('class') || '').split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(['h-8', 'w-8', 'shrink-0', 'sm:w-full']));
+    const label = search
+      .findAll('span')
+      .find((s) => s.text() === 'omnibar.trigger_label' && s.findAll('span').length === 0);
+    expect(label?.classes()).toEqual(expect.arrayContaining(['hidden', 'sm:inline']));
+    wrapper.unmount();
+  });
+  it('renders Log In as icon-only below sm while keeping its accessible label', async () => {
+    const wrapper = await mountAppBar();
+    const login = wrapper.find('a[aria-label="app_bar.login_aria"]');
+    const classes = (login.attributes('class') || '').split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(['w-8', 'sm:w-auto']));
+    const label = login.findAll('span').find((s) => s.text() === 'navigation_drawer.login');
+    expect(label?.classes()).toEqual(expect.arrayContaining(['hidden', 'sm:inline']));
+    wrapper.unmount();
+  });
   it('wraps the Support CTA in a hidden sm:inline-flex container for CSS responsive visibility', async () => {
     const wrapper = await mountAppBar();
     const supportWrappers = wrapper.findAll('span.hidden').filter((span) => {
@@ -442,13 +530,13 @@ describe('AppBar responsive layout', () => {
     expect(moreWrappers.length).toBe(1);
     wrapper.unmount();
   });
-  it('gives the bell a 36x36 hit target with aria-label and tooltip', async () => {
+  it('gives the bell a 32x32 hit target with aria-label and tooltip', async () => {
     const wrapper = await mountAppBar();
     const bell = wrapper.find('button[aria-label="common.activity_log"]');
     expect(bell.exists()).toBe(true);
     const classAttr = bell.attributes('class') || '';
-    expect(classAttr).toContain('h-9');
-    expect(classAttr).toContain('w-9');
+    expect(classAttr).toContain('h-8');
+    expect(classAttr).toContain('w-8');
     wrapper.unmount();
   });
   it('renders the Log In button with an accessible primary treatment', async () => {
@@ -459,7 +547,7 @@ describe('AppBar responsive layout', () => {
     expect(classAttr).toContain('bg-primary-500');
     expect(classAttr).toContain('hover:bg-primary-400');
     expect(classAttr).toContain('text-surface-950');
-    expect(classAttr).toContain('h-9');
+    expect(classAttr).toContain('h-8');
     wrapper.unmount();
   });
 });
@@ -478,7 +566,7 @@ describe('AppBar authenticated state', () => {
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
     expect(trigger.exists()).toBe(true);
     const classAttr = trigger.attributes('class') || '';
-    expect(classAttr).toContain('h-9');
+    expect(classAttr).toContain('h-8');
     expect(trigger.find('img').exists()).toBe(true);
     expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
     wrapper.unmount();

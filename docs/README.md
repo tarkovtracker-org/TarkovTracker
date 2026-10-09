@@ -21,6 +21,7 @@ instead of restating it.
 | Understand the deeper architecture, state model, and data flows                   | [`architecture.md`](./architecture.md)                  |
 | Read the Tarkov data architecture decision and implementation plan                | [`decision-tarkov-data.md`](./decision-tarkov-data.md)  |
 | Use or extend the HTTP/API surface                                                | [`api.md`](./api.md)                                    |
+| Decide whether an API/frontend change belongs here or in the gateway              | [`api-ownership.md`](./api-ownership.md)                |
 | Understand rate limits / abuse controls by layer                                  | [`rate-limiting.md`](./rate-limiting.md)                |
 | Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                            |
 | Understand CI/CD, hooks, and releases                                             | [`workflow-automation.md`](./workflow-automation.md)    |
@@ -48,6 +49,7 @@ instead of restating it.
 - [`tarkov-clearance-rollout.md`](./tarkov-clearance-rollout.md) — proposed game-data browser verification infrastructure, approval gates, acceptance evidence and edge-first rollback.
 - [`workflow-automation.md`](./workflow-automation.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
 - [`ci-efficiency-audit.md`](./ci-efficiency-audit.md) — CI coverage inventory and measured setup optimization.
+- [`test-signal-audit-2026-10-04.md`](./test-signal-audit-2026-10-04.md) — historical test inventory and conditional proposals; no test removals.
 - [`/scripts/README.md`](../scripts/README.md) — what each repository script does and what runs it.
 - [`code-review.md`](./code-review.md) — production-readiness review policy: risk areas, severity calibration, deployment and rollback checks.
 - [`testing-coverage.md`](./testing-coverage.md) — coverage gates and reproduction. Exact floors live in `vitest.config.ts`.

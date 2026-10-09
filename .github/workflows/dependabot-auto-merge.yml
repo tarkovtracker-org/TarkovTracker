@@ -62,11 +62,19 @@ jobs:
             echo "::notice::Dependabot PR is closed, draft, stale, forked, or no longer targets main."
             exit 0
           fi
+          # Every group is minor/patch only (.github/dependabot.yml); majors and ungrouped
+          # updates use other branch names. Auth and billing clients are confirm-required.
           case "$HEAD_REF" in
+            dependabot/npm_and_yarn/auth-and-billing-*)
+              ;;
+            dependabot/npm_and_yarn/nuxt-ecosystem-* | \
             dependabot/npm_and_yarn/lint-and-format-* | \
             dependabot/npm_and_yarn/testing-tooling-* | \
+            dependabot/npm_and_yarn/typescript-and-types-* | \
             dependabot/npm_and_yarn/tailwind-tooling-* | \
-            dependabot/npm_and_yarn/release-tooling-*)
+            dependabot/npm_and_yarn/cloudflare-tooling-* | \
+            dependabot/npm_and_yarn/release-tooling-* | \
+            dependabot/npm_and_yarn/remaining-npm-*)
               eligible=true
               ;;
           esac
@@ -99,6 +107,37 @@ jobs:
             printf '%s\n' "$invalid_files"
             exit 0
           fi
+          # Defense in depth for group drift: any changed manifest line naming an auth or
+          # billing client keeps the PR for human confirmation. Unreadable changes hold it too.
+          if ! patches="$(
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+              --jq '.[] | select(.filename | endswith("package.json")) | .patch // "MISSING_PATCH"'
+          )"; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Could not read the PR's manifest changes; merge needs confirmation."
+            exit 0
+          fi
+          if printf '%s\n' "$patches" | grep -qx 'MISSING_PATCH'; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::A manifest diff is unavailable; merge needs confirmation."
+            exit 0
+          fi
+          grep_status=0
+          sensitive="$(
+            printf '%s\n' "$patches" |
+              grep -E '^[-+][[:space:]]*"(stripe|@stripe/[^"]+|@supabase/[^"]+|supabase)":'
+          )" || grep_status=$?
+          if [ "$grep_status" -gt 1 ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Manifest inspection failed; merge needs confirmation."
+            exit 0
+          fi
+          if [ -n "$sensitive" ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Dependabot PR changes an auth or billing dependency; merge needs confirmation:"
+            printf '%s\n' "$sensitive"
+            exit 0
+          fi
           echo "eligible=true" >> "$GITHUB_OUTPUT"
       - name: Wait for checks
         if: steps.gate.outputs.eligible == 'true'
@@ -106,11 +145,13 @@ jobs:
         run: |
           set -euo pipefail
           # Aggregates only: `CI Result` (GitHub Actions check run, covers validation and the
-          # integrated security scans) and `Preview Result` (commit status from the trusted preview
-          # controller). Individual job names are no longer a dependency of this gate.
+          # integrated security scans), Socket's PR alerts, and `Preview Result` (commit status
+          # from the trusted preview controller). Individual job names are not a dependency.
+          # Socket Security vets new and changed packages for supply-chain risk.
           expected_checks=(
-            "CI Result"
-            "PR Meta"
+            "CI Result|15368"
+            "PR Meta|15368"
+            "Socket Security: Pull Request Alerts|156372"
           )
           expected_statuses=(
             "Preview Result"
@@ -166,9 +207,11 @@ jobs:
             other_pending_status_count="$(
               jq '[.[] | select(.context != "Preview Result" and .state == "pending")] | length' <<< "$status_contexts"
             )"
-            for check_name in "${expected_checks[@]}"; do
+            for expected_check in "${expected_checks[@]}"; do
+              check_name="${expected_check%|*}"
+              check_app="${expected_check##*|}"
               matching_check="$(
-                jq --arg name "$check_name" '[.[] | select(.name == $name and .app.id == 15368)]' <<< "$check_runs"
+                jq --arg name "$check_name" --argjson app "$check_app" '[.[] | select(.name == $name and .app.id == $app)]' <<< "$check_runs"
               )"
               if [ "$(jq 'length' <<< "$matching_check")" -eq 0 ]; then
                 missing_checks+=("$check_name")
