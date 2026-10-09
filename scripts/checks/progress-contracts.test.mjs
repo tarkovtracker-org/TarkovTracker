@@ -13,11 +13,11 @@ const contracts = {
 };
 const manifest = () => ({ dependencies: { '@tarkovtracker/progress-contracts': contracts.url } });
 const lock = `resolution: {integrity: ${contracts.integrity}, tarball: ${contracts.url}}`;
-describe('published progress contract pins', () => {
-  it('rejects a second tracked rule owner even when all release pins agree', () => {
-    const root = mkdtempSync(join(tmpdir(), 'contracts-owner-'));
-    for (const folder of ['workers/contract-tests', 'workers/api-gateway/progress-contracts'])
-      mkdirSync(join(root, folder), { recursive: true });
+function withOwnerFixture(check) {
+  const root = mkdtempSync(join(tmpdir(), 'contracts-owner-'));
+  try {
+    mkdirSync(join(root, 'workers/contract-tests'), { recursive: true });
+    mkdirSync(join(root, 'workers/api-gateway'), { recursive: true });
     for (const file of ['package.json', 'workers/api-gateway/package.json'])
       writeFileSync(join(root, file), JSON.stringify(manifest()));
     writeFileSync(
@@ -25,7 +25,28 @@ describe('published progress contract pins', () => {
       JSON.stringify({ contracts })
     );
     writeFileSync(join(root, 'pnpm-lock.yaml'), lock);
-    expect(() => checkProgressContracts(root)).toThrow('second source owner');
+    check(root, join(root, 'workers/api-gateway/progress-contracts'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+describe('published progress contract pins', () => {
+  it.each([
+    ['package.json', (owner) => writeFileSync(join(owner, 'package.json'), '{}')],
+    ['src', (owner) => mkdirSync(join(owner, 'src'))],
+  ])('rejects a second rule owner with %s even when all release pins agree', (_, add) => {
+    withOwnerFixture((root, owner) => {
+      mkdirSync(owner);
+      add(owner);
+      expect(() => checkProgressContracts(root)).toThrow('second source owner');
+    });
+  });
+  it('ignores build leftovers from the removed workspace package', () => {
+    withOwnerFixture((root, owner) => {
+      for (const folder of ['dist', 'node_modules'])
+        mkdirSync(join(owner, folder), { recursive: true });
+      expect(checkProgressContracts(root)).toEqual({ contracts });
+    });
   });
   it('accepts the same release in both consumers and the lockfile', () => {
     expect(inspectReleasePins({ contracts }, manifest(), manifest(), lock)).toEqual([]);
