@@ -320,15 +320,12 @@ try {
   );
   assert.equal(preview, true);
   assert.equal((await committed(writer)).record.raw, retry.record.raw);
-  await evaluate(
-    writer.sessionId,
-    `document.querySelector('[data-testid="older-tab-cleanup"]').click();true`
-  );
+  // Export opens the saved-file confirmation but must retain recovery until acknowledgement.
   const beforeCleanup = await committed(writer);
   assert.ok(beforeCleanup.record.legacyUpdates.includes(olderRaw));
   await evaluate(
     writer.sessionId,
-    `document.querySelector('[data-testid="older-tab-cleanup-confirm"]').click();true`
+    `document.querySelector('[data-testid="older-tab-cleanup-saved-confirm"]').click();true`
   );
   const cleared = await evaluate(
     writer.sessionId,
