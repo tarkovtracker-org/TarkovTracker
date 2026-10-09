@@ -119,3 +119,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
     expect(store.pvp.progressEpoch).toBe(7);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

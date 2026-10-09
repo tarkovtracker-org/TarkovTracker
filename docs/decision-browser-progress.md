@@ -1,12 +1,12 @@
 # Browser progress authority checkpoint
 
 W10 requires a transaction-backed browser progress record because a native Web Lock does not
-make another renderer's localStorage cache current. This checkpoint proposes a staged replacement
-and records the remaining rollout decision. The application still uses its existing storage paths;
-`progressRepository.ts` is an inactive substrate with no runtime callers. Issue #1091's preserved
+make another renderer's localStorage cache current. This checkpoint records the original
+native boundary investigation and the #1092 runtime integration. The application now uses the
+transactional active-envelope repository; the earlier typed substrate remains available for tests. Issue #1091's preserved
 reset implementation remains separate, and draft #1086 must retain its cached-client hold.
 
-## Verified source and native boundary evidence
+## Historical investigation and native boundary evidence
 
 Source audit base: main `abb4e9b1a8abb9fa0f8807a909d009926db8c236` on 2026-10-06. Root
 `AGENTS.md` and `supabase/AGENTS.md` apply; no `.agents` directory exists at this revision. Open
@@ -84,7 +84,7 @@ The race is timing-sensitive, not a deterministic claim. Focused decoder tests c
 missing optionals and competing queued revision-CAS writes. Trial counts outside 1–1000 are
 rejected before browser launch.
 
-The inactive substrate stores session control and owner-scoped progress in one object store.
+At the original checkpoint, the inactive typed substrate stored session control and owner-scoped progress in one object store.
 Native readwrite transactions serialize the session check, latest-record read, revision check
 and replacement. A transaction result resolves only on `complete`, never on put-request
 success. `abort`, quota and unavailable errors leave revision/state unchanged and propagate to
@@ -115,20 +115,28 @@ known map/history entries and present optionals, and allows missing optionals wi
 Malformed known fields are rejected even when opaque extensions are retained. Revision zero is
 empty-only. Dictionaries must be plain records; Map/Date values are rejected and retained.
 Existing coercive sanitizers are unsuitable for this retain-and-reject boundary.
-Recovery/export UI remains an integration gate. Conflict retry must never just increment `expectedRevision` on a stale
+At that checkpoint, recovery/export UI remained an integration gate; the runtime bridge below now provides it. Conflict retry must never just increment `expectedRevision` on a stale
 envelope: reread accepted state and reapply the original intent.
 
 An owner token includes a persisted generation. A transition A to B to A invalidates old A
 operations even though the account ID matches again. Joining an already-active owner can reuse
-its generation; deliberate same-account restart renews it. These are internal persistence
-fences, not an authorization system. A pending caller must also protect its own post-commit
+its generation, including a same-account local restart, so another tab for that owner remains
+writable. Activation checks live identity and the caller's session revision before changing the
+native session and after hydration; an obsolete callback cannot retire or adopt a replacement
+owner. These are internal persistence fences, not an authorization system. A pending caller must also protect its own post-commit
 memory patch against session changes and later edits. Results must not overwrite newer local
 intent or acknowledge a later pending edit. Broadcast and storage events request an IDB reread;
 they never carry authority or act as mandatory visibility waits.
 
-The substrate does not yet own serializer baselines, field-level intent reconstruction, recovery
-archives, cloud acknowledgements, startup UI, or network operations. Those remain integration
-gates. Unsupported/newer database versions, blocked upgrade, versionchange and unavailable
+Runtime account-save intent and commit acknowledgements are owned by
+[`progressAuthority.ts`](../app/stores/tarkov/progressAuthority.ts) and
+[`progressRepository.ts`](../app/stores/tarkov/progressRepository.ts).
+Acceptance requires that unrelated clocks cannot promote stale fields, failed intent remains
+retryable in order, and memory/Saved never acknowledge an aborted write.
+
+The original typed substrate did not own serializer baselines, field-level intent reconstruction, recovery
+archives, cloud acknowledgements, startup UI, or network operations. The runtime integration below
+now owns browser authority and recovery; cloud retirement remains separate. Unsupported/newer database versions, blocked upgrade, versionchange and unavailable
 storage must become visible unavailable/pending states with no silent old-key fallback.
 
 ## Recommended coexistence and recovery policy
@@ -143,7 +151,8 @@ At first explicit migration, preserve the exact selected legacy bytes together w
 owner and original season, import version and authoritative state in the IDB transaction.
 Malformed/unknown/foreign-owner values become retained recovery material, not another owner's
 progress. The inactive substrate only retains caller-supplied first-import raw bytes; the
-recoverable source inventory and user discovery workflow are not implemented yet.
+runtime now retains the first import and observed older-tab bytes. Settings → Backup & Restore
+shows owned recovery edits, export and explicit import preview actions.
 
 After first adoption, later observed legacy values remain recovery candidates. Startup, focus,
 and notifications should discover available candidates and show a persistent recovery banner
@@ -219,20 +228,59 @@ prove cached clients stopped writing. Legacy deletion or server rejection remain
 authorized action. #1086's cached-client hold concerns its own database retirement and is not
 released by this browser bridge.
 
-## Rollback and remaining acceptance
+## Historical rollback requirements and remaining acceptance
 
 Untouched legacy snapshots cannot restore changes committed only to IDB. Before old-code
 rollback, a new-aware exporter must read committed owner/mode records and retained recovery
 material, produce a validated native backup with original season targeting, and verify its
 round trip through the supported importer. A schema-compatible repair deployment that can
-still read IDB is safer than deploying code that ignores it. No tested rollback exporter exists
-in this stage; rollback is an integration gate.
+still read IDB is safer than deploying code that ignores it. At the original substrate checkpoint, no tested rollback exporter existed. The runtime bridge now exports exact committed device data and retained recovery bytes, with archive-import preview validation.
 
-The next PR should integrate the agreed surface coherently rather than a sequence of partial
-authority switches. Its acceptance must use actual app stores in separate native renderers:
+The original checkpoint required the runtime bridge to integrate the agreed surface coherently. Its acceptance must use actual app stores in separate native renderers:
 immediate write/release in both orders, ordinary edits, first save, same-time scalar changes,
 selected/all resets and unrelated mode reload, reset epoch adoption followed by a valid edit,
 put-success then transaction abort, quota/unavailable/blocked/newer-version failures,
 A to B to A, crash/reopen, retained old-client writes, deletion reimport prevention and new-only
 export recovery. Focused tests use modest workers; CI owns broad validation. W10 is incomplete
 until those integration gates and the compatibility decision are resolved.
+
+## #1092 runtime integration contract
+
+The runtime bridge preserves the active envelope's owner, clocks and reset epochs. Its
+implementation owners are [`progressRepository.ts`](../app/stores/tarkov/progressRepository.ts)
+(native persistence), [`progressAuthority.ts`](../app/stores/tarkov/progressAuthority.ts)
+(hydration and session fencing), and [`useTarkov.ts`](../app/stores/useTarkov.ts)
+(application reconciliation). Acceptance requires retained pending intent after abort, no Saved
+acknowledgement before durability, and no legacy reimport after reset or deletion. Storage
+failure must not fall back to overwriting localStorage.
+
+The initial legacy bytes stay retained with the new record. Existing localStorage progress keys
+remain untouched after adoption, with no dual writes or replacement projection. Later legacy edits
+remain recovery candidates and must be discoverable/exportable; they are never blindly merged into
+new authority. Older tabs retain existing cloud write access during this bridge. This preserves the
+current mixed-client cloud limits; server retirement and #1086 remain separate decisions.
+
+Acceptance covers the actual runtime boundary in separate native renderers: both writer orders,
+ordinary edits and selected/all-mode resets, first-save/import, reload, aborted transaction, session
+replacement, and export of committed new-only data. Primitive repository tests supplement that
+application evidence and do not replace it.
+
+The native app acceptance command is `pnpm run test:progress-app`, with `W10_CHROMIUM`
+and an offline local server at `PROGRESS_APP_URL` (default localhost:3102). Its receipt proves
+separate renderer processes, held/pending native locks, both write/reset orders, reload, quota
+failure/retry, recovery export and explicit preview without adoption. Repository integration tests
+cover transaction abort, account generations, blocked storage and corrupt/newer logical records.
+That guest receipt does not cover signed-in behavior or server compatibility retirement. Separate signed-in native-browser acceptance covers A/B/A login and reload, same-owner two-tab edits, a queued stale activation, and an actual delayed cloud save response across an account switch. Server compatibility retirement remains outside this change; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
+import/recovery copies, retaining unattributable bytes and reporting incomplete removal.
+
+Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the export are removed after the user confirms the file was saved. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted. Recovery capture is capped at 20 snapshots and 5 Mi UTF-16 characters; overflow leaves current saved progress and existing copies untouched, and Settings reports it. Export includes the latest uncaptured owned legacy bytes and uses a read without writes, so capture quota failures do not prevent archive export.
+
+Native database opening has a bounded deadline. A stalled request cannot leave startup waiting indefinitely; a late success closes its connection, and a subsequent activation can open a fresh request. Unavailable progress authority uses the existing bounded cloud-start retry path.
+
+An explicit device deletion removes and verifies owned legacy keys before the native purge announces its commit. If legacy removal fails, native progress remains. This ordering closes the immediate peer-refresh recapture window; IndexedDB and localStorage do not form one transaction, and older tabs may still write later recovery candidates.
+
+Debug export reads progress without capturing legacy writes. If native storage is unavailable, it still exports the remaining sanitized diagnostic data with null progress.
+
+Device archives retain current, original, and older-tab entries for explicit preview selection; importing does not automatically apply any entry. Export and cleanup are separate: the user confirms that the file was saved before only the exported owned copies are cleared. Archive size validation and the stricter ordinary-backup bound are owned by [`useDataBackup.ts`](../app/composables/useDataBackup.ts).
+
+A failed current account transition stops initialization and blocks progress writes. A superseded failure cannot change the replacement session's write state. Auth-boundary handling is owned by [`useAppInitialization.ts`](../app/composables/useAppInitialization.ts) and [`useTarkov.ts`](../app/stores/useTarkov.ts).

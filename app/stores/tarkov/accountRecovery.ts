@@ -371,7 +371,7 @@ const readOwnedHistoricalSources = (
   ownerId: string
 ): (PersistedProgressSnapshot | null)[] | null => {
   try {
-    const active = localStorage.getItem(STORAGE_KEYS.progress);
+    const active = safeGetItem(STORAGE_KEYS.progress);
     const recovery = readRecoveryStorage(ownerId);
     if (!recovery.ok) return null;
     const values = [active, recovery.raw].filter((raw): raw is string => raw !== null);

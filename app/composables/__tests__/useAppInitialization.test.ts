@@ -8,6 +8,14 @@ import {
   SYNC_RETRY_MAX_ATTEMPTS,
   useAppInitialization,
 } from '@/composables/useAppInitialization';
+const mockInitializeProgressAuthority = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => {}));
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return {
+    ...createProgressPolicyAuthority(),
+    initializeProgressAuthority: mockInitializeProgressAuthority,
+  };
+});
 const localeRef = ref('en');
 const setLocale = vi.fn(async (value: string) => {
   localeRef.value = value;
@@ -126,11 +134,12 @@ describe('useAppInitialization locale setup', () => {
         mockMetadataStore.languageCode = localeOverride === 'uk' ? 'en' : localeOverride;
       }
     });
+    mockInitializeProgressAuthority.mockReset().mockResolvedValue(undefined);
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
     mockHasPendingProgressHandoff.mockReset().mockReturnValue(false);
     mockSettlePendingProgressHandoffs.mockReset().mockResolvedValue(undefined);
-    mockResetTarkovStoreForSessionTransition.mockClear();
+    mockResetTarkovStoreForSessionTransition.mockReset().mockResolvedValue(undefined);
     mockResetTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockMigrateDataIfNeeded.mockResolvedValue(undefined);
@@ -141,6 +150,53 @@ describe('useAppInitialization locale setup', () => {
     (logger.error as Mock).mockClear();
     mockSupabaseUser.loggedIn = false;
     mockSupabaseUser.id = null;
+  });
+  it('activates the signed-in owner before starting cloud sync after guest login', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    let finish!: () => void;
+    mockInitializeProgressAuthority.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'owner';
+    await flushPromises();
+    expect(mockInitializeProgressAuthority).toHaveBeenCalledWith(
+      'owner',
+      false,
+      expect.any(Function)
+    );
+    expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
+    finish();
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('fences a delayed owner activation when the identity changes', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    let finish!: () => void;
+    mockInitializeProgressAuthority.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'a';
+    await flushPromises();
+    const canContinue = mockInitializeProgressAuthority.mock.calls[0]![2] as () => boolean;
+    mockSupabaseUser.id = 'b';
+    await flushPromises();
+    expect(canContinue()).toBe(false);
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    finish();
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    wrapper.unmount();
   });
   it('applies locale override through setLocale on mount', async () => {
     const wrapper = await mountWithComposable();
@@ -249,6 +305,7 @@ describe('useAppInitialization locale setup', () => {
     const wrapper = await mountWithComposable();
     await flushPromises();
     mockResetTarkovStoreForSessionTransition.mockClear();
+    mockInitializeProgressAuthority.mockReset().mockResolvedValue(undefined);
     mockInitializeTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockSupabaseUser.id = 'user-2';
@@ -260,6 +317,53 @@ describe('useAppInitialization locale setup', () => {
     expect(mockActivityLogResetForSession).toHaveBeenCalled();
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+  it.each(['logout', 'account switch'])(
+    'handles a current progress activation failure at the %s auth boundary',
+    async (transition) => {
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      const { logger } = await import('@/utils/logger');
+      const failure = new Error('IndexedDB activation unavailable');
+      mockInitializeTarkovSync.mockClear();
+      mockMigrateDataIfNeeded.mockClear();
+      mockSupporter.subscribe.mockClear();
+      mockResetTarkovStoreForSessionTransition.mockRejectedValueOnce(failure);
+      if (transition === 'logout') {
+        mockSupabaseUser.loggedIn = false;
+        mockSupabaseUser.id = null;
+      } else mockSupabaseUser.id = 'user-2';
+      await flushPromises();
+      expect(logger.error).toHaveBeenCalledWith(
+        '[useAppInitialization] Failed to transition progress owner:',
+        failure
+      );
+      expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
+      expect(mockMigrateDataIfNeeded).not.toHaveBeenCalled();
+      expect(mockSupporter.subscribe).not.toHaveBeenCalled();
+      wrapper.unmount();
+    }
+  );
+  it('does not let a superseded transition failure stop the new owner', async () => {
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    const pending = Promise.withResolvers<undefined>();
+    mockResetTarkovStoreForSessionTransition.mockReturnValueOnce(pending.promise);
+    mockInitializeTarkovSync.mockClear();
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    mockSupabaseUser.id = 'user-3';
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    pending.reject(new Error('former activation failed'));
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    expect(mockSupporter.subscribe).toHaveBeenLastCalledWith('user-3');
     wrapper.unmount();
   });
   it('settles a pending logout handoff before starting the next login', async () => {

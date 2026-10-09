@@ -13,6 +13,10 @@ import {
   safeSetItem,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
+import {
+  readAuthoritativeProgress,
+  removeOwnedProgressRecovery,
+} from '@/stores/tarkov/progressAuthority';
 import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { logger } from '@/utils/logger';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
@@ -73,7 +77,7 @@ const removalMarkerKey = (userId: string): string =>
 /** `undefined` means the browser refused the read, which must not count as absent. */
 const readStorageItem = (key: string): string | null | undefined => {
   try {
-    return localStorage.getItem(key);
+    return key === STORAGE_KEYS.progress ? readAuthoritativeProgress() : localStorage.getItem(key);
   } catch {
     return undefined;
   }
@@ -182,6 +186,61 @@ const updateRemovalWriteBarrier = (userId: string, activeReleased: boolean): voi
     setActiveProgressWritesBlocked(true);
   }
 };
+// Remove the observable legacy projection before the purge announces its commit.
+// Later cached observations/new legacy writes still follow the mixed-client recovery policy.
+const canStartNativeRemoval = (userId: string, canContinue: () => boolean): boolean =>
+  canContinue() && removeOwnedLegacyProgress(userId);
+const removeNativeRecoveryCopies = async (
+  userId: string,
+  activeRemoval: RemovalResult,
+  canContinue: () => boolean
+): Promise<RemovalResult> => {
+  try {
+    if (!canStartNativeRemoval(userId, canContinue)) return { complete: false, released: false };
+    const removed = await removeOwnedProgressRecovery(userId, canContinue);
+    if (!canContinue()) return { complete: false, released: false };
+    return combineNativeRemoval(userId, removed, activeRemoval);
+  } catch {
+    return { complete: false, released: false };
+  }
+};
+const combineNativeRemoval = (
+  userId: string,
+  removed: RemovalResult,
+  activeRemoval: RemovalResult
+): RemovalResult => ({
+  complete: removed.complete && activeRemoval.complete,
+  released: removed.released && activeRemoval.released,
+});
+/** Legacy projections remain untouched except during explicit owner removal. */
+const removeOwnedLegacyProgress = (userId: string): boolean => {
+  try {
+    for (const key of [STORAGE_KEYS.progress, 'progress']) {
+      if (!removeOwnedLegacyKey(key, userId)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+const removeOwnedLegacyKey = (key: string, userId: string): boolean => {
+  const raw = localStorage.getItem(key);
+  if (parseUserScopedStorage(raw ?? '')?._userId !== userId) return true;
+  localStorage.removeItem(key);
+  return localStorage.getItem(key) === null;
+};
+const removeOwnedStorageKeys = async (
+  keys: string[],
+  userId: string,
+  canContinue: () => boolean
+): Promise<boolean> => {
+  let removed = true;
+  for (const key of keys) {
+    removed = (await removeIfOwned(key, userId)).complete && removed;
+    if (!canContinue()) return false;
+  }
+  return removed;
+};
 /** Removes every locally stored copy owned by `userId`; other accounts are untouched. */
 export const removeAccountDeviceData = async (userId: string): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
@@ -195,23 +254,23 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
   // A canceled active-slot operation is not a storage failure. A later sign-in or
   // removal request must keep its copies and must not inherit this attempt's barrier.
   if (!isCurrent()) return false;
-  let removed = activeRemoval.complete;
+  const nativeRemoval = await removeNativeRecoveryCopies(userId, activeRemoval, isCurrent);
+  let removed = nativeRemoval.complete;
+  if (!isCurrent()) return false;
   // An earlier queued replacement can retain the owner's active bytes while removal waits.
   removed = removeAccountRecoveryCopy(userId) && removed;
   removed = removeSupersededProgressCopies(userId) && removed;
-  for (const key of OWNER_SCOPED_KEYS) {
-    removed = (await removeIfOwned(key, userId)).complete && removed;
-    if (!isCurrent()) return false;
-  }
+  removed = (await removeOwnedStorageKeys(OWNER_SCOPED_KEYS, userId, isCurrent)) && removed;
+  if (!isCurrent()) return false;
   // The active-slot lock and owner cleanup can allow another tab to create a backup.
   const keys = listStorageKeys();
   removed = keys !== null && removed;
-  for (const key of (keys ?? []).filter(isRecognizedBackupKey)) {
-    removed = (await removeIfOwned(key, userId)).complete && removed;
-    if (!isCurrent()) return false;
-  }
+  removed =
+    (await removeOwnedStorageKeys((keys ?? []).filter(isRecognizedBackupKey), userId, isCurrent)) &&
+    removed;
+  if (!isCurrent()) return false;
   removed = !quarantineRemainsForOwner(userId) && removed;
-  updateRemovalWriteBarrier(userId, activeRemoval.released);
+  updateRemovalWriteBarrier(userId, nativeRemoval.released);
   return removed;
 };
 /**

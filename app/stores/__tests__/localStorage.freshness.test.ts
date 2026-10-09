@@ -420,3 +420,7 @@ describe('local mode freshness', () => {
     expect(parsed?._modeTimestamps).toEqual({ pvp: 20 });
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

@@ -18,6 +18,7 @@ import {
   flushActiveProgressWrites,
   invalidateActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
+import * as progressAuthority from '@/stores/tarkov/progressAuthority';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 const auth = vi.hoisted(() => ({ owner: null as string | null }));
 vi.mock('@/utils/userScopedStorage', async (importOriginal) => ({
@@ -42,6 +43,38 @@ describe('device data removal', () => {
     clearDeviceDataRemoval();
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
+  });
+  it.each(['throw', 'silent'] as const)(
+    'does not purge native recovery when owned legacy deletion fails: %s',
+    async (failure) => {
+      const raw = owned('user-1');
+      localStorage.setItem('progress', raw);
+      const removeItem = localStorage.removeItem.bind(localStorage);
+      vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
+        if (key !== 'progress') return removeItem(key);
+        if (failure === 'throw') throw new DOMException('blocked', 'SecurityError');
+      });
+      const purge = vi.spyOn(progressAuthority, 'removeOwnedProgressRecovery');
+      expect(await removeAccountDeviceData('user-1')).toBe(false);
+      expect(purge).not.toHaveBeenCalled();
+      expect(localStorage.getItem('progress')).toBe(raw);
+    }
+  );
+  it('keeps writes blocked when native active bytes remain despite an empty cached slot', async () => {
+    const purge = vi
+      .spyOn(progressAuthority, 'removeOwnedProgressRecovery')
+      .mockResolvedValue({ complete: false, released: false });
+    expect(await removeAccountDeviceData('user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    purge.mockRestore();
+  });
+  it('allows guest writes when only isolated native recovery copies remain', async () => {
+    const purge = vi
+      .spyOn(progressAuthority, 'removeOwnedProgressRecovery')
+      .mockResolvedValue({ complete: false, released: true });
+    expect(await removeAccountDeviceData('user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    purge.mockRestore();
   });
   it.each([
     ['user-1', true],
@@ -681,4 +714,8 @@ describe('device data removal', () => {
     clearDeviceDataRemoval();
     expect(isDeviceDataRemovalPending('user-1')).toBe(false);
   });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

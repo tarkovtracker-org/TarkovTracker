@@ -1,3 +1,4 @@
+import { useI18n } from 'vue-i18n';
 import { useAnalyticsConsent, type AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
 import {
   migrateToGameModeStructure,
@@ -5,6 +6,15 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
+import {
+  readCommittedProgressAuthority,
+  ownedLegacyUpdates,
+  isOwnedProgressRecovery,
+  legacyProgressRecoveryCount,
+  discardExportedLegacyProgress,
+  exportableLegacyUpdates,
+  legacyProgressRecoveryOverflow,
+} from '@/stores/tarkov/progressAuthority';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   getPersistedPreferencesState,
@@ -21,6 +31,10 @@ import { sanitizeOwnedProgressData, sanitizeOwnedUserState } from '@/utils/progr
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 const BACKUP_FORMAT = 'tarkovtracker-backup' as const;
+const MAX_BACKUP_SIZE = 5 * 1024 * 1024;
+// Current, original, captured recovery and one pending copy: 20 Mi characters
+// may expand to 120 MiB in JSON escaping, with room for archive metadata.
+const MAX_RECOVERY_ARCHIVE_SIZE = 128 * 1024 * 1024;
 const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
 const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
@@ -123,9 +137,20 @@ export type BackupImportTargetModes = {
   pve: boolean;
   seasonal?: boolean;
 };
+export type RecoveryArchiveEntry = { kind: 'current' | 'original' | 'older'; index: number };
+type RawRecoveryArchiveEntry = RecoveryArchiveEntry & { raw: string };
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
   exportSupersededProgress: () => Promise<void>;
+  exportDeviceProgressRecovery: () => Promise<void>;
+  confirmRecoveryArchiveSaved: () => Promise<void>;
+  recoveryExportPending: Ref<boolean>;
+  recoveryArchiveEntries: Ref<RecoveryArchiveEntry[]>;
+  selectedRecoveryArchiveEntry: Ref<number | null>;
+  reviewRecoveryArchiveEntry: (index: number) => void;
+  legacyProgressRecoveryCount: Ref<number>;
+  legacyProgressRecoveryOverflow: Ref<boolean>;
+  reviewOlderTabProgress: (index: number) => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
   debugExportError: Ref<string | null>;
@@ -343,6 +368,108 @@ function validateBackup(json: unknown):
       seasonal,
     },
   };
+}
+function selectOlderTabRaw(copies: string[], index: number): string {
+  if (!Number.isInteger(index) || index < 0 || index >= copies.length) {
+    throw new Error('Older edit is unavailable');
+  }
+  return copies[index]!;
+}
+function parseOlderTabRaw(raw: string): unknown {
+  if (raw.length > 5 * 1024 * 1024) throw new Error('Older edit is too large');
+  return parseUserScopedStorage(raw)?.data ?? JSON.parse(raw);
+}
+const olderTabMetadataKeys = [
+  'currentGameMode',
+  'gameEdition',
+  'tarkovUid',
+  'seasonalSeasonNumber',
+] as const;
+function normalizeOlderTabSource(source: Record<string, unknown>): Record<string, unknown> {
+  if ('pvp' in source || 'pve' in source) return source;
+  const progress = sanitizeProgressData(source);
+  if (!progress.ok) throw new Error(progress.error);
+  const migrated = migrateToGameModeStructure(source);
+  const metadata = Object.fromEntries(
+    olderTabMetadataKeys.filter((key) => key in source).map((key) => [key, source[key]])
+  );
+  return { ...migrated, ...metadata };
+}
+function buildOlderTabBackup(raw: string): TarkovTrackerExport {
+  const source: unknown = parseOlderTabRaw(raw);
+  if (!isPlainObject(source)) throw new Error('Invalid older edit');
+  const candidate = {
+    ...normalizeOlderTabSource(source),
+    _format: BACKUP_FORMAT,
+    _version: 2,
+    exportedAt: Date.now(),
+    appVersion: 'older-tab',
+    seasonNumber: source.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
+  };
+  const checked = validateBackup(candidate);
+  if (!checked.ok) throw new Error(checked.error);
+  const migrated = sanitizeOwnedUserState(migrateToGameModeStructure(source));
+  return { ...checked.data.export, ...migrated };
+}
+type RecoveryArchiveResult =
+  | { ok: true; value: unknown; entries?: RawRecoveryArchiveEntry[] }
+  | { ok: false; error: 'empty_device_archive' | 'invalid_device_archive' };
+function parseRecoveryProgress(raw: string): RecoveryArchiveResult {
+  try {
+    return { ok: true, value: buildOlderTabBackup(raw) };
+  } catch {
+    return { ok: false, error: 'invalid_device_archive' };
+  }
+}
+const invalidArchiveSlot = (raw: unknown): boolean =>
+  raw !== undefined && raw !== null && typeof raw !== 'string';
+function collectRecoveryArchiveEntries(
+  json: Record<string, unknown>,
+  owner: string | null
+): RecoveryArchiveResult {
+  const older = json.older_tab_edits ?? [];
+  if (!Array.isArray(older)) return { ok: false, error: 'invalid_device_archive' };
+  const candidates = [
+    { kind: 'current' as const, index: 0, raw: json.current },
+    { kind: 'original' as const, index: 0, raw: json.original },
+    ...older.map((raw: unknown, index: number) => ({ kind: 'older' as const, index, raw })),
+  ];
+  if (candidates.some(({ raw }) => invalidArchiveSlot(raw)))
+    return { ok: false, error: 'invalid_device_archive' };
+  const entries = candidates.filter(
+    (entry): entry is RawRecoveryArchiveEntry =>
+      typeof entry.raw === 'string' && isOwnedProgressRecovery(entry.raw, owner)
+  );
+  return resolveCollectedArchiveEntries(
+    entries,
+    candidates.some(({ raw }) => typeof raw === 'string')
+  );
+}
+function resolveCollectedArchiveEntries(
+  entries: RawRecoveryArchiveEntry[],
+  hasRaw: boolean
+): RecoveryArchiveResult {
+  if (entries.length === 0)
+    return { ok: false, error: hasRaw ? 'invalid_device_archive' : 'empty_device_archive' };
+  return { ok: true, value: null, entries };
+}
+function isDeviceRecoveryArchiveV1(json: unknown): boolean {
+  return (
+    isPlainObject(json) && json._format === 'tarkovtracker-device-progress' && json._version === 1
+  );
+}
+function resolveRecoveryArchive(json: unknown, owner: string | null): RecoveryArchiveResult {
+  if (!isPlainObject(json) || json._format !== 'tarkovtracker-device-progress')
+    return { ok: true, value: json };
+  if (json._version !== 1) return { ok: false, error: 'invalid_device_archive' };
+  return collectRecoveryArchiveEntries(json, owner);
+}
+function defaultArchiveEntryIndex(entries: RawRecoveryArchiveEntry[]): number {
+  const preferred =
+    entries.find((entry) => entry.kind === 'current') ??
+    entries.filter((entry) => entry.kind === 'older').at(-1) ??
+    entries[0]!;
+  return entries.indexOf(preferred);
 }
 function buildPreview(
   exportData: TarkovTrackerExport,
@@ -690,11 +817,16 @@ async function buildPreferencesStorageSnapshot(
     };
   }
 }
-async function downloadJsonFile(filenamePrefix: string, payload: unknown): Promise<void> {
+async function downloadJsonFile(
+  filenamePrefix: string,
+  payload: unknown,
+  sizeLimit?: { bytes: number; error: string }
+): Promise<void> {
   let url: string | null = null;
   try {
     const json = JSON.stringify(payload, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
+    if (sizeLimit && blob.size > sizeLimit.bytes) throw new Error(sizeLimit.error);
     url = URL.createObjectURL(blob);
     const date = new Date().toISOString().split('T')[0];
     const anchor = document.createElement('a');
@@ -714,16 +846,22 @@ export function useDataBackup(): UseDataBackupReturn {
   const preferencesStore = usePreferencesStore();
   const analyticsConsent = useAnalyticsConsent();
   const { $supabase } = useNuxtApp();
+  const { t } = useI18n();
   const exportError = ref<string | null>(null);
   const debugExportError = ref<string | null>(null);
   const importState = ref<BackupImportState>('idle');
   const importPreview = ref<BackupPreviewData | null>(null);
   const importError = ref<string | null>(null);
+  const recoveryExportPending = ref(false);
+  let recoveryExportReceipt: { owner: string | null; copies: string[] } | null = null;
+  const recoveryArchiveEntries = ref<RecoveryArchiveEntry[]>([]);
+  const selectedRecoveryArchiveEntry = ref<number | null>(null);
+  let rawArchiveEntries: RawRecoveryArchiveEntry[] = [];
   let parsedPvp: UserProgressData | null = null;
   let parsedPve: UserProgressData | null = null;
   let parsedSeasonal: UserProgressData | null = null;
   let parsedExport: TarkovTrackerExport | null = null;
-  function resetImport(): void {
+  function clearParsedImport(): void {
     importState.value = 'idle';
     importPreview.value = null;
     importError.value = null;
@@ -731,6 +869,68 @@ export function useDataBackup(): UseDataBackupReturn {
     parsedPve = null;
     parsedSeasonal = null;
     parsedExport = null;
+  }
+  function resetImport(): void {
+    clearParsedImport();
+    rawArchiveEntries = [];
+    recoveryArchiveEntries.value = [];
+    selectedRecoveryArchiveEntry.value = null;
+  }
+  function applyBackupPreview(value: unknown): void {
+    const result = validateBackup(value);
+    if (!result.ok) {
+      importState.value = 'error';
+      importError.value = result.error;
+      return;
+    }
+    parsedPvp = result.data.pvp;
+    parsedPve = result.data.pve;
+    parsedSeasonal = result.data.seasonal;
+    parsedExport = result.data.export;
+    importPreview.value = buildPreview(
+      result.data.export,
+      result.data.pvp,
+      result.data.pve,
+      result.data.seasonal
+    );
+    importState.value = 'preview';
+  }
+  function applyResolvedRecovery(resolved: RecoveryArchiveResult): void {
+    if (!resolved.ok) {
+      importState.value = 'error';
+      importError.value = t(`settings.data_management.${resolved.error}`);
+      return;
+    }
+    applyBackupPreview(resolved.value);
+  }
+  function reviewRecoveryArchiveEntry(index: number): void {
+    clearParsedImport();
+    selectedRecoveryArchiveEntry.value = index;
+    try {
+      const raw = selectOlderTabRaw(
+        rawArchiveEntries.map((entry) => entry.raw),
+        index
+      );
+      if (!isOwnedProgressRecovery(raw, $supabase.user.id ?? null))
+        throw new Error('Recovery owner changed');
+      applyResolvedRecovery(parseRecoveryProgress(raw));
+    } catch {
+      applyResolvedRecovery({ ok: false, error: 'invalid_device_archive' });
+    }
+  }
+  function previewParsedBackup(json: unknown): void {
+    const resolved = resolveRecoveryArchive(json, $supabase.user.id ?? null);
+    if (!resolved.ok) {
+      applyResolvedRecovery(resolved);
+      return;
+    }
+    if (!resolved.entries) {
+      applyBackupPreview(resolved.value);
+      return;
+    }
+    rawArchiveEntries = resolved.entries;
+    recoveryArchiveEntries.value = resolved.entries.map(({ kind, index }) => ({ kind, index }));
+    reviewRecoveryArchiveEntry(defaultArchiveEntryIndex(rawArchiveEntries));
   }
   async function exportProgress(): Promise<void> {
     exportError.value = null;
@@ -766,6 +966,51 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  async function reviewOlderTabProgress(index: number): Promise<void> {
+    resetImport();
+    try {
+      const record = await readCommittedProgressAuthority();
+      const copies = ownedLegacyUpdates(record, $supabase.user.id ?? null);
+      const backup = buildOlderTabBackup(selectOlderTabRaw(copies, index));
+      await parseBackupFile(new File([JSON.stringify(backup)], 'older-tab.json'));
+    } catch (error) {
+      importState.value = 'error';
+      importError.value = error instanceof Error ? error.message : 'Failed to read older edit';
+    }
+  }
+  async function exportDeviceProgressRecovery(): Promise<void> {
+    recoveryExportReceipt = null;
+    recoveryExportPending.value = false;
+    const owner = $supabase.user.id ?? null;
+    const record = await readCommittedProgressAuthority(false);
+    const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
+    const copies = [...exportableLegacyUpdates(record, owner)];
+    await downloadJsonFile(
+      'tarkovtracker-device-progress',
+      {
+        _format: 'tarkovtracker-device-progress',
+        _version: 1,
+        exportedAt: Date.now(),
+        current: belongsToOwner(record.raw) ? record.raw : null,
+        original: belongsToOwner(record.legacyRaw) ? record.legacyRaw : null,
+        older_tab_edits: copies,
+      },
+      {
+        bytes: MAX_RECOVERY_ARCHIVE_SIZE,
+        error: t('settings.data_management.recovery_archive_too_large'),
+      }
+    );
+    recoveryExportReceipt = { owner, copies: [...copies] };
+    recoveryExportPending.value = true;
+  }
+  async function confirmRecoveryArchiveSaved(): Promise<void> {
+    const receipt = recoveryExportReceipt;
+    if (!receipt) throw new Error('Download a recovery archive before clearing copies');
+    if (receipt.owner !== ($supabase.user.id ?? null)) throw new Error('Recovery owner changed');
+    await discardExportedLegacyProgress(receipt.owner, receipt.copies);
+    recoveryExportReceipt = null;
+    recoveryExportPending.value = false;
+  }
   async function exportSupersededProgress(): Promise<void> {
     const ownerId = $supabase.user.id;
     if (!ownerId) throw new Error('Sign in to export superseded progress');
@@ -786,9 +1031,12 @@ export function useDataBackup(): UseDataBackupReturn {
       const currentPreferences = await sanitizePreferencesForDebug(
         getPersistedPreferencesState(preferencesStore.$state)
       );
-      const rawProgressStorage =
-        localStorage.getItem(STORAGE_KEYS.progress) ??
-        localStorage.getItem(LEGACY_STORAGE_KEYS.progress);
+      const rawProgressStorage = await readCommittedProgressAuthority(false)
+        .then((record) => record.raw)
+        .catch((error) => {
+          logger.warn('[DataBackup] Progress authority unavailable for debug export:', error);
+          return null;
+        });
       const rawPreferencesStorage =
         localStorage.getItem(STORAGE_KEYS.preferences) ??
         localStorage.getItem(LEGACY_STORAGE_KEYS.preferences);
@@ -841,11 +1089,10 @@ export function useDataBackup(): UseDataBackupReturn {
     }
   }
   async function parseBackupFile(file: File): Promise<void> {
-    importError.value = null;
-    const MAX_BACKUP_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_BACKUP_SIZE) {
+    resetImport();
+    if (file.size > MAX_RECOVERY_ARCHIVE_SIZE) {
       importState.value = 'error';
-      importError.value = 'Backup file is too large (max 5 MB)';
+      importError.value = t('settings.data_management.recovery_archive_too_large');
       return;
     }
     try {
@@ -858,23 +1105,12 @@ export function useDataBackup(): UseDataBackupReturn {
         importError.value = 'Failed to parse JSON — file may be corrupted';
         return;
       }
-      const result = validateBackup(json);
-      if (!result.ok) {
+      if (file.size > MAX_BACKUP_SIZE && !isDeviceRecoveryArchiveV1(json)) {
         importState.value = 'error';
-        importError.value = result.error;
+        importError.value = 'Backup file is too large (max 5 MB)';
         return;
       }
-      parsedPvp = result.data.pvp;
-      parsedPve = result.data.pve;
-      parsedSeasonal = result.data.seasonal;
-      parsedExport = result.data.export;
-      importPreview.value = buildPreview(
-        result.data.export,
-        result.data.pvp,
-        result.data.pve,
-        result.data.seasonal
-      );
-      importState.value = 'preview';
+      previewParsedBackup(json);
     } catch (e) {
       importState.value = 'error';
       importError.value = 'Failed to read backup file';
@@ -935,6 +1171,15 @@ export function useDataBackup(): UseDataBackupReturn {
   return {
     exportProgress,
     exportSupersededProgress,
+    exportDeviceProgressRecovery,
+    confirmRecoveryArchiveSaved,
+    recoveryExportPending,
+    recoveryArchiveEntries,
+    selectedRecoveryArchiveEntry,
+    reviewRecoveryArchiveEntry,
+    reviewOlderTabProgress,
+    legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow,
     exportError,
     exportDebugSnapshot,
     debugExportError,

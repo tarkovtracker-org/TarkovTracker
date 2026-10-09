@@ -59,6 +59,10 @@ import {
   type PrestigeRunRecord,
   type UserPrestigeRunRow,
 } from '@/stores/tarkov/prestige';
+import {
+  initializeProgressAuthority,
+  isProgressAuthorityReady,
+} from '@/stores/tarkov/progressAuthority';
 import { getNextProgressEpoch, hasProgress } from '@/stores/tarkov/progressMerge';
 import {
   countStoryIdChanges,
@@ -683,6 +687,17 @@ const startProgressHandoff = (writes: ReturnType<typeof getPendingProgressWrites
   );
 const isCurrentSessionTransition = (revision: number, userId: string | null): boolean =>
   revision === sessionTransitionRevision && userId === getCurrentSupabaseUserId();
+const activateSessionProgressAuthority = async (revision: number, userId: string | null) => {
+  try {
+    await initializeProgressAuthority(userId, false, () =>
+      isCurrentSessionTransition(revision, userId)
+    );
+  } catch (error) {
+    // A failed former session must not block the replacement owner's writes.
+    if (isCurrentSessionTransition(revision, userId)) setActiveProgressWritesBlocked(true);
+    throw error;
+  }
+};
 const isMatchingGuestProgress = (
   guest: PersistedProgressSnapshot | null,
   state: UserState
@@ -732,6 +747,8 @@ export async function resetTarkovStoreForSessionTransition(
     if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
       return;
   }
+  await activateSessionProgressAuthority(revision, currentUserId);
+  if (!isCurrentSessionTransition(revision, currentUserId)) return;
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
     return;
@@ -747,6 +764,9 @@ export async function resetTarkovStoreForSessionTransition(
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
+  if (!isProgressAuthorityReady()) {
+    throw new DOMException('Progress authority is unavailable', 'InvalidStateError');
+  }
   if (progressSync.isActiveFor(userId)) {
     logger.debug('[TarkovStore] Supabase sync already initialized, skipping');
     return false;

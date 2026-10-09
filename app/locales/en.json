@@ -2068,7 +2068,22 @@
       "prestige_history_duration": "Run Duration",
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
-      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}"
+      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
+      "empty_device_archive": "This recovery archive has no current saved progress to preview. Its recovery copies remain in the exported file.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "older_tab_recovery_full": "Recovery storage is full. Export recovery copies for this account, then clear the exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
+      "export_device_recovery": "Export saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} Prestige Complete",

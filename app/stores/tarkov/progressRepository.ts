@@ -394,24 +394,56 @@ const nextSnapshot = (
     legacyRaw: input.kind === 'import' ? input.legacyRaw : current.legacyRaw,
   };
 };
+const DATABASE_OPEN_TIMEOUT_MS = 5000;
+type DatabaseOpenSettlement = { settled: boolean; timer: ReturnType<typeof setTimeout> };
+const rejectDatabaseOpen = (
+  state: DatabaseOpenSettlement,
+  reject: (error: unknown) => void,
+  error: unknown
+): void => {
+  if (state.settled) return;
+  state.settled = true;
+  clearTimeout(state.timer);
+  reject(error);
+};
+const finishDatabaseOpen = (
+  request: IDBOpenDBRequest,
+  state: DatabaseOpenSettlement,
+  resolve: (db: IDBDatabase) => void
+): void => {
+  if (state.settled) {
+    request.result.close();
+    return;
+  }
+  state.settled = true;
+  clearTimeout(state.timer);
+  request.result.onversionchange = () => request.result.close();
+  resolve(request.result);
+};
 const openDatabase = (factory: IDBFactory, name: string): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
     const request = factory.open(name, 1);
-    let blocked = false;
+    const state: DatabaseOpenSettlement = {
+      settled: false,
+      timer: setTimeout(
+        () =>
+          rejectDatabaseOpen(
+            state,
+            reject,
+            new DOMException('Progress database open timed out', 'TimeoutError')
+          ),
+        DATABASE_OPEN_TIMEOUT_MS
+      ),
+    };
     request.onupgradeneeded = () => request.result.createObjectStore(storeName);
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => {
-      blocked = true;
-      reject(new DOMException('Progress database upgrade blocked', 'InvalidStateError'));
-    };
-    request.onsuccess = () => {
-      if (blocked) {
-        request.result.close();
-        return;
-      }
-      request.result.onversionchange = () => request.result.close();
-      resolve(request.result);
-    };
+    request.onerror = () => rejectDatabaseOpen(state, reject, request.error);
+    request.onblocked = () =>
+      rejectDatabaseOpen(
+        state,
+        reject,
+        new DOMException('Progress database upgrade blocked', 'InvalidStateError')
+      );
+    request.onsuccess = () => finishDatabaseOpen(request, state, resolve);
   });
 /** No async callback is accepted: every read/check/write stays in native IDB request callbacks. */
 const transaction = <T>(
@@ -559,4 +591,195 @@ export const openProgressRepository = async (factory: IDBFactory, name: string) 
     });
   };
   return { activateOwner, read, commit, remove, close: () => db.close() };
+};
+/** Exact runtime envelope, including ownership, mode clocks and opaque recovery bytes. */
+export type ActiveProgressRecord = {
+  version: 1;
+  revision: number;
+  raw: string | null;
+  legacyRaw: string | null;
+  legacyUpdates?: Array<string | null>;
+  lastLegacyRaw?: string | null;
+  legacyRecoveryOverflow?: boolean;
+};
+const activeKey = 'active-envelope';
+const initialActiveRecord = (legacyRaw: string | null): ActiveProgressRecord => {
+  requireNullableText(legacyRaw, 'owner');
+  return { version: 1, revision: 0, raw: legacyRaw, legacyRaw };
+};
+const decodeActiveRecord = (entry: RecordEntry, legacyRaw: string | null): ActiveProgressRecord => {
+  if (!entry.exists) return initialActiveRecord(legacyRaw);
+  const value = requireRecord(entry.value, 'owner');
+  requireVersion(value, 'owner');
+  requireCounter(value.revision, 'owner');
+  requireNullableText(value.raw, 'owner');
+  requireNullableText(value.legacyRaw, 'owner');
+  if (value.lastLegacyRaw !== undefined) requireNullableText(value.lastLegacyRaw, 'owner');
+  validateLegacyOverflow(value.legacyRecoveryOverflow);
+  validateLegacyUpdates(value.legacyUpdates);
+  return value as ActiveProgressRecord;
+};
+const validateLegacyOverflow = (value: unknown): void => {
+  if (value !== undefined && typeof value !== 'boolean') {
+    throw new TypeError('Invalid legacy recovery overflow');
+  }
+};
+const MAX_LEGACY_SNAPSHOTS = 20;
+const MAX_LEGACY_CHARACTERS = 5 * 1024 * 1024;
+const exceedsLegacyRecoveryLimits = (updates: Array<string | null>, raw: string): boolean =>
+  updates.length >= MAX_LEGACY_SNAPSHOTS ||
+  updates.reduce((total, copy) => total + (copy?.length ?? 0), raw.length) > MAX_LEGACY_CHARACTERS;
+const appendLegacySnapshot = (current: ActiveProgressRecord, raw: string): ActiveProgressRecord => {
+  const updates = current.legacyUpdates ?? [];
+  if (exceedsLegacyRecoveryLimits(updates, raw)) {
+    return current.legacyRecoveryOverflow ? current : { ...current, legacyRecoveryOverflow: true };
+  }
+  return { ...current, lastLegacyRaw: raw, legacyUpdates: [...updates, raw] };
+};
+const validateLegacyUpdates = (values: unknown): void => {
+  if (values === undefined) return;
+  if (!Array.isArray(values)) throw new TypeError('Invalid legacy progress recovery');
+  values.forEach((value) => requireNullableText(value, 'owner'));
+};
+const isKnownLegacySnapshot = (current: ActiveProgressRecord, raw: string | null): boolean =>
+  raw === current.legacyRaw || (current.legacyUpdates ?? []).includes(raw);
+const observeLegacyRecord = (
+  current: ActiveProgressRecord,
+  source: string | null | (() => string | null)
+): ActiveProgressRecord => {
+  try {
+    return captureLegacyRecord(current, resolveLegacyRaw(source));
+  } catch {
+    return current;
+  }
+};
+const captureLegacyRecord = (
+  current: ActiveProgressRecord,
+  raw: string | null
+): ActiveProgressRecord => {
+  const last = current.lastLegacyRaw === undefined ? current.legacyRaw : current.lastLegacyRaw;
+  if (raw === last) return current;
+  return captureChangedLegacyRecord(current, raw);
+};
+const captureChangedLegacyRecord = (
+  current: ActiveProgressRecord,
+  raw: string | null
+): ActiveProgressRecord => {
+  if (isKnownLegacySnapshot(current, raw)) return { ...current, lastLegacyRaw: raw };
+  if (raw === null) return { ...current, lastLegacyRaw: raw };
+  return appendLegacySnapshot(current, raw);
+};
+const resolveLegacyRaw = (source: string | null | (() => string | null)): string | null =>
+  typeof source === 'function' ? source() : source;
+const withActiveRecord = <T>(
+  store: IDBObjectStore,
+  token: ProgressOwnerToken,
+  legacyRaw: string | null | (() => string | null),
+  finish: (value: T) => void,
+  fail: (error: unknown) => void,
+  operation: (current: ActiveProgressRecord, exists: boolean) => T,
+  initialized = false
+): void => {
+  readEntry(
+    store,
+    sessionKey,
+    (session) => {
+      assertSession(decodeSession(session), token);
+      readEntry(
+        store,
+        activeKey,
+        (entry) => {
+          if (initialized && !entry.exists) throw new ProgressRepositoryConflict('import');
+          finish(
+            operation(
+              decodeActiveRecord(entry, entry.exists ? null : resolveLegacyRaw(legacyRaw)),
+              entry.exists
+            )
+          );
+        },
+        fail
+      );
+    },
+    fail
+  );
+};
+/** Runtime bytes are opaque here: application retention/quarantine decides how to interpret them. */
+export const openActiveProgressRepository = async (factory: IDBFactory, name: string) => {
+  const db = await openDatabase(factory, name);
+  const activateOwner = (
+    owner: Owner,
+    renew = false,
+    canContinue = () => true
+  ): Promise<ProgressOwnerToken> => {
+    if (!isOwnerArgument(owner)) return Promise.reject(new TypeError('Invalid progress owner'));
+    return transaction(db, 'readwrite', (store, finish, fail) => {
+      readEntry(
+        store,
+        sessionKey,
+        (entry) => {
+          if (!canContinue()) throw new ProgressRepositoryConflict('session');
+          const token = nextOwnerToken(decodeSession(entry), owner, renew);
+          requireCounter(token.generation, 'session');
+          store.put({ version: 1, ...token }, sessionKey);
+          finish(token);
+        },
+        fail
+      );
+    });
+  };
+  const read = (
+    request: ProgressOwnerToken,
+    legacyRaw: string | null | (() => string | null)
+  ): Promise<ActiveProgressRecord> => {
+    const token = structuredClone(request);
+    return transaction(db, 'readwrite', (store, finish, fail) => {
+      withActiveRecord(store, token, legacyRaw, finish, fail, (current, exists) => {
+        const observed =
+          typeof legacyRaw === 'function' ? observeLegacyRecord(current, legacyRaw) : current;
+        if (!exists || observed !== current) store.put(observed, activeKey);
+        return observed;
+      });
+    });
+  };
+  const mutate = <T>(
+    request: ProgressOwnerToken,
+    operation: (current: ActiveProgressRecord) => {
+      raw: string | null;
+      result: T;
+      recovery?: Pick<
+        ActiveProgressRecord,
+        'legacyRaw' | 'legacyUpdates' | 'lastLegacyRaw' | 'legacyRecoveryOverflow'
+      >;
+    }
+  ): Promise<{ committed: ActiveProgressRecord; result: T }> => {
+    const token = structuredClone(request);
+    return transaction(db, 'readwrite', (store, finish, fail) => {
+      withActiveRecord(
+        store,
+        token,
+        null,
+        finish,
+        fail,
+        (current) => {
+          const next = operation(structuredClone(current));
+          const committed = decodeActiveRecord(
+            {
+              exists: true,
+              value: {
+                ...current,
+                ...next.recovery,
+                revision: incrementRevision(current.revision),
+                raw: next.raw,
+              },
+            },
+            null
+          );
+          store.put(committed, activeKey);
+          return { committed, result: next.result };
+        },
+        true
+      );
+    });
+  };
+  return { activateOwner, read, mutate, close: () => db.close() };
 };

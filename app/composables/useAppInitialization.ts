@@ -1,5 +1,6 @@
 import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
+import { initializeProgressAuthority } from '@/stores/tarkov/progressAuthority';
 import {
   hasPendingCloudChanges,
   markCloudSyncUnavailable,
@@ -165,9 +166,15 @@ export function useAppInitialization() {
   };
   onScopeDispose(cancelSyncRetry);
   const resetTarkovState = async (reason: string, previousUserId: string | null = null) => {
-    const transition = resetTarkovStoreForSessionTransition(previousUserId, reason);
-    activityLogStore.resetForSession();
-    await transition;
+    try {
+      const transition = resetTarkovStoreForSessionTransition(previousUserId, reason);
+      activityLogStore.resetForSession();
+      await transition;
+      return true;
+    } catch (error) {
+      logger.error('[useAppInitialization] Failed to transition progress owner:', error);
+      return false;
+    }
   };
   const resetInitializationState = (loggedIn: boolean) => {
     syncStarted = false;
@@ -264,6 +271,12 @@ export function useAppInitialization() {
     if (!authenticatedUserId || syncStarted) return;
     syncStarted = true;
     try {
+      await initializeProgressAuthority(
+        authenticatedUserId,
+        false,
+        () => !isStaleInitialization(expectedUserId, expectedToken)
+      );
+      if (isStaleInitialization(expectedUserId, expectedToken)) return;
       await initializeTarkovSync();
       // The replacement session owns syncStarted; stale completions must not clear it.
       if (isStaleInitialization(expectedUserId, expectedToken)) return;
@@ -333,7 +346,7 @@ export function useAppInitialization() {
       }
       if (didSwitchUser(prevUserId, userId)) {
         resetInitializationState(loggedIn);
-        await resetTarkovState('user switched', prevUserId);
+        if (!(await resetTarkovState('user switched', prevUserId))) return;
         if (token !== authChangeToken) return;
       } else if (hasPendingProgressHandoff()) {
         await settlePendingProgressHandoffs();
