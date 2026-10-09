@@ -139,7 +139,7 @@ describe('useAppInitialization locale setup', () => {
     mockInitializeTarkovSync.mockResolvedValue(undefined);
     mockHasPendingProgressHandoff.mockReset().mockReturnValue(false);
     mockSettlePendingProgressHandoffs.mockReset().mockResolvedValue(undefined);
-    mockResetTarkovStoreForSessionTransition.mockClear();
+    mockResetTarkovStoreForSessionTransition.mockReset().mockResolvedValue(undefined);
     mockResetTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockMigrateDataIfNeeded.mockResolvedValue(undefined);
@@ -317,6 +317,53 @@ describe('useAppInitialization locale setup', () => {
     expect(mockActivityLogResetForSession).toHaveBeenCalled();
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+  it.each(['logout', 'account switch'])(
+    'handles a current progress activation failure at the %s auth boundary',
+    async (transition) => {
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      const { logger } = await import('@/utils/logger');
+      const failure = new Error('IndexedDB activation unavailable');
+      mockInitializeTarkovSync.mockClear();
+      mockMigrateDataIfNeeded.mockClear();
+      mockSupporter.subscribe.mockClear();
+      mockResetTarkovStoreForSessionTransition.mockRejectedValueOnce(failure);
+      if (transition === 'logout') {
+        mockSupabaseUser.loggedIn = false;
+        mockSupabaseUser.id = null;
+      } else mockSupabaseUser.id = 'user-2';
+      await flushPromises();
+      expect(logger.error).toHaveBeenCalledWith(
+        '[useAppInitialization] Failed to transition progress owner:',
+        failure
+      );
+      expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
+      expect(mockMigrateDataIfNeeded).not.toHaveBeenCalled();
+      expect(mockSupporter.subscribe).not.toHaveBeenCalled();
+      wrapper.unmount();
+    }
+  );
+  it('does not let a superseded transition failure stop the new owner', async () => {
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    const pending = Promise.withResolvers<undefined>();
+    mockResetTarkovStoreForSessionTransition.mockReturnValueOnce(pending.promise);
+    mockInitializeTarkovSync.mockClear();
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    mockSupabaseUser.id = 'user-3';
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    pending.reject(new Error('former activation failed'));
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    expect(mockSupporter.subscribe).toHaveBeenLastCalledWith('user-3');
     wrapper.unmount();
   });
   it('settles a pending logout handoff before starting the next login', async () => {

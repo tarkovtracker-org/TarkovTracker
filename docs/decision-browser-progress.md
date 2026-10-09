@@ -128,14 +128,11 @@ memory patch against session changes and later edits. Results must not overwrite
 intent or acknowledge a later pending edit. Broadcast and storage events request an IDB reread;
 they never carry authority or act as mandatory visibility waits.
 
-Runtime account saves replay captured field changes onto the latest transactional envelope.
-An unrelated edit's new mode timestamp cannot promote unchanged stale fields. Explicit startup
-or cloud hydration is captured separately with its source clocks. Local edits retained by the
-accepted reconciliation replay separately, so they cannot promote unchanged remote fields.
-Failed account intent remains an ordered prefix for the next edit and is consumed only after
-commit; a queued undo still applies after that prefix. Conditional remote acknowledgements compare
-the expected snapshot inside the transaction. Memory adoption and Saved acknowledgement remain
-deferred until commit completion.
+Runtime account-save intent and commit acknowledgements are owned by
+[`progressAuthority.ts`](../app/stores/tarkov/progressAuthority.ts) and
+[`progressRepository.ts`](../app/stores/tarkov/progressRepository.ts).
+Acceptance requires that unrelated clocks cannot promote stale fields, failed intent remains
+retryable in order, and memory/Saved never acknowledge an aborted write.
 
 The original typed substrate did not own serializer baselines, field-level intent reconstruction, recovery
 archives, cloud acknowledgements, startup UI, or network operations. The runtime integration below
@@ -249,19 +246,13 @@ until those integration gates and the compatibility decision are resolved.
 
 ## #1092 runtime integration contract
 
-The runtime bridge moves the existing active progress envelope into the repository's
-transactional object store, retaining its owner wrapper, mode clocks and reset epochs as exact
-bytes. The existing application merge, retention and quarantine policies continue to operate on
-those bytes. The transaction reads the latest envelope, validates the persisted session generation,
-applies the captured synchronous mutation and commits its replacement. Saved and memory/baseline
-adoption occur only after transaction completion; abort retains the old envelope and pending intent.
-
-Hydration must await an authoritative read before the synchronous Pinia adapter is installed.
-The adapter reads an accepted in-memory cache and queues asynchronous writes. Session transitions
-transfer pending intent before activating the next persisted owner generation. Same-account restarts
-reuse the shared owner generation; actual owner changes advance it. Reset and explicit deletion retain the initialized record even when its payload
-is empty, preventing legacy reimport after reload. Recovery/quota checks may abort an active write;
-they cannot fall back to a localStorage overwrite.
+The runtime bridge preserves the active envelope's owner, clocks and reset epochs. Its
+implementation owners are [`progressRepository.ts`](../app/stores/tarkov/progressRepository.ts)
+(native persistence), [`progressAuthority.ts`](../app/stores/tarkov/progressAuthority.ts)
+(hydration and session fencing), and [`useTarkov.ts`](../app/stores/useTarkov.ts)
+(application reconciliation). Acceptance requires retained pending intent after abort, no Saved
+acknowledgement before durability, and no legacy reimport after reset or deletion. Storage
+failure must not fall back to overwriting localStorage.
 
 The initial legacy bytes stay retained with the new record. Existing localStorage progress keys
 remain untouched after adoption, with no dual writes or replacement projection. Later legacy edits
@@ -282,10 +273,14 @@ cover transaction abort, account generations, blocked storage and corrupt/newer 
 That guest receipt does not cover signed-in behavior or server compatibility retirement. Separate signed-in native-browser acceptance covers A/B/A login and reload, same-owner two-tab edits, a queued stale activation, and an actual delayed cloud save response across an account switch. Server compatibility retirement remains outside this change; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
 import/recovery copies, retaining unattributable bytes and reporting incomplete removal.
 
-Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the completed export are removed. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted. Recovery capture is capped at 20 snapshots and 5 Mi UTF-16 characters; overflow leaves current saved progress and existing copies untouched, and Settings reports it. Export includes the latest uncaptured owned legacy bytes and uses a read without writes, so capture quota failures do not prevent archive export.
+Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the export are removed after the user confirms the file was saved. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted. Recovery capture is capped at 20 snapshots and 5 Mi UTF-16 characters; overflow leaves current saved progress and existing copies untouched, and Settings reports it. Export includes the latest uncaptured owned legacy bytes and uses a read without writes, so capture quota failures do not prevent archive export.
 
 Native database opening has a bounded deadline. A stalled request cannot leave startup waiting indefinitely; a late success closes its connection, and a subsequent activation can open a fresh request. Unavailable progress authority uses the existing bounded cloud-start retry path.
 
 An explicit device deletion removes and verifies owned legacy keys before the native purge announces its commit. If legacy removal fails, native progress remains. This ordering closes the immediate peer-refresh recapture window; IndexedDB and localStorage do not form one transaction, and older tabs may still write later recovery candidates.
 
 Debug export reads progress without capturing legacy writes. If native storage is unavailable, it still exports the remaining sanitized diagnostic data with null progress.
+
+Device archives retain current, original, and older-tab entries for explicit preview selection; importing does not automatically apply any entry. Export and cleanup are separate: the user confirms that the file was saved before only the exported owned copies are cleared. Archive size validation and the stricter ordinary-backup bound are owned by [`useDataBackup.ts`](../app/composables/useDataBackup.ts).
+
+A failed current account transition stops initialization and blocks progress writes. A superseded failure cannot change the replacement session's write state. Auth-boundary handling is owned by [`useAppInitialization.ts`](../app/composables/useAppInitialization.ts) and [`useTarkov.ts`](../app/stores/useTarkov.ts).

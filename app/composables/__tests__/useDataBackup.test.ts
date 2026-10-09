@@ -1598,6 +1598,183 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it('imports an owned exported archive larger than the ordinary backup limit', async () => {
+    const raw =
+      JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state }) +
+      ' '.repeat(3 * 1024 * 1024);
+    const file = new File(
+      [
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: raw,
+          original: raw,
+          older_tab_edits: [],
+        }),
+      ],
+      'recovery.json'
+    );
+    expect(file.size).toBeGreaterThan(5 * 1024 * 1024);
+    const backup = useDataBackup();
+    await backup.parseBackupFile(file);
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.recoveryArchiveEntries.value).toHaveLength(2);
+  });
+  it('rejects oversized archive input before reading any bytes', async () => {
+    const file = { size: 128 * 1024 * 1024 + 1, text: vi.fn() } as unknown as File;
+    const backup = useDataBackup();
+    await backup.parseBackupFile(file);
+    expect(backup.importState.value).toBe('error');
+    expect(file.text).not.toHaveBeenCalled();
+  });
+  it('keeps the ordinary backup size limit when large device archives are supported', async () => {
+    const file = new File(
+      [
+        JSON.stringify({
+          ...tarkovStore.$state,
+          _format: 'tarkovtracker-backup',
+          _version: 1,
+          exportedAt: Date.now(),
+          appVersion: 'test',
+          padding: ' '.repeat(5 * 1024 * 1024),
+        }),
+      ],
+      'backup.json'
+    );
+    const backup = useDataBackup();
+    await backup.parseBackupFile(file);
+    expect(backup.importState.value).toBe('error');
+    expect(backup.importError.value).toBe('Backup file is too large (max 5 MB)');
+  });
+  it('previews every owned archive entry, defaults to the latest older edit without current, and never applies automatically', async () => {
+    const raw = (level: number, owner = 'user-123') =>
+      JSON.stringify({
+        _userId: owner,
+        data: { ...tarkovStore.$state, pvp: { ...tarkovStore.$state.pvp, level } },
+      });
+    const older = [raw(20), raw(25), raw(99, 'foreign')];
+    const backup = useDataBackup();
+    tarkovStore.$patch.mockClear();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: null,
+          original: raw(10),
+          older_tab_edits: older,
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.importPreview.value?.pvp.level).toBe(25);
+    expect(backup.recoveryArchiveEntries.value).toEqual([
+      { kind: 'original', index: 0 },
+      { kind: 'older', index: 0 },
+      { kind: 'older', index: 1 },
+    ]);
+    backup.reviewRecoveryArchiveEntry(0);
+    expect(backup.importPreview.value?.pvp.level).toBe(10);
+    backup.reviewRecoveryArchiveEntry(1);
+    expect(backup.importPreview.value?.pvp.level).toBe(20);
+    expect(tarkovStore.$patch).not.toHaveBeenCalled();
+    expect(older).toHaveLength(3);
+    backup.reviewRecoveryArchiveEntry(99);
+    expect(backup.importState.value).toBe('error');
+    expect(backup.importPreview.value).toBeNull();
+  });
+  it('rejects malformed selected recovery and owner changes without discarding other archive entries', async () => {
+    const good = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    const malformed = JSON.stringify({ _userId: 'user-123', data: { gameEdition: 99 } });
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: good,
+          original: malformed,
+          older_tab_edits: [good],
+        })
+      )
+    );
+    backup.reviewRecoveryArchiveEntry(1);
+    expect(backup.importState.value).toBe('error');
+    expect(backup.recoveryArchiveEntries.value).toHaveLength(3);
+    backup.reviewRecoveryArchiveEntry(2);
+    expect(backup.importState.value).toBe('preview');
+    supabaseUser.id = 'different';
+    try {
+      backup.reviewRecoveryArchiveEntry(0);
+      expect(backup.importState.value).toBe('error');
+    } finally {
+      supabaseUser.id = 'user-123';
+    }
+  });
+  it('rejects an oversized recovery export before download or cleanup confirmation', async () => {
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockResolvedValue({
+      version: 1,
+      revision: 1,
+      raw,
+      legacyRaw: raw,
+    });
+    const blob = vi.spyOn(Blob.prototype, 'size', 'get').mockReturnValue(128 * 1024 * 1024 + 1);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:recovery'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      const backup = useDataBackup();
+      await expect(backup.exportDeviceProgressRecovery()).rejects.toThrow(
+        'recovery_archive_too_large'
+      );
+      expect(click).not.toHaveBeenCalled();
+      expect(backup.recoveryExportPending.value).toBe(false);
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('Download');
+    } finally {
+      read.mockRestore();
+      blob.mockRestore();
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+  it('binds saved-file confirmation to the exported owner and copies rather than newer recovery', async () => {
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    const read = vi
+      .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+      .mockResolvedValue({ version: 1, revision: 1, raw, legacyRaw: raw });
+    const copies = [raw];
+    const owned = vi.spyOn(progressAuthority, 'exportableLegacyUpdates').mockReturnValue(copies);
+    const clear = vi.spyOn(progressAuthority, 'discardExportedLegacyProgress').mockResolvedValue();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:recovery'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      const backup = useDataBackup();
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('Download');
+      await backup.exportDeviceProgressRecovery();
+      expect(clear).not.toHaveBeenCalled();
+      copies.push('newer-copy');
+      supabaseUser.id = 'different';
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('owner changed');
+      expect(clear).not.toHaveBeenCalled();
+      supabaseUser.id = 'user-123';
+      await backup.confirmRecoveryArchiveSaved();
+      expect(clear).toHaveBeenCalledWith('user-123', [raw]);
+      expect(backup.recoveryExportPending.value).toBe(false);
+    } finally {
+      supabaseUser.id = 'user-123';
+      read.mockRestore();
+      owned.mockRestore();
+      clear.mockRestore();
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
   it.each([
     [1, null, 'empty_device_archive'],
     [2, null, 'invalid_device_archive'],
@@ -1624,7 +1801,7 @@ describe('older-tab recovery review', () => {
         JSON.stringify({
           _format: 'tarkovtracker-device-progress',
           _version: 1,
-          current: JSON.stringify(flat),
+          current: JSON.stringify({ _userId: 'user-123', data: flat }),
         })
       )
     );
@@ -1656,7 +1833,7 @@ describe('older-tab recovery review', () => {
     }
   });
   it.each([false, true])(
-    'clears exported copies only after download starts (download failure: %s)',
+    'requires saved-file confirmation after export (download failure: %s)',
     async (fails) => {
       const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
       const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockResolvedValue({
@@ -1679,7 +1856,8 @@ describe('older-tab recovery review', () => {
         revokeObjectURL: vi.fn(),
       });
       try {
-        const exportResult = useDataBackup().exportDeviceProgressRecovery(true);
+        const backup = useDataBackup();
+        const exportResult = backup.exportDeviceProgressRecovery();
         if (fails) {
           await expect(exportResult).rejects.toThrow('download unavailable');
           expect(clear).not.toHaveBeenCalled();
@@ -1688,6 +1866,9 @@ describe('older-tab recovery review', () => {
           expect(read).toHaveBeenCalledWith(false);
           expect(owned).toHaveBeenCalledWith(expect.any(Object), 'user-123');
           expect(click).toHaveBeenCalledOnce();
+          expect(clear).not.toHaveBeenCalled();
+          expect(backup.recoveryExportPending.value).toBe(true);
+          await backup.confirmRecoveryArchiveSaved();
           expect(clear).toHaveBeenCalledWith('user-123', [raw]);
           expect(click.mock.invocationCallOrder[0]).toBeLessThan(
             clear.mock.invocationCallOrder[0]!

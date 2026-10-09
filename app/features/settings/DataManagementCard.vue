@@ -807,9 +807,18 @@
                 :loading="recoveryCleanupRunning"
                 :disabled="recoveryCleanupRunning"
                 data-testid="older-tab-cleanup-confirm"
+                @click="handleRecoveryCleanupDownload"
+              >
+                {{ $t('settings.data_management.export_device_recovery') }}
+              </UButton>
+              <UButton
+                v-if="recoveryExportPending"
+                color="warning"
+                :disabled="recoveryCleanupRunning"
+                data-testid="older-tab-cleanup-saved-confirm"
                 @click="handleRecoveryCleanup"
               >
-                {{ $t('settings.data_management.export_and_clear_older_copies') }}
+                {{ $t('settings.data_management.saved_recovery_archive_confirmation') }}
               </UButton>
               <UButton
                 color="neutral"
@@ -881,6 +890,25 @@
               </div>
             </div>
           </template>
+          <div v-if="recoveryArchiveEntries.length" class="space-y-2">
+            <p class="text-surface-400 text-sm">
+              {{ $t('settings.data_management.recovery_archive_select_entry') }}
+            </p>
+            <UButton
+              v-for="(entry, index) in recoveryArchiveEntries"
+              :key="index"
+              color="neutral"
+              :variant="selectedRecoveryArchiveEntry === index ? 'solid' : 'soft'"
+              :data-testid="`recovery-archive-entry-${index}`"
+              @click="reviewRecoveryArchiveEntry(index)"
+            >
+              {{
+                $t(`settings.data_management.recovery_archive_${entry.kind}`, {
+                  index: entry.index + 1,
+                })
+              }}
+            </UButton>
+          </div>
           <template v-if="backupImportState === 'preview' && backupPreview">
             <div
               class="bg-surface-900/80 divide-surface-700 divide-y rounded-md border border-white/10"
@@ -1128,6 +1156,11 @@
   const {
     exportProgress,
     exportDeviceProgressRecovery,
+    confirmRecoveryArchiveSaved,
+    recoveryExportPending,
+    recoveryArchiveEntries,
+    selectedRecoveryArchiveEntry,
+    reviewRecoveryArchiveEntry,
     reviewOlderTabProgress,
     legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow,
@@ -1165,6 +1198,7 @@
   async function handleExportDeviceRecovery() {
     try {
       await exportDeviceProgressRecovery();
+      confirmRecoveryCleanup.value = true;
     } catch (error) {
       toast.add({
         title: t('settings.data_management.export_error_title'),
@@ -1173,10 +1207,13 @@
       });
     }
   }
+  async function handleRecoveryCleanupDownload() {
+    await handleExportDeviceRecovery();
+  }
   async function handleRecoveryCleanup() {
     recoveryCleanupRunning.value = true;
     try {
-      await exportDeviceProgressRecovery(true);
+      await confirmRecoveryArchiveSaved();
       confirmRecoveryCleanup.value = false;
     } catch (error) {
       toast.add({

@@ -2076,7 +2076,13 @@
       "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
       "export_device_recovery": "Export saved device data and recovery copies",
       "clear_older_copies": "Clear older tab recovery copies",
-      "clear_older_copies_confirmation": "Download a recovery archive, then clear the older tab copies included in it. Your saved progress and original device data will stay available. Keep the downloaded archive if you may need those edits later.",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
       "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {

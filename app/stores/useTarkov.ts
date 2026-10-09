@@ -687,6 +687,17 @@ const startProgressHandoff = (writes: ReturnType<typeof getPendingProgressWrites
   );
 const isCurrentSessionTransition = (revision: number, userId: string | null): boolean =>
   revision === sessionTransitionRevision && userId === getCurrentSupabaseUserId();
+const activateSessionProgressAuthority = async (revision: number, userId: string | null) => {
+  try {
+    await initializeProgressAuthority(userId, false, () =>
+      isCurrentSessionTransition(revision, userId)
+    );
+  } catch (error) {
+    // A failed former session must not block the replacement owner's writes.
+    if (isCurrentSessionTransition(revision, userId)) setActiveProgressWritesBlocked(true);
+    throw error;
+  }
+};
 const isMatchingGuestProgress = (
   guest: PersistedProgressSnapshot | null,
   state: UserState
@@ -736,9 +747,7 @@ export async function resetTarkovStoreForSessionTransition(
     if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
       return;
   }
-  await initializeProgressAuthority(currentUserId, false, () =>
-    isCurrentSessionTransition(revision, currentUserId)
-  );
+  await activateSessionProgressAuthority(revision, currentUserId);
   if (!isCurrentSessionTransition(revision, currentUserId)) return;
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())

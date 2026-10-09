@@ -608,6 +608,60 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('blocks active progress writes after the current owner activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockRejectedValueOnce(new Error('IndexedDB activation unavailable'));
+    try {
+      await expect(switchSession('user-1', null, 'logout')).rejects.toThrow(
+        'IndexedDB activation unavailable'
+      );
+      const before = localStorage.getItem(STORAGE_KEYS.progress);
+      const next = JSON.stringify({
+        _userId: null,
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 42 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(false);
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(before);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
+  it('keeps a replacement owner writable after a superseded activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const pending = Promise.withResolvers<undefined>();
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementationOnce(() => pending.promise);
+    try {
+      const stale = switchSession('user-1', 'user-2');
+      const failed = expect(stale).rejects.toThrow('former activation failed');
+      await vi.waitFor(() => expect(activate).toHaveBeenCalledOnce());
+      await switchSession('user-2', 'user-3');
+      pending.reject(new Error('former activation failed'));
+      await failed;
+      const next = JSON.stringify({
+        _userId: 'user-3',
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 43 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(true);
+      expect(readPersistedEnvelope()._userId).toBe('user-3');
+      expect(readPersistedEnvelope().data?.pvp?.level).toBe(43);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
   it('keeps a same-owner peer writable after a local session reset', async () => {
     const { IDBFactory } = await import('fake-indexeddb');
     const { openActiveProgressRepository } = await import('@/stores/tarkov/progressRepository');

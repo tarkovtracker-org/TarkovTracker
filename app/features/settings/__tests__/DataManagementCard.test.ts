@@ -27,12 +27,19 @@ const {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
     exportProgress: vi.fn(async () => undefined),
-    exportDeviceProgressRecovery: vi.fn(async (_clear?: boolean) => undefined),
+    exportDeviceProgressRecovery: vi.fn(async () => {
+      backupState.recoveryExportPending.value = true;
+    }),
+    confirmRecoveryArchiveSaved: vi.fn(async () => undefined),
+    reviewRecoveryArchiveEntry: vi.fn(),
     reviewOlderTabProgress: vi.fn(async () => undefined),
     parseBackupFile: vi.fn(async () => undefined),
     resetImport: vi.fn(),
   },
   backupState: {
+    recoveryExportPending: {} as Ref<boolean>,
+    recoveryArchiveEntries: {} as Ref<Array<{ kind: string; index: number }>>,
+    selectedRecoveryArchiveEntry: {} as Ref<number | null>,
     legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
     legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
@@ -125,6 +132,11 @@ vi.mock('@/composables/useDataBackup', () => ({
     debugExportError: backupState.debugExportError,
     exportProgress: backupFns.exportProgress,
     exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
+    confirmRecoveryArchiveSaved: backupFns.confirmRecoveryArchiveSaved,
+    recoveryExportPending: backupState.recoveryExportPending,
+    recoveryArchiveEntries: backupState.recoveryArchiveEntries,
+    selectedRecoveryArchiveEntry: backupState.selectedRecoveryArchiveEntry,
+    reviewRecoveryArchiveEntry: backupFns.reviewRecoveryArchiveEntry,
     reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
     legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
@@ -221,7 +233,13 @@ describe('DataManagementCard', () => {
     backupFns.confirmBackupImport.mockReset();
     backupFns.exportDebugSnapshot.mockReset();
     backupFns.exportProgress.mockReset();
-    backupFns.exportDeviceProgressRecovery.mockReset();
+    backupState.recoveryExportPending = ref(false);
+    backupState.recoveryArchiveEntries = ref([]);
+    backupState.selectedRecoveryArchiveEntry = ref(null);
+    backupFns.confirmRecoveryArchiveSaved.mockReset();
+    backupFns.exportDeviceProgressRecovery.mockReset().mockImplementation(async () => {
+      backupState.recoveryExportPending.value = true;
+    });
     backupState.legacyProgressRecoveryCount.value = 0;
     backupState.legacyProgressRecoveryOverflow.value = false;
     backupFns.parseBackupFile.mockReset();
@@ -1039,13 +1057,25 @@ describe('DataManagementCard', () => {
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);
   });
+  it('routes archive copy selection into the existing preview', async () => {
+    backupState.recoveryArchiveEntries.value = [
+      { kind: 'original', index: 0 },
+      { kind: 'older', index: 1 },
+    ];
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="recovery-archive-entry-1"]').trigger('click');
+    expect(backupFns.reviewRecoveryArchiveEntry).toHaveBeenCalledWith(1);
+  });
   it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
     backupState.legacyProgressRecoveryOverflow.value = true;
     const wrapper = createWrapper({ view: 'backup' });
     expect(wrapper.text()).toContain('settings.data_management.older_tab_recovery_full');
     await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
     await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
-    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith(true);
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith();
+    expect(backupFns.confirmRecoveryArchiveSaved).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
   });
   it('requires confirmation before exporting and clearing older copies', async () => {
     backupState.legacyProgressRecoveryCount.value = 2;
@@ -1053,7 +1083,10 @@ describe('DataManagementCard', () => {
     await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
     expect(backupFns.exportDeviceProgressRecovery).not.toHaveBeenCalled();
     await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
-    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith(true);
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith();
+    expect(backupFns.confirmRecoveryArchiveSaved).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
   });
   it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
     backupState.legacyProgressRecoveryCount.value = 1;
