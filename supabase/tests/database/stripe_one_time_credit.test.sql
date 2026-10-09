@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,909) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,912) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -216,5 +216,44 @@ SELECT ok((SELECT one_time_tier='scav' AND one_time_remaining=interval '30 days'
  AND NOT one_time_legacy_unlimited AND status='active' AND tier='chad'
  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000909'),
  'last legacy refund preserves independently purchased prepaid days');
+
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id)
+VALUES ('00000000-0000-0000-0000-000000000910','subscription','active','chad','sub_exhausted'),
+ ('00000000-0000-0000-0000-000000000911','subscription','active','chad','sub_unknown'),
+ ('00000000-0000-0000-0000-000000000912','subscription','active','chad','sub_refund_exhausted');
+SELECT pg_temp.pay(910,'pi_exhausted');
+UPDATE public.supporters SET status='past_due',expires_at=now()-interval '31 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000910';
+SELECT ok((SELECT NOT(status='active' AND (expires_at IS NULL OR expires_at>now()))
+ FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000910'),
+ 'write after exhausted grace cannot project finite credit as unlimited');
+SELECT pg_temp.pay(911,'pi_unknown_first');
+UPDATE public.supporters SET status='past_due',expires_at=NULL
+ WHERE user_id='00000000-0000-0000-0000-000000000911';
+SELECT pg_temp.pay(911,'pi_unknown_second');
+SELECT ok((SELECT type='subscription' AND status='past_due' AND one_time_remaining=interval '60 days'
+ AND one_time_expires_at IS NULL FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000911'),
+ 'unknown subscription resume anchor preserves and stacks finite paused credit');
+SELECT is((SELECT banked_duration FROM private.stripe_one_time_payments WHERE payment_id='pi_unknown_second'),
+ interval '30 days','payment during unknown grace keeps its refundable bank allocation');
+SELECT pg_temp.pay(912,'pi_refund_exhausted_first');
+SELECT pg_temp.pay(912,'pi_refund_exhausted_second');
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET status='past_due',expires_at=now()-interval '40 days'
+ WHERE user_id='00000000-0000-0000-0000-000000000912';
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+SELECT public.refund_one_time_supporter('pi_refund_exhausted_first',
+ '00000000-0000-0000-0000-000000000912','2026-10-07 00:00:00+00',400);
+SELECT ok((SELECT NOT(status='active' AND (expires_at IS NULL OR expires_at>now()))
+ FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000912'),
+ 'refund cannot turn an exhausted finite bank into unlimited access');
+UPDATE public.supporters SET stripe_subscription_id=NULL
+ WHERE user_id='00000000-0000-0000-0000-000000000911';
+SELECT pg_temp.pay(911,'pi_unknown_without_id');
+SELECT ok((SELECT type='subscription' AND status='past_due' AND one_time_remaining=interval '90 days'
+ AND one_time_expires_at IS NULL FROM public.supporters
+ WHERE user_id='00000000-0000-0000-0000-000000000911'),
+ 'unknown resume anchor without subscription identity cannot turn finite credit unlimited');
 SELECT * FROM finish();
 ROLLBACK;

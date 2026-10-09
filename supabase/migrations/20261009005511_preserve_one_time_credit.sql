@@ -51,7 +51,7 @@ BEGIN
     RETURN NEW;
   END IF;
   subscription_access := NEW.type = 'subscription' AND NEW.status IN ('active','past_due')
-    AND (NEW.expires_at > now() OR (NEW.status = 'active' AND NEW.expires_at IS NULL));
+    AND (NEW.expires_at > now() OR NEW.expires_at IS NULL);
   IF TG_OP = 'UPDATE' AND subscription_access AND NEW.one_time_tier IS NULL
     AND OLD.type = 'one_time' AND OLD.status = 'active' THEN
     NEW.one_time_tier := OLD.tier;
@@ -91,11 +91,15 @@ BEGIN
   IF NEW.type = 'subscription' AND NOT subscription_access AND NEW.one_time_tier IS NOT NULL THEN
     resume_at := CASE WHEN NEW.status IN ('active','past_due') THEN NEW.expires_at
       ELSE coalesce(NEW.subscription_ended_at, NEW.expires_at, now()) END;
-    IF NEW.one_time_remaining IS NOT NULL THEN
+    IF NEW.one_time_remaining IS NOT NULL AND resume_at IS NOT NULL THEN
       NEW.one_time_expires_at := resume_at + NEW.one_time_remaining;
       NEW.one_time_remaining := NULL;
     END IF;
-    IF NEW.one_time_expires_at IS NULL OR NEW.one_time_expires_at > now() THEN
+    IF NEW.one_time_expires_at <= now() THEN
+      NEW.one_time_tier := NULL;
+      NEW.one_time_expires_at := NULL;
+      NEW.one_time_legacy_unlimited := false;
+    ELSIF NEW.one_time_remaining IS NULL THEN
       NEW.type := 'one_time';
       NEW.status := 'active';
       NEW.tier := NEW.one_time_tier;
@@ -165,7 +169,7 @@ BEGIN
   INSERT INTO private.stripe_one_time_payments(payment_id, user_id, paid_at, amount_total, credit_tier, banked_duration)
     VALUES (p_payment_id, target_user, p_paid_at, amount, incoming_tier,
       CASE WHEN existing.type = 'subscription' AND existing.status IN ('active','past_due')
-        AND (existing.expires_at > now() OR (existing.status = 'active' AND existing.expires_at IS NULL))
+        AND (existing.expires_at > now() OR existing.expires_at IS NULL)
         AND p_paid_at >= timestamptz '2026-10-07 00:00:00+00'
       THEN interval '30 days' * least(12, greatest(1, amount / 400)) END) ON CONFLICT (payment_id) DO NOTHING;
   IF NOT FOUND THEN
@@ -178,8 +182,8 @@ BEGIN
   END IF;
   PERFORM set_config('stripe.one_time_payment_id', p_payment_id, true);
   live_subscription := coalesce(existing.type = 'subscription'
-    AND existing.status IN ('active', 'past_due') AND existing.stripe_subscription_id IS NOT NULL
-    AND (existing.expires_at > now() OR (existing.status = 'active' AND existing.expires_at IS NULL)), false);
+    AND existing.status IN ('active', 'past_due')
+    AND (existing.expires_at > now() OR existing.expires_at IS NULL), false);
   -- NULL tier means no credit; a present tier with neither expiry nor balance means unlimited.
   credit_tier := existing.one_time_tier;
   credit_expiry := existing.one_time_expires_at;
@@ -342,9 +346,10 @@ SELECT effective.* FROM public.supporters s CROSS JOIN LATERAL jsonb_populate_re
     s.type = 'subscription' AND s.status IN ('active','past_due')
     AND s.expires_at IS NOT NULL AND s.expires_at <= now()
     AND s.one_time_tier IS NOT NULL AND s.has_ever_supported AND s.supporter_disqualified_at IS NULL
-    AND (s.one_time_remaining IS NULL OR s.expires_at + s.one_time_remaining > now())
+    AND (coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining) > now()
+      OR (s.one_time_expires_at IS NULL AND s.one_time_remaining IS NULL))
   THEN jsonb_build_object('tier',s.one_time_tier,'type','one_time','status','active',
-    'expires_at', CASE WHEN s.one_time_remaining IS NOT NULL THEN s.expires_at + s.one_time_remaining END)
+    'expires_at', coalesce(s.one_time_expires_at, s.expires_at + s.one_time_remaining))
   ELSE '{}'::jsonb END
 ) effective;
 GRANT SELECT ON public.supporter_entitlements TO authenticated, service_role;
