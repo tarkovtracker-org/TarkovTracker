@@ -394,24 +394,56 @@ const nextSnapshot = (
     legacyRaw: input.kind === 'import' ? input.legacyRaw : current.legacyRaw,
   };
 };
+const DATABASE_OPEN_TIMEOUT_MS = 5000;
+type DatabaseOpenSettlement = { settled: boolean; timer: ReturnType<typeof setTimeout> };
+const rejectDatabaseOpen = (
+  state: DatabaseOpenSettlement,
+  reject: (error: unknown) => void,
+  error: unknown
+): void => {
+  if (state.settled) return;
+  state.settled = true;
+  clearTimeout(state.timer);
+  reject(error);
+};
+const finishDatabaseOpen = (
+  request: IDBOpenDBRequest,
+  state: DatabaseOpenSettlement,
+  resolve: (db: IDBDatabase) => void
+): void => {
+  if (state.settled) {
+    request.result.close();
+    return;
+  }
+  state.settled = true;
+  clearTimeout(state.timer);
+  request.result.onversionchange = () => request.result.close();
+  resolve(request.result);
+};
 const openDatabase = (factory: IDBFactory, name: string): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
     const request = factory.open(name, 1);
-    let blocked = false;
+    const state: DatabaseOpenSettlement = {
+      settled: false,
+      timer: setTimeout(
+        () =>
+          rejectDatabaseOpen(
+            state,
+            reject,
+            new DOMException('Progress database open timed out', 'TimeoutError')
+          ),
+        DATABASE_OPEN_TIMEOUT_MS
+      ),
+    };
     request.onupgradeneeded = () => request.result.createObjectStore(storeName);
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => {
-      blocked = true;
-      reject(new DOMException('Progress database upgrade blocked', 'InvalidStateError'));
-    };
-    request.onsuccess = () => {
-      if (blocked) {
-        request.result.close();
-        return;
-      }
-      request.result.onversionchange = () => request.result.close();
-      resolve(request.result);
-    };
+    request.onerror = () => rejectDatabaseOpen(state, reject, request.error);
+    request.onblocked = () =>
+      rejectDatabaseOpen(
+        state,
+        reject,
+        new DOMException('Progress database upgrade blocked', 'InvalidStateError')
+      );
+    request.onsuccess = () => finishDatabaseOpen(request, state, resolve);
   });
 /** No async callback is accepted: every read/check/write stays in native IDB request callbacks. */
 const transaction = <T>(

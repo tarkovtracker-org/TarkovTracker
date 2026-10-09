@@ -891,7 +891,12 @@ export function useDataBackup(): UseDataBackupReturn {
       const currentPreferences = await sanitizePreferencesForDebug(
         getPersistedPreferencesState(preferencesStore.$state)
       );
-      const rawProgressStorage = (await readCommittedProgressAuthority()).raw;
+      const rawProgressStorage = await readCommittedProgressAuthority(false)
+        .then((record) => record.raw)
+        .catch((error) => {
+          logger.warn('[DataBackup] Progress authority unavailable for debug export:', error);
+          return null;
+        });
       const rawPreferencesStorage =
         localStorage.getItem(STORAGE_KEYS.preferences) ??
         localStorage.getItem(LEGACY_STORAGE_KEYS.preferences);

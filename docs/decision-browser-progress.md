@@ -283,3 +283,9 @@ That guest receipt does not cover signed-in behavior or server compatibility ret
 import/recovery copies, retaining unattributable bytes and reporting incomplete removal.
 
 Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the completed export are removed. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted. Recovery capture is capped at 20 snapshots and 5 Mi UTF-16 characters; overflow leaves current saved progress and existing copies untouched, and Settings reports it. Export includes the latest uncaptured owned legacy bytes and uses a read without writes, so capture quota failures do not prevent archive export.
+
+Native database opening has a bounded deadline. A stalled request cannot leave startup waiting indefinitely; a late success closes its connection, and a subsequent activation can open a fresh request. Unavailable progress authority uses the existing bounded cloud-start retry path.
+
+An explicit device deletion removes and verifies owned legacy keys before the native purge announces its commit. If legacy removal fails, native progress remains. This ordering closes the immediate peer-refresh recapture window; IndexedDB and localStorage do not form one transaction, and older tabs may still write later recovery candidates.
+
+Debug export reads progress without capturing legacy writes. If native storage is unavailable, it still exports the remaining sanitized diagnostic data with null progress.

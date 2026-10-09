@@ -554,6 +554,45 @@ describe('useDataBackup', () => {
     }
   });
   describe('exportDebugSnapshot', () => {
+    it.each([false, true])(
+      'exports debug data without native writes (authority available: %s)',
+      async (available) => {
+        const authority = await import('@/stores/tarkov/progressAuthority');
+        const read = vi
+          .spyOn(authority, 'readCommittedProgressAuthority')
+          .mockImplementation(async (observe) => {
+            if (observe !== false || !available)
+              throw new DOMException('unavailable', 'InvalidStateError');
+            return { version: 1, revision: 0, raw: null, legacyRaw: null };
+          });
+        let artifact: Blob | undefined;
+        const NativeURL = URL;
+        vi.stubGlobal(
+          'URL',
+          class extends NativeURL {
+            static override createObjectURL(value: Blob | MediaSource): string {
+              if (value instanceof Blob) artifact = value;
+              return 'blob:debug-unavailable';
+            }
+            static override revokeObjectURL(): void {}
+          }
+        );
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        try {
+          const backup = await loadComposable();
+          await expect(backup.exportDebugSnapshot()).resolves.toBeUndefined();
+          expect(read).toHaveBeenCalledWith(false);
+          expect(click).toHaveBeenCalledOnce();
+          expect(artifact).toBeDefined();
+          expect(JSON.parse(await artifact!.text()).storage.progress).toBeNull();
+          expect(backup.debugExportError.value).toBeNull();
+        } finally {
+          read.mockRestore();
+          click.mockRestore();
+          vi.unstubAllGlobals();
+        }
+      }
+    );
     it('exports a sanitized debug snapshot without auth secrets or player identifiers', async () => {
       localStorage.setItem(
         STORAGE_KEYS.progress,

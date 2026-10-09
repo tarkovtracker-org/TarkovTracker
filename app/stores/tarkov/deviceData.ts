@@ -186,12 +186,17 @@ const updateRemovalWriteBarrier = (userId: string, activeReleased: boolean): voi
     setActiveProgressWritesBlocked(true);
   }
 };
+// Remove the observable legacy projection before the purge announces its commit.
+// Later cached observations/new legacy writes still follow the mixed-client recovery policy.
+const canStartNativeRemoval = (userId: string, canContinue: () => boolean): boolean =>
+  canContinue() && removeOwnedLegacyProgress(userId);
 const removeNativeRecoveryCopies = async (
   userId: string,
   activeRemoval: RemovalResult,
   canContinue: () => boolean
 ): Promise<RemovalResult> => {
   try {
+    if (!canStartNativeRemoval(userId, canContinue)) return { complete: false, released: false };
     const removed = await removeOwnedProgressRecovery(userId, canContinue);
     if (!canContinue()) return { complete: false, released: false };
     return combineNativeRemoval(userId, removed, activeRemoval);
@@ -204,20 +209,25 @@ const combineNativeRemoval = (
   removed: RemovalResult,
   activeRemoval: RemovalResult
 ): RemovalResult => ({
-  complete: removeOwnedLegacyProgress(userId) && removed.complete && activeRemoval.complete,
+  complete: removed.complete && activeRemoval.complete,
   released: removed.released && activeRemoval.released,
 });
 /** Legacy projections remain untouched except during explicit owner removal. */
 const removeOwnedLegacyProgress = (userId: string): boolean => {
   try {
     for (const key of [STORAGE_KEYS.progress, 'progress']) {
-      const raw = localStorage.getItem(key);
-      if (parseUserScopedStorage(raw ?? '')?._userId === userId) localStorage.removeItem(key);
+      if (!removeOwnedLegacyKey(key, userId)) return false;
     }
     return true;
   } catch {
     return false;
   }
+};
+const removeOwnedLegacyKey = (key: string, userId: string): boolean => {
+  const raw = localStorage.getItem(key);
+  if (parseUserScopedStorage(raw ?? '')?._userId !== userId) return true;
+  localStorage.removeItem(key);
+  return localStorage.getItem(key) === null;
 };
 const removeOwnedStorageKeys = async (
   keys: string[],

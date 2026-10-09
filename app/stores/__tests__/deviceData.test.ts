@@ -44,6 +44,22 @@ describe('device data removal', () => {
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
   });
+  it.each(['throw', 'silent'] as const)(
+    'does not purge native recovery when owned legacy deletion fails: %s',
+    async (failure) => {
+      const raw = owned('user-1');
+      localStorage.setItem('progress', raw);
+      const removeItem = localStorage.removeItem.bind(localStorage);
+      vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
+        if (key !== 'progress') return removeItem(key);
+        if (failure === 'throw') throw new DOMException('blocked', 'SecurityError');
+      });
+      const purge = vi.spyOn(progressAuthority, 'removeOwnedProgressRecovery');
+      expect(await removeAccountDeviceData('user-1')).toBe(false);
+      expect(purge).not.toHaveBeenCalled();
+      expect(localStorage.getItem('progress')).toBe(raw);
+    }
+  );
   it('keeps writes blocked when native active bytes remain despite an empty cached slot', async () => {
     const purge = vi
       .spyOn(progressAuthority, 'removeOwnedProgressRecovery')

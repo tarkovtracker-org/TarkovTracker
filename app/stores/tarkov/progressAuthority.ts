@@ -30,8 +30,16 @@ class RejectedMutation extends Error {
   }
 }
 const openRepository = (): Promise<Repository> => {
-  repository ??= openActiveProgressRepository(window.indexedDB, 'tarkovtracker-active-progress-v1');
-  return repository;
+  if (repository) return repository;
+  const pending = openActiveProgressRepository(
+    window.indexedDB,
+    'tarkovtracker-active-progress-v1'
+  );
+  repository = pending;
+  void pending.catch(() => {
+    if (repository === pending) repository = undefined;
+  });
+  return pending;
 };
 const recoveryEnvelopeOwner = (value: unknown): string | null => {
   if (!value || typeof value !== 'object') return null;

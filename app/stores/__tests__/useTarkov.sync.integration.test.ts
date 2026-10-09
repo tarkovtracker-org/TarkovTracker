@@ -637,10 +637,13 @@ describe('useTarkov sync integration', () => {
     rpc.mockClear();
     channel.subscribe.mockClear();
     try {
-      await initializeTarkovSync();
+      await expect(initializeTarkovSync()).rejects.toThrow('Progress authority is unavailable');
       expect(single).not.toHaveBeenCalled();
       expect(rpc).not.toHaveBeenCalled();
       expect(channel.subscribe).not.toHaveBeenCalled();
+      ready.mockReturnValue(true);
+      await initializeTarkovSync();
+      expect(channel.subscribe).toHaveBeenCalled();
     } finally {
       ready.mockRestore();
     }

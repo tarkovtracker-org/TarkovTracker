@@ -13,6 +13,7 @@ describe('native progress authority integration', () => {
     localStorage.clear();
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -21,6 +22,76 @@ describe('native progress authority integration', () => {
     await authority.initializeProgressAuthority(owner);
     return authority;
   };
+  it('times out a silent database open, closes late success and allows a real reopen', async () => {
+    vi.useFakeTimers();
+    const close = vi.fn();
+    const request = { onsuccess: null as null | (() => void), result: { close } };
+    const blockedOpen = vi
+      .spyOn(factory, 'open')
+      .mockReturnValue(request as unknown as IDBOpenDBRequest);
+    const a = await import('@/stores/tarkov/progressAuthority');
+    let outcome: unknown;
+    const opening = a.initializeProgressAuthority(null).then(
+      () => null,
+      (error: unknown) => {
+        outcome = error;
+        return error;
+      }
+    );
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(a.isProgressAuthorityReady()).toBe(false);
+    expect(outcome).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(outcome).toMatchObject({ name: 'TimeoutError' });
+    await opening;
+    request.onsuccess!();
+    expect(close).toHaveBeenCalledOnce();
+    expect(a.isProgressAuthorityReady()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    blockedOpen.mockRestore();
+    vi.useRealTimers();
+    await a.initializeProgressAuthority(null);
+    expect(a.isProgressAuthorityReady()).toBe(true);
+  });
+  it('deletes owned legacy projections before announcing the final native purge', async () => {
+    const original = JSON.stringify({ _userId: 'a', data: {} });
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    const a = await open('a');
+    a.configureProgressSession(() => 'a');
+    const { openActiveProgressRepository } = await import('@/stores/tarkov/progressRepository');
+    const peer = await openActiveProgressRepository(factory, 'tarkovtracker-active-progress-v1');
+    const peerToken = await peer.activateOwner('a');
+    let peerRefresh: ReturnType<typeof peer.read> | undefined;
+    const { removeAccountDeviceData } = await import('@/stores/tarkov/deviceData');
+    let legacyAtPurge: string | null | undefined;
+    const postMessage = vi.fn(({ revision }: { revision: number }) => {
+      if (revision !== 2) return;
+      legacyAtPurge = localStorage.getItem(STORAGE_KEYS.progress);
+      const observedLegacy = legacyAtPurge;
+      peerRefresh = peer.read(peerToken, () => observedLegacy);
+    });
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (_name: unknown, _options: unknown, callback: () => unknown) => callback(),
+      },
+    });
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class {
+        postMessage = postMessage;
+        addEventListener() {}
+        close() {}
+      }
+    );
+    const stop = a.observeProgressAuthority(vi.fn());
+    expect(await removeAccountDeviceData('a')).toBe(true);
+    expect(legacyAtPurge).toBeNull();
+    expect((await peerRefresh)!.legacyUpdates ?? []).toEqual([]);
+    await a.refreshProgressAuthority();
+    expect((await a.readCommittedProgressAuthority(false)).legacyUpdates ?? []).toEqual([]);
+    stop();
+    peer.close();
+  });
   it('imports exact legacy bytes once, commits new-only bytes and reloads without legacy resurrection', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, ' original bytes ');
     const a = await open();

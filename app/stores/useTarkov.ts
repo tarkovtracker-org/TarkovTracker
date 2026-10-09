@@ -756,8 +756,7 @@ export async function resetTarkovStoreForSessionTransition(
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
   if (!isProgressAuthorityReady()) {
-    logger.error('[TarkovStore] Cloud startup held because progress authority is unavailable');
-    return false;
+    throw new DOMException('Progress authority is unavailable', 'InvalidStateError');
   }
   if (progressSync.isActiveFor(userId)) {
     logger.debug('[TarkovStore] Supabase sync already initialized, skipping');
