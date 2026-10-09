@@ -717,9 +717,20 @@ function resolveEventAccount(timestamp: string | null, signals: AccountSignal[])
   }
   return resolved;
 }
-/** Lists the accounts a session contains, or the unidentified bucket when no login was logged. */
+/** Lists recorded accounts and preserves any events that cannot resolve to a preceding login. */
 function sessionAccountIds(group: SessionLogs): string[] {
-  const ids = [...new Set(collectSessionAccountSignals(group).map((signal) => signal.accountId))];
+  const signals = collectSessionAccountSignals(group);
+  const ids = [...new Set(signals.map((signal) => signal.accountId))];
+  const hasUnidentifiedEvents = group.files.some((file) => {
+    const result = file.notifications;
+    if (!result) return false;
+    return [result.completionEvents, result.startedEvents, result.failedEvents].some((events) =>
+      events.some(
+        (event) => resolveEventAccount(event.timestamp, signals) === UNIDENTIFIED_LOG_ACCOUNT
+      )
+    );
+  });
+  if (hasUnidentifiedEvents) ids.push(UNIDENTIFIED_LOG_ACCOUNT);
   return ids.length > 0 ? ids : [UNIDENTIFIED_LOG_ACCOUNT];
 }
 /** Keeps the newest known login time, treating a missing time as unknown. */

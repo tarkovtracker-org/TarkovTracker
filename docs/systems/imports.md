@@ -152,8 +152,9 @@ and `CompleteSelectedProfile` lines in the `application` and `output` channels (
 differs per mode, so it is never the key). Each event belongs to the latest preceding selection
 in its session, so an account switch inside one session splits correctly. The preview defaults
 to the most recently played account and imports one account at a time (`account: null` selects
-every account and is used only to discover destination modes). Sessions with no recorded
-selection form an `unidentified` bucket: it joins the only identified account, but stays
+every account and is used only to discover destination modes). Events before a session's first
+retained selection also remain available in the `unidentified` bucket, alongside sessions with
+no recorded selection: it joins the only identified account, but stays
 separate when two or more accounts exist. Account IDs stay in memory and are shown only as a
 four-character suffix. Switching accounts resets version selection to that account's defaults.
 Version filters are compatibility filters, not wipe/prestige boundaries: users must

@@ -776,6 +776,53 @@ describe('multi-account log separation', () => {
       parseEftLogsForQuestImport(files, ids, { account: 'unidentified' }).matchedTaskIds
     ).toEqual([questC]);
   });
+  it.each([
+    [12, 'matchedTaskIds'],
+    [10, 'matchedStartedTaskIds'],
+    [11, 'matchedFailedTaskIds'],
+  ] as const)('retains pre-login events of type %s in the unidentified preview', (type, field) => {
+    const files = [
+      ...twoAccountLogs.slice(0, 2),
+      {
+        name: `${sessionB}/application_001.log`,
+        text: login(accountB, '2026-02-21 12:00:00.000'),
+      },
+      {
+        name: `${sessionB}/push-notifications_000.log`,
+        text: completionPayload('evt-before-login', `${questC} successMessageText`).replace(
+          '"type": 12',
+          `"type": ${type}`
+        ),
+      },
+      {
+        name: `${sessionB}/push-notifications_001.log`,
+        text: completionPayload(
+          'evt-after-login',
+          `${questB} successMessageText`,
+          '2026-02-21 13:00:00.000'
+        ),
+      },
+    ];
+    const unidentified = parseEftLogsForQuestImport(files, ids, { account: 'unidentified' });
+    expect(unidentified.selectedAccount).toBe('unidentified');
+    expect(unidentified.availableAccounts).toContainEqual({
+      id: 'unidentified',
+      sessionCount: 1,
+      lastSeen: null,
+    });
+    expect(unidentified.availableVersions).toEqual(['1.2.0.0.47888']);
+    expect(unidentified.versionSessionCounts).toEqual({ '1.2.0.0.47888': 1 });
+    expect(unidentified[field]).toEqual([questC]);
+    expect(unidentified.events).toHaveLength(1);
+    for (const [account, quest] of [
+      [accountA, questA],
+      [accountB, questB],
+    ]) {
+      const preview = parseEftLogsForQuestImport(files, ids, { account });
+      expect(preview.matchedTaskIds).toEqual([quest]);
+      expect(preview.events).toHaveLength(1);
+    }
+  });
   it('folds sessions without a recorded login into the only identified account', () => {
     const result = parseEftLogsForQuestImport(
       [
