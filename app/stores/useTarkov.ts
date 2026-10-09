@@ -59,6 +59,10 @@ import {
   type PrestigeRunRecord,
   type UserPrestigeRunRow,
 } from '@/stores/tarkov/prestige';
+import {
+  initializeProgressAuthority,
+  isProgressAuthorityReady,
+} from '@/stores/tarkov/progressAuthority';
 import { getNextProgressEpoch, hasProgress } from '@/stores/tarkov/progressMerge';
 import {
   countStoryIdChanges,
@@ -732,6 +736,8 @@ export async function resetTarkovStoreForSessionTransition(
     if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
       return;
   }
+  await initializeProgressAuthority(currentUserId, true);
+  if (!isCurrentSessionTransition(revision, currentUserId)) return;
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
     return;
@@ -747,6 +753,10 @@ export async function resetTarkovStoreForSessionTransition(
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
+  if (!isProgressAuthorityReady()) {
+    logger.error('[TarkovStore] Cloud startup held because progress authority is unavailable');
+    return false;
+  }
   if (progressSync.isActiveFor(userId)) {
     logger.debug('[TarkovStore] Supabase sync already initialized, skipping');
     return false;

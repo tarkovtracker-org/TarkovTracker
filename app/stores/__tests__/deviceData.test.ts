@@ -682,3 +682,7 @@ describe('device data removal', () => {
     expect(isDeviceDataRemovalPending('user-1')).toBe(false);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

@@ -2153,7 +2153,8 @@ describe('active progress across tabs', () => {
         throw new DOMException('Site data is blocked', 'SecurityError');
       },
     });
-    expect(await tab.clearActiveProgressStorage('owner')).toBe(true);
+    // Unavailable storage no longer proves that authoritative progress is absent.
+    expect(await tab.clearActiveProgressStorage('owner')).toBe(false);
     expect(tab.safeRemoveItem(STORAGE_KEYS.preferences)).toBe(false);
   });
   it('prevents synchronous helpers from bypassing active progress serialization', async () => {
@@ -2269,4 +2270,8 @@ describe('active progress across tabs', () => {
       expect(first.status.progressSaveStatus).toEqual(localSaveBefore);
     }
   );
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

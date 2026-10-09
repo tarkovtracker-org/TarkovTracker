@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
+import * as progressAuthority from '@/stores/tarkov/progressAuthority';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
@@ -1555,4 +1556,73 @@ describe('useDataBackup', () => {
       expect(importError.value).toBeNull();
     });
   });
+});
+describe('older-tab recovery review', () => {
+  const ownedRaw = () => JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+  it('previews an owned edit without applying it', async () => {
+    tarkovStore.$patch.mockClear();
+    const raw = ownedRaw();
+    const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockResolvedValue({
+      version: 1,
+      revision: 0,
+      raw: null,
+      legacyRaw: null,
+      legacyUpdates: [raw],
+    });
+    const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+    const before = JSON.stringify(tarkovStore.$state);
+    const backup = useDataBackup();
+    await backup.reviewOlderTabProgress(0);
+    expect(owned).toHaveBeenCalledWith(expect.anything(), 'user-123');
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.importPreview.value).not.toBeNull();
+    expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+    expect(tarkovStore.$patch).not.toHaveBeenCalled();
+    expect(read.mock.results).toHaveLength(1);
+    read.mockRestore();
+    owned.mockRestore();
+  });
+  it('imports the committed snapshot from a device recovery archive into preview', async () => {
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: ownedRaw(),
+          original: null,
+          older_tab_edits: [],
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.importPreview.value?.pvp.level).toBe(tarkovStore.$state.pvp.level);
+  });
+  it.each([-1, 0, 1, 0.5])('rejects unavailable owned index %s', async (index) => {
+    const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([]);
+    const backup = useDataBackup();
+    await backup.reviewOlderTabProgress(index);
+    expect(backup.importState.value).toBe('error');
+    expect(backup.importPreview.value).toBeNull();
+    owned.mockRestore();
+  });
+  it.each(['{broken', '{}', JSON.stringify({ ...tarkovStore.$state, gameEdition: 99 })])(
+    'rejects malformed or unsupported recovery without changing archived bytes',
+    async (raw) => {
+      const copies = [raw];
+      const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue(copies);
+      const before = JSON.stringify(tarkovStore.$state);
+      const backup = useDataBackup();
+      await backup.reviewOlderTabProgress(0);
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importPreview.value).toBeNull();
+      expect(copies).toEqual([raw]);
+      expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+      owned.mockRestore();
+    }
+  );
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

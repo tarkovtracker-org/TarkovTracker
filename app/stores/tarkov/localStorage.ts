@@ -1,6 +1,13 @@
 import { defaultState, migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { resolveInitialSyncState } from '@/stores/tarkov/initialSyncState';
+import {
+  afterProgressCommit,
+  commitProgressMutation,
+  currentProgressSessionOwner,
+  readAuthoritativeProgress,
+  writeAuthoritativeProgress,
+} from '@/stores/tarkov/progressAuthority';
 import { getNextProgressEpoch, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import {
   classifyLocalSaveFailure,
@@ -15,7 +22,7 @@ import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
-import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
   taskAvailabilityCandidates,
   type ConfirmationMap,
@@ -182,7 +189,7 @@ export const createProgressStorageSerializer = (
       _userId: userId,
       data: state,
     });
-    guestSerialization = userId === null ? { value, state, baseline } : null;
+    guestSerialization = { value, state, baseline };
     return value;
   };
   return {
@@ -252,7 +259,7 @@ export const cloneStateSnapshot = <T>(value: T): T => {
 export const safeGetItem = (key: string): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    return localStorage.getItem(key);
+    return key === STORAGE_KEYS.progress ? readAuthoritativeProgress() : localStorage.getItem(key);
   } catch (error) {
     logger.error(`[TarkovStore] Failed to read localStorage key "${key}":`, error);
     return null;
@@ -363,13 +370,17 @@ export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false
 export const flushActiveProgressWrites = async (): Promise<void> => {
   while (activeProgressOperations.size) await Promise.all(activeProgressOperations);
 };
+const liveProgressOwner = (): string | null => {
+  const configured = currentProgressSessionOwner();
+  return configured === undefined ? getCurrentSupabaseUserId() : configured;
+};
 const mutateActiveProgress = (
   mutate: () => StorageWriteResult,
   owner?: string | null
 ): Promise<StorageWriteResult> => {
   const generation = activeProgressGeneration;
   const ownerGeneration = ownerGenerationFor(owner);
-  const sessionOwner = getCurrentSupabaseUserId();
+  const sessionOwner = liveProgressOwner();
   const operation = (async (): Promise<StorageWriteResult> => {
     try {
       if (typeof window === 'undefined' || !navigator.locks) {
@@ -378,7 +389,7 @@ const mutateActiveProgress = (
       return await navigator.locks.request(ACTIVE_PROGRESS_LOCK, { mode: 'exclusive' }, () => {
         if (
           generation !== activeProgressGeneration ||
-          sessionOwner !== getCurrentSupabaseUserId() ||
+          sessionOwner !== liveProgressOwner() ||
           ownerGeneration !== ownerGenerationFor(owner)
         ) {
           return {
@@ -387,7 +398,14 @@ const mutateActiveProgress = (
             canceled: true,
           };
         }
-        return mutate();
+        return commitProgressMutation(
+          mutate,
+          () =>
+            generation === activeProgressGeneration &&
+            sessionOwner === liveProgressOwner() &&
+            ownerGeneration === ownerGenerationFor(owner),
+          sessionOwner
+        );
       });
     } catch (error) {
       logger.error('[TarkovStore] Active progress mutation failed:', error);
@@ -417,7 +435,7 @@ const writeStorageItem = (key: string, value: string, cloudHeld = false): Storag
     if (key === STORAGE_KEYS.progress) {
       if (
         activeProgressWritesBlocked ||
-        !activeProgressRetentionGuard(localStorage.getItem(key), value, cloudHeld)
+        !activeProgressRetentionGuard(readAuthoritativeProgress(), value, cloudHeld)
       ) {
         return {
           ok: false,
@@ -425,7 +443,8 @@ const writeStorageItem = (key: string, value: string, cloudHeld = false): Storag
         };
       }
     }
-    localStorage.setItem(key, value);
+    if (key === STORAGE_KEYS.progress) writeAuthoritativeProgress(value);
+    else localStorage.setItem(key, value);
     return { ok: true };
   } catch (error) {
     logger.error(`[TarkovStore] Failed to write localStorage key "${key}":`, error);
@@ -513,7 +532,7 @@ const writeOpaqueProgressQuarantine = (raw: string): string | null => {
 const quarantineUnparseableActiveProgress = (raw: string): string | null => {
   if (typeof window === 'undefined' || !raw) return null;
   try {
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return null;
+    if (readAuthoritativeProgress() !== raw) return null;
     if (!isUnparseableProgressStorageValue(raw)) return null;
     return findOpaqueProgressQuarantine(raw) ?? writeOpaqueProgressQuarantine(raw);
   } catch (error) {
@@ -538,11 +557,9 @@ export const quarantineAndRemoveUnparseableActiveProgress = async (
   const result = await mutateActiveProgress(() => {
     const quarantineKey = quarantineUnparseableActiveProgress(raw);
     if (!quarantineKey || !confirmRelease(quarantineKey)) return { ok: false, error: null };
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return { ok: false, error: null };
-    localStorage.removeItem(STORAGE_KEYS.progress);
-    return localStorage.getItem(STORAGE_KEYS.progress) === null
-      ? { ok: true }
-      : { ok: false, error: null };
+    if (readAuthoritativeProgress() !== raw) return { ok: false, error: null };
+    writeAuthoritativeProgress(null);
+    return readAuthoritativeProgress() === null ? { ok: true } : { ok: false, error: null };
   });
   return result.ok;
 };
@@ -967,7 +984,7 @@ const retainFailedGuestWrite = (request: ProgressWriteRequest, error: unknown): 
 };
 const commitGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
   const incoming = parsePersistedProgressState(request.value, null)!;
-  const current = parsePersistedProgressState(localStorage.getItem(STORAGE_KEYS.progress), null);
+  const current = parsePersistedProgressState(readAuthoritativeProgress(), null);
   const accepted = reconcileGuestWrite(request, current);
   const result = writeStorageItem(
     STORAGE_KEYS.progress,
@@ -975,10 +992,12 @@ const commitGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteRe
     request.cloudHeld
   );
   if (result.ok) {
-    request.guestCommitted = true;
-    consumeGuestPrefix(request.source);
-    adoptGuestWrite(request, accepted);
-    discardFailedGuestWritesBefore(request);
+    afterProgressCommit(() => {
+      request.guestCommitted = true;
+      consumeGuestPrefix(request.source);
+      adoptGuestWrite(request, accepted);
+      discardFailedGuestWritesBefore(request);
+    });
   } else {
     foldGuestWriteRequest(request, current, accepted);
     // The next lock holder must see failed intent before this holder releases the lock.
@@ -1059,7 +1078,7 @@ const assertGuestResetSession = (): void => {
 const readGuestProgressForReset = (): PersistedProgressSnapshot | null => {
   assertGuestResetSession();
   // Read durable bytes, never this tab's pending overlay. Failed reads must abort the reset.
-  const raw = localStorage.getItem(STORAGE_KEYS.progress);
+  const raw = readAuthoritativeProgress();
   if (raw === null) return null;
   const current = parsePersistedProgressState(raw, null);
   if (isUnparseableProgressStorageValue(raw) || !current)
@@ -1207,18 +1226,19 @@ export const resetGuestProgress = async (
       resetAll
     );
     const written = writeStorageItem(STORAGE_KEYS.progress, encodeProgressSnapshot(next));
-    if (written.ok) {
-      accepted = next;
-      consumeGuestPrefix(guestSource);
-      rebaseGuestResetWrites(
-        queued,
-        parsePersistedProgressState(latest.value, null)!,
-        next,
-        resetAll
-      );
-      progressStorageSerializer.reset(next);
-      acceptState(next);
-    }
+    if (written.ok)
+      afterProgressCommit(() => {
+        accepted = next;
+        consumeGuestPrefix(guestSource);
+        rebaseGuestResetWrites(
+          queued,
+          parsePersistedProgressState(latest.value, null)!,
+          next,
+          resetAll
+        );
+        progressStorageSerializer.reset(next);
+        acceptState(next);
+      });
     return written;
   }, null);
   recordGuestResetResult(
@@ -1229,22 +1249,58 @@ export const resetGuestProgress = async (
   if (!result.ok) {
     throw new Error('Local guest progress could not be saved after reset');
   }
-  safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
   return accepted!;
 };
 const isOrdinaryGuestWrite = (request: ProgressWriteRequest): boolean =>
   request.expected === undefined &&
   request.handoffBaseline === undefined &&
   parseUserScopedStorage<unknown>(request.value)?._userId === null;
+const applyAccountProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
+  const owner = parseUserScopedStorage<unknown>(request.value)?._userId ?? null;
+  const incoming = parsePersistedProgressState(request.value, owner);
+  const current = parsePersistedProgressState(readAuthoritativeProgress(), owner);
+  if (!request.source || !incoming || !current)
+    return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
+  return commitAccountProgressWrite(request, current, incoming);
+};
+const commitAccountProgressWrite = (
+  request: ProgressWriteRequest,
+  current: PersistedProgressSnapshot,
+  incoming: PersistedProgressSnapshot
+): StorageWriteResult => {
+  const before = request.baseline ?? {
+    ...initialGuestProgressSnapshot(),
+    storedUserId: incoming.storedUserId,
+  };
+  const accepted = rebaseGuestSnapshot(
+    reconcileGuestSnapshots(incoming, current),
+    before,
+    incoming
+  );
+  const result = writeStorageItem(
+    STORAGE_KEYS.progress,
+    encodeProgressSnapshot(accepted),
+    request.cloudHeld
+  );
+  if (result.ok) afterProgressCommit(() => adoptAccountProgressWrite(request, accepted, incoming));
+  return result;
+};
+const adoptAccountProgressWrite = (
+  request: ProgressWriteRequest,
+  accepted: PersistedProgressSnapshot,
+  captured: PersistedProgressSnapshot
+): void => {
+  const live = { ...captured, state: cloneStateSnapshot(request.source!.readState()) };
+  const next = rebaseGuestSnapshot(accepted, captured, live, true);
+  progressStorageSerializer.reset(next);
+  if (!deepEqual(next.state, live.state)) request.source!.acceptState(next);
+};
 const applyProgressWrite = (request: ProgressWriteRequest): StorageWriteResult => {
   const required = request.expected === undefined ? request.handoffBaseline : request.expected;
-  if (
-    required !== undefined &&
-    !matchesExpectedProgress(localStorage.getItem(STORAGE_KEYS.progress), required)
-  )
+  if (required !== undefined && !matchesExpectedProgress(readAuthoritativeProgress(), required))
     return { ok: false, error: null, canceled: true };
   if (isOrdinaryGuestWrite(request)) return applyGuestProgressWrite(request);
-  return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
+  return applyAccountProgressWrite(request);
 };
 const shouldReportProgressWriteFailure = (
   request: ProgressWriteRequest,
@@ -1288,6 +1344,13 @@ const retainUnregisteredGuestFailure = (
   if (!request.failedGuest && pendingProgressWrites.get(revision) === request)
     retainFailedGuestWrite(request, error);
 };
+const capturedProgressWriteBaseline = (
+  value: string,
+  captured: PersistedProgressSnapshot | null | undefined
+): PersistedProgressSnapshot | null => {
+  const observed = parseHandoffBaseline(readActiveProgressValue());
+  return parseUserScopedStorage<unknown>(value)?._userId ? (captured ?? observed) : observed;
+};
 /** Writes active envelopes and transfers their captured baselines across auth changes. */
 export const persistActiveProgressValue = async (
   value: ProgressWriteRequest['value'],
@@ -1305,7 +1368,7 @@ export const persistActiveProgressValue = async (
     handoffBaseline,
     baseline:
       handoffBaseline === undefined
-        ? parseHandoffBaseline(readActiveProgressValue())
+        ? capturedProgressWriteBaseline(value, captured?.baseline)
         : handoffBaseline,
     guestBaseline: captured?.baseline ?? null,
     guestMemoryBaseline: captured?.baseline ?? null,
@@ -1318,7 +1381,7 @@ export const persistActiveProgressValue = async (
         })
       : undefined,
   };
-  if (!isOrdinaryGuestWrite(request)) request.source = undefined;
+  if (request.expected !== undefined || request.handoff) request.source = undefined;
   const valueRevision = queueProgressWrite(request);
   if (expected === undefined) markLocalProgressPending(revision, cloudHeld);
   const result = await mutateActiveProgress(
@@ -1374,7 +1437,13 @@ const removeStorageItem = (
   if (typeof window === 'undefined') return false;
   try {
     // Blocked site data throws on access to `localStorage` itself, so resolve it here.
-    const target = storage ?? localStorage;
+    const target =
+      key === STORAGE_KEYS.progress
+        ? {
+            getItem: readAuthoritativeProgress,
+            removeItem: () => writeAuthoritativeProgress(null),
+          }
+        : (storage ?? localStorage);
     if (
       key === STORAGE_KEYS.progress &&
       !canRemoveActiveProgress(target.getItem(key), explicitOwnerRemoval, expectedValue)
@@ -1404,8 +1473,7 @@ export const removeActiveProgressValue = async (
 };
 /** An empty slot leaves nothing for a reload to restore, even where a write barrier refuses removal. */
 const clearActiveSlot = (explicitOwner?: string): boolean =>
-  localStorage.getItem(STORAGE_KEYS.progress) === null ||
-  removeStorageItem(STORAGE_KEYS.progress, explicitOwner);
+  readAuthoritativeProgress() === null || removeStorageItem(STORAGE_KEYS.progress, explicitOwner);
 const reportActiveClearFailure = (
   result: StorageWriteResult,
   revision: number,
@@ -1431,13 +1499,12 @@ export const clearActiveProgressStorage = async (
     const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
     return finishActiveProgressClear(clearActiveSlot(explicitOwner));
   });
-  const cleared =
-    (result.ok && safeRemoveItem(LEGACY_STORAGE_KEYS.progress)) || isLocalStorageInaccessible();
+  const cleared = result.ok;
   if (!cleared) reportActiveClearFailure(result, revision, cloudHeld);
   return cleared;
 };
 const finishActiveProgressClear = (cleared: boolean): StorageWriteResult => {
-  if (cleared) discardGuestProgressIntent();
+  if (cleared) afterProgressCommit(discardGuestProgressIntent);
   return cleared ? { ok: true } : { ok: false, error: null };
 };
 const hasCompleteModes = (data: Record<string, unknown>): boolean => 'pvp' in data && 'pve' in data;

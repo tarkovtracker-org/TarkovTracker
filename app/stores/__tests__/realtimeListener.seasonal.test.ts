@@ -1271,3 +1271,7 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp.xpOffset).toBe(300);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

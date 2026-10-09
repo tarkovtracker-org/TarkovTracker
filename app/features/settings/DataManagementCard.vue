@@ -752,6 +752,34 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
+          <div class="bg-surface-900/80 space-y-2 rounded-md border border-white/10 p-3">
+            <p v-if="legacyProgressRecoveryCount" class="text-warning-300 text-sm">
+              {{
+                $t('settings.data_management.older_tab_recovery_available', {
+                  count: legacyProgressRecoveryCount,
+                })
+              }}
+            </p>
+            <UButton
+              v-for="index in legacyProgressRecoveryCount"
+              :key="index"
+              color="neutral"
+              variant="soft"
+              :data-testid="`older-tab-review-${index}`"
+              @click="reviewOlderTabProgress(index - 1)"
+            >
+              {{ $t('settings.data_management.review_older_edit', { index }) }}
+            </UButton>
+            <UButton
+              icon="i-mdi-download"
+              color="neutral"
+              variant="soft"
+              data-testid="device-progress-recovery-export"
+              @click="handleExportDeviceRecovery"
+            >
+              {{ $t('settings.data_management.export_device_recovery') }}
+            </UButton>
+          </div>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
@@ -1058,6 +1086,9 @@
   const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
+    exportDeviceProgressRecovery,
+    reviewOlderTabProgress,
+    legacyProgressRecoveryCount,
     exportError: backupExportError,
     exportDebugSnapshot,
     debugExportError,
@@ -1083,6 +1114,17 @@
       toast.add({
         title: t('settings.data_management.export_error_title'),
         description: backupExportError.value,
+        color: 'error',
+      });
+    }
+  }
+  async function handleExportDeviceRecovery() {
+    try {
+      await exportDeviceProgressRecovery();
+    } catch (error) {
+      toast.add({
+        title: t('settings.data_management.export_error_title'),
+        description: String(error),
         color: 'error',
       });
     }

@@ -5,6 +5,12 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
+import {
+  readCommittedProgressAuthority,
+  ownedLegacyUpdates,
+  isOwnedProgressRecovery,
+  legacyProgressRecoveryCount,
+} from '@/stores/tarkov/progressAuthority';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   getPersistedPreferencesState,
@@ -126,6 +132,9 @@ export type BackupImportTargetModes = {
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
   exportSupersededProgress: () => Promise<void>;
+  exportDeviceProgressRecovery: () => Promise<void>;
+  legacyProgressRecoveryCount: Ref<number>;
+  reviewOlderTabProgress: (index: number) => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
   debugExportError: Ref<string | null>;
@@ -343,6 +352,38 @@ function validateBackup(json: unknown):
       seasonal,
     },
   };
+}
+function selectOlderTabRaw(copies: string[], index: number): string {
+  if (!Number.isInteger(index) || index < 0 || index >= copies.length) {
+    throw new Error('Older edit is unavailable');
+  }
+  return copies[index]!;
+}
+function parseOlderTabRaw(raw: string): unknown {
+  if (raw.length > 5 * 1024 * 1024) throw new Error('Older edit is too large');
+  return parseUserScopedStorage(raw)?.data ?? JSON.parse(raw);
+}
+function buildOlderTabBackup(raw: string): TarkovTrackerExport {
+  const source: unknown = parseOlderTabRaw(raw);
+  if (!isPlainObject(source)) throw new Error('Invalid older edit');
+  const candidate = {
+    ...source,
+    _format: BACKUP_FORMAT,
+    _version: 2,
+    exportedAt: Date.now(),
+    appVersion: 'older-tab',
+    seasonNumber: source.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
+  };
+  const checked = validateBackup(candidate);
+  if (!checked.ok) throw new Error(checked.error);
+  const migrated = sanitizeOwnedUserState(migrateToGameModeStructure(source));
+  return { ...checked.data.export, ...migrated };
+}
+function resolveRecoveryArchive(json: unknown): unknown {
+  if (!isPlainObject(json) || json._format !== 'tarkovtracker-device-progress') return json;
+  if (json._version !== 1 || typeof json.current !== 'string')
+    throw new Error('Invalid device archive');
+  return buildOlderTabBackup(json.current);
 }
 function buildPreview(
   exportData: TarkovTrackerExport,
@@ -766,6 +807,31 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  async function reviewOlderTabProgress(index: number): Promise<void> {
+    resetImport();
+    try {
+      const record = await readCommittedProgressAuthority();
+      const copies = ownedLegacyUpdates(record, $supabase.user.id ?? null);
+      const backup = buildOlderTabBackup(selectOlderTabRaw(copies, index));
+      await parseBackupFile(new File([JSON.stringify(backup)], 'older-tab.json'));
+    } catch (error) {
+      importState.value = 'error';
+      importError.value = error instanceof Error ? error.message : 'Failed to read older edit';
+    }
+  }
+  async function exportDeviceProgressRecovery(): Promise<void> {
+    const owner = $supabase.user.id ?? null;
+    const record = await readCommittedProgressAuthority();
+    const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
+    await downloadJsonFile('tarkovtracker-device-progress', {
+      _format: 'tarkovtracker-device-progress',
+      _version: 1,
+      exportedAt: Date.now(),
+      current: belongsToOwner(record.raw) ? record.raw : null,
+      original: belongsToOwner(record.legacyRaw) ? record.legacyRaw : null,
+      older_tab_edits: ownedLegacyUpdates(record, owner),
+    });
+  }
   async function exportSupersededProgress(): Promise<void> {
     const ownerId = $supabase.user.id;
     if (!ownerId) throw new Error('Sign in to export superseded progress');
@@ -786,9 +852,7 @@ export function useDataBackup(): UseDataBackupReturn {
       const currentPreferences = await sanitizePreferencesForDebug(
         getPersistedPreferencesState(preferencesStore.$state)
       );
-      const rawProgressStorage =
-        localStorage.getItem(STORAGE_KEYS.progress) ??
-        localStorage.getItem(LEGACY_STORAGE_KEYS.progress);
+      const rawProgressStorage = (await readCommittedProgressAuthority()).raw;
       const rawPreferencesStorage =
         localStorage.getItem(STORAGE_KEYS.preferences) ??
         localStorage.getItem(LEGACY_STORAGE_KEYS.preferences);
@@ -858,7 +922,7 @@ export function useDataBackup(): UseDataBackupReturn {
         importError.value = 'Failed to parse JSON — file may be corrupted';
         return;
       }
-      const result = validateBackup(json);
+      const result = validateBackup(resolveRecoveryArchive(json));
       if (!result.ok) {
         importState.value = 'error';
         importError.value = result.error;
@@ -935,6 +999,9 @@ export function useDataBackup(): UseDataBackupReturn {
   return {
     exportProgress,
     exportSupersededProgress,
+    exportDeviceProgressRecovery,
+    reviewOlderTabProgress,
+    legacyProgressRecoveryCount,
     exportError,
     exportDebugSnapshot,
     debugExportError,

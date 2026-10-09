@@ -1,9 +1,9 @@
 # Browser progress authority checkpoint
 
 W10 requires a transaction-backed browser progress record because a native Web Lock does not
-make another renderer's localStorage cache current. This checkpoint proposes a staged replacement
-and records the remaining rollout decision. The application still uses its existing storage paths;
-`progressRepository.ts` is an inactive substrate with no runtime callers. Issue #1091's preserved
+make another renderer's localStorage cache current. This checkpoint records the original
+native boundary investigation and the #1092 runtime integration. The application now uses the
+transactional active-envelope repository; the earlier typed substrate remains available for tests. Issue #1091's preserved
 reset implementation remains separate, and draft #1086 must retain its cached-client hold.
 
 ## Verified source and native boundary evidence
@@ -143,7 +143,8 @@ At first explicit migration, preserve the exact selected legacy bytes together w
 owner and original season, import version and authoritative state in the IDB transaction.
 Malformed/unknown/foreign-owner values become retained recovery material, not another owner's
 progress. The inactive substrate only retains caller-supplied first-import raw bytes; the
-recoverable source inventory and user discovery workflow are not implemented yet.
+runtime now retains the first import and observed older-tab bytes. Settings → Backup & Restore
+shows owned recovery edits, export and explicit import preview actions.
 
 After first adoption, later observed legacy values remain recovery candidates. Startup, focus,
 and notifications should discover available candidates and show a persistent recovery banner
@@ -236,3 +237,39 @@ put-success then transaction abort, quota/unavailable/blocked/newer-version fail
 A to B to A, crash/reopen, retained old-client writes, deletion reimport prevention and new-only
 export recovery. Focused tests use modest workers; CI owns broad validation. W10 is incomplete
 until those integration gates and the compatibility decision are resolved.
+
+## #1092 runtime integration contract
+
+The runtime bridge moves the existing active progress envelope into the repository's
+transactional object store, retaining its owner wrapper, mode clocks and reset epochs as exact
+bytes. The existing application merge, retention and quarantine policies continue to operate on
+those bytes. The transaction reads the latest envelope, validates the persisted session generation,
+applies the captured synchronous mutation and commits its replacement. Saved and memory/baseline
+adoption occur only after transaction completion; abort retains the old envelope and pending intent.
+
+Hydration must await an authoritative read before the synchronous Pinia adapter is installed.
+The adapter reads an accepted in-memory cache and queues asynchronous writes. Session transitions
+transfer pending intent before activating the next persisted owner generation. Same-account restarts
+renew the generation. Reset and explicit deletion retain the initialized record even when its payload
+is empty, preventing legacy reimport after reload. Recovery/quota checks may abort an active write;
+they cannot fall back to a localStorage overwrite.
+
+The initial legacy bytes stay retained with the new record. Existing localStorage progress keys
+remain untouched after adoption, with no dual writes or replacement projection. Later legacy edits
+remain recovery candidates and must be discoverable/exportable; they are never blindly merged into
+new authority. Older tabs retain existing cloud write access during this bridge. This preserves the
+current mixed-client cloud limits; server retirement and #1086 remain separate decisions.
+
+Acceptance covers the actual runtime boundary in separate native renderers: both writer orders,
+ordinary edits and selected/all-mode resets, first-save/import, reload, aborted transaction, session
+replacement, and export of committed new-only data. Primitive repository tests supplement that
+application evidence and do not replace it.
+
+The native app acceptance command is `pnpm run test:progress-app`, with `W10_CHROMIUM`
+and an offline local server at `PROGRESS_APP_URL` (default localhost:3102). Its receipt proves
+separate renderer processes, held/pending native locks, both write/reset orders, reload, quota
+failure/retry, recovery export and explicit preview without adoption. Repository integration tests
+cover transaction abort, account generations, blocked storage and corrupt/newer logical records.
+Signed-in browser behavior and server compatibility retirement remain outside this guest browser
+receipt; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
+import/recovery copies, retaining unattributable bytes and reporting incomplete removal.

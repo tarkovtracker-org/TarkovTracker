@@ -2068,7 +2068,10 @@
       "prestige_history_duration": "Run Duration",
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
-      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}"
+      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
+      "export_device_recovery": "Export saved device data and recovery copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} Prestige Complete",

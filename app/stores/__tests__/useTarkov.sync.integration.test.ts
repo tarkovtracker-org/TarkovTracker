@@ -608,6 +608,21 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('holds cloud startup when the authoritative repository is unavailable', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const ready = vi.spyOn(authority, 'isProgressAuthorityReady').mockReturnValue(false);
+    single.mockClear();
+    rpc.mockClear();
+    channel.mockClear();
+    try {
+      await initializeTarkovSync();
+      expect(single).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
+      expect(channel).not.toHaveBeenCalled();
+    } finally {
+      ready.mockRestore();
+    }
+  });
   it.each(
     GAME_MODE_VALUES.flatMap((mode) => [null, 3, 9].map((pendingLevel) => ({ mode, pendingLevel })))
   )(
@@ -2533,14 +2548,9 @@ describe('useTarkov sync integration', () => {
     );
     resetTarkovSync('user switched', { preservePersistedStateForUserId: 'user-2' });
     store.$reset();
-    localStorage.setItem(
-      STORAGE_KEYS.progress,
-      JSON.stringify({
-        _timestamp: base + 15_000,
-        _userId: 'user-2',
-        data: structuredClone(defaultState),
-      })
-    );
+    // A memory reset no longer creates an authoritative placeholder. Legacy-tab
+    // placeholder writes are isolated and recovered by the native authority tests.
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level).toBe(9);
     single.mockResolvedValue({
       data: createRemoteRow({ updated_at: new Date(base + 1_000).toISOString() }),
       error: null,
@@ -5453,4 +5463,8 @@ describe('useTarkov sync integration', () => {
       }
     );
   });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });
