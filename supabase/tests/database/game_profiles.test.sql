@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(29);
+SELECT plan(31);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000001001', 'profiles-supporter@example.invalid'),
@@ -48,6 +48,10 @@ SELECT throws_ok($$SELECT public.add_game_profile('Third', '3333')$$,
   'PT422', 'Game profile limit reached', 'a third profile is rejected');
 SELECT throws_ok($$SELECT public.update_game_profile(NULL, NULL, '2222')$$,
   'PT409', 'Game profile already exists for this account', 'one profile per EFT account id');
+SELECT throws_ok($$SELECT public.update_game_profile(NULL, repeat('x', 41), NULL)$$,
+  'PT400', 'Invalid game profile label or EFT account id', 'an over-long label is rejected');
+SELECT throws_ok($$SELECT public.update_game_profile(NULL, NULL, '12 34')$$,
+  'PT400', 'Invalid game profile label or EFT account id', 'a malformed EFT account id is rejected');
 SELECT is((SELECT jsonb_path_query_array(public.list_game_profiles()->'profiles', '$[*].is_default')),
   '[true, false]'::jsonb, 'the default profile is listed first');
 

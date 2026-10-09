@@ -208,6 +208,8 @@ BEGIN
     RETURNING id INTO v_new;
   EXCEPTION WHEN unique_violation THEN
     RAISE EXCEPTION 'Game profile already exists for this account' USING ERRCODE = 'PT409';
+  WHEN check_violation THEN
+    RAISE EXCEPTION 'Invalid game profile label or EFT account id' USING ERRCODE = 'PT400';
   END;
   RETURN jsonb_build_object('profile', private.game_profile_json(v_new));
 END;
@@ -255,6 +257,8 @@ BEGIN
     WHERE id = v_id;
   EXCEPTION WHEN unique_violation THEN
     RAISE EXCEPTION 'Game profile already exists for this account' USING ERRCODE = 'PT409';
+  WHEN check_violation THEN
+    RAISE EXCEPTION 'Invalid game profile label or EFT account id' USING ERRCODE = 'PT400';
   END;
   RETURN jsonb_build_object('profile', private.game_profile_json(v_id));
 END;

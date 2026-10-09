@@ -124,8 +124,8 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   `user_game_mode_progress`, keyed `(profile_id, game_mode, season_number)`. Both tables are
   deny-all; clients use `list_game_profiles`, `add_game_profile`, `update_game_profile`,
   `delete_game_profile`, `get_game_profile_progress`, and `sync_game_profile_progress`.
-- Cap: 2 profiles per account (default plus one), enforced in `add_game_profile`. Errors: `PT403`
-  locked, `PT404` unknown profile, `PT409` duplicate or default-profile misuse, `PT422` cap reached.
+- Cap: 2 profiles per account (default plus one), enforced in `add_game_profile`. Errors: `PT400`
+  invalid label or EFT account id, `PT403` locked, `PT404` unknown profile, `PT409` duplicate or default-profile misuse, `PT422` cap reached.
 - Access: `private.game_profiles_unlocked` is true for an active, non-disqualified supporter (same
   rule as `supporterStatus.ts`) or when `app_settings.game_profiles_access` is `"all"`; a missing
   setting means supporters only. Binding the default profile is never gated. A lapsed account keeps
