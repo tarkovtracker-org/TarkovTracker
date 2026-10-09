@@ -512,6 +512,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_game_profiles: {
+        Row: {
+          created_at: string
+          eft_account_id: string | null
+          game_edition: number | null
+          id: string
+          is_default: boolean
+          label: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          eft_account_id?: string | null
+          game_edition?: number | null
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          eft_account_id?: string | null
+          game_edition?: number | null
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string | null
@@ -791,6 +824,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profile_mode_progress: {
+        Row: {
+          created_at: string
+          game_mode: string
+          profile_id: string
+          profile_public: boolean
+          progress_data: Json
+          season_number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_mode: string
+          profile_id: string
+          profile_public?: boolean
+          progress_data?: Json
+          season_number?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          game_mode?: string
+          profile_id?: string
+          profile_public?: boolean
+          progress_data?: Json
+          season_number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profile_mode_progress_profile_fkey"
+            columns: ["profile_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "user_game_profiles"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       user_progress: {
         Row: {
           created_at: string | null
@@ -946,6 +1020,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_game_profile: {
+        Args: { p_eft_account_id: string; p_label: string }
+        Returns: Json
+      }
       archive_prestige_run_and_reset_progress: {
         Args: {
           p_archived_progress: Json
@@ -1001,9 +1079,17 @@ export type Database = {
           reset_at: string
         }[]
       }
+      delete_game_profile: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
       disband_team: {
         Args: { p_owner_id: string; p_team_id: string }
         Returns: boolean
+      }
+      get_game_profile_progress: {
+        Args: { p_profile_id: string }
+        Returns: Json
       }
       get_api_usage_summary: {
         Args: { p_limit?: number; p_since: string }
@@ -1020,6 +1106,10 @@ export type Database = {
       increment_token_usage: {
         Args: { p_token_id: string }
         Returns: undefined
+      }
+      list_game_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       merge_api_update_history: {
         Args: { max_entries?: number; payload: Json; previous_payload: Json }
@@ -1105,6 +1195,15 @@ export type Database = {
         }
         Returns: Json
       }
+      sync_game_profile_progress: {
+        Args: {
+          p_game_edition: number
+          p_modes: Json
+          p_profile_id: string
+          p_seasonal_season_number?: number
+        }
+        Returns: Json
+      }
       transfer_team_ownership: {
         Args: {
           p_new_owner_id: string
@@ -1112,6 +1211,14 @@ export type Database = {
           p_team_id: string
         }
         Returns: undefined
+      }
+      update_game_profile: {
+        Args: {
+          p_eft_account_id: string
+          p_label: string
+          p_profile_id: string
+        }
+        Returns: Json
       }
       update_task_completion: {
         Args: {
