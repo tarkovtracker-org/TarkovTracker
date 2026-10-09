@@ -10,6 +10,7 @@ import {
   ownedLegacyUpdates,
   isOwnedProgressRecovery,
   legacyProgressRecoveryCount,
+  discardExportedLegacyProgress,
 } from '@/stores/tarkov/progressAuthority';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
@@ -132,7 +133,7 @@ export type BackupImportTargetModes = {
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
   exportSupersededProgress: () => Promise<void>;
-  exportDeviceProgressRecovery: () => Promise<void>;
+  exportDeviceProgressRecovery: (clearOlderCopies?: boolean) => Promise<void>;
   legacyProgressRecoveryCount: Ref<number>;
   reviewOlderTabProgress: (index: number) => Promise<void>;
   exportError: Ref<string | null>;
@@ -819,18 +820,20 @@ export function useDataBackup(): UseDataBackupReturn {
       importError.value = error instanceof Error ? error.message : 'Failed to read older edit';
     }
   }
-  async function exportDeviceProgressRecovery(): Promise<void> {
+  async function exportDeviceProgressRecovery(clearOlderCopies = false): Promise<void> {
     const owner = $supabase.user.id ?? null;
     const record = await readCommittedProgressAuthority();
     const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
+    const copies = ownedLegacyUpdates(record, owner);
     await downloadJsonFile('tarkovtracker-device-progress', {
       _format: 'tarkovtracker-device-progress',
       _version: 1,
       exportedAt: Date.now(),
       current: belongsToOwner(record.raw) ? record.raw : null,
       original: belongsToOwner(record.legacyRaw) ? record.legacyRaw : null,
-      older_tab_edits: ownedLegacyUpdates(record, owner),
+      older_tab_edits: copies,
     });
+    if (clearOlderCopies) await discardExportedLegacyProgress(owner, copies);
   }
   async function exportSupersededProgress(): Promise<void> {
     const ownerId = $supabase.user.id;

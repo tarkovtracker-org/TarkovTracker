@@ -120,11 +120,22 @@ envelope: reread accepted state and reapply the original intent.
 
 An owner token includes a persisted generation. A transition A to B to A invalidates old A
 operations even though the account ID matches again. Joining an already-active owner can reuse
-its generation; deliberate same-account restart renews it. These are internal persistence
-fences, not an authorization system. A pending caller must also protect its own post-commit
+its generation, including a same-account local restart, so another tab for that owner remains
+writable. Activation checks live identity and the caller's session revision before changing the
+native session and after hydration; an obsolete callback cannot retire or adopt a replacement
+owner. These are internal persistence fences, not an authorization system. A pending caller must also protect its own post-commit
 memory patch against session changes and later edits. Results must not overwrite newer local
 intent or acknowledge a later pending edit. Broadcast and storage events request an IDB reread;
 they never carry authority or act as mandatory visibility waits.
+
+Runtime account saves replay captured field changes onto the latest transactional envelope.
+An unrelated edit's new mode timestamp cannot promote unchanged stale fields. Explicit startup
+or cloud hydration is captured separately with its source clocks. Local edits retained by the
+accepted reconciliation replay separately, so they cannot promote unchanged remote fields.
+Failed account intent remains an ordered prefix for the next edit and is consumed only after
+commit; a queued undo still applies after that prefix. Conditional remote acknowledgements compare
+the expected snapshot inside the transaction. Memory adoption and Saved acknowledgement remain
+deferred until commit completion.
 
 The substrate does not yet own serializer baselines, field-level intent reconstruction, recovery
 archives, cloud acknowledgements, startup UI, or network operations. Those remain integration
@@ -250,7 +261,7 @@ adoption occur only after transaction completion; abort retains the old envelope
 Hydration must await an authoritative read before the synchronous Pinia adapter is installed.
 The adapter reads an accepted in-memory cache and queues asynchronous writes. Session transitions
 transfer pending intent before activating the next persisted owner generation. Same-account restarts
-renew the generation. Reset and explicit deletion retain the initialized record even when its payload
+reuse the shared owner generation; actual owner changes advance it. Reset and explicit deletion retain the initialized record even when its payload
 is empty, preventing legacy reimport after reload. Recovery/quota checks may abort an active write;
 they cannot fall back to a localStorage overwrite.
 
@@ -273,3 +284,5 @@ cover transaction abort, account generations, blocked storage and corrupt/newer 
 Signed-in browser behavior and server compatibility retirement remain outside this guest browser
 receipt; #1086 retains its compatibility hold. Explicit device removal also removes owned IDB
 import/recovery copies, retaining unattributable bytes and reporting incomplete removal.
+
+Older-tab recovery stores each distinct snapshot once. Settings offers an explicit export-and-clear action: only owned copies included in the completed export are removed. Original device data, current saved progress, other owners, and edits arriving after export are preserved. No copies are automatically evicted.

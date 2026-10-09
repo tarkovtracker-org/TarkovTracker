@@ -602,7 +602,9 @@ const observeLegacyRecord = (
   }
   const last = current.lastLegacyRaw === undefined ? current.legacyRaw : current.lastLegacyRaw;
   if (raw === last) return current;
-  return { ...current, lastLegacyRaw: raw, legacyUpdates: [...(current.legacyUpdates ?? []), raw] };
+  const updates = current.legacyUpdates ?? [];
+  if (raw === current.legacyRaw || updates.includes(raw)) return { ...current, lastLegacyRaw: raw };
+  return { ...current, lastLegacyRaw: raw, legacyUpdates: [...updates, raw] };
 };
 const resolveLegacyRaw = (source: string | null | (() => string | null)): string | null =>
   typeof source === 'function' ? source() : source;
@@ -638,13 +640,18 @@ const withActiveRecord = <T>(
 /** Runtime bytes are opaque here: application retention/quarantine decides how to interpret them. */
 export const openActiveProgressRepository = async (factory: IDBFactory, name: string) => {
   const db = await openDatabase(factory, name);
-  const activateOwner = (owner: Owner, renew = false): Promise<ProgressOwnerToken> => {
+  const activateOwner = (
+    owner: Owner,
+    renew = false,
+    canContinue = () => true
+  ): Promise<ProgressOwnerToken> => {
     if (!isOwnerArgument(owner)) return Promise.reject(new TypeError('Invalid progress owner'));
     return transaction(db, 'readwrite', (store, finish, fail) => {
       readEntry(
         store,
         sessionKey,
         (entry) => {
+          if (!canContinue()) throw new ProgressRepositoryConflict('session');
           const token = nextOwnerToken(decodeSession(entry), owner, renew);
           requireCounter(token.generation, 'session');
           store.put({ version: 1, ...token }, sessionKey);

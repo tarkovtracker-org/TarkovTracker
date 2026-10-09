@@ -16,7 +16,8 @@ export const createProgressPolicyAuthority = () => {
   });
   return {
     initializeProgressAuthority: async () => {},
-    removeOwnedProgressRecovery: async () => true,
+    removeOwnedProgressRecovery: async () => ({ complete: true, released: true }),
+    discardExportedLegacyProgress: async () => {},
     configureProgressSession: () => {},
     currentProgressSessionOwner: () => undefined,
     isProgressAuthorityReady: () => true,

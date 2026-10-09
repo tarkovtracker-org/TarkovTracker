@@ -1,5 +1,6 @@
 import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
+import { initializeProgressAuthority } from '@/stores/tarkov/progressAuthority';
 import {
   hasPendingCloudChanges,
   markCloudSyncUnavailable,
@@ -264,6 +265,12 @@ export function useAppInitialization() {
     if (!authenticatedUserId || syncStarted) return;
     syncStarted = true;
     try {
+      await initializeProgressAuthority(
+        authenticatedUserId,
+        false,
+        () => !isStaleInitialization(expectedUserId, expectedToken)
+      );
+      if (isStaleInitialization(expectedUserId, expectedToken)) return;
       await initializeTarkovSync();
       // The replacement session owns syncStarted; stale completions must not clear it.
       if (isStaleInitialization(expectedUserId, expectedToken)) return;

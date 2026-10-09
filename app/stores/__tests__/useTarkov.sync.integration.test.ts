@@ -608,6 +608,28 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('keeps a same-owner peer writable after a local session reset', async () => {
+    const { IDBFactory } = await import('fake-indexeddb');
+    const { openActiveProgressRepository } = await import('@/stores/tarkov/progressRepository');
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const db = await openActiveProgressRepository(new IDBFactory(), 'same-owner-reset');
+    const peerToken = await db.activateOwner('user-1');
+    await db.read(peerToken, null);
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementation(async (owner, renew, canContinue) => {
+        await db.activateOwner(owner, renew, canContinue);
+      });
+    try {
+      await resetTarkovStoreForSessionTransition('user-1', 'same-owner reset');
+      await expect(
+        db.mutate(peerToken, () => ({ raw: 'peer-save', result: true }))
+      ).resolves.toMatchObject({ result: true });
+    } finally {
+      activate.mockRestore();
+      db.close();
+    }
+  });
   it('holds cloud startup when the authoritative repository is unavailable', async () => {
     const authority = await import('@/stores/tarkov/progressAuthority');
     const ready = vi.spyOn(authority, 'isProgressAuthorityReady').mockReturnValue(false);

@@ -736,7 +736,9 @@ export async function resetTarkovStoreForSessionTransition(
     if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
       return;
   }
-  await initializeProgressAuthority(currentUserId, true);
+  await initializeProgressAuthority(currentUserId, false, () =>
+    isCurrentSessionTransition(revision, currentUserId)
+  );
   if (!isCurrentSessionTransition(revision, currentUserId)) return;
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())

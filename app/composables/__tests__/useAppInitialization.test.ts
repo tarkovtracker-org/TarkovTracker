@@ -8,6 +8,14 @@ import {
   SYNC_RETRY_MAX_ATTEMPTS,
   useAppInitialization,
 } from '@/composables/useAppInitialization';
+const mockInitializeProgressAuthority = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => {}));
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return {
+    ...createProgressPolicyAuthority(),
+    initializeProgressAuthority: mockInitializeProgressAuthority,
+  };
+});
 const localeRef = ref('en');
 const setLocale = vi.fn(async (value: string) => {
   localeRef.value = value;
@@ -126,6 +134,7 @@ describe('useAppInitialization locale setup', () => {
         mockMetadataStore.languageCode = localeOverride === 'uk' ? 'en' : localeOverride;
       }
     });
+    mockInitializeProgressAuthority.mockReset().mockResolvedValue(undefined);
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
     mockHasPendingProgressHandoff.mockReset().mockReturnValue(false);
@@ -141,6 +150,53 @@ describe('useAppInitialization locale setup', () => {
     (logger.error as Mock).mockClear();
     mockSupabaseUser.loggedIn = false;
     mockSupabaseUser.id = null;
+  });
+  it('activates the signed-in owner before starting cloud sync after guest login', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    let finish!: () => void;
+    mockInitializeProgressAuthority.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'owner';
+    await flushPromises();
+    expect(mockInitializeProgressAuthority).toHaveBeenCalledWith(
+      'owner',
+      false,
+      expect.any(Function)
+    );
+    expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
+    finish();
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('fences a delayed owner activation when the identity changes', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    let finish!: () => void;
+    mockInitializeProgressAuthority.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'a';
+    await flushPromises();
+    const canContinue = mockInitializeProgressAuthority.mock.calls[0]![2] as () => boolean;
+    mockSupabaseUser.id = 'b';
+    await flushPromises();
+    expect(canContinue()).toBe(false);
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    finish();
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledOnce();
+    wrapper.unmount();
   });
   it('applies locale override through setLocale on mount', async () => {
     const wrapper = await mountWithComposable();
@@ -249,6 +305,7 @@ describe('useAppInitialization locale setup', () => {
     const wrapper = await mountWithComposable();
     await flushPromises();
     mockResetTarkovStoreForSessionTransition.mockClear();
+    mockInitializeProgressAuthority.mockReset().mockResolvedValue(undefined);
     mockInitializeTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockSupabaseUser.id = 'user-2';

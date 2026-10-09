@@ -57,6 +57,10 @@ type RemoteProgressSnapshot = {
   updatedAtByMode: Partial<Record<GameMode, number>>;
   metadataTimestamp?: number;
 };
+type CapturedProgressIntent = {
+  before: PersistedProgressSnapshot;
+  after: PersistedProgressSnapshot;
+};
 const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number => {
   if (
     mode === 'seasonal' &&
@@ -140,20 +144,105 @@ const initialGuestProgressSnapshot = (): PersistedProgressSnapshot => ({
   modeTimestamps: { pvp: 0, pve: 0, seasonal: 0 },
   hadDeprecatedProgressData: false,
 });
+const acceptHydrationModeClock = (
+  hydration: PersistedProgressSnapshot,
+  snapshot: RemoteProgressSnapshot,
+  mode: GameMode
+): void => {
+  if (!snapshot.next[mode] || !snapshot.remote[mode]) return;
+  hydration.modeTimestamps![mode] = snapshot.updatedAtByMode[mode] ?? 0;
+};
+const acceptHydrationSourceClocks = (
+  hydration: PersistedProgressSnapshot,
+  snapshot: RemoteProgressSnapshot
+): void => {
+  if (snapshot.metadataTimestamp !== undefined)
+    hydration.metadataTimestamp = snapshot.metadataTimestamp;
+  GAME_MODE_VALUES.forEach((mode) => acceptHydrationModeClock(hydration, snapshot, mode));
+};
+const acceptHydrationSnapshot = (
+  previous: PersistedProgressSnapshot | null,
+  snapshot: RemoteProgressSnapshot
+): PersistedProgressSnapshot => {
+  const hydration = cloneStateSnapshot(previous ?? initialGuestProgressSnapshot());
+  hydration.storedUserId = snapshot.userId;
+  hydration.modeTimestamps = { ...hydration.modeTimestamps };
+  acceptRemoteMetadata(hydration, snapshot);
+  GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(hydration, snapshot, mode));
+  acceptHydrationSourceClocks(hydration, snapshot);
+  return hydration;
+};
+const captureHydrationIntent = (
+  existing: CapturedProgressIntent | null,
+  before: PersistedProgressSnapshot | null,
+  after: PersistedProgressSnapshot
+): CapturedProgressIntent | null => {
+  const baseline = before ?? {
+    ...initialGuestProgressSnapshot(),
+    storedUserId: after.storedUserId,
+  };
+  if (!existing) return { before: cloneStateSnapshot(baseline), after: cloneStateSnapshot(after) };
+  return { ...existing, after: rebaseGuestSnapshot(existing.after, baseline, after, true) };
+};
+const retainedHydrationIntentRecord = (
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  accepted: Record<string, unknown>
+): Record<string, unknown> =>
+  Object.fromEntries(
+    [...new Set([...Object.keys(before), ...Object.keys(after)])]
+      .map((key) => [key, retainedHydrationIntentValue(before[key], after[key], accepted[key])])
+      .filter(([, value]) => value !== undefined)
+  );
+const retainedHydrationIntentValue = (
+  before: unknown,
+  after: unknown,
+  accepted: unknown
+): unknown => {
+  if (deepEqual(before, after)) return cloneStateSnapshot(before);
+  const values = [before, after, accepted];
+  if (values.every(isRecord))
+    return retainedHydrationIntentRecord(values[0]!, values[1]!, values[2]!);
+  return cloneStateSnapshot(deepEqual(after, accepted) ? after : before);
+};
+const retainAcceptedHydrationIntent = (
+  intent: CapturedProgressIntent | null,
+  accepted: PersistedProgressSnapshot
+): CapturedProgressIntent | null => {
+  if (!intent) return null;
+  return {
+    ...intent,
+    after: {
+      ...intent.after,
+      state: retainedHydrationIntentValue(
+        intent.before.state,
+        intent.after.state,
+        accepted.state
+      ) as UserState,
+    },
+  };
+};
 export const createProgressStorageSerializer = (
   readPrevious: (userId: string | null) => PersistedProgressSnapshot | null,
   persistAccepted?: (value: string, expected: PersistedProgressSnapshot | null) => void,
   resetScope?: (snapshot: PersistedProgressSnapshot | null) => void
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
+  let acceptedHydration: PersistedProgressSnapshot | null = null;
+  let hydrationIntent: CapturedProgressIntent | null = null;
   let guestSerialization: {
     value: string;
     state: UserState;
     baseline: PersistedProgressSnapshot | null;
+    hydration: PersistedProgressSnapshot | null;
+    hydrationIntent: CapturedProgressIntent | null;
   } | null = null;
   const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
-    if (previous?.storedUserId !== userId)
+    if (previous?.storedUserId !== userId) {
+      acceptedHydration = null;
+      hydrationIntent = null;
       previous = userId === null ? initialGuestProgressSnapshot() : readPrevious(userId);
+    }
     const baseline = previous ? cloneStateSnapshot(previous) : null;
     const editTimestamp = (clock: number) =>
       userId === null ? Math.max(timestamp, clock + 1) : timestamp;
@@ -189,7 +278,14 @@ export const createProgressStorageSerializer = (
       _userId: userId,
       data: state,
     });
-    guestSerialization = { value, state, baseline };
+    guestSerialization = {
+      value,
+      state,
+      baseline,
+      hydration:
+        acceptedHydration?.storedUserId === userId ? cloneStateSnapshot(acceptedHydration) : null,
+      hydrationIntent: cloneStateSnapshot(hydrationIntent),
+    };
     return value;
   };
   return {
@@ -203,6 +299,8 @@ export const createProgressStorageSerializer = (
     },
     retainBaseline: (userId: string, state: UserState) => {
       if (previous?.storedUserId === userId) return;
+      acceptedHydration = null;
+      hydrationIntent = null;
       previous = {
         ...cloneStateSnapshot({
           ...(readPrevious(userId) ?? {
@@ -215,7 +313,9 @@ export const createProgressStorageSerializer = (
         storedUserId: userId,
       };
     },
-    reset: (snapshot: PersistedProgressSnapshot | null = null) => {
+    reset: (snapshot: PersistedProgressSnapshot | null = null, acceptHydration = false) => {
+      acceptedHydration = acceptHydration ? cloneStateSnapshot(snapshot) : null;
+      hydrationIntent = null;
       resetScope?.(snapshot);
       guestSerialization = null;
       previous = snapshot
@@ -229,11 +329,18 @@ export const createProgressStorageSerializer = (
       // would incorrectly timestamp downloaded progress as a new local edit.
       serialize(snapshot.state, snapshot.userId, Date.now());
       const accepted = previous!;
+      hydrationIntent = captureHydrationIntent(
+        hydrationIntent,
+        guestSerialization?.baseline ?? null,
+        accepted
+      );
       const persistedBefore = readPrevious(snapshot.userId);
       const canPersist = matchesPersistedSnapshot(persistedBefore, accepted);
       const expected = persistedBefore ? cloneStateSnapshot(accepted) : null;
       acceptRemoteMetadata(accepted, snapshot);
       GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(accepted, snapshot, mode));
+      acceptedHydration = acceptHydrationSnapshot(acceptedHydration, snapshot);
+      hydrationIntent = retainAcceptedHydrationIntent(hydrationIntent, accepted);
       // Matching echoes may require no Pinia patch. Persist the accepted clocks
       // now so a reload cannot restore an obsolete client-side edit timestamp.
       // Another tab may have persisted an unsaved edit since our last write.
@@ -297,6 +404,16 @@ const markLocalProgressPending = (revision: number, cloudHeld = false): void => 
 const pendingProgressWrites = new Map<number, ProgressWriteRequest>();
 /** Logical guest intent outlives request cancellation; only a commit or explicit scope clears it. */
 const retainedGuestPrefixes = new Map<object, ProgressWriteRequest[]>();
+const retainedAccountFailures = new Map<
+  object,
+  { intent: CapturedProgressIntent; error: unknown }
+>();
+const clearRetainedAccountFailures = (owner?: string): void => {
+  for (const [source, failure] of retainedAccountFailures) {
+    if (owner === undefined || failure.intent.after.storedUserId === owner)
+      retainedAccountFailures.delete(source);
+  }
+};
 export const discardGuestProgressIntent = (): void => retainedGuestPrefixes.clear();
 const guestProgressWrites = (): ProgressWriteRequest[] => [
   ...[...retainedGuestPrefixes.values()].flat(),
@@ -351,6 +468,7 @@ const activeProgressOperations = new Set<Promise<StorageWriteResult>>();
 /** Cancel queued writes before changing the session or intentionally clearing its progress. */
 export const invalidateActiveProgressWrites = (owner?: string, cloudHeld = false): void => {
   const pending = latestPendingProgressWrite();
+  clearRetainedAccountFailures(owner);
   retainCancelingGuestWrites(owner);
   progressStorageSerializer.clearGuestSource();
   discardPendingProgressWrites(owner);
@@ -579,6 +697,9 @@ type ProgressWriteRequest = {
   expected?: PersistedProgressSnapshot | null;
   handoffBaseline?: PersistedProgressSnapshot | null;
   baseline: PersistedProgressSnapshot | null;
+  /** Explicit cloud/startup adoption retains its original clocks, separate from local edits. */
+  hydration?: PersistedProgressSnapshot | null;
+  hydrationIntent?: CapturedProgressIntent | null;
   /** Before-state for replaying captured intent against observed storage; failure may fold it. */
   guestBaseline: PersistedProgressSnapshot | null;
   /** Before-state in visible memory's representation; only adoption may rebase it. */
@@ -1263,6 +1384,25 @@ const applyAccountProgressWrite = (request: ProgressWriteRequest): StorageWriteR
     return writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
   return commitAccountProgressWrite(request, current, incoming);
 };
+const acceptedAccountWriteBaseline = (
+  request: ProgressWriteRequest,
+  current: PersistedProgressSnapshot
+): PersistedProgressSnapshot => {
+  const hydrated = request.hydration
+    ? reconcileGuestSnapshots(request.hydration, current)
+    : current;
+  const intent = request.hydrationIntent;
+  return intent ? rebaseGuestSnapshot(hydrated, intent.before, intent.after) : hydrated;
+};
+const replayFailedAccountIntent = (
+  request: ProgressWriteRequest,
+  accepted: PersistedProgressSnapshot
+): PersistedProgressSnapshot => {
+  const failure = retainedAccountFailures.get(request.source!.key);
+  return failure
+    ? rebaseGuestSnapshot(accepted, failure.intent.before, failure.intent.after)
+    : accepted;
+};
 const commitAccountProgressWrite = (
   request: ProgressWriteRequest,
   current: PersistedProgressSnapshot,
@@ -1272,8 +1412,9 @@ const commitAccountProgressWrite = (
     ...initialGuestProgressSnapshot(),
     storedUserId: incoming.storedUserId,
   };
+  // Only explicit hydration contributes untouched fields, using its original source clocks.
   const accepted = rebaseGuestSnapshot(
-    reconcileGuestSnapshots(incoming, current),
+    replayFailedAccountIntent(request, acceptedAccountWriteBaseline(request, current)),
     before,
     incoming
   );
@@ -1282,7 +1423,11 @@ const commitAccountProgressWrite = (
     encodeProgressSnapshot(accepted),
     request.cloudHeld
   );
-  if (result.ok) afterProgressCommit(() => adoptAccountProgressWrite(request, accepted, incoming));
+  if (result.ok)
+    afterProgressCommit(() => {
+      retainedAccountFailures.delete(request.source!.key);
+      adoptAccountProgressWrite(request, accepted, incoming);
+    });
   return result;
 };
 const adoptAccountProgressWrite = (
@@ -1319,7 +1464,12 @@ const recordProgressWriteResult = (
 };
 const recordGuestSaveAcknowledgement = (): void => {
   const failed = [...retainedGuestPrefixes.values()].flat()[0];
-  if (failed) recordLocalSave(false, classifyLocalSaveFailure(failed.failedGuest?.error));
+  const accountFailure = [...retainedAccountFailures.values()][0];
+  if (failed || accountFailure)
+    recordLocalSave(
+      false,
+      classifyLocalSaveFailure(failed?.failedGuest?.error ?? accountFailure?.error)
+    );
   else recordLocalSave(true);
 };
 const isRetainableGuestWriteFailure = (
@@ -1327,11 +1477,30 @@ const isRetainableGuestWriteFailure = (
   result: StorageWriteResult
 ): result is Extract<StorageWriteResult, { ok: false }> =>
   !result.ok && !result.canceled && Boolean(request.source) && isOrdinaryGuestWrite(request);
+const isCapturedAccountWrite = (request: ProgressWriteRequest): boolean =>
+  Boolean(request.source) && Boolean(parseUserScopedStorage<unknown>(request.value)?._userId);
+const retainFailedAccountIntent = (request: ProgressWriteRequest, error: unknown): void => {
+  const owner = parseUserScopedStorage<unknown>(request.value)?._userId ?? null;
+  const incoming = parsePersistedProgressState(request.value, owner);
+  if (!incoming) return;
+  const before = request.baseline ?? { ...initialGuestProgressSnapshot(), storedUserId: owner };
+  const existing = retainedAccountFailures.get(request.source!.key)?.intent;
+  const intent = captureHydrationIntent(existing ?? null, before, incoming)!;
+  retainedAccountFailures.set(request.source!.key, { intent, error });
+};
+const rememberAccountWriteFailure = (
+  request: ProgressWriteRequest,
+  result: StorageWriteResult
+): void => {
+  if (result.ok || result.canceled) return;
+  if (isCapturedAccountWrite(request)) retainFailedAccountIntent(request, result.error);
+};
 const finishProgressWriteResult = (
   request: ProgressWriteRequest,
   valueRevision: number,
   result: StorageWriteResult
 ): void => {
+  rememberAccountWriteFailure(request, result);
   if (isRetainableGuestWriteFailure(request, result))
     retainUnregisteredGuestFailure(request, valueRevision, result.error);
   else finishPendingProgressWrite(valueRevision);
@@ -1370,6 +1539,8 @@ export const persistActiveProgressValue = async (
       handoffBaseline === undefined
         ? capturedProgressWriteBaseline(value, captured?.baseline)
         : handoffBaseline,
+    hydration: captured?.hydration,
+    hydrationIntent: captured?.hydrationIntent,
     guestBaseline: captured?.baseline ?? null,
     guestMemoryBaseline: captured?.baseline ?? null,
     handoff: handoffBaseline !== undefined,

@@ -69,6 +69,17 @@ describe('active progress envelope authority', () => {
     await expect(repository.mutate(token, mutate)).rejects.toMatchObject({ reason: 'session' });
     expect(mutate).not.toHaveBeenCalled();
   });
+  it('does not retire the current owner for an obsolete queued activation', async () => {
+    const b = await repository.activateOwner('b');
+    await repository.read(b, 'original');
+    let current = true;
+    const activation = repository.activateOwner('a', false, () => current);
+    current = false;
+    await expect(activation).rejects.toMatchObject({ reason: 'session' });
+    await expect(
+      repository.mutate(b, () => ({ raw: 'saved', result: true }))
+    ).resolves.toMatchObject({ result: true });
+  });
   it('requires hydration before mutation instead of inventing an empty record', async () => {
     await expect(
       repository.mutate(token, () => ({ raw: 'new', result: true }))

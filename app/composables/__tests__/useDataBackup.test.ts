@@ -1558,6 +1558,51 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it.each([false, true])(
+    'clears exported copies only after download starts (download failure: %s)',
+    async (fails) => {
+      const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockResolvedValue({
+        version: 1,
+        revision: 1,
+        raw,
+        legacyRaw: raw,
+        legacyUpdates: [raw],
+      });
+      const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+      const clear = vi
+        .spyOn(progressAuthority, 'discardExportedLegacyProgress')
+        .mockResolvedValue();
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      vi.stubGlobal('URL', {
+        createObjectURL: vi.fn(() => {
+          if (fails) throw new Error('download unavailable');
+          return 'blob:recovery';
+        }),
+        revokeObjectURL: vi.fn(),
+      });
+      try {
+        const exportResult = useDataBackup().exportDeviceProgressRecovery(true);
+        if (fails) {
+          await expect(exportResult).rejects.toThrow('download unavailable');
+          expect(clear).not.toHaveBeenCalled();
+        } else {
+          await exportResult;
+          expect(click).toHaveBeenCalledOnce();
+          expect(clear).toHaveBeenCalledWith('user-123', [raw]);
+          expect(click.mock.invocationCallOrder[0]).toBeLessThan(
+            clear.mock.invocationCallOrder[0]!
+          );
+        }
+      } finally {
+        vi.unstubAllGlobals();
+        read.mockRestore();
+        owned.mockRestore();
+        clear.mockRestore();
+        click.mockRestore();
+      }
+    }
+  );
   const ownedRaw = () => JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
   it('previews an owned edit without applying it', async () => {
     tarkovStore.$patch.mockClear();

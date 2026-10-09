@@ -779,6 +779,37 @@
             >
               {{ $t('settings.data_management.export_device_recovery') }}
             </UButton>
+            <UButton
+              v-if="legacyProgressRecoveryCount && !confirmRecoveryCleanup"
+              color="neutral"
+              variant="soft"
+              data-testid="older-tab-cleanup"
+              @click="confirmRecoveryCleanup = true"
+            >
+              {{ $t('settings.data_management.clear_older_copies') }}
+            </UButton>
+            <div v-if="confirmRecoveryCleanup" class="space-y-2">
+              <p class="text-surface-400 text-sm">
+                {{ $t('settings.data_management.clear_older_copies_confirmation') }}
+              </p>
+              <UButton
+                color="warning"
+                :loading="recoveryCleanupRunning"
+                :disabled="recoveryCleanupRunning"
+                data-testid="older-tab-cleanup-confirm"
+                @click="handleRecoveryCleanup"
+              >
+                {{ $t('settings.data_management.export_and_clear_older_copies') }}
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="soft"
+                :disabled="recoveryCleanupRunning"
+                @click="confirmRecoveryCleanup = false"
+              >
+                {{ $t('common.cancel') }}
+              </UButton>
+            </div>
           </div>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
@@ -1099,6 +1130,8 @@
     confirmBackupImport,
     resetImport: resetBackupImport,
   } = dataManagementSession.backup;
+  const confirmRecoveryCleanup = ref(false);
+  const recoveryCleanupRunning = ref(false);
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
   const importTarget = ref<GameMode | 'all'>('all');
   function resetBackupPreview() {
@@ -1127,6 +1160,21 @@
         description: String(error),
         color: 'error',
       });
+    }
+  }
+  async function handleRecoveryCleanup() {
+    recoveryCleanupRunning.value = true;
+    try {
+      await exportDeviceProgressRecovery(true);
+      confirmRecoveryCleanup.value = false;
+    } catch (error) {
+      toast.add({
+        title: t('settings.data_management.export_error_title'),
+        description: String(error),
+        color: 'error',
+      });
+    } finally {
+      recoveryCleanupRunning.value = false;
     }
   }
   async function handleExportDebugSnapshot() {

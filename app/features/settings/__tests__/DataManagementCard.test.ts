@@ -27,10 +27,13 @@ const {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
     exportProgress: vi.fn(async () => undefined),
+    exportDeviceProgressRecovery: vi.fn(async (_clear?: boolean) => undefined),
+    reviewOlderTabProgress: vi.fn(async () => undefined),
     parseBackupFile: vi.fn(async () => undefined),
     resetImport: vi.fn(),
   },
   backupState: {
+    legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -120,6 +123,9 @@ vi.mock('@/composables/useDataBackup', () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
     debugExportError: backupState.debugExportError,
     exportProgress: backupFns.exportProgress,
+    exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
+    reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
+    legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -213,6 +219,8 @@ describe('DataManagementCard', () => {
     backupFns.confirmBackupImport.mockReset();
     backupFns.exportDebugSnapshot.mockReset();
     backupFns.exportProgress.mockReset();
+    backupFns.exportDeviceProgressRecovery.mockReset();
+    backupState.legacyProgressRecoveryCount.value = 0;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -1027,5 +1035,22 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper();
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);
+  });
+  it('requires confirmation before exporting and clearing older copies', async () => {
+    backupState.legacyProgressRecoveryCount.value = 2;
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith(true);
+  });
+  it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
+    backupState.legacyProgressRecoveryCount.value = 1;
+    backupFns.exportDeviceProgressRecovery.mockRejectedValueOnce(new Error('export failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(expect.objectContaining({ color: 'error' }));
+    expect(wrapper.find('[data-testid="older-tab-cleanup-confirm"]').exists()).toBe(true);
   });
 });

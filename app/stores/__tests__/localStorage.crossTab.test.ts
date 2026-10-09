@@ -68,6 +68,119 @@ describe('active progress across tabs', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('preserves failed account intent through a later unrelated save and queued undo', async () => {
+    auth.owner = 'owner';
+    const tab = await openTab();
+    const original = envelope('owner', 30);
+    values.set(STORAGE_KEYS.progress, original);
+    const state = structuredClone(defaultState);
+    state.pvp.level = 30;
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, 'owner'));
+    state.pvp.level = 20;
+    const save = vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    expect(
+      await tab.persistActiveProgressValue(
+        tab.progressStorageSerializer.serialize(state, 'owner', 200)
+      )
+    ).toBe(false);
+    state.pvp.xpOffset = 50;
+    const retry = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, 'owner', 300)
+    );
+    state.pvp.level = 30;
+    const undo = tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, 'owner', 400)
+    );
+    await retry;
+    const savedRetry = tab.parsePersistedProgressState(save.mock.calls[1]![1], 'owner')!;
+    expect(savedRetry.state.pvp).toMatchObject({ level: 20, xpOffset: 50 });
+    await undo;
+    expect(
+      tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!.state.pvp
+    ).toMatchObject({ level: 30, xpOffset: 50 });
+  });
+  it('accepted remote merge does not promote a stale level beside unsaved xp', async () => {
+    auth.owner = 'owner';
+    const tab = await openTab();
+    const originalState = structuredClone(defaultState);
+    originalState.pvp.level = 30;
+    const original = JSON.stringify({
+      _userId: 'owner',
+      _timestamp: 100,
+      _modeTimestamps: { pvp: 100, pve: 100, seasonal: 100 },
+      _metadataTimestamp: 100,
+      data: originalState,
+    });
+    values.set(STORAGE_KEYS.progress, original);
+    tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, 'owner'));
+    const state = structuredClone(originalState);
+    state.pvp.xpOffset = 50;
+    const current = structuredClone(originalState);
+    current.pvp.level = 20;
+    values.set(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _userId: 'owner',
+        _timestamp: 200,
+        _modeTimestamps: { pvp: 200, pve: 100, seasonal: 100 },
+        _metadataTimestamp: 100,
+        data: current,
+      })
+    );
+    vi.spyOn(Date, 'now').mockReturnValue(300);
+    tab.progressStorageSerializer.acceptRemote({
+      state,
+      userId: 'owner',
+      remote: originalState,
+      next: state,
+      updatedAtByMode: { pvp: 100, pve: 100, seasonal: 100 },
+      metadataTimestamp: 100,
+    });
+    await tab.persistActiveProgressValue(
+      tab.progressStorageSerializer.serialize(state, 'owner', 400)
+    );
+    const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!;
+    expect(saved.state.pvp.level).toBe(20);
+    expect(saved.state.pvp.xpOffset).toBe(50);
+  });
+  it.each([false, true])(
+    'replays only captured account edits over concurrent same-mode corrections, hydrated=%s',
+    async (hydrated) => {
+      auth.owner = 'owner';
+      const first = await openTab();
+      const second = await openTab();
+      const original = envelope('owner', 30);
+      values.set(STORAGE_KEYS.progress, original);
+      const a = structuredClone(defaultState);
+      const b = structuredClone(defaultState);
+      a.pvp.level = b.pvp.level = 30;
+      first.progressStorageSerializer.reset(first.parsePersistedProgressState(original, 'owner'));
+      second.progressStorageSerializer.reset(second.parsePersistedProgressState(original, 'owner'));
+      if (hydrated)
+        second.progressStorageSerializer.acceptRemote({
+          state: b,
+          userId: 'owner',
+          remote: b,
+          next: b,
+          updatedAtByMode: { pvp: 100, pve: 100, seasonal: 100 },
+          metadataTimestamp: 100,
+        });
+      a.pvp.level = 20;
+      await first.persistActiveProgressValue(
+        first.progressStorageSerializer.serialize(a, 'owner', 200)
+      );
+      b.pvp.xpOffset = 50;
+      await second.persistActiveProgressValue(
+        second.progressStorageSerializer.serialize(b, 'owner', 300)
+      );
+      const saved = second.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!;
+      expect(saved.state.pvp.level).toBe(20);
+      expect(saved.state.pvp.xpOffset).toBe(50);
+      expect(b.pvp).toEqual(saved.state.pvp);
+    }
+  );
   it('review regression: a stale PvP reset preserves saved PvE corrections and reload', async () => {
     const resetter = await openTab();
     const writer = await openTab();

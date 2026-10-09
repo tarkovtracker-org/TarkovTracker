@@ -4,7 +4,6 @@ import {
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 type Repository = Awaited<ReturnType<typeof openActiveProgressRepository>>;
 type Result = { ok: true } | { ok: false; error: unknown; canceled?: true };
 type Draft = { raw: string | null; actions: Array<() => void> };
@@ -14,6 +13,7 @@ let accepted: ActiveProgressRecord | undefined;
 let draft: Draft | undefined;
 export const legacyProgressRecoveryCount = ref(0);
 let announcements: BroadcastChannel | undefined;
+let activationRevision = 0;
 let readSessionOwner: (() => string | null) | undefined;
 export const configureProgressSession = (readOwner: () => string | null): void => {
   readSessionOwner = readOwner;
@@ -81,16 +81,35 @@ export const observeProgressAuthority = (onError: (error: unknown) => void): (()
     window.removeEventListener('storage', storage);
   };
 };
+const hydrateActivatedProgressOwner = async (
+  db: Repository,
+  next: ProgressOwnerToken,
+  canContinue: () => boolean
+): Promise<void> => {
+  if (!canContinue()) return;
+  const current = await db.read(next, legacySource);
+  if (!canContinue()) return;
+  token = next;
+  acceptAuthority(current);
+};
 /** Explicit session activation, never an implicit retry of a stale writer. */
 export const initializeProgressAuthority = async (
   owner: string | null,
-  renew = false
+  renew = false,
+  canContinue = () => true
 ): Promise<void> => {
-  const db = await openRepository();
-  const next = await db.activateOwner(owner, renew);
-  const current = await db.read(next, legacySource);
-  token = next;
-  acceptAuthority(current);
+  const ownsSession = () => canContinue() && (!readSessionOwner || readSessionOwner() === owner);
+  if (!ownsSession()) return;
+  const revision = ++activationRevision;
+  const ownsActivation = () => revision === activationRevision && ownsSession();
+  try {
+    const db = await openRepository();
+    if (!ownsActivation()) return;
+    const next = await db.activateOwner(owner, renew, ownsActivation);
+    await hydrateActivatedProgressOwner(db, next, ownsActivation);
+  } catch (error) {
+    if (ownsActivation()) throw error;
+  }
 };
 export const readAuthoritativeProgress = (): string | null => {
   if (draft) return draft.raw;
@@ -158,26 +177,26 @@ export const readCommittedProgressAuthority = async (): Promise<ActiveProgressRe
 export const removeOwnedProgressRecovery = async (
   owner: string,
   canContinue = () => true
-): Promise<boolean> => {
-  if (!token) return false;
+): Promise<{ complete: boolean; released: boolean }> => {
+  if (!token) return { complete: false, released: false };
   const request = structuredClone(token);
   let complete = true;
   const keep = (raw: string | null): string | null => {
     if (raw === null) return null;
-    const envelope = parseUserScopedStorage(raw);
-    if (!envelope) {
+    const rawOwner = recoveryRawOwner(raw);
+    if (rawOwner === null) {
       complete = false;
       return raw;
     }
-    return envelope._userId === owner ? null : raw;
+    return rawOwner === owner ? null : raw;
   };
   const receipt = await (
     await openRepository()
   ).mutate(request, (current) => {
     if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
     return {
-      raw: current.raw,
-      result: true,
+      raw: keep(current.raw),
+      result: current.raw === null || recoveryRawOwner(current.raw) !== null,
       recovery: {
         legacyRaw: keep(current.legacyRaw),
         lastLegacyRaw: keep(current.lastLegacyRaw ?? null),
@@ -185,7 +204,36 @@ export const removeOwnedProgressRecovery = async (
       },
     };
   });
-  if (!canContinue()) return false;
+  if (!canContinue()) return { complete: false, released: false };
   acceptAuthority(receipt.committed);
-  return complete;
+  return { complete, released: receipt.result };
+};
+/** Explicit cleanup removes only snapshots included in the completed export. */
+export const discardExportedLegacyProgress = async (
+  owner: string | null,
+  copies: readonly string[]
+): Promise<void> => {
+  if (!token || token.owner !== owner)
+    throw new DOMException('Progress owner changed', 'InvalidStateError');
+  const request = structuredClone(token);
+  const isCurrent = () =>
+    token?.generation === request.generation && (!readSessionOwner || readSessionOwner() === owner);
+  const exported = new Set(copies);
+  const keep = (raw: string | null) => !isOwnedProgressRecovery(raw, owner) || !exported.has(raw);
+  const receipt = await (
+    await openRepository()
+  ).mutate(request, (current) => {
+    if (!isCurrent()) throw new DOMException('Progress owner changed', 'InvalidStateError');
+    return {
+      raw: current.raw,
+      result: true,
+      recovery: {
+        legacyRaw: current.legacyRaw,
+        legacyUpdates: (current.legacyUpdates ?? []).filter(keep),
+      },
+    };
+  });
+  if (!isCurrent()) throw new DOMException('Progress owner changed', 'InvalidStateError');
+  acceptAuthority(receipt.committed);
+  announcements?.postMessage({ revision: receipt.committed.revision });
 };

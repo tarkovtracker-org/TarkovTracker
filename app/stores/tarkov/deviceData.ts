@@ -188,19 +188,25 @@ const updateRemovalWriteBarrier = (userId: string, activeReleased: boolean): voi
 };
 const removeNativeRecoveryCopies = async (
   userId: string,
-  activeRemoved: boolean,
+  activeRemoval: RemovalResult,
   canContinue: () => boolean
-): Promise<boolean> => {
+): Promise<RemovalResult> => {
   try {
     const removed = await removeOwnedProgressRecovery(userId, canContinue);
-    if (!canContinue()) return false;
-    return finishRecoveryRemoval(userId, removed, activeRemoved);
+    if (!canContinue()) return { complete: false, released: false };
+    return combineNativeRemoval(userId, removed, activeRemoval);
   } catch {
-    return false;
+    return { complete: false, released: false };
   }
 };
-const finishRecoveryRemoval = (userId: string, removed: boolean, activeRemoved: boolean): boolean =>
-  removeOwnedLegacyProgress(userId) && removed && activeRemoved;
+const combineNativeRemoval = (
+  userId: string,
+  removed: RemovalResult,
+  activeRemoval: RemovalResult
+): RemovalResult => ({
+  complete: removeOwnedLegacyProgress(userId) && removed.complete && activeRemoval.complete,
+  released: removed.released && activeRemoval.released,
+});
 /** Legacy projections remain untouched except during explicit owner removal. */
 const removeOwnedLegacyProgress = (userId: string): boolean => {
   try {
@@ -238,7 +244,8 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
   // A canceled active-slot operation is not a storage failure. A later sign-in or
   // removal request must keep its copies and must not inherit this attempt's barrier.
   if (!isCurrent()) return false;
-  let removed = await removeNativeRecoveryCopies(userId, activeRemoval.complete, isCurrent);
+  const nativeRemoval = await removeNativeRecoveryCopies(userId, activeRemoval, isCurrent);
+  let removed = nativeRemoval.complete;
   if (!isCurrent()) return false;
   // An earlier queued replacement can retain the owner's active bytes while removal waits.
   removed = removeAccountRecoveryCopy(userId) && removed;
@@ -253,7 +260,7 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
     removed;
   if (!isCurrent()) return false;
   removed = !quarantineRemainsForOwner(userId) && removed;
-  updateRemovalWriteBarrier(userId, activeRemoval.released);
+  updateRemovalWriteBarrier(userId, nativeRemoval.released);
   return removed;
 };
 /**

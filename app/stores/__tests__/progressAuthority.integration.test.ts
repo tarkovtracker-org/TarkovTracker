@@ -126,6 +126,70 @@ describe('native progress authority integration', () => {
     vi.restoreAllMocks();
     expect((await a.readCommittedProgressAuthority()).raw).toBe('original');
   });
+  it('lets same-owner tabs commit without retiring their shared session generation', async () => {
+    const a = await open('a');
+    vi.resetModules();
+    const b = await open('a');
+    await b.initializeProgressAuthority('a');
+    await expect(
+      a.commitProgressMutation(
+        () => {
+          a.writeAuthoritativeProgress('peer-save');
+          return { ok: true };
+        },
+        () => true,
+        'a'
+      )
+    ).resolves.toEqual({ ok: true });
+    expect((await b.readCommittedProgressAuthority()).raw).toBe('peer-save');
+  });
+  it('does not adopt an obsolete activation that finishes reading after the new owner', async () => {
+    const module = await import('@/stores/tarkov/progressRepository');
+    const db = await module.openActiveProgressRepository(
+      factory,
+      'tarkovtracker-active-progress-v1'
+    );
+    let release!: () => void;
+    let reading!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    vi.spyOn(module, 'openActiveProgressRepository').mockResolvedValue({
+      ...db,
+      read: async (...args) => {
+        const record = await db.read(...args);
+        if (args[0].owner === 'a') {
+          reading();
+          await gate;
+        }
+        return record;
+      },
+    });
+    const a = await import('@/stores/tarkov/progressAuthority');
+    let owner = 'a';
+    a.configureProgressSession(() => owner);
+    const old = a.initializeProgressAuthority('a');
+    await started;
+    owner = 'b';
+    await a.initializeProgressAuthority('b');
+    release();
+    await old;
+    expect(a.isProgressAuthorityReady()).toBe(true);
+    await expect(
+      a.commitProgressMutation(
+        () => {
+          a.writeAuthoritativeProgress('b-save');
+          return { ok: true };
+        },
+        () => true,
+        'b'
+      )
+    ).resolves.toEqual({ ok: true });
+    db.close();
+  });
   it('rejects an old tab after A to B to A before invoking its mutation', async () => {
     const a = await open('a');
     vi.resetModules();
@@ -180,7 +244,7 @@ describe('native progress authority integration', () => {
     await a.refreshProgressAuthority();
     localStorage.setItem(STORAGE_KEYS.progress, original);
     await a.refreshProgressAuthority();
-    expect(await a.removeOwnedProgressRecovery('a')).toBe(true);
+    expect(await a.removeOwnedProgressRecovery('a')).toEqual({ complete: true, released: true });
     // Device removal clears the native legacy key too; it must not be re-observed.
     localStorage.removeItem(STORAGE_KEYS.progress);
     expect(await a.readCommittedProgressAuthority()).toMatchObject({
@@ -192,8 +256,39 @@ describe('native progress authority integration', () => {
   it('preserves unattributable recovery bytes and reports incomplete device removal', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, 'opaque original');
     const a = await open('a');
-    expect(await a.removeOwnedProgressRecovery('a')).toBe(false);
+    expect(await a.removeOwnedProgressRecovery('a')).toEqual({ complete: false, released: false });
     expect((await a.readCommittedProgressAuthority()).legacyRaw).toBe('opaque original');
+  });
+  it('purges owned committed active bytes even when this runtime cached an empty slot', async () => {
+    const a = await open('a');
+    vi.resetModules();
+    const b = await open('a');
+    const raw = JSON.stringify({ _userId: 'a', data: { pvp: { level: 55 } } });
+    await b.commitProgressMutation(
+      () => {
+        b.writeAuthoritativeProgress(raw);
+        return { ok: true };
+      },
+      () => true,
+      'a'
+    );
+    expect(a.readAuthoritativeProgress()).toBeNull();
+    expect(await a.removeOwnedProgressRecovery('a')).toEqual({ complete: true, released: true });
+    expect((await a.readCommittedProgressAuthority()).raw).toBeNull();
+  });
+  it('keeps unattributable active bytes and marks the active slot unreleased', async () => {
+    const a = await open('a');
+    const raw = JSON.stringify({ data: { pvp: { level: 55 } } });
+    await a.commitProgressMutation(
+      () => {
+        a.writeAuthoritativeProgress(raw);
+        return { ok: true };
+      },
+      () => true,
+      'a'
+    );
+    expect(await a.removeOwnedProgressRecovery('a')).toEqual({ complete: false, released: false });
+    expect((await a.readCommittedProgressAuthority()).raw).toBe(raw);
   });
   it('rebases each concurrent runtime mutation on the committed envelope', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ pvp: 20, pve: 42 }));

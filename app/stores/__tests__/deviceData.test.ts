@@ -18,6 +18,7 @@ import {
   flushActiveProgressWrites,
   invalidateActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
+import * as progressAuthority from '@/stores/tarkov/progressAuthority';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 const auth = vi.hoisted(() => ({ owner: null as string | null }));
 vi.mock('@/utils/userScopedStorage', async (importOriginal) => ({
@@ -42,6 +43,22 @@ describe('device data removal', () => {
     clearDeviceDataRemoval();
     resetAccountRecoveryRetentionBlock();
     setActiveProgressWritesBlocked(false);
+  });
+  it('keeps writes blocked when native active bytes remain despite an empty cached slot', async () => {
+    const purge = vi
+      .spyOn(progressAuthority, 'removeOwnedProgressRecovery')
+      .mockResolvedValue({ complete: false, released: false });
+    expect(await removeAccountDeviceData('user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    purge.mockRestore();
+  });
+  it('allows guest writes when only isolated native recovery copies remain', async () => {
+    const purge = vi
+      .spyOn(progressAuthority, 'removeOwnedProgressRecovery')
+      .mockResolvedValue({ complete: false, released: true });
+    expect(await removeAccountDeviceData('user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    purge.mockRestore();
   });
   it.each([
     ['user-1', true],

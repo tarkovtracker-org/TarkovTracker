@@ -149,7 +149,7 @@ const adoptSnapshot = (
   snapshot: PersistedProgressSnapshot,
   state: UserState
 ): LocalProgress => {
-  progressStorageSerializer.reset(snapshot);
+  progressStorageSerializer.reset(snapshot, true);
   return {
     ...local,
     state,

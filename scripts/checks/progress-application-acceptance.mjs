@@ -12,6 +12,9 @@ assert(
 const executable = process.env.W10_CHROMIUM;
 assert(executable, 'Set W10_CHROMIUM');
 const profile = await mkdtemp(join(tmpdir(), 'progress-app-'));
+const screenshotPath = join(profile, 'recovery-ui.png');
+const receiptPath = join(profile, 'acceptance-receipt.json');
+const privateWriteOptions = { flag: 'wx', mode: 0o600 };
 const child = spawn(
   executable,
   [
@@ -317,9 +320,43 @@ try {
   );
   assert.equal(preview, true);
   assert.equal((await committed(writer)).record.raw, retry.record.raw);
+  await evaluate(
+    writer.sessionId,
+    `document.querySelector('[data-testid="older-tab-cleanup"]').click();true`
+  );
+  const beforeCleanup = await committed(writer);
+  assert.ok(beforeCleanup.record.legacyUpdates.includes(olderRaw));
+  await evaluate(
+    writer.sessionId,
+    `document.querySelector('[data-testid="older-tab-cleanup-confirm"]').click();true`
+  );
+  const cleared = await evaluate(
+    writer.sessionId,
+    `(async()=>{
+    const deadline=Date.now()+10000;
+    while((await tt.authority.readCommittedProgressAuthority()).legacyUpdates?.includes(${JSON.stringify(olderRaw)})) {
+      if(Date.now()>deadline)throw new Error('Recovery cleanup timed out');
+      await new Promise(resolve=>setTimeout(resolve,20));
+    }
+    return await tt.authority.readCommittedProgressAuthority();
+  })()`
+  );
+  assert.equal(cleared.raw, retry.record.raw);
+  assert.equal(cleared.legacyRaw, beforeCleanup.record.legacyRaw);
   const screenshot = await call('Page.captureScreenshot', { format: 'png' }, writer.sessionId);
-  await writeFile('/tmp/tt1092-recovery-ui.png', Buffer.from(screenshot.data, 'base64'));
-  receipt.recovery = { currentPreserved: true, olderBytesPreserved: true, uiExport: true };
+  const png = Buffer.from(screenshot.data, 'base64');
+  assert(
+    png.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')),
+    'Invalid screenshot PNG'
+  );
+  await writeFile(screenshotPath, png, privateWriteOptions);
+  assert((await readFile(screenshotPath)).equals(png), 'Screenshot write validation failed');
+  receipt.recovery = {
+    currentPreserved: true,
+    olderBytesPreserved: true,
+    uiExport: true,
+    confirmedExportCleanup: true,
+  };
   await call('Tracing.end');
   await traceComplete;
   receipt.frames = trace
@@ -332,10 +369,9 @@ try {
   receipt.traceMarks = trace.filter((event) => event.name === 'progress-app-renderer');
   assert(rendererProcesses.size >= 2, 'Acceptance requires distinct renderer processes');
   receipt.rendererProcesses = [...rendererProcesses];
-  await writeFile(
-    process.env.W10_RECEIPT ?? '/tmp/tt1092-app-receipt.json',
-    JSON.stringify(receipt, null, 2) + '\n'
-  );
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2) + '\n', privateWriteOptions);
+  assert.deepEqual(JSON.parse(await readFile(receiptPath, 'utf8')), receipt);
+  console.log(`Acceptance artifacts: ${screenshotPath}, ${receiptPath}`);
   console.log(
     `Application acceptance passed: ${receipt.results.length} write/reset orders, native quota/retry, reload, recovery UI export, ${rendererProcesses.size} renderers`
   );

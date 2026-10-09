@@ -2071,7 +2071,10 @@
       "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
       "review_older_edit": "Review older edit {index}",
       "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your saved progress.",
-      "export_device_recovery": "Export saved device data and recovery copies"
+      "export_device_recovery": "Export saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive, then clear the older tab copies included in it. Your saved progress and original device data will stay available. Keep the downloaded archive if you may need those edits later.",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} Prestige Complete",
