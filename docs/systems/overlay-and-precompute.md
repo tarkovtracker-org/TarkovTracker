@@ -165,8 +165,10 @@ retirement, and a future retirement needs the overlay to declare the replacement
   and fail when no last-good overlay exists, preserving client caches rather than publishing
   incomplete authoritative eligibility data.
 - The overlay repository is private. Set `OVERLAY_TOKEN` (a fine-grained, read-only Contents token
-  scoped to `tarkov-data-overlay`) in every runtime that fetches it: production, previews, and the
-  precompute workflow. `overlayAuthHeaders` attaches it only to `raw.githubusercontent.com` and
+  scoped to `tarkov-data-overlay`) in every runtime that fetches it: production, previews, the
+  precompute workflow, and local/operator runs such as `pnpm run verify:overlay`. Supply the token
+  through the process environment or a secret store. `overlayAuthHeaders` attaches it only to
+  `raw.githubusercontent.com` and
   `api.github.com` over HTTPS, never to redirect targets elsewhere, and it must never be logged.
 - Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
   resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
