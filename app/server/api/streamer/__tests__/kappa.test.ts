@@ -143,7 +143,7 @@ describe('Streamer Kappa API', () => {
     expect(mockComputeStreamerKappaMetrics).toHaveBeenCalled();
     expect(mockDollarFetch).toHaveBeenCalledWith(
       expect.stringContaining('tarkov-data-overlay/main/dist/overlay.json'),
-      { redirect: 'error' }
+      { headers: {}, redirect: 'error' }
     );
     expect(result).toMatchObject({
       displayName: 'PublicPlayer',

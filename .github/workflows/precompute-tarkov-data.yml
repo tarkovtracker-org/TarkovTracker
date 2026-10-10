@@ -10,6 +10,7 @@ name: Precompute Tarkov Data
 #
 # Requires (see scripts/precompute/run.ts):
 #   secret CLOUDFLARE_API_TOKEN          - scoped to Workers KV Storage: Edit
+#   secret OVERLAY_TOKEN                 - read-only Contents on the private tarkov-data-overlay repo
 #   variable CLOUDFLARE_ACCOUNT_ID       - account that owns the namespace
 #   variable TARKOV_DATA_KV_NAMESPACE_ID - id of the TARKOV_DATA namespace
 on:
@@ -54,6 +55,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TARKOV_DATA_KV_NAMESPACE_ID: ${{ vars.TARKOV_DATA_KV_NAMESPACE_ID }}
           EXPECTED_OVERLAY_SHA: ${{ inputs.expectedOverlaySha }}
+          OVERLAY_TOKEN: ${{ secrets.OVERLAY_TOKEN }}
           PRECOMPUTE_LANG: ${{ inputs.lang }}
           PRECOMPUTE_GAME_MODE: ${{ inputs.gameMode }}
         run: pnpm run precompute:tarkov
