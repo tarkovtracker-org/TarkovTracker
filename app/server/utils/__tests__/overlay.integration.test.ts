@@ -139,6 +139,44 @@ describe('overlay redirect handling', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 });
+describe('overlay authentication', () => {
+  const overlayBody = () =>
+    JSON.stringify({
+      editions: testOverlayEditions,
+      $meta: { version: 'auth-v1', generated: '2026-09-07', sha256: 'test-sha' },
+    });
+  const authOf = (call: unknown[]) =>
+    (call[1] as { headers: Record<string, string> }).headers.Authorization;
+  it('sends the configured token to the GitHub overlay source', async () => {
+    vi.stubEnv('OVERLAY_TOKEN', 'secret-token');
+    const fetchMock = stubOverlayFetch(JSON.parse(overlayBody()));
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    expect(authOf(fetchMock.mock.calls[0] as unknown[])).toBe('Bearer secret-token');
+  });
+  it('does not forward the token to a redirect target on another host', async () => {
+    vi.stubEnv('OVERLAY_TOKEN', 'secret-token');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: 'https://cdn.example.com/o.json' } })
+      )
+      .mockResolvedValueOnce(new Response(overlayBody(), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({ data: { tasks: [] } });
+    expect(authOf(fetchMock.mock.calls[0] as unknown[])).toBe('Bearer secret-token');
+    expect(authOf(fetchMock.mock.calls[1] as unknown[])).toBeUndefined();
+    expect(result.dataOverlay).toMatchObject({ status: 'fresh' });
+  });
+  it('omits Authorization when no token is configured', async () => {
+    vi.stubEnv('OVERLAY_TOKEN', '');
+    const fetchMock = stubOverlayFetch(JSON.parse(overlayBody()));
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    expect(authOf(fetchMock.mock.calls[0] as unknown[])).toBeUndefined();
+  });
+});
 describe('applyOverlay locale integration', () => {
   it('applies the selected locale after global and mode corrections', async () => {
     const fetchMock = stubOverlayFetch({

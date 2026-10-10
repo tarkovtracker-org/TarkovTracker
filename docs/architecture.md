@@ -615,7 +615,7 @@ or `on` before starting the dev server or building the app to enable timing logs
 `app/utils/perf.ts` through the shared client logger. Leave it unset or set it to `false` for normal
 builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
-**Server-side (Nuxt private runtime config):**
+**Server-side (Nuxt private runtime config and direct process environment):**
 
 | Variable                                        | Description                                                     | Required   |
 | ----------------------------------------------- | --------------------------------------------------------------- | ---------- |
@@ -626,6 +626,7 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors                         | No         |
 | `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                              | No         |
 | `NUXT_GITHUB_TOKEN`                             | GitHub API token                                                | No         |
+| `OVERLAY_TOKEN`                                 | Read-only Contents token scoped to `tarkov-data-overlay`        | Yes        |
 | `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header                          | No         |
 | `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                            | No         |
 | `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                                        | No         |
@@ -652,6 +653,11 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`     | Per-IP shared-profile requests per minute                       | No         |
 | `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds                 | No         |
 | `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports                | No²        |
+
+`OVERLAY_TOKEN` is required for private overlay fetches in production, previews, precompute, and
+local/operator checks such as `pnpm run verify:overlay`. Server and precompute consumers read it
+directly from the process environment; see
+[overlay authentication](systems/overlay-and-precompute.md#invariants).
 
 **Build-time / platform:**
 
