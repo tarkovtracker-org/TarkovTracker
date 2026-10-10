@@ -2317,7 +2317,7 @@
       "entries_scanned": "Archive Entries Scanned",
       "entries_scanned_tooltip": "Total selected files or archive entries scanned while looking for EFT logs.",
       "chat_messages": "Chat Messages",
-      "chat_messages_tooltip": "Chat notification payloads read from included notification logs.",
+      "chat_messages_tooltip": "Chat notification payloads read from included notification logs, across all accounts in those logs.",
       "completion_events": "Quest Completion Events",
       "completion_events_tooltip": "Unique quest completion events after deduping repeated log lines.",
       "started_events": "Quest Start Events",
