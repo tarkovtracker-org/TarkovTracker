@@ -2304,7 +2304,7 @@
       "account_label": "Account …{suffix}",
       "account_unidentified": "Sessions without a recorded account",
       "multiple_accounts_title": "Logs from multiple accounts detected",
-      "multiple_accounts_description": "Only the selected account's sessions are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Include Log Versions",
       "version_filter_hint": "Latest major version is selected by default. Include only logs from the character and wipe you want to restore.",
       "version_filter_tooltip": "Versions do not identify wipes or prestige resets. Select the appropriate session folders before importing. Seasonal events must fall within the active season.",

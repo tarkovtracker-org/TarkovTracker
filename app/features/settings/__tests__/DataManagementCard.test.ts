@@ -306,7 +306,7 @@ describe('DataManagementCard', () => {
           },
           URadioGroup: {
             template:
-              '<div role="radiogroup" :aria-label="legend"><button v-for="item in items" :key="item.value" type="button" class="account-option" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
+              '<div role="radiogroup" :aria-label="legend"><button v-for="item in items" :key="item.value" type="button" class="account-option" :data-selected="item.value === modelValue" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
             props: ['disabled', 'items', 'legend', 'modelValue'],
             emits: ['update:modelValue'],
           },
@@ -925,6 +925,7 @@ describe('DataManagementCard', () => {
     );
     const options = wrapper.findAll('.account-option');
     expect(options).toHaveLength(2);
+    expect(options.map((o) => o.attributes('data-selected'))).toEqual(['true', 'false']);
     expect(wrapper.text()).not.toContain('2222222222');
     expect(wrapper.text()).not.toContain('1111111111');
     await options[1]!.trigger('click');
