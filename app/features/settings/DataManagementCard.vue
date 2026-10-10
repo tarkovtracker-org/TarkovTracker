@@ -453,6 +453,33 @@
             </template>
           </div>
           <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
+            <UAlert
+              v-if="eftLogsPreview.hasMultipleAccounts"
+              icon="i-mdi-account-multiple"
+              color="warning"
+              variant="soft"
+              :title="$t('settings.log_import.multiple_accounts_title')"
+              :description="$t('settings.log_import.multiple_accounts_description')"
+            />
+            <div v-if="eftLogsAccountItems.length > 1" class="space-y-1">
+              <div class="flex items-center gap-1">
+                <span class="text-surface-200 text-sm font-semibold" aria-hidden="true">
+                  {{ $t('settings.log_import.account_filter_label') }}
+                </span>
+                <UTooltip :text="$t('settings.log_import.account_filter_tooltip')">
+                  <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                </UTooltip>
+              </div>
+              <URadioGroup
+                :model-value="eftLogsPreview.selectedAccount ?? undefined"
+                :items="eftLogsAccountItems"
+                :legend="$t('settings.log_import.account_filter_label')"
+                :ui="{ legend: 'sr-only' }"
+                value-key="value"
+                :disabled="eftLogsIsImporting"
+                @update:model-value="(account) => handleEftLogsAccountChange(String(account))"
+              />
+            </div>
             <div class="space-y-1">
               <div class="flex items-center gap-1">
                 <label class="text-surface-200 text-sm font-semibold">
@@ -1027,6 +1054,8 @@
     isCurrentSeasonLogEvent,
     isEligibleImportEvent,
     latestEftQuestEvents,
+    UNIDENTIFIED_LOG_ACCOUNT,
+    type EftLogAccountSummary,
   } from '@/utils/eftLogQuestParser';
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
@@ -1188,6 +1217,7 @@
     parseProgress: eftLogsParseProgress,
     parseFiles: parseEftLogsFiles,
     setIncludedVersions: setEftLogsIncludedVersions,
+    setAccount: setEftLogsAccount,
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
   } = dataManagementSession.eftLogs;
@@ -1484,6 +1514,13 @@
       );
     }
   }
+  function handleEftLogsAccountChange(accountId: string) {
+    try {
+      setEftLogsAccount(accountId);
+    } catch (err) {
+      logger.error('DataManagementCard: setEftLogsAccount failed', err, eftLogsImportError.value);
+    }
+  }
   async function handleEftLogsConfirm() {
     try {
       await confirmEftLogsImport(eftLogsTargetMode.value);
@@ -1496,6 +1533,21 @@
       return;
     }
   }
+  /** Labels accounts by a short ID suffix only, so full account identifiers never reach the UI. */
+  function formatEftLogsAccountLabel(account: EftLogAccountSummary): string {
+    const name =
+      account.id === UNIDENTIFIED_LOG_ACCOUNT
+        ? t('settings.log_import.account_unidentified')
+        : t('settings.log_import.account_label', { suffix: account.id.slice(-4) });
+    const lastSeen = account.lastSeen === null ? '' : ` · ${formatDate(account.lastSeen)}`;
+    return `${name} (${account.sessionCount})${lastSeen}`;
+  }
+  const eftLogsAccountItems = computed(() =>
+    (eftLogsPreview.value?.availableAccounts ?? []).map((account) => ({
+      value: account.id,
+      label: formatEftLogsAccountLabel(account),
+    }))
+  );
   const eftUnknownVersionKey = 'unknown';
   function formatEftLogsVersionLabel(version: string): string {
     const versionLabel =

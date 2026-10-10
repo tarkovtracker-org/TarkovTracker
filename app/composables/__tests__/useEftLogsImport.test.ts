@@ -659,6 +659,90 @@ describe('useEftLogsImport', () => {
     expect(composable.previewData.value?.includedVersions).toEqual(['0.16.8.1.38114']);
     expect(composable.previewData.value?.matchedTaskIds).toEqual(['61604635c725987e815b1a46']);
   });
+  it('previews and imports pre-login events only after selecting unidentified', async () => {
+    const earlyQuest = '657315ddab5a49b71f098853';
+    const questA = '61604635c725987e815b1a46';
+    const questB = '5ac2426c86f774138762edfe';
+    metadataStore.tasks = [earlyQuest, questA, questB].map((id) => ({ id }));
+    const composable = await loadComposable();
+    const withPath = (text: string, path: string) => {
+      const file = new File([text], path.split('/').at(-1)!);
+      Object.defineProperty(file, 'webkitRelativePath', { value: path });
+      return file;
+    };
+    const first = 'Logs/log_2026.02.20_09-00-00_1.2.0.0.47888';
+    const second = 'Logs/log_2026.02.21_09-00-00_1.2.0.0.47888';
+    const login = (date: string, time: string, account: string) =>
+      `${date} ${time}|1.2.0.0.47888|Info|application|PrepareSelectedProfileLocally ProfileId:5c0d2e5f1a2b3c4d5e6f7a8b AccountId:${account}`;
+    await composable.parseFiles([
+      withPath(login('2026-02-20', '09:00:00.000', '1111111'), `${first}/application_000.log`),
+      withPath(completionLog(questA, '2026-02-20'), `${first}/push-notifications_000.log`),
+      withPath(login('2026-02-21', '11:00:00.000', '2222222'), `${second}/application_001.log`),
+      withPath(completionLog(earlyQuest), `${second}/push-notifications_000.log`),
+      withPath(
+        completionLog(questB)
+          .replaceAll('10:14:24.222', '12:14:24.222')
+          .replace(
+            String(Date.parse('2026-02-21T10:14:24.222Z') / 1000),
+            String(Date.parse('2026-02-21T12:14:24.222Z') / 1000)
+          ),
+        `${second}/push-notifications_001.log`
+      ),
+    ]);
+    expect(composable.previewData.value?.selectedAccount).toBe('2222222');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual([questB]);
+    composable.setAccount('1111111');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual([questA]);
+    composable.setAccount('unidentified');
+    expect(composable.previewData.value?.selectedAccount).toBe('unidentified');
+    expect(composable.previewData.value?.includedVersions).toEqual(['1.2.0.0.47888']);
+    expect(composable.previewData.value?.matchedTaskIds).toEqual([earlyQuest]);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(earlyQuest);
+  });
+  it('separates accounts, defaults to the latest, and imports only the chosen account', async () => {
+    metadataStore.tasks = [{ id: '61604635c725987e815b1a46' }, { id: '5ac2426c86f774138762edfe' }];
+    const composable = await loadComposable();
+    const login = (date: string, account: string) =>
+      `${date} 09:00:00.000|1.2.0.0.47888|Info|application|PrepareSelectedProfileLocally ProfileId:5c0d2e5f1a2b3c4d5e6f7a8b AccountId:${account}`;
+    const withPath = (file: File, path: string) => {
+      Object.defineProperty(file, 'webkitRelativePath', { configurable: true, value: path });
+      return file;
+    };
+    const first = 'Logs/log_2026.02.20_09-00-00_1.2.0.0.47888';
+    const second = 'Logs/log_2026.02.21_09-00-00_1.2.0.0.47888';
+    await composable.parseFiles([
+      withPath(
+        new File([login('2026-02-20', '1111111')], 'application_000.log'),
+        `${first}/application_000.log`
+      ),
+      withPath(
+        new File([completionLog('61604635c725987e815b1a46')], 'push-notifications_000.log'),
+        `${first}/push-notifications_000.log`
+      ),
+      withPath(
+        new File([login('2026-02-21', '2222222')], 'application_000.log'),
+        `${second}/application_000.log`
+      ),
+      withPath(
+        new File([completionLog('5ac2426c86f774138762edfe')], 'push-notifications_000.log'),
+        `${second}/push-notifications_000.log`
+      ),
+    ]);
+    expect(composable.previewData.value?.hasMultipleAccounts).toBe(true);
+    expect(composable.previewData.value?.selectedAccount).toBe('2222222');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual(['5ac2426c86f774138762edfe']);
+    composable.setAccount('1111111');
+    expect(composable.previewData.value?.selectedAccount).toBe('1111111');
+    expect(composable.previewData.value?.matchedTaskIds).toEqual(['61604635c725987e815b1a46']);
+    composable.setAccount('unknown-account');
+    expect(composable.previewData.value?.selectedAccount).toBe('1111111');
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
+  });
 });
 describe('expanded log import', () => {
   beforeEach(() => {
