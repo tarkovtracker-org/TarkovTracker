@@ -36,8 +36,7 @@ CREATE FUNCTION pg_temp.backfill() RETURNS bigint LANGUAGE sql AS $$
     '00000000-0000-0000-0000-000000001100', '00000000-0000-0000-0000-000000001200');
 $$;
 
--- Legacy-only accounts predate the mirror trigger, so build their state with it disabled.
-ALTER TABLE public.user_progress DISABLE TRIGGER sync_legacy_user_progress_modes;
+-- Build legacy-only accounts with their source timestamps preserved.
 ALTER TABLE public.user_progress DISABLE TRIGGER set_user_progress_updated_at;
 INSERT INTO auth.users (id, email, created_at, last_sign_in_at)
 SELECT user_id, name || '-backfill@example.invalid', now() - interval '2 years',
@@ -58,7 +57,6 @@ UPDATE public.user_progress SET
   updated_at = CASE WHEN user_id = pg_temp.fixture_user('undated') THEN NULL
     ELSE now() - interval '1 year' END
 WHERE user_id IN (SELECT user_id FROM backfill_fixture);
-ALTER TABLE public.user_progress ENABLE TRIGGER sync_legacy_user_progress_modes;
 ALTER TABLE public.user_progress ENABLE TRIGGER set_user_progress_updated_at;
 
 INSERT INTO public.user_preferences (user_id, profile_share_pvp_public, created_at, updated_at)

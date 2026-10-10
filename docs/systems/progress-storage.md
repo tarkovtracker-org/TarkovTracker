@@ -6,16 +6,17 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 **Summary.** Persistent PvP, PvE, and numbered Seasonal PvP progress share one normalized table.
 `user_game_mode_progress` has primary key `(user_id, game_mode, season_number)`; PvP and PvE use
-season `0`, while Seasonal uses the active positive season number. Season 1 is active. The legacy
-`user_progress` row retains account-wide metadata and mirrored PvP/PvE JSON during the rolling
-deployment window, but Seasonal progress is never stored in that combined row.
+season `0`, while Seasonal uses the active positive season number. Season 1 is active. The
+`user_progress` row holds account-wide metadata and the accepted client account-clock contract. Its legacy `pvp_data` / `pve_data` columns are
+no longer written (#1028 Phase 3) and remain, frozen, until they are dropped; Seasonal progress was
+never stored there.
 
 ### Diagram
 
 ```mermaid
 flowchart LR
     Store["useTarkovStore<br/>pvp | pve | seasonal"] --> Sync["sync_user_game_mode_progress()"]
-    Sync --> Meta["user_progress<br/>edition, UID, selected mode<br/>legacy PvP/PvE mirrors"]
+    Sync --> Meta["user_progress<br/>edition, UID, selected mode"]
     Sync --> Modes["user_game_mode_progress<br/>(user, mode, season)<br/>progress + visibility"]
     Modes --> RT["Realtime<br/>multi-device + teammates"]
     Modes --> Share["Shared profiles<br/>streamer overlays"]
@@ -28,8 +29,9 @@ flowchart LR
    Missing or unmaterialized rows do not cause legacy JSON reads. Owned local recovery copies still
    reconcile with cloud state under the existing ownership, reset-epoch, and per-mode clock rules.
 2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
-   concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
-   clients, and upserts each normalized row. The caller passes the season number its bundle was
+   concurrent account-row updates and upserts each normalized row. It writes the account row once
+   when metadata or persistent PvP/PvE progress changes, without touching legacy JSON. Identical
+   saves and Seasonal-only client syncs leave the account row untouched. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state. The
    Tarkov UID link is applied last in its own savepoint: a UID another account owns keeps the stored
@@ -69,9 +71,13 @@ flowchart LR
    (`@tarkovtracker/progress-contracts/apiTaskUpdates`), so a client sync cannot flip a stored entry. When a sync
    resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
    from a client built before the cap), the database keeps the larger stored count.
-3. Realtime listens to both the account row and normalized rows. Recognized account metadata
+3. Realtime listens to both the account row, for metadata, and normalized rows. Recognized account metadata
    echoes advance the listener's timestamp watermark before being discarded, so older metadata
    cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
+   A sync returns the account row's current `metadata_write_id`. The row and marker stay unchanged
+   only when neither metadata nor persistent PvP/PvE progress changes; persistent changes still
+   advance the account clock. An echo matches only that marker together with the same values, so a
+   foreign metadata change is never mistaken for one.
    A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -125,8 +131,11 @@ Teams, save status and recovery, and progress imports build on this storage; see
   keeps source timestamps and records unknown freshness, and `track_account_mutation` records no
   activity. Correctness does not depend on running it until the legacy fallbacks are removed (#1028);
   see _Normalized PvP/PvE progress backfill_ in `docs/runbook.md`
-- `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
-  unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
+- `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — former
+  legacy seed of an unmaterialized persistent row inside `merge_progress_data`'s row lock
+- `supabase/migrations/20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` — stops every
+  legacy PvP/PvE write and legacy merge seed, and drops the legacy-to-normalized trigger and the
+  legacy-only `update_task_completion`, while retaining account clocks for accepted cached clients
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/composables/useDataBackup.ts` — season-aware native backups
@@ -180,14 +189,17 @@ Teams, save status and recovery, and progress imports build on this storage; see
   `ON CONFLICT DO NOTHING`; placeholder repairs lock and recheck after concurrent writes. It preserves
   source timestamps and records no account activity. Schema rollout and data completion are separate
   checks; see the runbook for bounded verification.
-- `merge_progress_data` seeds an unmaterialized persistent row from its legacy column inside the same
-  `FOR UPDATE` lock before merging. Its original seed is an `INSERT ... ON CONFLICT DO NOTHING`, which
-  only fires when no row exists, so a placeholder row created by the visibility RPC or the legacy
-  sharing trigger used to become the merge base — and because the RPC mirrors the result back into
-  `user_progress.pvp_data` / `pve_data`, a single public-API write erased the account's level, display
-  name, and every task completion. The seed is a write-time repair, not a backfill: it touches only
-  the row the write already locks. Reader-side fallback alone cannot close this hole, because the
-  merge base comes from the row rather than from anything the caller sends.
+- No runtime path writes `user_progress.pvp_data` / `pve_data` or merges from them (#1028 Phase 3).
+  `merge_progress_data` creates a missing normalized row empty under the account row lock and
+  merges into the normalized row only; as before, every API write also advances
+  `user_progress.updated_at` (never a legacy column). Its `p_field` values keep the legacy names
+  only to select a mode. The sync RPC's merge base is the stored normalized row.
+  Removing both former legacy seeds is safe only because the completion gate was zero: no account
+  has legacy progress with a numeric `level` whose normalized row lacks one, so a frozen legacy
+  column can never resurrect progress. Signup no longer creates placeholder normalized rows;
+  readers already treat missing and placeholder rows alike.
+  `supabase/tests/database/legacy_mode_progress_writes.test.sql` fails if a legacy writer, the
+  legacy-to-normalized trigger, or a legacy merge seed returns.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
@@ -201,8 +213,16 @@ Teams, save status and recovery, and progress imports build on this storage; see
   cannot read a row.
 - Startup fetches account metadata and normalized modes without selecting legacy mode columns.
   Shared-profile, gateway, and teammate reads never request legacy progress. Public visibility and
-  team authorization still precede normalized reads. Database compatibility writers remain for older
-  clients until the separately reviewed dual-write retirement deploys.
+  team authorization still precede normalized reads. Clients since #641 apply `user_progress`
+  Realtime events as account metadata only, so frozen legacy columns in those payloads are ignored.
+  #1087 selects startup policy per mode: known-clock PvP/PvE use the preferred snapshot, and
+  Seasonal uses timestamped snapshot merging only when its own clock exceeds the account clock.
+  Older accepted clients use a global predicate instead, so Phase 3 retains the account-clock
+  updates they already require. This preserves their existing contract; it does not correct their
+  pre-existing cross-mode policy. Account-row Realtime events therefore remain until that contract
+  is separately retired. The read-only
+  `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
+  still read the frozen columns until they are dropped (#1028 Phase 4).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
@@ -243,7 +263,7 @@ Teams, save status and recovery, and progress imports build on this storage; see
   `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
   highest history generation participate in the union. Full progress reset epochs take precedence.
   The sync RPC merges histories under its existing account lock before unchanged-write comparisons,
-  and row triggers preserve that contract for legacy/API writers. Omitted fields from older clients
+  and row triggers preserve that contract for API writers. Omitted fields from older clients
   preserve existing server history; a higher full reset epoch intentionally discards it.
 - Equal-timestamp manual entries sort by ID; conflicting same-ID entries use type, action, title,
   then details as ascending Unicode code-point tie-breakers. Client and database use the same order
@@ -254,11 +274,9 @@ Teams, save status and recovery, and progress imports build on this storage; see
   produce a different id for the same entry. The client additionally strips lone surrogates before
   clamping: `jsonb` rejects the whole `p_modes` document at parameter binding, before the SQL
   sanitizer can run, so no client-sanitized string can carry one.
-- The sync RPC merges each mode against the persisted payload for that mode, and seeds from the
-  account row's locked legacy column when the normalized row is an unmaterialized placeholder. Row
-  triggers re-merge against each table's own stored row, so the seeding is what keeps the RPC's
-  unchanged-write comparison accurate: without it a placeholder makes every sync rewrite an
-  otherwise unchanged account row.
+- The sync RPC merges each mode against the persisted normalized payload for that mode, under the
+  account row lock, before its unchanged-write comparison. The account row updates when metadata
+  or persistent PvP/PvE progress changes; an unchanged persistent payload avoids a compatibility-clock write.
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.

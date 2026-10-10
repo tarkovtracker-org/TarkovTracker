@@ -250,8 +250,8 @@ SELECT is(
     FROM public.user_progress
     WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
   ),
-  '12',
-  'legacy PvP progress still commits when Seasonal state is stale'
+  NULL,
+  'the multi-mode sync leaves the legacy PvP column unwritten'
 );
 SELECT is(
   (
