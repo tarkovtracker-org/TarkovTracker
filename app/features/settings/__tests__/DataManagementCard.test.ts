@@ -306,8 +306,8 @@ describe('DataManagementCard', () => {
           },
           URadioGroup: {
             template:
-              '<div><button v-for="item in items" :key="item.value" type="button" class="account-option" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
-            props: ['disabled', 'items', 'modelValue'],
+              '<div role="radiogroup" :aria-label="legend"><button v-for="item in items" :key="item.value" type="button" class="account-option" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
+            props: ['disabled', 'items', 'legend', 'modelValue'],
             emits: ['update:modelValue'],
           },
           USeparator: true,
@@ -920,6 +920,9 @@ describe('DataManagementCard', () => {
     };
     const wrapper = createWrapper();
     expect(wrapper.text()).toContain('settings.log_import.multiple_accounts_title');
+    expect(wrapper.find('[role="radiogroup"]').attributes('aria-label')).toBe(
+      'settings.log_import.account_filter_label'
+    );
     const options = wrapper.findAll('.account-option');
     expect(options).toHaveLength(2);
     expect(wrapper.text()).not.toContain('2222222222');

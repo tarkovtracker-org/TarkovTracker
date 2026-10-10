@@ -463,9 +463,9 @@
             />
             <div v-if="eftLogsAccountItems.length > 1" class="space-y-1">
               <div class="flex items-center gap-1">
-                <label class="text-surface-200 text-sm font-semibold">
+                <span class="text-surface-200 text-sm font-semibold" aria-hidden="true">
                   {{ $t('settings.log_import.account_filter_label') }}
-                </label>
+                </span>
                 <UTooltip :text="$t('settings.log_import.account_filter_tooltip')">
                   <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
                 </UTooltip>
@@ -473,6 +473,8 @@
               <URadioGroup
                 :model-value="eftLogsPreview.selectedAccount ?? undefined"
                 :items="eftLogsAccountItems"
+                :legend="$t('settings.log_import.account_filter_label')"
+                :ui="{ legend: 'sr-only' }"
                 value-key="value"
                 :disabled="eftLogsIsImporting"
                 @update:model-value="(account) => handleEftLogsAccountChange(String(account))"
