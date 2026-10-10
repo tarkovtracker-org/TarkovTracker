@@ -757,6 +757,30 @@ describe('multi-account log separation', () => {
       questB,
     ]);
   });
+  it('counts only the selected account events and leaves same-millisecond ties unidentified', () => {
+    const files = [
+      {
+        name: `${sessionA}/application_000.log`,
+        text: [
+          login(accountA, '2026-02-20 10:00:01.000'),
+          login(accountB, '2026-02-20 12:00:00.000'),
+        ].join('\n'),
+      },
+      {
+        name: `${sessionA}/push-notifications_000.log`,
+        text:
+          completionPayload('evt-a', `${questA} successMessageText`, '2026-02-20 11:00:00.000') +
+          completionPayload('evt-b', `${questB} successMessageText`, '2026-02-20 13:00:00.000') +
+          completionPayload('evt-t', `${questC} successMessageText`, '2026-02-20 12:00:00.000'),
+      },
+    ];
+    const a = parseEftLogsForQuestImport(files, ids, { account: accountA });
+    expect(a.completionEventCount).toBe(1);
+    expect(a.matchedTaskIds).toEqual([questA]);
+    const b = parseEftLogsForQuestImport(files, ids, { account: accountB });
+    expect(b.completionEventCount).toBe(1);
+    expect(b.matchedTaskIds).toEqual([questB]);
+  });
   it('keeps sessions without a recorded login separate when several accounts exist', () => {
     const files = [
       ...twoAccountLogs,

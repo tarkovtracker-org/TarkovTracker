@@ -150,7 +150,8 @@ Malformed/skipped records are reported in the preview.
 Accounts are separated by the `AccountId` on `SelectProfile`, `PrepareSelectedProfileLocally`,
 and `CompleteSelectedProfile` lines in the `application` and `output` channels (`ProfileId`
 differs per mode, so it is never the key). Each event belongs to the latest preceding selection
-in its session, so an account switch inside one session splits correctly. The preview defaults
+in its session (an event at the same millisecond as a selection stays unidentified),
+so an account switch inside one session splits correctly. Quest-event counts cover only the selected account. The preview defaults
 to the most recently played account and imports one account at a time (`account: null` selects
 every account and is used only to discover destination modes). Events before a session's first
 retained selection also remain available in the `unidentified` bucket, alongside sessions with

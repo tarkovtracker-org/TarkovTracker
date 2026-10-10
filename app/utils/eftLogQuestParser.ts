@@ -706,12 +706,13 @@ function groupLogSources(files: (EftLogInputFile | EftParsedLogFile)[]): Session
 function collectSessionAccountSignals(group: SessionLogs): AccountSignal[] {
   return group.files.flatMap((file) => file.accounts).sort((a, b) => a.timestamp - b.timestamp);
 }
-/** Attributes an event to the latest preceding profile selection; future selections never apply. */
+/** Attributes an event to the latest preceding profile selection; ties and future selections never apply. */
 function resolveEventAccount(timestamp: string | null, signals: AccountSignal[]): string {
   const time = eftLogTimestampMillis(timestamp);
   if (time === null) return UNIDENTIFIED_LOG_ACCOUNT;
   let resolved = UNIDENTIFIED_LOG_ACCOUNT;
   for (const signal of signals) {
+    if (signal.timestamp === time) return UNIDENTIFIED_LOG_ACCOUNT;
     if (signal.timestamp > time) break;
     resolved = signal.accountId;
   }
@@ -814,13 +815,7 @@ function selectIncludedVersions(
 }
 /** Counts parsed notifications without retaining or re-reading their source text. */
 function addImportCounts(counts: ImportCounts, result: EftLogTextParseResult): void {
-  const keys = [
-    'chatMessageCount',
-    'completionEventCount',
-    'startedEventCount',
-    'failedEventCount',
-    'parseErrorCount',
-  ] as const;
+  const keys = ['chatMessageCount', 'parseErrorCount'] as const;
   for (const key of keys) counts[key] += result[key];
   counts.filesParsed++;
 }
@@ -834,6 +829,11 @@ function retainImportEvent(
   if (duplicate) retainEarliestEvent(duplicate, event);
   else seen.set(key, event);
 }
+const EVENT_COUNT_KEYS = {
+  completed: 'completionEventCount',
+  started: 'startedEventCount',
+  failed: 'failedEventCount',
+} as const;
 /** Routes each file's events against the complete session timeline, regardless of file order. */
 function collectFileEvents(
   file: EftParsedLogFile,
@@ -853,6 +853,7 @@ function collectFileEvents(
     for (const event of buckets[status]) {
       if (!context.includesAccount(resolveEventAccount(event.timestamp, context.accounts)))
         continue;
+      counts[EVENT_COUNT_KEYS[status]]++;
       const mode = resolveEventModeFromTimeline(event.timestamp, context.timeline);
       retainImportEvent(seen, { ...event, mode, status });
     }
