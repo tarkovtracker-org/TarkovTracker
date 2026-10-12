@@ -296,8 +296,9 @@ Missing provenance, malformed task/objective arrays, duplicate IDs, invalid coun
 scope fail verification even when all core KV rows are current. The verifier does not join the
 independent UI projections or certify them as coherent. Import release verification requires one valid
 whole snapshot per mode with the published identity; this operator gate is stricter than bounded
-runtime retention. The report contains counts, identity agreement, and missing IDs, never raw
-overlay/catalog payloads. A failing import read retains the successful core provenance in the report.
+runtime retention. The report contains import task counts, overlay SHA values, core cache sources
+and verification statuses, never raw overlay/catalog payloads. A failing import read retains the
+successful core provenance in the report.
 Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
 target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee

@@ -142,8 +142,7 @@ All destination catalogs are loaded before mutations, without changing the activ
 `/api/tarkov/tasks-import` reads one English precomputed snapshot for each requested upstream mode.
 The producer combines core fields, objectives and fail conditions from one raw task set, then applies
 the private overlay once. Import never joins the independently cached UI core/objective projections.
-The raw task registry must be nonempty and well formed before adaptation or overlay additions;
-declared malformed objective arrays cannot become empty valid arrays. Missing provenance,
+Snapshot validation follows the [producer contract](./overlay-and-precompute.md#key-contract). Missing provenance,
 duplicate task/objective IDs, invalid counts, wrong scope, corrupt data or a
 snapshot older than seven days rejects the preview before any progress or mode change. Failed
 refreshes retain each mode's last-good entry. Runtime use of a whole last-good snapshot does not
