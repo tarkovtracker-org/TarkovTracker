@@ -45,12 +45,12 @@ All area labels use `#c2e0c6` (light green) for visual grouping.
 
 ### Special Labels
 
-| Label              | Color     | Description                        | When to Use                                                                                           |
-| ------------------ | --------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `good-first-issue` | `#7057ff` | Good for newcomers                 | Simple, well-defined issues that can be completed in isolation without deep knowledge                 |
-| `help-wanted`      | `#008672` | Community help needed              | Well-scoped issues that welcome community contributions but may require broader context or experience |
-| `never-stale`      | `#5319e7` | Never auto-close from stale        | Long-lived backlog issues/PRs that may be marked stale for review but must not be auto-closed         |
-| `upstream`         | `#e99695` | Issue belongs in data-overlay repo | Quest/item data issues that need fixes in the data-overlay repository                                 |
+| Label              | Color     | Description                 | When to Use                                                                                           |
+| ------------------ | --------- | --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `good-first-issue` | `#7057ff` | Good for newcomers          | Simple, well-defined issues that can be completed in isolation without deep knowledge                 |
+| `help-wanted`      | `#008672` | Community help needed       | Well-scoped issues that welcome community contributions but may require broader context or experience |
+| `never-stale`      | `#5319e7` | Never auto-close from stale | Long-lived backlog issues/PRs that may be marked stale for review but must not be auto-closed         |
+| `upstream`         | `#e99695` | Fix belongs in overlay data | Quest/item data issues fixed in the private data overlay; keep open until the overlay release ships   |
 
 ## Label Usage Guidelines
 
@@ -111,14 +111,14 @@ Issue Type: enhancement
 Labels: area:ui, priority:low, good-first-issue
 ```
 
-**Missing quest data (send to data-overlay):**
+**Missing quest data (fixed in the data overlay):**
 
 ```text
 Issue Type: bug (or feature, depending on what's wrong)
 Labels: upstream
 ```
 
-Close the issue with a comment explaining it belongs in the data-overlay repo and link to where they should report it.
+Keep the issue open, fix the data in the private overlay, and close the issue once the overlay release is live.
 
 **Dependency update PR:**
 
@@ -165,7 +165,7 @@ These are **NOT** labels - they're handled by GitHub Project columns:
    - `good-first-issue` for simple, well-defined issues
    - `help-wanted` for community contributions
    - `never-stale` for long-lived backlog work that should not auto-close
-   - `upstream` if it's a data issue → close with comment
+   - `upstream` if it's a data issue → fix in the overlay, close once released
 
    **Note**: Prefer `help-wanted` over `good-first-issue` unless the issue is truly first-time contributor safe.
 
@@ -187,11 +187,8 @@ These are **NOT** labels - they're handled by GitHub Project columns:
 When someone reports incorrect quest requirements, missing items, wrong item properties, etc.:
 
 1. Add `upstream` label
-2. Close the issue
-3. Comment:
-   > Thanks for reporting! This is a data issue that needs to be fixed in our data source repository. Please report it at: [link to data-overlay repo issues]
-   >
-   > We'll pick up the fix once it's merged upstream.
+2. Fix the data in the private `tarkov-data-overlay` repository
+3. Close the issue once the overlay release is live, linking the fix if it is public
 
 ## Quick Reference
 
@@ -212,4 +209,4 @@ When someone reports incorrect quest requirements, missing items, wrong item pro
 - Issue Type: `bug` + Labels: `area:ui, priority:medium`
 - Issue Type: `enhancement` + Labels: `area:ui, priority:low`
 - Issue Type: `feature` + Labels: `area:api, priority:high`
-- Issue Type: `bug` + Labels: `upstream` (then close)
+- Issue Type: `bug` + Labels: `upstream` (close once the overlay release ships)
