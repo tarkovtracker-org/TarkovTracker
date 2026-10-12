@@ -64,6 +64,8 @@ sequenceDiagram
   so they take precedence over global and mode-specific corrections. The locale defaults to `en`
   when a handler does not pass one.
 - `tasksAdd` lets the overlay inject entirely new tasks not present upstream.
+  Omitted `failConditions` become an empty list; explicitly malformed values remain unchanged
+  so import snapshot validation can reject them.
 - Objective post-processing (`objectiveTypeInferrer.ts`) normalizes objective lists and infers
   `foundInRaid` flags so the client does not have to guess.
 - `bypassCache: true` (from `shouldBypassCache`) forces an awaited overlay refresh — used after

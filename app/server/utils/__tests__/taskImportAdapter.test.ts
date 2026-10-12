@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
+import { buildPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
 import {
   adaptTasksImportResponse,
   createTarkovJsonTasksImportFetcher,
 } from '@/server/utils/tarkov-json';
+import { isTaskImportSnapshot } from '@/server/utils/taskImportSnapshot';
 import { isTaskImportCatalog } from '@/utils/taskImportCatalog';
 const source = {
   tasks: {
@@ -92,7 +94,6 @@ describe('coherent import adaptation', () => {
           added: {
             id: 'added',
             objectives: [{ id: 'added-obj', type: 'giveItem', count: 4 }],
-            failConditions: [],
           },
         },
       };
@@ -104,7 +105,9 @@ describe('coherent import adaptation', () => {
         catalog: { lang: 'en', gameMode },
       };
       expect(isTaskImportCatalog(snapshot, gameMode)).toBe(true);
+      expect(isTaskImportSnapshot(buildPrecomputedEnvelope(snapshot), gameMode)).toBe(true);
       expect(snapshot.data.tasks.map((task) => task.id)).toEqual(['task', 'added']);
+      expect(snapshot.data.tasks[1]?.failConditions).toEqual([]);
       expect(snapshot.data.tasks[0]).toMatchObject({
         minPlayerLevel: 25,
         objectives: [{ id: 'obj', count: 9 }],
@@ -120,6 +123,39 @@ describe('coherent import adaptation', () => {
       );
       expect(JSON.stringify(snapshot)).not.toContain(token);
       expect(JSON.stringify(snapshot)).not.toContain('raw-editions-only');
+    }
+  );
+  it.each([null, {}, 'invalid', [{ id: 'fail', count: 'invalid' }]])(
+    'rejects an explicit malformed failure-condition value on an overlay addition: %j',
+    async (failConditions) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                editions: testOverlayEditions,
+                $meta: { version: 'import-v1', sha256: 'sha1', generated: '2026-10-12' },
+                tasksAdd: {
+                  added: { id: 'added', objectives: [], failConditions },
+                },
+              })
+            )
+        )
+      );
+      const { applyOverlay } = await import('@/server/utils/overlay');
+      const payload = {
+        ...(await applyOverlay(adaptTasksImportResponse(source), {
+          gameMode: 'regular',
+          locale: 'en',
+        })),
+        catalog: { lang: 'en', gameMode: 'regular' },
+      };
+      expect(payload.dataOverlay).toMatchObject({ version: 'import-v1', sha256: 'sha1' });
+      const actual = payload.data.tasks.find((task) => task.id === 'added')?.failConditions;
+      if (Array.isArray(failConditions)) expect(actual).toMatchObject(failConditions);
+      else expect(actual).toEqual(failConditions);
+      expect(isTaskImportSnapshot(buildPrecomputedEnvelope(payload), 'regular')).toBe(false);
     }
   );
 });
