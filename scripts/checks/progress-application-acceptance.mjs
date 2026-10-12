@@ -125,7 +125,7 @@ try {
         return await bootOnce(session);
       } catch (error) {
         if (
-          !/Execution context was destroyed|Inspected target navigated or closed/.test(
+          !/Execution context was destroyed|Inspected target navigated or closed|No execution context was found|Cannot find context with specified id/.test(
             error.message
           )
         )
@@ -151,7 +151,9 @@ try {
       return await evaluate(sessionId, `location.href === ${JSON.stringify(url)}`);
     } catch (error) {
       if (
-        !/Execution context was destroyed|Inspected target navigated or closed/.test(error.message)
+        !/Execution context was destroyed|Inspected target navigated or closed|No execution context was found|Cannot find context with specified id/.test(
+          error.message
+        )
       )
         throw error;
       return false;

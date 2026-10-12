@@ -1229,9 +1229,14 @@
       await exportDeviceProgressRecovery();
       confirmRecoveryCleanup.value = true;
     } catch (error) {
+      logger.error('DataManagementCard: recovery export failed', error);
       toast.add({
         title: t('settings.data_management.export_error_title'),
-        description: error instanceof Error ? error.message : String(error),
+        description:
+          error instanceof Error &&
+          error.message === t('settings.data_management.recovery_archive_too_large')
+            ? error.message
+            : t('settings.data_management.recovery_export_failed'),
         color: 'error',
       });
     }
@@ -1245,9 +1250,10 @@
       await confirmRecoveryArchiveSaved();
       confirmRecoveryCleanup.value = false;
     } catch (error) {
+      logger.error('DataManagementCard: recovery cleanup failed', error);
       toast.add({
         title: t('settings.data_management.export_error_title'),
-        description: error instanceof Error ? error.message : String(error),
+        description: t('settings.data_management.recovery_cleanup_failed'),
         color: 'error',
       });
     } finally {

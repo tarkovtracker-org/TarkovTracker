@@ -1168,7 +1168,10 @@ describe('DataManagementCard', () => {
     await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
     await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
     expect(toastAddMock).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'error', description: 'cleanup failed' })
+      expect.objectContaining({
+        color: 'error',
+        description: 'settings.data_management.recovery_cleanup_failed',
+      })
     );
     expect(wrapper.find('[data-testid="older-tab-cleanup-saved-confirm"]').exists()).toBe(true);
   });

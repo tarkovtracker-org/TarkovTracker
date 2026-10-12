@@ -2079,6 +2079,8 @@
       "clear_older_copies": "Clear older tab recovery copies",
       "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
       "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
       "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
       "older_edit_unavailable": "This older edit is no longer available.",
       "older_edit_read_failed": "Unable to read this older edit. Try again.",

@@ -1,6 +1,13 @@
 import { ref } from 'vue';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import { parseUserScopedStorage } from '@/utils/userScopedStorage';
+const recoveryOwner = (raw: string): string | null | undefined => {
+  try {
+    const owner = JSON.parse(raw)?._userId;
+    return owner === null || typeof owner === 'string' ? owner : undefined;
+  } catch {
+    return undefined;
+  }
+};
 /**
  * Storage double for existing merge/retention policy tests. These tests already mock
  * localStorage and locks; they do not establish IndexedDB commit or renderer visibility.
@@ -18,7 +25,7 @@ export const createProgressPolicyAuthority = () => {
     initializeProgressAuthority: async () => {},
     removeOwnedProgressRecovery: async () => {
       const raw = localStorage.getItem(STORAGE_KEYS.progress);
-      const released = raw === null || parseUserScopedStorage(raw) !== null;
+      const released = raw === null || recoveryOwner(raw) !== undefined;
       return { complete: released, released };
     },
     discardExportedLegacyProgress: async () => {},
@@ -32,7 +39,7 @@ export const createProgressPolicyAuthority = () => {
     exportableLegacyUpdates: () => [],
     ownedLegacyUpdates: () => [],
     isOwnedProgressRecovery: (raw: string | null, owner: string | null) =>
-      raw !== null && (parseUserScopedStorage(raw)?._userId ?? null) === owner,
+      raw !== null && recoveryOwner(raw) === owner,
     readAuthoritativeProgress: () => localStorage.getItem(STORAGE_KEYS.progress),
     writeAuthoritativeProgress: (raw: string | null) => {
       if (raw === null) localStorage.removeItem(STORAGE_KEYS.progress);

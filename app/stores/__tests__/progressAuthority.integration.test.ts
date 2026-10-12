@@ -78,6 +78,83 @@ describe('native progress authority integration', () => {
     expect(b.isProgressAuthorityReady()).toBe(true);
     expect(b.legacyProgressRecoveryOverflow.value).toBe(true);
   });
+  it('keeps a capture failure visible across durable mutations until capture succeeds', async () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
+    await open();
+    const pending = JSON.stringify({ _userId: null, data: { newer: true } });
+    localStorage.setItem(STORAGE_KEYS.progress, pending);
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    vi.resetModules();
+    const a = await open();
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    put.mockRestore();
+    await a.commitProgressMutation(
+      () => {
+        a.writeAuthoritativeProgress(JSON.stringify({ _userId: null, data: { edited: true } }));
+        return { ok: true };
+      },
+      () => true,
+      null
+    );
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    await a.refreshProgressAuthority();
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(false);
+    expect(
+      a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null)
+    ).toContain(pending);
+  });
+  it('keeps a failed snapshot available when a different legacy snapshot is captured', async () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
+    await open();
+    const missed = JSON.stringify({ _userId: null, data: { missed: true } });
+    localStorage.setItem(STORAGE_KEYS.progress, missed);
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    vi.resetModules();
+    const a = await open();
+    put.mockRestore();
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, data: { newer: true } })
+    );
+    await a.refreshProgressAuthority();
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    const record = await a.readCommittedProgressAuthority(false);
+    const exported = a.exportableLegacyUpdates(record, null);
+    expect(exported).toContain(missed);
+    await a.discardExportedLegacyProgress(null, exported);
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(false);
+  });
+  it.each([null, 'foreign'])(
+    'preserves a known non-target owner %s without blocking writes',
+    async (owner) => {
+      const raw = JSON.stringify({ _userId: owner, data: null });
+      localStorage.setItem(STORAGE_KEYS.progress, raw);
+      const a = await open('target');
+      expect(await a.removeOwnedProgressRecovery('target')).toEqual({
+        complete: true,
+        released: true,
+      });
+      expect((await a.readCommittedProgressAuthority(false)).raw).toBe(raw);
+    }
+  );
+  it.each([null, 'foreign'])(
+    'policy double recognizes owner %s independently of payload validity',
+    async (owner) => {
+      const { createProgressPolicyAuthority } =
+        await import('#tests/test-helpers/progressAuthority');
+      const double = createProgressPolicyAuthority();
+      localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: owner }));
+      expect(await double.removeOwnedProgressRecovery()).toEqual({
+        complete: true,
+        released: true,
+      });
+      expect(double.isOwnedProgressRecovery(JSON.stringify({ data: {} }), null)).toBe(false);
+    }
+  );
   it('retries a transient activation failure within the same owner session', async () => {
     const nativePut = IDBObjectStore.prototype.put;
     const put = vi
