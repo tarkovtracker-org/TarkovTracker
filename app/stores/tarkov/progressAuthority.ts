@@ -6,7 +6,8 @@ import {
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 type Repository = Awaited<ReturnType<typeof openActiveProgressRepository>>;
 type Result = { ok: true } | { ok: false; error: unknown; canceled?: true };
-type Draft = { raw: string | null; actions: Array<() => void> };
+type CommitAction = { action: () => void; requiresCurrentRevision: boolean };
+type Draft = { raw: string | null; actions: CommitAction[] };
 let repository: Promise<Repository> | undefined;
 let token: ProgressOwnerToken | undefined;
 let accepted: ActiveProgressRecord | undefined;
@@ -41,16 +42,16 @@ const openRepository = (): Promise<Repository> => {
   });
   return pending;
 };
-const recoveryEnvelopeOwner = (value: unknown): string | null => {
-  if (!value || typeof value !== 'object') return null;
+const recoveryEnvelopeOwner = (value: unknown): string | null | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
   const owner = (value as Record<string, unknown>)._userId;
-  return typeof owner === 'string' ? owner : null;
+  return owner === null || typeof owner === 'string' ? owner : undefined;
 };
-const recoveryRawOwner = (raw: string): string | null => {
+const recoveryRawOwner = (raw: string): string | null | undefined => {
   try {
     return recoveryEnvelopeOwner(JSON.parse(raw));
   } catch {
-    return null;
+    return undefined;
   }
 };
 export const isOwnedProgressRecovery = (raw: string | null, owner: string | null): raw is string =>
@@ -70,7 +71,8 @@ const isExportablePendingLegacy = (
   record: ActiveProgressRecord,
   raw: string | null,
   owner: string | null
-): raw is string => isOwnedProgressRecovery(raw, owner) && raw !== record.legacyRaw;
+): raw is string =>
+  isOwnedProgressRecovery(raw, owner) && raw !== record.legacyRaw && raw !== record.lastLegacyRaw;
 export const exportableLegacyUpdates = (
   record: ActiveProgressRecord,
   owner: string | null
@@ -137,10 +139,35 @@ const hydrateActivatedProgressOwner = async (
   canContinue: () => boolean
 ): Promise<void> => {
   if (!canContinue()) return;
-  const current = await db.read(next, legacySource);
+  const current = await db.read(next, legacySource, false);
   if (!canContinue()) return;
   token = next;
   acceptAuthority(current);
+  try {
+    const observed = await db.read(next, legacySource);
+    if (canContinue()) acceptAuthority(observed);
+  } catch (error) {
+    if (canContinue()) legacyProgressRecoveryOverflow.value = true;
+    console.warn('Older progress recovery could not be captured', error);
+  }
+};
+const activateProgressOwner = async (
+  owner: string | null,
+  renew: boolean,
+  canContinue: () => boolean,
+  attempt = 0
+): Promise<void> => {
+  try {
+    const db = await openRepository();
+    if (!canContinue()) return;
+    const next = await db.activateOwner(owner, renew, canContinue);
+    await hydrateActivatedProgressOwner(db, next, canContinue);
+  } catch (error) {
+    if (!canContinue()) return;
+    if (attempt >= 2) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await activateProgressOwner(owner, renew, canContinue, attempt + 1);
+  }
 };
 /** Explicit session activation, never an implicit retry of a stale writer. */
 export const initializeProgressAuthority = async (
@@ -153,10 +180,7 @@ export const initializeProgressAuthority = async (
   const revision = ++activationRevision;
   const ownsActivation = () => revision === activationRevision && ownsSession();
   try {
-    const db = await openRepository();
-    if (!ownsActivation()) return;
-    const next = await db.activateOwner(owner, renew, ownsActivation);
-    await hydrateActivatedProgressOwner(db, next, ownsActivation);
+    await activateProgressOwner(owner, renew, ownsActivation);
   } catch (error) {
     if (ownsActivation()) throw error;
   }
@@ -172,15 +196,15 @@ export const writeAuthoritativeProgress = (raw: string | null): void => {
     throw new DOMException('Progress write is outside its transaction', 'InvalidStateError');
   draft.raw = raw;
 };
-export const afterProgressCommit = (action: () => void): void => {
+export const afterProgressCommit = (action: () => void, requiresCurrentRevision = true): void => {
   if (!draft)
     throw new DOMException('Progress adoption is outside its transaction', 'InvalidStateError');
-  draft.actions.push(action);
+  draft.actions.push({ action, requiresCurrentRevision });
 };
 const runDraft = (
   current: ActiveProgressRecord,
   mutate: () => Result
-): { raw: string | null; result: Result; actions: Array<() => void> } => {
+): { raw: string | null; result: Result; actions: CommitAction[] } => {
   const currentDraft: Draft = { raw: current.raw, actions: [] };
   draft = currentDraft;
   try {
@@ -199,7 +223,7 @@ export const commitProgressMutation = async (
   if (!token) throw new DOMException('Progress authority is not hydrated', 'InvalidStateError');
   if (token.owner !== expectedOwner) return { ok: false, error: null, canceled: true };
   const request = structuredClone(token);
-  let actions: Array<() => void> = [];
+  let actions: CommitAction[] = [];
   try {
     const receipt = await (
       await openRepository()
@@ -209,10 +233,13 @@ export const commitProgressMutation = async (
       actions = next.actions;
       return { raw: next.raw, result: next.result };
     });
-    if (!adoptCommittedReceipt(request, receipt.committed) || !canContinue()) {
+    const adopted = adoptCommittedReceipt(request, receipt.committed);
+    if (!ownsReceiptSession(request) || !canContinue()) {
       return { ok: false, error: null, canceled: true };
     }
-    actions.forEach((action) => action());
+    actions
+      .filter(({ requiresCurrentRevision }) => adopted || !requiresCurrentRevision)
+      .forEach(({ action }) => action());
     return receipt.result;
   } catch (error) {
     if (error instanceof RejectedMutation) return error.result;
@@ -236,7 +263,7 @@ export const removeOwnedProgressRecovery = async (
   const keep = (raw: string | null): string | null => {
     if (raw === null) return null;
     const rawOwner = recoveryRawOwner(raw);
-    if (rawOwner === null) {
+    if (rawOwner == null) {
       complete = false;
       return raw;
     }
@@ -248,7 +275,7 @@ export const removeOwnedProgressRecovery = async (
     if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
     return {
       raw: keep(current.raw),
-      result: current.raw === null || recoveryRawOwner(current.raw) !== null,
+      result: current.raw === null || typeof recoveryRawOwner(current.raw) === 'string',
       recovery: {
         legacyRaw: keep(current.legacyRaw),
         lastLegacyRaw: keep(current.lastLegacyRaw ?? null),
@@ -288,7 +315,7 @@ export const discardExportedLegacyProgress = async (
       result: true,
       recovery: {
         legacyRaw: current.legacyRaw,
-        legacyRecoveryOverflow: false,
+        legacyRecoveryOverflow: current.legacyRecoveryOverflow === true,
         lastLegacyRaw: isExportedPendingLegacy(pending, owner, exported)
           ? pending
           : current.lastLegacyRaw,

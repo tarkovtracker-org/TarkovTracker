@@ -16,7 +16,11 @@ export const createProgressPolicyAuthority = () => {
   });
   return {
     initializeProgressAuthority: async () => {},
-    removeOwnedProgressRecovery: async () => ({ complete: true, released: true }),
+    removeOwnedProgressRecovery: async () => {
+      const raw = localStorage.getItem(STORAGE_KEYS.progress);
+      const released = raw === null || parseUserScopedStorage(raw) !== null;
+      return { complete: released, released };
+    },
     discardExportedLegacyProgress: async () => {},
     configureProgressSession: () => {},
     currentProgressSessionOwner: () => undefined,

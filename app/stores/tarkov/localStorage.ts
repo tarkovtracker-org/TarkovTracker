@@ -201,6 +201,14 @@ const retainedHydrationIntentValue = (
 ): unknown => {
   if (deepEqual(before, after)) return cloneStateSnapshot(before);
   const values = [before, after, accepted];
+  if (values.every(Array.isArray) && values.every(hasHistoryIds))
+    return Object.values(
+      retainedHydrationIntentRecord(
+        historyById(values[0]!),
+        historyById(values[1]!),
+        historyById(values[2]!)
+      )
+    );
   if (values.every(isRecord))
     return retainedHydrationIntentRecord(values[0]!, values[1]!, values[2]!);
   return cloneStateSnapshot(deepEqual(after, accepted) ? after : before);
@@ -1116,9 +1124,9 @@ const commitGuestProgressWrite = (request: ProgressWriteRequest): StorageWriteRe
     afterProgressCommit(() => {
       request.guestCommitted = true;
       consumeGuestPrefix(request.source);
-      adoptGuestWrite(request, accepted);
       discardFailedGuestWritesBefore(request);
-    });
+    }, false);
+    afterProgressCommit(() => adoptGuestWrite(request, accepted));
   } else {
     foldGuestWriteRequest(request, current, accepted);
     // The next lock holder must see failed intent before this holder releases the lock.
@@ -1387,7 +1395,7 @@ const commitDirectAccountProgressWrite = (request: ProgressWriteRequest): Storag
   const result = writeStorageItem(STORAGE_KEYS.progress, request.value, request.cloudHeld);
   if (result.ok && request.source) {
     const key = request.source.key;
-    afterProgressCommit(() => clearMatchingAccountFailure(key, request.value));
+    afterProgressCommit(() => clearMatchingAccountFailure(key, request.value), false);
   }
   return result;
 };
@@ -1436,11 +1444,10 @@ const commitAccountProgressWrite = (
     encodeProgressSnapshot(accepted),
     request.cloudHeld
   );
-  if (result.ok)
-    afterProgressCommit(() => {
-      retainedAccountFailures.delete(request.source!.key);
-      adoptAccountProgressWrite(request, accepted, incoming);
-    });
+  if (result.ok) {
+    afterProgressCommit(() => retainedAccountFailures.delete(request.source!.key), false);
+    afterProgressCommit(() => adoptAccountProgressWrite(request, accepted, incoming));
+  }
   return result;
 };
 const adoptAccountProgressWrite = (

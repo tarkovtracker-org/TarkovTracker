@@ -146,15 +146,31 @@ try {
     assert.equal((await boot(sessionId)).ready, true);
     actors.push({ sessionId, targetId, name });
   }
+  const hasCommittedDocument = async (sessionId, url) => {
+    try {
+      return await evaluate(sessionId, `location.href === ${JSON.stringify(url)}`);
+    } catch (error) {
+      if (
+        !/Execution context was destroyed|Inspected target navigated or closed/.test(error.message)
+      )
+        throw error;
+      return false;
+    }
+  };
+  const waitForDocument = async (sessionId, url) => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      if (await hasCommittedDocument(sessionId, url)) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error('New reload document did not commit');
+  };
   const reload = async (actor) => {
-    await call(
-      'Page.navigate',
-      {
-        url: new URL(`/settings?actor=${actor.name}&reload=${Date.now()}#backup-restore`, base)
-          .href,
-      },
-      actor.sessionId
-    );
+    const url = new URL(`/settings?actor=${actor.name}&reload=${Date.now()}#backup-restore`, base)
+      .href;
+    await call('Page.navigate', { url }, actor.sessionId);
+    // Page.navigate acknowledges the request before its new document commits.
+    await waitForDocument(actor.sessionId, url);
     assert.equal((await boot(actor.sessionId)).ready, true);
   };
   const committed = async (actor) =>
@@ -355,7 +371,17 @@ try {
     confirmedExportCleanup: true,
   };
   await call('Tracing.end');
-  await traceComplete;
+  let traceTimeout;
+  try {
+    await Promise.race([
+      traceComplete,
+      new Promise((_, reject) => {
+        traceTimeout = setTimeout(() => reject(new Error('Trace completion timed out')), 30000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(traceTimeout);
+  }
   receipt.frames = trace
     .filter((event) => event.name === 'FrameCommittedInBrowser')
     .map((event) => event.args?.data)

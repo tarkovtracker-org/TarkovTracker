@@ -729,13 +729,16 @@ export const openActiveProgressRepository = async (factory: IDBFactory, name: st
   };
   const read = (
     request: ProgressOwnerToken,
-    legacyRaw: string | null | (() => string | null)
+    legacyRaw: string | null | (() => string | null),
+    observeLegacy = true
   ): Promise<ActiveProgressRecord> => {
     const token = structuredClone(request);
     return transaction(db, 'readwrite', (store, finish, fail) => {
       withActiveRecord(store, token, legacyRaw, finish, fail, (current, exists) => {
         const observed =
-          typeof legacyRaw === 'function' ? observeLegacyRecord(current, legacyRaw) : current;
+          observeLegacy && typeof legacyRaw === 'function'
+            ? observeLegacyRecord(current, legacyRaw)
+            : current;
         if (!exists || observed !== current) store.put(observed, activeKey);
         return observed;
       });

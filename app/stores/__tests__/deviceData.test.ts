@@ -31,6 +31,17 @@ vi.mock('@/utils/logger', () => ({
 const owned = (userId: string | null) =>
   JSON.stringify({ _userId: userId, data: structuredClone(defaultState) });
 describe('device data removal', () => {
+  it('uses a fresh native purge receipt to release writes after a stale unreadable cached slot', async () => {
+    vi.spyOn(progressAuthority, 'readAuthoritativeProgress').mockImplementation(() => {
+      throw new DOMException('stale cache', 'InvalidStateError');
+    });
+    vi.spyOn(progressAuthority, 'removeOwnedProgressRecovery').mockResolvedValue({
+      complete: true,
+      released: true,
+    });
+    expect(await removeAccountDeviceData('user-1')).toBe(true);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+  });
   it('reports incomplete removal when unowned malformed legacy bytes remain', async () => {
     const raw = '{malformed late edit';
     localStorage.setItem('progress', raw);

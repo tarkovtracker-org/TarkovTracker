@@ -1601,7 +1601,7 @@ describe('older-tab recovery review', () => {
   it('imports an owned exported archive larger than the ordinary backup limit', async () => {
     const raw =
       JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state }) +
-      ' '.repeat(3 * 1024 * 1024);
+      ' '.repeat(6 * 1024 * 1024);
     const file = new File(
       [
         JSON.stringify({
@@ -1619,6 +1619,23 @@ describe('older-tab recovery review', () => {
     await backup.parseBackupFile(file);
     expect(backup.importState.value).toBe('preview');
     expect(backup.recoveryArchiveEntries.value).toHaveLength(2);
+  });
+  it('previews an owned partial mode archive with a default for the missing mode', async () => {
+    const { pve: _pve, ...partial } = tarkovStore.$state;
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: JSON.stringify({ _userId: 'user-123', data: partial }),
+          original: null,
+          older_tab_edits: [],
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.importPreview.value?.pve).toBeDefined();
   });
   it('rejects oversized archive input before reading any bytes', async () => {
     const file = { size: 128 * 1024 * 1024 + 1, text: vi.fn() } as unknown as File;

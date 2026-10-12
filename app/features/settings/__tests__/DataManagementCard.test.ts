@@ -1160,6 +1160,16 @@ describe('DataManagementCard', () => {
     await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
     expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
   });
+  it('keeps saved-file confirmation and reports a failed native cleanup', async () => {
+    backupState.legacyProgressRecoveryCount.value = 1;
+    backupFns.confirmRecoveryArchiveSaved.mockRejectedValueOnce(new Error('cleanup failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(expect.objectContaining({ color: 'error' }));
+    expect(wrapper.find('[data-testid="older-tab-cleanup-saved-confirm"]').exists()).toBe(true);
+  });
   it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
     backupState.legacyProgressRecoveryCount.value = 1;
     backupFns.exportDeviceProgressRecovery.mockRejectedValueOnce(new Error('export failed'));

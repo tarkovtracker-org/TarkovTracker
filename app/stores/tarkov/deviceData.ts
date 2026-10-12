@@ -192,7 +192,6 @@ const canStartNativeRemoval = (userId: string, canContinue: () => boolean): Remo
   canContinue() ? removeOwnedLegacyProgress(userId) : { complete: false, released: false };
 const removeNativeRecoveryCopies = async (
   userId: string,
-  activeRemoval: RemovalResult,
   canContinue: () => boolean
 ): Promise<RemovalResult> => {
   try {
@@ -200,18 +199,17 @@ const removeNativeRecoveryCopies = async (
     if (!legacyRemoval.released) return legacyRemoval;
     const removed = await removeOwnedProgressRecovery(userId, canContinue);
     if (!canContinue()) return { complete: false, released: false };
-    return combineNativeRemoval(removed, activeRemoval, legacyRemoval);
+    return combineNativeRemoval(removed, legacyRemoval);
   } catch {
     return { complete: false, released: false };
   }
 };
 const combineNativeRemoval = (
   removed: RemovalResult,
-  activeRemoval: RemovalResult,
   legacyRemoval: RemovalResult
 ): RemovalResult => ({
-  complete: removed.complete && activeRemoval.complete && legacyRemoval.complete,
-  released: removed.released && activeRemoval.released,
+  complete: removed.complete && legacyRemoval.complete,
+  released: removed.released,
 });
 /** Legacy projections remain untouched except during explicit owner removal. */
 const removeOwnedLegacyProgress = (userId: string): RemovalResult => {
@@ -260,11 +258,11 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
     revision === removalIntentRevision && sessionOwner === getCurrentSupabaseUserId();
   invalidateActiveProgressWrites(userId);
   removalCleanupCallbacks.forEach((cleanup) => cleanup(userId));
-  const activeRemoval = await removeIfOwned(STORAGE_KEYS.progress, userId, true);
+  await removeIfOwned(STORAGE_KEYS.progress, userId, true);
   // A canceled active-slot operation is not a storage failure. A later sign-in or
   // removal request must keep its copies and must not inherit this attempt's barrier.
   if (!isCurrent()) return false;
-  const nativeRemoval = await removeNativeRecoveryCopies(userId, activeRemoval, isCurrent);
+  const nativeRemoval = await removeNativeRecoveryCopies(userId, isCurrent);
   let removed = nativeRemoval.complete;
   if (!isCurrent()) return false;
   // An earlier queued replacement can retain the owner's active bytes while removal waits.

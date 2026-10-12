@@ -41,7 +41,7 @@ describe('native progress authority integration', () => {
     await vi.advanceTimersByTimeAsync(4999);
     expect(a.isProgressAuthorityReady()).toBe(false);
     expect(outcome).toBeUndefined();
-    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(10501);
     expect(outcome).toMatchObject({ name: 'TimeoutError' });
     await opening;
     request.onsuccess!();
@@ -52,6 +52,62 @@ describe('native progress authority integration', () => {
     vi.useRealTimers();
     await a.initializeProgressAuthority(null);
     expect(a.isProgressAuthorityReady()).toBe(true);
+  });
+  it('hydrates committed progress when capturing a newer legacy copy exceeds quota', async () => {
+    const original = JSON.stringify({ _userId: null, data: {} });
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    const a = await open();
+    await a.commitProgressMutation(
+      () => {
+        a.writeAuthoritativeProgress('committed');
+        return { ok: true };
+      },
+      () => true,
+      null
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, data: { newer: true } })
+    );
+    const nativePut = IDBObjectStore.prototype.put;
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      if (args[1] === 'active-envelope') throw new DOMException('full', 'QuotaExceededError');
+      return nativePut.apply(this, args);
+    });
+    vi.resetModules();
+    const b = await open();
+    expect(b.readAuthoritativeProgress()).toBe('committed');
+    expect(b.isProgressAuthorityReady()).toBe(true);
+    expect(b.legacyProgressRecoveryOverflow.value).toBe(true);
+  });
+  it('retries a transient activation failure within the same owner session', async () => {
+    const nativePut = IDBObjectStore.prototype.put;
+    const put = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementationOnce(function () {
+        throw new DOMException('transient', 'AbortError');
+      })
+      .mockImplementation(function (this: IDBObjectStore, ...args) {
+        return nativePut.apply(this, args);
+      });
+    const a = await open();
+    expect(a.isProgressAuthorityReady()).toBe(true);
+    expect(put.mock.calls.length).toBeGreaterThan(1);
+  });
+  it('does not export malformed or unknown recovery ownership as guest data', async () => {
+    const a = await open();
+    for (const raw of [
+      'broken',
+      '{}',
+      JSON.stringify({ _userId: 7 }),
+      JSON.stringify({ data: {} }),
+    ]) {
+      expect(a.isOwnedProgressRecovery(raw, null)).toBe(false);
+    }
+    expect(a.isOwnedProgressRecovery(JSON.stringify({ _userId: null, data: {} }), null)).toBe(true);
   });
   it('deletes owned legacy projections before announcing the final native purge', async () => {
     const original = JSON.stringify({ _userId: 'a', data: {} });
@@ -133,11 +189,14 @@ describe('native progress authority integration', () => {
       () => true,
       null
     );
-    localStorage.setItem(STORAGE_KEYS.progress, 'older-tab edit');
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, data: { edit: true } })
+    );
     await a.refreshProgressAuthority();
     expect(a.readAuthoritativeProgress()).toBe('current');
     expect(await a.readCommittedProgressAuthority()).toMatchObject({
-      legacyUpdates: ['older-tab edit'],
+      legacyUpdates: [JSON.stringify({ _userId: null, data: { edit: true } })],
     });
     expect(a.legacyProgressRecoveryCount.value).toBe(1);
   });
@@ -350,12 +409,14 @@ describe('native progress authority integration', () => {
       let owner = 'a';
       a.configureProgressSession(() => owner);
       const action = vi.fn();
+      const acknowledged = vi.fn();
       const old =
         kind === 'write'
           ? a.commitProgressMutation(
               () => {
                 a.writeAuthoritativeProgress('old');
                 a.afterProgressCommit(action);
+                a.afterProgressCommit(acknowledged, false);
                 return { ok: true };
               },
               () => true,
@@ -377,8 +438,13 @@ describe('native progress authority integration', () => {
       );
       release();
       expect(await old).toMatchObject(
-        kind === 'write' ? { canceled: true } : { complete: false, released: false }
+        kind === 'write'
+          ? change === 'revision'
+            ? { ok: true }
+            : { canceled: true }
+          : { complete: false, released: false }
       );
+      expect(acknowledged).toHaveBeenCalledTimes(change === 'revision' && kind === 'write' ? 1 : 0);
       expect(a.readAuthoritativeProgress()).toBe('newer');
       expect(action).not.toHaveBeenCalled();
       db.close();
@@ -538,6 +604,9 @@ describe('native progress authority integration', () => {
       legacyRecoveryOverflow: false,
     });
     expect((await a.readCommittedProgressAuthority()).legacyUpdates ?? []).toEqual([]);
+    expect(a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), 'a')).toEqual(
+      []
+    );
   });
   it('exports captured copies when legacy storage is blocked and keeps unexported pending edits', async () => {
     const original = JSON.stringify({ _userId: 'a', data: { level: 1 } });

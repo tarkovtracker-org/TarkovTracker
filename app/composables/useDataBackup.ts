@@ -376,7 +376,8 @@ function selectOlderTabRaw(copies: string[], index: number): string {
   return copies[index]!;
 }
 function parseOlderTabRaw(raw: string): unknown {
-  if (raw.length > 5 * 1024 * 1024) throw new Error('Older edit is too large');
+  if (new TextEncoder().encode(raw).byteLength > MAX_RECOVERY_ARCHIVE_SIZE)
+    throw new Error('Older edit is too large');
   return parseUserScopedStorage(raw)?.data ?? JSON.parse(raw);
 }
 const olderTabMetadataKeys = [
@@ -386,7 +387,7 @@ const olderTabMetadataKeys = [
   'seasonalSeasonNumber',
 ] as const;
 function normalizeOlderTabSource(source: Record<string, unknown>): Record<string, unknown> {
-  if ('pvp' in source || 'pve' in source) return source;
+  if ('pvp' in source || 'pve' in source) return { ...migrateToGameModeStructure(source) };
   const progress = sanitizeProgressData(source);
   if (!progress.ok) throw new Error(progress.error);
   const migrated = migrateToGameModeStructure(source);

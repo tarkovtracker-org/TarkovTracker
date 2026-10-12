@@ -23,7 +23,6 @@ export default defineNuxtPlugin({
       await initializeProgressAuthority(supabase.user.id || null);
       const stop = observeProgressAuthority((error) => {
         logger.error('[PiniaPlugin] Progress refresh failed', error);
-        recordLocalSave(false, 'unknown');
       });
       nuxtApp.vueApp.onUnmount(stop);
     } catch (error) {
