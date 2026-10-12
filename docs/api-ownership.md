@@ -64,11 +64,26 @@ not prerender/dev. It introduces no other platform behavior. The compiled-worker
 (`node --test scripts/checks/legacy-api-pages.mjs`, after build) makes body reads and binding
 access throw on retirement and verifies normal POST/asset behavior separately. This proves the
 body-isolation contract, not a measured production CPU, billing, or security improvement.
-The wrapper-disabled negative control still returned 410 for a retired POST, but recorded one
-adapter body read and `bodyUsed=true`; the unread-body assertion failed as expected. With the
-wrapper enabled, the compiled suite requires zero reads and `bodyUsed=false`. Separate adapter
-unit tests assert the original Request/environment/context/Response identities and scheduled
-callback pass-through.
+The manual wrapper-disabled negative control still returned 410 for a retired POST, but recorded
+one adapter body read and `bodyUsed=true`; the unread-body assertion failed as expected. Reproduce
+it in an isolated checkout, restoring the source before a normal build:
+
+1. Disable only `nitro.options.entry = resolve(appDir, 'server/pages-entry.ts')` in the
+   `nitro:init` hook, keeping retirement middleware enabled. Build using the anonymous preview
+   profile (`NODE_ENV=production`, `CI=true`, preview `APP_URL`, and no production credentials).
+2. Start the same workerd harness configuration as
+   [`legacy-api-pages.mjs`](../scripts/checks/legacy-api-pages.mjs), with main
+   `scripts/checks/legacy-api-pages-worker.mjs`. Send a plain POST to
+   `https://tarkovtracker.org/api/progress` with body `{invalid json`, **without**
+   `X-Test-Unread-Body` or `X-Test-No-Bindings`. Those throw flags are intentionally absent:
+   this control observes the adapter's read instead of preventing it.
+3. The [test-only instrumentation](../scripts/checks/legacy-api-pages-worker.mjs) reports status
+   410, `X-Test-Body-Reads: 1`, and `X-Test-Body-Used: true`. Requiring bodyUsed=false fails.
+   Close the harness, restore the entry assignment, rebuild, and run the normal compiled suite.
+
+The owning [compiled checks](../scripts/checks/legacy-api-pages.mjs) cover the enabled wrapper;
+[adapter unit tests](../app/server/__tests__/pages-entry.test.ts) cover identity and callback
+pass-through. The negative control is a manual experiment, not an extra CI build.
 
 Promote in this order, with explicit approval for production merges/deployments and route removal:
 
