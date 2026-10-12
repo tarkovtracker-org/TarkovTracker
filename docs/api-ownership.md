@@ -64,6 +64,11 @@ not prerender/dev. It introduces no other platform behavior. The compiled-worker
 (`node --test scripts/checks/legacy-api-pages.mjs`, after build) makes body reads and binding
 access throw on retirement and verifies normal POST/asset behavior separately. This proves the
 body-isolation contract, not a measured production CPU, billing, or security improvement.
+The wrapper-disabled negative control still returned 410 for a retired POST, but recorded one
+adapter body read and `bodyUsed=true`; the unread-body assertion failed as expected. With the
+wrapper enabled, the compiled suite requires zero reads and `bodyUsed=false`. Separate adapter
+unit tests assert the original Request/environment/context/Response identities and scheduled
+callback pass-through.
 
 Promote in this order, with explicit approval for production merges/deployments and route removal:
 
