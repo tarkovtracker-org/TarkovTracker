@@ -35,6 +35,8 @@ CREATE INDEX user_game_profiles_user_created_idx
   ON public.user_game_profiles (user_id, created_at, id);
 
 ALTER TABLE public.user_game_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY user_game_profiles_deny_direct_access ON public.user_game_profiles
+  AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 REVOKE ALL ON public.user_game_profiles FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON TABLE public.user_game_profiles IS
   'EFT game profiles of one account. The is_default row describes the existing progress rows; other rows own user_profile_mode_progress.';
@@ -62,29 +64,49 @@ CREATE TABLE public.user_profile_mode_progress (
 );
 
 ALTER TABLE public.user_profile_mode_progress ENABLE ROW LEVEL SECURITY;
+CREATE POLICY user_profile_mode_progress_deny_direct_access ON public.user_profile_mode_progress
+  AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 REVOKE ALL ON public.user_profile_mode_progress FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON TABLE public.user_profile_mode_progress IS
   'Per-mode progress of a non-default game profile. Same shape as user_game_mode_progress; clients use RPCs.';
 
 CREATE FUNCTION private.game_profiles_unlocked(p_user_id UUID)
 RETURNS BOOLEAN
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT COALESCE(
-      (SELECT value #>> '{}' FROM public.app_settings WHERE key = 'game_profiles_access'),
-      'supporters') = 'all'
-    OR (
-      NOT public.supporter_benefits_disqualified(p_user_id)
-      AND EXISTS (
-        SELECT 1 FROM public.supporters s
-        WHERE s.user_id = p_user_id
+DECLARE
+  unlocked BOOLEAN;
+BEGIN
+  IF COALESCE((SELECT value #>> '{}' FROM public.app_settings WHERE key = 'game_profiles_access'),
+      'supporters') = 'all' THEN
+    RETURN true;
+  END IF;
+  IF public.supporter_benefits_disqualified(p_user_id) THEN
+    RETURN false;
+  END IF;
+  -- The schema can deploy before or after the independent credit rollout.
+  -- Dynamic SQL avoids referencing its view until that schema exists.
+  IF pg_catalog.to_regclass('public.supporter_entitlements') IS NOT NULL THEN
+    EXECUTE $query$
+      SELECT EXISTS (
+        SELECT 1 FROM public.supporter_entitlements s
+        WHERE s.user_id = $1
           AND ((s.status = 'active' AND s.expires_at IS NULL)
             OR (s.status IN ('active', 'past_due') AND s.expires_at > now()))
       )
-    );
+    $query$ INTO unlocked USING p_user_id;
+    RETURN unlocked;
+  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.supporters s
+    WHERE s.user_id = p_user_id
+      AND ((s.status = 'active' AND s.expires_at IS NULL)
+        OR (s.status IN ('active', 'past_due') AND s.expires_at > now()))
+  );
+END;
 $$;
 REVOKE ALL ON FUNCTION private.game_profiles_unlocked(UUID) FROM PUBLIC, anon, authenticated;
 

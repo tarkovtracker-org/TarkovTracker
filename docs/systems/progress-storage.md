@@ -133,7 +133,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 - Cap: 2 profiles per account (default plus one), enforced in `add_game_profile`. Errors: `PT400`
   invalid label or EFT account id, `PT403` locked, `PT404` unknown profile, `PT409` duplicate or default-profile misuse, `PT422` cap reached.
 - Access: `private.game_profiles_unlocked` is true for an active, non-disqualified supporter (same
-  rule as `supporterStatus.ts`) or when `app_settings.game_profiles_access` is `"all"`; a missing
+  rule as `supporterStatus.ts`, using effective prepaid entitlements when that rollout is present) or when `app_settings.game_profiles_access` is `"all"`; a missing
   setting means supporters only. Binding the default profile is never gated. A lapsed account keeps
   its extra profile read-only and can still delete it.
 - Preferences and other non-progress settings stay account-global. API tokens and teams still address
@@ -160,7 +160,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   legacy-only `update_task_completion`, while retaining account clocks for accepted cached clients
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
-- `supabase/migrations/20261008120000_add_game_profiles.sql` — game profile tables, supporter gate,
+- `supabase/migrations/20261012094933_reconcile_game_profile_entitlements.sql` — game profile tables, supporter gate,
   and profile RPCs
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
@@ -172,6 +172,12 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Game profiles remain capped at default plus one extra, with account-owned IDs and RPC-only access.
+  Default progress is never gated or mixed with extra-profile rows. Lapsed accounts retain read and
+  delete access to extras; writes use effective, non-disqualified supporter access unless the setting
+  opens access to all. Preferences, team readers, shares and existing API tokens stay account-global
+  or default-profile scoped. Current Seasonal writes require a matching season stamp and preserve
+  all historical profile seasons.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
   requires aligned application/gateway consumers and a verified database rollout first. The

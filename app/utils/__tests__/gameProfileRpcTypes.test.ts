@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expectTypeOf, it } from 'vitest';
-import type { Database } from '~~/supabase/functions/_shared/database.types';
+import type { Database, Json } from '~~/supabase/functions/_shared/database.types';
 type ProfileFunctions = Database['public']['Functions'];
 it('accepts the nullable game profile RPC inputs supported by SQL', () => {
   expectTypeOf<ProfileFunctions['update_game_profile']['Args']>().toEqualTypeOf<{
@@ -14,7 +14,7 @@ it('accepts the nullable game profile RPC inputs supported by SQL', () => {
   }>();
   expectTypeOf<ProfileFunctions['sync_game_profile_progress']['Args']>().toEqualTypeOf<{
     p_game_edition: number | null;
-    p_modes: Database['public']['Functions']['sync_game_profile_progress']['Args']['p_modes'];
+    p_modes: Json;
     p_profile_id: string;
     p_seasonal_season_number?: number | null;
   }>();
