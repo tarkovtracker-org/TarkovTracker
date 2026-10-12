@@ -1637,6 +1637,24 @@ describe('older-tab recovery review', () => {
     expect(backup.importState.value).toBe('preview');
     expect(backup.importPreview.value?.pve).toBeDefined();
   });
+  it('rejects malformed present mode data instead of silently replacing it with defaults', async () => {
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: JSON.stringify({
+            _userId: 'user-123',
+            data: { ...tarkovStore.$state, pvp: null },
+          }),
+          original: null,
+          older_tab_edits: [],
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('error');
+  });
   it('rejects oversized archive input before reading any bytes', async () => {
     const file = { size: 128 * 1024 * 1024 + 1, text: vi.fn() } as unknown as File;
     const backup = useDataBackup();

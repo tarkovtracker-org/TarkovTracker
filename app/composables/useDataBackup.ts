@@ -387,7 +387,8 @@ const olderTabMetadataKeys = [
   'seasonalSeasonNumber',
 ] as const;
 function normalizeOlderTabSource(source: Record<string, unknown>): Record<string, unknown> {
-  if ('pvp' in source || 'pve' in source) return { ...migrateToGameModeStructure(source) };
+  if ('pvp' in source || 'pve' in source)
+    return { ...migrateToGameModeStructure(source), ...source };
   const progress = sanitizeProgressData(source);
   if (!progress.ok) throw new Error(progress.error);
   const migrated = migrateToGameModeStructure(source);
