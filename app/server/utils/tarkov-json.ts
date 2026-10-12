@@ -4,6 +4,7 @@ import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
+import { assertTaskImportSource } from '@/utils/taskImportCatalog';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
   isValidTraderLevel,
@@ -1002,6 +1003,23 @@ export function adaptTaskObjectivesResponse(
     },
   };
 }
+/** Combines all import fields from the same raw task set before one overlay application. */
+export function adaptTasksImportResponse(
+  tasksPayload: JsonTasksPayload,
+  options: { hideoutPayload?: unknown; tradersPayload?: unknown } = {}
+): { data: { tasks: Task[] } } {
+  assertTaskImportSource(tasksPayload);
+  const context = buildContext({ ...options, tasksPayload });
+  context.tasksById = toLookup(tasksPayload.tasks);
+  return {
+    data: {
+      tasks: toRecordArray(tasksPayload.tasks).map((task) => ({
+        ...adaptTaskCore(task, context),
+        ...adaptTaskObjectives(task, context),
+      })),
+    },
+  };
+}
 export function adaptTaskRewardsResponse(
   tasksPayload: JsonTasksPayload,
   options: {
@@ -1101,6 +1119,17 @@ export function createTarkovJsonTaskObjectivesFetcher(options: TarkovJsonOptions
       });
       throw error;
     }
+  };
+}
+/** English import snapshots are generated off the Worker request path by precompute. */
+export function createTarkovJsonTasksImportFetcher(options: TarkovJsonOptions) {
+  return async () => {
+    const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
+      fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
+      fetchTarkovJsonEndpoint<unknown>('hideout', options),
+      fetchTarkovJsonEndpoint<unknown>('traders', options),
+    ]);
+    return adaptTasksImportResponse(tasksPayload, { hideoutPayload, tradersPayload });
   };
 }
 export function createTarkovJsonTaskRewardsFetcher(options: TarkovJsonOptions) {

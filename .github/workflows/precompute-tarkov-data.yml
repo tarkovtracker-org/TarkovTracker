@@ -2,7 +2,8 @@ name: Precompute Tarkov Data
 # Runs the heavy tasks-core fetch/adapt/overlay pipeline off Cloudflare and
 # writes the resulting payloads to the TARKOV_DATA KV namespace (7-day TTL).
 # The Pages request handlers read these entries via edgeCache's `precomputed`
-# option; a missed run degrades to slightly stale data, never an outage.
+# option; a missed run degrades to slightly stale data. EFT log imports read
+# only the English tasks-import snapshots, so they fail once those expire.
 #
 # Runs here instead of a scheduled Worker because the account is on the
 # Workers Free tier (10ms CPU/invocation), which cannot fit even a single
@@ -82,6 +83,7 @@ jobs:
               `- Commit: ${context.sha}`,
               '',
               'KV entries have a 7-day TTL; investigate before they expire.',
+              'EFT log imports fail once the tasks-import snapshots expire (no runtime fallback).',
             ].join('\n');
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,

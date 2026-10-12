@@ -1175,6 +1175,28 @@ standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe
 this cache-key rollout. After deployment, run `pnpm run verify:overlay` and retain the served
 fleet verification before closing issue #729.
 
+### EFT import snapshot rollout (#1161)
+
+`/api/tarkov/tasks-import` reads only `tasks-import-json-v1-en-{regular,pve,pvp-season}` and returns
+503 while a key is missing, so seed before Pages deploys the consumer
+([release order](./systems/overlay-and-precompute.md#release-verification)):
+
+1. Read the published overlay `$meta.sha256`. Dispatch `precompute-tarkov-data.yml` on the PR
+   branch with `lang=en`, no mode, and that `expectedOverlaySha`. Require the run's
+   `importSnapshots.failures` to be empty.
+2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
+   overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
+3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
+   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+   environment or a secret store) reports no import mismatches.
+4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
+   entries and the import keys share the release.
+
+Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
+which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail
+for affected modes. Purge the `json-v3` objective targets with `admin-cache-purge` after rolling
+back so they regenerate with the overlay. The 7-day import keys can be left to expire.
+
 ### Retired automatic-level cleanup
 
 The automatic-level removal migration is schema only. New clients and database writes discard

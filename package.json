@@ -114,7 +114,7 @@
     "test:progress-native": "node scripts/checks/progress-renderer-repro.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
-    "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts",
+    "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts supabase/functions/admin-cache-purge/cache-targets.deno.test.ts",
     "validate:changes": "node scripts/ci/validate-changes.mjs",
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",
     "test:workflow": "node --test scripts/workflow-tests/*.mjs scripts/codex-review/*-tests.mjs",
