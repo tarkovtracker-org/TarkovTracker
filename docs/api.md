@@ -621,4 +621,4 @@ seasons create new progress rows without overwriting earlier Seasonal history.
 
 ## Data Overlay
 
-All task data is enhanced with community corrections from the [tarkov-data-overlay](https://github.com/tarkovtracker-org/tarkov-data-overlay) repository.
+All task data is enhanced with community corrections from the `tarkov-data-overlay` dataset.
