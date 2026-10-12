@@ -1,6 +1,7 @@
 import {
   openActiveProgressRepository,
   exceedsLegacyRecoveryLimits,
+  ProgressDatabaseClosed,
   type ActiveProgressRecord,
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
@@ -32,8 +33,7 @@ class RejectedMutation extends Error {
     super('Progress mutation rejected');
   }
 }
-const openRepository = (): Promise<Repository> => {
-  if (repository) return repository;
+const startRepository = (): Promise<Repository> => {
   const pending = openActiveProgressRepository(
     window.indexedDB,
     'tarkovtracker-active-progress-v1'
@@ -43,6 +43,25 @@ const openRepository = (): Promise<Repository> => {
     if (repository === pending) repository = undefined;
   });
   return pending;
+};
+/** A closed connection is replaced once; concurrent callers share that replacement. */
+const replaceClosedRepository = (stale: Promise<Repository>, db: Repository) => {
+  if (!db.isClosed()) return db;
+  return repository === stale ? startRepository() : openRepository();
+};
+const openRepository = (): Promise<Repository> => {
+  const cached = repository;
+  if (!cached) return startRepository();
+  return cached.then((db) => replaceClosedRepository(cached, db));
+};
+/** Retries only a transaction the closed connection refused to start; no callback has run. */
+const withRepository = async <T>(operation: (db: Repository) => Promise<T>): Promise<T> => {
+  try {
+    return await operation(await openRepository());
+  } catch (error) {
+    if (!(error instanceof ProgressDatabaseClosed)) throw error;
+    return await operation(await openRepository());
+  }
 };
 const recoveryEnvelopeOwner = (value: unknown): string | null | undefined => {
   if (!value || typeof value !== 'object') return undefined;
@@ -172,7 +191,7 @@ const readObservedAuthority = async (
 export const refreshProgressAuthority = async (source = legacySource): Promise<void> => {
   if (!token) return;
   const request = structuredClone(token);
-  const record = await readObservedAuthority(await openRepository(), request, source);
+  const record = await withRepository((db) => readObservedAuthority(db, request, source));
   if (ownsReceiptSession(request)) acceptAuthority(record);
 };
 export const observeProgressAuthority = (onError: (error: unknown) => void): (() => void) => {
@@ -296,14 +315,14 @@ export const commitProgressMutation = async (
   const request = structuredClone(token);
   let actions: CommitAction[] = [];
   try {
-    const receipt = await (
-      await openRepository()
-    ).mutate(request, (current) => {
-      if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
-      const next = runDraft(current, mutate);
-      actions = next.actions;
-      return { raw: next.raw, result: next.result };
-    });
+    const receipt = await withRepository((db) =>
+      db.mutate(request, (current) => {
+        if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
+        const next = runDraft(current, mutate);
+        actions = next.actions;
+        return { raw: next.raw, result: next.result };
+      })
+    );
     const adopted = adoptCommittedReceipt(request, receipt.committed);
     if (!ownsReceiptSession(request) || !canContinue()) {
       return { ok: false, error: null, canceled: true };
@@ -322,10 +341,9 @@ export const readCommittedProgressAuthority = async (
 ): Promise<ActiveProgressRecord> => {
   if (!token) throw new DOMException('Progress authority is not hydrated', 'InvalidStateError');
   const request = structuredClone(token);
-  const db = await openRepository();
-  return observeLegacy
-    ? readObservedAuthority(db, request, legacySource)
-    : db.read(request, null, false);
+  return withRepository((db) =>
+    observeLegacy ? readObservedAuthority(db, request, legacySource) : db.read(request, null, false)
+  );
 };
 /** Explicit device removal also covers the immutable import and older-tab recovery copies. */
 export const removeOwnedProgressRecovery = async (
@@ -344,20 +362,20 @@ export const removeOwnedProgressRecovery = async (
     }
     return rawOwner === owner ? null : raw;
   };
-  const receipt = await (
-    await openRepository()
-  ).mutate(request, (current) => {
-    if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
-    return {
-      raw: keep(current.raw),
-      result: current.raw === null || recoveryRawOwner(current.raw) !== undefined,
-      recovery: {
-        legacyRaw: keep(current.legacyRaw),
-        lastLegacyRaw: keep(current.lastLegacyRaw ?? null),
-        legacyUpdates: (current.legacyUpdates ?? []).map(keep).filter((raw) => raw !== null),
-      },
-    };
-  });
+  const receipt = await withRepository((db) =>
+    db.mutate(request, (current) => {
+      if (!canContinue()) throw new RejectedMutation({ ok: false, error: null, canceled: true });
+      return {
+        raw: keep(current.raw),
+        result: current.raw === null || recoveryRawOwner(current.raw) !== undefined,
+        recovery: {
+          legacyRaw: keep(current.legacyRaw),
+          lastLegacyRaw: keep(current.lastLegacyRaw ?? null),
+          legacyUpdates: (current.legacyUpdates ?? []).map(keep).filter((raw) => raw !== null),
+        },
+      };
+    })
+  );
   if (!adoptCommittedReceipt(request, receipt.committed) || !canContinue()) {
     return { complete: false, released: false };
   }
@@ -394,24 +412,24 @@ export const discardExportedLegacyProgress = async (
   const exported = new Set(copies.filter((raw) => isOwnedProgressRecovery(raw, owner)));
   const pending = readPendingLegacySource();
   const keep = (raw: string | null) => !isOwnedProgressRecovery(raw, owner) || !exported.has(raw);
-  const receipt = await (
-    await openRepository()
-  ).mutate(request, (current) => {
-    if (!isCurrent()) throw new DOMException('Progress owner changed', 'InvalidStateError');
-    return {
-      raw: current.raw,
-      result: true,
-      recovery: {
-        legacyRaw: current.legacyRaw,
-        legacyRecoveryOverflow:
-          current.legacyRecoveryOverflow === true || hasCurrentCaptureOverflow(),
-        lastLegacyRaw: isExportedPendingLegacy(pending, owner, exported)
-          ? pending
-          : current.lastLegacyRaw,
-        legacyUpdates: (current.legacyUpdates ?? []).filter(keep),
-      },
-    };
-  });
+  const receipt = await withRepository((db) =>
+    db.mutate(request, (current) => {
+      if (!isCurrent()) throw new DOMException('Progress owner changed', 'InvalidStateError');
+      return {
+        raw: current.raw,
+        result: true,
+        recovery: {
+          legacyRaw: current.legacyRaw,
+          legacyRecoveryOverflow:
+            current.legacyRecoveryOverflow === true || hasCurrentCaptureOverflow(),
+          lastLegacyRaw: isExportedPendingLegacy(pending, owner, exported)
+            ? pending
+            : current.lastLegacyRaw,
+          legacyUpdates: (current.legacyUpdates ?? []).filter(keep),
+        },
+      };
+    })
+  );
   if (!adoptCommittedReceipt(request, receipt.committed) || !isCurrent()) {
     throw new DOMException('Progress owner changed', 'InvalidStateError');
   }

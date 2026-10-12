@@ -394,6 +394,30 @@ const nextSnapshot = (
     legacyRaw: input.kind === 'import' ? input.legacyRaw : current.legacyRaw,
   };
 };
+/** Connections the browser closed, released for an upgrade, or lost; owners reopen instead. */
+const closedDatabases = new WeakSet<IDBDatabase>();
+/** The connection refused to start a transaction, so no callback ran and a retry is safe. */
+export class ProgressDatabaseClosed extends Error {
+  constructor(cause: unknown) {
+    super('Progress database connection is closed', { cause });
+    this.name = 'ProgressDatabaseClosed';
+  }
+}
+const isClosedConnectionError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'InvalidStateError';
+const startTransaction = (db: IDBDatabase, mode: IDBTransactionMode): IDBTransaction => {
+  try {
+    return db.transaction(storeName, mode, { durability: 'strict' });
+  } catch (error) {
+    if (!isClosedConnectionError(error)) throw error;
+    closedDatabases.add(db);
+    throw new ProgressDatabaseClosed(error);
+  }
+};
+/** WebKit reports a lost IDB server as UnknownError; later transactions on that handle also fail. */
+const markLostConnection = (db: IDBDatabase, error: DOMException | null): void => {
+  if (error?.name === 'UnknownError') closedDatabases.add(db);
+};
 const DATABASE_OPEN_TIMEOUT_MS = 5000;
 type DatabaseOpenSettlement = { settled: boolean; timer: ReturnType<typeof setTimeout> };
 const rejectDatabaseOpen = (
@@ -417,8 +441,13 @@ const finishDatabaseOpen = (
   }
   state.settled = true;
   clearTimeout(state.timer);
-  request.result.onversionchange = () => request.result.close();
-  resolve(request.result);
+  const db = request.result;
+  db.onversionchange = () => {
+    closedDatabases.add(db);
+    db.close();
+  };
+  db.onclose = () => closedDatabases.add(db);
+  resolve(db);
 };
 const openDatabase = (factory: IDBFactory, name: string): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -456,12 +485,14 @@ const transaction = <T>(
   ) => void
 ): Promise<T> =>
   new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode, { durability: 'strict' });
+    const tx = startTransaction(db, mode);
     let result: T;
     let failure: unknown;
     tx.oncomplete = () => resolve(result);
-    tx.onabort = () =>
+    tx.onabort = () => {
+      markLostConnection(db, tx.error);
       reject(failure ?? tx.error ?? new DOMException('Progress transaction aborted', 'AbortError'));
+    };
     const fail = (error: unknown) => {
       failure = error;
       tx.abort();
@@ -785,5 +816,9 @@ export const openActiveProgressRepository = async (factory: IDBFactory, name: st
       );
     });
   };
-  return { activateOwner, read, mutate, close: () => db.close() };
+  const close = () => {
+    closedDatabases.add(db);
+    db.close();
+  };
+  return { activateOwner, read, mutate, close, isClosed: () => closedDatabases.has(db) };
 };

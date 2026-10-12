@@ -1179,6 +1179,23 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`rate-limiting.md`](./rate-limiting.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
+### Browser progress authority (#1092) rollback
+
+After this release, IndexedDB `tarkovtracker-active-progress-v1` owns browser progress. The
+`v2_progress` localStorage copy is imported once and then only observed, so it is stale after the
+first edit ([decision record](./decision-browser-progress.md#historical-rollback-requirements-and-remaining-acceptance)).
+
+- Fix forward. Prefer a repair release that still reads IndexedDB; revert later changes, not this
+  reader.
+- Do not redeploy a pre-#1092 frontend as routine rollback. It reads the stale localStorage copy:
+  guest edits made since the release disappear, and signed-in tabs can sync stale local state.
+- If an old-code rollback is unavoidable, first announce that users should open Settings →
+  Backup & Restore and use "Export locally saved device data and recovery copies". After the
+  IndexedDB release returns, edits made by old code appear only as older-tab recovery copies in
+  that card; users restore them from there.
+- Verify a release by editing in two tabs, reloading both and confirming the edit persists with
+  no recovery warning.
+
 ### Combined task cache contract rollout (v2 to v3)
 
 The progression and overlay changes ship together through PR #826, which supersedes PR #825.

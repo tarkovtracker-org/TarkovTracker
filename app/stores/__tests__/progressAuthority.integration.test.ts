@@ -985,4 +985,34 @@ describe('native progress authority integration', () => {
     ).toEqual([]);
     expect(a.isOwnedProgressRecovery(foreign, 'other-account')).toBe(true);
   });
+  it('reopens a connection the browser closed and commits the next edit once', async () => {
+    const connections: IDBDatabase[] = [];
+    const nativeOpen = factory.open.bind(factory);
+    vi.spyOn(factory, 'open').mockImplementation((name: string, version?: number) => {
+      const request = nativeOpen(name, version);
+      request.addEventListener('success', () => connections.push(request.result));
+      return request;
+    });
+    const a = await open();
+    let runs = 0;
+    const write = (raw: string) =>
+      a.commitProgressMutation(
+        () => {
+          runs += 1;
+          a.writeAuthoritativeProgress(raw);
+          return { ok: true };
+        },
+        () => true,
+        null
+      );
+    await expect(write('first')).resolves.toEqual({ ok: true });
+    // A forced close (site data cleared, WebKit IDB server loss) leaves the cached handle unusable.
+    connections[0]!.close();
+    runs = 0;
+    await expect(write('second')).resolves.toEqual({ ok: true });
+    expect(runs).toBe(1);
+    expect(connections).toHaveLength(2);
+    expect(a.readAuthoritativeProgress()).toBe('second');
+    expect((await a.readCommittedProgressAuthority(false)).raw).toBe('second');
+  });
 });
