@@ -671,11 +671,12 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     refreshMembers,
   });
   // Setup Supabase listener with custom onData handler
-  // NOTE: Don't pass the store - we handle patching manually to preserve mapped fields
+  // Mapping and deadline freshness belong to our handler, not the listener's generic patch.
   const listenerState = listenerScope.run(() =>
     useSupabaseListener({
       store: teamStore,
       table: 'teams',
+      patchStore: false,
       filter: teamFilter,
       storeId: 'team',
       onData: handleTeamData,

@@ -744,6 +744,10 @@ describe('Team realtime resources', () => {
     const teamQuery = {
       select: vi.fn(),
       eq: vi.fn(),
+      single: vi.fn().mockResolvedValue({
+        data: { id: 'team-1', owner_id: currentUserId, join_code: 'server-code' },
+        error: null,
+      }),
       maybeSingle: vi
         .fn()
         .mockResolvedValue({ data: { owner_only_expires_at: null }, error: null }),
@@ -805,7 +809,7 @@ describe('Team realtime resources', () => {
     }));
     useSystemStoreWithSupabase().cleanup();
     const teamRecords = () => records.filter((record) => record.topic.startsWith('team:'));
-    return { client, currentUserId, teamRecords, teammateId, teamQuery };
+    return { client, currentUserId, teamRecords, teammateId, teamQuery, records };
   };
   const firstTeamRecord = (teamRecords: () => ChannelRecord[]): ChannelRecord => {
     const record = teamRecords()[0];
@@ -1104,6 +1108,72 @@ describe('Team realtime resources', () => {
         .handler({ eventType: 'UPDATE', new: {} });
       await vi.waitFor(() => expect(instance.teamStore.owner).toBe(currentUserId));
       expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-25T12:00:00Z');
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('preserves the warning and member state through the real listener when independent reads fail', async () => {
+    const { currentUserId, teamQuery, records } = buildRealtimeHarness();
+    const { useSupabaseListener: actualListener } = await vi.importActual<
+      typeof import('@/composables/supabase/useSupabaseListener')
+    >('@/composables/supabase/useSupabaseListener');
+    const fallback = mockUseSupabaseListener.getMockImplementation()!;
+    mockUseSupabaseListener.mockImplementation((config) =>
+      config.table === 'teams' ? actualListener(config) : fallback(config)
+    );
+    const deadline = '2026-10-22T12:00:00Z';
+    const store = useTeamStore();
+    teamQuery.maybeSingle.mockResolvedValue({
+      data: { owner_only_expires_at: deadline },
+      error: null,
+    });
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamQuery.single).toHaveBeenCalled());
+      await vi.waitFor(() => expect(store.joinCode).toBe('server-code'));
+      await vi.waitFor(() => expect(store.ownerOnlyExpiresAt).toBe(deadline));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.owner).toBe(currentUserId);
+      const members = [...(store.members ?? [])];
+      const profiles = structuredClone(toRaw(store.memberProfiles));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'Deadline unavailable' },
+      });
+      mockGetTeamMembers.mockRejectedValue({ statusCode: 503 });
+      const subscription = records.find((record) => record.topic === 'public:teams:id=eq.team-1');
+      const handler = subscription?.handlers.find(
+        ({ config }) => config.table === 'teams'
+      )?.handler;
+      expect(handler).toBeDefined();
+      const row = {
+        id: 'team-1',
+        owner_id: currentUserId,
+        join_code: 'changed-code',
+        owner_only_expires_at: '2026-10-20T12:00:00Z',
+      };
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      handler!({ eventType: 'UPDATE', new: row });
+      await vi.waitFor(() =>
+        expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.joinCode).toBe('changed-code');
+      expect(store.ownerOnlyExpiresAt).toBe(deadline);
+      expect(store.members).toEqual(members);
+      expect(store.memberProfiles).toMatchObject(profiles ?? {});
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: null },
+        error: null,
+      });
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      handler!({ eventType: 'UPDATE', new: row });
+      await vi.waitFor(() => expect(store.ownerOnlyExpiresAt).toBeNull());
+      expect(store.members).toEqual([currentUserId]);
+      handler!({ eventType: 'DELETE', new: {} });
+      expect(store.owner).toBeNull();
+      expect(store.joinCode).toBeNull();
+      expect(store.members).toEqual([]);
     } finally {
       instance.cleanup();
     }
