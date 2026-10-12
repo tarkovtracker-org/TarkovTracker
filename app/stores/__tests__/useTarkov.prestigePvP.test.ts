@@ -522,3 +522,7 @@ describe('prestige persistence ordering', () => {
     expect(cloneProgress(store.$state)).toEqual(before);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

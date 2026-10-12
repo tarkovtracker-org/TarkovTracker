@@ -363,3 +363,29 @@ timeout. They perform no row rewrites or policy changes. After approved deployme
 effective privileges and the `postgres` defaults; close #663 only after rollout evidence and the
 explicitly linked reserved-role follow-up are recorded. An application rollback cannot restore
 revoked grants: any rollback requires a separately reviewed forward migration, never a bulk GRANT ALL.
+
+## Browser progress authority
+
+The active browser envelope is stored in IndexedDB through `progressRepository.ts` and
+`progressAuthority.ts`. Pinia hydration awaits its read; local edits apply their captured field
+changes to the latest committed envelope. Cloud hydration retains its original source clocks.
+Durable revisions are announced even when the original caller is canceled after commit. Cache adoption checks the live owner, session generation and a newer revision, so a delayed receipt cannot overwrite a newer account or recovery observation.
+Saved and memory adoption follow transaction completion, and account generations fence stale
+callbacks while same-owner tabs share their generation. Failed account intent survives retry.
+
+Existing localStorage progress keys remain available to older clients. Their observed later edits are
+retained as recovery copies for preview and export in Settings. Edits overwritten before observation cannot be recovered. Capture has a count/size cap and reports overflow without evicting retained copies; export includes the latest uncaptured owned edit and reads committed data without writes. Explicit export-and-clear removes
+only owned copies included in that archive; explicit device removal checks committed active data
+inside the native transaction. Unknown ownership remains quarantined and reports incomplete removal.
+See the [browser authority checkpoint](../decision-browser-progress.md#1092-runtime-integration-contract)
+for compatibility limits and native acceptance evidence; #1086 retains its compatibility hold.
+
+Failed older-tab captures retain exact observed snapshots in the current tab, bounded by the same
+20 copies and 5 Mi UTF-16 character limits as persistent recovery. They remain exportable until captured or
+confirmed as exported; account switches retain them under their raw owner, so returning to that
+account restores access without exposing them to another account. The retention limits apply across
+all owners in the tab. Explicit device removal also clears that owner's retained snapshots.
+Unrelated saves and unobserved read errors do not clear their warning.
+Only committed IndexedDB copies survive closing the tab. Bytes overwritten upstream while unable
+to persist or beyond the retention limit cannot be reconstructed; cleanup persists truncation
+warnings when it can commit.

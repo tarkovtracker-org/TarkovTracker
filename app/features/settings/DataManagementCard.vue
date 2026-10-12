@@ -779,6 +779,84 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
+          <div class="bg-surface-900/80 space-y-2 rounded-md border border-white/10 p-3">
+            <p
+              v-if="legacyProgressRecoveryOverflow"
+              class="text-warning-300 text-sm"
+              data-testid="older-tab-recovery-overflow"
+            >
+              {{ $t('settings.data_management.older_tab_recovery_full') }}
+            </p>
+            <p v-if="legacyProgressRecoveryCount" class="text-warning-300 text-sm">
+              {{
+                $t('settings.data_management.older_tab_recovery_available', {
+                  count: legacyProgressRecoveryCount,
+                })
+              }}
+            </p>
+            <UButton
+              v-for="index in legacyProgressRecoveryCount"
+              :key="index"
+              color="neutral"
+              variant="soft"
+              :data-testid="`older-tab-review-${index}`"
+              @click="reviewOlderTabProgress(index - 1)"
+            >
+              {{ $t('settings.data_management.review_older_edit', { index }) }}
+            </UButton>
+            <UButton
+              icon="i-mdi-download"
+              color="neutral"
+              variant="soft"
+              data-testid="device-progress-recovery-export"
+              @click="handleExportDeviceRecovery"
+            >
+              {{ $t('settings.data_management.export_device_recovery') }}
+            </UButton>
+            <UButton
+              v-if="
+                (legacyProgressRecoveryCount || legacyProgressRecoveryOverflow) &&
+                !confirmRecoveryCleanup
+              "
+              color="neutral"
+              variant="soft"
+              data-testid="older-tab-cleanup"
+              @click="confirmRecoveryCleanup = true"
+            >
+              {{ $t('settings.data_management.clear_older_copies') }}
+            </UButton>
+            <div v-if="confirmRecoveryCleanup" class="space-y-2">
+              <p class="text-surface-400 text-sm">
+                {{ $t('settings.data_management.clear_older_copies_confirmation') }}
+              </p>
+              <UButton
+                color="warning"
+                :loading="recoveryCleanupRunning"
+                :disabled="recoveryCleanupRunning"
+                data-testid="older-tab-cleanup-confirm"
+                @click="handleRecoveryCleanupDownload"
+              >
+                {{ $t('settings.data_management.export_device_recovery') }}
+              </UButton>
+              <UButton
+                v-if="recoveryExportPending"
+                color="warning"
+                :disabled="recoveryCleanupRunning"
+                data-testid="older-tab-cleanup-saved-confirm"
+                @click="handleRecoveryCleanup"
+              >
+                {{ $t('settings.data_management.saved_recovery_archive_confirmation') }}
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="soft"
+                :disabled="recoveryCleanupRunning"
+                @click="confirmRecoveryCleanup = false"
+              >
+                {{ $t('common.cancel') }}
+              </UButton>
+            </div>
+          </div>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
@@ -839,6 +917,25 @@
               </div>
             </div>
           </template>
+          <div v-if="recoveryArchiveEntries.length" class="space-y-2">
+            <p class="text-surface-400 text-sm">
+              {{ $t('settings.data_management.recovery_archive_select_entry') }}
+            </p>
+            <UButton
+              v-for="(entry, index) in recoveryArchiveEntries"
+              :key="index"
+              color="neutral"
+              :variant="selectedRecoveryArchiveEntry === index ? 'solid' : 'soft'"
+              :data-testid="`recovery-archive-entry-${index}`"
+              @click="reviewRecoveryArchiveEntry(index)"
+            >
+              {{
+                $t(`settings.data_management.recovery_archive_${entry.kind}`, {
+                  index: entry.index + 1,
+                })
+              }}
+            </UButton>
+          </div>
           <template v-if="backupImportState === 'preview' && backupPreview">
             <div
               class="bg-surface-900/80 divide-surface-700 divide-y rounded-md border border-white/10"
@@ -1087,6 +1184,15 @@
   const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
+    exportDeviceProgressRecovery,
+    confirmRecoveryArchiveSaved,
+    recoveryExportPending,
+    recoveryArchiveEntries,
+    selectedRecoveryArchiveEntry,
+    reviewRecoveryArchiveEntry,
+    reviewOlderTabProgress,
+    legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow,
     exportError: backupExportError,
     exportDebugSnapshot,
     debugExportError,
@@ -1097,6 +1203,8 @@
     confirmBackupImport,
     resetImport: resetBackupImport,
   } = dataManagementSession.backup;
+  const confirmRecoveryCleanup = ref(false);
+  const recoveryCleanupRunning = ref(false);
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
   const importTarget = ref<GameMode | 'all'>('all');
   function resetBackupPreview() {
@@ -1114,6 +1222,46 @@
         description: backupExportError.value,
         color: 'error',
       });
+    }
+  }
+  async function handleExportDeviceRecovery() {
+    try {
+      await exportDeviceProgressRecovery();
+      confirmRecoveryCleanup.value = true;
+    } catch (error) {
+      logger.error('DataManagementCard: recovery export failed', error);
+      toast.add({
+        title: t('settings.data_management.export_error_title'),
+        description:
+          error instanceof Error &&
+          error.message === t('settings.data_management.recovery_archive_too_large')
+            ? error.message
+            : t('settings.data_management.recovery_export_failed'),
+        color: 'error',
+      });
+    }
+  }
+  async function handleRecoveryCleanupDownload() {
+    await handleExportDeviceRecovery();
+  }
+  async function handleRecoveryCleanup() {
+    recoveryCleanupRunning.value = true;
+    try {
+      await confirmRecoveryArchiveSaved();
+      confirmRecoveryCleanup.value = false;
+    } catch (error) {
+      logger.error('DataManagementCard: recovery cleanup failed', error);
+      toast.add({
+        title: t('settings.data_management.export_error_title'),
+        description:
+          error instanceof Error &&
+          error.message === t('settings.data_management.recovery_owner_changed')
+            ? error.message
+            : t('settings.data_management.recovery_cleanup_failed'),
+        color: 'error',
+      });
+    } finally {
+      recoveryCleanupRunning.value = false;
     }
   }
   async function handleExportDebugSnapshot() {

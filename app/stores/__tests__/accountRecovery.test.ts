@@ -1078,3 +1078,7 @@ describe('storage pressure relief', () => {
     expect(Object.keys(localStorage)).toHaveLength(2);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

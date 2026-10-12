@@ -351,3 +351,7 @@ describe('useProgressStore', () => {
     expect(store.unlockedTasks['ref-task']?.self).toBe(true);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

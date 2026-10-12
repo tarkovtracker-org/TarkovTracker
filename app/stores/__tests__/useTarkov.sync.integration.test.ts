@@ -608,6 +608,100 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('blocks active progress writes after the current owner activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockRejectedValueOnce(new Error('IndexedDB activation unavailable'));
+    try {
+      await expect(switchSession('user-1', null, 'logout')).rejects.toThrow(
+        'IndexedDB activation unavailable'
+      );
+      const before = localStorage.getItem(STORAGE_KEYS.progress);
+      const next = JSON.stringify({
+        _userId: null,
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 42 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(false);
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(before);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
+  it('keeps a replacement owner writable after a superseded activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const pending = Promise.withResolvers<undefined>();
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementationOnce(() => pending.promise);
+    try {
+      const stale = switchSession('user-1', 'user-2');
+      const failed = expect(stale).rejects.toThrow('former activation failed');
+      await vi.waitFor(() => expect(activate).toHaveBeenCalledOnce());
+      await switchSession('user-2', 'user-3');
+      pending.reject(new Error('former activation failed'));
+      await failed;
+      const next = JSON.stringify({
+        _userId: 'user-3',
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 43 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(true);
+      expect(readPersistedEnvelope()._userId).toBe('user-3');
+      expect(readPersistedEnvelope().data?.pvp?.level).toBe(43);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
+  it('keeps a same-owner peer writable after a local session reset', async () => {
+    const { IDBFactory } = await import('fake-indexeddb');
+    const { openActiveProgressRepository } = await import('@/stores/tarkov/progressRepository');
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const db = await openActiveProgressRepository(new IDBFactory(), 'same-owner-reset');
+    const peerToken = await db.activateOwner('user-1');
+    await db.read(peerToken, null);
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementation(async (owner, renew, canContinue) => {
+        await db.activateOwner(owner, renew, canContinue);
+      });
+    try {
+      await resetTarkovStoreForSessionTransition('user-1', 'same-owner reset');
+      await expect(
+        db.mutate(peerToken, () => ({ raw: 'peer-save', result: true }))
+      ).resolves.toMatchObject({ result: true });
+    } finally {
+      activate.mockRestore();
+      db.close();
+    }
+  });
+  it('holds cloud startup when the authoritative repository is unavailable', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const ready = vi.spyOn(authority, 'isProgressAuthorityReady').mockReturnValue(false);
+    single.mockClear();
+    rpc.mockClear();
+    channel.subscribe.mockClear();
+    try {
+      await expect(initializeTarkovSync()).rejects.toThrow('Progress authority is unavailable');
+      expect(single).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
+      expect(channel.subscribe).not.toHaveBeenCalled();
+      ready.mockReturnValue(true);
+      await initializeTarkovSync();
+      expect(channel.subscribe).toHaveBeenCalled();
+    } finally {
+      ready.mockRestore();
+    }
+  });
   it.each(
     GAME_MODE_VALUES.flatMap((mode) => [null, 3, 9].map((pendingLevel) => ({ mode, pendingLevel })))
   )(
@@ -2533,14 +2627,9 @@ describe('useTarkov sync integration', () => {
     );
     resetTarkovSync('user switched', { preservePersistedStateForUserId: 'user-2' });
     store.$reset();
-    localStorage.setItem(
-      STORAGE_KEYS.progress,
-      JSON.stringify({
-        _timestamp: base + 15_000,
-        _userId: 'user-2',
-        data: structuredClone(defaultState),
-      })
-    );
+    // A memory reset no longer creates an authoritative placeholder. Legacy-tab
+    // placeholder writes are isolated and recovered by the native authority tests.
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level).toBe(9);
     single.mockResolvedValue({
       data: createRemoteRow({ updated_at: new Date(base + 1_000).toISOString() }),
       error: null,
@@ -5453,4 +5542,8 @@ describe('useTarkov sync integration', () => {
       }
     );
   });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });
