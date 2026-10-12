@@ -41,7 +41,7 @@ describe('native progress authority integration', () => {
     await vi.advanceTimersByTimeAsync(4999);
     expect(a.isProgressAuthorityReady()).toBe(false);
     expect(outcome).toBeUndefined();
-    await vi.advanceTimersByTimeAsync(10501);
+    await vi.advanceTimersByTimeAsync(1);
     expect(outcome).toMatchObject({ name: 'TimeoutError' });
     await opening;
     request.onsuccess!();
@@ -450,6 +450,76 @@ describe('native progress authority integration', () => {
       db.close();
     }
   );
+  it('adopts the newer durable guest state when a reset receipt is delayed', async () => {
+    const { defaultState } = await import('@/stores/progressState');
+    const state = structuredClone(defaultState);
+    state.pvp.level = 40;
+    const original = JSON.stringify({ _userId: null, data: state });
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    const module = await import('@/stores/tarkov/progressRepository');
+    const db = await module.openActiveProgressRepository(
+      factory,
+      'tarkovtracker-active-progress-v1'
+    );
+    let release!: () => void;
+    let didCommit!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const committed = new Promise<void>((resolve) => {
+      didCommit = resolve;
+    });
+    let delay = true;
+    vi.spyOn(module, 'openActiveProgressRepository').mockResolvedValue({
+      ...db,
+      mutate: async (...args) => {
+        const receipt = await db.mutate(...args);
+        if (delay) {
+          delay = false;
+          didCommit();
+          await gate;
+        }
+        return receipt;
+      },
+    });
+    const a = await open();
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: async (_name: unknown, _options: unknown, callback: () => unknown) => callback(),
+      },
+    });
+    const scoped = await import('@/utils/userScopedStorage');
+    vi.spyOn(scoped, 'getCurrentSupabaseUserId').mockReturnValue(null);
+    const storage = await import('@/stores/tarkov/localStorage');
+    storage.setActiveProgressRetentionGuard(() => true);
+    storage.progressStorageSerializer.reset(storage.parsePersistedProgressState(original, null));
+    const accept = vi.fn();
+    const resetting = storage.resetGuestProgress(['pvp'], false, () => state, accept);
+    await Promise.race([
+      committed,
+      resetting.then(() => {
+        throw new Error('Reset settled before its commit');
+      }),
+    ]);
+    const peer = await db.activateOwner(null);
+    await db.mutate(peer, (current) => {
+      const value = JSON.parse(current.raw!);
+      value.data.pve.level = 42;
+      return { raw: JSON.stringify(value), result: true };
+    });
+    await a.refreshProgressAuthority();
+    release();
+    expect((await resetting).state).toMatchObject({ pvp: { level: 1 }, pve: { level: 42 } });
+    expect(accept).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: expect.objectContaining({
+          pvp: expect.objectContaining({ level: 1 }),
+          pve: expect.objectContaining({ level: 42 }),
+        }),
+      })
+    );
+    db.close();
+  });
   it('announces exported cleanup even when identity changes after put success', async () => {
     const a = await open('a');
     let owner = 'a';

@@ -1231,7 +1231,7 @@
     } catch (error) {
       toast.add({
         title: t('settings.data_management.export_error_title'),
-        description: String(error),
+        description: error instanceof Error ? error.message : String(error),
         color: 'error',
       });
     }
@@ -1247,7 +1247,7 @@
     } catch (error) {
       toast.add({
         title: t('settings.data_management.export_error_title'),
-        description: String(error),
+        description: error instanceof Error ? error.message : String(error),
         color: 'error',
       });
     } finally {

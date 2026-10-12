@@ -1167,7 +1167,9 @@ describe('DataManagementCard', () => {
     await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
     await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
     await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
-    expect(toastAddMock).toHaveBeenCalledWith(expect.objectContaining({ color: 'error' }));
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'error', description: 'cleanup failed' })
+    );
     expect(wrapper.find('[data-testid="older-tab-cleanup-saved-confirm"]').exists()).toBe(true);
   });
   it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {

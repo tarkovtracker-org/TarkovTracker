@@ -1357,17 +1357,17 @@ export const resetGuestProgress = async (
     const written = writeStorageItem(STORAGE_KEYS.progress, encodeProgressSnapshot(next));
     if (written.ok)
       afterProgressCommit(() => {
-        accepted = next;
+        accepted = readGuestProgressForReset() ?? initialGuestProgressSnapshot();
         consumeGuestPrefix(guestSource);
         rebaseGuestResetWrites(
           queued,
           parsePersistedProgressState(latest.value, null)!,
-          next,
+          accepted,
           resetAll
         );
-        progressStorageSerializer.reset(next);
-        acceptState(next);
-      });
+        progressStorageSerializer.reset(accepted);
+        acceptState(accepted);
+      }, false);
     return written;
   }, null);
   recordGuestResetResult(

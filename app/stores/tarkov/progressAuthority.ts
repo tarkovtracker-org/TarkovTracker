@@ -151,6 +151,18 @@ const hydrateActivatedProgressOwner = async (
     console.warn('Older progress recovery could not be captured', error);
   }
 };
+const attemptProgressActivation = async (
+  owner: string | null,
+  renew: boolean,
+  canContinue: () => boolean
+): Promise<void> => {
+  const db = await openRepository();
+  if (!canContinue()) return;
+  const next = await db.activateOwner(owner, renew, canContinue);
+  await hydrateActivatedProgressOwner(db, next, canContinue);
+};
+const shouldRetryActivation = (error: unknown, attempt: number): boolean =>
+  attempt < 2 && !(error instanceof DOMException && error.name === 'TimeoutError');
 const activateProgressOwner = async (
   owner: string | null,
   renew: boolean,
@@ -158,13 +170,10 @@ const activateProgressOwner = async (
   attempt = 0
 ): Promise<void> => {
   try {
-    const db = await openRepository();
-    if (!canContinue()) return;
-    const next = await db.activateOwner(owner, renew, canContinue);
-    await hydrateActivatedProgressOwner(db, next, canContinue);
+    await attemptProgressActivation(owner, renew, canContinue);
   } catch (error) {
     if (!canContinue()) return;
-    if (attempt >= 2) throw error;
+    if (!shouldRetryActivation(error, attempt)) throw error;
     await new Promise((resolve) => setTimeout(resolve, 250));
     await activateProgressOwner(owner, renew, canContinue, attempt + 1);
   }
