@@ -116,3 +116,55 @@ If Pages verification fails, keep the ten bindings and fix Pages before promotio
 an approved rollback can restore those exact ten bindings from the prior config commit, giving
 the prior static Worker 404 while Pages is repaired. Do not restore the six redundant/health
 bindings. Source cutover remains a separate decision.
+
+### Held www operational change
+
+Prepare this change for coordinated approval only after stage-one CI, preview, independent
+review, and the exact production Pages deployment are verified. Nothing below is an instruction
+to mutate live settings as part of these PRs.
+
+The proposed replacement **expression only** for Single Redirect rule
+`214cb75a91f343dea59d29f8aaea9275`, in ruleset `4842721a8167425487283e3453e14e1d`, is:
+
+```text
+(http.host eq "www.tarkovtracker.org") and not (
+  http.request.uri.path in {"/api/v2" "/api/token" "/api/progress" "/api/team/progress"}
+  or starts_with(http.request.uri.path, "/api/v2/")
+  or starts_with(http.request.uri.path, "/api/token/")
+  or starts_with(http.request.uri.path, "/api/progress/")
+  or starts_with(http.request.uri.path, "/api/team/progress/")
+)
+```
+
+Preserve the enabled flag, rule identity/order, 308 action, target
+`concat("https://tarkovtracker.org", http.request.uri.path)`, and `preserve_query_string=true`.
+There is no method restriction, so OPTIONS is exempt alongside actual retired requests. Health,
+`/api/tarkov/*`, `/api/v20`, `/api/tokenize`, `/api/progression`, and other www frontend paths
+continue canonical redirects. The apex, API host, and other hosts are outside this rule.
+
+Re-read the rule and Pages/DNS state immediately before an approved operation; stop if it no
+longer matches the reviewed state. The observed www record is proxied CNAME
+`www.tarkovtracker.org -> tarkovtracker.org` (record `2b3d731df01e059d34cca7e3b302c77d`, TTL auto).
+Pages project `tarkovtracker` registers only the apex. The ingress prerequisite is to associate
+`www.tarkovtracker.org` with that same existing Pages project and verify its domain/TLS status.
+The association request is `{"name":"www.tarkovtracker.org"}` to the project's domains endpoint.
+Cloudflare's [custom-domain setup](https://developers.cloudflare.com/pages/configuration/custom-domains/)
+can require or automatically update DNS; any change from the existing record to the project's
+`tarkovtrackernuxt.pages.dev` target must be separately named and approved. Do not guess that the
+existing CNAME chain is sufficient or alter any other DNS/hosting/access setting.
+
+After those prerequisites are approved, keep the canonical redirect in place while establishing
+the www Pages association. Then apply only the narrow expression above and verify unrelated
+www paths still return 308 with path/query preserved. The legacy bindings still return their
+existing 404 when reached; direct Pages retirement cannot be proven through those bindings.
+
+For the separately approved cutover, first remove only the existing exact
+`www.tarkovtracker.org/api/v2` Worker binding as a canary, keeping the other nine legacy bindings.
+Verify the actual www base path returns GET/POST 410 JSON, HEAD 410 without a body, and a valid
+Authorization/Content-Type preflight 204, with no Location/Retry-After and no redirect following.
+Use a fresh route-ID read for that exact pattern, not a broad deletion filter. If ingress or the
+response fails, restore that exact canary binding and stop. Once it passes, promote the held
+ten-route source removal in both repositories and verify all four families, descendants,
+trailing slashes, queries, API health 200, and normal frontend paths. Capture the exact deployed
+SHA and before/after edge snapshots. Neither canary removal nor the remaining cutover is
+authorized by making the PR ready or creating a preview.
