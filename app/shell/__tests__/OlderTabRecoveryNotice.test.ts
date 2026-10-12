@@ -5,7 +5,7 @@ import {
   legacyProgressRecoveryCount,
   legacyProgressRecoveryOverflow,
 } from '@/stores/tarkov/progressAuthority';
-const route = vi.hoisted(() => ({ path: '/', hash: '' }));
+const route = vi.hoisted(() => ({ name: 'index', path: '/', hash: '' }));
 mockNuxtImport('useRoute', () => () => route);
 const NOTICE = '[data-testid="older-tab-recovery-notice"]';
 const mountNotice = () => mountSuspended(OlderTabRecoveryNotice);
@@ -14,6 +14,7 @@ describe('OlderTabRecoveryNotice', () => {
     clearNuxtState('older-tab-recovery-notice');
     legacyProgressRecoveryCount.value = 0;
     legacyProgressRecoveryOverflow.value = false;
+    route.name = 'index';
     route.path = '/';
     route.hash = '';
   });
@@ -51,6 +52,7 @@ describe('OlderTabRecoveryNotice', () => {
   });
   it('hides on the Backup & Restore tab that already lists the copies', async () => {
     legacyProgressRecoveryCount.value = 1;
+    route.name = 'settings';
     route.path = '/settings';
     route.hash = '#backup-restore';
     const wrapper = await mountNotice();
@@ -60,6 +62,7 @@ describe('OlderTabRecoveryNotice', () => {
     'hides on the Backup & Restore tab reached through the %s Settings alias',
     async (path) => {
       legacyProgressRecoveryCount.value = 1;
+      route.name = 'settings';
       route.path = path;
       route.hash = '#backup-restore';
       const wrapper = await mountNotice();
