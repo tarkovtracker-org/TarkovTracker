@@ -352,7 +352,10 @@ for compatibility limits and native acceptance evidence; #1086 retains its compa
 
 Failed older-tab captures retain exact observed snapshots in the current tab, bounded by the same
 20 copies and 5 Mi UTF-16 character limits as persistent recovery. They remain exportable until captured or
-confirmed as exported; unrelated saves and unobserved read errors do not clear their warning.
+confirmed as exported; account switches retain them under their raw owner, so returning to that
+account restores access without exposing them to another account. The retention limits apply across
+all owners in the tab. Explicit device removal also clears that owner's retained snapshots.
+Unrelated saves and unobserved read errors do not clear their warning.
 Only committed IndexedDB copies survive closing the tab. Bytes overwritten upstream while unable
 to persist or beyond the retention limit cannot be reconstructed; cleanup persists truncation
 warnings when it can commit.

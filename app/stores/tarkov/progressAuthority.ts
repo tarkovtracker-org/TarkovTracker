@@ -12,7 +12,7 @@ type Draft = { raw: string | null; actions: CommitAction[] };
 let repository: Promise<Repository> | undefined;
 let token: ProgressOwnerToken | undefined;
 let accepted: ActiveProgressRecord | undefined;
-let captureFailure: { token: ProgressOwnerToken; raws: string[]; overflow: boolean } | undefined;
+let captureFailure: { raws: string[]; overflow: boolean } | undefined;
 let draft: Draft | undefined;
 export const legacyProgressRecoveryCount = ref(0);
 export const legacyProgressRecoveryOverflow = ref(false);
@@ -76,9 +76,14 @@ const isExportablePendingLegacy = (
 ): raw is string =>
   isOwnedProgressRecovery(raw, owner) && raw !== record.legacyRaw && raw !== record.lastLegacyRaw;
 const hasCurrentCaptureFailure = (): boolean =>
-  captureFailure !== undefined && matchesReceiptToken(captureFailure.token);
+  captureFailure !== undefined &&
+  (captureFailure.overflow ||
+    captureFailure.raws.some(
+      (raw) =>
+        recoveryRawOwner(raw) === undefined || isOwnedProgressRecovery(raw, token?.owner ?? null)
+    ));
 const currentFailedRecovery = (): string[] =>
-  hasCurrentCaptureFailure() ? captureFailure!.raws : [];
+  (captureFailure?.raws ?? []).filter((raw) => isOwnedProgressRecovery(raw, token?.owner ?? null));
 const hasUnresolvedCaptures = (failure: NonNullable<typeof captureFailure>): boolean =>
   failure.overflow || failure.raws.length > 0;
 const clearResolvedCaptureFailure = (): void => {
@@ -102,10 +107,9 @@ const appendFailedCapture = (failure: NonNullable<typeof captureFailure>, raw: s
   }
   failure.raws.push(raw);
 };
-const recordFailedCapture = (request: ProgressOwnerToken, raw: string | null): void => {
+const recordFailedCapture = (raw: string | null): void => {
   if (raw === null) return;
-  if (!hasCurrentCaptureFailure())
-    captureFailure = { token: structuredClone(request), raws: [], overflow: false };
+  captureFailure ??= { raws: [], overflow: false };
   appendFailedCapture(captureFailure!, raw);
   legacyProgressRecoveryOverflow.value = true;
 };
@@ -160,7 +164,7 @@ const readObservedAuthority = async (
     return record;
   } catch (error) {
     if (isCurrent()) {
-      recordFailedCapture(request, observedRaw);
+      recordFailedCapture(observedRaw);
     }
     throw error;
   }
@@ -357,6 +361,10 @@ export const removeOwnedProgressRecovery = async (
   if (!adoptCommittedReceipt(request, receipt.committed) || !canContinue()) {
     return { complete: false, released: false };
   }
+  if (captureFailure)
+    captureFailure.raws = captureFailure.raws.map(keep).filter((raw) => raw !== null);
+  clearResolvedCaptureFailure();
+  acceptAuthority(receipt.committed);
   return { complete, released: receipt.result };
 };
 const isExportedPendingLegacy = (
@@ -383,7 +391,7 @@ export const discardExportedLegacyProgress = async (
   const request = structuredClone(token);
   const isCurrent = () =>
     token?.generation === request.generation && (!readSessionOwner || readSessionOwner() === owner);
-  const exported = new Set(copies);
+  const exported = new Set(copies.filter((raw) => isOwnedProgressRecovery(raw, owner)));
   const pending = readPendingLegacySource();
   const keep = (raw: string | null) => !isOwnedProgressRecovery(raw, owner) || !exported.has(raw);
   const receipt = await (

@@ -1253,7 +1253,11 @@
       logger.error('DataManagementCard: recovery cleanup failed', error);
       toast.add({
         title: t('settings.data_management.export_error_title'),
-        description: t('settings.data_management.recovery_cleanup_failed'),
+        description:
+          error instanceof Error &&
+          error.message === t('settings.data_management.recovery_owner_changed')
+            ? error.message
+            : t('settings.data_management.recovery_cleanup_failed'),
         color: 'error',
       });
     } finally {

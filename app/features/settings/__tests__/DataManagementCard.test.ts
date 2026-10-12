@@ -1160,6 +1160,19 @@ describe('DataManagementCard', () => {
     await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
     expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
   });
+  it('asks for a new recovery archive after the account changes', async () => {
+    backupState.legacyProgressRecoveryOverflow.value = true;
+    backupFns.confirmRecoveryArchiveSaved.mockRejectedValueOnce(
+      new Error('settings.data_management.recovery_owner_changed')
+    );
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'settings.data_management.recovery_owner_changed' })
+    );
+  });
   it('keeps saved-file confirmation and reports a failed native cleanup', async () => {
     backupState.legacyProgressRecoveryCount.value = 1;
     backupFns.confirmRecoveryArchiveSaved.mockRejectedValueOnce(new Error('cleanup failed'));
