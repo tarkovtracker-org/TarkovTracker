@@ -1,6 +1,7 @@
 <template>
   <div
-    class="bg-surface-900 rounded-lg border border-white/10 p-4 transition-colors"
+    :id="`storyline-chapter-${chapter.id}`"
+    class="bg-surface-900 scroll-mt-16 rounded-lg border border-white/10 p-4 transition-colors"
     :class="chapter.complete ? 'border-success-700/30' : ''"
   >
     <div class="mb-3 flex items-center gap-3">

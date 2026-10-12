@@ -697,27 +697,10 @@
         }
       },
       "progress": {
-        "title": "Progress Breakdown",
-        "items": "Task Items",
         "hideout_items": "Hideout Items",
         "filtered_status_active": "Filtered by task settings",
-        "filtered_status_inactive": "Using all task types",
-        "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks)."
-      },
-      "progress_card": {
-        "view_details": "View details for {label}",
-        "progress_label": "{label} progress"
-      },
-      "milestones": {
-        "title": "Milestones",
-        "halfway": "Halfway There",
-        "veteran": "Almost Done",
-        "kappa": {
-          "subtitle": "Container Earned"
-        },
-        "lightkeeper": {
-          "subtitle": "Trader Unlocked"
-        }
+        "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks).",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "Trader Progress",
@@ -729,12 +712,12 @@
         "set_loyalty_level": "Set loyalty level {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav Karma",
-        "unlock_required": "Unlock required:",
-        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
         "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",

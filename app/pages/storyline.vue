@@ -46,6 +46,7 @@
 <script setup lang="ts">
   import { useStorylineChapters } from '@/composables/useStorylineChapters';
   import ChapterCard from '@/features/storyline/components/ChapterCard.vue';
+  import { useStorylineRouteFocus } from '@/features/storyline/useStorylineRouteFocus';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { toggleStoryChapterWithLinearObjectives } from '@/utils/storylineObjectives';
   const { t } = useI18n({ useScope: 'global' });
@@ -59,6 +60,7 @@
         .map(([objectiveId]) => objectiveId),
   });
   const totalChapters = computed(() => storylineChapters.value.length);
+  useStorylineRouteFocus(totalChapters);
   const completedChapters = computed(() => {
     return storylineChapters.value.filter((chapter) => chapter.complete).length;
   });

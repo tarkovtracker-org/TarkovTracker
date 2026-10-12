@@ -29,6 +29,12 @@ const getCurrentProgressDataMock = vi.fn(() => ({
 }));
 mockNuxtImport('definePageMeta', () => () => {});
 mockNuxtImport('useSeoMeta', () => () => {});
+const router = vi.hoisted(() => ({
+  route: { path: '/storyline', hash: '', query: {} as Record<string, string> },
+  replace: vi.fn(),
+}));
+mockNuxtImport('useRoute', () => () => router.route);
+mockNuxtImport('useRouter', () => () => ({ replace: router.replace }));
 const storylineOptions = vi.fn();
 vi.mock('@/composables/useStorylineChapters', () => ({
   useStorylineChapters: (options: { completedObjectiveIds?: (chapterId: string) => string[] }) => {
@@ -95,6 +101,7 @@ describe('storyline page', () => {
     vi.clearAllMocks();
     chapterCompletionState = {};
     objectiveCompletionState = {};
+    router.route.query = {};
   });
   const createWrapper = () =>
     mount(StorylinePage, {
@@ -193,6 +200,37 @@ describe('storyline page', () => {
     await objectiveCard.trigger('click');
     expect(setStoryObjectiveCompleteMock).not.toHaveBeenCalled();
     expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('focuses a deep-linked objective and drops the focus query', async () => {
+    router.route.query = { chapter: 'chapter-1', objective: 'obj-1', tab: 'keep' };
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const wrapper = mount(StorylinePage, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          ChapterCard: {
+            template: `
+              <div id="storyline-chapter-chapter-1">
+                <label data-testid="objective-row">
+                  <input id="storyline-objective-chapter-1-obj-1" type="checkbox" />
+                </label>
+              </div>
+            `,
+          },
+          UAlert: true,
+        },
+      },
+    });
+    await vi.waitFor(() => expect(router.replace).toHaveBeenCalled());
+    expect(wrapper.get('[data-testid="objective-row"]').classes()).toContain('ring-2');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith({
+      hash: '',
+      path: '/storyline',
+      query: { tab: 'keep' },
+    });
     wrapper.unmount();
   });
 });
