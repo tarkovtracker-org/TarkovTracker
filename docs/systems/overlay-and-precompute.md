@@ -177,7 +177,9 @@ retirement, and a future retirement needs the overlay to declare the replacement
 - Generic task/item/hideout consumers return the base payload with `X-Overlay-Status: missing`
   when no valid overlay is available. Prestige and edition/story/perk catalogs require an overlay
   and fail when no last-good overlay exists, preserving client caches rather than publishing
-  incomplete authoritative eligibility data.
+  incomplete authoritative eligibility data. Task objectives also require overlay provenance: a
+  miss without one returns 503 rather than caching an uncorrected entry, so local runs need
+  `OVERLAY_TOKEN` for objective data.
 - The overlay repository is private. Set `OVERLAY_TOKEN` (a fine-grained, read-only Contents token
   scoped to `tarkov-data-overlay`) in every runtime that fetches it: production, previews, the
   precompute workflow, and local/operator runs such as `pnpm run verify:overlay`. Supply the token

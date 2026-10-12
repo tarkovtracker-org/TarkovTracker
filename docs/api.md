@@ -178,6 +178,25 @@ Fetches task objectives and fail conditions.
 
 **Cache TTL:** 12 hours
 
+Requires overlay provenance. A cache miss that cannot apply a valid overlay returns `503` instead
+of caching uncorrected objectives; a good stale entry keeps serving during background refresh.
+
+---
+
+### GET /api/tarkov/tasks-import
+
+Whole English task catalog used by EFT log import, read only from the precomputed snapshot
+(`tasks-import-json-v1-en-<gameMode>`). There is no runtime generation or language parameter.
+
+**Query Parameters:**
+
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
+
+**Caching:** `Cache-Control: no-store`. Missing, corrupt, wrong-mode or expired snapshots return
+`503`. Seeding and verification: [overlay and precompute](systems/overlay-and-precompute.md#release-verification).
+
 ---
 
 ### GET /api/tarkov/tasks-rewards
