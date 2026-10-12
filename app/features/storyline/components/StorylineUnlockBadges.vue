@@ -9,10 +9,11 @@
       variant="subtle"
       size="md"
       :color="UNLOCK_COLORS[unlock.type]"
+      :icon="UNLOCK_ICONS[unlock.type]"
     >
       {{ t(UNLOCK_LABEL_KEYS[unlock.type], { name: unlock.label }) }}
     </UBadge>
-    <UBadge v-if="estimated" variant="subtle" color="neutral" size="md">
+    <UBadge v-if="estimated" variant="subtle" color="neutral" size="md" icon="i-mdi-clock-outline">
       {{ t('page.storyline.route_unlocks_estimated') }}
     </UBadge>
   </span>
@@ -30,6 +31,11 @@
     map: 'primary',
     trader: 'warning',
     reward: 'success',
+  };
+  const UNLOCK_ICONS: Record<UnlockType, string> = {
+    map: 'i-mdi-map-outline',
+    trader: 'i-mdi-account-tie',
+    reward: 'i-mdi-gift-outline',
   };
   const UNLOCK_LABEL_KEYS: Record<UnlockType, string> = {
     map: 'page.storyline.route_unlock_map',

@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import StorylinePage from '@/pages/storyline.vue';
 const setStoryChapterCompleteMock = vi.fn();
 const setStoryChapterUncompleteMock = vi.fn();
@@ -38,6 +38,28 @@ const router = await vi.hoisted(async () => {
 });
 mockNuxtImport('useRoute', () => () => router.route);
 mockNuxtImport('useRouter', () => () => ({ replace: router.replace }));
+const storyline = await vi.hoisted(async () => {
+  const { ref } = await import('vue');
+  return { normalizedChapters: ref<Record<string, unknown>[]>([]) };
+});
+const createNormalizedChapters = () => [
+  {
+    complete: true,
+    id: 'chapter-0',
+    mainObjectiveCompleted: 2,
+    mainObjectiveTotal: 2,
+    name: 'Chapter 0',
+    normalizedName: 'chapter-0',
+  },
+  {
+    complete: false,
+    id: 'chapter-1',
+    mainObjectiveCompleted: 1,
+    mainObjectiveTotal: 3,
+    name: 'Chapter 1',
+    normalizedName: 'chapter-1',
+  },
+];
 const storylineOptions = vi.fn();
 vi.mock('@/composables/useStorylineChapters', () => ({
   useStorylineChapters: (options: { completedObjectiveIds?: (chapterId: string) => string[] }) => {
@@ -72,24 +94,7 @@ vi.mock('@/composables/useStorylineChapters', () => ({
           },
         },
       ]),
-      normalizedChapters: ref([
-        {
-          complete: true,
-          id: 'chapter-0',
-          mainObjectiveCompleted: 2,
-          mainObjectiveTotal: 2,
-          name: 'Chapter 0',
-          normalizedName: 'chapter-0',
-        },
-        {
-          complete: false,
-          id: 'chapter-1',
-          mainObjectiveCompleted: 1,
-          mainObjectiveTotal: 3,
-          name: 'Chapter 1',
-          normalizedName: 'chapter-1',
-        },
-      ]),
+      normalizedChapters: storyline.normalizedChapters,
     };
   },
 }));
@@ -116,6 +121,7 @@ describe('storyline page', () => {
     chapterCompletionState = {};
     objectiveCompletionState = {};
     router.route.query = {};
+    storyline.normalizedChapters.value = createNormalizedChapters();
   });
   const createWrapper = () =>
     mount(StorylinePage, {
@@ -233,10 +239,43 @@ describe('storyline page', () => {
       },
     });
     expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-1');
-    const tile = wrapper.get('button[aria-label="Chapter 0 (2/2)"]');
+    const tile = wrapper.get('button[aria-label="Chapter 0 (common.completed)"]');
     await tile.trigger('click');
     expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-0');
     expect(tile.attributes('aria-current')).toBe('true');
+    wrapper.unmount();
+  });
+  it('keeps the shown chapter selected after it is completed and scrolls the rail to it', async () => {
+    const scrollTo = vi.fn();
+    vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(scrollTo);
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+    });
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    await nextTick();
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    storyline.normalizedChapters.value = storyline.normalizedChapters.value.map((chapter) => ({
+      ...chapter,
+      complete: true,
+    }));
+    await nextTick();
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-1');
+    expect(wrapper.find('button[aria-label="Chapter 1 (common.completed)"]').exists()).toBe(true);
+    await wrapper.get('button[aria-label="Chapter 0 (common.completed)"]').trigger('click');
+    await nextTick();
+    expect(scrollTo).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
   it('opens the chapter named by the chapter query', () => {

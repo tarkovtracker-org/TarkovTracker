@@ -6,7 +6,15 @@
         {{ completed }}/{{ total }}
       </span>
     </div>
-    <div v-if="total" class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
+    <div
+      v-if="total"
+      role="progressbar"
+      class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full"
+      aria-valuemin="0"
+      :aria-valuemax="total"
+      :aria-valuenow="completed"
+      :aria-label="label"
+    >
       <div
         class="h-full rounded-full transition-[width] duration-300"
         :class="complete ? 'bg-success-500/70' : 'bg-primary-500/70'"

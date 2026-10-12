@@ -20,7 +20,11 @@
         @toggle="emit('toggleObjective', objective.id)"
       />
     </div>
-    <p v-if="routeChoice.chosenObjectiveId" class="mt-2 text-xs leading-snug" :class="tone.hint">
+    <p
+      v-if="routeChoice.chosenObjectiveId && !readOnly"
+      class="mt-2 text-xs leading-snug"
+      :class="tone.hint"
+    >
       {{ t('page.storyline.route_switch_hint') }}
     </p>
   </div>

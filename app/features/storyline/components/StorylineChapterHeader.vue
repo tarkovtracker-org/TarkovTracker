@@ -10,7 +10,7 @@
     >
       <img
         :src="`/img/storyline/${chapter.normalizedName}.webp`"
-        :alt="chapter.name"
+        alt=""
         class="size-full object-contain"
         :class="chapter.complete ? '' : 'opacity-40'"
       />
@@ -24,19 +24,21 @@
       <p class="text-surface-400 hidden text-xs tracking-widest uppercase @3xl/card:block">
         {{ t('page.storyline.chapter_eyebrow') }}
       </p>
-      <a
-        :href="toWikiUrl(chapter.wikiLink)"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-surface-50 hover:text-link-hover flex items-center gap-1.5 text-base font-semibold no-underline @3xl/card:text-2xl"
-      >
-        <span class="truncate">{{ chapter.name }}</span>
-        <UIcon
-          name="i-mdi-open-in-new"
-          class="text-surface-400 size-4 shrink-0"
-          aria-hidden="true"
-        />
-      </a>
+      <h2>
+        <a
+          :href="toWikiUrl(chapter.wikiLink)"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-surface-50 hover:text-link-hover flex items-center gap-1.5 text-base font-semibold no-underline @3xl/card:text-2xl"
+        >
+          <span class="truncate">{{ chapter.name }}</span>
+          <UIcon
+            name="i-mdi-open-in-new"
+            class="text-surface-400 size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </a>
+      </h2>
       <div class="mt-1 flex flex-wrap items-center gap-1.5">
         <UBadge variant="subtle" :color="chapter.autoStart ? 'info' : 'neutral'" size="md">
           {{

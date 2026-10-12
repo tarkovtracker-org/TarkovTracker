@@ -1,9 +1,15 @@
 <template>
   <nav :aria-label="t('page.storyline.chapter_nav_label')">
     <ul
-      class="-mx-3 flex snap-x gap-2 overflow-x-auto px-3 py-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-1"
+      ref="listRef"
+      class="relative -mx-3 flex snap-x gap-2 overflow-x-auto px-3 py-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-1"
     >
-      <li v-for="chapter in chapters" :key="chapter.id" class="shrink-0 snap-start">
+      <li
+        v-for="chapter in chapters"
+        :key="chapter.id"
+        class="shrink-0 snap-start"
+        :data-chapter-id="chapter.id"
+      >
         <UTooltip :text="tileLabel(chapter)" :content="{ side: 'right' }">
           <button
             type="button"
@@ -43,7 +49,7 @@
 </template>
 <script setup lang="ts">
   import type { StorylineNormalizedChapterView } from '@/composables/useStorylineChapters';
-  defineProps<{
+  const props = defineProps<{
     chapters: StorylineNormalizedChapterView[];
     selectedId: string | null;
   }>();
@@ -54,8 +60,22 @@
     if (!chapter.mainObjectiveTotal) return 0;
     return (chapter.mainObjectiveCompleted / chapter.mainObjectiveTotal) * 100;
   };
+  const tileProgress = (chapter: StorylineNormalizedChapterView) => {
+    if (chapter.complete) return ` (${t('common.completed', 'Completed')})`;
+    if (!chapter.mainObjectiveTotal) return '';
+    return ` (${chapter.mainObjectiveCompleted}/${chapter.mainObjectiveTotal})`;
+  };
   const tileLabel = (chapter: StorylineNormalizedChapterView) =>
-    chapter.mainObjectiveTotal
-      ? `${chapter.name} (${chapter.mainObjectiveCompleted}/${chapter.mainObjectiveTotal})`
-      : chapter.name;
+    `${chapter.name}${tileProgress(chapter)}`;
+  // On narrow screens the rail scrolls sideways, so keep the selected tile in view. Only the list's
+  // own horizontal offset moves; the page never scrolls, and the vertical desktop rail is unaffected.
+  const listRef = ref<HTMLElement | null>(null);
+  const revealSelected = () => {
+    const list = listRef.value;
+    const tile = list?.querySelector<HTMLElement>(`[data-chapter-id="${props.selectedId}"]`);
+    if (!list || !tile) return;
+    list.scrollTo({ left: tile.offsetLeft - (list.clientWidth - tile.offsetWidth) / 2 });
+  };
+  onMounted(revealSelected);
+  watch(() => props.selectedId, revealSelected, { flush: 'post' });
 </script>

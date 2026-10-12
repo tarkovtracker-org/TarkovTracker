@@ -37,7 +37,7 @@
         >
           {{ ending.objectiveLabel }}
         </div>
-        <div v-if="ending.objectiveTotal" :class="META_CLASS">
+        <div v-if="ending.objectiveTotal && !ending.evidencePending" :class="META_CLASS">
           {{
             t('page.storyline.ending_progress', {
               completed: ending.objectiveCompleted ?? 0,

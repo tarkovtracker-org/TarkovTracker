@@ -72,13 +72,18 @@
   });
   const totalChapters = computed(() => storylineChapters.value.length);
   const selectedChapterId = ref<string | null>(null);
-  // Default to the first chapter still in progress so returning players land on their next step.
-  const selectedChapter = computed(
-    () =>
-      storylineChapters.value.find((chapter) => chapter.id === selectedChapterId.value) ??
-      storylineChapters.value.find((chapter) => !chapter.complete) ??
-      storylineChapters.value[0]
+  const selectedChapter = computed(() =>
+    storylineChapters.value.find((chapter) => chapter.id === selectedChapterId.value)
   );
+  // Default once to the first chapter still in progress so returning players land on their next
+  // step; after that the selection only moves when the player picks a chapter, so completing the
+  // shown chapter keeps it on screen.
+  watchEffect(() => {
+    if (selectedChapter.value || !storylineChapters.value.length) return;
+    const fallback =
+      storylineChapters.value.find((chapter) => !chapter.complete) ?? storylineChapters.value[0];
+    selectedChapterId.value = fallback?.id ?? null;
+  });
   const detailRef = ref<HTMLElement | null>(null);
   const selectChapter = (chapterId: string) => {
     selectedChapterId.value = chapterId;

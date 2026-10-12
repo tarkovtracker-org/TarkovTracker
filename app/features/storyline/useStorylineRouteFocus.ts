@@ -6,7 +6,7 @@ const FOCUS_DURATION_MS = 2500;
 const objectiveElement = (chapterId: string, objectiveId: string | undefined) => {
   if (!objectiveId) return null;
   const input = document.getElementById(storylineObjectiveInputId(chapterId, objectiveId));
-  return input?.closest('label') ?? input?.parentElement ?? null;
+  return input?.closest<HTMLElement>('[data-storyline-objective]') ?? input?.parentElement ?? null;
 };
 const focusTarget = (chapterId: string, objectiveId: string | undefined) =>
   objectiveElement(chapterId, objectiveId) ??

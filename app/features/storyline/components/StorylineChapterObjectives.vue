@@ -7,21 +7,9 @@
         :total="chapter.mainObjectiveTotal"
         :complete="chapter.complete"
       />
-      <StorylineRouteChoiceGroup
-        v-for="(routeChoice, routeIndex) in chapter.mainRouteChoices"
-        :key="routeChoice.id"
-        :route-choice="routeChoice"
+      <StorylineObjectiveTimeline
+        :entries="timeline"
         :chapter-id="chapter.id"
-        :index="routeIndex + 1"
-        :read-only="readOnly"
-        @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
-      />
-      <StorylineObjectiveList
-        v-if="timelineObjectives.length"
-        indent-optional
-        :objectives="timelineObjectives"
-        :chapter-id="chapter.id"
-        :label="t('page.storyline.route_required_steps')"
         :read-only="readOnly"
         @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
       />
@@ -46,7 +34,7 @@
       />
       <StorylineObjectiveList
         v-if="showStandaloneOptionalObjectives"
-        :objectives="sortObjectivesByOrder(chapter.optionalLinearObjectives)"
+        :objectives="sortStorylineObjectives(chapter.optionalLinearObjectives)"
         :chapter-id="chapter.id"
         :label="t('page.storyline.route_optional_steps')"
         :read-only="readOnly"
@@ -58,31 +46,22 @@
 <script setup lang="ts">
   import StorylineObjectiveList from '@/features/storyline/components/StorylineObjectiveList.vue';
   import StorylineObjectiveProgressBar from '@/features/storyline/components/StorylineObjectiveProgressBar.vue';
+  import StorylineObjectiveTimeline from '@/features/storyline/components/StorylineObjectiveTimeline.vue';
   import StorylineRouteChoiceGroup from '@/features/storyline/components/StorylineRouteChoiceGroup.vue';
   import {
     STORYLINE_LABEL_CLASS,
     STORYLINE_PANEL_CLASS,
   } from '@/features/storyline/storylineClasses';
-  import type {
-    StorylineNormalizedChapterView,
-    StorylineObjectiveProgress,
-  } from '@/composables/useStorylineChapters';
+  import {
+    buildStorylineTimeline,
+    sortStorylineObjectives,
+  } from '@/features/storyline/storylineTimeline';
+  import type { StorylineNormalizedChapterView } from '@/composables/useStorylineChapters';
   const props = defineProps<{ chapter: StorylineNormalizedChapterView; readOnly?: boolean }>();
   const emit = defineEmits<{ toggleObjective: [objectiveId: string] }>();
   const { t } = useI18n({ useScope: 'global' });
   const { chapter } = toRefs(props);
-  const sortObjectivesByOrder = (objectives: StorylineObjectiveProgress[]) =>
-    [...objectives].sort(
-      (left, right) => left.order - right.order || left.id.localeCompare(right.id)
-    );
-  const timelineObjectives = computed(() =>
-    chapter.value.mainObjectives.length
-      ? sortObjectivesByOrder([
-          ...chapter.value.mainLinearObjectives,
-          ...chapter.value.optionalLinearObjectives,
-        ])
-      : []
-  );
+  const timeline = computed(() => buildStorylineTimeline(chapter.value));
   const showStandaloneOptionalObjectives = computed(
     () =>
       chapter.value.mainObjectives.length === 0 && chapter.value.optionalLinearObjectives.length > 0

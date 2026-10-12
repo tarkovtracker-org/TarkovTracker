@@ -2,16 +2,7 @@
   <div>
     <h4 :class="STORYLINE_SUBLABEL_CLASS">{{ label }}</h4>
     <ol class="gap-x-8 @4xl/objectives:columns-2">
-      <li
-        v-for="objective in objectives"
-        :key="objective.id"
-        class="break-inside-avoid"
-        :class="
-          indentOptional && isOptional(objective)
-            ? 'ml-3 border-l border-white/10 pl-1 sm:ml-6'
-            : ''
-        "
-      >
+      <li v-for="objective in objectives" :key="objective.id" class="break-inside-avoid">
         <StorylineObjectiveRow
           :objective="objective"
           :input-id="storylineObjectiveInputId(chapterId, objective.id)"
@@ -34,7 +25,6 @@
     chapterId: string;
     label: string;
     readOnly?: boolean;
-    indentOptional?: boolean;
   }>();
   const emit = defineEmits<{ toggleObjective: [objectiveId: string] }>();
   const isOptional = (objective: StorylineObjectiveProgress) => objective.type === 'optional';

@@ -3,12 +3,14 @@
     <h3 :class="STORYLINE_LABEL_CLASS">{{ t('page.storyline.route_choice') }}</h3>
     <div v-for="questRoute in questRoutes" :key="questRoute.id" class="mt-2 space-y-1.5">
       <div
-        v-for="branch in questRoute.branches"
+        v-for="(branch, branchIndex) in questRoute.branches"
         :key="branch.id"
         class="flex flex-wrap items-center gap-1.5 rounded border p-2"
         :class="getQuestBranchClass(branch, questRoute)"
       >
-        <span class="text-surface-100 min-w-0 flex-1 text-sm">{{ branch.label }}</span>
+        <span class="text-surface-100 min-w-0 flex-1 text-sm">
+          {{ branchLabel(branch, branchIndex) }}
+        </span>
         <UBadge variant="subtle" color="neutral" size="md">
           {{ branchProgressLabel(branch) }}
         </UBadge>
@@ -51,6 +53,12 @@
           completed: branch.completedCount,
           total: branch.totalCount,
         });
+  // A route the chapter publishes no objective for has only its quest ID to go on, so it gets a
+  // positional name instead of exposing the ID.
+  const branchLabel = (branch: StorylineQuestRouteBranchView, index: number) =>
+    branch.evidencePending
+      ? t('page.storyline.quest_route_unnamed', { index: index + 1 })
+      : branch.label;
   // A branch is highlighted from the player's own marks only. The sibling is not styled as blocked:
   // the objective list can be a projection of the overlay's capture, so a finished known set is not
   // proof the route is finished, and the overlay only rules out completing both.
