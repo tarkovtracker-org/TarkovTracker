@@ -5,20 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardTraderCard from '@/features/dashboard/DashboardTraderCard.vue';
 import type { Trader, TraderLoyaltyLevel } from '@/types/tarkov';
 const mockState = {
-  isLocked: false,
   traderLevel: 1,
   gameMode: 'pvp',
 };
 mockNuxtImport('useRouter', () => () => ({
   push: vi.fn(),
-}));
-vi.mock('@/features/dashboard/traderLockStatus', () => ({
-  isTraderLocked: () => mockState.isLocked,
-}));
-vi.mock('@/stores/useMetadata', () => ({
-  useMetadataStore: () => ({
-    tasks: [],
-  }),
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
@@ -51,7 +42,6 @@ vi.mock('@/composables/useTheme', () => ({
 }));
 describe('DashboardTraderCard', () => {
   beforeEach(() => {
-    mockState.isLocked = false;
     mockState.traderLevel = 1;
     mockTheme.themeMode = 'dark';
     document.documentElement.removeAttribute('data-theme');
@@ -107,6 +97,14 @@ describe('DashboardTraderCard', () => {
           $t: (key: string) => key,
         },
         stubs: {
+          NuxtLink: {
+            props: ['to'],
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+          },
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+          },
           NuxtImg: {
             props: ['src', 'alt'],
             template: '<img :src="src" :alt="alt" />',
@@ -135,11 +133,52 @@ describe('DashboardTraderCard', () => {
     // Level 2 should be inactive
     expect(btn2.classes()).toContain('text-surface-300');
   });
-  it('renders locked trader state', () => {
-    mockState.isLocked = true;
-    const wrapper = createWrapper();
-    const container = wrapper.find('div');
-    expect(container.classes()).toContain('bg-surface-950/80');
+  it('renders a storyline requirement for a story-locked trader', () => {
+    const wrapper = createWrapper({
+      unlock: {
+        kind: 'story',
+        chapter: { id: 'tour', name: 'Tour' },
+        objective: { id: 'talk-to-prapor', name: 'Talk to Prapor' },
+      },
+    });
+    expect(wrapper.find('div').classes()).toContain('bg-surface-950/80');
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.text()).toContain('Talk to Prapor');
+    expect(JSON.parse(requirement.attributes('data-to')!)).toEqual({
+      path: '/storyline',
+      query: { chapter: 'tour', objective: 'talk-to-prapor' },
+    });
+  });
+  it('links a task-locked trader to its unlock task', () => {
+    const wrapper = createWrapper({
+      unlock: { kind: 'task', task: { id: 'task-1', name: 'Getting Acquainted' } },
+    });
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.text()).toContain('Getting Acquainted');
+    expect(JSON.parse(requirement.attributes('data-to')!)).toEqual({
+      path: '/tasks',
+      query: { task: 'task-1' },
+    });
+  });
+  it('shows an unlinked lock notice while the unlock task is loading', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'task', task: null } });
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.element.tagName).toBe('DIV');
+    expect(requirement.text()).toBe('page.dashboard.traders.unlock_via_task');
+  });
+  it('hides progress and loyalty controls while locked', () => {
+    const wrapper = createWrapper({
+      unlock: { kind: 'task', task: { id: 'task-1', name: 'Getting Acquainted' } },
+    });
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
+    expect(wrapper.find('button[aria-label*="set_loyalty_level"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="reputation-input"]').exists()).toBe(false);
+    expect(wrapper.find('.tabular-nums').exists()).toBe(false);
+  });
+  it('shows no requirement for an open trader', () => {
+    const wrapper = createWrapper({ unlock: null });
+    expect(wrapper.find('[data-testid="trader-unlock-requirement"]').exists()).toBe(false);
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(true);
   });
   it('renders completed trader state', () => {
     mockState.traderLevel = 4;
