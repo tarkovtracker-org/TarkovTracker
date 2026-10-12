@@ -34,10 +34,13 @@ describe('device data removal', () => {
   it('reports incomplete removal when unowned malformed legacy bytes remain', async () => {
     const raw = '{malformed late edit';
     localStorage.setItem('progress', raw);
-    const purge = vi.spyOn(progressAuthority, 'removeOwnedProgressRecovery');
+    const purge = vi
+      .spyOn(progressAuthority, 'removeOwnedProgressRecovery')
+      .mockResolvedValue({ complete: true, released: true });
     expect(await removeAccountDeviceData('user-1')).toBe(false);
     expect(localStorage.getItem('progress')).toBe(raw);
-    expect(purge).not.toHaveBeenCalled();
+    expect(purge).toHaveBeenCalledOnce();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
   });
   afterEach(async () => {
     await flushActiveProgressWrites();

@@ -188,48 +188,56 @@ const updateRemovalWriteBarrier = (userId: string, activeReleased: boolean): voi
 };
 // Remove the observable legacy projection before the purge announces its commit.
 // Later cached observations/new legacy writes still follow the mixed-client recovery policy.
-const canStartNativeRemoval = (userId: string, canContinue: () => boolean): boolean =>
-  canContinue() && removeOwnedLegacyProgress(userId);
+const canStartNativeRemoval = (userId: string, canContinue: () => boolean): RemovalResult =>
+  canContinue() ? removeOwnedLegacyProgress(userId) : { complete: false, released: false };
 const removeNativeRecoveryCopies = async (
   userId: string,
   activeRemoval: RemovalResult,
   canContinue: () => boolean
 ): Promise<RemovalResult> => {
   try {
-    if (!canStartNativeRemoval(userId, canContinue)) return { complete: false, released: false };
+    const legacyRemoval = canStartNativeRemoval(userId, canContinue);
+    if (!legacyRemoval.released) return legacyRemoval;
     const removed = await removeOwnedProgressRecovery(userId, canContinue);
     if (!canContinue()) return { complete: false, released: false };
-    return combineNativeRemoval(userId, removed, activeRemoval);
+    return combineNativeRemoval(removed, activeRemoval, legacyRemoval);
   } catch {
     return { complete: false, released: false };
   }
 };
 const combineNativeRemoval = (
-  userId: string,
   removed: RemovalResult,
-  activeRemoval: RemovalResult
+  activeRemoval: RemovalResult,
+  legacyRemoval: RemovalResult
 ): RemovalResult => ({
-  complete: removed.complete && activeRemoval.complete,
+  complete: removed.complete && activeRemoval.complete && legacyRemoval.complete,
   released: removed.released && activeRemoval.released,
 });
 /** Legacy projections remain untouched except during explicit owner removal. */
-const removeOwnedLegacyProgress = (userId: string): boolean => {
+const removeOwnedLegacyProgress = (userId: string): RemovalResult => {
   try {
-    for (const key of [STORAGE_KEYS.progress, 'progress']) {
-      if (!removeOwnedLegacyKey(key, userId)) return false;
-    }
-    return true;
+    return [STORAGE_KEYS.progress, 'progress']
+      .map((key) => removeOwnedLegacyKey(key, userId))
+      .reduce(
+        (result, keyResult) => ({
+          complete: result.complete && keyResult.complete,
+          released: result.released && keyResult.released,
+        }),
+        { complete: true, released: true }
+      );
   } catch {
-    return false;
+    return { complete: false, released: false };
   }
 };
-const removeOwnedLegacyKey = (key: string, userId: string): boolean => {
+const removeOwnedLegacyKey = (key: string, userId: string): RemovalResult => {
   const raw = localStorage.getItem(key);
-  const parsed = parseUserScopedStorage(raw ?? '');
-  if (raw !== null && parsed === null) return false;
-  if (parsed?._userId !== userId) return true;
+  if (raw === null) return { complete: true, released: true };
+  const parsed = parseUserScopedStorage(raw);
+  if (parsed === null) return { complete: false, released: true };
+  if (parsed._userId !== userId) return { complete: true, released: true };
   localStorage.removeItem(key);
-  return localStorage.getItem(key) === null;
+  const removed = localStorage.getItem(key) === null;
+  return { complete: removed, released: removed };
 };
 const removeOwnedStorageKeys = async (
   keys: string[],

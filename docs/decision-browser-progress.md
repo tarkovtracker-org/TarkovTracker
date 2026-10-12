@@ -277,7 +277,7 @@ Older-tab recovery stores each distinct snapshot once. Settings offers an explic
 
 Native database opening has a bounded deadline. A stalled request cannot leave startup waiting indefinitely; a late success closes its connection, and a subsequent activation can open a fresh request. Unavailable progress authority uses the existing bounded cloud-start retry path.
 
-An explicit device deletion removes and verifies owned legacy keys before the native purge announces its commit. If legacy removal fails, native progress remains. Unparseable legacy bytes stay retained and make removal incomplete even if native recovery has not captured them. This ordering closes the immediate peer-refresh recapture window; IndexedDB and localStorage do not form one transaction, and older tabs may still write later recovery candidates.
+An explicit device deletion removes and verifies owned legacy keys before the native purge announces its commit. If owned legacy removal fails, native progress remains. Unparseable legacy bytes stay retained and make removal incomplete even if native recovery has not captured them, while safely removable owned native copies are still cleared. This ordering closes the immediate peer-refresh recapture window; IndexedDB and localStorage do not form one transaction, and older tabs may still write later recovery candidates.
 
 Debug export reads progress without capturing legacy writes. If native storage is unavailable, it still exports the remaining sanitized diagnostic data with null progress.
 

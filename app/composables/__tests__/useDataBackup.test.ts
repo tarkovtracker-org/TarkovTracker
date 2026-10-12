@@ -32,7 +32,7 @@ const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   supabaseUser: {
     createdAt: '2025-01-01T00:00:00.000Z',
     email: 'player@example.com',
-    id: 'user-123',
+    id: 'user-123' as string | null,
     lastLoginAt: '2025-02-01T00:00:00.000Z',
     loggedIn: true,
     provider: 'discord',
@@ -1884,34 +1884,60 @@ describe('older-tab recovery review', () => {
     }
   );
   const ownedRaw = () => JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
-  it('rejects a recovery preview after the signed-in account changes', async () => {
-    const backup = useDataBackup();
-    await backup.parseBackupFile(
-      createFile(
-        JSON.stringify({
-          _format: 'tarkovtracker-device-progress',
-          _version: 1,
-          current: ownedRaw(),
-          original: null,
-          older_tab_edits: [],
-        })
-      )
-    );
-    expect(backup.importState.value).toBe('preview');
-    const before = JSON.stringify(tarkovStore.$state);
-    tarkovStore.$patch.mockClear();
-    supabaseUser.id = 'different';
-    try {
-      await backup.confirmBackupImport({ pvp: true, pve: true });
-      expect(tarkovStore.$patch).not.toHaveBeenCalled();
-      expect(JSON.stringify(tarkovStore.$state)).toBe(before);
-      expect(backup.importState.value).toBe('error');
-      expect(backup.importPreview.value).toBeNull();
-      expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
-    } finally {
-      supabaseUser.id = 'user-123';
+  it.each([
+    ['archive', 'different'],
+    ['archive', null],
+    ['older-tab', 'different'],
+    ['older-tab', null],
+  ])(
+    'rejects a recovery preview after the signed-in account changes (%s, %s)',
+    async (source, nextOwner) => {
+      const backup = useDataBackup();
+      const raw = ownedRaw();
+      const record = {
+        version: 1 as const,
+        revision: 0,
+        raw: null,
+        legacyRaw: null,
+        legacyUpdates: [raw],
+      };
+      const read = vi
+        .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+        .mockResolvedValue(record);
+      const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+      const clear = vi.spyOn(progressAuthority, 'discardExportedLegacyProgress');
+      const archive = JSON.stringify({
+        _format: 'tarkovtracker-device-progress',
+        _version: 1,
+        current: raw,
+        original: null,
+        older_tab_edits: [],
+      });
+      const file = createFile(archive);
+      if (source === 'archive') await backup.parseBackupFile(file);
+      else await backup.reviewOlderTabProgress(0);
+      expect(backup.importState.value).toBe('preview');
+      const before = JSON.stringify(tarkovStore.$state);
+      tarkovStore.$patch.mockClear();
+      supabaseUser.id = nextOwner;
+      try {
+        await backup.confirmBackupImport({ pvp: true, pve: true });
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+        expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+        expect(backup.importState.value).toBe('error');
+        expect(backup.importPreview.value).toBeNull();
+        expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
+        expect(record.legacyUpdates).toEqual([raw]);
+        expect(await file.text()).toBe(archive);
+        expect(clear).not.toHaveBeenCalled();
+      } finally {
+        supabaseUser.id = 'user-123';
+        read.mockRestore();
+        owned.mockRestore();
+        clear.mockRestore();
+      }
     }
-  });
+  );
   it('previews an owned edit without applying it', async () => {
     tarkovStore.$patch.mockClear();
     const raw = ownedRaw();
