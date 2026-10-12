@@ -281,7 +281,10 @@ response is cached per language **and** game mode.
 
 ### GET /api/tarkov/editions
 
-Fetches game editions, story chapters, and seasonal perks projected from the overlay.
+Fetches mode-scoped game editions and story chapters from the overlay. In `pvp-season`, seasonal
+perk metadata comes from the localized `json.tarkov.dev/pvp-season/season` catalog, augmented by
+overlay effects matched by perk ID. All upstream perks are retained, including perks without an
+effect patch. Other modes return an empty seasonal perk list.
 
 **Query Parameters:**
 
@@ -290,8 +293,17 @@ Fetches game editions, story chapters, and seasonal perks projected from the ove
 | `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-This endpoint is served directly from the overlay rather than through `edgeCache`, so it returns no
-`X-Cache-Status` header. It answers `503` when the overlay is unavailable.
+Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-season-<overlay-sha>`; the overlay is
+applied after that cache read. Seasonal responses expose `X-Cache-Status`, including `STALE` when
+last-good metadata is served during refresh. Other modes still read only the overlay. An unavailable
+or malformed upstream catalog fails with `502` on a cold read; unknown overlay IDs or an unavailable
+overlay fail with `503`. Metadata is checked against the current overlay before cache admission;
+incompatible refreshes retain last-good metadata. The overlay is also checked after cache reads,
+so an overlay introducing unknown IDs still returns `503` rather than silently dropping effects.
+Error responses explicitly use `Cache-Control: no-store`, replacing any policy set by the metadata
+cache before a projection failure.
+Successful responses use `Cache-Control: no-cache` so the internal metadata TTL cannot hide newer
+overlay effects or story corrections. A changed overlay SHA selects a fresh metadata entry.
 
 ---
 
