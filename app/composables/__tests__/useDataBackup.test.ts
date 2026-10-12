@@ -1767,7 +1767,9 @@ describe('older-tab recovery review', () => {
       );
       expect(click).not.toHaveBeenCalled();
       expect(backup.recoveryExportPending.value).toBe(false);
-      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('Download');
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow(
+        'settings.data_management.recovery_archive_download_required'
+      );
     } finally {
       read.mockRestore();
       blob.mockRestore();
@@ -1790,12 +1792,16 @@ describe('older-tab recovery review', () => {
     });
     try {
       const backup = useDataBackup();
-      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('Download');
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow(
+        'settings.data_management.recovery_archive_download_required'
+      );
       await backup.exportDeviceProgressRecovery();
       expect(clear).not.toHaveBeenCalled();
       copies.push('newer-copy');
       supabaseUser.id = 'different';
-      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow('owner changed');
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow(
+        'settings.data_management.import_owner_changed'
+      );
       expect(clear).not.toHaveBeenCalled();
       supabaseUser.id = 'user-123';
       await backup.confirmRecoveryArchiveSaved();
@@ -2095,7 +2101,17 @@ describe('older-tab recovery review', () => {
     await backup.reviewOlderTabProgress(index);
     expect(backup.importState.value).toBe('error');
     expect(backup.importPreview.value).toBeNull();
+    expect(backup.importError.value).toBe('settings.data_management.older_edit_unavailable');
     owned.mockRestore();
+  });
+  it('translates unexpected older-copy read failures', async () => {
+    const read = vi
+      .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+      .mockRejectedValue('unavailable');
+    const backup = useDataBackup();
+    await backup.reviewOlderTabProgress(0);
+    expect(backup.importError.value).toBe('settings.data_management.older_edit_read_failed');
+    read.mockRestore();
   });
   it.each(['{broken', '{}', JSON.stringify({ ...tarkovStore.$state, gameEdition: 99 })])(
     'rejects malformed or unsupported recovery without changing archived bytes',

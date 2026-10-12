@@ -369,9 +369,9 @@ function validateBackup(json: unknown):
     },
   };
 }
-function selectOlderTabRaw(copies: string[], index: number): string {
+function selectOlderTabRaw(copies: string[], index: number, unavailable: string): string {
   if (!Number.isInteger(index) || index < 0 || index >= copies.length) {
-    throw new Error('Older edit is unavailable');
+    throw new Error(unavailable);
   }
   return copies[index]!;
 }
@@ -914,7 +914,8 @@ export function useDataBackup(): UseDataBackupReturn {
     try {
       const raw = selectOlderTabRaw(
         rawArchiveEntries.map((entry) => entry.raw),
-        index
+        index,
+        t('settings.data_management.older_edit_unavailable')
       );
       if (!isOwnedProgressRecovery(raw, $supabase.user.id ?? null))
         throw new Error('Recovery owner changed');
@@ -979,10 +980,17 @@ export function useDataBackup(): UseDataBackupReturn {
       if (owner !== ($supabase.user.id ?? null))
         throw new Error(t('settings.data_management.import_owner_changed'));
       const copies = ownedLegacyUpdates(record, owner);
-      applyResolvedRecovery(parseRecoveryProgress(selectOlderTabRaw(copies, index)));
+      applyResolvedRecovery(
+        parseRecoveryProgress(
+          selectOlderTabRaw(copies, index, t('settings.data_management.older_edit_unavailable'))
+        )
+      );
     } catch (error) {
       importState.value = 'error';
-      importError.value = error instanceof Error ? error.message : 'Failed to read older edit';
+      importError.value =
+        error instanceof Error
+          ? error.message
+          : t('settings.data_management.older_edit_read_failed');
     }
   }
   async function exportDeviceProgressRecovery(): Promise<void> {
@@ -1012,8 +1020,9 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   async function confirmRecoveryArchiveSaved(): Promise<void> {
     const receipt = recoveryExportReceipt;
-    if (!receipt) throw new Error('Download a recovery archive before clearing copies');
-    if (receipt.owner !== ($supabase.user.id ?? null)) throw new Error('Recovery owner changed');
+    if (!receipt) throw new Error(t('settings.data_management.recovery_archive_download_required'));
+    if (receipt.owner !== ($supabase.user.id ?? null))
+      throw new Error(t('settings.data_management.import_owner_changed'));
     await discardExportedLegacyProgress(receipt.owner, receipt.copies);
     recoveryExportReceipt = null;
     recoveryExportPending.value = false;
