@@ -75,6 +75,7 @@ const isMissingEntitlementView = async (response: Response): Promise<boolean> =>
 };
 const supporterReadUrl = (base: string, table: string, query: string): string => {
   const url = new URL(base);
+  if (url.protocol !== 'https:') throw new Error('Supporter entitlement reads require HTTPS');
   url.pathname = `${url.pathname.replace(/\/+$/, '')}/rest/v1/${table}`;
   url.search = query;
   url.hash = '';
