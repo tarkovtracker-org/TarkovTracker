@@ -124,6 +124,12 @@
     "export_button": "Export progress",
     "export_hint": "Export downloads your current progress as a backup file, even when saving has failed."
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "Sign out with unsaved changes?",
     "risk": "Your latest progress changes are not saved in this browser or to the cloud. If you sign out now, they will be lost.",

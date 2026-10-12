@@ -374,7 +374,9 @@ Saved and memory adoption follow transaction completion, and account generations
 callbacks while same-owner tabs share their generation. Failed account intent survives retry.
 
 Existing localStorage progress keys remain available to older clients. Their observed later edits are
-retained as recovery copies for preview and export in Settings. Edits overwritten before observation cannot be recovered. Capture has a count/size cap and reports overflow without evicting retained copies; export includes the latest uncaptured owned edit and reads committed data without writes. Explicit export-and-clear removes
+retained as recovery copies for preview and export in Settings. While copies exist or capture
+overflowed, a dismissible app-wide notice (`app/shell/OlderTabRecoveryNotice.vue`) links to
+Settings → Backup & Restore; dismissal lasts for the tab and returns for new copies. Edits overwritten before observation cannot be recovered. Capture has a count/size cap and reports overflow without evicting retained copies; export includes the latest uncaptured owned edit and reads committed data without writes. Explicit export-and-clear removes
 only owned copies included in that archive; explicit device removal checks committed active data
 inside the native transaction. Unknown ownership remains quarantined and reports incomplete removal.
 See the [browser authority checkpoint](../decision-browser-progress.md#1092-runtime-integration-contract)
