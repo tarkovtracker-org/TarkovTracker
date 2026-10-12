@@ -31,6 +31,14 @@ vi.mock('@/utils/logger', () => ({
 const owned = (userId: string | null) =>
   JSON.stringify({ _userId: userId, data: structuredClone(defaultState) });
 describe('device data removal', () => {
+  it('reports incomplete removal when unowned malformed legacy bytes remain', async () => {
+    const raw = '{malformed late edit';
+    localStorage.setItem('progress', raw);
+    const purge = vi.spyOn(progressAuthority, 'removeOwnedProgressRecovery');
+    expect(await removeAccountDeviceData('user-1')).toBe(false);
+    expect(localStorage.getItem('progress')).toBe(raw);
+    expect(purge).not.toHaveBeenCalled();
+  });
   afterEach(async () => {
     await flushActiveProgressWrites();
     vi.restoreAllMocks();

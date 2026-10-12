@@ -225,7 +225,9 @@ const removeOwnedLegacyProgress = (userId: string): boolean => {
 };
 const removeOwnedLegacyKey = (key: string, userId: string): boolean => {
   const raw = localStorage.getItem(key);
-  if (parseUserScopedStorage(raw ?? '')?._userId !== userId) return true;
+  const parsed = parseUserScopedStorage(raw ?? '');
+  if (raw !== null && parsed === null) return false;
+  if (parsed?._userId !== userId) return true;
   localStorage.removeItem(key);
   return localStorage.getItem(key) === null;
 };

@@ -1884,6 +1884,34 @@ describe('older-tab recovery review', () => {
     }
   );
   const ownedRaw = () => JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+  it('rejects a recovery preview after the signed-in account changes', async () => {
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: ownedRaw(),
+          original: null,
+          older_tab_edits: [],
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    const before = JSON.stringify(tarkovStore.$state);
+    tarkovStore.$patch.mockClear();
+    supabaseUser.id = 'different';
+    try {
+      await backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(tarkovStore.$patch).not.toHaveBeenCalled();
+      expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importPreview.value).toBeNull();
+      expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
+    } finally {
+      supabaseUser.id = 'user-123';
+    }
+  });
   it('previews an owned edit without applying it', async () => {
     tarkovStore.$patch.mockClear();
     const raw = ownedRaw();

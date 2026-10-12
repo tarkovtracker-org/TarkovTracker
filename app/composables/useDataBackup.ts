@@ -861,6 +861,7 @@ export function useDataBackup(): UseDataBackupReturn {
   let parsedPve: UserProgressData | null = null;
   let parsedSeasonal: UserProgressData | null = null;
   let parsedExport: TarkovTrackerExport | null = null;
+  let previewOwner: string | null | undefined;
   function clearParsedImport(): void {
     importState.value = 'idle';
     importPreview.value = null;
@@ -869,6 +870,7 @@ export function useDataBackup(): UseDataBackupReturn {
     parsedPve = null;
     parsedSeasonal = null;
     parsedExport = null;
+    previewOwner = undefined;
   }
   function resetImport(): void {
     clearParsedImport();
@@ -887,6 +889,7 @@ export function useDataBackup(): UseDataBackupReturn {
     parsedPve = result.data.pve;
     parsedSeasonal = result.data.seasonal;
     parsedExport = result.data.export;
+    previewOwner = $supabase.user.id ?? null;
     importPreview.value = buildPreview(
       result.data.export,
       result.data.pvp,
@@ -1117,8 +1120,21 @@ export function useDataBackup(): UseDataBackupReturn {
       logger.error('[DataBackup] Parse error:', e);
     }
   }
+  function previewMatchesCurrentOwner(): boolean {
+    if (previewOwner === ($supabase.user.id ?? null)) return true;
+    clearParsedImport();
+    importState.value = 'error';
+    importError.value = t('settings.data_management.import_owner_changed');
+    return false;
+  }
   async function confirmBackupImport(targetModes: BackupImportTargetModes): Promise<void> {
-    if (importState.value !== 'preview' || !parsedPvp || !parsedPve || !parsedExport) {
+    if (
+      importState.value !== 'preview' ||
+      !parsedPvp ||
+      !parsedPve ||
+      !parsedExport ||
+      !previewMatchesCurrentOwner()
+    ) {
       return;
     }
     try {
