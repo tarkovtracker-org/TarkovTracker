@@ -346,7 +346,10 @@ export function useAppInitialization() {
       }
       if (didSwitchUser(prevUserId, userId)) {
         resetInitializationState(loggedIn);
-        if (!(await resetTarkovState('user switched', prevUserId))) return;
+        if (!(await resetTarkovState('user switched', prevUserId))) {
+          if (token === authChangeToken) showLoadFailed();
+          return;
+        }
         if (token !== authChangeToken) return;
       } else if (hasPendingProgressHandoff()) {
         await settlePendingProgressHandoffs();

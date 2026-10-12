@@ -299,6 +299,35 @@ describe('useAppInitialization locale setup', () => {
     expect(mockActivityLogResetForSession).toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('reports a failed current account-switch transition', async () => {
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    mockResetTarkovStoreForSessionTransition.mockRejectedValueOnce(
+      new Error('storage unavailable')
+    );
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    expect(mockShowLoadFailed).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('does not report a failed superseded account-switch transition', async () => {
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    const pending = Promise.withResolvers<undefined>();
+    mockResetTarkovStoreForSessionTransition.mockReturnValueOnce(pending.promise);
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    mockSupabaseUser.id = 'user-3';
+    await flushPromises();
+    pending.reject(new Error('old storage failure'));
+    await flushPromises();
+    expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('preserves the previous user snapshot before resetting on account switch', async () => {
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-1';

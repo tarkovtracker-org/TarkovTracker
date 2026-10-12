@@ -69,13 +69,8 @@ describe('native progress authority integration', () => {
       STORAGE_KEYS.progress,
       JSON.stringify({ _userId: null, data: { newer: true } })
     );
-    const nativePut = IDBObjectStore.prototype.put;
-    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
-      this: IDBObjectStore,
-      ...args
-    ) {
-      if (args[1] === 'active-envelope') throw new DOMException('full', 'QuotaExceededError');
-      return nativePut.apply(this, args);
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
     });
     vi.resetModules();
     const b = await open();

@@ -718,9 +718,12 @@ export const openActiveProgressRepository = async (factory: IDBFactory, name: st
         sessionKey,
         (entry) => {
           if (!canContinue()) throw new ProgressRepositoryConflict('session');
-          const token = nextOwnerToken(decodeSession(entry), owner, renew);
+          const previous = decodeSession(entry);
+          const token = nextOwnerToken(previous, owner, renew);
           requireCounter(token.generation, 'session');
-          store.put({ version: 1, ...token }, sessionKey);
+          // Reopening the same session must remain readable even when every put hits quota.
+          if (previous?.generation !== token.generation)
+            store.put({ version: 1, ...token }, sessionKey);
           finish(token);
         },
         fail
