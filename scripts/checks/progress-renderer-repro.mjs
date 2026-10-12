@@ -7,12 +7,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
-// Embeds a value in evaluated source; escapes characters that could end a string or script context.
-const literal = (value) =>
-  JSON.stringify(value).replace(
-    /[<>/\b\f\n\r\t\0\u2028\u2029]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
-  );
+import { literal } from './source-literal.mjs';
 const executable = process.env.W10_CHROMIUM;
 if (!executable) throw new Error('Set W10_CHROMIUM to a local Chromium executable');
 const rounds = Number(process.env.W10_ROUNDS ?? 50);
