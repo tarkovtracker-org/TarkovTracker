@@ -5,6 +5,9 @@ const { adapterFetch, adapterScheduled } = vi.hoisted(() => ({
   adapterFetch: vi.fn(),
   adapterScheduled: vi.fn(),
 }));
+// Same Nuxt-resolved transitive adapter alias as pages-entry.ts; Fallow cannot resolve it.
+// Typecheck and the compiled-workerd build verify the alias.
+// fallow-ignore-next-line unresolved-import
 vi.mock('nitropack/presets/cloudflare/runtime/cloudflare-pages', () => ({
   default: { fetch: adapterFetch, scheduled: adapterScheduled },
 }));
