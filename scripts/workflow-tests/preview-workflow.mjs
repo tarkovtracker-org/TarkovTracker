@@ -163,9 +163,8 @@ test('tampering with the controller boundary is detected', () => {
     assert.throws(() => assertTrustedBoundary(changed), before);
   }
 });
-test('the Pages preview environment carries no production bindings or identifiers', () => {
-  const toml = read('wrangler.toml');
-  const previewStart = toml.search(/^\[\[?env\.preview\./m);
+function assertPreviewIsolation(toml) {
+  const previewStart = toml.search(/^\[\[?env\.preview[.\]]/m);
   assert.ok(previewStart >= 0);
   const preview = toml.slice(previewStart);
   const isolatedKv = preview.match(
@@ -193,6 +192,16 @@ test('the Pages preview environment carries no production bindings or identifier
   assert.match(production, /\[\[durable_objects\.bindings\]\]/);
   assert.match(production, /\[\[kv_namespaces\]\]/);
   assert.match(production, /^APP_URL = "https:\/\/tarkovtracker\.org"$/m);
+}
+test('the Pages preview environment carries no production bindings or identifiers', () => {
+  assertPreviewIsolation(read('wrangler.toml'));
+});
+test('a bare preview table cannot hide a production identifier before the KV binding', () => {
+  const candidate = read('wrangler.toml').replace(
+    '[[env.preview.kv_namespaces]]',
+    '[env.preview]\nSUPABASE_URL = "https://hidden.supabase.co"\n\n[[env.preview.kv_namespaces]]'
+  );
+  assert.throws(() => assertPreviewIsolation(candidate));
 });
 test('the Validate job builds once through the profile step and uploads a preview artifact', () => {
   const ci = read('.github/workflows/ci.yml');

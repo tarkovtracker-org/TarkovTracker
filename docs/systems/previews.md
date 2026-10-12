@@ -182,7 +182,17 @@ GitHub has computed the test merge; other pending reasons are left alone.
 - Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches, separate from
   production. Seed/refresh its three English core keys and three English import snapshot keys
   explicitly with a reviewed producer and seven-day TTL; the production precompute workflow does
-  not refresh preview data. Import previews require valid snapshots before verification.
+  not refresh preview data. A maintainer owns this manual refresh: the producer is
+  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) at the reviewed revision, with
+  `PRECOMPUTE_LANG=en`, a pinned `EXPECTED_OVERLAY_SHA`, and `TARKOV_DATA_KV_NAMESPACE_ID` set to
+  the preview namespace. An approved broker writer can invoke the same exported `runPrecompute`
+  and `runImportPrecompute` functions without exposing credentials. Refresh before import
+  verification and at least every six days while an import preview remains active.
+  Missing or expired import snapshots return 503 and block import verification until a valid
+  release is reseeded; ordinary preview smoke tests do not establish import-snapshot readiness.
+  Every approved preview runtime has read/write/delete access to this shared, expendable store.
+  Only merged public game catalogs belong there, never raw overlays, credentials, or user progress;
+  revalidate the seeded release before importing because another preview can change these keys.
   The trusted deployment job reads `wrangler.toml` from the default branch, so binding changes
   take effect only after that configuration is merged and the preview is redeployed.
 - Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
