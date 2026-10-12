@@ -26,7 +26,34 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 
 ## Progress API Host (api.tarkovtracker.org)
 
-The progress API gateway (token, progress, team progress) is served exclusively on `https://api.tarkovtracker.org` (clean paths, with `/api/v2/*` accepted as a path alias on the subdomain). Legacy `/api/` and `/api/v2/` routes on `tarkovtracker.org` have been retired and removed from production.
+The functional progress API gateway (token, progress, team progress) is served exclusively on
+`https://api.tarkovtracker.org` (clean paths, with `/api/v2/*` accepted as a path alias on the
+subdomain). On exactly `tarkovtracker.org` and `www.tarkovtracker.org`, the legacy families
+`/api/v2`, `/api/token`, `/api/progress` and `/api/team/progress` (each exact path or slash-delimited
+descendant) are retired. Pages returns HTTP **410 Gone** with static JSON:
+
+```json
+{
+  "error": "legacy_api_retired",
+  "message": "This legacy API address has been retired. Update your API base URL to https://api.tarkovtracker.org. See the documentation for migration instructions.",
+  "api_base_url": "https://api.tarkovtracker.org",
+  "documentation_url": "https://api.tarkovtracker.org/"
+}
+```
+
+The Pages entry wrapper returns before Nitro buffers a request body. The early retirement
+middleware uses the same response helper before API protection in other Nitro runtimes.
+Retirement authenticates nothing, reads no submitted body, and performs no outbound requests
+or binding calls. Responses use `no-store`;
+HEAD has no body. Valid browser preflight returns 204, allowing GET, HEAD, POST, PUT, PATCH,
+DELETE and OPTIONS with Accept, Authorization, Content-Type, If-None-Match and User-Agent.
+Wildcard CORS applies only to this static response, without credential support. There is no
+redirect, Location or Retry-After. Other hosts and first-party frontend routes keep their
+existing behavior, including `/api/tarkov/*`; near prefixes such as `/api/v20` are unaffected.
+
+During staging, the ten existing apex/www Worker bindings still intercept these requests and
+return their existing 404. The Pages 410 takes effect after the separately approved binding
+removal. See [the promotion order](./api-ownership.md#legacy-address-retirement).
 
 Third-party integrations call `api.tarkovtracker.org` directly:
 
