@@ -32,7 +32,9 @@ const {
   mockShouldBypassCache,
   mockValidateGameMode,
 } = vi.hoisted(() => ({
-  mockFetchOverlay: vi.fn(async () => ({ overlay: {}, meta: { status: 'fresh' } })),
+  mockFetchOverlay: vi.fn<
+    () => Promise<{ overlay: object | null; meta: { status: string; sha256?: string } }>
+  >(async () => ({ overlay: {}, meta: { status: 'fresh', sha256: 'overlay-sha' } })),
   mockApplyOverlay: vi.fn(),
   mockCreateTarkovJsonBootstrapFetcher: vi.fn(),
   mockCreateTarkovJsonHideoutFetcher: vi.fn(),
@@ -289,7 +291,7 @@ describe('Tarkov API handlers', () => {
           modes: { pve: { storyChapters: { added: { name: 'PvE chapter', order: 2 } } } },
           seasonalPerks: { perk: { id: 'perk', effects: [{ effectId: 'health', value: 1.25 }] } },
         },
-        meta: { status: 'fresh' },
+        meta: { status: 'fresh', sha256: 'overlay-sha' },
       });
       const { default: handler } = await import('@/server/api/tarkov/editions.get');
       const response = await handler(event);
@@ -312,7 +314,7 @@ describe('Tarkov API handlers', () => {
         });
         expect(mockEdgeCache).toHaveBeenCalledWith(
           event,
-          'seasonal-perks-json-v1-en-pvp-season',
+          'seasonal-perks-json-v1-en-pvp-season-overlay-sha',
           expect.any(Function),
           111,
           { cacheKeyPrefix: 'tarkov' }
@@ -341,14 +343,16 @@ describe('Tarkov API handlers', () => {
     mockEdgeCache.mockResolvedValueOnce(cached);
     mockFetchOverlay.mockResolvedValueOnce({
       overlay: { seasonalPerks: { perk: { effects: [{ effectId: 'health' }] } } },
-      meta: { status: 'cached' },
+      meta: { status: 'cached', sha256: 'overlay-sha' },
     });
     const { default: handler } = await import('@/server/api/tarkov/editions.get');
     const response = await handler(event);
     expect(response.data.seasonalPerks).toEqual([
       { ...cached[0], effects: [{ effectId: 'health' }] },
     ]);
-    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe('seasonal-perks-json-v1-de-pvp-season');
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(
+      'seasonal-perks-json-v1-de-pvp-season-overlay-sha'
+    );
     expect(mockFetchTarkovJsonEndpoint).not.toHaveBeenCalled();
   });
   it.each([new Error('upstream unavailable'), { perks: { common: [] } }])(

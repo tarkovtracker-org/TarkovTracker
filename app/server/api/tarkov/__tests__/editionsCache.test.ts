@@ -20,7 +20,7 @@ const sourcePerk = (id: string) => ({
 });
 const overlay = {
   overlay: { seasonalPerks: { perk: { effects: [{ effectId: 'health' }] } } },
-  meta: { status: 'fresh' },
+  meta: { status: 'fresh', sha256: 'overlay-sha' },
 };
 const request = () =>
   new Request('https://tarkovtracker.org/api/tarkov/editions?gameMode=pvp-season&lang=en');
@@ -63,8 +63,10 @@ describe('editions metadata cache boundary', () => {
     const handler = await createHandler(cache, background);
     const first = await handler(request());
     expect(first.status).toBe(200);
+    expect(first.headers.get('Cache-Control')).toBe('no-cache');
     await Promise.all(background);
     expect(cache.put).toHaveBeenCalledTimes(1);
+    expect(stored!.headers.get('Cache-Control')).toBe('public, max-age=43200, s-maxage=86400');
     const lastGood = (await stored!.clone().json()) as SeasonalPerk[];
     stored!.headers.set('X-Cache-Stored-At', String(Date.now() - 43_201_000));
     fetchSeason.mockResolvedValue({ perks: { personal: [sourcePerk('metadata-only')] } });
@@ -79,6 +81,49 @@ describe('editions metadata cache boundary', () => {
     expect(next.headers.get('X-Cache-Status')).toBe('STALE');
     await Promise.all(background);
   });
+  it('refreshes metadata when a new overlay SHA adds an upstream perk', async () => {
+    const entries = new Map<string, Response>();
+    const cache = {
+      match: vi.fn(async (key: Request) => entries.get(key.url)?.clone()),
+      put: vi.fn(async (key: Request, response: Response) => {
+        entries.set(key.url, response.clone());
+      }),
+    };
+    const background: Promise<unknown>[] = [];
+    const handler = await createHandler(cache, background);
+    expect((await handler(request())).status).toBe(200);
+    await Promise.all(background);
+    fetchOverlay.mockResolvedValue({
+      overlay: {
+        seasonalPerks: { perk: { effects: [] }, added: { effects: [{ effectId: 'new' }] } },
+      },
+      meta: { status: 'fresh', sha256: 'new-overlay-sha' },
+    });
+    fetchSeason.mockResolvedValue({
+      perks: { personal: [sourcePerk('perk'), sourcePerk('metadata-only'), sourcePerk('added')] },
+    });
+    const response = await handler(request());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Cache-Status')).toBe('MISS');
+    expect(response.headers.get('Cache-Control')).toBe('no-cache');
+    expect((await response.json()).data.seasonalPerks).toHaveLength(3);
+    await Promise.all(background);
+    expect(fetchSeason).toHaveBeenCalledTimes(2);
+    expect(entries.size).toBe(2);
+  });
+  it.each([new Error('source unavailable'), { perks: {} }])(
+    'returns a no-store 502 for a failed cold upstream read (%#)',
+    async (payload) => {
+      const cache = { match: vi.fn(async () => undefined), put: vi.fn() };
+      if (payload instanceof Error) fetchSeason.mockRejectedValueOnce(payload);
+      else fetchSeason.mockResolvedValueOnce(payload);
+      const handler = await createHandler(cache);
+      const response = await handler(request());
+      expect(response.status).toBe(502);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(cache.put).not.toHaveBeenCalled();
+    }
+  );
   it('returns a no-store 503 when the current overlay introduces an unknown cached ID', async () => {
     const cache = {
       match: vi.fn(

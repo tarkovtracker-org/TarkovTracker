@@ -272,7 +272,7 @@ effect patch. Other modes return an empty seasonal perk list.
 | `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-season`; the overlay is
+Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-season-<overlay-sha>`; the overlay is
 applied after that cache read. Seasonal responses expose `X-Cache-Status`, including `STALE` when
 last-good metadata is served during refresh. Other modes still read only the overlay. An unavailable
 or malformed upstream catalog fails with `502` on a cold read; unknown overlay IDs or an unavailable
@@ -281,6 +281,8 @@ incompatible refreshes retain last-good metadata. The overlay is also checked af
 so an overlay introducing unknown IDs still returns `503` rather than silently dropping effects.
 Error responses explicitly use `Cache-Control: no-store`, replacing any policy set by the metadata
 cache before a projection failure.
+Successful responses use `Cache-Control: no-cache` so the internal metadata TTL cannot hide newer
+overlay effects or story corrections. A changed overlay SHA selects a fresh metadata entry.
 
 ---
 

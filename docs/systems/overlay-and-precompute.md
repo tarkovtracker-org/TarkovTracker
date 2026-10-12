@@ -119,7 +119,11 @@ missing upstream IDs, invalid groups/metadata/exclusions, unresolved translation
 overlay IDs fail closed. Upstream transport/schema failures use the existing edge-cache stale
 refresh path; an incompatible refresh also preserves last-good metadata. A cold schema failure
 returns `502`, while incompatible overlay IDs return `503`, including on cache hits. Failed editions
-responses override any metadata cache policy with `Cache-Control: no-store`. The browser
+responses override any metadata cache policy with `Cache-Control: no-store`; successful responses
+use `no-cache` so the internal TTL cannot hide overlay changes. Metadata keys include the overlay
+SHA to fetch current upstream data when the overlay changes. Declared season translation paths and
+keys must resolve through the requested-language/English dictionaries; unresolved keys fail before
+adaptation regardless of their spelling. The browser
 editions cache advances to `overlay-v3` so earlier effects-only catalogs are not reused.
 
 Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`

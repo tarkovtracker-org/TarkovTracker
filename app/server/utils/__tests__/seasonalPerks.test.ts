@@ -83,7 +83,9 @@ describe('seasonal perk metadata and effect join', () => {
     const result = projectSeasonalPerks(overlay, 'pvp-season', upstream);
     expect(result).toHaveLength(40);
     expect(result.map((perk) => ({ ...perk, effects: [] }))).toEqual(upstream);
-    expect(result.slice(0, 37).every((perk) => perk.effects === effects)).toBe(true);
+    expect(result.slice(0, 37).map((perk) => perk.effects)).toEqual(
+      Array.from({ length: 37 }, () => effects)
+    );
     expect(result.slice(37).every((perk) => perk.effects.length === 0)).toBe(true);
     expect(result[0]).toMatchObject({ type: 'common', points: null });
     expect(result[6]).toMatchObject({ type: 'personal', mutuallyExclusiveSeasonalPerkIds: ['p1'] });
@@ -108,9 +110,13 @@ describe('seasonal perk metadata and effect join', () => {
     expect(upstream[1]?.effects).toEqual([]);
   });
   it.each(['regular', 'pve'])('does not expose seasonal perks in %s', (mode) => {
-    expect(projectSeasonalPerks({ seasonalPerks: { unknown: { effects: [] } } }, mode, [])).toEqual(
-      []
-    );
+    expect(
+      projectSeasonalPerks(
+        { seasonalPerks: { personal: { effects: [] } } },
+        mode,
+        adaptSeasonalPerks(catalog())
+      )
+    ).toEqual([]);
   });
   it.each([
     undefined,

@@ -50,6 +50,41 @@ describe('createTarkovJsonBootstrapFetcher', () => {
   });
 });
 describe('fetchTarkovJsonEndpoint', () => {
+  it.each([{ data: {} }, new Error('translations unavailable')])(
+    'rejects unresolved season translations regardless of raw key spelling (%#)',
+    async (dictionary) => {
+      const fetcher = createFetcher({
+        'https://json.tarkov.dev/pvp-season/season': {
+          data: { perks: { common: [{ name: 'different.perk.title' }] } },
+          translations: ['$.data.perks.*.*.name'],
+        },
+        'https://json.tarkov.dev/pvp-season/season_en': dictionary,
+      });
+      await expect(
+        fetchTarkovJsonEndpoint('season', {
+          gameMode: 'pvp-season',
+          lang: 'en',
+          maxRetries: 1,
+          deps: { fetcher },
+        })
+      ).rejects.toThrow(/season translations?/);
+    }
+  );
+  it('rejects unsupported declared translation paths for season metadata', async () => {
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/pvp-season/season': {
+        data: { perks: { common: [{ name: 'different.perk.title' }] } },
+        translations: ['$.data.perks[?(@.name)].name'],
+      },
+      'https://json.tarkov.dev/pvp-season/season_en': { data: { 'different.perk.title': 'Name' } },
+    });
+    await expect(
+      fetchTarkovJsonEndpoint('season', {
+        gameMode: 'pvp-season',
+        deps: { fetcher },
+      })
+    ).rejects.toThrow('Unsupported json.tarkov.dev season translation path');
+  });
   it('localizes grouped season perks with English fallback using the published paths', async () => {
     const fetcher = createFetcher({
       'https://json.tarkov.dev/pvp-season/season': {

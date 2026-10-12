@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
       gameMode === 'pvp-season'
         ? await edgeCache(
             event,
-            `seasonal-perks-json-v1-${lang}-${gameMode}`,
+            `seasonal-perks-json-v1-${lang}-${gameMode}-${meta.sha256}`,
             async () => {
               const metadata = adaptSeasonalPerks(
                 await fetchTarkovJsonEndpoint('season', { lang, gameMode })
@@ -39,6 +39,8 @@ export default defineEventHandler(async (event) => {
       },
       dataOverlay: meta,
     };
+    // Keep the internal metadata TTL from hiding current overlay effects and story corrections.
+    setHeader(event, 'Cache-Control', 'no-cache');
     setOverlayResponseHeaders(event, response);
     return response;
   } catch (error) {
