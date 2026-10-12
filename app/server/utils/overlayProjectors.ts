@@ -1,7 +1,7 @@
 import { normalizeStoryChapter } from '@/utils/storylineObjectives';
 import { deepMerge, isPlainObject } from './deepMerge';
 import type { OverlayData, OverlayRecords, OverlaySections } from './overlayTypes';
-import type { GameEdition, StoryChapter, SeasonalPerk } from '@/types/tarkov';
+import type { GameEdition, StoryChapter } from '@/types/tarkov';
 const overlayRecords = (value: unknown): OverlayRecords => {
   if (!isPlainObject(value)) return {};
   return value as OverlayRecords;
@@ -56,10 +56,6 @@ export const projectStoryChapters = (
     .sort((a, b) => a.order - b.order);
 export const projectEditions = (overlay: OverlayData, mode: string): GameEdition[] =>
   overlayEntries(scopedOverlay(overlay, 'editions', mode)) as unknown as GameEdition[];
-export const projectSeasonalPerks = (overlay: OverlayData, mode: string): SeasonalPerk[] => {
-  if (mode !== 'pvp-season') return [];
-  return overlayEntries(scopedOverlay(overlay, 'seasonalPerks', mode)) as unknown as SeasonalPerk[];
-};
 const withPatchedConditions = (
   prestige: Record<string, unknown>,
   patch: Record<string, unknown>
