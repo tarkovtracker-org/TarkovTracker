@@ -61,11 +61,12 @@ path.
   100 team locks, skips locked teams, and rereads actual membership in a separate statement after
   the lock. It uses `disband_team`, preserving personal progress, all mode/Seasonal history,
   preferences, accounts and tokens. Team rows, memberships and team events expire together.
-- Expiry is automatic: a migration starts warnings, enables deletion and schedules the hourly
-  `owner-only-team-cleanup` pg_cron job. The runner gives existing solo teams a fresh seven days
-  from their own initialization; no migration bulk rewrite or old-age inference is involved, and
-  nothing is disbanded before seven days after warnings started. `deletion_enabled=false` or
-  unscheduling the job pauses deletion. The
+- Migrations schedule the hourly `owner-only-team-cleanup` job with warning and deletion gates
+  off. After the warning UI and restricted observer pass acceptance, operators separately approve
+  warning activation and, after 168 hours of verified warning availability, deletion activation.
+  The runner gives existing solo teams a fresh seven days from their own initialization; no
+  migration bulk rewrite or old-age inference is involved. Both the team deadline and global
+  warning floor must pass. `deletion_enabled=false` or unscheduling the job pauses deletion. The
   [rollout runbook](../runbook.md#owner-only-team-expiry-rollout) owns monitoring and recovery.
 - Committed active batches persist aggregate-only time/count/flag receipts. Receipt failures or
   disband failures roll back the entire batch; pg_cron records failure instead. The allowlisted

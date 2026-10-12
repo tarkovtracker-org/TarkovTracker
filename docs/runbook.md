@@ -1034,42 +1034,51 @@ regressions and deployment postchecks against any recovery migration before decl
 
 ## Owner-only team expiry rollout
 
-Expiry is automatic once the migrations apply. `20261012174500_owner_only_team_expiry.sql` adds
-schema and triggers with both gates off, `20261012174501_owner_only_team_cleanup_receipts.sql`
-adds aggregate receipts and the restricted observer view, and
-`20261012174502_schedule_owner_only_team_cleanup.sql` starts warnings, enables deletion and
-schedules the `owner-only-team-cleanup` pg_cron job (`17 * * * *`, 60-second statement timeout,
-at most 100 teams per batch). Deploying these migrations follows the database procedure above and
-needs the usual explicit production approval; no further manual activation step exists.
+The migrations install schema, aggregate receipts and the hourly `owner-only-team-cleanup`
+pg_cron job (`17 * * * *`, 60-second statement timeout, at most 100 teams per batch).
+Both gates stay off: `warnings_started_at=NULL` and `deletion_enabled=false`. The scheduled
+runner is inert until warning activation. Database migrations and frontend deployment are
+independent; applying migrations must never consume an owner's warning period before the
+warning UI is verified live. Follow the database procedure above for deployment approval.
 
-1. After deploy, confirm the gate and job:
-   `scripts/ops/prod-db owner-only-teams` reports `warnings_started_at` and `deletion_enabled`,
-   and `cron.job` lists `owner-only-team-cleanup` as active. Until the first hourly run, existing
-   solo teams show no deadline; the runner then initializes them (100 per batch) and each receives
-   at least 168 hours from its own initialization time, however long the backlog takes. New solo
-   transitions are stamped immediately. The migration and the warning UI deploy from the same
-   merge; if the app deploy fails or rolls back to a build without the warning, set
-   `deletion_enabled=false` until the warning is live again, so no owner loses a team unwarned.
-2. No team can be disbanded until seven days after `warnings_started_at`; the runner enforces
-   `greatest(team deadline, warnings_started_at + 168 hours)`. Expiry is on or after the deadline,
-   depending on hourly batches, lock contention and backlog.
-3. Use `scripts/ops/prod-db owner-only-teams` for aggregate owner-only/populated/empty/inconsistent
-   counts, awaiting-clock/in-grace/deadline-reached counts, warning activation time, deletion flag
-   and the latest 20 aggregate receipts. It needs the dedicated observer's view grant (separately
-   approved; grant no base-table reads or cleanup execution):
+1. Before production activation, use an isolated local/preview database with warnings enabled
+   and deletion disabled. Verify the persistent owner warning and date on desktop/mobile,
+   reload persistence, PvP/PvE/Seasonal switches, join cancellation, a fresh 168-hour clock after
+   the last member leaves, and disband fallback with personal progress and other-mode teams
+   preserved. Run the committed concurrency and expiry tests for failure/response ordering.
+2. Separately approve provisioning the dedicated observer's aggregate-view grant. Grant no
+   base-table reads or cleanup execution:
 
    ```sql
    GRANT USAGE ON SCHEMA private TO pi_prod_observer;
    GRANT SELECT ON private.owner_only_team_cleanup_status TO pi_prod_observer;
    ```
 
-   The report returns no identities, names, join codes or progress. Each committed batch records
-   completion time, initialized/disbanded counts and the deletion flag in
-   `private.owner_only_team_cleanup_receipts`; a failed transaction records none, so inspect
-   pg_cron run status for failures. Receipts retain thirty days at the hourly cadence, pruning at
-   most 100 older rows per batch. Empty, missing-owner or role/mode-inconsistent teams are
-   preserved for a separate report. The 100-row cap bounds locks and mutations, not the
-   eligibility scan; check batch runtime in `cron.job_run_details` and tune in a reviewed change.
+   Run `scripts/ops/prod-db canary` and `scripts/ops/prod-db owner-only-teams` using that restricted
+   role. Confirm the report succeeds within the observer timeout, contains only aggregate counts
+   and receipts, and both gates are off. The telemetry canary alone does not exercise this view.
+   A failed report or unverified warning UI blocks activation.
+
+3. After the production warning UI is live and the observer checks pass, obtain explicit approval
+   to start warnings (a manual production mutation). In a bounded transaction, call
+   `SELECT private.begin_owner_only_team_warnings();` while deletion remains disabled. Confirm
+   activation time with `scripts/ops/prod-db owner-only-teams` and the named job is active in
+   `cron.job`. The runner initializes existing solo teams in batches of 100, giving each at
+   least 168 hours from its own initialization; new solo transitions are stamped immediately.
+4. Keep deletion disabled for a full 168 hours of verified warning availability. Before enabling
+   deletion, repeat the warning/lifecycle acceptance and observer report checks; inspect
+   `cron.job_run_details` for failures and runtime, and confirm committed initialization receipts.
+   Obtain separate explicit approval to set `deletion_enabled=true`. No team expires until both
+   its own deadline and `warnings_started_at + 168 hours` have passed. Hourly batching, lock
+   contention and backlog may delay expiry.
+5. Monitor `scripts/ops/prod-db owner-only-teams` for owner-only/populated/empty/inconsistent
+   counts, awaiting-clock/in-grace/deadline-reached counts, activation state and the latest 20
+   aggregate receipts. Each committed batch records completion time, initialized/disbanded
+   counts and the deletion flag. Failed transactions record no receipt; inspect pg_cron status.
+   Receipts retain thirty days at hourly cadence, pruning at most 100 older rows per batch.
+   Empty, missing-owner or role/mode-inconsistent teams remain for separate investigation.
+   The cap bounds locks and mutations, not scan work; measure runtime before approving deletion
+   and tune in a reviewed change if the scan approaches the 60-second timeout.
 
 A single disband or receipt failure rolls back the entire batch. No deletion receipt is committed
 for that failed run; pg_cron records failure and the next hourly run retries. Persistent failures
@@ -1078,8 +1087,12 @@ can stall the earliest candidates and need investigation before resuming deletio
 Pause deletion by setting `deletion_enabled=false`; the next batch initializes clocks but
 does not disband. The flag update waits for an in-flight batch's settings share lock, so a batch
 already running completes atomically. Unschedule the named job to pause all batches. Neither
-pause resets clocks. If a new policy/grace period is desired, prepare a separately reviewed
-forward change rather than resetting deadlines through user activity. Do not drop the warning
+pause resets clocks. If warning availability is interrupted by a failed app deployment or rollback,
+keep deletion disabled. After restoring and verifying the warning UI, obtain approval to restart
+the global warning floor with `warnings_started_at=clock_timestamp()` and wait another full 168
+hours before re-enabling deletion. Preserve individual team clocks; the global floor prevents an
+old deadline from allowing immediate deletion after warning restoration. If a new policy/grace
+period is desired, prepare a separately reviewed forward change rather than resetting deadlines through user activity. Do not drop the warning
 UI while deletion remains enabled. Existing account-deletion retry handlers must retain
 whole-transaction handling of `55P03`; failed cascades leave all data unchanged for retry.
 

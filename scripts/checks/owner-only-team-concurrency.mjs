@@ -70,7 +70,8 @@ async function heldTransaction(sql) {
   const child = spawn('docker', ['exec', '-i', container, ...psqlArgs, '-v', 'VERBOSITY=verbose']);
   const pending = collect(child);
   const timer = setTimeout(() => child.kill('SIGKILL'), HOLD_TIMEOUT_MS);
-  child.stdin.write(`BEGIN; SET application_name='${holderName}';\n${sql};\n`);
+  // Publish the observed session name after the statement has acquired its locks.
+  child.stdin.write(`BEGIN;\n${sql};\nSET application_name='${holderName}';\n`);
   await waitFor(`SELECT count(*) FROM pg_stat_activity
     WHERE application_name='${holderName}' AND state='idle in transaction'`);
   const release = (rollback) => {
@@ -196,7 +197,7 @@ try {
   created = true;
   // Pausing does not stop a sweep that already started; let it finish before fixtures exist.
   await waitFor(`SELECT (count(*) = 0)::int FROM cron.job_run_details
-    WHERE status IN ('starting','running') AND jobid IN (SELECT jobid ${cronJob})`);
+    WHERE status NOT IN ('succeeded','failed') AND jobid IN (SELECT jobid ${cronJob})`);
   await joinWins();
   await cleanupWins(false);
   await cleanupWins(true);

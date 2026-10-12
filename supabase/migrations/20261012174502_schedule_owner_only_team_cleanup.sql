@@ -1,13 +1,9 @@
--- Automatic owner-only team disband. Starts warnings and enables deletion in the singleton gate
--- (one row, no team rewrite), then schedules the bounded hourly runner. The runner initializes
--- legacy solo teams lazily and still disbands only after greatest(team deadline,
--- warnings_started_at + 168 hours), so nothing can be deleted for seven days after this applies.
--- Kill switch: UPDATE private.owner_only_team_cleanup SET deletion_enabled = false (warnings and
--- clocks continue), or cron.unschedule('owner-only-team-cleanup') to stop the runner entirely.
+-- Install the bounded hourly runner without starting warning clocks or enabling deletion.
+-- Database migrations and the warning UI deploy separately. Start warnings only after the
+-- deployed UI and restricted observer have passed the acceptance checks in the rollout runbook;
+-- enable deletion separately after a full 168-hour warning period. The scheduled runner is
+-- inert while warnings_started_at is NULL and initializes clocks without deletion afterward.
 SET LOCAL lock_timeout = '5s';
-
-SELECT private.begin_owner_only_team_warnings();
-UPDATE private.owner_only_team_cleanup SET deletion_enabled = true WHERE NOT deletion_enabled;
 
 CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA extensions;
 

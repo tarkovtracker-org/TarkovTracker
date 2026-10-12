@@ -1,10 +1,10 @@
 BEGIN;
-SELECT plan(67);
+SELECT plan(69);
 
--- Installed state: automatic disband is on, behind the seven-day warning floor.
-SELECT ok((SELECT warnings_started_at IS NOT NULL AND warnings_started_at <= now()
-  FROM private.owner_only_team_cleanup), 'migrations start the warning clock');
-SELECT ok((SELECT deletion_enabled FROM private.owner_only_team_cleanup), 'migrations enable automatic disband');
+-- Installed state: scheduling cannot activate expiry before the warning UI is verified.
+SELECT ok((SELECT warnings_started_at IS NULL
+  FROM private.owner_only_team_cleanup), 'migrations leave the warning clock off');
+SELECT ok((SELECT NOT deletion_enabled FROM private.owner_only_team_cleanup), 'migrations leave deletion disabled');
 SELECT is((SELECT schedule FROM cron.job WHERE jobname = 'owner-only-team-cleanup'), '17 * * * *',
   'cleanup runs hourly');
 SELECT ok((SELECT active AND command LIKE '%private.run_owner_only_team_cleanup(100)%'
@@ -29,7 +29,12 @@ $$;
 UPDATE public.teams SET created_at = now() - interval '3 years' WHERE id = pg_temp.expiry_team('legacy');
 SELECT is((SELECT owner_only_since FROM public.teams WHERE id = pg_temp.expiry_team('legacy')),
   NULL::timestamptz, 'schema installation does not start clocks');
+CREATE TEMP TABLE inactive_receipts AS SELECT count(*) AS receipts FROM private.owner_only_team_cleanup_receipts;
 SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup()), 0, 'runner is inert before warning activation');
+SELECT is((SELECT owner_only_expires_at FROM public.teams WHERE id = pg_temp.expiry_team('legacy')),
+  NULL::timestamptz, 'a delayed UI deployment consumes none of the owner warning period');
+SELECT is((SELECT count(*) FROM private.owner_only_team_cleanup_receipts), (SELECT receipts FROM inactive_receipts),
+  'scheduled runs before warning acceptance record no active batch');
 CREATE TEMP TABLE warning_start AS SELECT private.begin_owner_only_team_warnings() AS started;
 SELECT is(private.begin_owner_only_team_warnings(), (SELECT started FROM warning_start), 'warning activation is idempotent');
 SELECT is((SELECT initialized FROM private.run_owner_only_team_cleanup()), 1, 'bounded runner initializes the legacy solo team');
