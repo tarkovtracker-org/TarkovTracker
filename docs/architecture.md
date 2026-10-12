@@ -315,7 +315,7 @@ sequenceDiagram
 
 Persistent PvP and PvE use season number `0`. Seasonal PvP uses the active positive season number
 (`1` for the initial integration). The legacy `user_progress` row remains the account-metadata
-source and temporarily mirrors PvP/PvE for rolling compatibility; Seasonal progress exists only in
+source; its frozen PvP/PvE columns are no longer written (#1028) and Seasonal progress exists only in
 `user_game_mode_progress`. See [`systems/progress-storage.md`](./systems/progress-storage.md#game-mode-and-seasonal-progress-storage)
 for the storage, RLS, team, sharing, prestige, backup, and compatibility invariants.
 

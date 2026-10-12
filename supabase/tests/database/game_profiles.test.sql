@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(31);
+SELECT plan(52);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000001001', 'profiles-supporter@example.invalid'),
@@ -89,6 +89,82 @@ SELECT throws_ok($$SELECT public.delete_game_profile(
     WHERE user_id = '00000000-0000-0000-0000-000000001001' AND is_default))$$,
   'PT409', 'The default game profile cannot be deleted', 'the default profile cannot be deleted');
 
+SELECT set_config('test.profile_active_season', private.active_season_number()::text, true);
+SET LOCAL ROLE authenticated;
+SELECT lives_ok($$SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'alt'), 2,
+  '{"seasonal":{"level":14}}', current_setting('test.profile_active_season')::SMALLINT)$$,
+  'an authenticated client saves the matching Seasonal season');
+RESET ROLE;
+SELECT is((SELECT progress_data->>'level' FROM public.user_profile_mode_progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt')
+    AND game_mode = 'seasonal' AND season_number = private.active_season_number()), '14',
+  'matching Seasonal progress is stored under the active season');
+CREATE TEMP TABLE profile_season_history AS
+SELECT to_jsonb(progress) AS saved_row
+FROM public.user_profile_mode_progress progress
+WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'seasonal';
+
+-- Roll over inside this transaction so the saved season becomes historical.
+SELECT set_config('test.profile_active_season', (private.active_season_number() + 1)::text, true);
+CREATE OR REPLACE FUNCTION private.active_season_number()
+RETURNS SMALLINT
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$ SELECT current_setting('test.profile_active_season')::SMALLINT; $$;
+SET LOCAL ROLE authenticated;
+SELECT lives_ok($$SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'alt'), 2,
+  '{"seasonal":{"level":22}}', current_setting('test.profile_active_season')::SMALLINT)$$,
+  'an authenticated client saves after a Seasonal rollover');
+RESET ROLE;
+SELECT is((SELECT progress_data->>'level' FROM public.user_profile_mode_progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt')
+    AND game_mode = 'seasonal' AND season_number = private.active_season_number()), '22',
+  'a rollover writes the new active season');
+SELECT is((SELECT count(*)::int FROM public.user_profile_mode_progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'seasonal'), 2,
+  'a rollover retains both seasons');
+SELECT is((SELECT to_jsonb(progress) FROM public.user_profile_mode_progress progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt')
+    AND game_mode = 'seasonal' AND season_number = private.active_season_number() - 1),
+  (SELECT saved_row FROM profile_season_history), 'a rollover leaves the historical row unchanged');
+CREATE TEMP TABLE profile_season_snapshot AS
+SELECT jsonb_agg(to_jsonb(progress) ORDER BY season_number) AS saved_rows
+FROM public.user_profile_mode_progress progress
+WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'seasonal';
+
+SET LOCAL ROLE authenticated;
+SELECT lives_ok($$SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'alt'), 2,
+  '{"pvp":{"level":12},"seasonal":{"level":99}}',
+  (current_setting('test.profile_active_season')::SMALLINT - 1)::SMALLINT)$$,
+  'a stale season does not abort valid persistent-mode changes');
+RESET ROLE;
+SELECT is((SELECT progress_data->>'level' FROM public.user_profile_mode_progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'pvp'), '12',
+  'a stale season still commits PvP progress');
+SELECT is((SELECT jsonb_agg(to_jsonb(progress) ORDER BY season_number)
+  FROM public.user_profile_mode_progress progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'seasonal'),
+  (SELECT saved_rows FROM profile_season_snapshot), 'a stale season preserves all Seasonal rows');
+
+SET LOCAL ROLE authenticated;
+SELECT lives_ok($$SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'alt'), 2,
+  '{"pvp":{"level":13},"seasonal":{"level":98}}')$$,
+  'a missing season does not abort valid persistent-mode changes');
+RESET ROLE;
+SELECT is((SELECT progress_data->>'level' FROM public.user_profile_mode_progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'pvp'), '13',
+  'a missing season still commits PvP progress');
+SELECT is((SELECT jsonb_agg(to_jsonb(progress) ORDER BY season_number)
+  FROM public.user_profile_mode_progress progress
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'seasonal'),
+  (SELECT saved_rows FROM profile_season_snapshot), 'a missing season preserves all Seasonal rows');
+
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000001002', true);
 SELECT throws_ok(format($$SELECT public.get_game_profile_progress(%L)$$,
   (SELECT id FROM profile_ids WHERE label = 'alt')),
@@ -104,7 +180,7 @@ SELECT throws_ok(format($$SELECT public.sync_game_profile_progress(%L, 2, '{"pvp
   (SELECT id FROM profile_ids WHERE label = 'alt')),
   'PT403', 'Game profiles require supporter access', 'a lapsed supporter''s extra profile is read-only');
 SELECT is((SELECT progress_data->>'level' FROM public.user_profile_mode_progress
-  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'pvp'), '8',
+  WHERE profile_id = (SELECT id FROM profile_ids WHERE label = 'alt') AND game_mode = 'pvp'), '13',
   'a lapsed supporter keeps the stored progress');
 SELECT lives_ok(format($$SELECT public.get_game_profile_progress(%L)$$,
   (SELECT id FROM profile_ids WHERE label = 'alt')),
@@ -126,7 +202,32 @@ SELECT is((SELECT count(*)::int FROM public.user_profile_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001001'), 0,
   'a lapsed supporter can delete the profile and its progress goes with it');
 
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000001002', true);
 SET LOCAL ROLE authenticated;
+SELECT is(public.list_game_profiles()->'can_add', 'true'::jsonb,
+  'an authenticated client can list its profiles');
+SELECT lives_ok($$SELECT public.update_game_profile(NULL, NULL, '4444')$$,
+  'an authenticated client can bind the default profile with nullable inputs');
+SELECT lives_ok($$INSERT INTO profile_ids
+  SELECT 'client-alt', (public.add_game_profile(NULL, NULL)->'profile'->>'id')::uuid$$,
+  'an authenticated client can add an unbound profile');
+SELECT is(public.update_game_profile((SELECT id FROM profile_ids WHERE label = 'client-alt'),
+  'Client alt', '5555')->'profile'->>'label', 'Client alt',
+  'an authenticated client can update its extra profile');
+SELECT lives_ok($$SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'), NULL, '{"pvp":{"level":7}}', NULL)$$,
+  'an authenticated client can sync with nullable edition and season inputs');
+SELECT is(jsonb_array_length(public.get_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'))->'modes'), 1,
+  'an authenticated client can read its extra profile progress');
+SELECT is(public.get_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'))->'game_edition', 'null'::jsonb,
+  'a null edition remains unset');
+SELECT lives_ok($$SELECT public.delete_game_profile(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'))$$,
+  'an authenticated client can delete its extra profile');
+SELECT is(jsonb_array_length(public.list_game_profiles()->'profiles'), 1,
+  'authenticated deletion leaves the default profile');
 SELECT throws_ok($$SELECT * FROM public.user_profile_mode_progress$$, '42501',
   'permission denied for table user_profile_mode_progress',
   'clients cannot read profile progress directly');

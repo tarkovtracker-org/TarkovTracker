@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(5);
+SELECT plan(7);
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000000891', 'progress-dedup@example.invalid');
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000891', true);
@@ -26,9 +26,9 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   '{"pvp":{"level":11},"pve":{"level":20},"seasonal":{"level":30}}',
   private.active_season_number());
 SELECT is((SELECT count(*) FROM progress_write_events WHERE relation_name = 'user_progress'), 1::bigint,
-  'one persistent change updates the legacy mirror once');
+  'a persistent mode change advances the compatibility account clock once');
 SELECT is((SELECT count(*) FROM progress_write_events WHERE mode = 'pvp'), 1::bigint,
-  'the RPC does not repeat the legacy trigger normalized write');
+  'a persistent mode change writes its normalized row once');
 SELECT is((SELECT count(*) FROM progress_write_events WHERE mode IN ('pve', 'seasonal')), 0::bigint,
   'unrelated modes do not produce writes');
 TRUNCATE progress_write_events;
@@ -37,5 +37,15 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   private.active_season_number());
 SELECT is((SELECT count(*) FROM progress_write_events), 1::bigint,
   'a seasonal-only change writes only its normalized row');
+TRUNCATE progress_write_events;
+SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
+  '{"pvp":{"level":12},"pve":{"level":21}}', private.active_season_number());
+SELECT is((SELECT count(*) FROM progress_write_events WHERE relation_name = 'user_progress'), 1::bigint,
+  'two persistent mode changes advance the compatibility account clock once');
+TRUNCATE progress_write_events;
+SELECT public.sync_user_game_mode_progress('pve', 2, NULL,
+  '{"pvp":{"level":13}}', private.active_season_number());
+SELECT is((SELECT count(*) FROM progress_write_events WHERE relation_name = 'user_progress'), 1::bigint,
+  'metadata and persistent progress commit in one account-row update');
 SELECT * FROM finish();
 ROLLBACK;

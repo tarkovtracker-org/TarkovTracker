@@ -1021,7 +1021,7 @@ export type Database = {
     }
     Functions: {
       add_game_profile: {
-        Args: { p_eft_account_id: string; p_label: string }
+        Args: { p_eft_account_id: string | null; p_label: string | null }
         Returns: Json
       }
       archive_prestige_run_and_reset_progress: {
@@ -1197,10 +1197,10 @@ export type Database = {
       }
       sync_game_profile_progress: {
         Args: {
-          p_game_edition: number
+          p_game_edition: number | null
           p_modes: Json
           p_profile_id: string
-          p_seasonal_season_number?: number
+          p_seasonal_season_number?: number | null
         }
         Returns: Json
       }
@@ -1214,22 +1214,11 @@ export type Database = {
       }
       update_game_profile: {
         Args: {
-          p_eft_account_id: string
-          p_label: string
-          p_profile_id: string
+          p_eft_account_id: string | null
+          p_label: string | null
+          p_profile_id: string | null
         }
         Returns: Json
-      }
-      update_task_completion: {
-        Args: {
-          p_complete: boolean
-          p_failed: boolean
-          p_game_mode: string
-          p_task_id: string
-          p_timestamp: number
-          p_user_id: string
-        }
-        Returns: undefined
       }
     }
     Enums: {
