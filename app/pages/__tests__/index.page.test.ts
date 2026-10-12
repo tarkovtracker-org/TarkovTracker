@@ -306,6 +306,21 @@ describe('dashboard page', () => {
       const wrapper = await mountSuspended(DashboardPage, {
         global: { stubs: defaultGlobalStubs },
       });
+      expect(renderedCards(wrapper)).toEqual([
+        'prapor-id:none',
+        'ragman-id:none',
+        'jaeger-id:none',
+        'lightkeeper-id:task',
+      ]);
+    });
+    it('unlocks a story-gated trader with a completed task hidden by dashboard filters', async () => {
+      // traderStats counts only filtered tasks, so Ragman reports 0 completed here.
+      const { DashboardPage } = await setup({ traderStats: traders }, {}, metadata, {
+        isTaskComplete: (id: string) => id === 'ragman-task',
+      });
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
       expect(renderedCards(wrapper)).toContain('ragman-id:none');
     });
   });

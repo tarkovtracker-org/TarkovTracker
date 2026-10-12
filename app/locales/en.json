@@ -699,7 +699,7 @@
       "progress": {
         "hideout_items": "Hideout Items",
         "filtered_status_active": "Filtered by task settings",
-        "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks).",
+        "filtered_warning_tooltip": "Task and Kappa counts follow your task filter settings (Kappa, Lightkeeper, and non-special tasks). Hideout items are not filtered.",
         "view_full_progress": "View full progress"
       },
       "traders": {

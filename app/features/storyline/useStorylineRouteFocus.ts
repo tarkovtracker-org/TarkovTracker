@@ -13,7 +13,6 @@ const focusTarget = (chapterId: string, objectiveId: string | undefined) =>
 const highlight = (element: HTMLElement) => {
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
   element.classList.add(...FOCUS_CLASSES);
-  return setTimeout(() => element.classList.remove(...FOCUS_CLASSES), FOCUS_DURATION_MS);
 };
 /**
  * Deep links such as `/storyline?chapter=tour&objective=<id>` (used by locked trader cards)
@@ -23,9 +22,12 @@ export function useStorylineRouteFocus(chapterCount: Ref<number>) {
   const route = useRoute();
   const router = useRouter();
   let timeout: ReturnType<typeof setTimeout> | null = null;
+  let focused: HTMLElement | null = null;
   const clearFocus = () => {
     if (timeout) clearTimeout(timeout);
+    focused?.classList.remove(...FOCUS_CLASSES);
     timeout = null;
+    focused = null;
   };
   const focusFromRoute = async () => {
     const chapterId = getQueryString(route.query.chapter);
@@ -34,12 +36,16 @@ export function useStorylineRouteFocus(chapterCount: Ref<number>) {
     const target = focusTarget(chapterId, getQueryString(route.query.objective));
     if (!target) return;
     clearFocus();
-    timeout = highlight(target);
+    highlight(target);
+    focused = target;
+    timeout = setTimeout(clearFocus, FOCUS_DURATION_MS);
     const nextQuery = { ...route.query };
     delete nextQuery.chapter;
     delete nextQuery.objective;
     router.replace({ hash: route.hash, path: route.path, query: nextQuery });
   };
-  watch([() => route.query.chapter, chapterCount], focusFromRoute, { immediate: true });
+  watch([() => route.query.chapter, () => route.query.objective, chapterCount], focusFromRoute, {
+    immediate: true,
+  });
   onBeforeUnmount(clearFocus);
 }

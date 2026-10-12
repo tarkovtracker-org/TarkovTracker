@@ -4,7 +4,7 @@ import type { StoryChapter, Task, Trader } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 type LockTask = Pick<Task, 'id' | 'name' | 'trader' | 'finishRewards' | 'otherRequirements'>;
 type LockChapter = Pick<StoryChapter, 'id' | 'name' | 'traderUnlocks'>;
-export type LockTrader = Pick<Trader, 'id' | 'normalizedName'> & { completedTasks?: number };
+export type LockTrader = Pick<Trader, 'id' | 'normalizedName'>;
 export type TraderUnlockRequirement =
   | { kind: 'task'; task: { id: string; name: string } | null }
   | {
@@ -42,15 +42,18 @@ const unlockTasksFor = (trader: LockTrader, deps: TraderLockStatusDeps, configur
     (task) => configuredIds.has(task.id) || unlockedTraderIds(task).includes(trader.id)
   );
 };
+const hasCompletedUnlockTask = (trader: LockTrader, deps: TraderLockStatusDeps) =>
+  unlockTasksFor(trader, deps, configuredUnlockTaskIds(trader, deps)).some((task) =>
+    deps.isTaskComplete(task.id)
+  );
 const taskRequirement = (
   trader: LockTrader,
   deps: TraderLockStatusDeps
 ): TraderUnlockRequirement | null => {
   const configured = configuredUnlockTaskIds(trader, deps);
   if (!deps.tasks?.length) return configured.length ? { kind: 'task', task: null } : null;
-  const unlockTasks = unlockTasksFor(trader, deps, configured);
-  const [first] = unlockTasks;
-  if (!first || unlockTasks.some((task) => deps.isTaskComplete(task.id))) return null;
+  const [first] = unlockTasksFor(trader, deps, configured);
+  if (!first || hasCompletedUnlockTask(trader, deps)) return null;
   return { kind: 'task', task: { id: first.id, name: first.name ?? '' } };
 };
 const unlockChaptersFor = (trader: LockTrader, deps: TraderLockStatusDeps) =>
@@ -74,11 +77,16 @@ const storyGateMet = (gate: StoryGate, deps: TraderLockStatusDeps) =>
     deps.isStoryObjectiveComplete?.(gate.storyChapter.id, gate.objective.id) ||
     deps.isStoryChapterComplete?.(gate.storyChapter.id)
   );
+// Checks every metadata task, not the dashboard-filtered trader counts.
+const hasCompletedTraderTask = (trader: LockTrader, deps: TraderLockStatusDeps) =>
+  (deps.tasks ?? []).some((task) => task.trader?.id === trader.id && deps.isTaskComplete(task.id));
+const hasTraderStanding = (trader: LockTrader, deps: TraderLockStatusDeps) =>
+  (deps.getTraderLevel?.(trader.id) ?? 1) > 1 || (deps.getTraderReputation?.(trader.id) ?? 0) > 0;
 /** Progress recorded before story gates existed still proves the trader is open. */
 const hasTraderProgress = (trader: LockTrader, deps: TraderLockStatusDeps) =>
-  (trader.completedTasks ?? 0) > 0 ||
-  (deps.getTraderLevel?.(trader.id) ?? 1) > 1 ||
-  (deps.getTraderReputation?.(trader.id) ?? 0) > 0;
+  hasCompletedTraderTask(trader, deps) ||
+  hasCompletedUnlockTask(trader, deps) ||
+  hasTraderStanding(trader, deps);
 const storyRequirement = (
   trader: LockTrader,
   deps: TraderLockStatusDeps

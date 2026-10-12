@@ -1,14 +1,15 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import DashboardProgressSummary from '@/features/dashboard/DashboardProgressSummary.vue';
-const state = vi.hoisted(() => ({ filtersActive: false }));
+const filtersActive = ref(false);
+const completed = ref(25);
 vi.mock('@/composables/useDashboardFilters', () => ({
-  useDashboardFilters: () => ({ hasDashboardFiltersActive: computed(() => state.filtersActive) }),
+  useDashboardFilters: () => ({ hasDashboardFiltersActive: computed(() => filtersActive.value) }),
 }));
 mockNuxtImport('useDashboardStats', () => () => ({
-  completedTasks: ref(25),
+  completedTasks: completed,
   totalTasks: ref(100),
   completedKappaTasks: ref(12),
   totalKappaTasks: ref(200),
@@ -37,15 +38,22 @@ describe('DashboardProgressSummary', () => {
     expect(wrapper.get('[data-testid="summary-kappa"]').text()).toBe('12/200');
     expect(wrapper.get('[data-testid="summary-hideout"]').text()).toBe('99%');
   });
+  it('floors percentages without float drift (29/100 is 29%)', () => {
+    completed.value = 29;
+    expect(mountSummary().get('[data-testid="summary-tasks"]').text()).toBe('29%');
+    completed.value = 25;
+  });
   it('points to the profile for the full breakdown', () => {
     const link = mountSummary().get('[data-testid="profile-link"]');
     expect(link.attributes('data-to')).toBe('/profile');
     expect(link.text()).toContain('page.dashboard.progress.view_full_progress');
   });
-  it('flags filtered stats only while dashboard filters are active', () => {
-    state.filtersActive = false;
-    expect(mountSummary().find('[data-testid="dashboard-filter-notice"]').exists()).toBe(false);
-    state.filtersActive = true;
-    expect(mountSummary().find('[data-testid="dashboard-filter-notice"]').exists()).toBe(true);
+  it('flags filtered stats only while dashboard filters are active', async () => {
+    filtersActive.value = false;
+    const wrapper = mountSummary();
+    expect(wrapper.find('[data-testid="dashboard-filter-notice"]').exists()).toBe(false);
+    filtersActive.value = true;
+    await nextTick();
+    expect(wrapper.find('[data-testid="dashboard-filter-notice"]').exists()).toBe(true);
   });
 });

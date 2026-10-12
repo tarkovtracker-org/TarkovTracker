@@ -82,10 +82,17 @@ describe('resolveTraderUnlock', () => {
     });
     it('resolves the ref unlock task by game mode', () => {
       const ref = { id: 'ref-id', normalizedName: 'ref' };
-      expect(resolve(ref)?.kind).toBe('task');
+      const pveTask = { id: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE, name: 'Easy Money - Part 1' };
+      expect(resolve(ref)).toEqual({
+        kind: 'task',
+        task: { id: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP, name: 'Easy Money - Part 1' },
+      });
       expect(
         resolve(ref, { isTaskComplete: (id) => id === TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP })
       ).toBeNull();
+      expect(
+        resolve(ref, { gameMode: GAME_MODES.PVE, tasks: [...createDeps().tasks!, pveTask] })
+      ).toEqual({ kind: 'task', task: pveTask });
     });
     it('reads trader unlocks from task finish rewards (Jaeger via Introduction)', () => {
       expect(resolve(JAEGER)).toEqual({
@@ -99,7 +106,10 @@ describe('resolveTraderUnlock', () => {
         ...introduction,
         finishRewards: { traderUnlock: { id: JAEGER.id, name: '' } },
       };
-      expect(resolve(JAEGER, { tasks: [task] })?.kind).toBe('task');
+      expect(resolve(JAEGER, { tasks: [task] })).toEqual({
+        kind: 'task',
+        task: { id: 'introduction', name: 'Introduction' },
+      });
     });
   });
   describe('storyline unlocks', () => {
@@ -127,12 +137,23 @@ describe('resolveTraderUnlock', () => {
     it('stays unlocked when no task names the unlock objective yet', () => {
       expect(resolve(PEACEKEEPER)).toBeNull();
     });
-    it.each([
-      ['completed tasks', { ...RAGMAN, completedTasks: 1 }, {}],
-      ['loyalty level above 1', RAGMAN, { getTraderLevel: () => 2 }],
-      ['positive reputation', RAGMAN, { getTraderReputation: () => 0.01 }],
-    ])('treats existing %s as proof the trader is open', (_label, trader, overrides) => {
-      expect(resolve(trader, overrides)).toBeNull();
+    it.each<[string, Partial<TraderLockStatusDeps>]>([
+      ['completed tasks', { isTaskComplete: (id) => id === ragmanTask.id }],
+      ['loyalty level above 1', { getTraderLevel: () => 2 }],
+      ['positive reputation', { getTraderReputation: () => 0.01 }],
+    ])('treats existing %s as proof the trader is open', (_label, overrides) => {
+      expect(resolve(RAGMAN, overrides)).toBeNull();
+    });
+    it('treats a completed unlock task as opening a story-gated trader', () => {
+      const unlockTask = {
+        id: 'ragman-unlock',
+        name: 'Unlock Ragman',
+        trader: { id: PRAPOR.id },
+        finishRewards: { traderUnlock: [RAGMAN.id] as unknown as { id: string; name: string } },
+      };
+      const tasks = [...createDeps().tasks!, unlockTask];
+      expect(resolve(RAGMAN, { tasks })?.kind).toBe('task');
+      expect(resolve(RAGMAN, { tasks, isTaskComplete: (id) => id === unlockTask.id })).toBeNull();
     });
   });
 });

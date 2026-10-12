@@ -37,13 +37,12 @@
 </template>
 <script setup lang="ts">
   import { useDashboardFilters } from '@/composables/useDashboardFilters';
-  import { calculatePercentageNum } from '@/utils/formatters';
   const { t } = useI18n({ useScope: 'global' });
   const dashboardStats = useDashboardStats();
   const { hasDashboardFiltersActive } = useDashboardFilters();
-  // Floor so unfinished progress never reads as 100%.
+  // Integer floor (multiply first to avoid 29/100 -> 28.99…) so unfinished never reads 100%.
   const percent = (completed: number, total: number) =>
-    `${Math.floor(calculatePercentageNum(completed, total))}%`;
+    `${total > 0 ? Math.floor((completed * 100) / total) : 0}%`;
   const stats = computed(() => [
     {
       key: 'tasks',
