@@ -310,8 +310,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   so an acknowledged count clear is not resurrected. Pending fields (including explicit clears) survive reconnect reads, incoming live events,
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
-  change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
-  its normalized write makes the subsequent identical RPC upsert a no-op. Startup account metadata
+  change progress timestamps or emit progress-row events. Mode JSON changes write only their
+  normalized rows. Persistent client changes also advance the account clock once; every public-API
+  write retains its original account-clock advancement (#1028), without rewriting legacy JSON.
+  Seasonal-only client syncs leave the account clock alone. Startup account metadata
   uses the account timestamp; each mode independently uses `progress_updated_at`, which changes only
   with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
   progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
