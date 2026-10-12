@@ -59,7 +59,7 @@ const HIDEOUT_SKILL_REQUIREMENT_SKILLS: Record<string, { id: string; name: strin
   },
 };
 type JsonRecord = Record<string, unknown>;
-type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'tasks' | 'traders';
+type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
   data: T;
   translations?: string[];

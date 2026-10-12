@@ -446,7 +446,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',
-      'overlay-v2-pve',
+      'overlay-v3-pve',
       'de',
       expect.any(Object),
       expect.any(Number)
