@@ -673,3 +673,223 @@ describe('notification replays', () => {
     expect(result.matchedTaskIds).toEqual([]);
   });
 });
+describe('multi-account log separation', () => {
+  const questA = '61604635c725987e815b1a46';
+  const questB = '5ac2426c86f774138762edfe';
+  const questC = '657315ddab5a49b71f098853';
+  const accountA = '1111111';
+  const accountB = '2222222';
+  const login = (account: string, timestamp: string, message = 'PrepareSelectedProfileLocally') =>
+    `${timestamp}|1.2.0.0.47888|Info|application|${message} ProfileId:5c0d2e5f1a2b3c4d5e6f7a8b AccountId:${account}`;
+  const sessionA = 'Logs/log_2026.02.20_10-00-00_1.2.0.0.47888';
+  const sessionB = 'Logs/log_2026.02.21_10-00-00_1.2.0.0.47888';
+  const twoAccountLogs = [
+    { name: `${sessionA}/application_000.log`, text: login(accountA, '2026-02-20 10:00:01.000') },
+    {
+      name: `${sessionA}/push-notifications_000.log`,
+      text: completionPayload('evt-a', `${questA} successMessageText`, '2026-02-20 11:00:00.000'),
+    },
+    { name: `${sessionB}/application_000.log`, text: login(accountB, '2026-02-21 10:00:01.000') },
+    {
+      name: `${sessionB}/push-notifications_000.log`,
+      text: completionPayload('evt-b', `${questB} successMessageText`, '2026-02-21 11:00:00.000'),
+    },
+  ];
+  const ids = [questA, questB, questC];
+  it('lists each account with its session count, most recent first', () => {
+    const result = parseEftLogsForQuestImport(twoAccountLogs, ids);
+    expect(result.availableAccounts.map((account) => account.id)).toEqual([accountB, accountA]);
+    expect(result.availableAccounts.map((account) => account.sessionCount)).toEqual([1, 1]);
+    expect(result.hasMultipleAccounts).toBe(true);
+  });
+  it('defaults to the most recently played account and excludes the other', () => {
+    const result = parseEftLogsForQuestImport(twoAccountLogs, ids);
+    expect(result.selectedAccount).toBe(accountB);
+    expect(result.matchedTaskIds).toEqual([questB]);
+  });
+  it('imports only the requested account', () => {
+    const result = parseEftLogsForQuestImport(twoAccountLogs, ids, { account: accountA });
+    expect(result.selectedAccount).toBe(accountA);
+    expect(result.matchedTaskIds).toEqual([questA]);
+  });
+  it('falls back to the default account when the request is unknown', () => {
+    const result = parseEftLogsForQuestImport(twoAccountLogs, ids, { account: '9999999' });
+    expect(result.selectedAccount).toBe(accountB);
+  });
+  it('includes every account only when explicitly requested with null', () => {
+    const result = parseEftLogsForQuestImport(twoAccountLogs, ids, { account: null });
+    expect(result.selectedAccount).toBeNull();
+    expect([...result.matchedTaskIds].sort()).toEqual([questA, questB].sort());
+  });
+  it('accepts legacy SelectProfile lines and output-channel mirrors', () => {
+    const result = parseEftLogsForQuestImport(
+      [
+        {
+          name: `${sessionA}/output_000.log`,
+          text: `2026-02-20 10:00:01.000|1.0.0.0.1|Info|output|application|SelectProfile ProfileId:5c0d2e5f1a2b3c4d5e6f7a8b AccountId:${accountA}`,
+        },
+        twoAccountLogs[1]!,
+      ],
+      ids
+    );
+    expect(result.selectedAccount).toBe(accountA);
+  });
+  it('attributes events by the latest preceding login when accounts switch in one session', () => {
+    const files = [
+      {
+        name: `${sessionA}/application_000.log`,
+        text: [
+          login(accountA, '2026-02-20 10:00:01.000'),
+          login(accountB, '2026-02-20 12:00:00.000'),
+        ].join('\n'),
+      },
+      {
+        name: `${sessionA}/push-notifications_000.log`,
+        text:
+          completionPayload('evt-a', `${questA} successMessageText`, '2026-02-20 11:00:00.000') +
+          completionPayload('evt-b', `${questB} successMessageText`, '2026-02-20 13:00:00.000'),
+      },
+    ];
+    expect(parseEftLogsForQuestImport(files, ids, { account: accountA }).matchedTaskIds).toEqual([
+      questA,
+    ]);
+    expect(parseEftLogsForQuestImport(files, ids, { account: accountB }).matchedTaskIds).toEqual([
+      questB,
+    ]);
+  });
+  it('counts only the selected account events and leaves same-millisecond ties unidentified', () => {
+    const files = [
+      {
+        name: `${sessionA}/application_000.log`,
+        text: [
+          login(accountA, '2026-02-20 10:00:01.000'),
+          login(accountB, '2026-02-20 12:00:00.000'),
+        ].join('\n'),
+      },
+      {
+        name: `${sessionA}/push-notifications_000.log`,
+        text:
+          completionPayload('evt-a', `${questA} successMessageText`, '2026-02-20 11:00:00.000') +
+          completionPayload('evt-b', `${questB} successMessageText`, '2026-02-20 13:00:00.000') +
+          completionPayload('evt-t', `${questC} successMessageText`, '2026-02-20 12:00:00.000'),
+      },
+    ];
+    const a = parseEftLogsForQuestImport(files, ids, { account: accountA });
+    expect(a.completionEventCount).toBe(1);
+    expect(a.matchedTaskIds).toEqual([questA]);
+    const b = parseEftLogsForQuestImport(files, ids, { account: accountB });
+    expect(b.completionEventCount).toBe(1);
+    expect(b.matchedTaskIds).toEqual([questB]);
+  });
+  it('keeps sessions without a recorded login separate when several accounts exist', () => {
+    const files = [
+      ...twoAccountLogs,
+      {
+        name: 'Logs/log_2026.02.22_10-00-00_1.2.0.0.47888/push-notifications_000.log',
+        text: completionPayload('evt-c', `${questC} successMessageText`, '2026-02-22 11:00:00.000'),
+      },
+    ];
+    const result = parseEftLogsForQuestImport(files, ids);
+    expect(result.availableAccounts.map((account) => account.id)).toEqual([
+      accountB,
+      accountA,
+      'unidentified',
+    ]);
+    expect(result.matchedTaskIds).toEqual([questB]);
+    expect(
+      parseEftLogsForQuestImport(files, ids, { account: 'unidentified' }).matchedTaskIds
+    ).toEqual([questC]);
+  });
+  it.each([
+    [12, 'matchedTaskIds'],
+    [10, 'matchedStartedTaskIds'],
+    [11, 'matchedFailedTaskIds'],
+  ] as const)('retains pre-login events of type %s in the unidentified preview', (type, field) => {
+    const files = [
+      ...twoAccountLogs.slice(0, 2),
+      {
+        name: `${sessionB}/application_001.log`,
+        text: login(accountB, '2026-02-21 12:00:00.000'),
+      },
+      {
+        name: `${sessionB}/push-notifications_000.log`,
+        text: completionPayload('evt-before-login', `${questC} successMessageText`).replace(
+          '"type": 12',
+          `"type": ${type}`
+        ),
+      },
+      {
+        name: `${sessionB}/push-notifications_001.log`,
+        text: completionPayload(
+          'evt-after-login',
+          `${questB} successMessageText`,
+          '2026-02-21 13:00:00.000'
+        ),
+      },
+    ];
+    const unidentified = parseEftLogsForQuestImport(files, ids, { account: 'unidentified' });
+    expect(unidentified.selectedAccount).toBe('unidentified');
+    expect(unidentified.availableAccounts).toContainEqual({
+      id: 'unidentified',
+      sessionCount: 1,
+      lastSeen: null,
+    });
+    expect(unidentified.availableVersions).toEqual(['1.2.0.0.47888']);
+    expect(unidentified.versionSessionCounts).toEqual({ '1.2.0.0.47888': 1 });
+    expect(unidentified[field]).toEqual([questC]);
+    expect(unidentified.events).toHaveLength(1);
+    for (const [account, quest] of [
+      [accountA, questA],
+      [accountB, questB],
+    ]) {
+      const preview = parseEftLogsForQuestImport(files, ids, { account });
+      expect(preview.matchedTaskIds).toEqual([quest]);
+      expect(preview.events).toHaveLength(1);
+    }
+  });
+  it('folds sessions without a recorded login into the only identified account', () => {
+    const result = parseEftLogsForQuestImport(
+      [
+        twoAccountLogs[0]!,
+        twoAccountLogs[1]!,
+        {
+          name: 'Logs/log_2026.02.22_10-00-00_1.2.0.0.47888/push-notifications_000.log',
+          text: completionPayload(
+            'evt-c',
+            `${questC} successMessageText`,
+            '2026-02-22 11:00:00.000'
+          ),
+        },
+      ],
+      ids
+    );
+    expect(result.hasMultipleAccounts).toBe(false);
+    expect([...result.matchedTaskIds].sort()).toEqual([questA, questC].sort());
+  });
+  it('does not filter when no log records an account', () => {
+    const result = parseEftLogsForQuestImport([twoAccountLogs[1]!], ids);
+    expect(result.selectedAccount).toBeNull();
+    expect(result.hasMultipleAccounts).toBe(false);
+    expect(result.matchedTaskIds).toEqual([questA]);
+  });
+  it('limits available versions to the selected account', () => {
+    const files = [
+      {
+        name: 'Logs/log_2025.07.17_10-00-00_0.16.8.1.38114/application_000.log',
+        text: login(accountA, '2025-07-17 10:00:01.000'),
+      },
+      {
+        name: 'Logs/log_2025.07.17_10-00-00_0.16.8.1.38114/push-notifications_000.log',
+        text: completionPayload('evt-a', `${questA} successMessageText`, '2025-07-17 11:00:00.000'),
+      },
+      twoAccountLogs[2]!,
+      twoAccountLogs[3]!,
+    ];
+    expect(parseEftLogsForQuestImport(files, ids, { account: accountA }).availableVersions).toEqual(
+      ['0.16.8.1.38114']
+    );
+    expect(parseEftLogsForQuestImport(files, ids, { account: accountB }).availableVersions).toEqual(
+      ['1.2.0.0.47888']
+    );
+  });
+});
