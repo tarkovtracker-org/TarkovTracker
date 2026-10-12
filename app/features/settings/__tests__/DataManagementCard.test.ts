@@ -75,6 +75,7 @@ const {
     parseFiles: vi.fn(async () => undefined),
     reset: vi.fn(),
     setIncludedVersions: vi.fn(),
+    setAccount: vi.fn(),
   },
   eftLogsState: {
     isParsing: {} as Ref<boolean>,
@@ -154,6 +155,7 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseFile: eftLogsFns.parseFile,
     parseFiles: eftLogsFns.parseFiles,
     setIncludedVersions: eftLogsFns.setIncludedVersions,
+    setAccount: eftLogsFns.setAccount,
     confirmImport: eftLogsFns.confirmImport,
     reset: eftLogsFns.reset,
   }),
@@ -225,6 +227,7 @@ describe('DataManagementCard', () => {
     eftLogsFns.parseFiles.mockReset();
     eftLogsFns.reset.mockReset();
     eftLogsFns.setIncludedVersions.mockReset();
+    eftLogsFns.setAccount.mockReset();
     tarkovStoreState.setTarkovUid.mockClear();
     tarkovStoreState.setTarkovUid.mockImplementation((uid: number | null) => {
       tarkovStoreState.tarkovUid = uid;
@@ -300,6 +303,12 @@ describe('DataManagementCard', () => {
               '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
             props: ['disabled', 'label', 'modelValue'],
             emits: ['update:model-value'],
+          },
+          URadioGroup: {
+            template:
+              '<div role="radiogroup" :aria-label="legend"><button v-for="item in items" :key="item.value" type="button" class="account-option" :data-selected="item.value === modelValue" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
+            props: ['disabled', 'items', 'legend', 'modelValue'],
+            emits: ['update:modelValue'],
           },
           USeparator: true,
         },
@@ -879,6 +888,69 @@ describe('DataManagementCard', () => {
         description: 'settings.log_import.cleared_logs_toast_description',
       })
     );
+  });
+  it('shows the multi-account notice and switches the previewed account', async () => {
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = {
+      availableAccounts: [
+        { id: '2222222222', sessionCount: 3, lastSeen: Date.parse('2026-02-21T10:00:00Z') },
+        { id: '1111111111', sessionCount: 2, lastSeen: Date.parse('2026-02-20T10:00:00Z') },
+      ],
+      availableVersions: ['1.2.0.0.47888'],
+      chatMessageCount: 2,
+      completionEventCount: 1,
+      dedupedCompletionEventCount: 1,
+      dedupedStartedEventCount: 0,
+      filesParsed: 1,
+      hasMultipleAccounts: true,
+      includedVersions: ['1.2.0.0.47888'],
+      matchedStartedTaskIds: [],
+      matchedStartedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      matchedTaskIds: ['61604635c725987e815b1a46'],
+      matchedTaskIdsByMode: { pve: [], pvp: ['61604635c725987e815b1a46'], unknown: [] },
+      questIds: ['61604635c725987e815b1a46'],
+      scannedEntries: 20,
+      selectedAccount: '2222222222',
+      sourceFileName: 'Logs.zip',
+      startedEventCount: 0,
+      startedQuestIds: [],
+      unmatchedQuestIds: [],
+      unmatchedStartedQuestIds: [],
+      versionSessionCounts: { '1.2.0.0.47888': 5 },
+    };
+    const wrapper = createWrapper();
+    expect(wrapper.text()).toContain('settings.log_import.multiple_accounts_title');
+    expect(wrapper.find('[role="radiogroup"]').attributes('aria-label')).toBe(
+      'settings.log_import.account_filter_label'
+    );
+    const options = wrapper.findAll('.account-option');
+    expect(options).toHaveLength(2);
+    expect(options.map((o) => o.attributes('data-selected'))).toEqual(['true', 'false']);
+    expect(wrapper.text()).not.toContain('2222222222');
+    expect(wrapper.text()).not.toContain('1111111111');
+    await options[1]!.trigger('click');
+    expect(eftLogsFns.setAccount).toHaveBeenCalledWith('1111111111');
+    wrapper.unmount();
+  });
+  it('hides the account selector when at most one account is available', () => {
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = {
+      availableAccounts: [{ id: '1111111111', sessionCount: 1, lastSeen: null }],
+      hasMultipleAccounts: false,
+      matchedStartedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      matchedTaskIds: [],
+      matchedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      questIds: [],
+      selectedAccount: '1111111111',
+      sourceFileName: 'Logs.zip',
+      startedQuestIds: [],
+      unmatchedQuestIds: [],
+      unmatchedStartedQuestIds: [],
+    };
+    const wrapper = createWrapper();
+    expect(wrapper.find('.account-option').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('settings.log_import.multiple_accounts_title');
+    wrapper.unmount();
   });
   it('hides EFT mode toggle when all matched events are auto-detected', () => {
     eftLogsState.importState.value = 'preview';
