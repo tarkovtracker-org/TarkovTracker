@@ -83,7 +83,7 @@ const makeFetchMock = ({
         },
       ]);
     }
-    if (url.includes('/rest/v1/supporters')) {
+    if (url.includes('/rest/v1/supporter_entitlements')) {
       return jsonResponse(supporter ? [supporter] : []);
     }
     if (url.includes('/rest/v1/rpc/record_api_usage')) {
@@ -452,7 +452,7 @@ describe('daily quota and abuse gate', () => {
       retain: true,
     });
   });
-  it('applies paid-tier limits from the supporters table', async () => {
+  it('applies paid-tier limits from the entitlement view', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({

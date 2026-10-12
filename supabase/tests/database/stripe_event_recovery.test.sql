@@ -1,5 +1,6 @@
 BEGIN;
 SELECT plan(29);
+SELECT set_config('request.headers', '{"x-supporter-credit-version":"1"}', true);
 SELECT ok(EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public' AND tablename='stripe_events'
   AND indexname='stripe_events_resolved_completion_idx' AND indexdef LIKE '%completed_at%'
   AND indexdef LIKE '%completed%terminal%'), 'resolved-only completion index supports retention');
@@ -23,7 +24,7 @@ UPDATE stripe_claims SET second_claim = public.claim_stripe_event('evt_recovery'
 SELECT isnt(second_claim->>'token', first_claim->>'token', 'retry replaces token') FROM stripe_claims;
 SELECT is(public.finish_stripe_event('evt_recovery', (first_claim->>'token')::uuid, 'terminal'), false,
   'old worker cannot finish after replacement') FROM stripe_claims;
-SELECT set_config('request.headers', jsonb_build_object('x-stripe-event-id', 'evt_recovery',
+SELECT set_config('request.headers', jsonb_build_object('x-supporter-credit-version', '1', 'x-stripe-event-id', 'evt_recovery',
   'x-stripe-claim-token', first_claim->>'token')::text, true) FROM stripe_claims;
 SELECT throws_ok($$UPDATE public.supporters SET tier = 'chad'$$, '40001',
   'Stripe event claim is no longer current', 'old worker cannot change entitlements');
@@ -31,7 +32,7 @@ SELECT throws_ok($$SELECT public.disqualify_supporter_customer('cus_stale', NULL
   'Stripe event claim is no longer current', 'nested disqualification is fenced before effects');
 SELECT is((SELECT count(*)::integer FROM private.supporter_chargebacks WHERE customer_id = 'cus_stale'),
   0, 'rejected chargeback leaves no partial denial');
-SELECT set_config('request.headers', jsonb_build_object('x-stripe-event-id', 'evt_recovery',
+SELECT set_config('request.headers', jsonb_build_object('x-supporter-credit-version', '1', 'x-stripe-event-id', 'evt_recovery',
   'x-stripe-claim-token', second_claim->>'token')::text, true) FROM stripe_claims;
 SELECT lives_ok($$UPDATE public.supporters SET tier = 'timmy'$$, 'current worker may update supporter');
 SELECT lives_ok($$SELECT public.disqualify_supporter_customer('cus_current', NULL)$$,
