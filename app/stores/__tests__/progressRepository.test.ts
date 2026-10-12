@@ -153,6 +153,7 @@ describe('inactive progress transaction repository', () => {
     for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
       expect(persisted.state![mode]).not.toHaveProperty('xpOffset');
       expect(persisted.state![mode].level).toBe(hydrated.state![mode].level);
+      expect(persisted.state![mode]).toMatchObject({ futureOpaque: { value: 42 } });
     }
   });
   it('decodes valid records and preserves opaque fields and exact legacy bytes', async () => {

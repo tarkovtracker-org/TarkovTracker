@@ -1229,11 +1229,12 @@ The automatic-level removal migration is schema only. New clients and database w
 existing level until refresh, except through an intentional newer reset epoch. Refresh clients
 before validating manual level editing. See [manual player levels](systems/progress-storage.md#manual-player-levels).
 
-Existing JSON offsets can be removed with `scripts/ops/remove-level-calculation-offsets.sql`.
+Existing JSON offsets can be removed with `scripts/maintenance/remove-level-calculation-offsets.sql`.
 It includes the same SQL that the database regression test runs, strips only the top-level
 `xpOffset`, and covers frozen PvP/PvE mirrors, normalized modes (all seasons), game-profile
 modes, and prestige archives. It preserves every other JSON value, row freshness clocks,
-sharing, and account-retention state. It does not recalculate or guess missing levels.
+metadata write markers, sharing, and account-retention state. It does not recalculate or guess
+missing levels.
 
 This is manual production data maintenance and needs explicit approval after the schema
 migration is merged and applied. Verify project identity and migration history with the
@@ -1253,7 +1254,7 @@ range or a loop in one transaction.
 ```sh
 psql -X --single-transaction --set ON_ERROR_STOP=1 \
   --set from_user_id='<inclusive UUID>' --set to_user_id='<exclusive UUID>' \
-  --file scripts/ops/remove-level-calculation-offsets.sql
+  --file scripts/maintenance/remove-level-calculation-offsets.sql
 ```
 
 The script refuses to run without one transaction or before the preference column has been

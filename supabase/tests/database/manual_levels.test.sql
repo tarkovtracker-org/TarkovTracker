@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(27);
+SELECT plan(28);
 SELECT ok(NOT EXISTS (SELECT 1 FROM information_schema.columns
   WHERE table_schema = 'public' AND table_name = 'user_preferences'
     AND column_name = 'use_automatic_level_calculation'), 'automatic level preference column is absent');
@@ -94,6 +94,8 @@ BEGIN
   IF NEW.user_id IN (SELECT user_id FROM manual_level_users) THEN
     NEW.updated_at := '2024-01-02T03:04:05Z';
     IF TG_TABLE_NAME = 'user_progress' THEN
+      -- A prior write must differ from the current transaction's marker.
+      NEW.metadata_write_id := '0';
       NEW.pvp_data := '{"level":42,"xpOffset":9000,"legacy":{"keep":[null,1,"x"]}}';
       NEW.pve_data := '{"level":21,"xpOffset":"12000","legacy":{"keep":false}}';
     ELSE
@@ -163,12 +165,16 @@ SELECT is((SELECT count(*) FROM manual_level_rows WHERE user_id = '00000000-0000
 SELECT ok((SELECT bool_and(value->'progress_data' ? 'xpOffset') FROM manual_level_rows
   WHERE kind IN ('normalized','profile')), 'fixture injection preserves legacy offsets after current sanitizer');
 
+SELECT ok((SELECT bool_and(metadata_write_id IS DISTINCT FROM pg_catalog.pg_current_xact_id()::text)
+  FROM public.user_progress WHERE user_id IN (SELECT user_id FROM manual_level_users)),
+  'cleanup fixtures retain metadata markers from an earlier transaction');
+
 \set from_user_id '00000000-0000-0000-0000-000000007010'
 \set to_user_id '00000000-0000-0000-0000-000000007011'
 \ir fixtures/remove-level-calculation-offsets.sql.inc
 SELECT results_eq('SELECT value FROM manual_level_rows WHERE kind = ''legacy'' ORDER BY user_id',
   'SELECT value FROM manual_level_expected WHERE kind = ''legacy'' ORDER BY user_id',
-  'legacy cleanup removes only xpOffset and preserves levels and timestamps');
+  'legacy cleanup removes only xpOffset and preserves levels, timestamps and metadata markers');
 SELECT results_eq('SELECT value FROM manual_level_rows WHERE kind = ''normalized'' ORDER BY user_id, value::text',
   'SELECT value FROM manual_level_expected WHERE kind = ''normalized'' ORDER BY user_id, value::text',
   'normalized cleanup preserves historical Seasonal, clocks, visibility and exact remaining JSON');

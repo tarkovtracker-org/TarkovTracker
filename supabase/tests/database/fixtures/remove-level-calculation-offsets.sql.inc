@@ -54,12 +54,13 @@ $$;
 -- Existing activity triggers honor this owner-only maintenance convention.
 SET LOCAL tarkovtracker.mode_progress_backfill = 'on';
 -- Run last among BEFORE triggers: strip exactly the retired field, preserving every
--- other JSON value and both freshness clocks, even after the usual sanitizer runs.
+-- other JSON value, freshness clocks, and write marker after the usual triggers run.
 CREATE FUNCTION pg_temp.preserve_level_cleanup_state() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   NEW.updated_at := OLD.updated_at;
   IF TG_TABLE_NAME = 'user_progress' THEN
+    NEW.metadata_write_id := OLD.metadata_write_id;
     NEW.pvp_data := OLD.pvp_data - 'xpOffset';
     NEW.pve_data := OLD.pve_data - 'xpOffset';
   ELSE

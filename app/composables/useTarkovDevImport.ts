@@ -23,7 +23,8 @@ export type ImportErrorCode =
   | 'verification_failed'
   | 'fetch_failed'
   | 'tarkov_uid_conflict'
-  | 'save_failed';
+  | 'save_failed'
+  | 'level_thresholds_unavailable';
 export interface UseTarkovDevImportReturn {
   isImporting: Ref<boolean>;
   importState: Ref<ImportState>;
@@ -300,15 +301,27 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     recordUrlImportCooldown(data.tarkovUid);
     importState.value = 'success';
   }
+  async function fetchLevelThresholds(): Promise<void> {
+    try {
+      await metadataStore.fetchBootstrapData();
+    } catch (error) {
+      logger.error('[TarkovDevImport] Failed to load player level thresholds:', error);
+    }
+  }
   async function runPreparedImport(
     data: TarkovDevImportResult,
     isCurrent: () => boolean,
     editionOverride?: number | null
   ): Promise<void> {
-    if (metadataStore.playerLevels.length === 0) await metadataStore.fetchBootstrapData();
+    if (metadataStore.playerLevels.length === 0) await fetchLevelThresholds();
     if (!isCurrent()) return;
     if (metadataStore.playerLevels.length === 0) {
-      throw new Error('Player level thresholds are unavailable');
+      setCodedError(
+        'Player level thresholds are unavailable',
+        'level_thresholds_unavailable',
+        null
+      );
+      return;
     }
     await runImport(data, isCurrent, editionOverride);
   }
@@ -327,10 +340,12 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     editionOverride?: number | null
   ): Promise<void> {
     const originalMode = tarkovStore.getCurrentGameMode();
-    if (targetMode === originalMode) return runPreparedImport(data, isCurrent, editionOverride);
+    const isTargetCurrent = () => isCurrent() && tarkovStore.getCurrentGameMode() === targetMode;
+    if (targetMode === originalMode)
+      return runPreparedImport(data, isTargetCurrent, editionOverride);
     try {
       await tarkovStore.switchGameMode(targetMode);
-      await runPreparedImport(data, isCurrent, editionOverride);
+      await runPreparedImport(data, isTargetCurrent, editionOverride);
     } finally {
       if (ownsSession()) await restoreGameMode(originalMode);
     }

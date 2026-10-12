@@ -2408,6 +2408,7 @@
         "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "This Tarkov profile is already linked to another TarkovTracker account, so it was not linked here. The imported progress was saved. Unlink it from the other account, then import again.",
         "save_failed": "The profile was imported on this device, but it could not be saved to your account yet. Check your connection; the import stays on this device until it syncs."
       }

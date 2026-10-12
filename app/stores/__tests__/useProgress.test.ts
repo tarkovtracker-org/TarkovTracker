@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
-import { nextTick, ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
 type TraderProgress = Record<string, { level?: number; reputation?: number }>;
 const createProgressData = (
@@ -108,7 +108,7 @@ describe('useProgressStore', () => {
   it.each(['pvp', 'pve', 'seasonal'] as const)(
     'uses the saved %s level despite stale automatic preferences and quest XP changes',
     async (mode) => {
-      const selfState = createStoreState({ currentGameMode: mode });
+      const selfState = reactive(createStoreState({ currentGameMode: mode }));
       Object.assign(selfState[mode], {
         level: 37,
         prestigeLevel: 3,
