@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
+import { literal } from './source-literal.mjs';
 const executable = process.env.W10_CHROMIUM;
 if (!executable) throw new Error('Set W10_CHROMIUM to a local Chromium executable');
 const rounds = Number(process.env.W10_ROUNDS ?? 50);
@@ -143,15 +144,17 @@ try {
     sessions.push(sessionId);
     await evaluate(
       sessionId,
-      `window.actor=${JSON.stringify(actor)}; performance.mark('w10-actor-'+actor); window.seen=new Map(); addEventListener('storage',e=>seen.set(e.key,e.newValue)); true`
+      `window.actor=${literal(actor)}; performance.mark('w10-actor-'+actor); window.seen=new Map(); addEventListener('storage',e=>seen.set(e.key,e.newValue)); true`
     );
     await evaluate(
       sessionId,
       `new Promise((resolve,reject)=>{const open=indexedDB.open('w10-native-probe',1);open.onupgradeneeded=()=>open.result.createObjectStore('records');open.onerror=()=>reject(open.error);open.onsuccess=()=>{window.db=open.result;resolve(true)}})`
     );
   }
-  const initial = JSON.stringify({ pvp: 20, pve: 42, seasonal: 33, clock: 100 });
-  const updated = JSON.stringify({ pvp: 20, pve: 55, seasonal: 33, clock: 500 });
+  const initialState = { pvp: 20, pve: 42, seasonal: 33, clock: 100 };
+  const updatedState = { pvp: 20, pve: 55, seasonal: 33, clock: 500 };
+  const initial = JSON.stringify(initialState);
+  const updated = JSON.stringify(updatedState);
   for (const order of [
     [0, 1],
     [1, 0],
@@ -161,21 +164,18 @@ try {
       const key = `w10-${order.join('')}-${round}`;
       const lock = `${key}:mutation`;
       // Baseline equality is proved explicitly before contention, never by a delay.
-      await evaluate(
-        writer,
-        `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(initial)}); true`
-      );
+      await evaluate(writer, `localStorage.setItem(${literal(key)},${literal(initial)}); true`);
       await evaluate(
         resetter,
-        `new Promise(resolve=>{const key=${JSON.stringify(key)}, expected=${JSON.stringify(initial)}; if(localStorage.getItem(key)===expected)return resolve(true); const handler=e=>{if(e.key===key&&e.newValue===expected){removeEventListener('storage',handler);resolve(true)}};addEventListener('storage',handler)})`
+        `new Promise(resolve=>{const key=${literal(key)}, expected=${literal(initial)}; if(localStorage.getItem(key)===expected)return resolve(true); const handler=e=>{if(e.key===key&&e.newValue===expected){removeEventListener('storage',handler);resolve(true)}};addEventListener('storage',handler)})`
       );
       await evaluate(
         writer,
-        `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${JSON.stringify(lock)},()=>{resolve(true);return new Promise(release=>window.release=()=>{localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(updated)});release()})})}); held`
+        `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${literal(lock)},()=>{resolve(true);return new Promise(release=>window.release=()=>{localStorage.setItem(${literal(key)},${literal(updated)});release()})})}); held`
       );
       await evaluate(
         resetter,
-        `window.reset=navigator.locks.request(${JSON.stringify(lock)},()=>{const raw=localStorage.getItem(${JSON.stringify(key)});const state=JSON.parse(raw);state.pvp=1;localStorage.setItem(${JSON.stringify(key)},JSON.stringify(state));return {raw,state}}); true`
+        `window.reset=navigator.locks.request(${literal(lock)},()=>{const raw=localStorage.getItem(${literal(key)});const state=JSON.parse(raw);state.pvp=1;localStorage.setItem(${literal(key)},JSON.stringify(state));return {raw,state}}); true`
       );
       const contention = await evaluate(writer, 'navigator.locks.query()');
       assert.equal(contention.held.filter((item) => item.name === lock).length, 1);
@@ -199,7 +199,7 @@ try {
         );
         recorded.freshRendererRead = await evaluate(
           sessionId,
-          `localStorage.getItem(${JSON.stringify(key)})`
+          `localStorage.getItem(${literal(key)})`
         );
         await call('Target.closeTarget', { targetId });
       }
@@ -213,26 +213,20 @@ try {
     const [writer, resetter] = order.map((index) => sessions[index]);
     const key = `barrier-${order.join('')}`;
     const lock = `${key}:mutation`;
+    await evaluate(writer, `localStorage.setItem(${literal(key)},${literal(initial)});true`);
+    await evaluate(
+      resetter,
+      `window.eventBarrier=new Promise(resolve=>{const handler=e=>{if(e.key===${literal(key)}&&e.newValue===${literal(updated)}){removeEventListener('storage',handler);resolve({eventValue:e.newValue,nativeRead:localStorage.getItem(e.key)})}};addEventListener('storage',handler)});true`
+    );
     await evaluate(
       writer,
-      `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(initial)});true`
+      `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${literal(lock)},()=>{resolve(true);return new Promise(release=>window.release=release)})});held`
     );
     await evaluate(
       resetter,
-      `window.eventBarrier=new Promise(resolve=>{const handler=e=>{if(e.key===${JSON.stringify(key)}&&e.newValue===${JSON.stringify(updated)}){removeEventListener('storage',handler);resolve({eventValue:e.newValue,nativeRead:localStorage.getItem(e.key)})}};addEventListener('storage',handler)});true`
+      `window.reset=navigator.locks.request(${literal(lock)},()=>{const state=JSON.parse(localStorage.getItem(${literal(key)}));state.pvp=1;localStorage.setItem(${literal(key)},JSON.stringify(state));return state});true`
     );
-    await evaluate(
-      writer,
-      `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${JSON.stringify(lock)},()=>{resolve(true);return new Promise(release=>window.release=release)})});held`
-    );
-    await evaluate(
-      resetter,
-      `window.reset=navigator.locks.request(${JSON.stringify(lock)},()=>{const state=JSON.parse(localStorage.getItem(${JSON.stringify(key)}));state.pvp=1;localStorage.setItem(${JSON.stringify(key)},JSON.stringify(state));return state});true`
-    );
-    await evaluate(
-      writer,
-      `localStorage.setItem(${JSON.stringify(key)},${JSON.stringify(updated)});true`
-    );
+    await evaluate(writer, `localStorage.setItem(${literal(key)},${literal(updated)});true`);
     const barrier = await evaluate(resetter, 'eventBarrier');
     const contention = await evaluate(writer, 'navigator.locks.query()');
     assert.equal(contention.held.filter((item) => item.name === lock).length, 1);
@@ -254,16 +248,16 @@ try {
       if (!firstSave)
         await evaluate(
           writer,
-          `new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put(${initial},${JSON.stringify(key)});tx.oncomplete=()=>resolve(true);tx.onabort=()=>reject(tx.error)})`
+          `new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put(${literal(initialState)},${literal(key)});tx.oncomplete=()=>resolve(true);tx.onabort=()=>reject(tx.error)})`
         );
       const lock = `${key}:mutation`;
       await evaluate(
         writer,
-        `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${JSON.stringify(lock)},()=>{resolve(true);return new Promise(release=>window.release=()=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put(${updated},${JSON.stringify(key)});window.commit=new Promise((done,reject)=>{tx.oncomplete=()=>done(true);tx.onabort=()=>reject(tx.error)});release()})})});held`
+        `window.held=new Promise(resolve=>{window.holder=navigator.locks.request(${literal(lock)},()=>{resolve(true);return new Promise(release=>window.release=()=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put(${literal(updatedState)},${literal(key)});window.commit=new Promise((done,reject)=>{tx.oncomplete=()=>done(true);tx.onabort=()=>reject(tx.error)});release()})})});held`
       );
       await evaluate(
         reader,
-        `window.control=navigator.locks.request(${JSON.stringify(lock)},()=>new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite');const store=tx.objectStore('records');const read=store.get(${JSON.stringify(key)});let before,after,saved=false;read.onsuccess=()=>{before=read.result;after={...before,pvp:1};store.put(after,${JSON.stringify(key)})};tx.oncomplete=()=>{saved=true;resolve({before,after,saved})};tx.onabort=()=>reject(tx.error)}));true`
+        `window.control=navigator.locks.request(${literal(lock)},()=>new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite');const store=tx.objectStore('records');const read=store.get(${literal(key)});let before,after,saved=false;read.onsuccess=()=>{before=read.result;after={...before,pvp:1};store.put(after,${literal(key)})};tx.oncomplete=()=>{saved=true;resolve({before,after,saved})};tx.onabort=()=>reject(tx.error)}));true`
       );
       const contention = await evaluate(writer, 'navigator.locks.query()');
       assert.equal(contention.pending.filter((item) => item.name === lock).length, 1);
@@ -275,11 +269,11 @@ try {
       receipt.indexedDB.push({ order, firstSave, ...result });
       const aborted = await evaluate(
         reader,
-        `new Promise(resolve=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put({pve:999},${JSON.stringify(key)});tx.oncomplete=()=>resolve({saved:true});tx.onabort=()=>resolve({saved:false});tx.abort()})`
+        `new Promise(resolve=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put({pve:999},${literal(key)});tx.oncomplete=()=>resolve({saved:true});tx.onabort=()=>resolve({saved:false});tx.abort()})`
       );
       const retained = await evaluate(
         writer,
-        `new Promise(resolve=>{const read=db.transaction('records').objectStore('records').get(${JSON.stringify(key)});read.onsuccess=()=>resolve(read.result)})`
+        `new Promise(resolve=>{const read=db.transaction('records').objectStore('records').get(${literal(key)});read.onsuccess=()=>resolve(read.result)})`
       );
       assert.equal(aborted.saved, false);
       assert.equal(retained.pve, 55);
@@ -324,16 +318,16 @@ try {
     for (const session of [writer, reader]) {
       await evaluate(
         session,
-        `(async()=>{window.repo=await import('/repository.js').then(m=>m.openProgressRepository(indexedDB,${JSON.stringify(name)}));window.token=await repo.activateOwner(null);return true})()`
+        `(async()=>{window.repo=await import('/repository.js').then(m=>m.openProgressRepository(indexedDB,${literal(name)}));window.token=await repo.activateOwner(null);return true})()`
       );
     }
     await evaluate(
       writer,
-      `(async()=>{window.draft=${JSON.stringify(fixture)};draft.pve.level=55;await repo.commit({token,expectedRevision:0,kind:'edit',state:draft});return true})()`
+      `(async()=>{window.draft=${literal(fixture)};draft.pve.level=55;await repo.commit({token,expectedRevision:0,kind:'edit',state:draft});return true})()`
     );
     const rejected = await evaluate(
       reader,
-      `repo.commit({token,expectedRevision:0,kind:'edit',state:${JSON.stringify(fixture)}}).then(()=>({saved:true}),e=>({saved:false,reason:e.reason}))`
+      `repo.commit({token,expectedRevision:0,kind:'edit',state:${literal(fixture)}}).then(()=>({saved:true}),e=>({saved:false,reason:e.reason}))`
     );
     assert.deepEqual(rejected, { saved: false, reason: 'revision' });
     const reset = await evaluate(
@@ -359,13 +353,13 @@ try {
     assert.equal(afterAbort.state.pve.level, 55);
     const removal = await evaluate(
       reader,
-      `(async()=>{await repo.remove(token,2);repo.close();window.repo=await import('/repository.js').then(m=>m.openProgressRepository(indexedDB,${JSON.stringify(name)}));return await repo.read(token)})()`
+      `(async()=>{await repo.remove(token,2);repo.close();window.repo=await import('/repository.js').then(m=>m.openProgressRepository(indexedDB,${literal(name)}));return await repo.read(token)})()`
     );
     assert.equal(removal.deleted, true);
     assert.equal(removal.state, null);
     const reimport = await evaluate(
       reader,
-      `repo.commit({token,expectedRevision:3,kind:'import',legacyRaw:'retained legacy bytes',state:${JSON.stringify(fixture)}}).then(()=>({saved:true}),e=>({saved:false,reason:e.reason}))`
+      `repo.commit({token,expectedRevision:3,kind:'import',legacyRaw:'retained legacy bytes',state:${literal(fixture)}}).then(()=>({saved:true}),e=>({saved:false,reason:e.reason}))`
     );
     assert.deepEqual(reimport, { saved: false, reason: 'deleted' });
     receipt.repository.push({
