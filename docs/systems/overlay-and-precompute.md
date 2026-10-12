@@ -75,7 +75,8 @@ sequenceDiagram
   five-second timeout covers both response headers and body parsing.
 - Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
   freshness is bounded by the overlay module's one-hour cache and browser cache TTL rather than the
-  hideout edge TTL. Other
+  hideout edge TTL. Seasonal editions also apply effect patches after reading their validated,
+  localized upstream season metadata cache. Other
   overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
@@ -100,13 +101,30 @@ precompute refuses to publish payloads with unconsumed sections.
 
 Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
 An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
-by mode and language (`json-v3` and `overlay-v2`), and stale responses cannot replace another scope.
+by mode and language (`json-v3` and `overlay-v3`), and stale responses cannot replace another scope.
 The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v3`, and IndexedDB
 schema 8 clears incompatible browser payloads. The combined progression/overlay release skips the
 standalone progression deployment: v3 always uses envelope format 2 with overlay provenance.
 The superseded progression-only writer must never publish to these keys; rollback uses v2.
 Story references must name own chapter entries, never inherited object properties. Seasonal perk
-exclusion lists may be omitted; when present, every entry must be a string.
+overlay exclusion lists may be omitted; when present, every entry must be a string.
+
+Seasonal perks use the localized `/pvp-season/season` JSON envelope. Its `perks` groups supply the
+type; each record supplies the name, description, points, and `exclusiveToPerks` IDs (adapted to
+`mutuallyExclusiveSeasonalPerkIds`). Upstream owns catalog membership and metadata. The effects-only
+overlay compatibility is validated before metadata enters the cache, then effects augment existing
+IDs after the cache read; the overlay cannot overwrite metadata or introduce a perk. Upstream perks
+without an effect patch keep an empty effects list. Duplicate or
+missing upstream IDs, invalid groups/metadata/exclusions, unresolved translation keys, and unknown
+overlay IDs fail closed. Upstream transport/schema failures use the existing edge-cache stale
+refresh path; an incompatible refresh also preserves last-good metadata. A cold schema failure
+returns `502`, while incompatible overlay IDs return `503`, including on cache hits. Failed editions
+responses override any metadata cache policy with `Cache-Control: no-store`; successful responses
+use `no-cache` so the internal TTL cannot hide overlay changes. Metadata keys include the overlay
+SHA to fetch current upstream data when the overlay changes. Declared season translation paths and
+keys must resolve through the requested-language/English dictionaries; unresolved keys fail before
+adaptation regardless of their spelling. The browser
+editions cache advances to `overlay-v3` so earlier effects-only catalogs are not reused.
 
 Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`
 blocks the opposing objective; chapter-level `mutuallyExclusiveQuestPairs` constrains only whole

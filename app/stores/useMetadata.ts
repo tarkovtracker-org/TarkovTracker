@@ -133,7 +133,7 @@ const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v5';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
 const PRESTIGE_CACHE_VERSION = 'json-v3';
-const EDITIONS_CACHE_VERSION = 'overlay-v2';
+const EDITIONS_CACHE_VERSION = 'overlay-v3';
 const settledEditionScope = (requested: string, current: string) =>
   requested === current ? requested : '';
 /**

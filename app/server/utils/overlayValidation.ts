@@ -81,6 +81,8 @@ const validPerk = (perk: Record<string, unknown>): boolean =>
   (perk.mutuallyExclusiveSeasonalPerkIds === undefined ||
     stringList(perk.mutuallyExclusiveSeasonalPerkIds)) &&
   perk.effects.every(validEffect);
+export const validSeasonalPerkPatch = (perk: unknown): boolean =>
+  isPlainObject(perk) && validPerk(perk);
 const validTaskReference = (value: unknown): boolean =>
   isPlainObject(value) && typeof value.id === 'string';
 const validCraftUnlock = (unlock: unknown): boolean =>
