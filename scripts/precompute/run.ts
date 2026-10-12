@@ -11,8 +11,9 @@
  *   CLOUDFLARE_ACCOUNT_ID       - account that owns the namespace
  *   TARKOV_DATA_KV_NAMESPACE_ID - id of the TARKOV_DATA namespace
  */
-import { parseArgs } from 'node:util';
 import { writeFile } from 'node:fs/promises';
+import { parseArgs } from 'node:util';
+import { runImportPrecompute } from './import-snapshots';
 import { createKvRestWriter } from './kv';
 import { runPrecompute, validatePrecomputeFilter } from './precompute';
 function fail(message: string): never {
@@ -43,11 +44,16 @@ const kv = createKvRestWriter({
 });
 try {
   const result = await runPrecompute(kv, filter);
+  const imports = await runImportPrecompute(
+    kv,
+    filter,
+    process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256
+  );
   try {
     await writeFile(
       'precompute-manifest.json',
       JSON.stringify(
-        { completedAt: Date.now(), entries: result.manifest, failures: result.failures },
+        { completedAt: Date.now(), entries: result.manifest, failures: result.failures, imports },
         null,
         2
       )
@@ -62,6 +68,7 @@ try {
         failed: result.failures.length,
         failures: result.failures,
         succeeded: result.successes.length,
+        importSnapshots: imports,
       },
       null,
       2
@@ -69,7 +76,7 @@ try {
   );
   // Non-zero exit surfaces partial failures in the Actions UI; existing KV
   // entries (7-day TTL) keep serving until the next successful run.
-  if (result.failures.length > 0) process.exit(1);
+  if (result.failures.length > 0 || imports.failures.length > 0) process.exit(1);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 }

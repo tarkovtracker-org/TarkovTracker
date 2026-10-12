@@ -116,7 +116,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "pnpm --filter api-gateway run test",
-    "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts",
+    "test:deno": "deno test --config supabase/functions/deno.json --frozen supabase/functions/_shared/*.deno.test.ts supabase/functions/admin-cache-purge/cache-targets.deno.test.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
     "validate:changes": "node scripts/ci/validate-changes.mjs",
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",

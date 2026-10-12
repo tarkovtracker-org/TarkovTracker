@@ -49,6 +49,7 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
+import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
@@ -128,7 +129,6 @@ const ENGLISH_LANGUAGE_CODE = 'en';
 const TASKS_CORE_CACHE_VERSION = 'json-v3';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 const ITEMS_CACHE_VERSION = 'json-v2';
-const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v5';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;

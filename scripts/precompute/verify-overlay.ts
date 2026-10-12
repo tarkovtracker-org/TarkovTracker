@@ -1,5 +1,6 @@
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
+import { isTaskImportCatalog } from '@/utils/taskImportCatalog';
 // 12h schedule plus a 2h operational allowance; browser retention is separate.
 export const OVERLAY_PROPAGATION_WINDOW_MS = 14 * 60 * 60 * 1000;
 type Identity = { version?: string; sha256?: string };
@@ -46,8 +47,12 @@ const manifestIdentity = (
   const matches = entries.filter((entry) => entry.lang === lang && entry.gameMode === gameMode);
   return identity(matches.length === 1 ? matches[0]!.overlay : undefined);
 };
-const completeProvenance = (identities: Identity[], source: string | null | undefined, age: number): boolean =>
-  verifiableSource(source, age) && identities.every(meta => meta.version && meta.sha256);
+const completeProvenance = (
+  identities: Identity[],
+  source: string | null | undefined,
+  age: number
+): boolean =>
+  verifiableSource(source, age) && identities.every((meta) => meta.version && meta.sha256);
 const rowStatus = (
   published: Identity,
   precomputed: Identity,
@@ -92,4 +97,30 @@ export function compareOverlayFleet(
       };
     })
   );
+}
+export type ImportCatalogComparison = {
+  gameMode: string;
+  taskCount: number;
+  sha256?: string;
+  status: 'current' | 'mismatch' | 'unverified';
+};
+const identified = (meta: Identity): boolean => Boolean(meta.version && meta.sha256);
+/** Release verification is stricter than runtime retention of a whole last-good import snapshot. */
+export function compareImportCatalog(
+  gameMode: string,
+  published: unknown,
+  payload: unknown
+): ImportCatalogComparison {
+  const expected = identity(published);
+  if (!identified(expected) || !isTaskImportCatalog(payload, gameMode))
+    return { gameMode, taskCount: 0, status: 'unverified' };
+  const matching = (['version', 'sha256'] as const).every(
+    (key) => payload.dataOverlay[key] === expected[key]
+  );
+  return {
+    gameMode,
+    taskCount: payload.data.tasks.length,
+    sha256: payload.dataOverlay.sha256,
+    status: matching ? 'current' : 'mismatch',
+  };
 }

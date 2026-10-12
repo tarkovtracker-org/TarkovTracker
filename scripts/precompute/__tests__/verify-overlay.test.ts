@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import {
+  compareImportCatalog,
   compareOverlayFleet,
   OVERLAY_PROPAGATION_WINDOW_MS,
 } from '@@/scripts/precompute/verify-overlay';
+import { describe, expect, it } from 'vitest';
+import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 const now = Date.parse('2026-09-07T12:00:00Z');
 const published = { version: '1', sha256: 'published', generated: new Date(now).toISOString() };
 const entries = API_SUPPORTED_LANGUAGES.flatMap((lang) =>
@@ -83,5 +84,33 @@ describe('overlay fleet verification', () => {
         (row) => row.status === 'propagating'
       )
     ).toBe(true);
+  });
+});
+describe('whole import snapshot release verification', () => {
+  const published = { version: 'v1', sha256: 'sha1' };
+  const snapshot = (gameMode: string) => ({
+    data: { tasks: [{ id: 'task', objectives: [], failConditions: [] }] },
+    dataOverlay: published,
+    catalog: { lang: 'en', gameMode },
+  });
+  it.each(['regular', 'pve', 'pvp-season'])(
+    'checks the complete %s source against the release',
+    (mode) => {
+      expect(compareImportCatalog(mode, published, snapshot(mode))).toMatchObject({
+        status: 'current',
+        taskCount: 1,
+      });
+      expect(
+        compareImportCatalog(mode, { version: 'v2', sha256: 'sha2' }, snapshot(mode))
+      ).toMatchObject({ status: 'mismatch' });
+    }
+  );
+  it('cannot certify missing, malformed or wrong-scope imports', () => {
+    expect(compareImportCatalog('regular', published, undefined).status).toBe('unverified');
+    expect(compareImportCatalog('pve', published, snapshot('regular')).status).toBe('unverified');
+    expect(
+      compareImportCatalog('regular', published, { ...snapshot('regular'), data: { tasks: [] } })
+        .status
+    ).toBe('unverified');
   });
 });

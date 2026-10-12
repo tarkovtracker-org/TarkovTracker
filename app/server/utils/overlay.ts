@@ -484,7 +484,9 @@ function normalizeTaskAdditions(
     .map((entry) => {
       const factionName = typeof entry.factionName === 'string' ? entry.factionName : 'Any';
       const objectives = normalizeObjectiveList(entry.objectives);
-      const failConditions = normalizeObjectiveList(entry.failConditions);
+      const failConditions = normalizeObjectiveList(
+        entry.failConditions === undefined ? [] : entry.failConditions
+      );
       return { ...entry, factionName, objectives, failConditions };
     });
 }
