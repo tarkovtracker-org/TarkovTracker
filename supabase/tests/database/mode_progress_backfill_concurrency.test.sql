@@ -8,13 +8,13 @@ SELECT extensions.dblink_connect('backfill_reader', format(
   'host=%s dbname=%s user=postgres password=postgres', inet_server_addr(), current_database()));
 CREATE TEMP TABLE backfill_race_fixture AS SELECT gen_random_uuid() AS user_id;
 SELECT extensions.dblink_exec('backfill_writer', format(
-  'BEGIN; ALTER TABLE public.user_progress DISABLE TRIGGER sync_legacy_user_progress_modes; '
+  'BEGIN; '
   'INSERT INTO auth.users(id,email) VALUES (%L,%L); '
   'UPDATE public.user_progress SET pvp_data=''{"level":20}''::jsonb WHERE user_id=%L; '
   'DELETE FROM public.user_game_mode_progress WHERE user_id=%L; '
   'INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data) '
   'VALUES (%L,''pvp'',0,''{}''); '
-  'ALTER TABLE public.user_progress ENABLE TRIGGER sync_legacy_user_progress_modes; COMMIT',
+  'COMMIT',
   user_id,user_id||'@example.invalid',user_id,user_id,user_id)) FROM backfill_race_fixture;
 CREATE TEMP TABLE backfill_race_pids AS
 SELECT w.pid AS writer,r.pid AS reader

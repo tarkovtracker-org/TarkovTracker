@@ -125,10 +125,10 @@ SELECT results_eq(
   'PvP prestige archives the completed run'
 );
 SELECT is(
-  (SELECT pvp_data FROM public.user_progress
+  (SELECT pvp_data->>'level' FROM public.user_progress
    WHERE user_id = (SELECT user_id FROM prestige_progress_fixture)),
-  (SELECT public.sanitize_user_progress_mode_data(reset_pvp) FROM prestige_progress_fixture),
-  'PvP prestige resets the legacy PvP mirror'
+  NULL,
+  'PvP prestige no longer writes the legacy PvP column'
 );
 SELECT is(
   (
@@ -145,7 +145,7 @@ SELECT is(
   (SELECT pve_data FROM public.user_progress
    WHERE user_id = (SELECT user_id FROM prestige_progress_fixture)),
   (SELECT legacy_pve FROM prestige_preserved_snapshot),
-  'PvP prestige preserves the legacy PvE mirror'
+  'PvP prestige leaves the legacy PvE column unchanged'
 );
 SELECT is(
   (
@@ -243,7 +243,7 @@ SELECT is(
     WHERE progress.user_id = (SELECT user_id FROM prestige_progress_fixture)
   ),
   (SELECT legacy_row FROM prestige_progress_snapshot),
-  'a nested sync failure rolls back legacy progress and metadata'
+  'a nested sync failure rolls back the account row'
 );
 SELECT is(
   (
@@ -296,7 +296,7 @@ SELECT is(
     WHERE progress.user_id = (SELECT user_id FROM prestige_progress_fixture)
   ),
   (SELECT legacy_row FROM prestige_progress_snapshot),
-  'rejected Seasonal prestige leaves legacy progress unchanged'
+  'rejected Seasonal prestige leaves the account row unchanged'
 );
 SELECT is(
   (

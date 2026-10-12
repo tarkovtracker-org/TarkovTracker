@@ -847,6 +847,12 @@ account activity, so retention deadlines and pending inactivity deletions are un
    I/O pressure.
 4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
 
+After `20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` deploys, nothing writes the legacy
+columns, so the gate stays a read-only check and the helper must not run: it would copy frozen
+legacy progress over newer normalized rows. A non-zero gate after that point (for example a
+normalized row saved without a `level`) does not mean missing data, and Phase 4 must not use the
+gate as its precondition; Phase 4 removes the helper and gate with the columns.
+
 ### Manual activity history rollout
 
 Apply `20260910050000_add_manual_activity_history_to_progress` and

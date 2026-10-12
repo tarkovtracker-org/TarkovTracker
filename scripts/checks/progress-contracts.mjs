@@ -2,6 +2,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const legacyOwnerSources = ['package.json', 'src'];
+const hasLegacyContractsSource = (root) =>
+  legacyOwnerSources.some((entry) =>
+    existsSync(resolve(root, 'workers/api-gateway/progress-contracts', entry))
+  );
 export function inspectReleasePins(version, frontend, gateway, lock) {
   const dependency = '@tarkovtracker/progress-contracts';
   const resolution = `resolution: {integrity: ${version.contracts.integrity}, tarball: ${version.contracts.url}}`;
@@ -36,7 +41,7 @@ export function checkProgressContracts(root) {
     readJson(resolve(root, 'workers/api-gateway/package.json')),
     readFileSync(resolve(root, 'pnpm-lock.yaml'), 'utf8')
   );
-  if (existsSync(resolve(root, 'workers/api-gateway/progress-contracts')))
+  if (hasLegacyContractsSource(root))
     violations.push('Progress rules have a second source owner in the frontend checkout.');
   if (violations.length) throw new Error(violations.join('\n'));
   return version;
