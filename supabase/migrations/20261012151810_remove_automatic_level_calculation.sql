@@ -4,6 +4,10 @@ SET lock_timeout = '5s';
 
 ALTER TABLE public.user_preferences DROP COLUMN use_automatic_level_calculation;
 
+-- Keep owner-bounded maintenance indexed for non-default profile progress too.
+CREATE INDEX user_profile_mode_progress_user_id_idx
+  ON public.user_profile_mode_progress (user_id);
+
 CREATE OR REPLACE FUNCTION public.sanitize_user_progress_mode_data(payload jsonb)
 RETURNS jsonb
 LANGUAGE SQL

@@ -27,18 +27,25 @@ LOCK TABLE public.user_progress, public.user_game_mode_progress,
   public.user_profile_mode_progress, public.user_prestige_runs IN ACCESS EXCLUSIVE MODE;
 
 DO $$
+DECLARE
+  lower_id uuid;
+  upper_id uuid;
 BEGIN
+  SELECT lower_bound, upper_bound INTO lower_id, upper_id FROM level_cleanup_bounds;
   IF (SELECT count(*) FROM (
     SELECT user_id FROM public.user_progress
-      WHERE pvp_data ? 'xpOffset' OR pve_data ? 'xpOffset'
+      WHERE user_id >= lower_id AND user_id < upper_id
+        AND (pvp_data ? 'xpOffset' OR pve_data ? 'xpOffset')
     UNION
-    SELECT user_id FROM public.user_game_mode_progress WHERE progress_data ? 'xpOffset'
+    SELECT user_id FROM public.user_game_mode_progress
+      WHERE user_id >= lower_id AND user_id < upper_id AND progress_data ? 'xpOffset'
     UNION
-    SELECT user_id FROM public.user_profile_mode_progress WHERE progress_data ? 'xpOffset'
+    SELECT user_id FROM public.user_profile_mode_progress
+      WHERE user_id >= lower_id AND user_id < upper_id AND progress_data ? 'xpOffset'
     UNION
-    SELECT user_id FROM public.user_prestige_runs WHERE archived_progress ? 'xpOffset'
-  ) affected, level_cleanup_bounds bounds
-    WHERE affected.user_id >= bounds.lower_bound AND affected.user_id < bounds.upper_bound) > 100 THEN
+    SELECT user_id FROM public.user_prestige_runs
+      WHERE user_id >= lower_id AND user_id < upper_id AND archived_progress ? 'xpOffset'
+  ) affected) > 100 THEN
     RAISE EXCEPTION 'Range exceeds 100 affected users; narrow UUID bounds';
   END IF;
 END;
@@ -73,20 +80,20 @@ CREATE TRIGGER zzzz_level_cleanup BEFORE UPDATE ON public.user_profile_mode_prog
 
 UPDATE public.user_progress row SET
   pvp_data = row.pvp_data - 'xpOffset', pve_data = row.pve_data - 'xpOffset'
-FROM level_cleanup_bounds bounds
-WHERE row.user_id >= bounds.lower_bound AND row.user_id < bounds.upper_bound
+WHERE row.user_id >= (SELECT lower_bound FROM level_cleanup_bounds)
+  AND row.user_id < (SELECT upper_bound FROM level_cleanup_bounds)
   AND (row.pvp_data ? 'xpOffset' OR row.pve_data ? 'xpOffset');
 UPDATE public.user_game_mode_progress row SET progress_data = row.progress_data - 'xpOffset'
-FROM level_cleanup_bounds bounds
-WHERE row.user_id >= bounds.lower_bound AND row.user_id < bounds.upper_bound
+WHERE row.user_id >= (SELECT lower_bound FROM level_cleanup_bounds)
+  AND row.user_id < (SELECT upper_bound FROM level_cleanup_bounds)
   AND row.progress_data ? 'xpOffset';
 UPDATE public.user_profile_mode_progress row SET progress_data = row.progress_data - 'xpOffset'
-FROM level_cleanup_bounds bounds
-WHERE row.user_id >= bounds.lower_bound AND row.user_id < bounds.upper_bound
+WHERE row.user_id >= (SELECT lower_bound FROM level_cleanup_bounds)
+  AND row.user_id < (SELECT upper_bound FROM level_cleanup_bounds)
   AND row.progress_data ? 'xpOffset';
 UPDATE public.user_prestige_runs row SET archived_progress = row.archived_progress - 'xpOffset'
-FROM level_cleanup_bounds bounds
-WHERE row.user_id >= bounds.lower_bound AND row.user_id < bounds.upper_bound
+WHERE row.user_id >= (SELECT lower_bound FROM level_cleanup_bounds)
+  AND row.user_id < (SELECT upper_bound FROM level_cleanup_bounds)
   AND row.archived_progress ? 'xpOffset';
 
 DROP TRIGGER zzzz_level_cleanup ON public.user_progress;

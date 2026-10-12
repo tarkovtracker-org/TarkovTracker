@@ -1238,7 +1238,8 @@ sharing, and account-retention state. It does not recalculate or guess missing l
 This is manual production data maintenance and needs explicit approval after the schema
 migration is merged and applied. Verify project identity and migration history with the
 [database migration procedure](#database-migrations), inspect the current trigger set, and
-choose a quiet window. The script creates and drops transaction-scoped maintenance triggers;
+choose a quiet window. The migration adds a user index for game-profile progress so every cleanup query can limit its
+scan to the approved owner range. The script creates and drops transaction-scoped maintenance triggers;
 its DDL briefly holds exclusive table locks. Lock waits are limited to 2 seconds and statements
 to 15 seconds. A failure rolls back the entire range; retry only after investigating it.
 No persistent maintenance trigger/function or new public RPC remains.

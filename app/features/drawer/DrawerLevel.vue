@@ -58,7 +58,7 @@
                   )
                 "
                 @click="startEditingLevel"
-                @keydown.enter="startEditingLevel"
+                @keyup.enter="startEditingLevel"
                 @keydown.space.prevent="startEditingLevel"
               >
                 {{ displayedLevel }}
