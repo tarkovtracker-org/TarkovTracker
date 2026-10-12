@@ -79,8 +79,6 @@ const setup = async (
   dashboardStatsOptions: Parameters<typeof createDashboardStatsMock>[0] = {},
   storeOverrides: {
     playerLevel?: number;
-    derivedLevel?: number;
-    useAutomaticLevel?: boolean;
     showKappaTasks?: boolean;
     showNonSpecialTasks?: boolean;
     showLightkeeperTasks?: boolean;
@@ -91,8 +89,6 @@ const setup = async (
 ) => {
   const {
     playerLevel = 8,
-    derivedLevel = 10,
-    useAutomaticLevel = false,
     showKappaTasks = true,
     showNonSpecialTasks = true,
     showLightkeeperTasks = true,
@@ -106,9 +102,6 @@ const setup = async (
   vi.doMock('@/composables/useDashboardStats', () => ({
     useDashboardStats: createDashboardStatsMock(dashboardStatsOptions),
   }));
-  vi.doMock('@/composables/useXpCalculation', () => ({
-    useXpCalculation: () => ({ derivedLevel: ref(derivedLevel) }),
-  }));
   vi.doMock('@/stores/useTarkov', () => ({
     useTarkovStore: () => ({
       playerLevel: vi.fn(() => playerLevel),
@@ -120,9 +113,6 @@ const setup = async (
   }));
   vi.doMock('@/stores/usePreferences', () => ({
     usePreferencesStore: () => ({
-      get getUseAutomaticLevelCalculation() {
-        return useAutomaticLevel;
-      },
       get getHideNonKappaTasks() {
         return !showKappaTasks;
       },
@@ -396,36 +386,6 @@ describe('dashboard page', () => {
       expect(progressPanel?.style.display ?? '').toBe('');
       await progressToggle.trigger('click');
       expect(progressPanel?.style.display).toBe('none');
-    });
-  });
-  describe('level calculation modes', () => {
-    it('uses manual level when automatic calculation disabled', async () => {
-      const { DashboardPage } = await setup(
-        {},
-        { playerLevel: 15, derivedLevel: 20, useAutomaticLevel: false }
-      );
-      const wrapper = await mountSuspended(DashboardPage, {
-        global: { stubs: defaultGlobalStubs },
-      });
-      expect(wrapper.exists()).toBe(true);
-      // Note: The level display is not directly verifiable at this test layer because
-      // DashboardPage doesn't expose the computed level via a data-testid or prop.
-      // The level is used internally by child components. Full verification would
-      // require integration tests or exposing the level in the DOM.
-    });
-    it('uses derived level when automatic calculation enabled', async () => {
-      const { DashboardPage } = await setup(
-        {},
-        { playerLevel: 15, derivedLevel: 20, useAutomaticLevel: true }
-      );
-      const wrapper = await mountSuspended(DashboardPage, {
-        global: { stubs: defaultGlobalStubs },
-      });
-      expect(wrapper.exists()).toBe(true);
-      // Note: The level display is not directly verifiable at this test layer because
-      // DashboardPage doesn't expose the computed level via a data-testid or prop.
-      // The level is used internally by child components. Full verification would
-      // require integration tests or exposing the level in the DOM.
     });
   });
   describe('trader sorting', () => {

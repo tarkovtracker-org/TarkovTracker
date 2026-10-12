@@ -16,7 +16,6 @@ const createBaseState = (): UserState =>
       level: 1,
       pmcFaction: 'USEC',
       displayName: null,
-      xpOffset: 0,
       taskObjectives: {},
       taskCompletions: {},
       hideoutParts: {},
@@ -31,7 +30,6 @@ const createBaseState = (): UserState =>
       level: 1,
       pmcFaction: 'USEC',
       displayName: null,
-      xpOffset: 0,
       taskObjectives: {},
       taskCompletions: {},
       hideoutParts: {},
@@ -345,5 +343,20 @@ describe('manual activity clearing', () => {
     expect(state.pve.manualActivityEpoch).toBeUndefined();
     actions.clearManualActivityHistory.call(state);
     expect(state.pvp.manualActivityEpoch).toBe(2);
+  });
+});
+describe('legacy XP state migration', () => {
+  it('preserves saved levels and prestige in every mode while dropping retired offsets', () => {
+    const legacy = createBaseState();
+    legacy.seasonal = structuredClone(legacy.pvp);
+    for (const [index, mode] of (['pvp', 'pve', 'seasonal'] as const).entries()) {
+      Object.assign(legacy[mode], { level: 30 + index, prestigeLevel: index, xpOffset: 999999 });
+    }
+    legacy.seasonalSeasonNumber = ACTIVE_SEASON_NUMBER;
+    const migrated = migrateToGameModeStructure(legacy);
+    for (const [index, mode] of (['pvp', 'pve', 'seasonal'] as const).entries()) {
+      expect(migrated[mode]).toMatchObject({ level: 30 + index, prestigeLevel: index });
+      expect(migrated[mode]).not.toHaveProperty('xpOffset');
+    }
   });
 });

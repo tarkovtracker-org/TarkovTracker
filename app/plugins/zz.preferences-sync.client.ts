@@ -188,7 +188,6 @@ const buildPreferencesSyncPayload = (
     show_locked_filter: preferencesState.showLockedFilter,
     show_completed_filter: preferencesState.showCompletedFilter,
     show_failed_filter: preferencesState.showFailedFilter,
-    use_automatic_level_calculation: preferencesState.useAutomaticLevelCalculation,
     needed_items_sort_by: normalizeEnum(
       preferencesState.neededItemsSortBy,
       NEEDED_ITEMS_SORT_FIELDS

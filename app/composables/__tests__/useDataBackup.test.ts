@@ -58,7 +58,6 @@ const tarkovStore = {
       taskCompletions: { task1: { complete: true, timestamp: 1000 } },
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
       level: 5,
     },
     pve: {
@@ -74,7 +73,6 @@ const tarkovStore = {
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
       level: 1,
     },
     seasonal: {
@@ -90,7 +88,6 @@ const tarkovStore = {
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
       level: 1,
     },
     tarkovUid: 987654,
@@ -102,7 +99,6 @@ const tarkovStore = {
     level: 5,
     pmcFaction: 'USEC',
     displayName: 'TestPlayer',
-    xpOffset: 0,
     taskCompletions: { task1: { complete: true, timestamp: 1000 } },
     taskObjectives: {},
     hideoutParts: {},
@@ -118,7 +114,6 @@ const tarkovStore = {
     level: 1,
     pmcFaction: 'BEAR',
     displayName: null,
-    xpOffset: 0,
     taskCompletions: {},
     taskObjectives: {},
     hideoutParts: {},
@@ -134,7 +129,6 @@ const tarkovStore = {
     level: 1,
     pmcFaction: 'USEC',
     displayName: null,
-    xpOffset: 0,
     taskCompletions: {},
     taskObjectives: {},
     hideoutParts: {},
@@ -261,7 +255,6 @@ describe('useDataBackup', () => {
         taskCompletions: { task1: { complete: true, timestamp: 1000 } },
         taskObjectives: {},
         traders: {},
-        xpOffset: 0,
         level: 5,
       },
       pve: {
@@ -277,7 +270,6 @@ describe('useDataBackup', () => {
         taskCompletions: {},
         taskObjectives: {},
         traders: {},
-        xpOffset: 0,
         level: 1,
       },
       seasonal: {
@@ -293,7 +285,6 @@ describe('useDataBackup', () => {
         taskCompletions: {},
         taskObjectives: {},
         traders: {},
-        xpOffset: 0,
         level: 1,
       },
       tarkovUid: 987654,
@@ -413,7 +404,6 @@ describe('useDataBackup', () => {
           level: 5,
           pmcFaction: 'USEC',
           displayName: 'ProxyPlayer',
-          xpOffset: 0,
           taskCompletions: { task1: { complete: true, timestamp: 1000 } },
           taskObjectives: {},
           hideoutParts: {},
@@ -903,7 +893,6 @@ describe('useDataBackup', () => {
           taskObjectives: {},
           tarkovUid: 998877,
           traders: {},
-          xpOffset: 0,
         })
       );
       let backupBlob: Blob | null = null;
@@ -1104,7 +1093,6 @@ describe('useDataBackup', () => {
               level: 1,
               pmcFaction: 'INVALID',
               displayName: null,
-              xpOffset: 0,
               taskCompletions: {},
               taskObjectives: {},
               hideoutParts: {},
@@ -1119,7 +1107,6 @@ describe('useDataBackup', () => {
               level: 1,
               pmcFaction: 'USEC',
               displayName: null,
-              xpOffset: 0,
               taskCompletions: {},
               taskObjectives: {},
               hideoutParts: {},
@@ -1149,7 +1136,6 @@ describe('useDataBackup', () => {
           level: 10,
           pmcFaction: 'USEC',
           displayName: 'Player',
-          xpOffset: 100,
           taskCompletions: { task1: { complete: true, timestamp: 1000 } },
           taskObjectives: {},
           hideoutParts: {},
@@ -1164,7 +1150,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'BEAR',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1200,7 +1185,6 @@ describe('useDataBackup', () => {
         taskCompletions: {},
         taskObjectives: {},
         traders: {},
-        xpOffset: 0,
       };
       const backup = {
         _format: 'tarkovtracker-backup',
@@ -1233,7 +1217,6 @@ describe('useDataBackup', () => {
           level: -5,
           pmcFaction: 'USEC',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1248,7 +1231,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'BEAR',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1291,7 +1273,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'USEC',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1308,7 +1289,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'BEAR',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1338,7 +1318,6 @@ describe('useDataBackup', () => {
         level: 10,
         pmcFaction: 'USEC',
         displayName: 'Player',
-        xpOffset: 100,
         taskCompletions: { task1: { complete: true, timestamp: 1000 } },
         taskObjectives: {},
         hideoutParts: {},
@@ -1354,7 +1333,6 @@ describe('useDataBackup', () => {
         level: 5,
         pmcFaction: 'BEAR',
         displayName: 'PvePlayer',
-        xpOffset: 50,
         taskCompletions: { task2: { complete: true, timestamp: 2000 } },
         taskObjectives: {},
         hideoutParts: {},
@@ -1389,6 +1367,29 @@ describe('useDataBackup', () => {
       expect(mockState.pvp.taskAvailability).toEqual({
         task1: { requirements: 'sig', timestamp: 3000 },
       });
+    });
+    it('imports saved mode levels and prestige while dropping stale XP offsets', async () => {
+      const backup = structuredClone(validBackup);
+      Object.assign(backup.pvp, { xpOffset: 999999, prestigeLevel: 3 });
+      Object.assign(backup.pve, { xpOffset: 999999, prestigeLevel: 2 });
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(backup)));
+      await confirmBackupImport({ pvp: true, pve: true });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const state = {
+        currentGameMode: 'pvp',
+        pvp: { level: 1 },
+        pve: { level: 1 },
+        gameEdition: 1,
+        tarkovUid: null,
+      };
+      patchFn(state);
+      expect(state.pvp).toMatchObject({ level: 10, prestigeLevel: 3 });
+      expect(state.pve).toMatchObject({ level: 5, prestigeLevel: 2 });
+      expect(state.pvp).not.toHaveProperty('xpOffset');
+      expect(state.pve).not.toHaveProperty('xpOffset');
     });
     it('patches pvp data only when pvp selected', async () => {
       const { parseBackupFile, confirmBackupImport, importState } = await loadComposable();
@@ -1561,7 +1562,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'USEC',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},
@@ -1576,7 +1576,6 @@ describe('useDataBackup', () => {
           level: 1,
           pmcFaction: 'BEAR',
           displayName: null,
-          xpOffset: 0,
           taskCompletions: {},
           taskObjectives: {},
           hideoutParts: {},

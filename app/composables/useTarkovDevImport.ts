@@ -1,5 +1,4 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
-import { useXpCalculation } from '@/composables/useXpCalculation';
 import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -102,7 +101,6 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   const metadataStore = useMetadataStore();
   const runtimeConfig = useRuntimeConfig();
   const { setTotalSkillLevel } = useSkillCalculation();
-  const { setTotalXP } = useXpCalculation();
   const importState = ref<ImportState>('idle');
   const isImporting = ref(false);
   const previewData = ref<TarkovDevImportResult | null>(null);
@@ -269,7 +267,6 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     tarkovStore.setPMCFaction(data.pmcFaction);
     tarkovStore.setDisplayName(data.displayName);
     tarkovStore.setPrestigeLevel(data.prestigeLevel);
-    setTotalXP(data.totalXP);
     tarkovStore.setLevel(deriveLevel(data.totalXP));
     for (const [skillId, level] of Object.entries(data.skills)) {
       setTotalSkillLevel(skillId, level);
@@ -303,6 +300,18 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     recordUrlImportCooldown(data.tarkovUid);
     importState.value = 'success';
   }
+  async function runPreparedImport(
+    data: TarkovDevImportResult,
+    isCurrent: () => boolean,
+    editionOverride?: number | null
+  ): Promise<void> {
+    if (metadataStore.playerLevels.length === 0) await metadataStore.fetchBootstrapData();
+    if (!isCurrent()) return;
+    if (metadataStore.playerLevels.length === 0) {
+      throw new Error('Player level thresholds are unavailable');
+    }
+    await runImport(data, isCurrent, editionOverride);
+  }
   async function restoreGameMode(mode: GameMode): Promise<void> {
     try {
       await tarkovStore.switchGameMode(mode);
@@ -318,10 +327,10 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     editionOverride?: number | null
   ): Promise<void> {
     const originalMode = tarkovStore.getCurrentGameMode();
-    if (targetMode === originalMode) return runImport(data, isCurrent, editionOverride);
+    if (targetMode === originalMode) return runPreparedImport(data, isCurrent, editionOverride);
     try {
       await tarkovStore.switchGameMode(targetMode);
-      await runImport(data, isCurrent, editionOverride);
+      await runPreparedImport(data, isCurrent, editionOverride);
     } finally {
       if (ownsSession()) await restoreGameMode(originalMode);
     }

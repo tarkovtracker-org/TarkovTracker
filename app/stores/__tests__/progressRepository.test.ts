@@ -121,6 +121,40 @@ describe('inactive progress transaction repository', () => {
     await expect(repository.read(token)).rejects.toBeInstanceOf(ProgressRepositoryDataError);
     expect(await rawRecords()).toEqual(original);
   });
+  it('retires legacy offsets on reads and commits while preserving levels and opaque extensions', async () => {
+    const valid = await repository.commit({
+      token,
+      expectedRevision: 0,
+      kind: 'edit',
+      state: state(),
+    });
+    const original = structuredClone(valid);
+    for (const [index, mode] of (['pvp', 'pve', 'seasonal'] as const).entries()) {
+      Object.assign(original.state![mode], {
+        level: 35 + index,
+        prestigeLevel: index,
+        xpOffset: 'retired malformed value',
+        futureOpaque: { value: 42 },
+      });
+    }
+    await rawRecords({ 'owner:null': original });
+    const hydrated = await repository.read(token);
+    for (const [index, mode] of (['pvp', 'pve', 'seasonal'] as const).entries()) {
+      expect(hydrated.state![mode]).toMatchObject({
+        level: 35 + index,
+        prestigeLevel: index,
+        futureOpaque: { value: 42 },
+      });
+      expect(hydrated.state![mode]).not.toHaveProperty('xpOffset');
+    }
+    expect((await rawRecords())['owner:null']).toEqual(original);
+    await repository.commit({ token, expectedRevision: 1, kind: 'edit', state: original.state! });
+    const persisted = (await rawRecords())['owner:null'] as ProgressRepositorySnapshot;
+    for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
+      expect(persisted.state![mode]).not.toHaveProperty('xpOffset');
+      expect(persisted.state![mode].level).toBe(hydrated.state![mode].level);
+    }
+  });
   it('decodes valid records and preserves opaque fields and exact legacy bytes', async () => {
     const valid = await repository.commit({
       token,

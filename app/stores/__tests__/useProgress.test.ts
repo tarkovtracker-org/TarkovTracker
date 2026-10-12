@@ -10,7 +10,6 @@ const createProgressData = (
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions,
   hideoutParts: {},
@@ -75,7 +74,7 @@ const setupMocks = ({
     usePreferencesStore: () => ({
       teamIsHidden: () => false,
       taskTeamAllHidden: false,
-      getUseAutomaticLevelCalculation: false,
+      getUseAutomaticLevelCalculation: true,
       getTasksRequireTraderLevels: tasksRequireTraderLevels ?? true,
     }),
   }));
@@ -84,7 +83,10 @@ const setupMocks = ({
       tasks,
       traders,
       hideoutStations: [],
-      playerLevels: [],
+      playerLevels: [
+        { level: 1, exp: 0 },
+        { level: 60, exp: 1000 },
+      ],
       editions: [],
     }),
   }));
@@ -103,6 +105,26 @@ const reputationRequirement = (
   compareMethod: '>=' | '<=' = '>='
 ) => ({ id, requirementType: 'reputation' as const, compareMethod, trader, value });
 describe('useProgressStore', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'uses the saved %s level despite stale automatic preferences and quest XP changes',
+    async (mode) => {
+      const selfState = createStoreState({ currentGameMode: mode });
+      Object.assign(selfState[mode], {
+        level: 37,
+        prestigeLevel: 3,
+        xpOffset: 1000000,
+        taskCompletions: { 'task-1': { complete: true } },
+      });
+      setupMocks({ selfState, tasks: [{ id: 'task-1', experience: 1000000 }] });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.getLevel('self')).toBe(37);
+      selfState[mode].taskCompletions = { 'task-1': { complete: false } };
+      await nextTick();
+      expect(store.getLevel('self')).toBe(37);
+      expect(selfState[mode].prestigeLevel).toBe(3);
+    }
+  );
   it('treats boolean teammate completions as completed', async () => {
     setupMocks({
       selfCompletions: { 'task-1': { complete: false, failed: false } },

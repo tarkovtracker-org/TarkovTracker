@@ -114,7 +114,6 @@ type SanitizedProgressData = Partial<{
   taskAvailability: Record<string, { requirements: string; timestamp: number }>;
   taskObjectives: Record<string, SanitizedObjectiveProgress>;
   traders: Record<string, SanitizedTrader>;
-  xpOffset: number;
 }>;
 type SharedProfilePayload = {
   data: SanitizedProgressData | null;
@@ -191,10 +190,6 @@ const sanitizeProgressPayload = (
   }
   if (value.pmcFaction === 'BEAR' || value.pmcFaction === 'USEC') {
     sanitized.pmcFaction = sanitizeFaction(value.pmcFaction);
-  }
-  const xpOffset = toFiniteNumber(value.xpOffset);
-  if (xpOffset !== null) {
-    sanitized.xpOffset = Math.trunc(xpOffset);
   }
   const taskCompletions = sanitizeTaskCompletionMap(value.taskCompletions);
   if (Object.keys(taskCompletions).length > 0) {

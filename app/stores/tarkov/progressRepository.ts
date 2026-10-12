@@ -1,3 +1,4 @@
+import { stripLegacyXpOffset } from '@/utils/progressSanitizers';
 import type { UserState } from '@/stores/progressState';
 import type { UserProgressData, ManualActivityAction, ManualActivityType } from '@/types/progress';
 import type { GameMode } from '@/utils/constants';
@@ -219,7 +220,6 @@ const modeChecks = {
   level: finite,
   pmcFaction: choice({ USEC: true, BEAR: true }),
   displayName: (value: unknown) => requireNullableText(value, 'owner'),
-  xpOffset: finite,
   taskObjectives: map(objective),
   taskCompletions: map(task),
   taskAvailability: optional(
@@ -277,7 +277,13 @@ const validateSnapshotState = (
   validateStateMetadata(state);
   modes.forEach((mode) => validateModeState(state[mode], snapshot.epochs[mode], work));
 };
-/** Decode without sanitation or migration. A rejected original remains untouched in its own key. */
+const stripLegacyStateOffsets = (state: UserState): UserState => ({
+  ...state,
+  pvp: stripLegacyXpOffset(state.pvp),
+  pve: stripLegacyXpOffset(state.pve),
+  seasonal: stripLegacyXpOffset(state.seasonal),
+});
+/** Validate before retiring the legacy XP offset; rejected originals remain untouched. */
 const decodeSnapshot = (
   entry: RecordEntry,
   owner: Owner,
@@ -294,7 +300,9 @@ const decodeSnapshot = (
   requireNullableText(value.legacyRaw, 'owner');
   const snapshot = value as ProgressRepositorySnapshot;
   validateSnapshotState(snapshot, work);
-  return snapshot;
+  return snapshot.state
+    ? { ...snapshot, state: stripLegacyStateOffsets(snapshot.state) }
+    : snapshot;
 };
 /** Validation for portable recovery records; never treats supplied data as an absent IDB key. */
 export const validateProgressRepositorySnapshot = (
@@ -381,7 +389,7 @@ const nextSnapshot = (
   assertRevision(current, input.expectedRevision);
   if (current.deleted) throw new ProgressRepositoryConflict('deleted');
   assertImport(current, input);
-  const state = stateForCommit(current, input);
+  const state = stripLegacyStateOffsets(stateForCommit(current, input));
   const epochs = epochsOf(state);
   assertFiniteEpochs(epochs);
   if (modes.some((mode) => epochs[mode] !== expectedEpoch(current, input, mode)))

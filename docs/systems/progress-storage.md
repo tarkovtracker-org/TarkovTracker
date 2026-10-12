@@ -389,3 +389,25 @@ Unrelated saves and unobserved read errors do not clear their warning.
 Only committed IndexedDB copies survive closing the tab. Bytes overwritten upstream while unable
 to persist or beyond the retention limit cannot be reconstructed; cleanup persists truncation
 warnings when it can commit.
+
+## Manual player levels
+
+Player levels use each mode's saved `level`, including Seasonal history and prestige archives.
+Completing or reversing tasks does not change the level. Users edit it in the drawer;
+a Tarkov.dev profile import converts the imported XP with player-level metadata once and saves
+that level. Imports load missing thresholds before writing progress and fail without changing
+progress if thresholds remain unavailable.
+
+The automatic-level preference, XP offset, calculation plugin, and Experience & Level settings
+are retired. Hydration and backup imports discard legacy fields while retaining saved levels.
+The forward migration drops `user_preferences.use_automatic_level_calculation` and removes
+`xpOffset` from the SQL progress sanitizer; it does not rewrite existing progress rows.
+
+Cached clients that still send `xpOffset` cannot change an existing level within the same reset
+epoch. Their other progress writes remain supported until refresh; a newer reset epoch still
+permits an intentional reset. API level writes discard any inherited offset marker before the
+normal merge, so API updates continue to set levels. The existing missing-column retry in
+preference sync allows cached clients to save other preferences after the column is dropped.
+
+Physical removal of existing JSON offsets is separate bounded maintenance, described in the
+[runbook](../runbook.md#retired-automatic-level-cleanup). Keep historical migrations immutable.

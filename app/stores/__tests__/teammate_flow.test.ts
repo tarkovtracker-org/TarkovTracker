@@ -119,7 +119,12 @@ describe('teammate store hydration and lifetime', () => {
   });
   it('retains hydrated progress when reconnect returns a placeholder or no rows', async () => {
     mocks.eq.mockResolvedValue({
-      data: [{ ...row(25), progress_data: { level: 25, pmcFaction: 'BEAR', xpOffset: 450 } }],
+      data: [
+        {
+          ...row(25),
+          progress_data: { level: 25, pmcFaction: 'BEAR', skillOffsets: { Endurance: 450 } },
+        },
+      ],
       error: null,
     });
     await addMember();
