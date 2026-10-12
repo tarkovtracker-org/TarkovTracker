@@ -14,15 +14,14 @@ compiler watch. The browser continues using Supabase and Nitro directly. UI/stor
 here. A shared rule change belongs in the API repository and reaches the frontend through a
 separate, reviewed dependency-update PR. Keep one implementation; never copy rules into `app/`.
 
-The public API repository owns `@tarkovtracker/progress-contracts`. This checkout and its legacy
-gateway both pin the compiled ESM/types archive from the immutable
+The public API repository owns `@tarkovtracker/progress-contracts`. This checkout pins the compiled ESM/types archive from the immutable
 [v0.1.0 release](https://github.com/tarkovtracker-org/TarkovTracker-API/releases/tag/v0.1.0).
 `workers/contract-tests/api-version.json` records the exact release URL, SHA-512 integrity and
 corresponding API tag/commit. `pnpm-lock.yaml` pins those same bytes. No registry publication or
 cross-repository symlink is involved. Edit source in the owning API repository, never installed
 package files or `dist`.
 
-A dependency update changes both consumer manifests, the lockfile and `api-version.json` together.
+A dependency update changes the frontend manifest, lockfile and `api-version.json` together.
 Run `pnpm run check:progress-contracts`, frontend tests/typecheck and `pnpm run verify:api-parity`.
 The parity command fetches only the recorded API commit into a fresh temporary checkout, uses its
 frozen lockfile, compares every compiled rule export and fixture to the installed release, runs
@@ -35,19 +34,29 @@ matching the API repository's `supabase-surface.json`.
 
 The API source ref/commit can advance separately for an API-only update while the frontend keeps
 its contracts version. That update must pass the same checks; compiled API rule exports still
-have to match the pinned frontend package. Never follow the API's moving branch head implicitly.
+have to match the pinned frontend package. Consumer integration tests never follow the API's moving branch head implicitly.
 
-`workers/api-gateway/` remains the **legacy production deployment source** during preparation.
-Its code, build commands, Worker Builds watch coverage and Pages DO binding remain functional.
-`pnpm run verify:api-standalone` independently installs and tests that gateway against the released
-archive without frontend source. Do not retire this directory or its watch paths until the
-production source cutover is separately approved. Coordinate any urgent legacy API fix with the
-new owner so the two gateway sources do not silently diverge.
+Production source cutover completed on 2026-10-12. The existing `api-gateway` Worker now builds
+from `TarkovTracker-API/main`, root `/`, using `pnpm run deploy` to prepare workspace contracts.
+The legacy Tracker build trigger was disconnected; the configured automatic build source is only
+the API repository. Its protected main branch is the deployment source; consumer tests instead
+fetch the explicit tag/commit. These are distinct: there is no automatic equality check between
+the live Worker SHA and the consumer pin. Before an API rollout, maintainers must review matching
+frontend integration evidence and any needed source-pin update, then verify the actual build SHA
+and active Worker version after deployment. The cutover below verified that mapping explicitly.
+API commit `655b825ddfc863a2bc56f88eea97a5bbb15744ce` built as `4ffaa165-f64f-4eb0-b21f-b2821e30f97a`
+and became active version `2043aeb0-6daa-47f2-af25-26a267ddbceb` at 100%. Consumer integration pins
+that exact source through source-only tag `v0.1.2`; the contracts archive remains `v0.1.0`.
+The duplicate gateway is removed from this checkout; retain the external parity tests and Supabase
+schema assertions here. API deployment and rollback instructions belong in
+[API operations](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/docs/operations.md).
 
-API source ownership and frontend release consumption are established separately from production
-source cutover. The production cutover still requires explicit approval and preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
-existing namespace/state, Pages `script_name = "api-gateway"` and the current DO protocol.
-Supabase ownership, W10 authority activation and #1086 remain outside this extraction stage.
+Worker identity, class `ApiGatewayRateLimiter`, migration `v1`, DO namespace
+`832c68d546974f9884747962b5efe97d`, Pages `script_name = "api-gateway"`, the DO protocol,
+abuse namespace `1001`, secrets and route `api.tarkovtracker.org/*` are preserved.
+The pre-cutover serving version `e470b448-d198-4138-9da4-054fb937e0ed` and old source settings
+were retained for rollback; disable the new build trigger before an approved rollback.
+Supabase ownership, W10 authority activation and #1086 remain outside this migration.
 
 ## Legacy address retirement
 
@@ -87,40 +96,31 @@ The owning [compiled checks](../scripts/checks/legacy-api-pages.mjs) cover the e
 [adapter unit tests](../app/server/__tests__/pages-entry.test.ts) cover identity and callback
 pass-through. The negative control is a manual experiment, not an extra CI build.
 
-Promote in this order, with explicit approval for production merges/deployments and route removal:
+Legacy-route retirement completed before the separately approved source cutover recorded above.
+Its historical sequence was:
 
-1. Align both gateway Wrangler configurations with the **eleven** intended bindings. Remove only
-   the six redundant/retired routes: apex/www `/health` and the four redundant API-host routes.
-   This persists the operator's manual removals, which an unchanged config redeploy can restore.
-   Keep all ten legacy bindings. Deploy the Pages retirement handler and verify the exact
-   deployed SHA, Function routing, and host/path/method boundary before changing those bindings.
-   Use the anonymous PR preview and compiled Pages Worker HTTP tests before promotion; previews
-   on `pages.dev` intentionally do not return the apex-only 410. The production Pages deployment
-   must be verified separately; a green preview is not permission to remove live routes.
-2. www edge: keep the canonical www redirect; www legacy calls reach the apex 410 through a 308.
-   See [www outcome](#www-outcome). Never exempt all `/api/*` or disable the rule broadly.
-3. Remove the ten legacy bindings by exact route ID (apex `/api/v2` first as a canary) and
-   promote the route-removal change in both repositories, leaving **only**
-   `api.tarkovtracker.org/*`. Apply the route change using the current production source; this is
-   not authorization to connect the API repository to Worker Builds. Updating both sources
-   prevents a later deployment from restoring legacy bindings.
-4. Verify the [retired HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg) externally,
-   including query and trailing-slash variants, with redirect following disabled.
-   Check API `/health` => 200 and a normal
-   first-party frontend route. Existing Pages static handling retires apex `/health` with 404;
-   without the health Worker bindings, www redirects to that 404. Keep that behavior and verify
-   `/health/` and query variants.
-   No apex health monitors were found in the repositories or Cloudflare; unknown external
-   monitors may still need to move to the API host.
+1. Remove the six redundant/health routes while retaining the ten legacy bindings. Deploy and
+   verify the Pages retirement handler and its compiled host/path/method boundary before removing
+   the legacy routes. Anonymous previews do not prove apex-only production retirement.
+2. Keep the canonical www redirect: www legacy calls receive 308 and then the apex 410; valid
+   browser preflights receive 204 on the apex. See [www outcome](#www-outcome).
+3. Remove the ten legacy Worker bindings by exact route ID, leaving only
+   `api.tarkovtracker.org/*`. The current API-owned `wrangler.toml` records that sole Worker route;
+   Tracker owns the Pages retirement middleware and has no gateway deployment configuration.
+4. Verify the [retired HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg), including
+   query/trailing-slash variants and redirect boundaries, plus API `/health` and first-party Pages
+   routes. Apex `/health` remains a Pages 404; www redirects to that response.
 
 The broad historical Worker `token*`/`progress*` patterns also intercept unrelated
 suffixes; after removal those return to normal frontend
 routing, while retirement remains precisely slash-delimited. These changes do not alter DNS,
 credentials, Worker identity, DO namespaces/state, or unrelated routing.
 
-If the Pages response regresses, an approved rollback can restore the exact ten legacy bindings
-from the prior config commit, giving the prior static Worker 404 while Pages is repaired. Do not restore the six redundant/health
-bindings. Source cutover remains a separate decision.
+If Pages retirement regresses, an explicitly approved emergency route rollback can restore only
+the retained ten legacy bindings in the API-owned configuration while Pages is repaired. Use the
+retained historical config rather than a deleted Tracker directory; never restore the six
+redundant/health bindings. This does not undo the completed source cutover or authorize a new
+source change.
 
 ### www outcome
 

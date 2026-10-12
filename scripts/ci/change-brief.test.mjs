@@ -48,7 +48,7 @@ const trace = (importedBy, transitive = [], exports = []) => ({
 });
 const files = [
   'AGENTS.md',
-  'workers/api-gateway/AGENTS.md',
+  'workers/contract-tests/AGENTS.md',
   'app/components/ui/GameItem.vue',
   'app/components/ui/__tests__/GameItem.test.ts',
   'app/features/hideout/HideoutRequirement.vue',
@@ -57,8 +57,8 @@ const files = [
   'app/features/hideout/__tests__/HideoutRequirement.test.ts',
   'app/pages/__tests__/hideout.page.test.ts',
   'shared/utils/seasonNumber.ts',
-  'workers/api-gateway/src/utils/gameMode.ts',
-  'workers/api-gateway/src/__tests__/gameMode.test.ts',
+  'workers/contract-tests/src/utils/gameMode.ts',
+  'workers/contract-tests/src/__tests__/gameMode.test.ts',
 ];
 const fakeIo = ({ reports = {}, grepFiles = [], grepLines = [], generated = true } = {}) => {
   const calls = [];
@@ -184,14 +184,14 @@ describe('path helpers', () => {
       validationFor([file]).scoped.includes('supabase/AGENTS.md checks (supabase:check)')
     ).toBe(expected);
   });
-  it('matches the actual root, gateway, Deno, and workflow runner naming rules', () => {
+  it('matches the root, external integration, Deno, and workflow runner naming rules', () => {
     for (const [file, expected] of [
       ['app/utils/example.test.tsx', true],
       ['app/utils/example.spec.cts', true],
       ['app/utils/__tests__/Helper.vue', false],
-      ['workers/api-gateway/src/handlers/__tests__/nested/example.test.ts', true],
-      ['workers/api-gateway/src/__tests__/example.test.tsx', false],
-      ['workers/api-gateway/src/utils/example.test.ts', false],
+      ['workers/contract-tests/src/handlers/__tests__/nested/example.test.ts', true],
+      ['workers/contract-tests/src/__tests__/example.test.tsx', true],
+      ['workers/contract-tests/src/utils/example.test.ts', true],
       ['supabase/functions/_shared/example.deno.test.ts', true],
       ['supabase/functions/_shared/fixtures.ts', false],
       ['scripts/workflow-tests/security.mjs', true],
@@ -211,9 +211,7 @@ describe('path helpers', () => {
   });
   it('excludes helper modules and files outside runner filename patterns', () => {
     for (const file of [
-      'workers/api-gateway/src/__tests__/cloudflare-workers.ts',
-      'workers/api-gateway/src/__tests__/example.spec.ts',
-      'workers/api-gateway/src/utils/example.test.ts',
+      'workers/contract-tests/src/__tests__/cloudflare-workers.ts',
       'app/utils/__tests__/fixtures.ts',
       'scripts/workflow-tests/helpers/workflow-blocks.mjs',
       'app/utils/example-tests.mjs',
@@ -225,10 +223,10 @@ describe('path helpers', () => {
   it('collects AGENTS.md files on each ancestor chain', () => {
     expect(
       scopedInstructions(
-        ['workers/api-gateway/src/utils/gameMode.ts', 'app/utils/x.ts'],
-        ['AGENTS.md', 'workers/api-gateway/AGENTS.md', 'supabase/AGENTS.md']
+        ['workers/contract-tests/src/utils/gameMode.ts', 'app/utils/x.ts'],
+        ['AGENTS.md', 'workers/contract-tests/AGENTS.md', 'supabase/AGENTS.md']
       )
-    ).toEqual(['AGENTS.md', 'workers/api-gateway/AGENTS.md']);
+    ).toEqual(['AGENTS.md', 'workers/contract-tests/AGENTS.md']);
   });
   it('includes Supabase instructions for lifecycle and database paths outside its directory', () => {
     for (const path of [
@@ -261,7 +259,7 @@ describe('path helpers', () => {
     expect(
       testCommands([
         'app/a.test.ts',
-        'workers/api-gateway/src/__tests__/b.test.ts',
+        'workers/contract-tests/src/__tests__/b.test.ts',
         'scripts/workflow-tests/c.mjs',
         'supabase/functions/_shared/d.deno.test.ts',
         'scripts/ci/e.test.mjs',
@@ -273,14 +271,7 @@ describe('path helpers', () => {
       },
       {
         executable: 'pnpm',
-        args: [
-          'exec',
-          'vitest',
-          'run',
-          '--config',
-          'workers/api-gateway/vitest.config.ts',
-          './src/__tests__/b.test.ts',
-        ],
+        args: ['run', 'verify:api-parity'],
       },
       { executable: 'node', args: ['--test', '--', './scripts/workflow-tests/c.mjs'] },
       {
@@ -307,39 +298,24 @@ describe('path helpers', () => {
     expect(testCommands(paths)).toEqual([
       { executable: 'pnpm', args: ['exec', 'vitest', 'run', ...paths.map((path) => `./${path}`)] },
     ]);
-    for (const prefix of [
-      'workers/api-gateway/',
-      'scripts/workflow-tests/',
-      'supabase/functions/',
-    ]) {
+    for (const prefix of ['scripts/workflow-tests/', 'supabase/functions/']) {
       const filename = "space 'quote' $(inert);&-file";
       const extension = prefix === 'supabase/functions/' ? '.deno.test.ts' : '.test.mjs';
       const [command] = testCommands([`${prefix}${filename}${extension}`]);
-      const operand = prefix === 'workers/api-gateway/' ? '' : prefix;
+      const operand = prefix;
       expect(command.args.at(-1)).toBe(`./${operand}${filename}${extension}`);
       expect(typeof command.executable).toBe('string');
     }
   });
-  it('selects versioned API parity and the legacy gateway tooling runner', () => {
+  it('selects versioned API parity for external integration tests', () => {
     const contracts = 'workers/contract-tests/taskFailureParity.test.ts';
-    const tooling = 'workers/api-gateway/scripts/check-boundaries.test.ts';
+    const tooling = 'workers/contract-tests/scripts/check-boundaries.test.ts';
     expect(isTestPath(contracts)).toBe(true);
     expect(isTestPath(tooling)).toBe(true);
     expect(testCommands([contracts, tooling])).toEqual([
       {
         executable: 'pnpm',
         args: ['run', 'verify:api-parity'],
-      },
-      {
-        executable: 'pnpm',
-        args: [
-          'exec',
-          'vitest',
-          'run',
-          '--config',
-          'workers/api-gateway/vitest.config.ts',
-          './scripts/check-boundaries.test.ts',
-        ],
       },
     ]);
   });
@@ -414,12 +390,9 @@ describe('validationFor', () => {
     expect(commands).toContain('pnpm run i18n:check');
     expect(commands).toContain('pnpm run test:workflow');
   });
-  it('includes the exact gateway contract checks for targets and affected consumers', () => {
-    const required = [
-      'pnpm --filter api-gateway run types:check',
-      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run',
-    ];
-    const gateway = 'workers/api-gateway/src/utils/gameMode.ts';
+  it('includes external parity and release pin checks for targets and affected consumers', () => {
+    const required = ['pnpm run check:progress-contracts', 'pnpm run verify:api-parity'];
+    const gateway = 'workers/contract-tests/src/utils/gameMode.ts';
     for (const [paths, affected] of [
       [[gateway], [gateway]],
       [['shared/utils/seasonNumber.ts'], ['shared/utils/seasonNumber.ts', gateway]],
@@ -434,7 +407,7 @@ describe('buildBrief', () => {
     const target = 'shared/utils/apiTaskUpdates.ts';
     for (const [owner, scope, runnable] of [
       ['supabase/migrations/mirror.sql', 'supabase/AGENTS.md', false],
-      ['workers/api-gateway/tooling.config.ts', 'workers/api-gateway/AGENTS.md', false],
+      ['workers/contract-tests/tooling.config.ts', 'workers/contract-tests/AGENTS.md', false],
       ['scripts/workflow-tests/source-check.mjs', null, true],
       ['scripts/ci/source.test.mjs', null, true],
       ['scripts/workflow-tests/helpers/source-check.mjs', null, false],
@@ -444,7 +417,7 @@ describe('buildBrief', () => {
       io.instructionFiles = () => [
         'AGENTS.md',
         'supabase/AGENTS.md',
-        'workers/api-gateway/AGENTS.md',
+        'workers/contract-tests/AGENTS.md',
       ];
       const brief = await buildBrief(io, { targets: [{ file: target }] });
       expect(brief.pathReferences).toEqual([{ file: owner, references: target }]);
@@ -458,7 +431,7 @@ describe('buildBrief', () => {
   it('reports the literal-search cap without dropping graph-derived scope', async () => {
     const target = 'app/utils/constants.ts';
     const transitive = Array.from({ length: 80 }, (_, index) => `app/utils/consumer${index}.ts`);
-    transitive.push('workers/api-gateway/src/handlers/team.ts');
+    transitive.push('workers/contract-tests/src/handlers/team.ts');
     const io = fakeIo({ reports: { [target]: trace([], transitive) } });
     const brief = await buildBrief(io, { targets: [{ file: target }] });
     expect(brief.uncertainty.join('\n')).toMatch(/Path-reference search limited.*60/);
@@ -466,7 +439,7 @@ describe('buildBrief', () => {
       (call) => call.kind === 'lines' && call.specs.includes('package.json')
     );
     expect(search.args.filter((arg) => arg === '-e')).toHaveLength(60);
-    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+    expect(brief.instructions).toContain('workers/contract-tests/AGENTS.md');
   });
   it('does not issue an unpatterned literal or doc search for an empty request', async () => {
     const io = fakeIo();
@@ -498,8 +471,8 @@ describe('buildBrief', () => {
   });
   it('keeps scoped validation complete and deduplicated for graph chains, test consumers, and cycles', async () => {
     const seed = 'app/utils/constants.ts';
-    const gateway = 'workers/api-gateway/src/handlers/team.ts';
-    const gatewayTest = 'workers/api-gateway/src/__tests__/team.test.ts';
+    const gateway = 'workers/contract-tests/src/handlers/team.ts';
+    const gatewayTest = 'workers/contract-tests/src/__tests__/team.test.ts';
     for (const [direct, transitive] of [
       [[gateway], []],
       [['app/utils/modeProgressFallback.ts'], [gateway]],
@@ -512,19 +485,17 @@ describe('buildBrief', () => {
       const io = fakeIo({ reports: { [seed]: trace(direct, transitive) } });
       const brief = await buildBrief(io, { targets: [{ file: seed }] });
       expect(
-        brief.instructions.filter((file) => file === 'workers/api-gateway/AGENTS.md')
+        brief.instructions.filter((file) => file === 'workers/contract-tests/AGENTS.md')
       ).toHaveLength(1);
       expect(brief.validation.scoped).toHaveLength(1);
-      expect(brief.validation.scoped[0]).toContain(
-        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
-      );
+      expect(brief.validation.scoped[0]).toContain('pnpm run verify:api-parity');
     }
   });
   it('retains scope checks and explicit uncertainty when a graph target is missing', async () => {
-    const missing = 'workers/api-gateway/src/utils/missing.ts';
+    const missing = 'workers/contract-tests/src/utils/missing.ts';
     const brief = await buildBrief(fakeIo(), { targets: [{ file: missing }] });
-    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
-    expect(brief.validation.scoped.join('\n')).toContain('--dry-run');
+    expect(brief.instructions).toContain('workers/contract-tests/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain('pnpm run verify:api-parity');
     expect(
       brief.uncertainty.some((note) => note.includes(`Fallow could not analyze ${missing}`))
     ).toBe(true);
@@ -548,19 +519,17 @@ describe('buildBrief', () => {
       reports: {
         'app/utils/constants.ts': trace(
           ['app/utils/modeProgressFallback.ts'],
-          ['workers/api-gateway/src/handlers/team.ts']
+          ['workers/contract-tests/src/handlers/team.ts']
         ),
       },
     });
     const brief = await buildBrief(io, { targets: [{ file: 'app/utils/constants.ts' }] });
-    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
-    expect(brief.validation.scoped.join('\n')).toContain(
-      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
-    );
+    expect(brief.instructions).toContain('workers/contract-tests/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain('pnpm run verify:api-parity');
   });
   it('finds real test consumers of a targeted gateway helper without running the helper', async () => {
-    const helper = 'workers/api-gateway/src/__tests__/cloudflare-workers.ts';
-    const consumer = 'workers/api-gateway/src/__tests__/example.test.ts';
+    const helper = 'workers/contract-tests/src/__tests__/cloudflare-workers.ts';
+    const consumer = 'workers/contract-tests/src/__tests__/example.test.ts';
     const io = fakeIo({ reports: { [helper]: trace([consumer]) } });
     const brief = await buildBrief(io, { targets: [{ file: helper }], changedPaths: [helper] });
     expect(brief.tests.direct).toEqual([consumer]);
@@ -580,7 +549,7 @@ describe('buildBrief', () => {
   it('includes test targets and changed tests in candidate commands across all runners', async () => {
     for (const file of [
       'app/utils/__tests__/example.test.ts',
-      'workers/api-gateway/src/__tests__/example.test.ts',
+      'workers/contract-tests/src/__tests__/example.test.ts',
       'scripts/workflow-tests/example.mjs',
       'supabase/functions/_shared/example.deno.test.ts',
     ]) {
@@ -771,8 +740,8 @@ describe('buildBrief', () => {
     const io = fakeIo({
       reports: {
         'shared/utils/seasonNumber.ts': trace(
-          ['workers/api-gateway/src/utils/gameMode.ts'],
-          ['workers/api-gateway/src/__tests__/gameMode.test.ts']
+          ['workers/contract-tests/src/utils/gameMode.ts'],
+          ['workers/contract-tests/src/__tests__/gameMode.test.ts']
         ),
       },
       grepLines: [
@@ -784,8 +753,8 @@ describe('buildBrief', () => {
       targets: [{ file: 'shared/utils/seasonNumber.ts', symbol: 'isSeasonNumber' }],
     });
     expect(brief.targets[0].target).toBe('shared/utils/seasonNumber.ts:isSeasonNumber');
-    expect(brief.targets[0].consumers).toEqual(['workers/api-gateway/src/utils/gameMode.ts']);
-    expect(brief.instructions).toEqual(['AGENTS.md', 'workers/api-gateway/AGENTS.md']);
+    expect(brief.targets[0].consumers).toEqual(['workers/contract-tests/src/utils/gameMode.ts']);
+    expect(brief.instructions).toEqual(['AGENTS.md', 'workers/contract-tests/AGENTS.md']);
     expect(brief.pathReferences).toEqual([
       { file: '.github/workflows/ci.yml', references: 'shared/utils/seasonNumber.ts' },
     ]);
@@ -794,20 +763,13 @@ describe('buildBrief', () => {
     expect(brief.tests.broaderCommands).toEqual([
       {
         executable: 'pnpm',
-        args: [
-          'exec',
-          'vitest',
-          'run',
-          '--config',
-          'workers/api-gateway/vitest.config.ts',
-          './src/__tests__/gameMode.test.ts',
-        ],
+        args: ['run', 'verify:api-parity'],
       },
     ]);
     const text = renderBrief(brief);
     expect(text).toContain('Executable/argv records (JSON data; do not paste into a shell');
     expect(text).toContain(JSON.stringify(brief.tests.broaderCommands[0]));
-    expect(brief.validation.scoped[0]).toMatch(/^workers\/api-gateway\/AGENTS\.md checks/);
+    expect(brief.validation.scoped[0]).toMatch(/^workers\/contract-tests\/AGENTS\.md checks/);
     expect(brief.uncertainty).toEqual([]);
   });
   it('surfaces Fallow failures, missing generated types, and relevant degraded analysis', async () => {
@@ -865,12 +827,12 @@ describe('buildBrief', () => {
 });
 describe('CLI repository-relative operands', () => {
   it('normalizes dot prefixes, parent segments, and Windows separators for files and symbols', () => {
-    const file = 'workers/api-gateway/src/utils/gameMode.ts';
+    const file = 'workers/contract-tests/taskFailureParity.test.ts';
     for (const args of [
       ['--file', `./${file}`],
       ['--symbol', `./${file}:getGameModeSeasonNumber`],
       ['--file', file.replaceAll('/', '\\')],
-      ['--file', 'workers/api-gateway/src/../src/utils/gameMode.ts'],
+      ['--file', 'workers/contract-tests/../contract-tests/taskFailureParity.test.ts'],
       ['--file', resolve(file)],
     ]) {
       const output = execFileSync(
@@ -879,10 +841,8 @@ describe('CLI repository-relative operands', () => {
         { encoding: 'utf8', shell: false, timeout: 20000 }
       );
       const brief = JSON.parse(output);
-      expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
-      expect(brief.validation.scoped.join('\n')).toContain(
-        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
-      );
+      expect(brief.instructions).toContain('workers/contract-tests/AGENTS.md');
+      expect(brief.validation.scoped.join('\n')).toContain('pnpm run verify:api-parity');
       expect(brief.targets[0].target).toBe(
         args[0] === '--symbol' ? `${file}:getGameModeSeasonNumber` : file
       );

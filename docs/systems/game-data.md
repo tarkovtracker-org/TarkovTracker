@@ -119,7 +119,7 @@ Game data passes through four layers; each consumer should state which one it re
 
 Tarkov.dev game data is not TarkovTracker's public API. The `/api/tarkov/*` routes proxy game data
 for the app; the public progress API on `api.tarkovtracker.org` is a separate contract defined by
-`workers/api-gateway/src/openapi.ts` and described in [API](../api.md).
+[TarkovTracker-API/src/openapi.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/openapi.ts) and described in [API](../api.md).
 
 ### Prestige, editions, fleet verification, and cache bundle scope
 

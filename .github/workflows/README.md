@@ -25,8 +25,9 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Validate` — Production Nuxt build (all pull requests, forks included) + artifact upload (main branch only)
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
-- `Workers` — Validate api-gateway (generated types, typecheck, OpenAPI, deployment dry-run, Node
-  unit tests, and a workerd smoke using the production Wrangler configuration)
+- `Workers` - Verify immutable frontend contracts pins, then fetch the exact tagged API source,
+  compare compiled contracts, run its standalone types/schema/API/workerd/dry-run checks, and
+  run all-mode frontend integration tests. No local gateway workspace remains.
 
 Heavy jobs run in parallel after classification; systems drift runs independently.
 Lighthouse scope detection runs independently of PR metadata.

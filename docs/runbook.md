@@ -122,75 +122,29 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys through three integrations — none of them GitHub Actions. Each one builds
-and deploys only when its trigger matches the merge, and surfaces as a check on the merge commit
-when it runs:
+Tracker merges deploy Pages and Supabase through their integrations. The API Worker builds
+independently from API-repository merges matching its watch paths; none of these deploys are
+GitHub Actions deployments. Checks appear on the corresponding source repository's commit:
 
-| What                                 | Mechanism                    | Check on the merge commit     |
-| ------------------------------------ | ---------------------------- | ----------------------------- |
-| Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
-| `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
-| DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+| What                                  | Mechanism                    | Check on the source commit    |
+| ------------------------------------- | ---------------------------- | ----------------------------- |
+| Frontend                              | Cloudflare Pages Git build   | `Cloudflare Pages`            |
+| `api-gateway` Worker (API repository) | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
+| DB migrations **and** Edge Functions  | Supabase GitHub integration  | `Supabase Preview`            |
 
-The Worker build is path-filtered. Its `Deploy default branch` trigger runs `npx wrangler deploy`
-in root directory `workers/api-gateway`, with no build command. It builds `main` only when any
-commit in a push changes a file under one of its build watch paths (marked below), or when
-Cloudflare skips
-[watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
-(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch paths gets no
-Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
-not a broken integration.
+The existing `api-gateway` Worker deploys only from `tarkovtracker-org/TarkovTracker-API/main`,
+root `/`, with empty build command and deploy command `pnpm run deploy`. That command prepares
+the generated workspace contracts before Wrangler bundles the Worker. The old Tracker source
+trigger is disconnected. Build caching remains enabled and preview builds remain disabled.
 
-Every build input is watched, plus `patches/**` and `.nvmrc`, so dependency and shared-code merges
-redeploy the Worker without a manual build. Besides its directory, the build reads the
-sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
-workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` and transitive local
-imports the install's `postinstall` evaluates. Its inputs, kept in sync with the code by
-`scripts/workflow-tests/worker-build-inputs.mjs`:
-
-<!-- api-gateway-build-inputs:start -->
-
-- `workers/api-gateway/**` — watched
-- `app/features/resources/resourceData.ts` — watched (`nuxt prepare` import)
-- `app/locales/en.json` — watched (`nuxt prepare` import)
-- `app/utils/apiProtectionConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/buildCommit.ts` — watched (`nuxt prepare` import)
-- `app/utils/csp.ts` — watched (`nuxt prepare` import)
-- `app/utils/entryRecoveryScript.ts` — watched (`nuxt prepare` import)
-- `app/utils/locales.ts` — watched (`nuxt prepare` import)
-- `app/utils/nuxtSecurityConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/prerenderOutput.ts` — watched (`nuxt prepare` import)
-- `app/utils/routeSeo.ts` — watched (`nuxt prepare` import)
-- `app/utils/runtimeConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/shellConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/stripBareNodeImports.ts` — watched (`nuxt prepare` import)
-- `app/utils/theme.ts` — watched (`nuxt prepare` import)
-- `app/utils/turnstileKeys.ts` — watched (`nuxt prepare` import)
-- `package.json` — watched (module type for the bundled files above; pnpm version and the
-  `postinstall` that workspace installs run)
-- `tsconfig.json` — watched (compiles the bundled files above; extends the generated
-  `.nuxt/tsconfig.json`)
-- `nuxt.config.ts` — watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
-  from it; the `app/utils/` modules it imports must also load for that install to succeed)
-- `pnpm-lock.yaml` — watched (pins Wrangler, esbuild and every installed package)
-- `pnpm-workspace.yaml` — watched (workspace membership, esbuild override, allowed build
-  scripts)
-
-<!-- api-gateway-build-inputs:end -->
-
-The legacy gateway now consumes the immutable progress-contracts release through its watched
-`package.json` and root `pnpm-lock.yaml`. Keep `workers/api-gateway/**` and all existing trigger
-watch paths until the separately approved production source cutover. This preparation does not
-modify the integration. Source ownership and release updates: [where changes belong](api-ownership.md).
-
-A new build input must be added to the trigger's watch paths in the same change, or production
-keeps the previous Worker build until a watched file changes.
-The check also rejects a deploy redirect (`.wrangler/deploy/config.json`), `wrangler.json` or
-`wrangler.jsonc` in `workers/api-gateway`, `workers/` or the repository root, which that deploy
-command would use instead of `workers/api-gateway/wrangler.toml`, and `wrangler.toml` settings it
-does not model. The root `.nvmrc` is watched so a Node bump rebuilds the Worker, although
-Cloudflare documents Node version files only in the build's root directory, `workers/api-gateway`,
-which has none.
+Its watched API-repository inputs are `src/**`, `progress-contracts/**`,
+`scripts/prepare-contracts.mjs`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+`tsconfig.json`, `worker-configuration.d.ts`, `wrangler.toml`, `.nvmrc` and `.npmrc`, with no
+exclusions. Tracker-only merges do not deploy the API Worker. For API deployment, secrets and
+rollback, use [API operations](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/docs/operations.md).
+Consumer source/tag pins, compiled contracts and all-mode integration tests remain here:
+[API ownership](api-ownership.md). `/health` reports a fixed version; verify build SHA to active
+Worker version through Workers Builds and the deployment record.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -254,23 +208,25 @@ integration fails or is unavailable, not the normal path.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
-   already provisioned on the production `api-gateway` Worker:
+   already provisioned on the production `api-gateway` Worker. Run these commands only from
+   the TarkovTracker-API checkout; Tracker's root Wrangler config is for Pages:
 
    ```bash
-   wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
-   wrangler secret put IP_HASH_SECRET --config workers/api-gateway/wrangler.toml   # set if missing
+   pnpm exec wrangler secret list --config wrangler.toml
+   # If absent, provision it only with explicit secret-change authorization:
+   pnpm exec wrangler secret put IP_HASH_SECRET --config wrangler.toml
    ```
 
-   The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
+   The api-gateway Worker auto-deploys from the API repository's `main` on merge. If `IP_HASH_SECRET` is absent at
    deploy time, `abuse_gate_429` and `abuse_gate_unavailable` log lines emit `ip_hash: null`,
    defeating the IP-level abuse observability the change introduced. Provision the secret **before**
    merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
 5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
-   the push changed `workers/api-gateway/**` or bypassed watch-path matching, also confirm
-   `Workers Builds: api-gateway` succeeded on it. Otherwise, if it changed an unwatched
-   [Worker build input](#deployment), no check appears and the Worker still needs a build.
+   an API-repository merge matches the Worker watch paths (or matching is bypassed by Cloudflare),
+   also confirm its `Workers Builds: api-gateway` check and exact active version there. Unwatched
+   docs-only changes normally create no Worker build/check. Tracker merges do not deploy the API.
    `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the
@@ -287,7 +243,7 @@ integration fails or is unavailable, not the normal path.
    `supabase/config.toml`.
 
 7. Confirm workers are serving the expected revision:
-   - `workers/api-gateway`
+   - `api-gateway` from the API repository
 8. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
