@@ -3,6 +3,7 @@ import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import {
   compareOverlayFleet,
+  compareTaskCatalogs,
   OVERLAY_PROPAGATION_WINDOW_MS,
 } from '@@/scripts/precompute/verify-overlay';
 const now = Date.parse('2026-09-07T12:00:00Z');
@@ -83,5 +84,58 @@ describe('overlay fleet verification', () => {
         (row) => row.status === 'propagating'
       )
     ).toBe(true);
+  });
+});
+describe('core and objective catalog coherence', () => {
+  const core = {
+    data: { tasks: [{ id: 'upstream' }, { id: 'overlay-addition' }] },
+    dataOverlay: published,
+  };
+  const objectives = {
+    data: {
+      tasks: [
+        { id: 'upstream', objectives: [] },
+        { id: 'overlay-addition', objectives: [{ id: 'objective' }] },
+      ],
+    },
+    dataOverlay: published,
+  };
+  it.each(VALID_GAME_MODES)(
+    'requires matching overlay identity and core task coverage for %s',
+    (gameMode) => {
+      expect(compareTaskCatalogs('en', gameMode, core, objectives)).toMatchObject({
+        status: 'current',
+        missingTaskIds: [],
+        coreCount: 2,
+        objectiveCount: 2,
+      });
+      const incomplete = { ...objectives, data: { tasks: [objectives.data.tasks[0]] } };
+      expect(compareTaskCatalogs('en', gameMode, core, incomplete)).toMatchObject({
+        status: 'mismatch',
+        missingTaskIds: ['overlay-addition'],
+      });
+      expect(
+        compareTaskCatalogs('en', gameMode, core, {
+          ...objectives,
+          dataOverlay: { status: 'missing', error: 'HTTP 404' },
+        })
+      ).toMatchObject({ status: 'unverified' });
+      expect(
+        compareTaskCatalogs('en', gameMode, core, {
+          ...objectives,
+          dataOverlay: { version: '0', sha256: 'old' },
+        })
+      ).toMatchObject({ status: 'mismatch' });
+    }
+  );
+  it.each([
+    {},
+    { data: { tasks: [] } },
+    { data: { tasks: [{ id: 'upstream', objectives: {} }] } },
+    { data: { tasks: [null] } },
+  ])('does not certify malformed objective payload %j', (invalid) => {
+    expect(
+      compareTaskCatalogs('en', 'regular', core, { ...invalid, dataOverlay: published }).status
+    ).toBe('unverified');
   });
 });

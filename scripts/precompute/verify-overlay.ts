@@ -46,8 +46,12 @@ const manifestIdentity = (
   const matches = entries.filter((entry) => entry.lang === lang && entry.gameMode === gameMode);
   return identity(matches.length === 1 ? matches[0]!.overlay : undefined);
 };
-const completeProvenance = (identities: Identity[], source: string | null | undefined, age: number): boolean =>
-  verifiableSource(source, age) && identities.every(meta => meta.version && meta.sha256);
+const completeProvenance = (
+  identities: Identity[],
+  source: string | null | undefined,
+  age: number
+): boolean =>
+  verifiableSource(source, age) && identities.every((meta) => meta.version && meta.sha256);
 const rowStatus = (
   published: Identity,
   precomputed: Identity,
@@ -92,4 +96,57 @@ export function compareOverlayFleet(
       };
     })
   );
+}
+export type CatalogComparison = {
+  lang: string;
+  gameMode: string;
+  coreCount: number;
+  objectiveCount: number;
+  missingTaskIds: string[];
+  status: 'current' | 'mismatch' | 'unverified';
+};
+type CatalogTask = { id: string; objectives?: unknown[] };
+const isCatalogTask = (value: unknown, withObjectives: boolean): boolean => {
+  const task = record(value);
+  return Boolean(nonempty(task.id)) && (!withObjectives || Array.isArray(task.objectives));
+};
+const catalogTasks = (payload: unknown, withObjectives: boolean): CatalogTask[] | null => {
+  const tasks = record(record(payload).data).tasks;
+  if (!Array.isArray(tasks) || tasks.length === 0) return null;
+  return tasks.every((task) => isCatalogTask(task, withObjectives))
+    ? (tasks as CatalogTask[])
+    : null;
+};
+const identified = (meta: Identity): boolean => Boolean(meta.version && meta.sha256);
+const comparisonStatus = (valid: boolean, matching: boolean): CatalogComparison['status'] => {
+  if (!valid) return 'unverified';
+  return matching ? 'current' : 'mismatch';
+};
+/** Verifies the split catalog contract without publishing either source payload in the report. */
+export function compareTaskCatalogs(
+  lang: string,
+  gameMode: string,
+  core: unknown,
+  objectives: unknown
+): CatalogComparison {
+  const coreTasks = catalogTasks(core, false);
+  const objectiveTasks = catalogTasks(objectives, true);
+  const coreIdentity = identity(record(core).dataOverlay);
+  const objectiveIdentity = identity(record(objectives).dataOverlay);
+  const objectiveIds = new Set(objectiveTasks?.map((task) => task.id));
+  const missingTaskIds =
+    coreTasks?.map((task) => task.id).filter((id) => !objectiveIds.has(id)) ?? [];
+  const valid =
+    Boolean(coreTasks && objectiveTasks) && [coreIdentity, objectiveIdentity].every(identified);
+  const sameIdentity = (['version', 'sha256'] as const).every(
+    (key) => coreIdentity[key] === objectiveIdentity[key]
+  );
+  return {
+    lang,
+    gameMode,
+    coreCount: coreTasks?.length ?? 0,
+    objectiveCount: objectiveTasks?.length ?? 0,
+    missingTaskIds,
+    status: comparisonStatus(valid, sameIdentity && missingTaskIds.length === 0),
+  };
 }

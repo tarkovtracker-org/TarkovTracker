@@ -79,6 +79,17 @@ sequenceDiagram
   overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
+The objective endpoint requires nonempty overlay version/SHA before caching a generated response.
+A missing private overlay returns 503; background refresh failure retains a good stale entry.
+`json-v4` retires earlier objective entries in the server cache, browser request query, and local
+metadata cache together. The operator purge targets current and retired objective keys across
+all supported languages and the three upstream modes. This does not alter the core KV release
+keys or introduce objective precompute.
+
+The raw overlay JSON and `OVERLAY_TOKEN` remain server-side. The browser consumes corrected
+task/objective data and overlay identity metadata; applied corrections are therefore visible in
+those catalogs. `/overlay/kappa/**` serves the streamer UI, not the private source JSON.
+
 ### Endpoint ownership and precedence
 
 Every collection merges shared records by ID, then the matching upstream mode (`regular`, `pve`,
@@ -248,7 +259,10 @@ have the existing live fallback, but that is not proof of production readiness f
 Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
 new private temporary directory. The command writes
 an artifact comparing the published SHA, last complete precompute and served tasks-core for all
-48 language/mode combinations. Missing evidence is `unverified`; a mismatch is `propagating` for
+48 language/mode combinations, plus every core/objective pair's overlay identity, task shape,
+and core-ID coverage. Missing or mismatched pairs fail verification even when all core KV rows
+are current. The pair report contains counts and missing IDs, never raw overlay/catalog payloads.
+Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
 target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee
 that caches expire within 14 hours. Browser IndexedDB has a separate maximum 24-hour TTL and must

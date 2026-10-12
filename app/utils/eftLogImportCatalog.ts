@@ -1,6 +1,7 @@
 import { isFetchSuccess, type FetchResponse } from '@/stores/tarkov/fetchResponse';
 import { API_GAME_MODES, type GameMode } from '@/utils/constants';
 import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
+import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -8,6 +9,24 @@ import type {
   TarkovTaskObjectivesQueryResult,
   TarkovTasksCoreQueryResult,
 } from '@/types/tarkov';
+type CatalogResponse<T> = FetchResponse<T> & {
+  dataOverlay?: { version?: string; sha256?: string };
+};
+/** Separate cache layers may propagate at different times; imports require one corrected catalog identity. */
+function requireMatchingOverlay(
+  core: CatalogResponse<unknown>,
+  objectives: CatalogResponse<unknown>
+): void {
+  const sameIdentity = (['version', 'sha256'] as const).every((key) => {
+    const value = core.dataOverlay?.[key];
+    return (
+      typeof value === 'string' &&
+      value.trim().length > 0 &&
+      value === objectives.dataOverlay?.[key]
+    );
+  });
+  if (!sameIdentity) throw new Error('Task catalog overlay versions do not match for log import.');
+}
 /** Rejects failed or malformed metadata responses before any progress can be changed. */
 function requireCatalogTasks<T extends { tasks: unknown[] }>(
   response: FetchResponse<T>
@@ -22,17 +41,21 @@ function requireCatalogTasks<T extends { tasks: unknown[] }>(
 export async function loadEftImportTaskCatalog(mode: GameMode): Promise<Task[]> {
   const query = { gameMode: API_GAME_MODES[mode], lang: 'en' };
   const [core, objectives] = await Promise.all([
-    tarkovApiFetch<FetchResponse<TarkovTasksCoreQueryResult>>('/api/tarkov/tasks-core', {
+    tarkovApiFetch<CatalogResponse<TarkovTasksCoreQueryResult>>('/api/tarkov/tasks-core', {
       query,
       timeout: 15000,
     }),
-    tarkovApiFetch<FetchResponse<TarkovTaskObjectivesQueryResult>>('/api/tarkov/tasks-objectives', {
-      query: { ...query, version: 'json-v3' },
-      timeout: 15000,
-    }),
+    tarkovApiFetch<CatalogResponse<TarkovTaskObjectivesQueryResult>>(
+      '/api/tarkov/tasks-objectives',
+      {
+        query: { ...query, version: TASK_OBJECTIVES_CACHE_VERSION },
+        timeout: 15000,
+      }
+    ),
   ]);
   const coreTasks = requireCatalogTasks(core);
   const objectiveTasks = requireCatalogTasks(objectives);
+  requireMatchingOverlay(core, objectives);
   if (!coreTasks.length) throw new Error('Task metadata could not be loaded for log import.');
   const byId = new Map(objectiveTasks.map((task) => [task.id, task]));
   const tasks = coreTasks.map((task) => {

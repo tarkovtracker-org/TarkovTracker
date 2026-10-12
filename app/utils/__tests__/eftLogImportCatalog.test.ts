@@ -1,28 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
+const dataOverlay = { version: 'catalog-test', sha256: 'catalog-sha' };
+const withOverlay = <T>(data: T) => ({ data, dataOverlay });
 describe('loadEftImportTaskCatalog', () => {
   afterEach(() => vi.unstubAllGlobals());
   it('loads the destination mode and joins objective data into the task catalog', async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce({ data: { tasks: [{ id: 'task', name: 'Task' }] } })
-      .mockResolvedValueOnce({
-        data: { tasks: [{ id: 'task', objectives: { a: { id: 'objective', count: 4 } } }] },
-      });
+      .mockResolvedValueOnce(withOverlay({ tasks: [{ id: 'task', name: 'Task' }] }))
+      .mockResolvedValueOnce(
+        withOverlay({ tasks: [{ id: 'task', objectives: { a: { id: 'objective', count: 4 } } }] })
+      );
     vi.stubGlobal('$fetch', fetch);
     expect(await loadEftImportTaskCatalog('seasonal')).toEqual([
       { id: 'task', name: 'Task', objectives: [{ id: 'objective', count: 4 }] },
     ]);
     expect(fetch.mock.calls[0]?.[1].query.gameMode).toBe('pvp-season');
     expect(fetch.mock.calls[1]?.[1].query.gameMode).toBe('pvp-season');
+    expect(fetch.mock.calls[1]?.[1].query.version).toBe('json-v4');
   });
   it('rejects incomplete objectives instead of importing partial progress', async () => {
     vi.stubGlobal(
       '$fetch',
       vi
         .fn()
-        .mockResolvedValueOnce({ data: { tasks: [{ id: 'task' }] } })
-        .mockResolvedValueOnce({ data: { tasks: [] } })
+        .mockResolvedValueOnce(withOverlay({ tasks: [{ id: 'task' }] }))
+        .mockResolvedValueOnce(withOverlay({ tasks: [] }))
     );
     await expect(loadEftImportTaskCatalog('pve')).rejects.toThrow('incomplete');
   });
@@ -30,6 +33,22 @@ describe('loadEftImportTaskCatalog', () => {
     vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ error: 'offline' }));
     await expect(loadEftImportTaskCatalog('pvp')).rejects.toThrow('could not be loaded');
   });
+  it.each([undefined, { version: 'catalog-test', sha256: 'old-sha' }])(
+    'rejects missing or mismatched objective provenance before returning a catalog: %j',
+    async (objectiveOverlay) => {
+      vi.stubGlobal(
+        '$fetch',
+        vi
+          .fn()
+          .mockResolvedValueOnce(withOverlay({ tasks: [{ id: 'task' }] }))
+          .mockResolvedValueOnce({
+            data: { tasks: [{ id: 'task', objectives: [] }] },
+            dataOverlay: objectiveOverlay,
+          })
+      );
+      await expect(loadEftImportTaskCatalog('pve')).rejects.toThrow('overlay');
+    }
+  );
 });
 describe('persisted objective identity', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -38,8 +57,9 @@ describe('persisted objective identity', () => {
       '$fetch',
       vi
         .fn()
-        .mockResolvedValueOnce({ data: { tasks: [{ id: 'task-a' }, { id: 'task-b' }] } })
+        .mockResolvedValueOnce(withOverlay({ tasks: [{ id: 'task-a' }, { id: 'task-b' }] }))
         .mockResolvedValueOnce({
+          dataOverlay,
           data: {
             tasks: [
               { id: 'task-a', objectives: [{ id: 'shared', count: 2 }] },

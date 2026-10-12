@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import type { H3Event } from 'h3';
 const CACHE_META_HEADERS = {
   'Cache-Control': 'public, max-age=0, must-revalidate',
@@ -389,6 +390,10 @@ describe('Tarkov API handlers', () => {
     );
   });
   it('applies overlay for tasks-objectives with versioned cache key', async () => {
+    mockApplyOverlay.mockImplementation(async (payload) => ({
+      ...payload,
+      dataOverlay: { status: 'fresh', version: 'catalog-test', sha256: 'catalog-sha' },
+    }));
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await handler(event);
     expect(mockCreateTarkovJsonTaskObjectivesFetcher).toHaveBeenCalledWith({
@@ -402,11 +407,34 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v3-en-regular',
+      'tasks-objectives-json-v4-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }
     );
+  });
+  it('rejects missing objective overlay provenance before admitting a cache entry', async () => {
+    mockApplyOverlay.mockResolvedValue({
+      data: { tasks: [{ id: 'upstream-task', objectives: [] }] },
+      dataOverlay: { status: 'missing', error: 'HTTP 404' },
+    });
+    const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+  });
+  it.each(
+    API_SUPPORTED_LANGUAGES.flatMap((lang) =>
+      ['regular', 'pve', 'pvp-season'].map((mode) => [lang, mode])
+    )
+  )('retires poisoned objective cache keys for %s/%s', async (lang, mode) => {
+    mockGetValidatedLanguage.mockReturnValue(lang);
+    mockValidateGameMode.mockReturnValue(mode);
+    mockApplyOverlay.mockResolvedValue({
+      data: { tasks: [] },
+      dataOverlay: { version: 'catalog-test', sha256: 'catalog-sha' },
+    });
+    const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
+    await handler(event);
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v4-${lang}-${mode}`);
   });
   it('sanitizes and overlays tasks-rewards before caching', async () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-rewards.get');

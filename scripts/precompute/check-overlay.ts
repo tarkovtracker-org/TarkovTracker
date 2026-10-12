@@ -2,9 +2,15 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
+import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { fetchOverlay } from '@/server/utils/overlay';
-import { compareOverlayFleet, type OverlayManifest } from './verify-overlay';
+import {
+  compareOverlayFleet,
+  compareTaskCatalogs,
+  type OverlayManifest,
+  type CatalogComparison,
+} from './verify-overlay';
 // This command verifies the production fleet and writes a private, unique report.
 const productionOrigin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
 const operationsUrl = new URL(productionOrigin);
@@ -46,24 +52,34 @@ try {
   console.error(String(error));
 }
 const served = [];
+const catalogs: CatalogComparison[] = [];
 for (const lang of API_SUPPORTED_LANGUAGES)
   for (const gameMode of VALID_GAME_MODES) {
     try {
-      const { payload, source } = await getJson(
-        `${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`
-      );
-      served.push({ lang, gameMode, overlay: payload.dataOverlay ?? {}, source });
+      const [core, objectives] = await Promise.all([
+        getJson(`${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`),
+        getJson(
+          `${productionOrigin}/api/tarkov/tasks-objectives?lang=${lang}&gameMode=${gameMode}&version=${TASK_OBJECTIVES_CACHE_VERSION}`
+        ),
+      ]);
+      served.push({ lang, gameMode, overlay: core.payload.dataOverlay ?? {}, source: core.source });
+      catalogs.push(compareTaskCatalogs(lang, gameMode, core.payload, objectives.payload));
     } catch (error) {
       console.error(String(error));
+      catalogs.push(compareTaskCatalogs(lang, gameMode, null, null));
     }
   }
 const rows = compareOverlayFleet(published, manifest, served);
 const reportDirectory = await mkdtemp(join(tmpdir(), 'tarkov-overlay-fleet-'));
 const output = join(reportDirectory, 'report.json');
-await writeFile(output, JSON.stringify({ checkedAt: new Date().toISOString(), rows }, null, 2), {
-  mode: 0o600,
-  flag: 'wx',
-});
+await writeFile(
+  output,
+  JSON.stringify({ checkedAt: new Date().toISOString(), rows, catalogs }, null, 2),
+  {
+    mode: 0o600,
+    flag: 'wx',
+  }
+);
 console.log(
   JSON.stringify({
     output,
@@ -72,6 +88,11 @@ console.log(
     propagating: rows.filter((row) => row.status === 'propagating').length,
     drift: rows.filter((row) => row.status === 'drift').length,
     unverified: rows.filter((row) => row.status === 'unverified').length,
+    catalogMismatches: catalogs.filter((row) => row.status !== 'current').length,
   })
 );
-if (rows.some((row) => row.status === 'drift' || row.status === 'unverified')) process.exitCode = 1;
+if (
+  rows.some((row) => row.status === 'drift' || row.status === 'unverified') ||
+  catalogs.some((row) => row.status !== 'current')
+)
+  process.exitCode = 1;
