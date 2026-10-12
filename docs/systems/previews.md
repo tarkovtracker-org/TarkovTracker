@@ -182,8 +182,11 @@ GitHub has computed the test merge; other pending reasons are left alone.
 - Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches, separate from
   production. Seed/refresh its three English core keys and three English import snapshot keys
   explicitly with a reviewed producer and seven-day TTL; the production precompute workflow does
-  not refresh preview data. A maintainer owns this manual refresh: the producer is
-  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) at the reviewed revision, with
+  not refresh preview data. A maintainer owns this manual refresh. Until
+  [#1161](https://github.com/tarkovtracker-org/TarkovTracker/pull/1161) merges, select its
+  independently reviewed snapshot-producer revision: this configuration change does not add that
+  producer, and main's existing core-only runner cannot seed import snapshots. The producer is
+  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) from that selected revision, with
   `PRECOMPUTE_LANG=en`, a pinned `EXPECTED_OVERLAY_SHA`, and `TARKOV_DATA_KV_NAMESPACE_ID` set to
   the preview namespace. An approved broker writer can invoke the same exported `runPrecompute`
   and `runImportPrecompute` functions without exposing credentials. Refresh before import
