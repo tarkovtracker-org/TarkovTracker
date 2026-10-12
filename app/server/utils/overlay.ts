@@ -24,6 +24,7 @@ import {
   normalizeObjectiveList,
 } from './objectiveTypeInferrer';
 import { addFallbackCrafts, addFallbackItems } from './overlayAdditions';
+import { overlayAuthHeaders } from './overlayAuth';
 import { attachCounterDerivations, usableCounterDerivations } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
@@ -128,7 +129,11 @@ async function fetchOverlayOverHttps(signal: AbortSignal): Promise<Response> {
     const response = await fetch(currentUrl, {
       signal,
       redirect: 'manual',
-      headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': TARKOVTRACKER_USER_AGENT,
+        ...overlayAuthHeaders(currentUrl),
+      },
     });
     if (!OVERLAY_REDIRECT_STATUSES.has(response.status)) return response;
     await response.body?.cancel();

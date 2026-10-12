@@ -8,6 +8,7 @@ import {
 } from 'h3';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { createLogger } from '@/server/utils/logger';
+import { overlayAuthHeaders } from '@/server/utils/overlayAuth';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
@@ -202,6 +203,7 @@ const getEditions = async (): Promise<GameEdition[]> => {
   editionsFetchPromise = (async () => {
     try {
       const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL, {
+        headers: overlayAuthHeaders(OVERLAY_URL),
         redirect: 'error',
       });
       const editions = overlay?.editions ? Object.values(overlay.editions) : [];
