@@ -14,15 +14,14 @@ compiler watch. The browser continues using Supabase and Nitro directly. UI/stor
 here. A shared rule change belongs in the API repository and reaches the frontend through a
 separate, reviewed dependency-update PR. Keep one implementation; never copy rules into `app/`.
 
-The public API repository owns `@tarkovtracker/progress-contracts`. This checkout and its legacy
-gateway both pin the compiled ESM/types archive from the immutable
+The public API repository owns `@tarkovtracker/progress-contracts`. This checkout pins the compiled ESM/types archive from the immutable
 [v0.1.0 release](https://github.com/tarkovtracker-org/TarkovTracker-API/releases/tag/v0.1.0).
 `workers/contract-tests/api-version.json` records the exact release URL, SHA-512 integrity and
 corresponding API tag/commit. `pnpm-lock.yaml` pins those same bytes. No registry publication or
 cross-repository symlink is involved. Edit source in the owning API repository, never installed
 package files or `dist`.
 
-A dependency update changes both consumer manifests, the lockfile and `api-version.json` together.
+A dependency update changes the frontend manifest, lockfile and `api-version.json` together.
 Run `pnpm run check:progress-contracts`, frontend tests/typecheck and `pnpm run verify:api-parity`.
 The parity command fetches only the recorded API commit into a fresh temporary checkout, uses its
 frozen lockfile, compares every compiled rule export and fixture to the installed release, runs
@@ -37,17 +36,22 @@ The API source ref/commit can advance separately for an API-only update while th
 its contracts version. That update must pass the same checks; compiled API rule exports still
 have to match the pinned frontend package. Never follow the API's moving branch head implicitly.
 
-`workers/api-gateway/` remains the **legacy production deployment source** during preparation.
-Its code, build commands, Worker Builds watch coverage and Pages DO binding remain functional.
-`pnpm run verify:api-standalone` independently installs and tests that gateway against the released
-archive without frontend source. Do not retire this directory or its watch paths until the
-production source cutover is separately approved. Coordinate any urgent legacy API fix with the
-new owner so the two gateway sources do not silently diverge.
+Production source cutover completed on 2026-10-12. The existing `api-gateway` Worker now builds
+from `TarkovTracker-API/main`, root `/`, using `pnpm run deploy` to prepare workspace contracts.
+The legacy Tracker build trigger was disconnected; only the API repository can deploy this Worker.
+API commit `655b825ddfc863a2bc56f88eea97a5bbb15744ce` built as `4ffaa165-f64f-4eb0-b21f-b2821e30f97a`
+and became active version `2043aeb0-6daa-47f2-af25-26a267ddbceb` at 100%. Consumer integration pins
+that exact source through source-only tag `v0.1.2`; the contracts archive remains `v0.1.0`.
+The duplicate gateway is removed from this checkout; retain the external parity tests and Supabase
+schema assertions here. API deployment and rollback instructions belong in
+[API operations](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/docs/operations.md).
 
-API source ownership and frontend release consumption are established separately from production
-source cutover. The production cutover still requires explicit approval and preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
-existing namespace/state, Pages `script_name = "api-gateway"` and the current DO protocol.
-Supabase ownership, W10 authority activation and #1086 remain outside this extraction stage.
+Worker identity, class `ApiGatewayRateLimiter`, migration `v1`, DO namespace
+`832c68d546974f9884747962b5efe97d`, Pages `script_name = "api-gateway"`, the DO protocol,
+abuse namespace `1001`, secrets and route `api.tarkovtracker.org/*` are preserved.
+The pre-cutover serving version `e470b448-d198-4138-9da4-054fb937e0ed` and old source settings
+were retained for rollback; disable the new build trigger before an approved rollback.
+Supabase ownership, W10 authority activation and #1086 remain outside this migration.
 
 ## Legacy address retirement
 

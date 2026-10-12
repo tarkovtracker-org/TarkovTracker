@@ -7,14 +7,12 @@ const hasLegacyContractsSource = (root) =>
   legacyOwnerSources.some((entry) =>
     existsSync(resolve(root, 'workers/api-gateway/progress-contracts', entry))
   );
-export function inspectReleasePins(version, frontend, gateway, lock) {
+export function inspectReleasePins(version, frontend, lock) {
   const dependency = '@tarkovtracker/progress-contracts';
   const resolution = `resolution: {integrity: ${version.contracts.integrity}, tarball: ${version.contracts.url}}`;
   return [
     frontend.dependencies[dependency] === version.contracts.url ||
       'Frontend contracts pin differs.',
-    gateway.dependencies[dependency] === version.contracts.url ||
-      'Legacy gateway contracts pin differs.',
     lock.includes(resolution) || 'Contracts URL/integrity differs in pnpm-lock.yaml.',
   ].filter((result) => typeof result === 'string');
 }
@@ -38,7 +36,6 @@ export function checkProgressContracts(root) {
   const violations = inspectReleasePins(
     version,
     readJson(resolve(root, 'package.json')),
-    readJson(resolve(root, 'workers/api-gateway/package.json')),
     readFileSync(resolve(root, 'pnpm-lock.yaml'), 'utf8')
   );
   if (hasLegacyContractsSource(root))
@@ -48,5 +45,7 @@ export function checkProgressContracts(root) {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   checkProgressContracts(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
-  console.log('Frontend and legacy gateway use the same immutable contracts URL/integrity.');
+  console.log(
+    'Frontend uses the immutable contracts URL/integrity with one external source owner.'
+  );
 }

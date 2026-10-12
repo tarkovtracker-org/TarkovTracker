@@ -51,7 +51,7 @@ For the full setup guide, coding standards, common tasks, debugging, and commit 
    (`fix/`, `feat/`, `enhance/`, `refactor/`, `docs/`, `chore/`)
 2. Make your changes following the coding standards
 3. Self-review, run the smallest relevant validation (`pnpm run lint` for code, `pnpm run typecheck`
-   for Nuxt/TS, `pnpm --filter api-gateway run typecheck` for Workers, `pnpm test` for executable
+   for Nuxt/TS, `pnpm run verify:api-parity` for external API integration, `pnpm test` for executable
    code), and update docs
 4. Open a PR using the template, link related issues, and ensure all CI checks pass
 5. Address review feedback; a maintainer merges once approved

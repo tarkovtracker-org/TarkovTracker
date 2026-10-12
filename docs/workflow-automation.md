@@ -917,7 +917,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 
 **Features:**
 
-- Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
+- Weekly dependency update batches for the frontend pnpm workspace (API updates are owned by TarkovTracker-API)
 - Monthly grouped GitHub Actions updates for manual review
 - Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
   behind a minor/patch-only rule

@@ -503,7 +503,7 @@ pnpm run test
 pnpm run test:watch
 
 # API Gateway tests
-pnpm run test:api-gateway
+pnpm run verify:api-parity
 ```
 
 **Test Organization:**
@@ -681,7 +681,7 @@ Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE
 Edge-only tier roles for supporter sync (role sync skips the tier role when one is unset). See
 `supabase/functions/.env.example`.
 
-**Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
+**Cloudflare Workers** (TarkovTracker-API, set via `wrangler secret put` in that checkout):
 
 | Variable                    | Description                                                    | Required   |
 | --------------------------- | -------------------------------------------------------------- | ---------- |

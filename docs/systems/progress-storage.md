@@ -166,7 +166,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
-- `app/utils/constants.ts`, `workers/api-gateway/src/utils/gameMode.ts` — runtime active-season
+- `app/utils/constants.ts`, [TarkovTracker-API/src/utils/gameMode.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/utils/gameMode.ts) — runtime active-season
   constants and upstream mode mapping
 
 ### Invariants
@@ -204,7 +204,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
-- Both season resolvers (Nitro and the Worker's `workers/api-gateway/src/utils/gameMode.ts`) accept
+- Both season resolvers (Nitro and the Worker's [TarkovTracker-API/src/utils/gameMode.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/utils/gameMode.ts)) accept
   the RPC's `SMALLINT` only as a JSON number that is a positive integer
   (`@tarkovtracker/progress-contracts/seasonNumber`); strings, booleans, arrays, objects, null, zero, negatives and
   fractions are rejected without coercion and fail closed.

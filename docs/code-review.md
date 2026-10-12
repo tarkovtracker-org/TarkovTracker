@@ -46,7 +46,7 @@ Verify every diff against the invariants in the root `AGENTS.md`, plus:
 
 ### Cloudflare Workers / Durable Objects
 
-- **Where:** `workers/api-gateway/` (`src/rateLimiter.ts` rate-limiter DO) — it is the only
+- **Where:** [TarkovTracker-API](https://github.com/tarkovtracker-org/TarkovTracker-API) (`src/rateLimiter.ts` rate-limiter DO) — it is the only
   Cloudflare Worker in this repo; precompute runs from the scheduled Actions workflow
   (`scripts/precompute/`), not from a Worker.
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without

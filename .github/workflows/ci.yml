@@ -297,19 +297,6 @@ jobs:
       - uses: ./.github/actions/setup-project
       - name: Check released contracts ownership and pins
         run: pnpm run check:progress-contracts
-      - name: Validate api-gateway
-        if: hashFiles('workers/api-gateway/package.json') != ''
-        run: |
-          pnpm --filter api-gateway run types:check
-          pnpm --filter api-gateway run typecheck
-          pnpm --filter api-gateway run validate:openapi
-          pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run
-      - name: Test api-gateway
-        if: hashFiles('workers/api-gateway/package.json') != ''
-        run: pnpm run test:api-gateway
-      - name: Prove standalone api-gateway
-        if: hashFiles('workers/api-gateway/package.json') != ''
-        run: pnpm run verify:api-standalone
       - name: Check versioned API and frontend parity in every mode
         run: pnpm run verify:api-parity
   # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable

@@ -50,7 +50,7 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path,
+1. **Routing + User-Agent gate.** [TarkovTracker-API/src/router.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/router.ts) normalizes the path,
    enforces the api host boundary (non-api host requests outside `/health` return 404, while
    loopback hosts such as `localhost` and `127.0.0.1` are admitted for local development), and
    rejects protected endpoint requests without a 5–200 character `User-Agent`; infrastructure routes
@@ -59,7 +59,7 @@ sequenceDiagram
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
    on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
    infrastructure protection, not a customer quota, and fails open on binding errors.
-3. **Token auth.** `workers/api-gateway/src/auth.ts` validates the bearer token against
+3. **Token auth.** [TarkovTracker-API/src/auth.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/auth.ts) validates the bearer token against
    `api_tokens` by hash and checks the permission (`GP`/`TP`/`WP`).
    After successful validation, the request's `ExecutionContext.waitUntil` retains the entire
    lifetime-accounting operation, including any permitted fallback, without blocking the response.
@@ -80,11 +80,11 @@ sequenceDiagram
    `ApiGatewayRateLimiter` Durable Object call (`daily-{kind}:{user_id}`, UTC-day anchor, retained)
    admits or denies the request. The quota counts admitted requests — downstream Supabase failures
    do not trigger refunds. The daily quota fails open on DO unavailability.
-5. **Data fetch.** `workers/api-gateway/src/handlers/progress.ts` selects the token mode's
+5. **Data fetch.** [TarkovTracker-API/src/handlers/progress.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/handlers/progress.ts) selects the token mode's
    `progress_data` from `user_game_mode_progress` using the mode's season number, selects only
    account-wide `game_edition` from `user_progress`, resolves a display-name fallback from Supabase
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
-   `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
+   [TarkovTracker-API/src/services/tarkov.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/services/tarkov.ts) (1h memory cache).
    Concurrent misses share one fetch/normalization per resource and upstream mode within an isolate.
    The originating request retains that operation with `waitUntil`; streams are consumed there and
    only parsed public catalog data is shared. Every settled operation leaves the in-flight map;
@@ -95,7 +95,7 @@ sequenceDiagram
    applying transitions or calling the progress merge RPC; level and objective patches do not
    evaluate task rules and retain their existing behavior. Expired catalogs are not used as a
    last-good fallback.
-6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
+6. **Transform.** [TarkovTracker-API/src/utils/transform.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/utils/transform.ts) converts the JSONB objects into the
    public array format, applies invalidation (`@tarkovtracker/progress-contracts/progressInvalidation`, the same
    algorithm the app uses) and game-edition hideout auto-completes.
    Browser and Worker catalogs compile completion-triggered failure edges through
@@ -106,28 +106,28 @@ sequenceDiagram
    Gateway task catalogs are frozen and registered with a prepared dependency graph once per catalog
    snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
    state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.
-7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
+7. **Conditional response.** `conditionalReadResponse` in [TarkovTracker-API/src/responses.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/responses.ts)
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
    `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
    accepts gzip; an explicit `gzip;q=0` is honored as a rejection, `identity;q=0` bypasses the
    size threshold, and a client that refuses every available coding gets `406`.
-8. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
+8. **Usage accounting.** [TarkovTracker-API/src/services/usage.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/services/usage.ts) records the read/write (and
    throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
 
 ### Files
 
-- `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
-- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
-- `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
-- `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
-- `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
-- `workers/api-gateway/src/auth.ts` — token validation
-- `workers/api-gateway/src/handlers/progress.ts`, `workers/api-gateway/src/handlers/team.ts` —
+- [TarkovTracker-API/src/index.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/index.ts) — Worker entrypoint; delegates to the modules below
+- [TarkovTracker-API/src/router.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/router.ts) — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
+- [TarkovTracker-API/src/authentication.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/authentication.ts) — abuse gate, token auth, daily-quota enforcement
+- [TarkovTracker-API/src/rateLimiter.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/rateLimiter.ts) — `ApiGatewayRateLimiter` Durable Object + quota client
+- [TarkovTracker-API/src/responses.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/responses.ts) — CORS, envelopes, conditional response, ETag/compression
+- [TarkovTracker-API/src/auth.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/auth.ts) — token validation
+- [TarkovTracker-API/src/handlers/progress.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/handlers/progress.ts), [TarkovTracker-API/src/handlers/team.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/handlers/team.ts) —
   progress reads/writes
-- `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
-  `workers/api-gateway/src/services/tarkov.ts`
-- `workers/api-gateway/src/utils/transform.ts`
+- [TarkovTracker-API/src/services/supporter.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/services/supporter.ts), [TarkovTracker-API/src/services/usage.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/services/usage.ts),
+  [TarkovTracker-API/src/services/tarkov.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/services/tarkov.ts)
+- [TarkovTracker-API/src/utils/transform.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/utils/transform.ts)
 - `@tarkovtracker/progress-contracts/progressInvalidation` — runtime-independent task/objective invalidation
   (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
   app progress store, public profile/streamer views, and the Worker transform
@@ -137,7 +137,7 @@ sequenceDiagram
   lock/unlock) used by Worker task writes
 - `@tarkovtracker/progress-contracts/userMetadata` — runtime-independent provider metadata parsing, shared with app
   user hydration through `@tarkovtracker/progress-contracts/userMetadata` in Nuxt and the Worker
-- `workers/api-gateway/src/utils/user-display-name.ts` — cached Auth metadata lookup shared by
+- [TarkovTracker-API/src/utils/user-display-name.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/utils/user-display-name.ts) — cached Auth metadata lookup shared by
   personal and team API progress
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs
 

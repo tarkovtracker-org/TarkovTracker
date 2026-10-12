@@ -6,7 +6,7 @@ Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration
 Team routes: /api/team/* (Supabase JWT auth).
 Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
 Game modes in API: regular (pvp), pve, pvp-season (seasonal).
-Rate limits: §Rate Limits. OpenAPI spec: workers/api-gateway/src/openapi.ts.
+Rate limits: §Rate Limits. OpenAPI spec: [API source](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/src/openapi.ts).
 -->
 
 ## Overview

@@ -44,7 +44,7 @@ the loader never reaches a real import.
 ### Files
 
 - `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
-- `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
+- `package.json` — `test`, `test:coverage`, and `verify:api-parity` scripts
 - `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
 - `scripts/workflow-tests/workflows.mjs` — asserts the shard command and required check names
 - `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
