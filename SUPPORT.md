@@ -12,7 +12,7 @@ tracker focused on bugs and features.
 | Reproducible bug                          | [Bug report form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=bug_report.yml)                                       |
 | Feature idea (something new)              | [Feature request form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=feature_request.yml)                             |
 | Improvement to an existing feature        | [Enhancement form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=enhancement.yml)                                     |
-| Incorrect in-game data (quest/item)       | [tarkov-data-overlay repository](https://github.com/tarkovtracker-org/tarkov-data-overlay)                                                     |
+| Incorrect in-game data (quest/item)       | [Data issue form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=data_issue.yml)                                       |
 | TarkovTracker displaying data incorrectly | [Data issue form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=data_issue.yml)                                       |
 | Security vulnerability                    | See [`SECURITY.md`](./SECURITY.md) — **do not open a public issue**                                                                            |
 | Account-specific support                  | [support@tarkovtracker.org](mailto:support@tarkovtracker.org)                                                                                  |
@@ -25,7 +25,7 @@ tracker focused on bugs and features.
 2. **Check the live app** at <https://tarkovtracker.org> to confirm the behavior
    on the current deployment.
 3. **Pick the right template.** A bug is not a feature request, and an
-   in-game-data error belongs in the data-overlay repository, not here.
+   in-game-data error goes in the Data issue form.
 
 ## What we cannot help with
 

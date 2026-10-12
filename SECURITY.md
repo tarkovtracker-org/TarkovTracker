@@ -61,11 +61,11 @@ In scope:
 - The Stripe billing webhook path
 - The Supabase database schema and Row Level Security policies
 
-Out of scope (report upstream):
+Out of scope (report through the channel listed):
 
 - `json.tarkov.dev` data issues — report to the tarkov.dev project
-- `tarkov-data-overlay` content issues — report at
-  <https://github.com/tarkovtracker-org/tarkov-data-overlay>
+- `tarkov-data-overlay` content issues — use the
+  [Data issue form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=data_issue.yml)
 - Supabase platform vulnerabilities — report to Supabase
 - Cloudflare platform vulnerabilities — report to Cloudflare
 
