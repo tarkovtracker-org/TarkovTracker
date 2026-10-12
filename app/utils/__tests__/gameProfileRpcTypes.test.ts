@@ -1,9 +1,7 @@
 // @vitest-environment node
 import { expectTypeOf, it } from 'vitest';
 import type { Database } from '~~/supabase/functions/_shared/database.types';
-
 type ProfileFunctions = Database['public']['Functions'];
-
 it('accepts the nullable game profile RPC inputs supported by SQL', () => {
   expectTypeOf<ProfileFunctions['update_game_profile']['Args']>().toEqualTypeOf<{
     p_eft_account_id: string | null;
