@@ -1,6 +1,6 @@
+import { runImportPrecompute } from '@@/scripts/precompute/import-snapshots';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TASK_IMPORT_MAX_AGE_MS } from '@/utils/taskImportCatalog';
-import { runImportPrecompute } from '../import-snapshots';
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), overlay: vi.fn(), create: vi.fn() }));
 vi.mock('@/server/utils/tarkov-json', () => ({ createTarkovJsonTasksImportFetcher: mocks.create }));
 vi.mock('@/server/utils/overlay', () => ({ applyOverlay: mocks.overlay }));
