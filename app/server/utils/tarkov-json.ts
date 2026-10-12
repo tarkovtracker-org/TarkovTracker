@@ -59,7 +59,7 @@ const HIDEOUT_SKILL_REQUIREMENT_SKILLS: Record<string, { id: string; name: strin
   },
 };
 type JsonRecord = Record<string, unknown>;
-type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'tasks' | 'traders';
+type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
   data: T;
   translations?: string[];
@@ -377,10 +377,12 @@ function applyTranslationPath(
   current: unknown,
   path: string,
   translate: TranslateFn,
-  log: TranslationLogger
+  log: TranslationLogger,
+  requireTranslations: boolean
 ): unknown {
   const segments = parseTranslationPath(path);
   if (segments) return translateAtPath(current, segments, 0, translate);
+  if (requireTranslations) throw new Error('Unsupported json.tarkov.dev season translation path');
   log.warn('[TarkovJson] Skipped unsupported translation path', { path });
   return current;
 }
@@ -388,14 +390,21 @@ function applyTranslations<T>(
   response: TarkovJsonEnvelope<T>,
   primaryTranslations: JsonRecord | undefined,
   fallbackTranslations: JsonRecord | undefined,
-  log: TranslationLogger
+  log: TranslationLogger,
+  requireTranslations: boolean
 ): T {
   const translations = primaryTranslations ?? fallbackTranslations;
+  if (!translations && requireTranslations)
+    throw new Error('Missing json.tarkov.dev season translations');
   if (!translations) return response.data;
-  const translate: TranslateFn = (key) =>
-    readTranslation(translations, fallbackTranslations, key)?.value;
+  const translate: TranslateFn = (key) => {
+    const translation = readTranslation(translations, fallbackTranslations, key);
+    if (!translation && requireTranslations)
+      throw new Error('Unresolved json.tarkov.dev season translation');
+    return translation?.value;
+  };
   const translated = (response.translations ?? []).reduce<unknown>(
-    (current, path) => applyTranslationPath(current, path, translate, log),
+    (current, path) => applyTranslationPath(current, path, translate, log, requireTranslations),
     response
   );
   return (translated as TarkovJsonEnvelope<T>).data;
@@ -420,7 +429,8 @@ export async function fetchTarkovJsonEndpoint<T>(
     baseResponse,
     primaryResponse.status === 'fulfilled' ? primaryResponse.value.data : undefined,
     fallbackResponse.status === 'fulfilled' ? fallbackResponse.value?.data : undefined,
-    resolveLogger(options)
+    resolveLogger(options),
+    endpoint === 'season'
   );
 }
 function adaptCategoryRef(value: unknown, context: AdapterContext) {

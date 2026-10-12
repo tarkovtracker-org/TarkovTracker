@@ -4,7 +4,6 @@ import { addFallbackCrafts, addFallbackItems } from '@/server/utils/overlayAddit
 import {
   projectEditions,
   projectRawPrestige,
-  projectSeasonalPerks,
   projectStoryChapters,
 } from '@/server/utils/overlayProjectors';
 import { unknownOverlaySections, validateOverlayData } from '@/server/utils/overlayValidation';
@@ -148,16 +147,13 @@ describe('endpoint overlay projectors', () => {
     );
     expect(raw.tasks).toEqual([{ id: 'synthetic', name: 'Upstream' }]);
   });
-  it('applies shared then mode edition data and gates perks to Seasonal', () => {
+  it('applies shared then mode edition data', () => {
     const scoped = { ...overlay, modes: { pve: { editions: { standard: { value: 2 } } } } };
     expect(projectEditions(scoped, 'pve')[0]).toMatchObject({
       id: 'standard',
       title: 'Standard',
       value: 2,
     });
-    expect(projectSeasonalPerks(overlay, 'regular')).toEqual([]);
-    expect(projectSeasonalPerks(overlay, 'pve')).toEqual([]);
-    expect(projectSeasonalPerks(overlay, 'pvp-season')).toHaveLength(1);
   });
   it('adapts missing items without shadowing existing upstream records', () => {
     const existing = { id: 'existing', name: 'Rich upstream', types: ['barter'] } as TarkovItem;
