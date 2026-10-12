@@ -117,6 +117,28 @@ Teams, save status and recovery, and progress imports build on this storage; see
 [teams](./teams.md), [progress sync and recovery](./progress-sync.md), and
 [imports](./imports.md).
 
+### Game profiles
+
+An account's existing progress rows are its default profile; nothing about them changes. A second
+EFT account is a non-default profile stored in its own tables, so a reader that does not know about
+profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its data.
+
+- `user_game_profiles`: one row per profile (`is_default`, `label`, `eft_account_id`,
+  `game_edition`). The default row is created lazily, when the account binds an EFT account id or
+  adds a profile. `eft_account_id` is unique per account, not globally.
+- `user_profile_mode_progress`: per-mode progress of a non-default profile, same shape and checks as
+  `user_game_mode_progress`, keyed `(profile_id, game_mode, season_number)`. Both tables are
+  deny-all; clients use `list_game_profiles`, `add_game_profile`, `update_game_profile`,
+  `delete_game_profile`, `get_game_profile_progress`, and `sync_game_profile_progress`.
+- Cap: 2 profiles per account (default plus one), enforced in `add_game_profile`. Errors: `PT400`
+  invalid label or EFT account id, `PT403` locked, `PT404` unknown profile, `PT409` duplicate or default-profile misuse, `PT422` cap reached.
+- Access: `private.game_profiles_unlocked` is true for an active, non-disqualified supporter (same
+  rule as `supporterStatus.ts`, using effective prepaid entitlements when that rollout is present) or when `app_settings.game_profiles_access` is `"all"`; a missing
+  setting means supporters only. Binding the default profile is never gated. A lapsed account keeps
+  its extra profile read-only and can still delete it.
+- Preferences and other non-progress settings stay account-global. API tokens and teams still address
+  the default profile only; profile-bound tokens and team membership are later changes.
+
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
@@ -138,6 +160,8 @@ Teams, save status and recovery, and progress imports build on this storage; see
   legacy-only `update_task_completion`, while retaining account clocks for accepted cached clients
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
+- `supabase/migrations/20261012094933_reconcile_game_profile_entitlements.sql` — game profile tables, supporter gate,
+  and profile RPCs
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
@@ -148,6 +172,12 @@ Teams, save status and recovery, and progress imports build on this storage; see
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Game profiles remain capped at default plus one extra, with account-owned IDs and RPC-only access.
+  Default progress is never gated or mixed with extra-profile rows. Lapsed accounts retain read and
+  delete access to extras; writes use effective, non-disqualified supporter access unless the setting
+  opens access to all. Preferences, team readers, shares and existing API tokens stay account-global
+  or default-profile scoped. Current Seasonal writes require a matching season stamp and preserve
+  all historical profile seasons. A NULL edition in extra-profile sync preserves its saved edition.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
   requires aligned application/gateway consumers and a verified database rollout first. The

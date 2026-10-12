@@ -1,4 +1,8 @@
-import { useSupporterActivity } from '@/composables/useSupporterActivity';
+import {
+  useSupporterActivity,
+  useSupporterEntitlement,
+  useSupporterClock,
+} from '@/composables/useSupporterActivity';
 import { logger } from '@/utils/logger';
 import {
   createChannelReleaseLatch,
@@ -14,6 +18,10 @@ export interface SupporterStatus {
   hasEverSupported: boolean;
   expiresAt: string | null;
   startedAt: string;
+  oneTimeTier?: string | null;
+  oneTimeRemainingSeconds?: number | null;
+  oneTimeExpiresAt?: string | null;
+  stripeSubscriptionId?: string | null;
 }
 // Module-scoped reactive state: useSupporter() is a singleton-style composable
 // (similar to Pinia stores) so all components observe the same supporter status
@@ -40,15 +48,25 @@ export function useSupporter() {
     const currentUserId = $supabase.user?.id ?? null;
     return !currentUserId || currentUserId === userId;
   };
-  const isActiveStatus = useSupporterActivity(supporterState);
+  const now = useSupporterClock();
+  const effectiveState = useSupporterEntitlement(supporterState, now);
+  const isActiveStatus = useSupporterActivity(effectiveState, now);
   const isSupporter = computed(() => supporterState.value?.hasEverSupported === true);
   const isActiveSubscriber = computed(
-    () => supporterState.value?.type === 'subscription' && isActiveStatus.value
+    () => effectiveState.value?.type === 'subscription' && isActiveStatus.value
+  );
+  const billingSubscription = computed(() =>
+    supporterState.value?.type === 'subscription' ? supporterState.value : null
+  );
+  const isSubscribed = computed(
+    () =>
+      Boolean(billingSubscription.value?.stripeSubscriptionId) &&
+      ['active', 'past_due'].includes(billingSubscription.value!.status)
   );
   const activeTier = computed(() => {
     if (!supporterState.value) return null;
     if (isActiveStatus.value) {
-      return supporterState.value.tier;
+      return effectiveState.value!.tier;
     }
     if (supporterState.value.hasEverSupported) return 'supporter';
     return null;
@@ -74,8 +92,11 @@ export function useSupporter() {
     let success = false;
     try {
       const { data, error: err } = await $supabase.client
+        // Keep billing details raw; effective access is projected separately above.
         .from('supporters')
-        .select('tier, status, type, has_ever_supported, expires_at, started_at')
+        .select(
+          'tier, status, type, has_ever_supported, expires_at, started_at, one_time_tier, one_time_remaining_seconds, one_time_expires_at, stripe_subscription_id'
+        )
         .eq('user_id', userId)
         .maybeSingle();
       if (err) {
@@ -93,6 +114,10 @@ export function useSupporter() {
           hasEverSupported: data.has_ever_supported,
           expiresAt: data.expires_at,
           startedAt: data.started_at,
+          oneTimeTier: data.one_time_tier,
+          oneTimeRemainingSeconds: data.one_time_remaining_seconds,
+          oneTimeExpiresAt: data.one_time_expires_at,
+          stripeSubscriptionId: data.stripe_subscription_id,
         };
       } else {
         supporterState.value = null;
@@ -242,12 +267,14 @@ export function useSupporter() {
     }
   }
   return {
-    supporter: supporterState,
+    supporter: effectiveState,
     loading,
     loadedUserId: readonly(statusLoadedForUserId),
     error,
     isSupporter,
     isActiveSubscriber,
+    isSubscribed,
+    billingSubscription,
     activeTier,
     badgeLabel,
     fetchStatus,

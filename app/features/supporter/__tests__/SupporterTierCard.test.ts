@@ -8,6 +8,8 @@ import type { SupporterTier } from '@/features/supporter/supporterTypes';
 const activeTier = ref<'supporter' | 'scav' | 'timmy' | 'chad' | null>('scav');
 const composableError = ref<string | null>(null);
 const isActiveSubscriber = ref(true);
+const isSubscribed = ref(true);
+const billingSubscription = ref({ tier: 'scav' });
 const mockCreateCheckout = vi.fn();
 const mockOpenBillingPortal = vi.fn();
 vi.mock('@/composables/useSupporter', () => ({
@@ -16,6 +18,8 @@ vi.mock('@/composables/useSupporter', () => ({
     createCheckout: mockCreateCheckout,
     error: composableError,
     isActiveSubscriber,
+    isSubscribed,
+    billingSubscription,
     openBillingPortal: mockOpenBillingPortal,
   }),
 }));
@@ -60,6 +64,8 @@ describe('SupporterTierCard', () => {
     activeTier.value = 'scav';
     composableError.value = null;
     isActiveSubscriber.value = true;
+    isSubscribed.value = true;
+    billingSubscription.value = { tier: 'scav' };
     mockCreateCheckout.mockReset();
     mockOpenBillingPortal.mockReset().mockResolvedValue(null);
     readyAuth.getUser.mockReset().mockResolvedValue({ data: { user: { id: 'user-1' } } });
@@ -83,6 +89,7 @@ describe('SupporterTierCard', () => {
   });
   it('reads the signed-in user only after the Supabase client is ready', async () => {
     isActiveSubscriber.value = false;
+    isSubscribed.value = false;
     const wrapper = await mountCard();
     await flushPromises();
     expect(supabase.ready).toHaveBeenCalledTimes(1);
@@ -91,6 +98,21 @@ describe('SupporterTierCard', () => {
     const button = wrapper.get('button');
     expect(button.text()).toBe('page.supporter.tier_cta');
     expect(button.attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('manages a past-due plan while a different prepaid tier supplies access', async () => {
+    isActiveSubscriber.value = false;
+    isSubscribed.value = true;
+    billingSubscription.value = { tier: 'chad' };
+    const wrapper = await mountCard();
+    await flushPromises();
+    expect(wrapper.text()).toContain('Current tier');
+    const button = wrapper.get('button');
+    expect(button.text()).toContain('Manage subscription');
+    await button.trigger('click');
+    await flushPromises();
+    expect(mockOpenBillingPortal).toHaveBeenCalledOnce();
+    expect(mockCreateCheckout).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 });
