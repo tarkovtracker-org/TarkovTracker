@@ -62,12 +62,17 @@
   import { useSupporterActivity } from '@/composables/useSupporterActivity';
   import { logger } from '@/utils/logger';
   const { t, te, locale } = useI18n({ useScope: 'global' });
-  const { supporter, openBillingPortal, error: composableError } = useSupporter();
+  const {
+    supporter,
+    billingSubscription,
+    openBillingPortal,
+    error: composableError,
+  } = useSupporter();
   const portalLoading = ref(false);
   const portalError = ref<string | null>(null);
   const isActive = useSupporterActivity(supporter);
   const isSubscription = computed(() => supporter.value?.type === 'subscription');
-  const canManage = computed(() => isSubscription.value && supporter.value !== null);
+  const canManage = computed(() => Boolean(billingSubscription.value?.stripeSubscriptionId));
   const canUpgrade = computed(() => !isActive.value && supporter.value?.hasEverSupported === true);
   const tierLabel = computed(() => {
     const tier = supporter.value?.tier;

@@ -68,7 +68,7 @@ const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: str
     if (url.pathname === '/project/rest/v1/rpc/increment_token_usage') {
       return jsonResponse({ ok: true });
     }
-    if (url.pathname === '/project/rest/v1/supporters') return jsonResponse([]);
+    if (url.pathname === '/project/rest/v1/supporter_entitlements') return jsonResponse([]);
     if (url.pathname === '/project/rest/v1/rpc/record_api_usage') {
       return jsonResponse({ ok: true });
     }
