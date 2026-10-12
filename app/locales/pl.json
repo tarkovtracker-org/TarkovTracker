@@ -92,7 +92,6 @@
     "user_avatar_alt": "Awatar użytkownika",
     "supporter_badge_aria": "Zarządzaj subskrypcją wspierającego ({tier})",
     "help_community_aria": "Pomoc i społeczność",
-    "community_section": "Społeczność",
     "keyboard_shortcuts": "Skróty klawiszowe",
     "report_problem": "Zgłoś problem",
     "login_aria": "Zaloguj się na swoje konto",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "Masz nieprzeczytaną aktywność",
     "mark_read": "Oznacz jako przeczytane",
-    "clear": "Wyczyść",
     "empty": "Nie zarejestrowano jeszcze żadnej aktywności.",
     "badge_api": "Synchronizacja API",
     "api_synced": "Postęp zsynchronizowany przez API",
@@ -158,11 +156,7 @@
       "uncompleted": "Oznaczono zadanie jako nieukończone: {name}",
       "failed": "Nieudane zadanie: {name}",
       "reset_failed": "Zresetowano stan niepowodzenia zadania: {name}",
-      "available": "Odblokowano zadanie: {name}",
-      "undo_completed": "Cofnięto ukończenie zadania: {name}",
-      "undo_uncompleted": "Cofnięto oznaczenie zadania jako nieukończonego: {name}",
-      "undo_reset_failed": "Cofnięto reset stanu niepowodzenia zadania: {name}",
-      "undo_failed": "Cofnięto oznaczenie zadania jako nieudanego: {name}"
+      "available": "Odblokowano zadanie: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "Sortuj handlarzy",
           "direction_aria_label": "Przełącz kierunek sortowania"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Wesprzyj TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "Odznaka wspierającego",
       "perk_discord": "Rola wspierającego na Discordzie (powiąż konto i dołącz do naszego serwera)",
       "perk_tier_role": "Rola {tier} Tier w serwisie Discord",
-      "perk_early_access": "Wczesny dostęp do nowych funkcji",
       "perk_priority_support": "Priorytetowe wsparcie",
       "perk_feature_voting": "Priorytet w głosowaniu nad funkcjami",
       "one_time_title": "Jednorazowy wkład",
@@ -873,11 +874,6 @@
       "savings_note": "Oszczędzasz {amount} względem opłaty miesięcznej",
       "kofi_deprecation_title": "Ko-fi (opcja zapasowa)",
       "kofi_deprecation_detail": "Subskrypcje i jednorazowe wkłady powyżej są realizowane przez Stripe, co oznacza niższe opłaty i większą część wsparcia trafiającą bezpośrednio do nas. Ko-fi pozostaje dostępne jako opcja zapasowa wyłącznie dla jednorazowych napiwków.",
-      "alt_payments_title": "Wkrótce więcej metod płatności",
-      "alt_payments_coming_soon": "Pracujemy nad dodaniem kolejnych opcji płatności, aby każdy mógł wesprzeć projekt w odpowiedni dla siebie sposób.",
-      "alt_payment_crypto": "Kryptowaluty",
-      "alt_payment_gift_cards": "Karty podarunkowe",
-      "alt_payments_more": "i więcej",
       "checkout_error_title": "Płatność nie powiodła się",
       "checkout_error_generic": "Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.",
       "manage_subscription_cta": "Zarządzaj subskrypcją",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "Język",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Zarządzaj kontem, postępem gry i preferencjami aplikacji.",
     "tabs": {
       "progression": "Postęp",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Prestige Unavailable",
-      "persistent_mode_unsupported": "Prestiż jest niedostępny dla trybu PvE na stałe.",
       "seasonal_mode_unsupported": "Prestiż jest niedostępna w Sezonowym PvP.",
       "current_level": "Bieżący poziom prestiżu",
       "set_current": "Ustaw bieżący prestiż",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "Nie możesz go znaleźć? Otwórz BSG Launcher → Game Settings → Logs i skopiuj tę ścieżkę.",
       "avoid_session_folder_label": "Przykładowy folder sesji:",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "Konto",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Uwzględnij wersje dzienników",
       "version_filter_hint": "Domyślnie wybrano najnowszą wersję główną. Uwzględnij tylko dzienniki postaci i wipe'u, który chcesz przywrócić.",
       "version_filter_tooltip": "Wersje nie identyfikują zmian konta, wipe'ów ani resetów prestiżu. Przed importem wybierz odpowiednie foldery sesji. Zdarzenia sezonowe muszą przypadać na aktywny sezon.",

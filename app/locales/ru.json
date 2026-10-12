@@ -92,7 +92,6 @@
     "user_avatar_alt": "Аватар пользователя",
     "supporter_badge_aria": "Управление подпиской сторонника ({tier})",
     "help_community_aria": "Помощь и сообщество",
-    "community_section": "Сообщество",
     "keyboard_shortcuts": "Быстрые клавиши",
     "report_problem": "Сообщить о проблеме",
     "login_aria": "Войти в аккаунт",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "У вас есть непрочитанные действия",
     "mark_read": "Пометить как прочитанное",
-    "clear": "Очистить",
     "empty": "Активность пока не зафиксирована.",
     "badge_api": "Синхронизация API",
     "api_synced": "Прогресс синхронизирован через API",
@@ -158,11 +156,7 @@
       "uncompleted": "Невыполненное задание: {name}",
       "failed": "Проваленная задача: {name}",
       "reset_failed": "Сбросить проваленную задачу {name}",
-      "available": "Задание открыто: {name}",
-      "undo_completed": "Выполнение задания отменено: {name}",
-      "undo_uncompleted": "Отметка о невыполнении задания отменена: {name}",
-      "undo_reset_failed": "Сброс статуса «Провалено» для задания отменён: {name}",
-      "undo_failed": "Статус «Провалено» для задания отменён: {name}"
+      "available": "Задание открыто: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "Сортировать торговцев",
           "direction_aria_label": "Изменить направление сортировки"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Поддержать TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "Значок сторонника",
       "perk_discord": "Роль сторонника в Discord (привяжите аккаунт и присоединяйтесь к нашему серверу)",
       "perk_tier_role": "Роль уровня {tier} в Discord",
-      "perk_early_access": "Ранний доступ к новым функциям",
       "perk_priority_support": "Приоритетная поддержка",
       "perk_feature_voting": "Приоритетное участие в голосовании за новые функции",
       "one_time_title": "Разовый взнос",
@@ -873,11 +874,6 @@
       "savings_note": "Вы экономите {amount} по сравнению с ежемесячной оплатой",
       "kofi_deprecation_title": "Ko-fi (резервный вариант)",
       "kofi_deprecation_detail": "Подписки и разовые взносы, перечисленные выше, теперь проходят через Stripe: комиссии ниже, и больше вашей поддержки напрямую получает наш проект. Ko-fi остаётся доступен только для разовых чаевых.",
-      "alt_payments_title": "Скоро появится больше способов оплаты",
-      "alt_payments_coming_soon": "Мы добавляем дополнительные способы оплаты, чтобы каждый мог поддержать проект наиболее удобным для себя способом.",
-      "alt_payment_crypto": "Криптовалюта",
-      "alt_payment_gift_cards": "Подарочные карты",
-      "alt_payments_more": "& другое",
       "checkout_error_title": "Не удалось оформить заказ",
       "checkout_error_generic": "Не удалось начать оформление заказа. Повторите попытку через мгновение.",
       "manage_subscription_cta": "Управлять подпиской",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "Язык",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Управляйте аккаунтом, игровым прогрессом и настройками приложения.",
     "tabs": {
       "progression": "Прогресс",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Престиж недоступен",
-      "persistent_mode_unsupported": "Престиж недоступен для постоянного PvE режима.",
       "seasonal_mode_unsupported": "Престиж недоступен в сезонных PvP.",
       "current_level": "Текущий уровень престижа",
       "set_current": "Установить текущий престиж",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "Не можете найти? Откройте BSG Launcher -> Game Settings -> Logs и скопируйте этот путь.",
       "avoid_session_folder_label": "Не выбирайте папку сессии вроде:",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "Аккаунт",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Включать версии логов",
       "version_filter_hint": "По умолчанию выбрана последняя основная версия. Измените это, чтобы включить более старые вайпы.",
       "version_filter_tooltip": "Логи сгруппированы по версии сессии. По умолчанию выбрана последняя основная версия, чтобы не смешивать данные старых вайпов.",
