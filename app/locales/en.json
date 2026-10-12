@@ -2081,6 +2081,7 @@
       "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
       "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
       "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
       "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
       "older_edit_unavailable": "This older edit is no longer available.",
       "older_edit_read_failed": "Unable to read this older edit. Try again.",

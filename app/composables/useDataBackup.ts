@@ -976,7 +976,10 @@ export function useDataBackup(): UseDataBackupReturn {
     resetImport();
     const owner = $supabase.user.id ?? null;
     try {
-      const record = await readCommittedProgressAuthority();
+      const record = await readCommittedProgressAuthority().catch((error) => {
+        logger.error('[DataBackup] Older-copy read failed:', error);
+        throw new Error(t('settings.data_management.older_edit_read_failed'));
+      });
       if (owner !== ($supabase.user.id ?? null))
         throw new Error(t('settings.data_management.import_owner_changed'));
       const copies = ownedLegacyUpdates(record, owner);
@@ -1022,7 +1025,7 @@ export function useDataBackup(): UseDataBackupReturn {
     const receipt = recoveryExportReceipt;
     if (!receipt) throw new Error(t('settings.data_management.recovery_archive_download_required'));
     if (receipt.owner !== ($supabase.user.id ?? null))
-      throw new Error(t('settings.data_management.import_owner_changed'));
+      throw new Error(t('settings.data_management.recovery_owner_changed'));
     await discardExportedLegacyProgress(receipt.owner, receipt.copies);
     recoveryExportReceipt = null;
     recoveryExportPending.value = false;

@@ -1800,7 +1800,7 @@ describe('older-tab recovery review', () => {
       copies.push('newer-copy');
       supabaseUser.id = 'different';
       await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow(
-        'settings.data_management.import_owner_changed'
+        'settings.data_management.recovery_owner_changed'
       );
       expect(clear).not.toHaveBeenCalled();
       supabaseUser.id = 'user-123';
@@ -2104,10 +2104,14 @@ describe('older-tab recovery review', () => {
     expect(backup.importError.value).toBe('settings.data_management.older_edit_unavailable');
     owned.mockRestore();
   });
-  it('translates unexpected older-copy read failures', async () => {
+  it.each([
+    new Error('raw database error'),
+    new DOMException('native read failed', 'UnknownError'),
+    'unavailable',
+  ])('translates older-copy read failure %s', async (error) => {
     const read = vi
       .spyOn(progressAuthority, 'readCommittedProgressAuthority')
-      .mockRejectedValue('unavailable');
+      .mockRejectedValue(error);
     const backup = useDataBackup();
     await backup.reviewOlderTabProgress(0);
     expect(backup.importError.value).toBe('settings.data_management.older_edit_read_failed');
