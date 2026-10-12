@@ -107,6 +107,7 @@
     "supabase:check": "bash scripts/checks/check-supabase-db.sh",
     "supabase:test:concurrency": "node scripts/checks/stripe-event-concurrency.mjs",
     "supabase:test:one-time-concurrency": "node scripts/checks/stripe-one-time-concurrency.mjs",
+    "supabase:test:owner-only-concurrency": "node scripts/checks/owner-only-team-concurrency.mjs",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "systems:check": "node scripts/checks/check-systems-drift.mjs",
     "test": "vitest run",

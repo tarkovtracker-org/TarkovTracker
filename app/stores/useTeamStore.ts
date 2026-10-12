@@ -40,17 +40,10 @@ function getTeamIdFromSystemStore(
  */
 export const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
   state: (): TeamState => ({
-    // Consumers do read this, as `teamStore.id` in useTeamInviteLink.ts and
-    // TeamDangerZone.vue, but Fallow does not attribute a `.id` read to this
-    // state key: `teamStore.owner`, read on the same line of TeamDangerZone.vue,
-    // is attributed and reports clean, while `id` stays flagged. Adding another
-    // consumer read cannot resolve it, and the key belongs to the row shape
-    // hydrated by `$patch(transformed as Partial<TeamState>)`, so renaming it to
-    // sidestep the rule would change the persisted contract.
-    // fallow-ignore-next-line unused-store-member -- not actionable: Fallow does not attribute `.id` reads to a state key
     id: null,
     owner: null,
     joinCode: null,
+    ownerOnlyExpiresAt: null,
     members: [],
     memberProfiles: {},
   }),
@@ -498,6 +491,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         join_code?: string | null;
       } = {
         ...data,
+        ownerOnlyExpiresAt:
+          typeof data.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null,
       };
       // Map owner_id to owner
       if ('owner_id' in data && typeof data.owner_id === 'string') {

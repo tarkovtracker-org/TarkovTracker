@@ -1032,6 +1032,60 @@ regressions and deployment postchecks against any recovery migration before decl
   `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The 2.101
   Go binary (`supabase-2.101` in `~/.local/bin`) can run `db diff` when the 2.108 wrapper cannot.
 
+## Owner-only team expiry rollout
+
+This is a separately approved production procedure. A draft PR, its migration merge or green
+CI authorizes none of these steps. Migration `20261012150355_owner_only_team_expiry.sql` adds
+schema and triggers only: clocks, cron and deletion are initially off. Obtain independent
+concurrency/migration review before merge, then explicit deployment/migration approval under
+the database procedure above. No cost saving has been measured; team rows do not duplicate
+personal progress.
+
+1. Deploy the schema with the gates off, then the app warning UI. Verify creation policy and
+   non-dismissible owner warning using test identities in every mode, server deadline formatting,
+   join cancellation, a fresh last-departure deadline, Realtime refresh and solo-progress fallback
+   after disband. Reads tolerate missing/null deadlines during the schema/app transition.
+2. Only after warning UI verification, separately authorize starting clocks:
+   `SELECT private.begin_owner_only_team_warnings();`. Record its timestamp; repeated calls do
+   not reset it. As postgres, schedule the bounded initializer/runner hourly:
+
+   ```sql
+   SELECT cron.schedule('owner-only-team-cleanup', '17 * * * *',
+     $$SET statement_timeout = '15s'; SELECT * FROM private.run_owner_only_team_cleanup(100);$$);
+   ```
+
+   `pg_cron` must already be installed and reviewed. No extension or job is installed by this PR.
+   Run one approved bounded initialization batch and inspect its receipt (`initialized`,
+   `disbanded`). It cannot delete while `deletion_enabled=false`. Each legacy solo team receives
+   at least 168 hours from its own initialization time, even when the backlog takes multiple runs.
+   New solo transitions are stamped immediately once clocks are activated.
+
+3. Use the approved observer for application-row eligibility/deadline evidence and anomaly
+   counts; do not use privileged MCP application reads if observer access fails. Catalog-only
+   evidence may verify triggers, function ACLs and the index. Confirm cleanup/begin helpers and
+   the settings table have no PUBLIC/anon/authenticated/service_role access. Preserve empty,
+   missing-owner or role/mode-inconsistent teams for a separate report. Check cron receipts and
+   runtime; batches lock at most 100 eligible teams, but the eligibility scan may examine more
+   rows. Tune only from measurements in a separately reviewed change.
+4. After at least seven full days of warning availability and per-team grace evidence, obtain
+   explicit destructive-cleanup approval. Enable only then:
+   `UPDATE private.owner_only_team_cleanup SET deletion_enabled=true WHERE singleton;`.
+   The runner independently enforces the global warning floor and each server deadline. Record
+   initial deletion receipts and verify populated teams and owner personal data remain intact.
+   Expiry is on or after the deadline, depending on hourly batches, lock contention and backlog.
+
+Pause deletion by setting `deletion_enabled=false`; the next batch initializes clocks but
+does not disband. The flag update waits for an in-flight batch's settings share lock, so a batch
+already running completes atomically. Unschedule the named job to pause all batches. Neither
+pause resets clocks. If a new policy/grace period is desired, prepare a separately reviewed
+forward change rather than resetting deadlines through user activity. Do not drop the warning
+UI while deletion remains enabled. Existing account-deletion retry handlers must retain
+whole-transaction handling of `55P03`; failed cascades leave all data unchanged for retry.
+
+Expired team rows/events cannot be recreated by toggling a flag; use the approved recovery
+procedure/backups if necessary. Personal progress needs no recovery because disband never
+deletes it. Do not rollback applied migration history.
+
 ## Production database observer
 
 The repository-owned `scripts/ops/prod-db` command is the canonical read-only production inspection

@@ -838,6 +838,29 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it('clears a prior deadline on join, old-schema snapshots and disband', async () => {
+    const { teamRecords } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      const row = { id: 'team-1', owner_only_expires_at: '2026-10-20T12:00:00Z' };
+      options.onData(row);
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe(row.owner_only_expires_at);
+      options.onData({ ...row, owner_only_expires_at: null });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+      options.onData(row);
+      options.onData({ id: 'team-1' });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+      options.onData(row);
+      options.onData(null);
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
   it.each(['success', 'forbidden', 'unavailable'])(
     'coalesces member reads and handles %s for every waiter',
     async (outcome) => {

@@ -37,6 +37,28 @@ path.
 
 ### Invariants
 
+- Teams expire after **168 continuous hours with exactly one membership belonging to the actual
+  owner**, regardless of account activity. Joins clear the clock; last leave, kick or Auth
+  account-deletion cascade starts a fresh clock. Membership role and mode must also agree with
+  the team; empty or inconsistent teams are preserved for separate investigation.
+- `teams.owner_only_since` and `owner_only_expires_at` are server-owned. The latter is the
+  deadline shown in a persistent, non-dismissible alert on the current owner's team invite card.
+  Creation shows the policy before its button. Clients never derive eligibility from the
+  `TeamMembers.vue` display list, old `created_at`, account activity or a client clock.
+- Membership BEFORE triggers acquire the team row with `NOWAIT`, before pointer maintenance.
+  Normal lifecycle RPCs already hold that lock. A contended raw Auth FK cascade aborts with
+  `55P03` for whole-transaction retry instead of waiting while holding a membership row.
+  Clock maintenance and pointers roll back with failed joins, leaves and kicks.
+- `private.run_owner_only_team_cleanup` is operator-only, limits each transaction to at most
+  100 team locks, skips locked teams, and rereads actual membership in a separate statement after
+  the lock. It uses `disband_team`, preserving personal progress, all mode/Seasonal history,
+  preferences, accounts and tokens. Team rows, memberships and team events expire together.
+- The migration activates neither warnings nor deletion and schedules no cron. After warning UI
+  verification, explicit activation and the bounded runner give existing solo teams a fresh
+  seven days; no migration bulk rewrite or old-age inference is involved. Deletion requires a
+  separate flag and cannot happen before seven days of warning availability. The
+  [staged rollout](../runbook.md#owner-only-team-expiry-rollout) owns activation and recovery.
+
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and

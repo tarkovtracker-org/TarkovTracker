@@ -60,11 +60,18 @@ const mockTeamState = reactive({
   joinCode: null as string | null,
   join_code: null as string | null,
   members: [] as string[],
+  ownerOnlyExpiresAt: null as string | null,
 });
 const mockTeamStore = {
   $state: mockTeamState,
   get id() {
     return mockTeamState.id;
+  },
+  get owner() {
+    return mockTeamState.owner;
+  },
+  get ownerOnlyExpiresAt() {
+    return mockTeamState.ownerOnlyExpiresAt;
   },
   get inviteCode() {
     return mockTeamState.joinCode ?? mockTeamState.join_code ?? null;
@@ -95,6 +102,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => mockTarkovStore,
 }));
 vi.mock('@/stores/useTeamStore', () => ({
+  useTeamStore: () => mockTeamStore,
   useTeamStoreWithSupabase: () => ({
     teamStore: mockTeamStore,
   }),
@@ -137,9 +145,14 @@ const mountMyTeam = async () => {
         TeamCard: { template: '<div><slot name="icon" /><slot /></div>' },
         UButton: UButtonStub,
         UIcon: true,
+        UAlert: {
+          props: ['title', 'description'],
+          template: '<div role="alert">{{ title }} {{ description }}</div>',
+        },
       },
       mocks: {
-        $t: (key: string) => key,
+        $t: (key: string, params?: { deadline: string }) =>
+          params ? `${key} ${params.deadline}` : key,
       },
     },
   });
@@ -190,6 +203,7 @@ describe('MyTeam store interactions', () => {
     mockTeamState.joinCode = null;
     mockTeamState.join_code = null;
     mockTeamState.members = [];
+    mockTeamState.ownerOnlyExpiresAt = null;
     mockHasInitiallyLoaded.value = true;
     mockCopyToClipboard.mockReset();
     mockCopyToClipboard.mockResolvedValue(true);
@@ -232,6 +246,49 @@ describe('MyTeam store interactions', () => {
     });
   });
   describe('destructive actions', () => {
+    it('shows the expiry policy before creating a team', async () => {
+      const wrapper = await mountMyTeam();
+      expect(wrapper.get('[data-testid="team-expiry-policy"]').text()).toBe(
+        'page.team.expiry.policy'
+      );
+      expect(mockEdgeFunctions.createTeam).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+    it('keeps the server deadline warning until a join cancels it', async () => {
+      mockSystemState.pvp_team_id = 'team-123';
+      mockTeamState.id = 'team-123';
+      mockTeamState.owner = mockSupabaseUser.id;
+      mockTeamState.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      const wrapper = await mountMyTeam();
+      expect(wrapper.get('[data-testid="team-expiry-warning"]').attributes('role')).toBe('alert');
+      expect(wrapper.get('[data-testid="team-expiry-warning"]').text()).toContain(
+        new Date('2026-10-20T12:00:00Z').toLocaleString()
+      );
+      expect(
+        wrapper.get('[data-testid="team-expiry-warning"]').attributes('dismissible')
+      ).toBeUndefined();
+      mockTeamState.ownerOnlyExpiresAt = null;
+      await nextTick();
+      expect(wrapper.find('[data-testid="team-expiry-warning"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+    it.each(['stale team', 'non-owner', 'missing deadline', 'invalid deadline'])(
+      'hides the deadline for %s',
+      async (scenario) => {
+        mockSystemState.pvp_team_id = 'team-123';
+        mockTeamState.id = scenario === 'stale team' ? 'old-team' : 'team-123';
+        mockTeamState.owner = scenario === 'non-owner' ? 'other-user' : mockSupabaseUser.id;
+        mockTeamState.ownerOnlyExpiresAt =
+          scenario === 'missing deadline'
+            ? null
+            : scenario === 'invalid deadline'
+              ? 'invalid'
+              : '2026-10-20T12:00:00Z';
+        const wrapper = await mountMyTeam();
+        expect(wrapper.find('[data-testid="team-expiry-warning"]').exists()).toBe(false);
+        wrapper.unmount();
+      }
+    );
     it('keeps destructive membership actions outside the invite card', async () => {
       mockSystemState.pvp_team_id = 'team-123';
       mockTeamState.owner_id = 'user-123';
