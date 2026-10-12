@@ -163,12 +163,17 @@ test('tampering with the controller boundary is detected', () => {
     assert.throws(() => assertTrustedBoundary(changed), before);
   }
 });
-test('the Pages preview environment carries no production bindings or identifiers', () => {
-  const toml = read('wrangler.toml');
-  const preview = toml.slice(toml.indexOf('[env.preview.vars]'));
-  assert.ok(preview.length > 0);
+function assertPreviewIsolation(toml) {
+  const previewStart = toml.search(/^\[\[?env\.preview[.\]]/m);
+  assert.ok(previewStart >= 0);
+  const preview = toml.slice(previewStart);
+  const isolatedKv = preview.match(
+    /\[\[env\.preview\.kv_namespaces\]\]\s*binding = "TARKOV_DATA"\s*id = "8b1f5caca19c4d379b601e4bd0f815e6"/
+  )?.[0];
+  assert.ok(isolatedKv, 'preview binds only the dedicated public game-data namespace');
+  assert.doesNotMatch(preview, /6034d8d7b7534946bf04110c33ac3b88/);
   assert.doesNotMatch(
-    preview,
+    preview.replace(isolatedKv, ''),
     /kv_namespaces|durable_objects|STRIPE_PRICE|supabase\.co|G-[A-Z0-9]{6,}|price_/
   );
   for (const key of [
@@ -183,10 +188,20 @@ test('the Pages preview environment carries no production bindings or identifier
     assert.match(preview, new RegExp(`^${key} = ""$`, 'm'), key);
   assert.match(preview, /^NODE_ENV = "production"$/m);
   // Production configuration remains intact.
-  const production = toml.slice(0, toml.indexOf('[env.preview.vars]'));
+  const production = toml.slice(0, previewStart);
   assert.match(production, /\[\[durable_objects\.bindings\]\]/);
   assert.match(production, /\[\[kv_namespaces\]\]/);
   assert.match(production, /^APP_URL = "https:\/\/tarkovtracker\.org"$/m);
+}
+test('the Pages preview environment carries no production bindings or identifiers', () => {
+  assertPreviewIsolation(read('wrangler.toml'));
+});
+test('a bare preview table cannot hide a production identifier before the KV binding', () => {
+  const candidate = read('wrangler.toml').replace(
+    '[[env.preview.kv_namespaces]]',
+    '[env.preview]\nSUPABASE_URL = "https://hidden.supabase.co"\n\n[[env.preview.kv_namespaces]]'
+  );
+  assert.throws(() => assertPreviewIsolation(candidate));
 });
 test('the Validate job builds once through the profile step and uploads a preview artifact', () => {
   const ci = read('.github/workflows/ci.yml');
