@@ -18,6 +18,7 @@ export type BankedSupporterActivity = SupporterActivity & {
   tier?: string;
   oneTimeTier?: string | null;
   oneTimeRemainingSeconds?: number | null;
+  oneTimeExpiresAt?: string | null;
 };
 const hasElapsedExpiry = (expiresAt: string | null, nowMs: number): boolean => {
   const expiry = Date.parse(expiresAt ?? '');
@@ -28,6 +29,7 @@ const hasEndedSubscriptionAccess = (supporter: BankedSupporterActivity, nowMs: n
   ['active', 'past_due'].includes(supporter.status) &&
   hasElapsedExpiry(supporter.expiresAt, nowMs);
 const prepaidExpiry = (supporter: BankedSupporterActivity): string | null => {
+  if (supporter.oneTimeExpiresAt != null) return supporter.oneTimeExpiresAt;
   if (supporter.oneTimeRemainingSeconds === null) return null;
   const seconds = supporter.oneTimeRemainingSeconds;
   if (!isPrepaidDuration(seconds)) return '';

@@ -196,3 +196,9 @@ to finite receipts using the same newest-first rule as subscription pauses. Refu
 lifetime payment then restores only those unused days, including zero for exhausted receipts.
 
 Billing controls use the raw subscription identity and status independently of projected prepaid access. A past-due subscriber using banked days can still manage the existing subscription. If a revocation read crosses grace expiry, the write retains that original deadline; the database trigger resumes only the unused bank or clears spent credit under its row lock.
+
+Expired subscription grace changes access without clearing an active/past-due Stripe plan.
+Both metadata writes and one-time fulfillment preserve its raw type, status, tier and subscription
+ID; `supporter_entitlements` projects the running prepaid balance separately. Receipt-checked
+refunds set their validated payment identity so the legacy grant fence permits the reduction
+while still rejecting unverified grants.

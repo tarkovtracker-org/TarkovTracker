@@ -16,6 +16,7 @@ export interface SupporterStatus {
   startedAt: string;
   oneTimeTier?: string | null;
   oneTimeRemainingSeconds?: number | null;
+  oneTimeExpiresAt?: string | null;
   stripeSubscriptionId?: string | null;
 }
 // Module-scoped reactive state: useSupporter() is a singleton-style composable
@@ -89,7 +90,7 @@ export function useSupporter() {
         // Keep billing details raw; effective access is projected separately above.
         .from('supporters')
         .select(
-          'tier, status, type, has_ever_supported, expires_at, started_at, one_time_tier, one_time_remaining_seconds, stripe_subscription_id'
+          'tier, status, type, has_ever_supported, expires_at, started_at, one_time_tier, one_time_remaining_seconds, one_time_expires_at, stripe_subscription_id'
         )
         .eq('user_id', userId)
         .maybeSingle();
@@ -110,6 +111,7 @@ export function useSupporter() {
           startedAt: data.started_at,
           oneTimeTier: data.one_time_tier,
           oneTimeRemainingSeconds: data.one_time_remaining_seconds,
+          oneTimeExpiresAt: data.one_time_expires_at,
           stripeSubscriptionId: data.stripe_subscription_id,
         };
       } else {

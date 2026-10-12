@@ -153,7 +153,8 @@ BEGIN
       NEW.one_time_expires_at := NULL;
       NEW.one_time_legacy_unlimited := false;
       NEW.one_time_legacy_tier := NULL;
-    ELSIF NEW.one_time_remaining IS NULL THEN
+    ELSIF NEW.one_time_remaining IS NULL
+      AND NOT (NEW.status IN ('active','past_due') AND NEW.stripe_subscription_id IS NOT NULL) THEN
       NEW.type := 'one_time';
       NEW.status := 'active';
       NEW.tier := NEW.one_time_tier;
@@ -179,6 +180,7 @@ DECLARE
   fulfilled public.supporters%ROWTYPE;
   receipt_user uuid;
   live_subscription boolean;
+  billing_subscription boolean;
   legacy_unlimited boolean;
   legacy_tier text;
   expiry timestamptz;
@@ -249,6 +251,8 @@ BEGIN
   live_subscription := coalesce(existing.type = 'subscription'
     AND existing.status IN ('active', 'past_due')
     AND (existing.expires_at > now() OR existing.expires_at IS NULL), false);
+  billing_subscription := coalesce(existing.type = 'subscription'
+    AND existing.status IN ('active','past_due') AND existing.stripe_subscription_id IS NOT NULL, false);
   -- NULL tier means no credit; a present tier with neither expiry nor balance means unlimited.
   credit_tier := existing.one_time_tier;
   credit_expiry := existing.one_time_expires_at;
@@ -293,14 +297,18 @@ BEGIN
       > array_position(ARRAY['supporter','scav','timmy','chad'], incoming_tier) THEN
       incoming_tier := existing.tier;
     END IF;
+  ELSIF billing_subscription THEN
+    -- Grace ending changes access, not the still-existing Stripe billing plan.
+    expiry := existing.expires_at;
+    incoming_tier := existing.tier;
   END IF;
   INSERT INTO public.supporters(user_id, tier, status, type, stripe_customer_id, stripe_subscription_id,
     has_ever_supported, retention_history_verified, last_contribution_at, discord_user_id,
     amount_total, started_at, expires_at, updated_at, one_time_tier, one_time_expires_at, one_time_remaining, one_time_legacy_unlimited, one_time_legacy_tier)
-  VALUES (target_user, incoming_tier, CASE WHEN live_subscription THEN existing.status ELSE 'active' END,
-    CASE WHEN live_subscription THEN 'subscription' ELSE 'one_time' END,
+  VALUES (target_user, incoming_tier, CASE WHEN live_subscription OR billing_subscription THEN existing.status ELSE 'active' END,
+    CASE WHEN live_subscription OR billing_subscription THEN 'subscription' ELSE 'one_time' END,
     coalesce(nullif(p_record->>'stripe_customer_id', ''), existing.stripe_customer_id),
-    CASE WHEN live_subscription THEN existing.stripe_subscription_id END,
+    CASE WHEN live_subscription OR billing_subscription THEN existing.stripe_subscription_id END,
     true, true, greatest(existing.last_contribution_at, p_paid_at), p_record->>'discord_user_id',
     amount, coalesce(existing.started_at, (p_record->>'started_at')::timestamptz, now()), expiry, now(), credit_tier, credit_expiry, credit_remaining, legacy_unlimited, legacy_tier)
   ON CONFLICT (user_id) DO UPDATE SET
@@ -362,6 +370,8 @@ BEGIN
   END IF;
   SELECT * INTO STRICT receipt FROM private.stripe_one_time_payments WHERE payment_id = p_payment_id FOR UPDATE;
   IF receipt.user_id <> p_user_id THEN RAISE EXCEPTION 'Stripe payment belongs to another supporter'; END IF;
+  -- Authorize only this validated receipt through the unchanged legacy grant fence.
+  PERFORM set_config('stripe.one_time_payment_id', p_payment_id, true);
   IF NOT new_receipt AND receipt.refunded_at IS NOT NULL THEN RETURN existing; END IF;
   verified_legacy_refund := existing.one_time_legacy_unlimited
     AND p_paid_at < timestamptz '2026-10-07 00:00:00+00';

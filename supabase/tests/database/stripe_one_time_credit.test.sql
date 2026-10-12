@@ -2,7 +2,7 @@ BEGIN;
 SELECT no_plan();
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,931) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,936) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -108,7 +108,7 @@ SELECT is((SELECT one_time_remaining FROM public.supporters
   'subscription pauses only the exact unused duration');
 UPDATE public.supporters SET status='past_due',expires_at=now()-interval '1 day'
   WHERE user_id='00000000-0000-0000-0000-000000000901';
-SELECT is((SELECT expires_at FROM public.supporters
+SELECT is((SELECT expires_at FROM public.supporter_entitlements
   WHERE user_id='00000000-0000-0000-0000-000000000901'), now()+interval '9 days 1 second',
   'expired grace resumes credit from grace expiry, not a previous subscription end');
 SELECT ok(NOT has_column_privilege('authenticated','public.supporters','one_time_remaining','UPDATE'),
@@ -532,5 +532,50 @@ END; $$;
 SET LOCAL enable_seqscan=off;
 SELECT ok(pg_temp.entitlement_lookup_plan() LIKE '%Index Cond%',
  'service-role entitlement lookup pushes user identity into an index condition');
+-- Production refunds include a claimed event and must pass the legacy grant fence.
+SELECT pg_temp.pay(932,'pi_claimed_refund_first');
+SELECT pg_temp.pay(932,'pi_claimed_refund_second');
+SELECT set_config('stripe.one_time_payment_id','',true);
+CREATE TEMP TABLE refund_claim AS SELECT public.claim_stripe_event('evt_credit_refund_claimed','charge.refunded') AS claim;
+SELECT set_config('request.headers',jsonb_build_object('x-supporter-credit-version','1',
+  'x-stripe-event-id','evt_credit_refund_claimed','x-stripe-claim-token',claim->>'token')::text,true) FROM refund_claim;
+SET LOCAL ROLE service_role;
+SELECT lives_ok($$SELECT public.refund_one_time_supporter('pi_claimed_refund_second',
+  '00000000-0000-0000-0000-000000000932','2026-10-07',400)$$,
+  'a claimed production refund reduces running credit without failing the legacy grant fence');
+RESET ROLE;
+SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000932'),
+  now()+interval '30 days','claimed refund preserves only the other paid receipt');
+SELECT set_config('stripe.one_time_payment_id','',true);
+SELECT throws_ok($$UPDATE public.supporters SET expires_at=now()+interval '90 days'
+  WHERE user_id='00000000-0000-0000-0000-000000000932'$$,'40001',
+  'Timed one-time grants must use payment-identity fulfillment','old unverified grants remain fenced');
+SELECT set_config('request.headers','{}',true);
+-- Subscription billing identity survives grace expiry even after the bank is persisted.
+INSERT INTO public.supporters(user_id,type,status,tier,stripe_subscription_id,expires_at)
+VALUES ('00000000-0000-0000-0000-000000000933','subscription','past_due','chad','sub_grace_identity',now()+interval '1 day');
+SELECT pg_temp.pay(933,'pi_grace_identity');
+ALTER TABLE public.supporters DISABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET expires_at=now()-interval '1 day'
+  WHERE user_id='00000000-0000-0000-0000-000000000933';
+ALTER TABLE public.supporters ENABLE TRIGGER zz_preserve_one_time_credit;
+UPDATE public.supporters SET updated_at=now() WHERE user_id='00000000-0000-0000-0000-000000000933';
+SELECT ok((SELECT type='subscription' AND status='past_due' AND tier='chad' AND stripe_subscription_id='sub_grace_identity'
+  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000933'),
+  'metadata writes preserve billing identity and status after grace');
+SELECT ok((SELECT type='one_time' AND tier='scav' AND status='active' AND expires_at=now()+interval '29 days'
+  FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000933'),
+  'persisted bank remains projected as prepaid access with twenty-nine unused days');
+SELECT pg_temp.pay(933,'pi_grace_new_payment');
+SELECT ok((SELECT type='subscription' AND status='past_due' AND tier='chad' AND stripe_subscription_id='sub_grace_identity'
+  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000933'),
+  'fulfillment after grace preserves the existing plan for management and checkout fencing');
+SELECT is((SELECT expires_at FROM public.supporter_entitlements WHERE user_id='00000000-0000-0000-0000-000000000933'),
+  now()+interval '59 days','fulfillment after grace stacks new days on the running balance');
+UPDATE public.supporters SET status='expired',stripe_subscription_id=NULL,subscription_ended_at=now()
+  WHERE user_id='00000000-0000-0000-0000-000000000933';
+SELECT ok((SELECT type='one_time' AND stripe_subscription_id IS NULL AND expires_at=now()+interval '59 days'
+  FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000933'),
+  'an actual ended subscription releases billing identity without restarting prepaid time');
 SELECT * FROM finish();
 ROLLBACK;

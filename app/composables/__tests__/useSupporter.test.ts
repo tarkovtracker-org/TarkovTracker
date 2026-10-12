@@ -317,6 +317,33 @@ describe('useSupporter', () => {
     await vi.waitFor(() => expect(supporter.loadedUserId.value).toBeNull());
     supporter.unsubscribe();
   });
+  it('loads persisted prepaid expiry while keeping the existing billing plan manageable', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        tier: 'chad',
+        status: 'past_due',
+        type: 'subscription',
+        has_ever_supported: true,
+        expires_at: '2020-01-01T00:00:00Z',
+        started_at: '2020-01-01T00:00:00Z',
+        stripe_subscription_id: 'sub_persisted',
+        one_time_tier: 'scav',
+        one_time_remaining_seconds: null,
+        one_time_expires_at: '2030-01-01T00:00:00Z',
+      },
+      error: null,
+    });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    await supporter.fetchStatus('user-1');
+    expect(supporter.supporter.value).toMatchObject({
+      type: 'one_time',
+      tier: 'scav',
+      expiresAt: '2030-01-01T00:00:00Z',
+    });
+    expect(supporter.billingSubscription.value?.stripeSubscriptionId).toBe('sub_persisted');
+    expect(supporter.isSubscribed.value).toBe(true);
+  });
   it('does not apply a stale status response after reset', async () => {
     const deferred = createDeferred<{
       data: {

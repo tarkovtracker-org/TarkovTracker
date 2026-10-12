@@ -48,6 +48,18 @@ describe('resolvePrepaidSupporter', () => {
     oneTimeTier: 'scav',
     oneTimeRemainingSeconds: 30,
   };
+  it('uses the persisted running credit expiry instead of treating a consumed bank as unlimited', () => {
+    const row = {
+      ...bank,
+      oneTimeRemainingSeconds: null,
+      oneTimeExpiresAt: '2026-05-25T12:00:10Z',
+    };
+    expect(resolvePrepaidSupporter(row, NOW)).toMatchObject({
+      type: 'one_time',
+      expiresAt: row.oneTimeExpiresAt,
+    });
+    expect(resolvePrepaidSupporter(row, NOW + 10001)).toBe(row);
+  });
   it('resumes lifetime credit with its own tier', () => {
     expect(resolvePrepaidSupporter({ ...bank, oneTimeRemainingSeconds: null }, NOW)).toMatchObject({
       type: 'one_time',
