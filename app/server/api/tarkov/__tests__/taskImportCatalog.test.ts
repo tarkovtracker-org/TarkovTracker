@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
-import { buildTaskImportKey } from '@/server/utils/taskImportSnapshot';
+import { buildTaskImportKey, isTaskImportSnapshot } from '@/server/utils/taskImportSnapshot';
 import { TASK_IMPORT_MAX_AGE_MS } from '@/utils/taskImportCatalog';
 const mocks = vi.hoisted(() => ({
   query: { gameMode: 'regular' },
@@ -31,6 +31,22 @@ const fixture = (gameMode = 'regular') =>
   });
 const event = { context: { cloudflare: { env: { TARKOV_DATA: { get: mocks.get } } } } };
 describe('snapshot-only task import route', () => {
+  it('tolerates at most one minute of writer/reader clock skew without extending expiration', () => {
+    const now = Date.now();
+    expect(isTaskImportSnapshot({ ...fixture(), storedAt: now + 60_000 }, 'regular', now)).toBe(
+      true
+    );
+    expect(isTaskImportSnapshot({ ...fixture(), storedAt: now + 60_001 }, 'regular', now)).toBe(
+      false
+    );
+    expect(
+      isTaskImportSnapshot(
+        { ...fixture(), storedAt: now - TASK_IMPORT_MAX_AGE_MS - 1 },
+        'regular',
+        now
+      )
+    ).toBe(false);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.query.gameMode = 'regular';

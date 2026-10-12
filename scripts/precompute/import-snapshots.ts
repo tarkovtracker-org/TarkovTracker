@@ -5,15 +5,17 @@ import { createTarkovJsonTasksImportFetcher } from '@/server/utils/tarkov-json';
 import { buildTaskImportKey, isTaskImportSnapshot } from '@/server/utils/taskImportSnapshot';
 import { TASK_IMPORT_MAX_AGE_MS } from '@/utils/taskImportCatalog';
 import type { KvWriter, PrecomputeFilter } from './precompute';
-const requiredSnapshot = (payload: unknown, mode: string, expectedSha?: string) => {
+const requiredSnapshot = (payload: unknown, mode: string, expectedSha: string) => {
   const envelope = buildPrecomputedEnvelope(payload);
   if (!isTaskImportSnapshot(envelope, mode))
     throw new Error('Invalid import snapshot; retaining previous entry');
-  if (expectedSha && envelope.overlay?.sha256 !== expectedSha)
+  if (envelope.overlay?.sha256 !== expectedSha)
     throw new Error('Import overlay SHA differs from release; retaining previous entry');
   return envelope;
 };
 const generateSnapshot = async (mode: (typeof VALID_GAME_MODES)[number], expectedSha?: string) => {
+  if (!expectedSha)
+    throw new Error('Import overlay release SHA unavailable; retaining previous entry');
   const base = await createTarkovJsonTasksImportFetcher({ gameMode: mode, lang: 'en' })();
   const corrected = await applyOverlay(base, { gameMode: mode, locale: 'en' });
   const payload = { ...corrected, catalog: { lang: 'en' as const, gameMode: mode } };

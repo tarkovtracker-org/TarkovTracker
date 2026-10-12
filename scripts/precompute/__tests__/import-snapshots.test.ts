@@ -55,7 +55,7 @@ describe('three English import snapshots', () => {
       dataOverlay: { version: 'v1', sha256: 'sha1' },
     });
     const put = vi.fn();
-    const result = await runImportPrecompute({ put });
+    const result = await runImportPrecompute({ put }, {}, 'sha1');
     expect(result.failures.map((row) => row.key)).toEqual([
       'tasks-import-json-v1-en-regular',
       'tasks-import-json-v1-en-pve',
@@ -69,9 +69,72 @@ describe('three English import snapshots', () => {
       successes: [],
       failures: [],
     });
-    expect((await runImportPrecompute({ put }, { lang: 'en', gameMode: 'pve' })).successes).toEqual(
-      ['tasks-import-json-v1-en-pve']
-    );
+    expect(
+      (await runImportPrecompute({ put }, { lang: 'en', gameMode: 'pve' }, 'sha1')).successes
+    ).toEqual(['tasks-import-json-v1-en-pve']);
     expect(put).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    {},
+    { tasks: {} },
+    { tasks: [] },
+    { tasks: { task: { id: 'task', objectives: {} } } },
+    { tasks: { task: { id: 'task' } } },
+    { tasks: { task: { id: 'task', objectives: [null] } } },
+    { tasks: { task: { id: 'task', objectives: [], failConditions: {} } } },
+    { tasks: { task: { id: 'task', objectives: [{ id: 'obj', count: '9' }] } } },
+    { tasks: { task: { id: 'task', objectives: [{ id: 'obj', type: 'giveItem', count: null }] } } },
+  ])(
+    'retains the full last-good snapshot when raw data is malformed, despite overlay additions: %j',
+    async (source) => {
+      const actual = await vi.importActual<typeof import('@/server/utils/tarkov-json')>(
+        '@/server/utils/tarkov-json'
+      );
+      const fetcher = vi.fn(async (url: string) => ({
+        data: url === 'https://json.tarkov.dev/regular/tasks' ? source : {},
+        translations: [],
+      }));
+      mocks.create.mockImplementation((options) =>
+        actual.createTarkovJsonTasksImportFetcher({
+          ...options,
+          deps: { fetcher: fetcher as never },
+        })
+      );
+      mocks.overlay.mockResolvedValue({
+        data: { tasks: [{ id: 'overlay-addition', objectives: [], failConditions: [] }] },
+        dataOverlay: { version: 'v1', sha256: 'sha1' },
+      });
+      const prior = JSON.stringify({
+        data: { tasks },
+        dataOverlay: { version: 'last-good', sha256: 'last-good' },
+      });
+      const saved = new Map([['tasks-import-json-v1-en-regular', prior]]);
+      const put = vi.fn(async (key: string, value: string) => {
+        saved.set(key, value);
+      });
+      const result = await runImportPrecompute({ put }, { gameMode: 'regular' }, 'sha1');
+      expect(result.failures).toEqual([
+        {
+          key: 'tasks-import-json-v1-en-regular',
+          error: 'Invalid raw task import source; retaining previous snapshot',
+        },
+      ]);
+      expect(put).not.toHaveBeenCalled();
+      expect(mocks.overlay).not.toHaveBeenCalled();
+      expect(saved.get('tasks-import-json-v1-en-regular')).toBe(prior);
+    }
+  );
+  it('does not refresh any import key when a failed core run supplies no pinned release SHA', async () => {
+    const put = vi.fn();
+    const result = await runImportPrecompute({ put });
+    expect(result.failures).toHaveLength(3);
+    expect(
+      result.failures.every(
+        (row) => row.error === 'Import overlay release SHA unavailable; retaining previous entry'
+      )
+    ).toBe(true);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(mocks.overlay).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,26 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe('coherent import adaptation', () => {
+  it('accepts upstream taskStatus null counts as boolean conditions', () => {
+    const result = adaptTasksImportResponse({
+      tasks: { task: { id: 'task', objectives: [{ id: 'obj', type: 'taskStatus', count: null }] } },
+    });
+    expect(
+      isTaskImportCatalog(
+        {
+          ...result,
+          dataOverlay: { version: 'v1', sha256: 'sha1' },
+          catalog: { lang: 'en', gameMode: 'regular' },
+        },
+        'regular'
+      )
+    ).toBe(true);
+    expect(result.data.tasks[0]?.objectives?.[0]).toMatchObject({
+      id: 'obj',
+      type: 'taskStatus',
+      count: null,
+    });
+  });
   it('projects core, objectives and fail conditions from the same raw task record', () => {
     const task = adaptTasksImportResponse(source).data.tasks[0]!;
     expect(task).toMatchObject({

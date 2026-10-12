@@ -5,7 +5,6 @@ const { report, published } = vi.hoisted(() => ({
   report: {
     value: null as {
       rows: Array<{ status: string; served?: string; source?: string }>;
-      catalogs: Array<{ status: string }>;
       imports: Array<{ status: string }>;
     } | null,
   },
@@ -34,7 +33,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
-it('reports all successful core identities when one objective endpoint fails', async () => {
+it('retains all healthy core evidence and fails verification when an import snapshot is unavailable', async () => {
+  const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.stubEnv('TARKOV_OPERATIONS_ORIGIN', 'https://catalog-test.example');
   vi.stubEnv('TARKOV_OPERATIONS_CLIENT_ID', '');
   vi.stubEnv('TARKOV_OPERATIONS_CLIENT_SECRET', '');
@@ -46,8 +46,7 @@ it('reports all successful core identities when one objective endpoint fails', a
     vi.fn(async (input: string) => {
       const url = new URL(input);
       if (
-        url.pathname.endsWith('tasks-objectives') &&
-        url.searchParams.get('lang') === 'en' &&
+        url.pathname === '/api/tarkov/tasks-import' &&
         url.searchParams.get('gameMode') === 'regular'
       )
         return new Response(null, { status: 503 });
@@ -69,8 +68,12 @@ it('reports all successful core identities when one objective endpoint fails', a
         row.status === 'current' && row.served === 'catalog-sha' && row.source === 'PRECOMPUTE'
     )
   ).toBe(true);
-  expect(report.value?.catalogs.filter((row) => row.status === 'unverified')).toHaveLength(1);
   expect(report.value?.imports).toHaveLength(3);
-  expect(report.value?.imports.every((row) => row.status === 'current')).toBe(true);
+  expect(report.value?.imports.filter((row) => row.status === 'unverified')).toHaveLength(1);
+  expect(report.value?.imports.filter((row) => row.status === 'current')).toHaveLength(2);
   expect(process.exitCode).toBe(1);
+  expect(JSON.parse(output.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+    importMismatches: 0,
+    importUnverified: 1,
+  });
 });

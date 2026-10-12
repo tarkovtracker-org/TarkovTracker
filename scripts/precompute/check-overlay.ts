@@ -4,14 +4,11 @@ import { join } from 'node:path';
 import { fetchOverlay } from '@/server/utils/overlay';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import {
   compareOverlayFleet,
-  readTaskCatalogPair,
   compareImportCatalog,
   type ImportCatalogComparison,
   type OverlayManifest,
-  type CatalogComparison,
 } from './verify-overlay';
 // This command verifies the production fleet and writes a private, unique report.
 const productionOrigin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
@@ -54,20 +51,16 @@ try {
   console.error(String(error));
 }
 const served = [];
-const catalogs: CatalogComparison[] = [];
 for (const lang of API_SUPPORTED_LANGUAGES)
   for (const gameMode of VALID_GAME_MODES) {
-    const pair = await readTaskCatalogPair(
-      lang,
-      gameMode,
-      getJson(`${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`),
-      getJson(
-        `${productionOrigin}/api/tarkov/tasks-objectives?lang=${lang}&gameMode=${gameMode}&version=${TASK_OBJECTIVES_CACHE_VERSION}`
-      )
-    );
-    if (pair.served) served.push(pair.served);
-    catalogs.push(pair.catalog);
-    pair.errors.forEach((error) => console.error(error));
+    try {
+      const { payload, source } = await getJson(
+        `${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`
+      );
+      served.push({ lang, gameMode, overlay: payload.dataOverlay ?? {}, source });
+    } catch (error) {
+      console.error(String(error));
+    }
   }
 const rows = compareOverlayFleet(published, manifest, served);
 const imports: ImportCatalogComparison[] = [];
@@ -85,7 +78,7 @@ const reportDirectory = await mkdtemp(join(tmpdir(), 'tarkov-overlay-fleet-'));
 const output = join(reportDirectory, 'report.json');
 await writeFile(
   output,
-  JSON.stringify({ checkedAt: new Date().toISOString(), rows, catalogs, imports }, null, 2),
+  JSON.stringify({ checkedAt: new Date().toISOString(), rows, imports }, null, 2),
   {
     mode: 0o600,
     flag: 'wx',
@@ -99,14 +92,12 @@ console.log(
     propagating: rows.filter((row) => row.status === 'propagating').length,
     drift: rows.filter((row) => row.status === 'drift').length,
     unverified: rows.filter((row) => row.status === 'unverified').length,
-    catalogMismatches: catalogs.filter((row) => row.status !== 'covered').length,
-    catalogIdentityDifferences: catalogs.filter((row) => !row.overlayIdentityMatches).length,
-    importMismatches: imports.filter((row) => row.status !== 'current').length,
+    importMismatches: imports.filter((row) => row.status === 'mismatch').length,
+    importUnverified: imports.filter((row) => row.status === 'unverified').length,
   })
 );
 if (
   rows.some((row) => row.status === 'drift' || row.status === 'unverified') ||
-  catalogs.some((row) => row.status !== 'covered') ||
   imports.some((row) => row.status !== 'current')
 )
   process.exitCode = 1;

@@ -4,6 +4,7 @@ import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
+import { assertTaskImportSource } from '@/utils/taskImportCatalog';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
   isValidTraderLevel,
@@ -997,6 +998,7 @@ export function adaptTasksImportResponse(
   tasksPayload: JsonTasksPayload,
   options: { hideoutPayload?: unknown; tradersPayload?: unknown } = {}
 ): { data: { tasks: Task[] } } {
+  assertTaskImportSource(tasksPayload);
   const context = buildContext({ ...options, tasksPayload });
   context.tasksById = toLookup(tasksPayload.tasks);
   return {

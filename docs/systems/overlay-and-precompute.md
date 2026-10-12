@@ -236,6 +236,8 @@ flowchart LR
   whole payload, and writes it with the same seven-day retention. A failed mode retains its old
   key. These writes are per mode and are not atomic across the three modes or the core fleet.
   Non-English filtered runs skip import snapshots; an English mode filter refreshes only that mode.
+  Raw task registries must be nonempty with valid objective arrays before adaptation; overlay
+  additions cannot turn an empty or malformed upstream response into a publishable small catalog.
   `/api/tarkov/tasks-import` directly reads and validates this whole envelope, checks its mode and
   age, and returns `no-store`. Missing or invalid import data returns 503 without runtime generation.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
@@ -270,19 +272,32 @@ core-only run or its 48-row manifest does not establish import readiness. Inspec
 fallback, but that is not proof of production readiness for cold colos. Missing import keys fail
 closed, so promotion requires explicit successful seeding rather than a request-time fallback.
 
+Initial promotion is held by leaving the consumer PR in draft until an approved `workflow_dispatch`
+of `precompute-tarkov-data.yml` on its reviewed branch succeeds with `lang=en`, no mode filter,
+and the verified overlay SHA. That dispatch runs the reviewed producer and writes three English
+core keys and three whole import keys. Read back each import envelope from the existing production
+namespace and verify its version, scope, storage age, task/objective validity and overlay identity
+before making the PR ready or merging it. Production Pages deploys `main` automatically; a runbook
+warning or an unrelated successful CI build is not a deploy gate. This PR does not add build-time
+KV credentials, change Pages settings, or execute that dispatch.
+
+Actions previews remain isolated: the Pages preview configuration has no `TARKOV_DATA` binding.
+The snapshot-only import endpoint therefore returns 503 there, while the ordinary public metadata
+routes retain their live fallback. Preview build/UI checks cannot establish production import
+readiness. Supporting functional imports on those previews requires an independently seeded preview
+namespace and trusted configuration work; it must not reuse the production binding or execute
+untrusted candidate code with deployment credentials.
+
 Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
 new private temporary directory. The command writes
 an artifact comparing the published SHA, last complete precompute and served tasks-core for all
-48 language/mode combinations, plus every UI core/objective pair's overlay identity, task shape,
-and core-ID coverage, and all three whole English import snapshots against the published release.
-Missing provenance, malformed task arrays, duplicate IDs, or missing core IDs fail
-verification even when all core KV rows are current. Global identity differences are reported
-as diagnostics: a non-task overlay release can change the SHA while the separately cached task
-data retains ID coverage. A pair's `covered` status establishes coverage only and cannot prove that
-its independently cached counts and gates agree. Import release verification requires one valid
+48 language/mode combinations and all three whole English import snapshots against the published release.
+Missing provenance, malformed task/objective arrays, duplicate IDs, invalid counts or wrong import
+scope fail verification even when all core KV rows are current. The verifier does not join the
+independent UI projections or certify them as coherent. Import release verification requires one valid
 whole snapshot per mode with the published identity; this operator gate is stricter than bounded
 runtime retention. The report contains counts, identity agreement, and missing IDs, never raw
-overlay/catalog payloads. A failing objective read retains the successful core provenance in the report.
+overlay/catalog payloads. A failing import read retains the successful core provenance in the report.
 Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
 target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee

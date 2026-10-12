@@ -98,74 +98,13 @@ export function compareOverlayFleet(
     })
   );
 }
-export type CatalogComparison = {
-  lang: string;
-  gameMode: string;
-  coreCount: number;
-  objectiveCount: number;
-  missingTaskIds: string[];
-  overlayIdentityMatches: boolean;
-  status: 'covered' | 'mismatch' | 'unverified';
-};
-type CatalogTask = { id: string; objectives?: unknown[] };
-const isCatalogTask = (value: unknown, withObjectives: boolean): boolean => {
-  const task = record(value);
-  return Boolean(nonempty(task.id)) && (!withObjectives || Array.isArray(task.objectives));
-};
-const taskArray = (payload: unknown): unknown[] | null => {
-  const tasks = record(record(payload).data).tasks;
-  return Array.isArray(tasks) && tasks.length > 0 ? tasks : null;
-};
-const uniqueTaskIds = (tasks: unknown[]): boolean =>
-  new Set(tasks.map((task) => record(task).id)).size === tasks.length;
-const catalogTasks = (payload: unknown, withObjectives: boolean): CatalogTask[] | null => {
-  const tasks = taskArray(payload);
-  if (!tasks) return null;
-  return tasks.every((task) => isCatalogTask(task, withObjectives)) && uniqueTaskIds(tasks)
-    ? (tasks as CatalogTask[])
-    : null;
-};
-const identified = (meta: Identity): boolean => Boolean(meta.version && meta.sha256);
-const comparisonStatus = (valid: boolean, matching: boolean): CatalogComparison['status'] => {
-  if (!valid) return 'unverified';
-  return matching ? 'covered' : 'mismatch';
-};
-/** Reports split UI coverage only; coverage does not prove that independently cached fields agree. */
-export function compareTaskCatalogs(
-  lang: string,
-  gameMode: string,
-  core: unknown,
-  objectives: unknown
-): CatalogComparison {
-  const coreTasks = catalogTasks(core, false);
-  const objectiveTasks = catalogTasks(objectives, true);
-  const coreIdentity = identity(record(core).dataOverlay);
-  const objectiveIdentity = identity(record(objectives).dataOverlay);
-  const objectiveIds = new Set(objectiveTasks?.map((task) => task.id));
-  const missingTaskIds =
-    coreTasks?.map((task) => task.id).filter((id) => !objectiveIds.has(id)) ?? [];
-  const valid =
-    Boolean(coreTasks && objectiveTasks) && [coreIdentity, objectiveIdentity].every(identified);
-  const sameIdentity = (['version', 'sha256'] as const).every(
-    (key) => coreIdentity[key] === objectiveIdentity[key]
-  );
-  return {
-    lang,
-    gameMode,
-    coreCount: coreTasks?.length ?? 0,
-    objectiveCount: objectiveTasks?.length ?? 0,
-    missingTaskIds,
-    // Import safety is verified against its whole snapshot below, never this split UI pair.
-    overlayIdentityMatches: [coreIdentity, objectiveIdentity].every(identified) && sameIdentity,
-    status: comparisonStatus(valid, missingTaskIds.length === 0),
-  };
-}
 export type ImportCatalogComparison = {
   gameMode: string;
   taskCount: number;
   sha256?: string;
   status: 'current' | 'mismatch' | 'unverified';
 };
+const identified = (meta: Identity): boolean => Boolean(meta.version && meta.sha256);
 /** Release verification is stricter than runtime retention of a whole last-good import snapshot. */
 export function compareImportCatalog(
   gameMode: string,
@@ -183,30 +122,5 @@ export function compareImportCatalog(
     taskCount: payload.data.tasks.length,
     sha256: payload.dataOverlay.sha256,
     status: matching ? 'current' : 'mismatch',
-  };
-}
-type CatalogSnapshot = { payload: unknown; source: string | null };
-const fulfilledSnapshot = (
-  result: PromiseSettledResult<CatalogSnapshot>
-): CatalogSnapshot | null => (result.status === 'fulfilled' ? result.value : null);
-const readErrors = (result: PromiseSettledResult<CatalogSnapshot>): string[] =>
-  result.status === 'rejected' ? [String(result.reason)] : [];
-/** Retains each endpoint's evidence when the other endpoint fails. */
-export async function readTaskCatalogPair(
-  lang: string,
-  gameMode: string,
-  coreRead: Promise<CatalogSnapshot>,
-  objectiveRead: Promise<CatalogSnapshot>
-): Promise<{ served: ServedOverlay | null; catalog: CatalogComparison; errors: string[] }> {
-  const [coreResult, objectiveResult] = await Promise.allSettled([coreRead, objectiveRead]);
-  const core = fulfilledSnapshot(coreResult);
-  const objectives = fulfilledSnapshot(objectiveResult);
-  const served = core
-    ? { lang, gameMode, overlay: identity(record(core.payload).dataOverlay), source: core.source }
-    : null;
-  return {
-    served,
-    catalog: compareTaskCatalogs(lang, gameMode, core?.payload, objectives?.payload),
-    errors: [...readErrors(coreResult), ...readErrors(objectiveResult)],
   };
 }
