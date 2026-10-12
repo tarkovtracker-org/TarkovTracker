@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { ref } from 'vue';
 import StorylinePage from '@/pages/storyline.vue';
 const setStoryChapterCompleteMock = vi.fn();
@@ -29,6 +29,15 @@ const getCurrentProgressDataMock = vi.fn(() => ({
 }));
 mockNuxtImport('definePageMeta', () => () => {});
 mockNuxtImport('useSeoMeta', () => () => {});
+const router = await vi.hoisted(async () => {
+  const { reactive } = await import('vue');
+  return {
+    route: reactive({ path: '/storyline', hash: '', query: {} as Record<string, string> }),
+    replace: vi.fn(),
+  };
+});
+mockNuxtImport('useRoute', () => () => router.route);
+mockNuxtImport('useRouter', () => () => ({ replace: router.replace }));
 const storylineOptions = vi.fn();
 vi.mock('@/composables/useStorylineChapters', () => ({
   useStorylineChapters: (options: { completedObjectiveIds?: (chapterId: string) => string[] }) => {
@@ -95,6 +104,7 @@ describe('storyline page', () => {
     vi.clearAllMocks();
     chapterCompletionState = {};
     objectiveCompletionState = {};
+    router.route.query = {};
   });
   const createWrapper = () =>
     mount(StorylinePage, {
@@ -194,5 +204,71 @@ describe('storyline page', () => {
     expect(setStoryObjectiveCompleteMock).not.toHaveBeenCalled();
     expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+  it('focuses a deep-linked objective and drops the focus query', async () => {
+    router.route.query = { chapter: 'chapter-1', objective: 'obj-1', tab: 'keep' };
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      wrapper.unmount();
+    });
+    const wrapper = mount(StorylinePage, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          ChapterCard: {
+            template: `
+              <div id="storyline-chapter-chapter-1">
+                <label data-testid="objective-row">
+                  <input id="storyline-objective-chapter-1-obj-1" type="checkbox" />
+                </label>
+              </div>
+            `,
+          },
+          UAlert: true,
+        },
+      },
+    });
+    await vi.waitFor(() => expect(router.replace).toHaveBeenCalled());
+    expect(wrapper.get('[data-testid="objective-row"]').classes()).toContain('ring-2');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith({
+      hash: '',
+      path: '/storyline',
+      query: { tab: 'keep' },
+    });
+  });
+  it('moves the highlight when another objective in the same chapter is linked', async () => {
+    router.route.query = { chapter: 'chapter-1', objective: 'obj-1' };
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      wrapper.unmount();
+    });
+    const wrapper = mount(StorylinePage, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          ChapterCard: {
+            template: `
+              <div id="storyline-chapter-chapter-1">
+                <label data-testid="row-1"><input id="storyline-objective-chapter-1-obj-1" /></label>
+                <label data-testid="row-2"><input id="storyline-objective-chapter-1-obj-2" /></label>
+              </div>
+            `,
+          },
+          UAlert: true,
+        },
+      },
+    });
+    await vi.waitFor(() => expect(router.replace).toHaveBeenCalledTimes(1));
+    expect(wrapper.get('[data-testid="row-1"]').classes()).toContain('ring-2');
+    router.route.query = { chapter: 'chapter-1', objective: 'obj-2' };
+    await vi.waitFor(() => expect(router.replace).toHaveBeenCalledTimes(2));
+    expect(wrapper.get('[data-testid="row-2"]').classes()).toContain('ring-2');
+    expect(wrapper.get('[data-testid="row-1"]').classes()).not.toContain('ring-2');
   });
 });
