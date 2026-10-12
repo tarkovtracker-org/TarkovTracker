@@ -194,6 +194,9 @@ try {
     ${setCronActive(false)}
     COMMIT;`);
   created = true;
+  // Pausing does not stop a sweep that already started; let it finish before fixtures exist.
+  await waitFor(`SELECT (count(*) = 0)::int FROM cron.job_run_details
+    WHERE status IN ('starting','running') AND jobid IN (SELECT jobid ${cronJob})`);
   await joinWins();
   await cleanupWins(false);
   await cleanupWins(true);

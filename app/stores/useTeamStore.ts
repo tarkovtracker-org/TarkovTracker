@@ -504,6 +504,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       ? `id=eq.${currentSystemStateTeam}`
       : undefined;
   });
+  // The team whose authorized row last set the deadline; a refresh can finish before the
+  // switched team's snapshot updates teamStore.id.
+  let deadlineTeamId: string | null = null;
   // Custom data handler that transforms DB data before patching to store
   const handleTeamData = (data: Record<string, unknown> | null) => {
     if (disposed) return;
@@ -519,7 +522,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       // below writes the deadline, so a delayed snapshot cannot restore an old warning. A
       // different team never inherits the previous team's deadline, even if its read fails.
       delete transformed.ownerOnlyExpiresAt;
-      if (data.id !== teamStore.id) transformed.ownerOnlyExpiresAt = null;
+      if (data.id !== deadlineTeamId) transformed.ownerOnlyExpiresAt = null;
       // Map owner_id to owner
       if ('owner_id' in data && typeof data.owner_id === 'string') {
         transformed.owner = data.owner_id;
@@ -568,8 +571,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     sessionIsCurrent(context) &&
     requestVersion === latestMembersRequestVersion &&
     getTeamIdFromSystemStore(systemStore) === context.teamId;
-  const applyOwnerOnlyDeadline = (row: TeamRow | undefined) => {
+  const applyOwnerOnlyDeadline = (row: TeamRow | undefined, teamId: string) => {
     if (row === undefined) return;
+    deadlineTeamId = teamId;
     const deadline = row?.owner_only_expires_at;
     const owner = row?.owner_id;
     teamStore.$patch((state) => {
@@ -605,7 +609,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     ]);
     if (!refreshIsCurrent(context, requestVersion)) return false;
     if (context.queued) return runRefresh(context, true);
-    applyOwnerOnlyDeadline(deadline);
+    applyOwnerOnlyDeadline(deadline, context.teamId);
     if (!members) return false;
     teamStore.$patch((state) => {
       state.members = members.members || [];

@@ -1047,7 +1047,9 @@ needs the usual explicit production approval; no further manual activation step 
    and `cron.job` lists `owner-only-team-cleanup` as active. Until the first hourly run, existing
    solo teams show no deadline; the runner then initializes them (100 per batch) and each receives
    at least 168 hours from its own initialization time, however long the backlog takes. New solo
-   transitions are stamped immediately.
+   transitions are stamped immediately. The migration and the warning UI deploy from the same
+   merge; if the app deploy fails or rolls back to a build without the warning, set
+   `deletion_enabled=false` until the warning is live again, so no owner loses a team unwarned.
 2. No team can be disbanded until seven days after `warnings_started_at`; the runner enforces
    `greatest(team deadline, warnings_started_at + 168 hours)`. Expiry is on or after the deadline,
    depending on hourly batches, lock contention and backlog.

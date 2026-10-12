@@ -1115,6 +1115,32 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it('keeps the next team deadline when its refresh finishes before its snapshot', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { id: 'team-2', owner_id: 'owner-2', owner_only_expires_at: '2026-10-21T12:00:00Z' },
+        error: null,
+      });
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z')
+      );
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2', owner_id: 'owner-2' });
+      expect(instance.teamStore.id).toBe('team-2');
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z');
+    } finally {
+      instance.cleanup();
+    }
+  });
   it('clears a stale owner when the authorized team row has no owner', async () => {
     const { teamRecords, teamQuery } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();
