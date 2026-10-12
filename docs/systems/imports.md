@@ -138,8 +138,20 @@ Explicit failure notifications use the persistent manual-failure flag so automat
 discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
-All destination task/objective catalogs are
-loaded before mutations, without changing the active metadata store. Destination catalogs
+All destination catalogs are loaded before mutations, without changing the active metadata store.
+`/api/tarkov/tasks-import` reads one English precomputed snapshot for each requested upstream mode.
+The producer combines core fields, objectives and fail conditions from one raw task set, then applies
+the private overlay once. Import never joins the independently cached UI core/objective projections.
+Snapshot validation follows the [producer contract](./overlay-and-precompute.md#key-contract). Missing provenance,
+duplicate task/objective IDs, invalid counts, wrong scope, corrupt data or a
+snapshot older than seven days rejects the preview before any progress or mode change. Failed
+refreshes retain each mode's last-good entry. Runtime use of a whole last-good snapshot does not
+require its global overlay SHA to match the separately cached UI release; a non-task overlay change
+cannot cause an import outage by itself. The snapshot route and request are `no-store`, and the
+route never runs upstream adaptation on a Worker request. Seed the three import keys from the
+reviewed app revision before promoting it (see [overlay and precompute](./overlay-and-precompute.md)).
+The UI objective route and local metadata cache use `TASK_OBJECTIVES_CACHE_VERSION` (`json-v4`)
+to retire earlier incomplete corrected entries. Destination catalogs
 determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
 failures explicitly warn that some progress may remain applied. Users can select the same logs
 to retry; state-setting operations preserve successful completions.

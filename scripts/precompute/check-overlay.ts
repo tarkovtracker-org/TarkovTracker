@@ -1,10 +1,15 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { fetchOverlay } from '@/server/utils/overlay';
-import { compareOverlayFleet, type OverlayManifest } from './verify-overlay';
+import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
+import {
+  compareOverlayFleet,
+  compareImportCatalog,
+  type ImportCatalogComparison,
+  type OverlayManifest,
+} from './verify-overlay';
 // This command verifies the production fleet and writes a private, unique report.
 const productionOrigin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
 const operationsUrl = new URL(productionOrigin);
@@ -58,12 +63,27 @@ for (const lang of API_SUPPORTED_LANGUAGES)
     }
   }
 const rows = compareOverlayFleet(published, manifest, served);
+const imports: ImportCatalogComparison[] = [];
+for (const gameMode of VALID_GAME_MODES) {
+  let payload: unknown;
+  try {
+    payload = (await getJson(`${productionOrigin}/api/tarkov/tasks-import?gameMode=${gameMode}`))
+      .payload;
+  } catch (error) {
+    console.error(String(error));
+  }
+  imports.push(compareImportCatalog(gameMode, published, payload));
+}
 const reportDirectory = await mkdtemp(join(tmpdir(), 'tarkov-overlay-fleet-'));
 const output = join(reportDirectory, 'report.json');
-await writeFile(output, JSON.stringify({ checkedAt: new Date().toISOString(), rows }, null, 2), {
-  mode: 0o600,
-  flag: 'wx',
-});
+await writeFile(
+  output,
+  JSON.stringify({ checkedAt: new Date().toISOString(), rows, imports }, null, 2),
+  {
+    mode: 0o600,
+    flag: 'wx',
+  }
+);
 console.log(
   JSON.stringify({
     output,
@@ -72,6 +92,12 @@ console.log(
     propagating: rows.filter((row) => row.status === 'propagating').length,
     drift: rows.filter((row) => row.status === 'drift').length,
     unverified: rows.filter((row) => row.status === 'unverified').length,
+    importMismatches: imports.filter((row) => row.status === 'mismatch').length,
+    importUnverified: imports.filter((row) => row.status === 'unverified').length,
   })
 );
-if (rows.some((row) => row.status === 'drift' || row.status === 'unverified')) process.exitCode = 1;
+if (
+  rows.some((row) => row.status === 'drift' || row.status === 'unverified') ||
+  imports.some((row) => row.status !== 'current')
+)
+  process.exitCode = 1;

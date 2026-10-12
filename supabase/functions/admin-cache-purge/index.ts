@@ -1,3 +1,4 @@
+import { buildTarkovCacheUrls } from './cache-targets.ts';
 import {
   authenticateUser,
   handleCorsPreflight,
@@ -16,42 +17,11 @@ const createPurgeError = (code: CachePurgeErrorCode, status: number, req: Reques
   createSuccessResponse({ error: code, code }, status, req);
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
-const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
 const TWITCH_CONFIG_CACHE_TAG = 'promoted-twitch-config';
 const TWITCH_CONFIG_PATH = '/api/twitch/config';
 const TWITCH_CONFIG_REPURGE_DELAY_MS = 6000;
 const PURGE_TIMEOUT_MS = 8000;
 const PURGE_CHUNK_SIZE = 30;
-const TARKOV_CACHE_KEYS = [
-  { key: 'bootstrap', includesGameMode: false },
-  { key: 'tasks-core', includesGameMode: true },
-  { key: 'tasks-objectives', includesGameMode: true },
-  { key: 'tasks-rewards', includesGameMode: true },
-  { key: 'hideout', includesGameMode: true },
-  { key: 'items', includesGameMode: false },
-  { key: 'items-lite', includesGameMode: false },
-  { key: 'prestige', includesGameMode: false },
-];
-// Keep in sync with app/utils/constants.ts (API_SUPPORTED_LANGUAGES)
-const TARKOV_LANGUAGES = [
-  'cs',
-  'de',
-  'en',
-  'es',
-  'fr',
-  'hu',
-  'it',
-  'ja',
-  'ko',
-  'pl',
-  'pt',
-  'ro',
-  'ru',
-  'sk',
-  'tr',
-  'zh',
-];
-const TARKOV_GAME_MODES = ['regular', 'pve'];
 type PurgeType = 'all' | 'tarkov-data' | 'twitch-config';
 const PURGE_AUDIT_ACTION: Record<PurgeType, string> = {
   all: 'cache_purge',
@@ -188,32 +158,6 @@ function chunkArray<T>(items: T[], size: number): T[][] {
   }
   return chunks;
 }
-function buildEntryUrls(
-  cacheBase: string,
-  entry: { key: string; includesGameMode: boolean }
-): string[] {
-  const urls: string[] = [];
-  for (const lang of TARKOV_LANGUAGES) {
-    if (entry.includesGameMode) {
-      for (const gameMode of TARKOV_GAME_MODES) {
-        urls.push(`${cacheBase}/${entry.key}-${lang}-${gameMode}`);
-      }
-    } else {
-      urls.push(`${cacheBase}/${entry.key}-${lang}`);
-    }
-  }
-  return urls;
-}
-function buildTarkovCacheUrls(baseUrl: string): string[] {
-  const urls: string[] = [];
-  for (const origin of buildCacheOrigins(baseUrl)) {
-    const cacheBase = `${origin}${EDGE_CACHE_PATH}`;
-    for (const entry of TARKOV_CACHE_KEYS) {
-      urls.push(...buildEntryUrls(cacheBase, entry));
-    }
-  }
-  return urls;
-}
 function buildTwitchConfigUrls(baseUrl: string): string[] {
   if (!baseUrl) return [];
   try {
@@ -320,7 +264,10 @@ async function purgeTarkovDataCache(
     result: { id: '' },
   };
   const resultIds: string[] = [];
-  for (const chunk of chunkArray(buildTarkovCacheUrls(baseUrl), PURGE_CHUNK_SIZE)) {
+  for (const chunk of chunkArray(
+    buildTarkovCacheUrls(buildCacheOrigins(baseUrl)),
+    PURGE_CHUNK_SIZE
+  )) {
     const result = await purgeCloudflareCache(zoneId, apiToken, { files: chunk });
     markPurgeFailure(aggregate, result);
     collectPurgeIds(resultIds, result);
