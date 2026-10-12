@@ -156,6 +156,10 @@ assert.equal(
     '(pnpm run supabase:check) so cleanup cannot touch unrelated teams.'
 );
 const original = JSON.parse(query('SELECT row_to_json(c) FROM private.owner_only_team_cleanup c'));
+// Pause the scheduled sweep so it cannot race the controlled sessions; restore its flag after.
+const cronJob = "FROM cron.job WHERE jobname='owner-only-team-cleanup'";
+const cronActive = query(`SELECT coalesce((SELECT active ${cronJob})::text, 'false')`);
+const setCronActive = (active) => `SELECT cron.alter_job(jobid, active => ${active}) ${cronJob};`;
 let created = false;
 function restore() {
   for (const child of children) child.kill('SIGKILL');
@@ -168,6 +172,7 @@ function restore() {
     DELETE FROM auth.users WHERE id IN ('${owner}','${member}');
     UPDATE private.owner_only_team_cleanup SET deletion_enabled=${original.deletion_enabled},
       warnings_started_at=${warning};
+    ${setCronActive(cronActive)}
     COMMIT;`);
 }
 for (const [signal, code] of [
@@ -186,6 +191,7 @@ try {
   query(`BEGIN;
     INSERT INTO auth.users(id,email) VALUES('${owner}','${owner}@example.invalid'),('${member}','${member}@example.invalid');
     UPDATE private.owner_only_team_cleanup SET warnings_started_at=clock_timestamp()-interval '8 days',deletion_enabled=true;
+    ${setCronActive(false)}
     COMMIT;`);
   created = true;
   await joinWins();

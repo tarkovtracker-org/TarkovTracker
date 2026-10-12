@@ -1,5 +1,18 @@
 BEGIN;
-SELECT plan(62);
+SELECT plan(67);
+
+-- Installed state: automatic disband is on, behind the seven-day warning floor.
+SELECT ok((SELECT warnings_started_at IS NOT NULL AND warnings_started_at <= now()
+  FROM private.owner_only_team_cleanup), 'migrations start the warning clock');
+SELECT ok((SELECT deletion_enabled FROM private.owner_only_team_cleanup), 'migrations enable automatic disband');
+SELECT is((SELECT schedule FROM cron.job WHERE jobname = 'owner-only-team-cleanup'), '17 * * * *',
+  'cleanup runs hourly');
+SELECT ok((SELECT active AND command LIKE '%private.run_owner_only_team_cleanup(100)%'
+  FROM cron.job WHERE jobname = 'owner-only-team-cleanup'), 'the scheduled job runs the bounded runner');
+SELECT is((SELECT count(*)::integer FROM cron.job WHERE jobname = 'owner-only-team-cleanup'), 1,
+  'the cleanup job is scheduled once');
+-- Exercise the lifecycle from the inert gate the schema migration installs.
+UPDATE private.owner_only_team_cleanup SET warnings_started_at = NULL, deletion_enabled = false;
 
 CREATE TEMP TABLE expiry_users AS SELECT name, gen_random_uuid() AS id
   FROM unnest(ARRAY['owner','member','successor','outsider']) name;
