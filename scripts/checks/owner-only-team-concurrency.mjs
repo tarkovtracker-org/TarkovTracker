@@ -46,11 +46,11 @@ function collect(child) {
 function connection(sql) {
   return collect(spawn('docker', [...psql, '-c', sql]));
 }
-async function waitFor(sql) {
+async function waitFor(sql, signal) {
   const deadline = Date.now() + 10_000;
   while (query(sql) !== '1') {
     assert.ok(Date.now() < deadline, 'Timed out observing the actual PostgreSQL session state');
-    await delay(25);
+    await delay(25, undefined, { signal });
   }
 }
 const joinSql = `SELECT public.join_team('${team}','owner-only-race-code','${member}')`;
@@ -68,15 +68,32 @@ function prepareTeam() {
 // runner speed. psql executes stdin statements as they arrive.
 async function heldTransaction(sql) {
   const child = spawn('docker', ['exec', '-i', container, ...psqlArgs, '-v', 'VERBOSITY=verbose']);
-  const pending = collect(child);
   const timer = setTimeout(() => child.kill('SIGKILL'), HOLD_TIMEOUT_MS);
+  const pending = collect(child).finally(() => clearTimeout(timer));
+  const observation = new AbortController();
   // Publish the observed session name after the statement has acquired its locks.
   child.stdin.write(`BEGIN;\n${sql};\nSET application_name='${holderName}';\n`);
-  await waitFor(`SELECT count(*) FROM pg_stat_activity
-    WHERE application_name='${holderName}' AND state='idle in transaction'`);
+  try {
+    await Promise.race([
+      waitFor(
+        `SELECT count(*) FROM pg_stat_activity
+          WHERE application_name='${holderName}' AND state='idle in transaction'`,
+        observation.signal
+      ),
+      pending.then((result) => {
+        assert.fail(result.stderr || 'Held transaction exited before acquiring its locks');
+      }),
+    ]);
+  } catch (error) {
+    clearTimeout(timer);
+    child.kill('SIGKILL');
+    throw error;
+  } finally {
+    observation.abort();
+  }
   const release = (rollback) => {
     child.stdin.end(rollback ? 'SELECT 1/0;\n' : 'COMMIT;\n');
-    return pending.finally(() => clearTimeout(timer));
+    return pending;
   };
   return { release };
 }
