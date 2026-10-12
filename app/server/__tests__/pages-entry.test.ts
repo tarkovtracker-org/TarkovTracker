@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import pagesWorker from '../pages-entry';
+import pagesWorker from '@/server/pages-entry';
 const { adapterFetch, adapterScheduled } = vi.hoisted(() => ({
   adapterFetch: vi.fn(),
   adapterScheduled: vi.fn(),

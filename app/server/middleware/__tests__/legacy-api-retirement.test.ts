@@ -3,8 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createApp, defineEventHandler, toWebHandler } from 'h3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import retirement from '../00.legacy-api-retirement';
-import protection from '../api-protection';
+import retirement from '@/server/middleware/00.legacy-api-retirement';
+import protection from '@/server/middleware/api-protection';
 const { runtimeConfig } = vi.hoisted(() => ({
   runtimeConfig: vi.fn(() => ({
     apiProtection: { requireAuth: true },
