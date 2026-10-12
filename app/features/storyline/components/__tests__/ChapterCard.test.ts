@@ -238,4 +238,164 @@ describe('ChapterCard story contract rendering', () => {
     expect(wrapper.text()).not.toContain('page.storyline.stale_progress_one');
     wrapper.unmount();
   });
+  it('renders route decisions with chosen and blocked options and forwards toggles', async () => {
+    const chosen = objective('obj-keep', {
+      description: 'Keep the case',
+      routeState: 'chosen',
+      routeAlternatives: [{ complete: false, id: 'obj-give', label: 'Give the case' }],
+    });
+    const blocked = objective('obj-give', {
+      description: 'Give the case',
+      routeState: 'blocked',
+      routeBlockingAlternatives: [{ complete: true, id: 'obj-keep', label: 'Keep the case' }],
+    });
+    const optionalChoice = objective('obj-side', { description: 'Side route', type: 'optional' });
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectives: [chosen, blocked],
+        mainObjectiveTotal: 2,
+        mainRouteChoices: [
+          { chosenObjectiveId: 'obj-keep', id: 'route-main', objectives: [chosen, blocked] },
+        ],
+        optionalObjectives: [optionalChoice],
+        optionalRouteChoices: [
+          { chosenObjectiveId: null, id: 'route-optional', objectives: [optionalChoice] },
+        ],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('page.storyline.route_decision:{"index":1}');
+    expect(text).toContain('page.storyline.route_switch_hint');
+    expect(text).toContain('page.storyline.route_selected_hint');
+    expect(text).toContain('page.storyline.route_blocked_by:{"objectives":"Keep the case"}');
+    expect(text).toContain('page.profile.storyline_objectives_optional');
+    expect(wrapper.get('#storyline-objective-the-ticket-obj-give').attributes('disabled')).toBe('');
+    await wrapper.get('#storyline-objective-the-ticket-obj-keep').trigger('change');
+    await wrapper.get('#storyline-objective-the-ticket-obj-side').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([
+      ['the-ticket', 'obj-keep'],
+      ['the-ticket', 'obj-side'],
+    ]);
+    wrapper.unmount();
+  });
+  it('lists linear steps with unlocks, route notes, and indented optional steps', async () => {
+    const step = objective('obj-step', {
+      description: 'Visit Woods',
+      hasEstimatedUnlocks: true,
+      routeAlternatives: [{ complete: false, id: 'obj-other', label: 'Visit Customs' }],
+      unlocks: [
+        { estimated: false, id: 'woods', label: 'Woods', type: 'map' },
+        { estimated: false, id: 'skier', label: 'Skier', type: 'trader' },
+        { estimated: true, id: 'reward', label: 'Rubles', type: 'reward' },
+      ],
+    });
+    const side = objective('obj-optional', { type: 'optional' });
+    const wrapper = mountCard(
+      createChapter({
+        complete: true,
+        mainLinearObjectives: [step],
+        mainObjectiveCompleted: 1,
+        mainObjectiveTotal: 2,
+        mainObjectives: [step],
+        optionalLinearObjectives: [side],
+        optionalObjectives: [side],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('page.storyline.route_required_steps');
+    expect(text).toContain('1/2');
+    expect(text).toContain('page.storyline.route_unlocks_here:');
+    expect(text).toContain('page.storyline.route_unlock_map:{"name":"Woods"}');
+    expect(text).toContain('page.storyline.route_unlock_trader:{"name":"Skier"}');
+    expect(text).toContain('page.storyline.route_unlock_reward:{"name":"Rubles"}');
+    expect(text).toContain('page.storyline.route_unlocks_estimated');
+    expect(text).toContain('page.storyline.route_choice');
+    expect(text).toContain('page.storyline.route_blocks:{"objectives":"Visit Customs"}');
+    expect(text).toContain('common.optional');
+    await wrapper.get('#storyline-objective-the-ticket-obj-step').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-step']]);
+    expect(
+      wrapper.get('#storyline-objective-the-ticket-obj-optional').element.closest('li')?.className
+    ).toContain('border-l');
+    wrapper.unmount();
+  });
+  it('shows standalone optional steps when a chapter has no main objectives', async () => {
+    const side = objective('obj-optional', { complete: true, type: 'optional' });
+    const chapter = createChapter({ optionalLinearObjectives: [side], optionalObjectives: [side] });
+    const editable = mountCard(chapter);
+    await editable.get('#storyline-objective-the-ticket-obj-optional').trigger('change');
+    expect(editable.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-optional']]);
+    editable.unmount();
+    const wrapper = mountCard(chapter, true);
+    expect(wrapper.text()).toContain('page.storyline.route_optional_steps');
+    expect(wrapper.text()).not.toContain('page.storyline.route_required_steps');
+    expect(wrapper.get('#storyline-objective-the-ticket-obj-optional').attributes('disabled')).toBe(
+      ''
+    );
+    wrapper.unmount();
+  });
+  it('renders requirements, chapter unlocks, and ending route states in the side panel', () => {
+    const ending = {
+      evidencePending: false,
+      objectiveCompleted: 0,
+      objectiveId: 'obj-end',
+      objectiveTotal: 0,
+      routeBlockingAlternatives: [],
+      routeChoiceIndex: null,
+      routeState: 'open' as const,
+      systemName: 'Ending',
+    };
+    const wrapper = mountCard(
+      createChapter({
+        chapterUnlocks: [{ estimated: false, id: 'tour', label: 'Tour', type: 'reward' }],
+        endings: [
+          {
+            ...ending,
+            id: 'ending-chosen',
+            label: 'Savior',
+            objectiveLabel: 'Give the case',
+            routeChoiceIndex: 2,
+            routeState: 'chosen',
+          },
+          {
+            ...ending,
+            id: 'ending-blocked',
+            label: 'Fallen',
+            objectiveLabel: 'Fallen',
+            routeBlockingAlternatives: [{ complete: true, id: 'obj-give', label: 'Give the case' }],
+            routeState: 'blocked',
+          },
+        ],
+        requirements: [{ id: 'req-1', label: 'Finish Tour' }],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('common.requires');
+    expect(text).toContain('Finish Tour');
+    expect(text).toContain('page.storyline.route_unlocks_chapter');
+    expect(text).toContain('page.storyline.route_decision:{"index":2}');
+    expect(text).toContain('Give the case');
+    expect(text).toContain('page.storyline.route_chosen');
+    expect(text).toContain('common.blocked');
+    expect(text).toContain('page.storyline.route_blocked_by:{"objectives":"Give the case"}');
+    wrapper.unmount();
+  });
+  it('toggles the chapter from the icon and the header action', async () => {
+    const wrapper = mountCard(createChapter({ autoStart: false, complete: true }));
+    expect(wrapper.text()).toContain('page.profile.storyline_discovered');
+    expect(wrapper.text()).toContain('common.completed');
+    await wrapper.get('button[aria-label="page.storyline.mark_incomplete"]').trigger('click');
+    for (const button of wrapper.findAll('button:not([aria-label])')) await button.trigger('click');
+    expect(wrapper.emitted('toggleChapter')).toEqual([
+      ['the-ticket'],
+      ['the-ticket'],
+      ['the-ticket'],
+    ]);
+    wrapper.unmount();
+  });
+  it('hides chapter actions on a read-only card', () => {
+    const wrapper = mountCard(createChapter(), true);
+    expect(wrapper.find('button').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });
