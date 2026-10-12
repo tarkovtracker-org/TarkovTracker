@@ -29,7 +29,9 @@ frozen lockfile, compares every compiled rule export and fixture to the installe
 its type/schema/API/DO tests and dry-run build, then checks real browser/Nitro adapters against
 that versioned API in PvP, PvE and Seasonal modes. CI runs this command explicitly; ordinary
 frontend unit tests do not fetch another repository. Optional full public-catalog captures remain
-opt-in. Supabase migration assertions continue running here with their schema owner.
+opt-in. Supabase migration assertions continue running here with their schema owner;
+`supabase/tests/database/api_gateway_surface.test.sql` pins every object the API Worker uses,
+matching the API repository's `supabase-surface.json`.
 
 The API source ref/commit can advance separately for an API-only update while the frontend keeps
 its contracts version. That update must pass the same checks; compiled API rule exports still
