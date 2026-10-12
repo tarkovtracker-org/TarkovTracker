@@ -1234,12 +1234,15 @@ fleet verification before closing issue #729.
 2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
    overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
 3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
-   three modes, and `pnpm run verify:overlay` reports no import mismatches.
+   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+   environment or a secret store) reports no import mismatches.
 4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
    entries and the import keys share the release.
 
-Rollback: the previous app ignores these keys and reads its `json-v3` objective entries, which
-stay valid until TTL. The 7-day import keys can be left to expire.
+Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
+which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail
+for affected modes. Purge the `json-v3` objective targets with `admin-cache-purge` after rolling
+back so they regenerate with the overlay. The 7-day import keys can be left to expire.
 
 ### Retired automatic-level cleanup
 
