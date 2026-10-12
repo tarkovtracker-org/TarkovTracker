@@ -19,10 +19,14 @@ export default defineNuxtPlugin({
     const supabase = nuxtApp.$supabase;
     configureProgressSession(() => supabase.user.id || null);
     // Refreshes no-op until a session is hydrated, so a later activation retry stays current.
-    const stop = observeProgressAuthority((error) => {
-      logger.error('[PiniaPlugin] Progress refresh failed', error);
-    });
-    nuxtApp.vueApp.onUnmount(stop);
+    try {
+      const stop = observeProgressAuthority((error) => {
+        logger.error('[PiniaPlugin] Progress refresh failed', error);
+      });
+      nuxtApp.vueApp.onUnmount(stop);
+    } catch (error) {
+      logger.error('[PiniaPlugin] Progress observer unavailable', error);
+    }
     try {
       await supabase.ready();
       await initializeProgressAuthority(supabase.user.id || null);
