@@ -1715,6 +1715,7 @@ describe('older-tab recovery review', () => {
     expect(tarkovStore.$patch).not.toHaveBeenCalled();
     expect(older).toHaveLength(3);
     backup.reviewRecoveryArchiveEntry(99);
+    expect(backup.importError.value).toBe('settings.data_management.older_edit_unavailable');
     expect(backup.importState.value).toBe('error');
     expect(backup.importPreview.value).toBeNull();
   });
@@ -1741,6 +1742,7 @@ describe('older-tab recovery review', () => {
     supabaseUser.id = 'different';
     try {
       backup.reviewRecoveryArchiveEntry(0);
+      expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
       expect(backup.importState.value).toBe('error');
     } finally {
       supabaseUser.id = 'user-123';
@@ -1773,6 +1775,31 @@ describe('older-tab recovery review', () => {
     } finally {
       read.mockRestore();
       blob.mockRestore();
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+  it('aborts archive export when the account changes during the authority read', async () => {
+    const read = vi
+      .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+      .mockImplementation(async () => {
+        supabaseUser.id = 'different';
+        return { version: 1, revision: 1, raw: null, legacyRaw: null };
+      });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const createObjectURL = vi.fn(() => 'blob:recovery');
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
+    try {
+      const backup = useDataBackup();
+      await expect(backup.exportDeviceProgressRecovery()).rejects.toThrow(
+        'settings.data_management.recovery_owner_changed'
+      );
+      expect(createObjectURL).not.toHaveBeenCalled();
+      expect(click).not.toHaveBeenCalled();
+      expect(backup.recoveryExportPending.value).toBe(false);
+    } finally {
+      supabaseUser.id = 'user-123';
+      read.mockRestore();
       click.mockRestore();
       vi.unstubAllGlobals();
     }

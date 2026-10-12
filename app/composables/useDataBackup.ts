@@ -918,10 +918,14 @@ export function useDataBackup(): UseDataBackupReturn {
         t('settings.data_management.older_edit_unavailable')
       );
       if (!isOwnedProgressRecovery(raw, $supabase.user.id ?? null))
-        throw new Error('Recovery owner changed');
+        throw new Error(t('settings.data_management.import_owner_changed'));
       applyResolvedRecovery(parseRecoveryProgress(raw));
-    } catch {
-      applyResolvedRecovery({ ok: false, error: 'invalid_device_archive' });
+    } catch (error) {
+      importState.value = 'error';
+      importError.value =
+        error instanceof Error
+          ? error.message
+          : t('settings.data_management.invalid_device_archive');
     }
   }
   function previewParsedBackup(json: unknown): void {
@@ -1001,6 +1005,8 @@ export function useDataBackup(): UseDataBackupReturn {
     recoveryExportPending.value = false;
     const owner = $supabase.user.id ?? null;
     const record = await readCommittedProgressAuthority(false);
+    if (owner !== ($supabase.user.id ?? null))
+      throw new Error(t('settings.data_management.recovery_owner_changed'));
     const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
     const copies = [...exportableLegacyUpdates(record, owner)];
     await downloadJsonFile(
