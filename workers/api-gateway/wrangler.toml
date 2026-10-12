@@ -4,10 +4,8 @@ compatibility_date = "2026-08-25"
 workers_dev = false
 preview_urls = false
 routes = [
-  { pattern = "tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
-  # Tombstone bindings: retain retired apex routes on the gateway so legacy requests
-  # return 404 directly at the edge instead of falling through to Pages/Nitro api-protection.
+  # Retain these ten legacy bindings until the Pages retirement deployment is verified.
+  # Their removal is a separate approval-gated stage; see docs/api-ownership.md.
   { pattern = "tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
   { pattern = "tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
   { pattern = "www.tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
@@ -18,10 +16,6 @@ routes = [
   { pattern = "www.tarkovtracker.org/api/progress*", zone_name = "tarkovtracker.org" },
   { pattern = "tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
   { pattern = "www.tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "api.tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
-  { pattern = "api.tarkovtracker.org/token*", zone_name = "tarkovtracker.org" },
-  { pattern = "api.tarkovtracker.org/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "api.tarkovtracker.org/team/progress*", zone_name = "tarkovtracker.org" },
   # Catch-all for docs/spec on api subdomain. Keep last for clarity.
   { pattern = "api.tarkovtracker.org/*", zone_name = "tarkovtracker.org" },
 ]
