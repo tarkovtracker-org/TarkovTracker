@@ -45,7 +45,5 @@ export function checkProgressContracts(root) {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   checkProgressContracts(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
-  console.log(
-    'Frontend uses the immutable contracts URL/integrity with one external source owner.'
-  );
+  console.log('Frontend contracts URL/integrity matches the immutable release pins.');
 }

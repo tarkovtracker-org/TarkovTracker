@@ -122,15 +122,15 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys through three integrations — none of them GitHub Actions. Each one builds
-and deploys only when its trigger matches the merge, and surfaces as a check on the merge commit
-when it runs:
+Tracker merges deploy Pages and Supabase through their integrations. The API Worker builds
+independently from API-repository merges matching its watch paths; none of these deploys are
+GitHub Actions deployments. Checks appear on the corresponding source repository's commit:
 
-| What                                 | Mechanism                    | Check on the merge commit     |
-| ------------------------------------ | ---------------------------- | ----------------------------- |
-| Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
-| `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
-| DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+| What                                  | Mechanism                    | Check on the source commit    |
+| ------------------------------------- | ---------------------------- | ----------------------------- |
+| Frontend                              | Cloudflare Pages Git build   | `Cloudflare Pages`            |
+| `api-gateway` Worker (API repository) | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
+| DB migrations **and** Edge Functions  | Supabase GitHub integration  | `Supabase Preview`            |
 
 The existing `api-gateway` Worker deploys only from `tarkovtracker-org/TarkovTracker-API/main`,
 root `/`, with empty build command and deploy command `pnpm run deploy`. That command prepares
@@ -208,11 +208,13 @@ integration fails or is unavailable, not the normal path.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
-   already provisioned on the production `api-gateway` Worker:
+   already provisioned on the production `api-gateway` Worker. Run these commands only from
+   the TarkovTracker-API checkout; Tracker's root Wrangler config is for Pages:
 
    ```bash
-   pnpm exec wrangler secret list --config wrangler.toml # in the API repository   # confirm IP_HASH_SECRET is listed
-   pnpm exec wrangler secret put IP_HASH_SECRET --config wrangler.toml # in the API repository   # set if missing
+   pnpm exec wrangler secret list --config wrangler.toml
+   # If absent, provision it only with explicit secret-change authorization:
+   pnpm exec wrangler secret put IP_HASH_SECRET --config wrangler.toml
    ```
 
    The api-gateway Worker auto-deploys from the API repository's `main` on merge. If `IP_HASH_SECRET` is absent at
@@ -222,8 +224,9 @@ integration fails or is unavailable, not the normal path.
    Do not commit the value.
 
 5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
-   a change was merged in the API repository, also confirm its `Workers Builds: api-gateway`
-   check and exact active version there. This repository no longer triggers API deployments.
+   an API-repository merge matches the Worker watch paths (or matching is bypassed by Cloudflare),
+   also confirm its `Workers Builds: api-gateway` check and exact active version there. Unwatched
+   docs-only changes normally create no Worker build/check. Tracker merges do not deploy the API.
    `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the

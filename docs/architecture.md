@@ -502,7 +502,7 @@ pnpm run test
 # Watch mode
 pnpm run test:watch
 
-# API Gateway tests
+# Versioned API parity (fetches/builds the pinned external source)
 pnpm run verify:api-parity
 ```
 
