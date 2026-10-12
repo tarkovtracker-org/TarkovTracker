@@ -74,9 +74,20 @@ vi.mock('@/composables/useStorylineChapters', () => ({
       ]),
       normalizedChapters: ref([
         {
+          complete: true,
+          id: 'chapter-0',
+          mainObjectiveCompleted: 2,
+          mainObjectiveTotal: 2,
+          name: 'Chapter 0',
+          normalizedName: 'chapter-0',
+        },
+        {
           complete: false,
           id: 'chapter-1',
-          title: 'Chapter 1',
+          mainObjectiveCompleted: 1,
+          mainObjectiveTotal: 3,
+          name: 'Chapter 1',
+          normalizedName: 'chapter-1',
         },
       ]),
     };
@@ -123,6 +134,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });
@@ -205,6 +218,45 @@ describe('storyline page', () => {
     expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('opens the first incomplete chapter and switches chapters from the rail', async () => {
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-1');
+    const tile = wrapper.get('button[aria-label="Chapter 0 (2/2)"]');
+    await tile.trigger('click');
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-0');
+    expect(tile.attributes('aria-current')).toBe('true');
+    wrapper.unmount();
+  });
+  it('opens the chapter named by the chapter query', () => {
+    router.route.query = { chapter: 'chapter-0' };
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-0');
+    wrapper.unmount();
+  });
   it('focuses a deep-linked objective and drops the focus query', async () => {
     router.route.query = { chapter: 'chapter-1', objective: 'obj-1', tab: 'keep' };
     const scrollIntoView = vi.fn();
@@ -228,6 +280,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });
@@ -261,6 +315,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });

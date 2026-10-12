@@ -1,10 +1,11 @@
+import { storylineObjectiveInputId } from '@/features/storyline/objectiveInputId';
 import { getQueryString } from '@/utils/routeHelpers';
 import type { Ref } from '#imports';
 const FOCUS_CLASSES = ['ring-2', 'ring-primary-500', 'ring-offset-2', 'ring-offset-surface-950'];
 const FOCUS_DURATION_MS = 2500;
 const objectiveElement = (chapterId: string, objectiveId: string | undefined) => {
   if (!objectiveId) return null;
-  const input = document.getElementById(`storyline-objective-${chapterId}-${objectiveId}`);
+  const input = document.getElementById(storylineObjectiveInputId(chapterId, objectiveId));
   return input?.closest('label') ?? input?.parentElement ?? null;
 };
 const focusTarget = (chapterId: string, objectiveId: string | undefined) =>
