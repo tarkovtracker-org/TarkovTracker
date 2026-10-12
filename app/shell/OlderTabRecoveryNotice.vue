@@ -48,6 +48,8 @@
   const BACKUP_RESTORE_TARGET = '/settings#backup-restore';
   // Hashes that open the Backup & Restore tab, which already lists these copies.
   const BACKUP_RESTORE_HASHES = new Set(['#backup-restore', '#settings-backup-restore']);
+  // The Settings page and its route aliases (app/pages/settings.vue definePageMeta).
+  const SETTINGS_PATHS = new Set(['/settings', '/progression', '/prestige', '/preferences']);
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   /** Tab-lifetime dismissal (never persisted); new copies or a new overflow show it again. */
@@ -62,7 +64,7 @@
     current.count <= dismissed.count &&
     (dismissed.overflow || !current.overflow);
   const onBackupRestoreTab = computed(
-    () => route.path === '/settings' && BACKUP_RESTORE_HASHES.has(route.hash)
+    () => SETTINGS_PATHS.has(route.path) && BACKUP_RESTORE_HASHES.has(route.hash)
   );
   const visible = computed(
     () =>

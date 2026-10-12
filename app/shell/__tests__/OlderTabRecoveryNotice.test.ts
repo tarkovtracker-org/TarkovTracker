@@ -56,6 +56,16 @@ describe('OlderTabRecoveryNotice', () => {
     const wrapper = await mountNotice();
     expect(wrapper.find(NOTICE).exists()).toBe(false);
   });
+  it.each(['/progression', '/prestige', '/preferences'])(
+    'hides on the Backup & Restore tab reached through the %s Settings alias',
+    async (path) => {
+      legacyProgressRecoveryCount.value = 1;
+      route.path = path;
+      route.hash = '#backup-restore';
+      const wrapper = await mountNotice();
+      expect(wrapper.find(NOTICE).exists()).toBe(false);
+    }
+  );
   it('dismisses for the session and returns when more copies are retained', async () => {
     legacyProgressRecoveryCount.value = 1;
     const wrapper = await mountNotice();
