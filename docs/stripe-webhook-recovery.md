@@ -162,11 +162,12 @@ entitlement expiry, normalizes the Supabase base URL and rejects non-HTTPS bases
 service-role headers. Only a missing-view `404/PGRST205` permits the existing table read during
 schema rollout. The progress-contracts release remains v0.1.0; no pure rules changed.
 
-Only the gateway tolerates the schema being absent. The browser supporter read and
-`discord-role-sync` require the new columns and view, and the merge deploys Pages, Edge Functions
-and the migration in an uncontrolled order. After merge, confirm the migration applied
-(`Supabase Preview` on the merge commit and `supabase migration list --linked`) before treating
-supporter-status read errors as a regression.
+Only the gateway tolerates the schema being absent. The browser `useSupporter` read selects the new
+`one_time_*` columns from `supporters`, and `discord-role-sync` reads `supporter_entitlements`.
+The Supabase integration deploys changed Edge Functions only after the migration step (step 4
+above), but the Cloudflare Pages build is ordered independently of both. After merge, confirm the
+migration applied (`Supabase Preview` on the merge commit and `supabase migration list --linked`)
+before treating browser supporter-status read errors as a regression.
 
 For pre-ledger lifetime refunds, the current handler verifies all remaining valid pre-cutoff
 one-time charges and their Checkout Session tiers before reconciling the legacy bank.
