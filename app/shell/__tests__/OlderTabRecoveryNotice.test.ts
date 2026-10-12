@@ -87,4 +87,27 @@ describe('OlderTabRecoveryNotice', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find(NOTICE).exists()).toBe(true);
   });
+  it('announces a new copy after a partial export-and-clear lowered the count', async () => {
+    legacyProgressRecoveryCount.value = 2;
+    const wrapper = await mountNotice();
+    await wrapper.get('[data-testid="older-tab-recovery-dismiss"]').trigger('click');
+    // Export-and-clear removed the exported copies but kept one captured afterwards.
+    legacyProgressRecoveryCount.value = 1;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(NOTICE).exists()).toBe(false);
+    legacyProgressRecoveryCount.value = 2;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(NOTICE).exists()).toBe(true);
+  });
+  it('announces a new overflow after an earlier overflow was resolved', async () => {
+    legacyProgressRecoveryCount.value = 1;
+    legacyProgressRecoveryOverflow.value = true;
+    const wrapper = await mountNotice();
+    await wrapper.get('[data-testid="older-tab-recovery-dismiss"]').trigger('click');
+    legacyProgressRecoveryOverflow.value = false;
+    await wrapper.vm.$nextTick();
+    legacyProgressRecoveryOverflow.value = true;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(NOTICE).exists()).toBe(true);
+  });
 });

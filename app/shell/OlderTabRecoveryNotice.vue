@@ -77,9 +77,14 @@
         : 'older_tab_recovery_notice.description'
     )
   );
-  // Copies cleared from Settings reset the dismissal so later copies are announced again.
-  watch(hasRecovery, (present) => {
-    if (!present) dismissedAt.value = null;
+  /** Clearing copies or resolving overflow lowers the baseline, so later ones are announced. */
+  const lowerDismissal = (current: RecoverySnapshot, dismissed: RecoverySnapshot) => ({
+    count: Math.min(current.count, dismissed.count),
+    overflow: dismissed.overflow && current.overflow,
+  });
+  watch(snapshot, (current) => {
+    if (!hasRecovery.value) dismissedAt.value = null;
+    else if (dismissedAt.value) dismissedAt.value = lowerDismissal(current, dismissedAt.value);
   });
   const dismiss = () => {
     dismissedAt.value = { ...snapshot.value };
