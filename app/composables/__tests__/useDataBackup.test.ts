@@ -1884,6 +1884,83 @@ describe('older-tab recovery review', () => {
     }
   );
   const ownedRaw = () => JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+  it('keeps explicitly selected ordinary backups portable across a delayed file read', async () => {
+    const content = JSON.stringify({
+      ...tarkovStore.$state,
+      _format: 'tarkovtracker-backup',
+      _version: 1,
+      exportedAt: Date.now(),
+      appVersion: 'test',
+    });
+    const file = createFile(content);
+    let resume!: (value: string) => void;
+    const text = vi.spyOn(file, 'text').mockReturnValue(
+      new Promise((resolve) => {
+        resume = resolve;
+      })
+    );
+    const backup = useDataBackup();
+    tarkovStore.$patch.mockClear();
+    const parsing = backup.parseBackupFile(file);
+    supabaseUser.id = 'different';
+    try {
+      resume(content);
+      await parsing;
+      expect(backup.importState.value).toBe('preview');
+      await backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(tarkovStore.$patch).toHaveBeenCalledOnce();
+      expect(backup.importState.value).toBe('success');
+    } finally {
+      resume(content);
+      supabaseUser.id = 'user-123';
+      text.mockRestore();
+    }
+  });
+  it('does not relabel an older-tab preview when File.text crosses an account switch', async () => {
+    const raw = ownedRaw();
+    const record = {
+      version: 1 as const,
+      revision: 0,
+      raw: null,
+      legacyRaw: null,
+      legacyUpdates: [raw],
+    };
+    const read = vi
+      .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+      .mockResolvedValue(record);
+    const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+    let resume!: () => void;
+    const held = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const originalText = File.prototype.text;
+    const text = vi.spyOn(File.prototype, 'text').mockImplementation(async function (this: File) {
+      const content = await originalText.call(this);
+      await held;
+      return content;
+    });
+    const backup = useDataBackup();
+    const before = JSON.stringify(tarkovStore.$state);
+    tarkovStore.$patch.mockClear();
+    const previewing = backup.reviewOlderTabProgress(0);
+    try {
+      await vi.waitFor(() => expect(owned).toHaveBeenCalled());
+      supabaseUser.id = 'different';
+      resume();
+      await previewing;
+      await backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(tarkovStore.$patch).not.toHaveBeenCalled();
+      expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+      expect(record.legacyUpdates).toEqual([raw]);
+      expect(backup.importState.value).toBe('error');
+    } finally {
+      resume();
+      supabaseUser.id = 'user-123';
+      text.mockRestore();
+      read.mockRestore();
+      owned.mockRestore();
+    }
+  });
   it.each([
     ['archive', 'different'],
     ['archive', null],

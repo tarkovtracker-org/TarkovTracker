@@ -971,11 +971,13 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   async function reviewOlderTabProgress(index: number): Promise<void> {
     resetImport();
+    const owner = $supabase.user.id ?? null;
     try {
       const record = await readCommittedProgressAuthority();
-      const copies = ownedLegacyUpdates(record, $supabase.user.id ?? null);
-      const backup = buildOlderTabBackup(selectOlderTabRaw(copies, index));
-      await parseBackupFile(new File([JSON.stringify(backup)], 'older-tab.json'));
+      if (owner !== ($supabase.user.id ?? null))
+        throw new Error(t('settings.data_management.import_owner_changed'));
+      const copies = ownedLegacyUpdates(record, owner);
+      applyResolvedRecovery(parseRecoveryProgress(selectOlderTabRaw(copies, index)));
     } catch (error) {
       importState.value = 'error';
       importError.value = error instanceof Error ? error.message : 'Failed to read older edit';
