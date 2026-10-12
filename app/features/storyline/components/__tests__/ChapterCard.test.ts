@@ -406,9 +406,8 @@ describe('ChapterCard story contract rendering', () => {
     );
     expect(wrapper.text()).toContain('page.storyline.timeline_unlocks');
     // The badge renders once, in the lane, not again inside the option's box.
-    expect(wrapper.findAll('[data-storyline-objective]').map((row) => row.text())).not.toContain(
-      expect.stringContaining('route_unlock_map')
-    );
+    const optionRows = wrapper.findAll('[data-storyline-objective]');
+    expect(optionRows.some((row) => row.text().includes('route_unlock_map'))).toBe(false);
     const lane = wrapper.get('ol > li').findAll(':scope > div').at(-1)!;
     expect(lane.text()).toBe('Keep the casepage.storyline.route_unlock_map:{"name":"Woods"}');
     wrapper.unmount();
