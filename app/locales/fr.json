@@ -92,7 +92,6 @@
     "user_avatar_alt": "Avatar de l'utilisateur",
     "supporter_badge_aria": "Gérer votre abonnement de soutien ({tier})",
     "help_community_aria": "Aide et communauté",
-    "community_section": "Communauté",
     "keyboard_shortcuts": "Raccourcis clavier",
     "report_problem": "Signaler un problème",
     "login_aria": "Connectez-vous à votre compte",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "Vous avez des activités non lues",
     "mark_read": "Marquer comme Lu",
-    "clear": "Nettoyer",
     "empty": "Aucune activité n'a été enregistrée pour le moment.",
     "badge_api": "Synchronisation de l'API",
     "api_synced": "API synchronisée",
@@ -158,11 +156,7 @@
       "uncompleted": "Quête non complétée : {name}",
       "failed": "Quête échouée : {name}",
       "reset_failed": "Réinitialiser la quête échouée : {name}",
-      "available": "Débloquer la quête : {name}",
-      "undo_completed": "Annuler les quêtes complétées : {name}",
-      "undo_uncompleted": "Annuler les quêtes complétées : {name}",
-      "undo_reset_failed": "Réinitialiser la quête échouée : {name}",
-      "undo_failed": "Échec de la tâche : {name}"
+      "available": "Débloquer la quête : {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "Trier les traders",
           "direction_aria_label": "Basculer la direction de tri"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Soutenir TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "Badge de supporter",
       "perk_discord": "Rôle de supporter sur Discord",
       "perk_tier_role": "Rôle de niveau {tier} dans Discord (bientôt disponible)",
-      "perk_early_access": "Accès anticipé aux nouvelles fonctionnalités",
       "perk_priority_support": "Support prioritaire",
       "perk_feature_voting": "Priorité de vote des fonctionnalités",
       "one_time_title": "Contribution unique",
@@ -873,11 +874,6 @@
       "savings_note": "Vous économisez {amount} vs mensuel",
       "kofi_deprecation_title": "Ko-fi (ancienne option)",
       "kofi_deprecation_detail": "Les abonnements et les contributions ponctuelles ci-dessus passent désormais par Stripe, ce qui signifie des frais plus bas et une plus grande partie de votre soutien nous parvient directement. Ko-fi reste disponible en tant que sauvegarde pour des conseils uniques seulement.",
-      "alt_payments_title": "Plus de modes de paiement à venir",
-      "alt_payments_coming_soon": "Nous travaillons à ajouter des options de paiement supplémentaires afin que tout le monde puisse contribuer de la manière qui fonctionne le mieux pour eux.",
-      "alt_payment_crypto": "Crypto",
-      "alt_payment_gift_cards": "Cartes-cadeaux",
-      "alt_payments_more": "& Plus",
       "checkout_error_title": "Le paiement a échoué",
       "checkout_error_generic": "Nous n'avons pas pu commencer la commande. Veuillez réessayer dans un instant.",
       "manage_subscription_cta": "Gérer l'abonnement",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "Langue",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Gérez votre compte, votre progression de jeu et vos préférences d'application.",
     "tabs": {
       "progression": "Progression",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Prestige indisponible",
-      "persistent_mode_unsupported": "Prestige n'est pas disponible pour le mode PvE persistant.",
       "seasonal_mode_unsupported": "Prestige n'est pas disponible en JcJ saisonnier.",
       "current_level": "Niveau de prestige actuel",
       "set_current": "Définir le prestige actuel",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "Vous ne le trouvez pas ? Ouvrez le BSG Launcher -> Game Settings -> Logs et copiez ce chemin.",
       "avoid_session_folder_label": "Ne sélectionnez pas un dossier de session comme :",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape de Tarkov\\Logs\\logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "Compte",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Inclure les versions de journaux",
       "version_filter_hint": "La dernière version majeure est sélectionnée par défaut. Ajustez pour inclure des wipes plus anciens.",
       "version_filter_tooltip": "Les journaux sont regroupés par version de session. La dernière version majeure est sélectionnée par défaut pour éviter de mélanger les données d'anciens wipes.",

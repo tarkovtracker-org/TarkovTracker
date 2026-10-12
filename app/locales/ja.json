@@ -92,7 +92,6 @@
     "user_avatar_alt": "ユーザーのアバター",
     "supporter_badge_aria": "サポーターのサブスクリプション（{tier}）を管理する",
     "help_community_aria": "ヘルプ＆コミュニティ",
-    "community_section": "コミュニティ",
     "keyboard_shortcuts": "キーボード ショートカット",
     "report_problem": "問題を報告",
     "login_aria": "アカウントにログイン",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "未読のアクティビティがあります",
     "mark_read": "既読にする",
-    "clear": "クリア",
     "empty": "記録されたアクティビティはまだありません。",
     "badge_api": "API 同期",
     "api_synced": "API進行状況を同期しました",
@@ -158,11 +156,7 @@
       "uncompleted": "未完了のタスク: {name}",
       "failed": "失敗したタスク: {name}",
       "reset_failed": "失敗したタスクをリセット: {name}",
-      "available": "アンロックされたタスク: {name}",
-      "undo_completed": "タスクの完了を取り消しました: {name}",
-      "undo_uncompleted": "タスクの未完了を取り消しました: {name}",
-      "undo_reset_failed": "失敗したタスクのリセットを取り消しました: {name}",
-      "undo_failed": "タスクの失敗を取り消しました: {name}"
+      "available": "アンロックされたタスク: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "トレーダーのソート",
           "direction_aria_label": "並び順を切り替え"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "TarkovTracker をサポート",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "サポーターバッジ",
       "perk_discord": "Discordのサポーターロール (アカウントをリンクしてサーバーに参加)",
       "perk_tier_role": "Discord の {tier} Tier ロール",
-      "perk_early_access": "新機能への先行アクセス",
       "perk_priority_support": "優先サポート",
       "perk_feature_voting": "機能の優先投票権",
       "one_time_title": "1回限りの寄付",
@@ -873,11 +874,6 @@
       "savings_note": "月々の支払額と比べて、{amount}の節約になります",
       "kofi_deprecation_title": "Ko-fi (バックアップオプション)",
       "kofi_deprecation_detail": "上記の定期購読および1回限りの寄付は、現在Stripeを通じて行われています。これにより手数料が削減され、皆様からのご支援のより多くの部分が直接私たちに届くようになります。Ko-fiは、1回限りのチップのみのバックアップ手段として引き続き利用可能です。",
-      "alt_payments_title": "その他の支払い方法は近日公開予定です",
-      "alt_payments_coming_soon": "皆様一人ひとりが、ご自身にとって最も都合の良い方法で寄付していただけるよう、現在、支払い方法の拡充に取り組んでいます。",
-      "alt_payment_crypto": "仮想通貨",
-      "alt_payment_gift_cards": "ギフトカード",
-      "alt_payments_more": "その他",
       "checkout_error_title": "支払いに失敗しました",
       "checkout_error_generic": "決済を開始できませんでした。しばらくしてからもう一度お試しください。",
       "manage_subscription_cta": "サブスクリプションを管理",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "言語",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "アカウント、ゲーム進行状況、アプリの環境設定を管理します。",
     "tabs": {
       "progression": "進捗",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "プレステージを利用できません",
-      "persistent_mode_unsupported": "永続モードのPvEではプライドを利用できません。",
       "seasonal_mode_unsupported": "シーズンPvPではプライドを利用できません。",
       "current_level": "現在のプレステージレベル",
       "set_current": "現在のプレステージを設定",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "見つかりませんか？ BSG Launcher -> ゲーム設定 -> ログを開き、そのパスをコピーしてください。",
       "avoid_session_folder_label": "セッションフォルダーの例：",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "アカウント",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "ログバージョンを含める",
       "version_filter_hint": "デフォルトでは最新のメジャーバージョンが選択されます。復元するキャラクターとワイプのログのみを含めてください。",
       "version_filter_tooltip": "バージョンはアカウント変更、ワイプ、プレステージのリセットを識別できません。インポート前に適切なセッションフォルダーを選択してください。シーズナルイベントは、アクティブなシーズン期間内である必要があります。",
