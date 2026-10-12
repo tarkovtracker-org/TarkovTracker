@@ -120,6 +120,7 @@ function verifyCutover() {
   );
 }
 async function subscriptionPair(label, holderSql, waiterSql) {
+  const started = performance.now();
   const baseline = Number(
     query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
     FROM public.supporters WHERE user_id='${user}'`)
@@ -144,8 +145,12 @@ async function subscriptionPair(label, holderSql, waiterSql) {
     query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
     FROM public.supporters WHERE user_id='${user}'`)
   );
+  const elapsed = (performance.now() - started) / 1000;
+  const remainingChange = expiry - baseline - 30 * 86400;
+  // Running credit spends real time while paused credit does not. Neither may
+  // gain time or lose more than the actual duration of the observed transition.
   assert.ok(
-    Math.abs(expiry - baseline - 30 * 86400) < 5,
+    remainingChange <= 1 && remainingChange >= -elapsed - 1,
     'Subscription transition preserves every committed paid period'
   );
   console.log(`PASS ${label}: actual row-lock wait; independent credit retains the payment`);
@@ -154,7 +159,7 @@ async function subscriptionRaces() {
   const activate = `UPDATE public.supporters SET type='subscription',status='active',tier='chad',
     expires_at=NULL,stripe_subscription_id='sub_concurrency_${user.replaceAll('-', '')}' WHERE user_id='${user}'`;
   const end = `UPDATE public.supporters SET status='expired',tier='supporter',expires_at=now(),
-    stripe_subscription_id=NULL WHERE user_id='${user}'`;
+    subscription_ended_at=now(),stripe_subscription_id=NULL WHERE user_id='${user}'`;
   await subscriptionPair('subscription starts before donation', activate, fulfill('sub_start'));
   await subscriptionPair('donation commits before subscription end', fulfill('sub_end_after'), end);
   query(activate);
