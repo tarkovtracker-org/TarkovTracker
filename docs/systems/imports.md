@@ -139,9 +139,10 @@ discard them when a triggering quest is missing from the logs. Existing complete
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
 All destination task/objective catalogs are
-loaded before mutations, without changing the active metadata store. Core and objective snapshots
-must carry the same nonempty overlay version/SHA and cover every core task ID; a missing or
-mismatched snapshot rejects the preview before any progress or mode change. The objective route,
+loaded before mutations, without changing the active metadata store. Objective snapshots must
+carry nonempty overlay version/SHA and cover every core task ID; a missing snapshot rejects the
+preview before any progress or mode change. Core KV and final objective caches refresh separately,
+so global overlay identity differences alone do not reject complete task data. The objective route,
 request query, and local metadata cache share `TASK_OBJECTIVES_CACHE_VERSION` (`json-v4`) so an
 upgrade retires incomplete corrected entries at every layer. Destination catalogs
 determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:

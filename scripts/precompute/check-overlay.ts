@@ -89,6 +89,7 @@ console.log(
     drift: rows.filter((row) => row.status === 'drift').length,
     unverified: rows.filter((row) => row.status === 'unverified').length,
     catalogMismatches: catalogs.filter((row) => row.status !== 'current').length,
+    catalogIdentityDifferences: catalogs.filter((row) => !row.overlayIdentityMatches).length,
   })
 );
 if (

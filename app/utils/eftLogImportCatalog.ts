@@ -12,20 +12,14 @@ import type {
 type CatalogResponse<T> = FetchResponse<T> & {
   dataOverlay?: { version?: string; sha256?: string };
 };
-/** Separate cache layers may propagate at different times; imports require one corrected catalog identity. */
-function requireMatchingOverlay(
-  core: CatalogResponse<unknown>,
-  objectives: CatalogResponse<unknown>
-): void {
-  const sameIdentity = (['version', 'sha256'] as const).every((key) => {
-    const value = core.dataOverlay?.[key];
-    return (
-      typeof value === 'string' &&
-      value.trim().length > 0 &&
-      value === objectives.dataOverlay?.[key]
-    );
+/** Rejects upstream-only objective snapshots while allowing separately cached overlay releases. */
+function requireObjectiveOverlay(objectives: CatalogResponse<unknown>): void {
+  const hasIdentity = (['version', 'sha256'] as const).every((key) => {
+    const value = objectives.dataOverlay?.[key];
+    return typeof value === 'string' && value.trim().length > 0;
   });
-  if (!sameIdentity) throw new Error('Task catalog overlay versions do not match for log import.');
+  if (!hasIdentity)
+    throw new Error('Task objective overlay metadata is unavailable for log import.');
 }
 /** Rejects failed or malformed metadata responses before any progress can be changed. */
 function requireCatalogTasks<T extends { tasks: unknown[] }>(
@@ -55,7 +49,7 @@ export async function loadEftImportTaskCatalog(mode: GameMode): Promise<Task[]> 
   ]);
   const coreTasks = requireCatalogTasks(core);
   const objectiveTasks = requireCatalogTasks(objectives);
-  requireMatchingOverlay(core, objectives);
+  requireObjectiveOverlay(objectives);
   if (!coreTasks.length) throw new Error('Task metadata could not be loaded for log import.');
   const byId = new Map(objectiveTasks.map((task) => [task.id, task]));
   const tasks = coreTasks.map((task) => {

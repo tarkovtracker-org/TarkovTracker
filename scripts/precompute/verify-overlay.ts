@@ -103,6 +103,7 @@ export type CatalogComparison = {
   coreCount: number;
   objectiveCount: number;
   missingTaskIds: string[];
+  overlayIdentityMatches: boolean;
   status: 'current' | 'mismatch' | 'unverified';
 };
 type CatalogTask = { id: string; objectives?: unknown[] };
@@ -147,6 +148,9 @@ export function compareTaskCatalogs(
     coreCount: coreTasks?.length ?? 0,
     objectiveCount: objectiveTasks?.length ?? 0,
     missingTaskIds,
-    status: comparisonStatus(valid, sameIdentity && missingTaskIds.length === 0),
+    // A global overlay SHA can change for unrelated sections while these separately cached
+    // task snapshots remain complete. Report that difference without declaring an import outage.
+    overlayIdentityMatches: [coreIdentity, objectiveIdentity].every(identified) && sameIdentity,
+    status: comparisonStatus(valid, missingTaskIds.length === 0),
   };
 }

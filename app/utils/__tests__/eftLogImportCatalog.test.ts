@@ -33,8 +33,8 @@ describe('loadEftImportTaskCatalog', () => {
     vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ error: 'offline' }));
     await expect(loadEftImportTaskCatalog('pvp')).rejects.toThrow('could not be loaded');
   });
-  it.each([undefined, { version: 'catalog-test', sha256: 'old-sha' }])(
-    'rejects missing or mismatched objective provenance before returning a catalog: %j',
+  it.each([undefined, { version: 'catalog-test', sha256: '' }])(
+    'rejects missing objective provenance before returning a catalog: %j',
     async (objectiveOverlay) => {
       vi.stubGlobal(
         '$fetch',
@@ -49,6 +49,21 @@ describe('loadEftImportTaskCatalog', () => {
       await expect(loadEftImportTaskCatalog('pve')).rejects.toThrow('overlay');
     }
   );
+  it('accepts complete task data while separately cached global overlay identities propagate', async () => {
+    vi.stubGlobal(
+      '$fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(withOverlay({ tasks: [{ id: 'task' }] }))
+        .mockResolvedValueOnce({
+          data: { tasks: [{ id: 'task', objectives: [] }] },
+          dataOverlay: { version: 'earlier-non-task-overlay', sha256: 'earlier-sha' },
+        })
+    );
+    await expect(loadEftImportTaskCatalog('pve')).resolves.toEqual([
+      { id: 'task', objectives: [] },
+    ]);
+  });
 });
 describe('persisted objective identity', () => {
   afterEach(() => vi.unstubAllGlobals());

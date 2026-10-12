@@ -101,7 +101,7 @@ describe('core and objective catalog coherence', () => {
     dataOverlay: published,
   };
   it.each(VALID_GAME_MODES)(
-    'requires matching overlay identity and core task coverage for %s',
+    'requires overlay provenance and core task coverage for %s',
     (gameMode) => {
       expect(compareTaskCatalogs('en', gameMode, core, objectives)).toMatchObject({
         status: 'current',
@@ -125,7 +125,7 @@ describe('core and objective catalog coherence', () => {
           ...objectives,
           dataOverlay: { version: '0', sha256: 'old' },
         })
-      ).toMatchObject({ status: 'mismatch' });
+      ).toMatchObject({ status: 'current', overlayIdentityMatches: false });
     }
   );
   it.each([

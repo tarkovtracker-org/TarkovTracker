@@ -260,8 +260,11 @@ Run `pnpm run verify:overlay` after promotion. It targets the fixed production o
 new private temporary directory. The command writes
 an artifact comparing the published SHA, last complete precompute and served tasks-core for all
 48 language/mode combinations, plus every core/objective pair's overlay identity, task shape,
-and core-ID coverage. Missing or mismatched pairs fail verification even when all core KV rows
-are current. The pair report contains counts and missing IDs, never raw overlay/catalog payloads.
+and core-ID coverage. Missing provenance, malformed task arrays, or missing core IDs fail
+verification even when all core KV rows are current. Global identity differences are reported
+as diagnostics: a non-task overlay release can change the SHA while the separately cached task
+data remains complete. The pair report contains counts, identity agreement, and missing IDs,
+never raw overlay/catalog payloads.
 Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
 target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee

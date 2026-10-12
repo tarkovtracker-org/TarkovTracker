@@ -40,12 +40,13 @@ Deno.test('retains existing non-task targets and covers both authorized cache or
     'https://tarkovtracker.org',
     'https://www.tarkovtracker.org',
   ]);
-  assertEquals(targets.includes('https://tarkovtracker.org/__edge-cache/tarkov/items-en'), true);
+  const uniqueTargets = new Set(targets);
+  assertEquals(uniqueTargets.has('https://tarkovtracker.org/__edge-cache/tarkov/items-en'), true);
   assertEquals(
-    targets.includes(
+    uniqueTargets.has(
       'https://www.tarkovtracker.org/__edge-cache/tarkov/tasks-objectives-json-v4-en-pvp-season'
     ),
     true
   );
-  assertEquals(new Set(targets).size, targets.length);
+  assertEquals(uniqueTargets.size, targets.length);
 });
