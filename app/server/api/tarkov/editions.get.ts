@@ -10,28 +10,40 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
-  const { overlay, meta } = await fetchOverlay(shouldBypassCache(event));
-  if (!overlay)
-    throw createError({ statusCode: 503, statusMessage: 'Progression metadata unavailable' });
-  const perks =
-    gameMode === 'pvp-season'
-      ? await edgeCache(
-          event,
-          `seasonal-perks-json-v1-${lang}-${gameMode}`,
-          async () =>
-            adaptSeasonalPerks(await fetchTarkovJsonEndpoint('season', { lang, gameMode })),
-          CACHE_TTL_DEFAULT,
-          { cacheKeyPrefix: 'tarkov' }
-        )
-      : [];
-  const response = {
-    data: {
-      editions: projectEditions(overlay, gameMode),
-      storyChapters: projectStoryChapters(overlay, gameMode, lang),
-      seasonalPerks: projectSeasonalPerks(overlay, gameMode, perks),
-    },
-    dataOverlay: meta,
-  };
-  setOverlayResponseHeaders(event, response);
-  return response;
+  try {
+    const { overlay, meta } = await fetchOverlay(shouldBypassCache(event));
+    if (!overlay)
+      throw createError({ statusCode: 503, statusMessage: 'Progression metadata unavailable' });
+    const perks =
+      gameMode === 'pvp-season'
+        ? await edgeCache(
+            event,
+            `seasonal-perks-json-v1-${lang}-${gameMode}`,
+            async () => {
+              const metadata = adaptSeasonalPerks(
+                await fetchTarkovJsonEndpoint('season', { lang, gameMode })
+              );
+              // An incompatible refresh must not replace the last-good metadata entry.
+              projectSeasonalPerks(overlay, gameMode, metadata);
+              return metadata;
+            },
+            CACHE_TTL_DEFAULT,
+            { cacheKeyPrefix: 'tarkov' }
+          )
+        : [];
+    const response = {
+      data: {
+        editions: projectEditions(overlay, gameMode),
+        storyChapters: projectStoryChapters(overlay, gameMode, lang),
+        seasonalPerks: projectSeasonalPerks(overlay, gameMode, perks),
+      },
+      dataOverlay: meta,
+    };
+    setOverlayResponseHeaders(event, response);
+    return response;
+  } catch (error) {
+    // edgeCache may have already attached a public HIT/MISS policy before projection fails.
+    setHeader(event, 'Cache-Control', 'no-store');
+    throw error;
+  }
 });

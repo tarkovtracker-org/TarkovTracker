@@ -276,7 +276,11 @@ Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-seas
 applied after that cache read. Seasonal responses expose `X-Cache-Status`, including `STALE` when
 last-good metadata is served during refresh. Other modes still read only the overlay. An unavailable
 or malformed upstream catalog fails with `502` on a cold read; unknown overlay IDs or an unavailable
-overlay fail with `503`. Invalid refreshes never replace cached metadata with a partial catalog.
+overlay fail with `503`. Metadata is checked against the current overlay before cache admission;
+incompatible refreshes retain last-good metadata. The overlay is also checked after cache reads,
+so an overlay introducing unknown IDs still returns `503` rather than silently dropping effects.
+Error responses explicitly use `Cache-Control: no-store`, replacing any policy set by the metadata
+cache before a projection failure.
 
 ---
 

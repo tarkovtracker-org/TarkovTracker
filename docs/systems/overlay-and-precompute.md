@@ -112,11 +112,14 @@ overlay exclusion lists may be omitted; when present, every entry must be a stri
 Seasonal perks use the localized `/pvp-season/season` JSON envelope. Its `perks` groups supply the
 type; each record supplies the name, description, points, and `exclusiveToPerks` IDs (adapted to
 `mutuallyExclusiveSeasonalPerkIds`). Upstream owns catalog membership and metadata. The effects-only
-overlay augments existing IDs after the base metadata cache read; it cannot overwrite metadata or
-introduce a perk. Upstream perks without an effect patch keep an empty effects list. Duplicate or
+overlay compatibility is validated before metadata enters the cache, then effects augment existing
+IDs after the cache read; the overlay cannot overwrite metadata or introduce a perk. Upstream perks
+without an effect patch keep an empty effects list. Duplicate or
 missing upstream IDs, invalid groups/metadata/exclusions, unresolved translation keys, and unknown
 overlay IDs fail closed. Upstream transport/schema failures use the existing edge-cache stale
-refresh path; a cold failure returns `502`, while incompatible overlay IDs return `503`. The browser
+refresh path; an incompatible refresh also preserves last-good metadata. A cold schema failure
+returns `502`, while incompatible overlay IDs return `503`, including on cache hits. Failed editions
+responses override any metadata cache policy with `Cache-Control: no-store`. The browser
 editions cache advances to `overlay-v3` so earlier effects-only catalogs are not reused.
 
 Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`
