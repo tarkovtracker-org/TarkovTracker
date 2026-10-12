@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(52);
+SELECT plan(54);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000001001', 'profiles-supporter@example.invalid'),
@@ -223,6 +223,16 @@ SELECT is(jsonb_array_length(public.get_game_profile_progress(
 SELECT is(public.get_game_profile_progress(
   (SELECT id FROM profile_ids WHERE label = 'client-alt'))->'game_edition', 'null'::jsonb,
   'a null edition remains unset');
+SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'), 2, '{}', NULL);
+SELECT is(public.get_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'))->'game_edition', '2'::jsonb,
+  'an explicit edition is saved');
+SELECT public.sync_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'), NULL, '{"pvp":{"level":8}}', NULL);
+SELECT is(public.get_game_profile_progress(
+  (SELECT id FROM profile_ids WHERE label = 'client-alt'))->'game_edition', '2'::jsonb,
+  'a nullable progress sync preserves the previously saved edition');
 SELECT lives_ok($$SELECT public.delete_game_profile(
   (SELECT id FROM profile_ids WHERE label = 'client-alt'))$$,
   'an authenticated client can delete its extra profile');

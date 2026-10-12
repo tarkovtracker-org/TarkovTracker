@@ -430,7 +430,8 @@ BEGIN
 
   UPDATE public.user_game_profiles
   SET game_edition = p_game_edition, updated_at = now()
-  WHERE id = p_profile_id AND game_edition IS DISTINCT FROM p_game_edition;
+  WHERE id = p_profile_id AND p_game_edition IS NOT NULL
+    AND game_edition IS DISTINCT FROM p_game_edition;
 
   RETURN jsonb_build_object('profile_id', p_profile_id);
 END;

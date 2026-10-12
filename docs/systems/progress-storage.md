@@ -177,7 +177,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   delete access to extras; writes use effective, non-disqualified supporter access unless the setting
   opens access to all. Preferences, team readers, shares and existing API tokens stay account-global
   or default-profile scoped. Current Seasonal writes require a matching season stamp and preserve
-  all historical profile seasons.
+  all historical profile seasons. A NULL edition in extra-profile sync preserves its saved edition.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
   requires aligned application/gateway consumers and a verified database rollout first. The
