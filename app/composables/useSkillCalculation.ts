@@ -5,8 +5,6 @@
  * 1. Completed task rewards (skillLevelReward from finishRewards)
  * 2. User manual offsets for passive in-game skill gains
  *
- * Mirrors the pattern established in useXpCalculation.ts
- *
  * @module composables/useSkillCalculation
  */
 import { useMetadataStore } from '@/stores/useMetadata';

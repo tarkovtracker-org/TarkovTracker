@@ -914,7 +914,6 @@ describe('api-gateway', () => {
               level: 10,
               pmcFaction: 'USEC',
               displayName: 'Tester',
-              xpOffset: 0,
               taskObjectives: { 'obj-1': { complete: false, count: 0, timestamp: 1 } },
               taskCompletions: { 'task-1': { complete: true, failed: false, timestamp: 1 } },
               hideoutParts: { 'part-1': { complete: false, count: 0 } },

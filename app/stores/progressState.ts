@@ -48,7 +48,6 @@ const defaultProgressData: UserProgressData = {
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
   taskAvailability: {},
@@ -161,7 +160,6 @@ const getCurrentData = (state: UserState): UserProgressData => {
       level: 1,
       pmcFaction: 'USEC',
       displayName: null,
-      xpOffset: 0,
       taskCompletions: {},
       taskAvailability: {},
       taskObjectives: {},
@@ -221,7 +219,6 @@ export const getters = {
     getCurrentData(state)?.traders?.[traderId]?.reputation ?? 0,
   getSkillLevel: (state: UserState) => (skillName: string) =>
     getCurrentData(state)?.skills?.[skillName] ?? 0,
-  getXpOffset: (state: UserState) => () => getCurrentData(state)?.xpOffset ?? 0,
   getPrestigeLevel: (state: UserState) => () => getCurrentData(state)?.prestigeLevel ?? 0,
   getProgressEpoch: (state: UserState) => () => getCurrentData(state)?.progressEpoch ?? 0,
   getSkillOffset: (state: UserState) => (skillName: string) =>
@@ -324,10 +321,6 @@ export const actions = {
   setModeDisplayName(this: UserState, mode: GameMode, name: string | null) {
     const modeData = this[mode];
     modeData.displayName = typeof name === 'string' ? name : null;
-  },
-  setXpOffset(this: UserState, offset: number) {
-    const currentData = getCurrentData(this);
-    currentData.xpOffset = Number.isFinite(offset) ? Math.trunc(offset) : 0;
   },
   setPrestigeLevel(this: UserState, level: number) {
     const currentData = getCurrentData(this);

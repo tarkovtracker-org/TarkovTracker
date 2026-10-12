@@ -27,7 +27,6 @@ const createProgressData = (): UserProgressData => ({
   taskCompletions: {},
   taskObjectives: {},
   traders: {},
-  xpOffset: 0,
 });
 const edition: Pick<GameEdition, 'defaultCultistCircleLevel' | 'defaultStashLevel'> = {
   defaultCultistCircleLevel: 0,

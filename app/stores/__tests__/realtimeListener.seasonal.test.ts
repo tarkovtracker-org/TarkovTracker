@@ -409,7 +409,6 @@ describe('seasonal progress realtime synchronization', () => {
     async (source) => {
       const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
       state.pvp.pmcFaction = 'BEAR';
-      state.pvp.xpOffset = 450;
       state.pvp.skillOffsets = { Endurance: 3 };
       const before = structuredClone(state.pvp);
       const placeholder = {
@@ -1114,7 +1113,6 @@ describe('seasonal progress realtime synchronization', () => {
       Object.assign(state.pvp, {
         displayName: null,
         pmcFaction: 'BEAR',
-        xpOffset: 123,
         skillOffsets: { Endurance: 4 },
       });
       pending = scenario !== 'saved-during-read';
@@ -1158,7 +1156,6 @@ describe('seasonal progress realtime synchronization', () => {
         expect(state.pvp).toMatchObject({
           displayName: null,
           pmcFaction: 'BEAR',
-          xpOffset: 123,
           skillOffsets: { Endurance: 4 },
         });
       }
@@ -1209,7 +1206,7 @@ describe('seasonal progress realtime synchronization', () => {
     handler?.({
       new: {
         game_mode: 'seasonal',
-        progress_data: { displayName: 'newer', level: 30, xpOffset: 300 },
+        progress_data: { displayName: 'newer', level: 30, skillOffsets: { Endurance: 300 } },
         season_number: 1,
         updated_at: '2026-08-04T12:00:00.000Z',
       },
@@ -1217,14 +1214,14 @@ describe('seasonal progress realtime synchronization', () => {
     handler?.({
       new: {
         game_mode: 'seasonal',
-        progress_data: { displayName: 'older', level: 20, xpOffset: 200 },
+        progress_data: { displayName: 'older', level: 20, skillOffsets: { Endurance: 200 } },
         season_number: 1,
         updated_at: '2026-08-04T11:00:00.000Z',
       },
     });
     expect(state.seasonal.displayName).toBe('newer');
     expect(state.seasonal.level).toBe(30);
-    expect(state.seasonal.xpOffset).toBe(300);
+    expect(state.seasonal.skillOffsets.Endurance).toBe(300);
   });
   it('applies a divergent normalized update during the self-origin window', async () => {
     vi.useFakeTimers();
@@ -1253,7 +1250,7 @@ describe('seasonal progress realtime synchronization', () => {
     handlers.get('user_game_mode_progress')?.({
       new: {
         game_mode: 'pvp',
-        progress_data: { displayName: 'newer', level: 30, xpOffset: 300 },
+        progress_data: { displayName: 'newer', level: 30, skillOffsets: { Endurance: 300 } },
         season_number: 0,
         updated_at: '2026-08-04T12:00:00.000Z',
       },
@@ -1262,13 +1259,13 @@ describe('seasonal progress realtime synchronization', () => {
       new: {
         current_game_mode: 'pvp',
         pve_data: defaultState.pve,
-        pvp_data: { displayName: 'older', level: 20, xpOffset: 200 },
+        pvp_data: { displayName: 'older', level: 20, skillOffsets: { Endurance: 200 } },
         updated_at: '2026-08-04T13:00:00.000Z',
       },
     });
     expect(state.pvp.displayName).toBe('newer');
     expect(state.pvp.level).toBe(30);
-    expect(state.pvp.xpOffset).toBe(300);
+    expect(state.pvp.skillOffsets.Endurance).toBe(300);
   });
 });
 vi.mock('@/stores/tarkov/progressAuthority', async () => {

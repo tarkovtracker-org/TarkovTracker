@@ -43,50 +43,26 @@
               class="text-surface-400 mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
             >
               <span>{{ t('common.level') }}</span>
-              <span class="text-surface-500 text-[0.5rem]">·</span>
-              <span
-                class="text-[0.55rem]"
-                :class="
-                  useAutomaticLevel ? 'text-accent-400 light:text-accent-700' : 'text-surface-400'
-                "
-              >
-                {{ useAutomaticLevel ? t('navigation_drawer.mode_auto') : t('common.manual') }}
-              </span>
             </div>
             <div class="flex h-8 items-center justify-center text-center">
-              <AppTooltip
-                v-if="!editingLevel || useAutomaticLevel"
-                :text="useAutomaticLevel ? t('navigation_drawer.auto_level_enabled') : ''"
+              <span
+                v-if="!editingLevel"
+                class="hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors"
+                tabindex="0"
+                role="button"
+                :aria-label="
+                  t(
+                    'navigation_drawer.level_display_editable',
+                    { level: displayedLevel },
+                    'Level {level}, click or press Enter to edit'
+                  )
+                "
+                @click="startEditingLevel"
+                @keyup.enter="startEditingLevel"
+                @keydown.space.prevent="startEditingLevel"
               >
-                <span
-                  :class="
-                    useAutomaticLevel
-                      ? 'mx-auto block h-8 w-12 text-center text-3xl leading-8 font-bold'
-                      : 'hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors'
-                  "
-                  :tabindex="useAutomaticLevel ? '-1' : '0'"
-                  :role="useAutomaticLevel ? undefined : 'button'"
-                  :aria-disabled="useAutomaticLevel ? 'true' : undefined"
-                  :aria-label="
-                    useAutomaticLevel
-                      ? t(
-                          'navigation_drawer.level_display_auto',
-                          { level: displayedLevel },
-                          'Level {level} (automatic calculation enabled)'
-                        )
-                      : t(
-                          'navigation_drawer.level_display_editable',
-                          { level: displayedLevel },
-                          'Level {level}, click or press Enter to edit'
-                        )
-                  "
-                  @click="!useAutomaticLevel && startEditingLevel()"
-                  @keydown.enter="!useAutomaticLevel && startEditingLevel()"
-                  @keydown.space.prevent="!useAutomaticLevel && startEditingLevel()"
-                >
-                  {{ displayedLevel }}
-                </span>
-              </AppTooltip>
+                {{ displayedLevel }}
+              </span>
               <input
                 v-else
                 ref="levelInput"
@@ -102,7 +78,6 @@
             </div>
           </span>
           <span
-            v-if="!useAutomaticLevel"
             class="flex shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5"
           >
             <AppTooltip :text="t('navigation_drawer.increment_level')">
@@ -129,63 +104,28 @@
             </AppTooltip>
           </span>
         </div>
-        <NuxtLink
-          v-if="useAutomaticLevel"
-          to="/settings"
-          class="hover:border-surface-600 mt-1.5 block cursor-pointer rounded border border-white/5 bg-white/5 px-2 py-1 no-underline transition-all hover:bg-white/10"
-          :aria-label="t('navigation_drawer.xp_settings_link')"
-        >
-          <div class="mb-0.5 flex items-center justify-between text-[0.6rem]">
-            <span class="text-surface-400">{{ formatNumber(xpCalculation.totalXP.value) }} XP</span>
-            <span class="text-surface-500">
-              {{ formatNumber(xpCalculation.xpToNextLevel.value) }} needed
-            </span>
-          </div>
-          <div class="bg-surface-800/35 h-2 overflow-hidden rounded-full">
-            <div
-              class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
-              :style="{ width: `${xpCalculation.xpProgress.value}%` }"
-              role="progressbar"
-              :aria-valuenow="Math.round(xpCalculation.xpProgress.value)"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="t('navigation_drawer.xp_progress')"
-            ></div>
-          </div>
-        </NuxtLink>
       </div>
     </template>
   </div>
 </template>
 <script setup lang="ts">
-  import { useXpCalculation } from '@/composables/useXpCalculation';
   import { useMetadataStore } from '@/stores/useMetadata';
-  import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import type { PlayerLevel } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
-  const formatNumber = useLocaleNumberFormatter();
   interface DrawerLevelProps {
     isCollapsed: boolean;
   }
   defineProps<DrawerLevelProps>();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
-  const preferencesStore = usePreferencesStore();
-  const xpCalculation = useXpCalculation();
   const minPlayerLevel = computed<number>(() => metadataStore.minPlayerLevel);
   const maxPlayerLevel = computed<number>(() => metadataStore.maxPlayerLevel);
   const playerLevels = computed<PlayerLevel[]>(() => metadataStore.playerLevels);
-  const useAutomaticLevel = computed<boolean>(
-    () => preferencesStore.getUseAutomaticLevelCalculation
-  );
   const STEPPER_BUTTON_CLASS =
     'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 light:text-surface-300 light:hover:bg-surface-700/50 light:hover:text-surface-50';
-  const displayedLevel = computed<number>(() => {
-    return useAutomaticLevel.value ? xpCalculation.derivedLevel.value : tarkovStore.playerLevel();
-  });
+  const displayedLevel = computed<number>(() => tarkovStore.playerLevel());
   const isDataReady = computed<boolean>(() => {
     return !metadataStore.loading && metadataStore.playerLevels.length > 0;
   });

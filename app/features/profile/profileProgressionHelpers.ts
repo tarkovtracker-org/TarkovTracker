@@ -116,7 +116,5 @@ export const normalizeSharedProgressData = (
     taskAvailability: sanitizeTaskAvailabilityMap(value.taskAvailability),
     taskObjectives,
     traders,
-    xpOffset:
-      typeof value.xpOffset === 'number' && Number.isFinite(value.xpOffset) ? value.xpOffset : 0,
   };
 };

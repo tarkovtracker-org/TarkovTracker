@@ -50,7 +50,6 @@ const createProgressData = (overrides: Record<string, unknown> = {}) => ({
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
   hideoutParts: {},
@@ -109,7 +108,6 @@ vi.mock('@/stores/useMetadata', () => ({
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     getTasksRequireTraderLevels: true,
-    getUseAutomaticLevelCalculation: false,
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({

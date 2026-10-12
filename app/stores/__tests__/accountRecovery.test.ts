@@ -424,7 +424,6 @@ describe('account recovery copies', () => {
       saved.pve.level = 9;
       saved.pve.displayName = 'Other tab';
       saved.pve.pmcFaction = 'BEAR';
-      saved.pve.xpOffset = 1234;
       saved.pve.skillOffsets = { endurance: 3 };
       const newerStorage = snapshot(100, saved, { modeTimestamps: { pve: 100 } });
       const memory = structuredClone(defaultState);

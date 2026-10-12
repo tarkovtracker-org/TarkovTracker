@@ -14,7 +14,6 @@ vi.mock('@/utils/userScopedStorage', () => ({
 const mockFetch = vi.fn();
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
-const mockSetTotalXP = vi.fn();
 const { mockGetImportCooldownRemainingMs, mockRecordImportCompletion, mockUseRuntimeConfig } =
   vi.hoisted(() => ({
     mockGetImportCooldownRemainingMs: vi.fn(),
@@ -47,6 +46,7 @@ const tarkovStore = {
   switchGameMode: vi.fn(),
 };
 const metadataStore = {
+  fetchBootstrapData: vi.fn(),
   playerLevels: [
     { exp: 0, level: 1 },
     { exp: 1000, level: 5 },
@@ -56,11 +56,6 @@ const metadataStore = {
 vi.mock('@/composables/useSkillCalculation', () => ({
   useSkillCalculation: () => ({
     setTotalSkillLevel: mockSetTotalSkillLevel,
-  }),
-}));
-vi.mock('@/composables/useXpCalculation', () => ({
-  useXpCalculation: () => ({
-    setTotalXP: mockSetTotalXP,
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
@@ -169,6 +164,9 @@ describe('useTarkovDevImport', () => {
     vi.resetAllMocks();
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      tarkovStore.getCurrentGameMode.mockReturnValue(mode);
+    });
     let linkedUid: number | null = null;
     tarkovStore.setTarkovUid.mockImplementation((uid: number | null) => {
       linkedUid = uid;
@@ -470,8 +468,7 @@ describe('useTarkovDevImport', () => {
     expect(switchModeOrder).toBeDefined();
     expect(setPrestigeOrder).toBeDefined();
     expect(switchModeOrder!).toBeLessThan(setPrestigeOrder!);
-    expect(mockSetTotalXP).toHaveBeenCalledWith(parsedData.totalXP);
-    expect(tarkovStore.setLevel).toHaveBeenCalledWith(12);
+    expect(tarkovStore.setLevel).toHaveBeenCalledExactlyOnceWith(12);
     expect(mockSetTotalSkillLevel).toHaveBeenCalledWith('Endurance', 10);
     expect(mockSetTotalSkillLevel).toHaveBeenCalledWith('Strength', 15);
     expect(tarkovStore.setGameEdition).toHaveBeenCalledWith(6);
@@ -490,6 +487,78 @@ describe('useTarkovDevImport', () => {
     await composable.confirmImport('pvp');
     expect(tarkovStore.setGameEdition).toHaveBeenCalledWith(4);
   });
+  it('loads XP thresholds before saving the imported level once', async () => {
+    metadataStore.playerLevels = [];
+    metadataStore.fetchBootstrapData.mockImplementation(async () => {
+      metadataStore.playerLevels = [
+        { exp: 0, level: 1 },
+        { exp: 2500, level: 12 },
+      ];
+    });
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{}'));
+    await composable.confirmImport('pvp');
+    expect(metadataStore.fetchBootstrapData).toHaveBeenCalledExactlyOnceWith();
+    expect(tarkovStore.setLevel).toHaveBeenCalledExactlyOnceWith(12);
+    expect(tarkovStore.saveProgressNow).toHaveBeenCalledExactlyOnceWith();
+  });
+  it('does not mutate progress when XP thresholds remain unavailable', async () => {
+    metadataStore.playerLevels = [];
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{}'));
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importErrorCode.value).toBe('level_thresholds_unavailable');
+    expect(composable.importError.value).toBe('Player level thresholds are unavailable');
+    expect(composable.importErrorMeta.value).toBeNull();
+    expect(tarkovStore.setTarkovUid).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.saveProgressNow).not.toHaveBeenCalled();
+  });
+  it('does not write to a mode selected while bootstrap is pending', async () => {
+    metadataStore.playerLevels = [];
+    let resolveBootstrap!: () => void;
+    metadataStore.fetchBootstrapData.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBootstrap = resolve;
+        })
+    );
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{}'));
+    const pending = composable.confirmImport('pvp');
+    expect(metadataStore.fetchBootstrapData).toHaveBeenCalledOnce();
+    await tarkovStore.switchGameMode('pve');
+    metadataStore.playerLevels = [
+      { exp: 0, level: 1 },
+      { exp: 2500, level: 12 },
+    ];
+    resolveBootstrap();
+    await pending;
+    expect(tarkovStore.getCurrentGameMode()).toBe('pve');
+    expect(tarkovStore.setTarkovUid).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+    expect(mockSetTotalSkillLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.saveProgressNow).not.toHaveBeenCalled();
+    expect(composable.importState.value).toBe('preview');
+    expect(composable.isImporting.value).toBe(false);
+  });
+  it('reports unavailable thresholds when bootstrap rejects', async () => {
+    metadataStore.playerLevels = [];
+    metadataStore.fetchBootstrapData.mockRejectedValue(new Error('metadata fetch failed'));
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{}'));
+    await composable.confirmImport('pvp');
+    expect(composable.importErrorCode.value).toBe('level_thresholds_unavailable');
+    expect(composable.importError.value).toBe('Player level thresholds are unavailable');
+    expect(composable.importState.value).toBe('error');
+    expect(tarkovStore.setTarkovUid).not.toHaveBeenCalled();
+    expect(tarkovStore.saveProgressNow).not.toHaveBeenCalled();
+  });
   it('defaults to level 1 when totalXP is zero', async () => {
     const parsedData = createImportData({ totalXP: 0 });
     mockParseTarkovDevProfile.mockReturnValue({
@@ -499,7 +568,6 @@ describe('useTarkovDevImport', () => {
     const composable = await loadComposable();
     await composable.parseFile(createFile('{"aid":123}'));
     await composable.confirmImport('pvp');
-    expect(mockSetTotalXP).toHaveBeenCalledWith(0);
     expect(tarkovStore.setLevel).toHaveBeenCalledWith(1);
   });
   it('sets error state when applying import data throws', async () => {
@@ -547,7 +615,9 @@ describe('useTarkovDevImport', () => {
     });
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.switchGameMode
-      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(async (mode: GameMode) => {
+        tarkovStore.getCurrentGameMode.mockReturnValue(mode);
+      })
       .mockRejectedValueOnce(new Error('restore failure'));
     const composable = await loadComposable();
     await composable.parseFile(createFile('{"aid":123}'));
