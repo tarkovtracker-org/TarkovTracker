@@ -231,6 +231,8 @@ jobs:
         run: node scripts/preview/build-profile.mjs
       - name: Build
         run: pnpm run build
+      - name: Verify compiled legacy retirement boundary
+        run: node --test scripts/checks/legacy-api-pages.mjs
       - name: Write preview manifest
         if: steps.profile.outputs.profile == 'preview'
         env:

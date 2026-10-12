@@ -46,3 +46,137 @@ API source ownership and frontend release consumption are established separately
 source cutover. The production cutover still requires explicit approval and preserves Worker `api-gateway`, DO class `ApiGatewayRateLimiter`, migration `v1`,
 existing namespace/state, Pages `script_name = "api-gateway"` and the current DO protocol.
 Supabase ownership, W10 authority activation and #1086 remain outside this extraction stage.
+
+## Legacy address retirement
+
+Retirement does not change production source ownership. The Pages implementation is
+[`00.legacy-api-retirement.ts`](../app/server/middleware/00.legacy-api-retirement.ts); its exact
+host/path and HTTP contract lives in [api.md](./api.md). Existing `/api/*` Pages Function routing
+already makes it reachable on the apex once the overlaid Worker bindings are removed. Direct
+www ingress has a separate edge prerequisite below.
+
+The small [Pages entry wrapper](../app/server/pages-entry.ts) is needed because Nitro 2's Pages
+adapter buffers POST bodies before running middleware. That would consume a retired upload and
+delay its static rejection until the upload completes. The wrapper calls the same response helper
+first and otherwise delegates the original Request, environment, and context to the installed
+adapter; it preserves the adapter's other exports and is applied only to the Pages runtime,
+not prerender/dev. It introduces no other platform behavior. The compiled-worker check
+(`node --test scripts/checks/legacy-api-pages.mjs`, after build) makes body reads and binding
+access throw on retirement and verifies normal POST/asset behavior separately. This proves the
+body-isolation contract, not a measured production CPU, billing, or security improvement.
+The manual wrapper-disabled negative control still returned 410 for a retired POST, but recorded
+one adapter body read and `bodyUsed=true`; the unread-body assertion failed as expected. Reproduce
+it in an isolated checkout, restoring the source before a normal build:
+
+1. Disable only `nitro.options.entry = resolve(appDir, 'server/pages-entry.ts')` in the
+   `nitro:init` hook, keeping retirement middleware enabled. Build using the anonymous preview
+   profile (`NODE_ENV=production`, `CI=true`, preview `APP_URL`, and no production credentials).
+2. Start the same workerd harness configuration as
+   [`legacy-api-pages.mjs`](../scripts/checks/legacy-api-pages.mjs), with main
+   `scripts/checks/legacy-api-pages-worker.mjs`. Send a plain POST to
+   `https://tarkovtracker.org/api/progress` with body `{invalid json`, **without**
+   `X-Test-Unread-Body` or `X-Test-No-Bindings`. Those throw flags are intentionally absent:
+   this control observes the adapter's read instead of preventing it.
+3. The [test-only instrumentation](../scripts/checks/legacy-api-pages-worker.mjs) reports status
+   410, `X-Test-Body-Reads: 1`, and `X-Test-Body-Used: true`. Requiring bodyUsed=false fails.
+   Close the harness, restore the entry assignment, rebuild, and run the normal compiled suite.
+
+The owning [compiled checks](../scripts/checks/legacy-api-pages.mjs) cover the enabled wrapper;
+[adapter unit tests](../app/server/__tests__/pages-entry.test.ts) cover identity and callback
+pass-through. The negative control is a manual experiment, not an extra CI build.
+
+Promote in this order, with explicit approval for production merges/deployments and route removal:
+
+1. Align both gateway Wrangler configurations with the **eleven** intended bindings. Remove only
+   the six redundant/retired routes: apex/www `/health` and the four redundant API-host routes.
+   This persists the operator's manual removals, which an unchanged config redeploy can restore.
+   Keep all ten legacy bindings. Deploy the Pages retirement handler and verify the exact
+   deployed SHA, Function routing, and host/path/method boundary before changing those bindings.
+   Use the anonymous PR preview and compiled Pages Worker HTTP tests before promotion; previews
+   on `pages.dev` intentionally do not return the apex-only 410. The production Pages deployment
+   must be verified separately; a green preview is not permission to remove live routes.
+2. Before removing any legacy binding, separately approve and verify the www edge prerequisite.
+   The [held operational proposal](#held-www-operational-change) owns the observed edge/domain
+   state, exact exception, and ingress approval sequence. Never exempt all `/api/*` or disable
+   the rule broadly. Required hosting/DNS changes need their own explicit approval and are not
+   included in these PRs.
+   The intended contract remains direct 410/204 without redirects; accepting a www redirect
+   instead requires a separate explicit product decision and contract update.
+3. Only after both Pages revision and www edge/ingress verification, promote the separately held
+   route-removal change in both repositories. It leaves **only** `api.tarkovtracker.org/*`.
+   Apply the route change using the
+   current production source; this is not authorization to connect the API repository to Worker
+   Builds. Updating both sources prevents a later deployment from restoring legacy bindings.
+4. Verify the [retired HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg) externally,
+   including query and trailing-slash variants, with redirect following disabled.
+   Check API `/health` => 200 and a normal
+   first-party frontend route. Existing Pages static handling retires apex `/health` with 404;
+   without the health Worker bindings, www redirects to that 404. Keep that behavior and verify
+   `/health/` and query variants.
+   No apex health monitors were found in the repositories or Cloudflare; unknown external
+   monitors may still need to move to the API host.
+
+The [staging caveat](./api.md#progress-api-host-apitarkovtrackerorg) applies until the approved
+cutover. The broad historical Worker `token*`/`progress*` patterns also intercept unrelated
+suffixes; after removal those return to normal frontend
+routing, while retirement remains precisely slash-delimited. These PRs do not change DNS,
+credentials, Worker identity, DO namespaces/state, or unrelated routing. Required www hosting
+work belongs in its separately reviewed and explicitly approved prerequisite.
+
+If Pages verification fails, keep the ten bindings and fix Pages before promotion. After removal,
+an approved rollback can restore those exact ten bindings from the prior config commit, giving
+the prior static Worker 404 while Pages is repaired. Do not restore the six redundant/health
+bindings. Source cutover remains a separate decision.
+
+### Held www operational change
+
+Prepare this change for coordinated approval only after stage-one CI, preview, independent
+review, and the exact production Pages deployment are verified. Nothing below is an instruction
+to mutate live settings as part of these PRs.
+
+The proposed replacement **expression only** for Single Redirect rule
+`214cb75a91f343dea59d29f8aaea9275`, in ruleset `4842721a8167425487283e3453e14e1d`, is:
+
+```text
+(http.host eq "www.tarkovtracker.org") and not (
+  http.request.uri.path in {"/api/v2" "/api/token" "/api/progress" "/api/team/progress"}
+  or starts_with(http.request.uri.path, "/api/v2/")
+  or starts_with(http.request.uri.path, "/api/token/")
+  or starts_with(http.request.uri.path, "/api/progress/")
+  or starts_with(http.request.uri.path, "/api/team/progress/")
+)
+```
+
+The observed rule redirects every www request; compiled-worker tests bypass this edge rule.
+Preserve the enabled flag, rule identity/order, 308 action, target
+`concat("https://tarkovtracker.org", http.request.uri.path)`, and `preserve_query_string=true`.
+There is no method restriction, so OPTIONS is exempt alongside actual retired requests. Health,
+`/api/tarkov/*`, `/api/v20`, `/api/tokenize`, `/api/progression`, and other www frontend paths
+continue canonical redirects. The apex, API host, and other hosts are outside this rule.
+
+Re-read the rule and Pages/DNS state immediately before an approved operation; stop if it no
+longer matches the reviewed state. The observed www record is proxied CNAME
+`www.tarkovtracker.org -> tarkovtracker.org` (record `2b3d731df01e059d34cca7e3b302c77d`, TTL auto).
+Pages project `tarkovtracker` registers only the apex. The ingress prerequisite is to associate
+`www.tarkovtracker.org` with that same existing Pages project and verify its domain/TLS status.
+The association request is `{"name":"www.tarkovtracker.org"}` to the project's domains endpoint.
+Cloudflare's [custom-domain setup](https://developers.cloudflare.com/pages/configuration/custom-domains/)
+can require or automatically update DNS; any change from the existing record to the project's
+`tarkovtrackernuxt.pages.dev` target must be separately named and approved. Do not guess that the
+existing CNAME chain is sufficient or alter any other DNS/hosting/access setting.
+
+After those prerequisites are approved, keep the canonical redirect in place while establishing
+the www Pages association. Then apply only the narrow expression above and verify unrelated
+www paths retain the canonical behavior described above. The
+[staging caveat](./api.md#progress-api-host-apitarkovtrackerorg) still applies while bindings remain.
+
+For the separately approved cutover, first remove only the existing exact
+`www.tarkovtracker.org/api/v2` Worker binding as a canary, keeping the other nine legacy bindings.
+Verify the actual www base path against the
+[HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg), with redirect following disabled.
+Use a fresh route-ID read for that exact pattern, not a broad deletion filter. If ingress or the
+response fails, restore that exact canary binding and stop. Once it passes, promote the held
+ten-route source removal in both repositories and verify all four families, descendants,
+trailing slashes, queries, API health 200, and normal frontend paths. Capture the exact deployed
+SHA and before/after edge snapshots. Neither canary removal nor the remaining cutover is
+authorized by making the PR ready or creating a preview.
