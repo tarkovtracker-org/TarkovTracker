@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { defineVitestConfig } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
 const versionedApi = process.env.TARKOV_VERSIONED_API_DIRECTORY;
@@ -10,12 +9,10 @@ export default defineVitestConfig({
   resolve: {
     alias: {
       ...(versionedApi ? { 'virtual:versioned-api': join(versionedApi, 'src') } : {}),
-      // Cross-runtime catalog regressions use the same Node lifetime shim as gateway tests.
-      'cloudflare:workers': versionedApi
-        ? join(versionedApi, 'src/__tests__/cloudflare-workers.ts')
-        : fileURLToPath(
-            new URL('./workers/api-gateway/src/__tests__/cloudflare-workers.ts', import.meta.url)
-          ),
+      // External parity loads the shim from the exact versioned API checkout.
+      ...(versionedApi
+        ? { 'cloudflare:workers': join(versionedApi, 'src/__tests__/cloudflare-workers.ts') }
+        : {}),
     },
   },
   define: {
@@ -27,7 +24,6 @@ export default defineVitestConfig({
     setupFiles: ['./tests/test-setup.ts'],
     exclude: [
       ...configDefaults.exclude,
-      'workers/api-gateway/**',
       ...(versionedApi ? [] : ['workers/contract-tests/**']),
       '**/*.deno.test.ts',
       '**/node_modules/**',

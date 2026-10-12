@@ -46,7 +46,7 @@ const files = compareCompiledContracts(installed, join(destination, 'progress-co
 run(destination, ['--filter', '@tarkovtracker/progress-contracts', 'run', 'test', '--silent']);
 for (const command of ['typecheck', 'types:check', 'validate:openapi', 'test', 'build'])
   run(destination, ['run', command, ...(command === 'test' ? ['--silent'] : [])]);
-run(root, ['exec', 'vitest', 'run', 'workers/contract-tests/taskFailureParity.test.ts'], {
+run(root, ['exec', 'vitest', 'run', 'workers/contract-tests/'], {
   ...process.env,
   TARKOV_VERSIONED_API_DIRECTORY: destination,
 });
