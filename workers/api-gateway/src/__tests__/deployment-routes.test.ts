@@ -6,5 +6,7 @@ describe('legacy route retirement', () => {
     const config = readFileSync(new URL('../../wrangler.toml', import.meta.url), 'utf8');
     const patterns = [...config.matchAll(/pattern = "([^"]+)"/g)].map((match) => match[1]);
     expect(patterns).toEqual(['api.tarkovtracker.org/*']);
+    // Catch any legacy apex/www address however the binding is written.
+    expect(config).not.toMatch(/(^|[^.\w])(www\.)?tarkovtracker\.org\/api/m);
   });
 });
