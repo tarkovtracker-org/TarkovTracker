@@ -20,6 +20,8 @@ SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup()), 0, 'run
 CREATE TEMP TABLE warning_start AS SELECT private.begin_owner_only_team_warnings() AS started;
 SELECT is(private.begin_owner_only_team_warnings(), (SELECT started FROM warning_start), 'warning activation is idempotent');
 SELECT is((SELECT initialized FROM private.run_owner_only_team_cleanup()), 1, 'bounded runner initializes the legacy solo team');
+SELECT is((SELECT initialized FROM private.owner_only_team_cleanup_receipts ORDER BY completed_at DESC LIMIT 1),
+  1, 'successful active initialization persists its aggregate receipt');
 SELECT ok((SELECT owner_only_since >= (SELECT started FROM warning_start) AND
   owner_only_expires_at = owner_only_since + interval '168 hours' FROM public.teams
   WHERE id = pg_temp.expiry_team('legacy')), 'legacy solo gets seven full days from fresh server time, not created_at');
@@ -92,6 +94,12 @@ UPDATE public.teams SET owner_only_since = now() - interval '8 days', owner_only
 SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup()), 0, 'populated, empty and inconsistent teams are excluded on fresh membership evidence');
 SELECT is((SELECT count(*)::integer FROM public.teams WHERE id IN (SELECT id FROM expiry_teams)), 4,
   'excluded teams and not-yet-due solo all remain');
+SELECT is((SELECT owner_only FROM private.owner_only_team_cleanup_status), 1::bigint, 'aggregate report counts actual owner-only teams');
+SELECT is((SELECT populated FROM private.owner_only_team_cleanup_status), 1::bigint, 'aggregate report counts populated teams');
+SELECT is((SELECT empty FROM private.owner_only_team_cleanup_status), 1::bigint, 'aggregate report counts empty anomalies');
+SELECT is((SELECT inconsistent FROM private.owner_only_team_cleanup_status), 1::bigint, 'aggregate report counts inconsistent-owner anomalies');
+SELECT is((SELECT in_grace FROM private.owner_only_team_cleanup_status), 1::bigint, 'aggregate report counts fresh grace');
+SELECT is((SELECT due FROM private.owner_only_team_cleanup_status), 0::bigint, 'aggregate report excludes populated and anomalous stale deadlines');
 
 -- Seed real all-mode progress with manual history plus an archived Seasonal row.
 CREATE OR REPLACE FUNCTION private.active_season_number()
@@ -120,7 +128,10 @@ BEGIN RAISE EXCEPTION 'test: delete rejected'; END;
 $$;
 CREATE TRIGGER zzz_expiry_delete_failure BEFORE DELETE ON public.teams
   FOR EACH ROW EXECUTE FUNCTION pg_temp.reject_expiry_delete();
+CREATE TEMP TABLE receipt_before_failure AS SELECT count(*) AS receipts FROM private.owner_only_team_cleanup_receipts;
 SELECT throws_ok($$SELECT private.run_owner_only_team_cleanup()$$,'test: delete rejected','disband failure aborts cleanup');
+SELECT is((SELECT count(*) FROM private.owner_only_team_cleanup_receipts), (SELECT receipts FROM receipt_before_failure),
+  'failed batch commits no successful deletion receipt');
 SELECT is((SELECT count(*)::integer FROM public.team_memberships WHERE user_id=pg_temp.expiry_user('successor')),3,
   'failed cleanup restores all memberships');
 SELECT ok((SELECT pvp_team_id IS NOT NULL AND pve_team_id IS NOT NULL AND seasonal_team_id IS NOT NULL
@@ -130,6 +141,8 @@ SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup(1)),1,'boun
 SELECT is((SELECT num_nonnulls(pvp_team_id,pve_team_id,seasonal_team_id) FROM public.user_system
   WHERE user_id=pg_temp.expiry_user('successor')),2,'one mode expiry leaves the other team pointers intact');
 SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup()),2,'deadline reached: expiry disbands the remaining owner-only modes');
+SELECT is((SELECT disbanded FROM private.owner_only_team_cleanup_receipts ORDER BY completed_at DESC LIMIT 1),
+  2, 'successful disband batch persists actual aggregate deletion count');
 SELECT is((SELECT jsonb_agg(to_jsonb(p) ORDER BY game_mode,season_number) FROM public.user_game_mode_progress p WHERE user_id=pg_temp.expiry_user('successor')),
   (SELECT modes FROM personal_before), 'active modes, progress and archived Seasonal history are byte-for-byte preserved');
 SELECT is((SELECT to_jsonb(p) FROM public.user_progress p WHERE user_id=pg_temp.expiry_user('successor')),
@@ -146,11 +159,39 @@ SELECT is((SELECT count(*)::integer FROM public.team_events WHERE team_id IN (SE
   'team events cascade with expired teams');
 SELECT is((SELECT disbanded FROM private.run_owner_only_team_cleanup()),0,'repeated cleanup is idempotent');
 
+INSERT INTO private.owner_only_team_cleanup_receipts(completed_at,initialized,disbanded,deletion_enabled)
+  SELECT clock_timestamp()-interval '31 days'-n*interval '1 second',0,0,false FROM generate_series(1,101) n;
+SELECT initialized FROM private.run_owner_only_team_cleanup();
+SELECT is((SELECT count(*) FROM private.owner_only_team_cleanup_receipts WHERE completed_at < now()-interval '30 days'),
+  1::bigint, 'receipt retention pruning is bounded to 100 old rows per batch');
+INSERT INTO private.owner_only_team_cleanup_receipts(completed_at,initialized,disbanded,deletion_enabled)
+  SELECT clock_timestamp()-n*interval '1 second',0,0,false FROM generate_series(1,22) n;
+SELECT is((SELECT jsonb_array_length(recent_receipts) FROM private.owner_only_team_cleanup_status),20,
+  'aggregate report returns only the latest 20 receipts');
+SELECT is((SELECT array_agg(key ORDER BY key) FROM private.owner_only_team_cleanup_status,
+  LATERAL jsonb_object_keys(recent_receipts->0) key),
+  ARRAY['completed_at','deletion_enabled','disbanded','initialized']::text[], 'receipt fields contain no identities or payloads');
+
+CREATE ROLE expiry_test_observer NOLOGIN;
+GRANT expiry_test_observer TO postgres;
+GRANT USAGE ON SCHEMA public, extensions TO expiry_test_observer;
+GRANT USAGE ON SCHEMA private TO expiry_test_observer;
+GRANT SELECT ON private.owner_only_team_cleanup_status TO expiry_test_observer;
+SET LOCAL ROLE expiry_test_observer;
+SELECT is((SELECT populated FROM private.owner_only_team_cleanup_status),1::bigint,
+  'dedicated observer can read the aggregate view without underlying table grants');
+RESET ROLE;
+SELECT ok(NOT has_table_privilege('expiry_test_observer','public.teams','SELECT'), 'aggregate observer cannot read team rows');
+SELECT ok(NOT has_table_privilege('expiry_test_observer','public.team_memberships','SELECT'), 'aggregate observer cannot read memberships');
+SELECT ok(NOT has_table_privilege('expiry_test_observer','private.owner_only_team_cleanup_receipts','SELECT'), 'aggregate observer cannot read receipt base table');
+
 SELECT ok(NOT has_schema_privilege(role,'private','USAGE') OR NOT has_function_privilege(role,
   'private.run_owner_only_team_cleanup(integer)','EXECUTE'),role || ' cannot run cleanup')
   FROM unnest(ARRAY['anon','authenticated','service_role']) role;
 SELECT ok(NOT has_function_privilege(role,'private.begin_owner_only_team_warnings()','EXECUTE'),
   role || ' cannot start or reset warning activation') FROM unnest(ARRAY['anon','authenticated','service_role']) role;
 SELECT ok(NOT has_table_privilege('authenticated','public.teams','UPDATE'), 'clients cannot forge a clock');
+SELECT ok(NOT has_table_privilege(role,'private.owner_only_team_cleanup_status','SELECT'),
+  role || ' cannot read the restricted aggregate report') FROM unnest(ARRAY['anon','authenticated','service_role']) role;
 SELECT * FROM finish();
 ROLLBACK;

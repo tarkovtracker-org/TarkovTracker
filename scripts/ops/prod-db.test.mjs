@@ -174,6 +174,16 @@ describe('prod-db observer', () => {
     expect(query).toContain('"id"');
     expect(query).not.toContain('email');
   });
+  it('allowlists only the aggregate owner-only cleanup view', () => {
+    const result = JSON.parse(run(['owner-only-teams']));
+    expect(result.ok).toBe(true);
+    expect(result.operation).toBe('owner-only-teams');
+    const query = result.data.rows[0].arguments.at(-1);
+    expect(query).toContain('from private.owner_only_team_cleanup_status');
+    expect(query).toContain('recent_receipts');
+    expect(query).toContain('limit 1');
+    expect(query).not.toMatch(/owner_id|user_id|join_code|progress|select \*/i);
+  });
   it('rejects sensitive distributions', () => {
     expect(() => run(['distribution', '--table', 'user_progress', '--column', 'email'])).toThrow(
       'distribution is not available for column'

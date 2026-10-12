@@ -90,6 +90,9 @@ async function joinWins() {
 }
 async function cleanupWins(rollback) {
   prepareTeam();
+  const receiptsBefore = Number(
+    query('SELECT count(*) FROM private.owner_only_team_cleanup_receipts')
+  );
   const { pending } = await heldTransaction(sweepSql, rollback);
   const joining = connection(`SET application_name='${joinerName}'; ${joinSql};`);
   await waitFor(
@@ -98,6 +101,11 @@ async function cleanupWins(rollback) {
   const [cleanup, join] = await Promise.all([pending, joining]);
   assert.equal(cleanup.code === 0, !rollback, cleanup.stderr);
   assert.equal(join.code === 0, rollback, join.stderr);
+  assert.equal(
+    Number(query('SELECT count(*) FROM private.owner_only_team_cleanup_receipts')),
+    receiptsBefore + (rollback ? 0 : 1),
+    'receipt must commit or roll back with cleanup'
+  );
   if (rollback) {
     assert.equal(
       query(`SELECT count(*) FROM public.team_memberships WHERE team_id='${team}'`),

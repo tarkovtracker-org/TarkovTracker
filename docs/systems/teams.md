@@ -58,6 +58,12 @@ path.
   seven days; no migration bulk rewrite or old-age inference is involved. Deletion requires a
   separate flag and cannot happen before seven days of warning availability. The
   [staged rollout](../runbook.md#owner-only-team-expiry-rollout) owns activation and recovery.
+- Committed active batches persist aggregate-only time/count/flag receipts. Receipt failures or
+  disband failures roll back the entire batch; pg_cron records failure instead. The allowlisted
+  observer command `owner-only-teams` reads only a private aggregate view with eligibility/grace/
+  anomaly counts and the latest 20 receipts, never identities or progress. Dedicated view grants,
+  observer runtime and real browser checks in a warning-enabled isolated environment are rollout
+  prerequisites. Neither the batch's 100-row cap nor the report's single output row bounds scan work.
 
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.

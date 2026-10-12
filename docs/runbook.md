@@ -1036,15 +1036,33 @@ regressions and deployment postchecks against any recovery migration before decl
 
 This is a separately approved production procedure. A draft PR, its migration merge or green
 CI authorizes none of these steps. Migration `20261012150355_owner_only_team_expiry.sql` adds
-schema and triggers only: clocks, cron and deletion are initially off. Obtain independent
+schema and triggers only: clocks, cron and deletion are initially off. Forward migration
+`20261012153724_owner_only_team_cleanup_receipts.sql` adds aggregate receipts and the restricted
+observer view without activating either gate. Obtain independent
 concurrency/migration review before merge, then explicit deployment/migration approval under
 the database procedure above. No cost saving has been measured; team rows do not duplicate
 personal progress.
 
-1. Deploy the schema with the gates off, then the app warning UI. Verify creation policy and
-   non-dismissible owner warning using test identities in every mode, server deadline formatting,
-   join cancellation, a fresh last-departure deadline, Realtime refresh and solo-progress fallback
-   after disband. Reads tolerate missing/null deadlines during the schema/app transition.
+1. Deploy the schema with the production gates off, then the app UI; verify the creation policy.
+   Before production activation, verify deadline formatting, the non-dismissible owner warning,
+   join cancellation, fresh last-departure clocks, Realtime and solo-progress fallback in an
+   **isolated local or separately approved preview environment with its warning gate enabled**
+   and deletion disabled. Gate-off production cannot exercise those clock flows: the refresh
+   helper returns early. Component tests use stubs and do not replace this real browser check.
+   Reads tolerate missing/null deadlines during the schema/app transition.
+
+   Separately approve provisioning the dedicated observer's read-only aggregate view access:
+
+   ```sql
+   GRANT USAGE ON SCHEMA private TO pi_prod_observer;
+   GRANT SELECT ON private.owner_only_team_cleanup_status TO pi_prod_observer;
+   ```
+
+   Grant no base-table reads or cleanup execution. Run the observer canary and
+   `scripts/ops/prod-db owner-only-teams` before starting production clocks. Successful restricted
+   access, acceptable report runtime and the real browser verification are activation blockers;
+   do not bypass a failed observer connection or missing grants using privileged application reads.
+
 2. Only after warning UI verification, separately authorize starting clocks:
    `SELECT private.begin_owner_only_team_warnings();`. Record its timestamp; repeated calls do
    not reset it. As postgres, schedule the bounded initializer/runner hourly:
@@ -1055,24 +1073,42 @@ personal progress.
    ```
 
    `pg_cron` must already be installed and reviewed. No extension or job is installed by this PR.
-   Run one approved bounded initialization batch and inspect its receipt (`initialized`,
-   `disbanded`). It cannot delete while `deletion_enabled=false`. Each legacy solo team receives
+   Run one approved bounded initialization batch and inspect its persisted receipt through
+   `scripts/ops/prod-db owner-only-teams`. Scheduled SELECT result columns are not cron receipts:
+   each committed active batch now records completion time, initialized/disbanded counts and
+   the deletion flag in `private.owner_only_team_cleanup_receipts`. A failed transaction records
+   no success receipt; inspect pg_cron status for failures. Gate-off calls record no active receipt.
+   It cannot delete while `deletion_enabled=false`. Each legacy solo team receives
    at least 168 hours from its own initialization time, even when the backlog takes multiple runs.
    New solo transitions are stamped immediately once clocks are activated.
 
-3. Use the approved observer for application-row eligibility/deadline evidence and anomaly
-   counts; do not use privileged MCP application reads if observer access fails. Catalog-only
+3. Use `scripts/ops/prod-db owner-only-teams` for aggregate owner-only/populated/empty/inconsistent
+   counts, awaiting-clock/in-grace/deadline-reached counts, warning activation time, deletion flag
+   and the latest 20 aggregate receipts. Reached deadlines still obey the independent activation
+   gates. The report returns no identities, names, join codes or progress. Receipts retain thirty
+   days at the hourly cadence, pruning at most 100 older rows per batch. Catalog-only
    evidence may verify triggers, function ACLs and the index. Confirm cleanup/begin helpers and
-   the settings table have no PUBLIC/anon/authenticated/service_role access. Preserve empty,
+   the settings/receipt tables and report view have no PUBLIC/anon/authenticated/service_role access.
+   Confirm the observer can read only the aggregate view. Preserve empty,
    missing-owner or role/mode-inconsistent teams for a separate report. Check cron receipts and
    runtime; batches lock at most 100 eligible teams, but the eligibility scan may examine more
-   rows. Tune only from measurements in a separately reviewed change.
-4. After at least seven full days of warning availability and per-team grace evidence, obtain
+   rows, and the aggregate report also scans membership state. The 100-row cap bounds locks and
+   mutations, not scan work. Measure both runtimes under their 15-second budgets before activation;
+   tune only in a separately reviewed change. Verify production warnings after clocks start, while
+   deletion remains disabled; validate personal-data preservation with approved test identities
+   through normal application paths, without logging user payloads.
+4. After at least seven full days of warning availability, aggregate grace/initialization evidence
+   and the isolated lifecycle checks above, obtain
    explicit destructive-cleanup approval. Enable only then:
    `UPDATE private.owner_only_team_cleanup SET deletion_enabled=true WHERE singleton;`.
    The runner independently enforces the global warning floor and each server deadline. Record
    initial deletion receipts and verify populated teams and owner personal data remain intact.
    Expiry is on or after the deadline, depending on hourly batches, lock contention and backlog.
+
+A single disband or receipt failure rolls back the entire batch. No deletion receipt is committed
+for that failed run; pg_cron records failure and the next hourly run retries. Persistent failures
+can stall the earliest candidates and require separately approved investigation before enabling
+or resuming deletion. Do not silently skip or partially commit failed teams.
 
 Pause deletion by setting `deletion_enabled=false`; the next batch initializes clocks but
 does not disband. The flag update waits for an in-flight batch's settings share lock, so a batch
