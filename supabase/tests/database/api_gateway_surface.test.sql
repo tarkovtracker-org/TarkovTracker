@@ -67,11 +67,14 @@ INSERT INTO api_gateway_function_contract VALUES
 
 SELECT is(
   (
-    SELECT ROW(COALESCE(p.proargnames, ARRAY[]::TEXT[]), format_type(p.prorettype, NULL))::TEXT
+    SELECT ROW(
+      COALESCE(p.proargnames, ARRAY[]::TEXT[]), format_type(p.prorettype, NULL), p.proretset
+    )::TEXT
     FROM pg_proc p WHERE p.oid = to_regprocedure(signature)
   ),
-  ROW(argument_names, result_type)::TEXT,
-  signature || ' keeps its API gateway argument names and result type'
+  -- proretset = false: SETOF keeps prorettype but makes PostgREST return an array.
+  ROW(argument_names, result_type, false)::TEXT,
+  signature || ' keeps its API gateway argument names, result type and scalar return'
 )
 FROM api_gateway_function_contract;
 
