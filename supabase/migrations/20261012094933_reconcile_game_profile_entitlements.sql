@@ -11,6 +11,11 @@
 -- supporter (same activity rule as the app) unless `app_settings.game_profiles_access` is 'all'.
 -- A lapsed supporter keeps the profile read-only and may still delete it.
 
+-- The auth.users foreign key takes a write-blocking lock; fail fast instead of
+-- queueing sign-in writes behind a held lock.
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
 CREATE TABLE public.user_game_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
