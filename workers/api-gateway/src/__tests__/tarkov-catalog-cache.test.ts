@@ -171,7 +171,6 @@ describe('gateway catalog cache', () => {
       level: 1,
       pmcFaction: 'USEC',
       displayName: 'Test',
-      xpOffset: 0,
       taskObjectives: {},
       hideoutParts: {},
       hideoutModules: {},
