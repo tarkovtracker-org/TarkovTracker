@@ -96,15 +96,10 @@ Promote in this order, with explicit approval for production merges/deployments 
    on `pages.dev` intentionally do not return the apex-only 410. The production Pages deployment
    must be verified separately; a green preview is not permission to remove live routes.
 2. Before removing any legacy binding, separately approve and verify the www edge prerequisite.
-   Cloudflare Single Redirect rule `214cb75a91f343dea59d29f8aaea9275` matches every
-   `www.tarkovtracker.org` request and returns 308 to the apex, preserving path/query. The
-   compiled-worker tests bypass that rule and do not establish direct www ingress. A narrowly
-   scoped exception must exclude only the four retired API families (exact path or slash-delimited
-   descendant) on the exact www host, for every method including OPTIONS. Keep canonical redirects
-   for other paths, including health; never exempt all `/api/*` or disable the rule broadly.
-   Separately verify www reaches the deployed Pages Function: the observed Pages custom domains
-   include only `tarkovtracker.org`, so changing the redirect alone does not prove ingress. Any
-   required hosting/DNS change needs its own explicit approval and is not included in these PRs.
+   The [held operational proposal](#held-www-operational-change) owns the observed edge/domain
+   state, exact exception, and ingress approval sequence. Never exempt all `/api/*` or disable
+   the rule broadly. Required hosting/DNS changes need their own explicit approval and are not
+   included in these PRs.
    The intended contract remains direct 410/204 without redirects; accepting a www redirect
    instead requires a separate explicit product decision and contract update.
 3. Only after both Pages revision and www edge/ingress verification, promote the separately held
@@ -112,17 +107,18 @@ Promote in this order, with explicit approval for production merges/deployments 
    Apply the route change using the
    current production source; this is not authorization to connect the API repository to Worker
    Builds. Updating both sources prevents a later deployment from restoring legacy bindings.
-4. Check apex/www legacy GET/POST => 410 JSON, HEAD => 410 without a body, and valid preflight =>
-   204, including query and trailing-slash variants. Check API `/health` => 200 and a normal
+4. Verify the [retired HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg) externally,
+   including query and trailing-slash variants, with redirect following disabled.
+   Check API `/health` => 200 and a normal
    first-party frontend route. Existing Pages static handling retires apex `/health` with 404;
    without the health Worker bindings, www redirects to that 404. Keep that behavior and verify
    `/health/` and query variants.
    No apex health monitors were found in the repositories or Cloudflare; unknown external
    monitors may still need to move to the API host.
 
-The intermediate Worker 404 remains until step 3; the current www redirect can precede it.
-Removing bindings alone cannot establish the direct www contract. The broad historical Worker `token*`/`progress*`
-patterns also intercept unrelated suffixes; after removal those return to normal frontend
+The [staging caveat](./api.md#progress-api-host-apitarkovtrackerorg) applies until the approved
+cutover. The broad historical Worker `token*`/`progress*` patterns also intercept unrelated
+suffixes; after removal those return to normal frontend
 routing, while retirement remains precisely slash-delimited. These PRs do not change DNS,
 credentials, Worker identity, DO namespaces/state, or unrelated routing. Required www hosting
 work belongs in its separately reviewed and explicitly approved prerequisite.
@@ -151,6 +147,7 @@ The proposed replacement **expression only** for Single Redirect rule
 )
 ```
 
+The observed rule redirects every www request; compiled-worker tests bypass this edge rule.
 Preserve the enabled flag, rule identity/order, 308 action, target
 `concat("https://tarkovtracker.org", http.request.uri.path)`, and `preserve_query_string=true`.
 There is no method restriction, so OPTIONS is exempt alongside actual retired requests. Health,
@@ -170,13 +167,13 @@ existing CNAME chain is sufficient or alter any other DNS/hosting/access setting
 
 After those prerequisites are approved, keep the canonical redirect in place while establishing
 the www Pages association. Then apply only the narrow expression above and verify unrelated
-www paths still return 308 with path/query preserved. The legacy bindings still return their
-existing 404 when reached; direct Pages retirement cannot be proven through those bindings.
+www paths retain the canonical behavior described above. The
+[staging caveat](./api.md#progress-api-host-apitarkovtrackerorg) still applies while bindings remain.
 
 For the separately approved cutover, first remove only the existing exact
 `www.tarkovtracker.org/api/v2` Worker binding as a canary, keeping the other nine legacy bindings.
-Verify the actual www base path returns GET/POST 410 JSON, HEAD 410 without a body, and a valid
-Authorization/Content-Type preflight 204, with no Location/Retry-After and no redirect following.
+Verify the actual www base path against the
+[HTTP contract](./api.md#progress-api-host-apitarkovtrackerorg), with redirect following disabled.
 Use a fresh route-ID read for that exact pattern, not a broad deletion filter. If ingress or the
 response fails, restore that exact canary binding and stop. Once it passes, promote the held
 ten-route source removal in both repositories and verify all four families, descendants,
