@@ -473,7 +473,28 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightTeamId: string | null = null;
   let latestMembersRequestVersion = 0;
-  let latestDeadlineRequestVersion = 0;
+  let disposed = false;
+  let authSessionVersion = 0;
+  type RefreshContext = {
+    teamId: string;
+    userId: string;
+    sessionVersion: number;
+    queued: boolean;
+  };
+  let refreshContext: RefreshContext | null = null;
+  const invalidateRefresh = () => {
+    authSessionVersion += 1;
+    latestMembersRequestVersion += 1;
+    refreshInFlight = null;
+    refreshInFlightTeamId = null;
+    refreshContext = null;
+    lastMembersRefreshAt = 0;
+  };
+  listenerScope.run(() => {
+    watch(() => [$supabase.user?.id, $supabase.user?.loggedIn], invalidateRefresh, {
+      flush: 'sync',
+    });
+  });
   // Computed reference to the team document based on system store
   const teamFilter = computed(() => {
     const currentSystemStateTeam = getTeamIdFromSystemStore(systemStore);
@@ -485,6 +506,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   });
   // Custom data handler that transforms DB data before patching to store
   const handleTeamData = (data: Record<string, unknown> | null) => {
+    if (disposed) return;
     if (data) {
       // Transform database fields to client fields BEFORE patching
       const transformed: Partial<TeamState> & {
@@ -492,9 +514,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         join_code?: string | null;
       } = {
         ...data,
-        ownerOnlyExpiresAt:
-          typeof data.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null,
       };
+      // Listener snapshots can predate a membership event. Only the authoritative refresh
+      // below writes the deadline, so a delayed snapshot cannot restore an old warning.
+      delete transformed.ownerOnlyExpiresAt;
       // Map owner_id to owner
       if ('owner_id' in data && typeof data.owner_id === 'string') {
         transformed.owner = data.owner_id;
@@ -508,8 +531,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         transformed.joinCode = null;
       }
       teamStore.$patch(transformed as Partial<TeamState>);
-      void refreshMembers();
+      void refreshMembers(true);
     } else {
+      invalidateRefresh();
       teamStore.$reset();
       teamStore.$patch((state) => {
         state.members = [];
@@ -519,44 +543,70 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const readOwnerOnlyDeadline = async (teamId: string): Promise<string | null | undefined> => {
     // Memberships are published even when teams is not. Read the same authorized row shape as
     // the team listener so pre-migration schemas with no deadline column remain compatible.
-    const { data, error } = await $supabase.client
-      .from('teams')
-      .select('*')
-      .eq('id', teamId)
-      .maybeSingle();
-    if (error) {
+    try {
+      const { data, error } = await $supabase.client
+        .from('teams')
+        .select('*')
+        .eq('id', teamId)
+        .maybeSingle();
+      if (error) throw error;
+      return typeof data?.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null;
+    } catch (error) {
       logger.warn('[TeamStore] Failed to refresh team deadline:', error);
       return undefined;
     }
-    return typeof data?.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null;
   };
-  const deadlineRequestIsCurrent = (
-    teamId: string,
-    membersVersion: number,
-    deadlineVersion: number
-  ) =>
-    membersVersion === latestMembersRequestVersion &&
-    deadlineVersion === latestDeadlineRequestVersion &&
-    getTeamIdFromSystemStore(systemStore) === teamId;
+  const sessionIsCurrent = (context: RefreshContext) =>
+    !disposed &&
+    context.sessionVersion === authSessionVersion &&
+    $supabase.user?.loggedIn &&
+    $supabase.user?.id === context.userId;
+  const refreshIsCurrent = (context: RefreshContext, requestVersion: number) =>
+    sessionIsCurrent(context) &&
+    requestVersion === latestMembersRequestVersion &&
+    getTeamIdFromSystemStore(systemStore) === context.teamId;
   const applyOwnerOnlyDeadline = (deadline: string | null | undefined) => {
     if (deadline === undefined) return;
     teamStore.$patch((state) => {
       state.ownerOnlyExpiresAt = deadline;
     });
   };
-  const refreshOwnerOnlyDeadline = async (
-    force: boolean,
-    teamId: string,
-    membersVersion: number
-  ) => {
-    if (!force) return;
-    if (!deadlineRequestIsCurrent(teamId, membersVersion, latestDeadlineRequestVersion)) return;
-    const deadlineVersion = ++latestDeadlineRequestVersion;
-    const deadline = await readOwnerOnlyDeadline(teamId);
-    if (!deadlineRequestIsCurrent(teamId, membersVersion, deadlineVersion)) return;
+  const readMembers = async (teamId: string, force: boolean) => {
+    try {
+      return await useEdgeFunctions().getTeamMembers(teamId, force);
+    } catch (error) {
+      const status = getErrorStatus(error);
+      if (status === 401 || status === 403) {
+        logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
+          status,
+        });
+      } else {
+        logger.warn('[TeamStore] Failed to load team members:', error);
+      }
+      return null;
+    }
+  };
+  const runRefresh = async (context: RefreshContext, force: boolean): Promise<boolean> => {
+    context.queued = false;
+    const requestVersion = ++latestMembersRequestVersion;
+    // Neither endpoint's failure prevents the other read. Apply one current pair only after
+    // both settle; an event during either read queues a fresh authoritative pair for all waiters.
+    const [members, deadline] = await Promise.all([
+      readMembers(context.teamId, force),
+      readOwnerOnlyDeadline(context.teamId),
+    ]);
+    if (!refreshIsCurrent(context, requestVersion)) return false;
+    if (context.queued) return runRefresh(context, true);
     applyOwnerOnlyDeadline(deadline);
+    if (!members) return false;
+    teamStore.$patch((state) => {
+      state.members = members.members || [];
+      state.memberProfiles = members.profiles || {};
+    });
+    return true;
   };
   const refreshMembers = async (force = false) => {
+    if (disposed) return false;
     if (!$supabase.user?.loggedIn || !$supabase.user?.id) {
       teamStore.$patch((state) => {
         state.members = [];
@@ -570,24 +620,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         refreshInFlight = null;
         refreshInFlightTeamId = null;
       } else {
-        try {
-          const requestVersion = latestMembersRequestVersion;
-          const result = await refreshInFlight;
-          // A membership event can join an initial non-forced read. Its deadline must still
-          // be read after that request completes, rather than reuse its earlier snapshot.
-          await refreshOwnerOnlyDeadline(force, currentTeamId, requestVersion);
-          return result;
-        } catch (error) {
-          const status = getErrorStatus(error);
-          if (status === 401 || status === 403) {
-            logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
-              status,
-            });
-            return false;
-          }
-          logger.warn('[TeamStore] Failed to load team members:', error);
-        }
-        return false;
+        if (force && refreshContext) refreshContext.queued = true;
+        return await refreshInFlight;
       }
     }
     const now = Date.now();
@@ -603,42 +637,23 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       await teamChannel.cleanup();
       return false;
     }
-    const requestVersion = ++latestMembersRequestVersion;
-    const inFlightRequest = (async () => {
-      const { getTeamMembers } = useEdgeFunctions();
-      const result = await getTeamMembers(currentTeamId, force);
-      await refreshOwnerOnlyDeadline(force, currentTeamId, requestVersion);
-      if (requestVersion !== latestMembersRequestVersion) {
-        return false;
-      }
-      if (getTeamIdFromSystemStore(systemStore) !== currentTeamId) {
-        return false;
-      }
-      teamStore.$patch((state) => {
-        state.members = result?.members || [];
-        state.memberProfiles = result?.profiles || {};
-      });
-      return true;
-    })();
+    refreshContext = {
+      teamId: currentTeamId,
+      userId: $supabase.user.id,
+      sessionVersion: authSessionVersion,
+      queued: false,
+    };
+    const inFlightRequest = runRefresh(refreshContext, force);
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
       return await inFlightRequest;
-    } catch (error) {
-      const status = getErrorStatus(error);
-      if (status === 401 || status === 403) {
-        logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
-          status,
-        });
-        return false;
-      }
-      logger.warn('[TeamStore] Failed to load team members:', error);
-      return false;
     } finally {
       if (refreshInFlight === inFlightRequest) {
         lastMembersRefreshAt = Date.now();
         refreshInFlight = null;
         refreshInFlightTeamId = null;
+        refreshContext = null;
       }
     }
   };
@@ -728,6 +743,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     teamStore,
     isSubscribed,
     cleanup: () => {
+      disposed = true;
+      invalidateRefresh();
       teamListenerCleanup();
       void teamChannel.dispose();
       listenerScope.stop();
