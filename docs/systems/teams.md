@@ -47,7 +47,8 @@ path.
   `TeamMembers.vue` display list, old `created_at`, account activity or a client clock.
   Membership events, reconnects and team snapshots use one authoritative membership/deadline
   refresh. Events during either read queue one fresh pair, and request, team, instance-lifetime
-  and auth-session fences reject stale results. Listener snapshots never assign the deadline.
+  and auth-session fences reject stale results. Listener snapshots never assign the deadline;
+  a snapshot for a different team clears it, so a failed read never shows another team's date.
   A member-list failure still permits the independent authorized deadline read. This makes join
   cancellation and fresh solo warnings work when only memberships are in the Realtime publication.
   The same authorized row also supplies the current owner, so a transfer shows the warning to the

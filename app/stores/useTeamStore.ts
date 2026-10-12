@@ -516,8 +516,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         ...data,
       };
       // Listener snapshots can predate a membership event. Only the authoritative refresh
-      // below writes the deadline, so a delayed snapshot cannot restore an old warning.
+      // below writes the deadline, so a delayed snapshot cannot restore an old warning. A
+      // different team never inherits the previous team's deadline, even if its read fails.
       delete transformed.ownerOnlyExpiresAt;
+      if (data.id !== teamStore.id) transformed.ownerOnlyExpiresAt = null;
       // Map owner_id to owner
       if ('owner_id' in data && typeof data.owner_id === 'string') {
         transformed.owner = data.owner_id;
@@ -574,7 +576,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       state.ownerOnlyExpiresAt = typeof deadline === 'string' ? deadline : null;
       // Ownership transfers also arrive only as membership role events. Keep the warning's
       // owner check in step with the same authorized row instead of a stale team snapshot.
-      if (typeof owner === 'string') state.owner = owner;
+      if (typeof owner === 'string' || owner === null) state.owner = owner;
     });
   };
   const readMembers = async (teamId: string, force: boolean) => {

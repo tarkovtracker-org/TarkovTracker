@@ -1089,6 +1089,53 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it('clears the previous team deadline when the next team deadline read fails', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2', owner_only_expires_at: '2026-10-20T12:00:00Z' });
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(instance.teamStore.id).toBe('team-2');
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('clears a stale owner when the authorized team row has no owner', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      instance.teamStore.$patch((state) => {
+        state.owner = 'departed-owner';
+      });
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_id: null, owner_only_expires_at: null },
+        error: null,
+      });
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'UPDATE', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.owner).toBeNull());
+    } finally {
+      instance.cleanup();
+    }
+  });
   it('adopts a transferred owner from the authorized team row without team publication', async () => {
     const { teamRecords, teamQuery, currentUserId } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();
