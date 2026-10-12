@@ -43,6 +43,9 @@ assessment requirements in the runbook. No remote mutation is authorized by an i
 
 ## Account lifecycle
 
+- The public API Worker reads/calls the relations, columns and RPCs pinned in
+  `tests/database/api_gateway_surface.test.sql` (from the API repo's `supabase-surface.json`).
+  Keep them, their argument names and `service_role` grants; add new objects before the Worker uses them.
 - API token renames update only the owner-scoped `note` (`docs/api.md#active-token-cap`).
 - Team owners disband through the confirmed owner function
   (`docs/api.md#team-mutation-edge-functions`).
