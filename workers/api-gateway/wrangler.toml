@@ -4,19 +4,7 @@ compatibility_date = "2026-08-25"
 workers_dev = false
 preview_urls = false
 routes = [
-  # Retain these ten legacy bindings until the Pages retirement deployment is verified.
-  # Their removal is a separate approval-gated stage; see docs/api-ownership.md.
-  { pattern = "tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
-  # Catch-all for docs/spec on api subdomain. Keep last for clarity.
+  # Legacy apex/www bindings are retired; Pages answers them. See docs/api-ownership.md.
   { pattern = "api.tarkovtracker.org/*", zone_name = "tarkovtracker.org" },
 ]
 

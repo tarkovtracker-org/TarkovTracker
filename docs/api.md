@@ -47,15 +47,17 @@ Retirement authenticates nothing, reads no submitted body, and performs no outbo
 or binding calls. Responses use `no-store`;
 HEAD has no body. Valid browser preflight returns 204, allowing GET, HEAD, POST, PUT, PATCH,
 DELETE and OPTIONS with Accept, Authorization, Content-Type, If-None-Match and User-Agent.
-Wildcard CORS applies only to this static response, without credential support. There is no
-redirect, Location or Retry-After. Other hosts and first-party frontend routes keep their
+Wildcard CORS applies only to this static response, without credential support. The Pages
+response has no redirect, Location or Retry-After. Other hosts and first-party frontend routes keep their
 existing behavior, including `/api/tarkov/*`; near prefixes such as `/api/v20` are unaffected.
 
-During staging, the ten existing apex/www Worker bindings still intercept these requests and
-return their existing 404 when reached. Cloudflare's current www canonical redirect can return
-308 before that handler. The direct Pages 410 contract requires both separately approved binding
-removal and the narrowly scoped www redirect exception plus verified www Pages ingress; compiled
-tests bypass edge redirects. See [the promotion order](./api-ownership.md#legacy-address-retirement).
+These responses come directly from the apex. The apex/www Worker bindings for these families are
+removed; the API Worker binds only `api.tarkovtracker.org/*`. On `www.tarkovtracker.org`, the
+Cloudflare canonical redirect answers first with 308 to the same apex path and query, which then
+returns the 410/204 above; a 308 preserves method and body. Browsers do not follow redirects for
+preflights, so cross-origin browser calls to www fail CORS instead of reading the 410. Compiled
+tests bypass edge redirects.
+See [the retirement record](./api-ownership.md#legacy-address-retirement).
 
 Third-party integrations call `api.tarkovtracker.org` directly:
 
