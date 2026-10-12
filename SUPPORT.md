@@ -25,7 +25,7 @@ tracker focused on bugs and features.
 2. **Check the live app** at <https://tarkovtracker.org> to confirm the behavior
    on the current deployment.
 3. **Pick the right template.** A bug is not a feature request, and an
-   in-game-data error belongs in the data-overlay repository, not here.
+   in-game-data error goes in the Data issue form.
 
 ## What we cannot help with
 

@@ -16,5 +16,5 @@ exclude = [
   '127\.0\.0\.1',
   'tarkovtracker\.org',
   'gnu\.org',
-  'github\.com/tarkovtracker-org/tarkov-data-overlay',
+  'github\.com/tarkovtracker-org/tarkov-data-overlay(/|$)',
 ]
