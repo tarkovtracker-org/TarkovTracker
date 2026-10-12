@@ -29,7 +29,10 @@
 </template>
 <script setup lang="ts">
   import StorylineTimelineRow from '@/features/storyline/components/StorylineTimelineRow.vue';
-  import type { StorylineTimelineEntry } from '@/features/storyline/storylineTimeline';
+  import {
+    storylineEntryUnlockGroups,
+    type StorylineTimelineEntry,
+  } from '@/features/storyline/storylineTimeline';
   const props = defineProps<{
     entries: StorylineTimelineEntry[];
     chapterId: string;
@@ -38,7 +41,9 @@
   const emit = defineEmits<{ toggleObjective: [objectiveId: string] }>();
   const { t } = useI18n({ useScope: 'global' });
   const hasOptionals = computed(() => props.entries.some((entry) => entry.step === null));
-  const hasUnlocks = computed(() => props.entries.some((entry) => entry.objective?.unlocks.length));
+  const hasUnlocks = computed(() =>
+    props.entries.some((entry) => storylineEntryUnlockGroups(entry).length)
+  );
   // Main steps take the wider lane; optional objectives keep their place in the sequence but sit in
   // a lane of their own, and unlocks get a fixed column so they never add height to a step.
   const lanes = computed(() => ({

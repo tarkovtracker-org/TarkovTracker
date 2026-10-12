@@ -16,6 +16,25 @@ export interface StorylineTimelineEntry {
 }
 const byOrder = (left: { order: number; id: string }, right: { order: number; id: string }) =>
   left.order - right.order || left.id.localeCompare(right.id);
+export interface StorylineTimelineUnlockGroup {
+  id: string;
+  /** The route option the unlocks belong to; null when the entry is a single objective. */
+  label: string | null;
+  objective: StorylineObjectiveProgress;
+}
+/**
+ * Unlocks shown in an entry's unlock column. Each option of a route decision keeps its own group so
+ * the column still says which choice unlocks what.
+ */
+export const storylineEntryUnlockGroups = (
+  entry: StorylineTimelineEntry
+): StorylineTimelineUnlockGroup[] => {
+  const options = entry.routeChoice?.objectives ?? [];
+  const groups = entry.objective
+    ? [{ id: entry.objective.id, label: null, objective: entry.objective }]
+    : options.map((objective) => ({ id: objective.id, label: objective.description, objective }));
+  return groups.filter((group) => group.objective.unlocks.length);
+};
 export const sortStorylineObjectives = (objectives: StorylineObjectiveProgress[]) =>
   [...objectives].sort(byOrder);
 const routeEntry = (routeChoice: StorylineRouteChoiceGroup, index: number) => ({

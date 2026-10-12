@@ -246,8 +246,19 @@ describe('storyline page', () => {
     wrapper.unmount();
   });
   it('keeps the shown chapter selected after it is completed and scrolls the rail to it', async () => {
-    const scrollTo = vi.fn();
+    // Tiles sit 100px apart and are 80px wide in a 200px rail, so centring tile N scrolls to N*100-60.
+    const scrolledLists: HTMLElement[] = [];
+    const scrollTo = vi.fn(function (this: HTMLElement) {
+      scrolledLists.push(this);
+    });
     vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(scrollTo);
+    vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return Number(this.dataset.chapterId?.split('-')[1] ?? 0) * 100;
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
     onTestFinished(() => {
       vi.restoreAllMocks();
     });
@@ -266,6 +277,7 @@ describe('storyline page', () => {
     });
     await nextTick();
     expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 40 });
     storyline.normalizedChapters.value = storyline.normalizedChapters.value.map((chapter) => ({
       ...chapter,
       complete: true,
@@ -276,6 +288,8 @@ describe('storyline page', () => {
     await wrapper.get('button[aria-label="Chapter 0 (common.completed)"]').trigger('click');
     await nextTick();
     expect(scrollTo).toHaveBeenCalledTimes(2);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: -60 });
+    expect(scrolledLists.every((list) => list.tagName === 'UL')).toBe(true);
     wrapper.unmount();
   });
   it('opens the chapter named by the chapter query', () => {

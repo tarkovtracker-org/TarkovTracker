@@ -17,6 +17,7 @@
         :input-id="storylineObjectiveInputId(chapterId, objective.id)"
         :accent="toneName === 'info' ? 'info' : 'success'"
         :read-only="readOnly"
+        :hide-unlocks="hideUnlocks"
         @toggle="emit('toggleObjective', objective.id)"
       />
     </div>
@@ -41,6 +42,8 @@
       index: number;
       toneName?: Tone;
       readOnly?: boolean;
+      /** Set when the timeline shows the options' unlocks in its own column. */
+      hideUnlocks?: boolean;
     }>(),
     { toneName: 'warning' }
   );

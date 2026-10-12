@@ -72,7 +72,8 @@
   const listRef = ref<HTMLElement | null>(null);
   const revealSelected = () => {
     const list = listRef.value;
-    const tile = list?.querySelector<HTMLElement>(`[data-chapter-id="${props.selectedId}"]`);
+    const tiles = list?.querySelectorAll<HTMLElement>('[data-chapter-id]') ?? [];
+    const tile = [...tiles].find((element) => element.dataset.chapterId === props.selectedId);
     if (!list || !tile) return;
     list.scrollTo({ left: tile.offsetLeft - (list.clientWidth - tile.offsetWidth) / 2 });
   };

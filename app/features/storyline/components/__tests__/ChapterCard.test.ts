@@ -104,6 +104,19 @@ describe('ChapterCard story contract rendering', () => {
             routeState: 'open',
             systemName: 'YouDidntEscapeFromYourself',
           },
+          {
+            evidencePending: true,
+            id: 'ending-unmapped',
+            label: 'Unmapped Ending',
+            objectiveCompleted: 0,
+            objectiveId: '',
+            objectiveLabel: '',
+            objectiveTotal: 0,
+            routeBlockingAlternatives: [],
+            routeChoiceIndex: null,
+            routeState: 'open',
+            systemName: 'UnmappedEnding',
+          },
         ],
       })
     );
@@ -111,7 +124,7 @@ describe('ChapterCard story contract rendering', () => {
     expect(text).toContain('Escaped From Tarkov For Humanity');
     expect(text).toContain('page.storyline.ending_progress:{"completed":1,"total":2}');
     expect(text).toContain('page.storyline.ending_evidence_pending');
-    expect(text).not.toContain('page.storyline.ending_progress:{"completed":0,"total":3}');
+    expect(text).toContain('page.storyline.ending_progress:{"completed":0,"total":3}');
     expect(wrapper.findAll('[role="progressbar"]')).toHaveLength(0);
     wrapper.unmount();
   });
@@ -376,6 +389,28 @@ describe('ChapterCard story contract rendering', () => {
     expect(wrapper.text()).not.toContain('page.storyline.timeline_objective');
     await wrapper.get('#storyline-objective-the-ticket-obj-give').trigger('change');
     expect(wrapper.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-give']]);
+    wrapper.unmount();
+  });
+  it('lists route option unlocks in the unlock lane under their option', () => {
+    const keep = objective('obj-keep', {
+      description: 'Keep the case',
+      unlocks: [{ estimated: false, id: 'woods', label: 'Woods', type: 'map' }],
+    });
+    const give = objective('obj-give', { order: 2, description: 'Give the case' });
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectiveTotal: 1,
+        mainObjectives: [keep, give],
+        mainRouteChoices: [{ chosenObjectiveId: null, id: 'route-main', objectives: [keep, give] }],
+      })
+    );
+    expect(wrapper.text()).toContain('page.storyline.timeline_unlocks');
+    // The badge renders once, in the lane, not again inside the option's box.
+    expect(wrapper.findAll('[data-storyline-objective]').map((row) => row.text())).not.toContain(
+      expect.stringContaining('route_unlock_map')
+    );
+    const lane = wrapper.get('ol > li').findAll(':scope > div').at(-1)!;
+    expect(lane.text()).toBe('Keep the casepage.storyline.route_unlock_map:{"name":"Woods"}');
     wrapper.unmount();
   });
   it('shows standalone optional steps when a chapter has no main objectives', async () => {

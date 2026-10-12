@@ -13,6 +13,7 @@
         :chapter-id="chapterId"
         :index="entry.routeIndex ?? entry.step ?? 0"
         :read-only="readOnly"
+        hide-unlocks
         @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
       />
       <StorylineObjectiveRow v-else-if="entry.objective" v-bind="rowProps(entry.objective)" />
@@ -32,11 +33,7 @@
       class="pl-8.5 @3xl/objectives:pt-1.5 @3xl/objectives:pl-0"
       :class="lanes.unlocks"
     >
-      <StorylineUnlockBadges
-        v-if="entry.objective?.unlocks.length"
-        :unlocks="entry.objective.unlocks"
-        :estimated="entry.objective.hasEstimatedUnlocks"
-      />
+      <StorylineTimelineUnlocks :entry="entry" />
     </div>
   </li>
 </template>
@@ -44,7 +41,7 @@
   import StorylineObjectiveRow from '@/features/storyline/components/StorylineObjectiveRow.vue';
   import StorylineRouteChoiceGroup from '@/features/storyline/components/StorylineRouteChoiceGroup.vue';
   import StorylineTimelineNode from '@/features/storyline/components/StorylineTimelineNode.vue';
-  import StorylineUnlockBadges from '@/features/storyline/components/StorylineUnlockBadges.vue';
+  import StorylineTimelineUnlocks from '@/features/storyline/components/StorylineTimelineUnlocks.vue';
   import { storylineObjectiveInputId } from '@/features/storyline/objectiveInputId';
   import type { StorylineObjectiveProgress } from '@/composables/useStorylineChapters';
   import type { StorylineTimelineEntry } from '@/features/storyline/storylineTimeline';
