@@ -64,8 +64,8 @@ In scope:
 Out of scope (report upstream):
 
 - `json.tarkov.dev` data issues — report to the tarkov.dev project
-- `tarkov-data-overlay` content issues — report at
-  <https://github.com/tarkovtracker-org/tarkov-data-overlay>
+- `tarkov-data-overlay` content issues — use the
+  [Data issue form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=data_issue.yml)
 - Supabase platform vulnerabilities — report to Supabase
 - Cloudflare platform vulnerabilities — report to Cloudflare
 

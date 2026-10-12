@@ -10,4 +10,11 @@ accept = ["200", "204", "206", "301", "302", "308"]
 # Generated release notes: issue shortrefs and historical URLs churn often.
 exclude_path = ['(^|/)CHANGELOG\.md$']
 # Local/dev hosts and production app origin (checked by deploy, not docs).
-exclude = ['localhost', '127\.0\.0\.1', 'tarkovtracker\.org', 'gnu\.org']
+# The private tarkov-data-overlay repo 404s without access; only maintainer docs link to it.
+exclude = [
+  'localhost',
+  '127\.0\.0\.1',
+  'tarkovtracker\.org',
+  'gnu\.org',
+  'github\.com/tarkovtracker-org/tarkov-data-overlay',
+]
