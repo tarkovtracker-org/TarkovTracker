@@ -128,7 +128,9 @@ vi.mock('@/utils/logger', () => ({
     debug: vi.fn(),
   },
 }));
+const mockLocale = ref('en');
 mockNuxtImport('useI18n', () => () => ({
+  locale: mockLocale,
   t: (key: string) => key,
 }));
 const UButtonStub = {
@@ -204,6 +206,7 @@ describe('MyTeam store interactions', () => {
     mockTeamState.join_code = null;
     mockTeamState.members = [];
     mockTeamState.ownerOnlyExpiresAt = null;
+    mockLocale.value = 'en';
     mockHasInitiallyLoaded.value = true;
     mockCopyToClipboard.mockReset();
     mockCopyToClipboard.mockResolvedValue(true);
@@ -262,7 +265,13 @@ describe('MyTeam store interactions', () => {
       const wrapper = await mountMyTeam();
       expect(wrapper.get('[data-testid="team-expiry-warning"]').attributes('role')).toBe('alert');
       expect(wrapper.get('[data-testid="team-expiry-warning"]').text()).toContain(
-        new Date('2026-10-20T12:00:00Z').toLocaleString()
+        new Date('2026-10-20T12:00:00Z').toLocaleString('en')
+      );
+      // The deadline follows the app's selected language, not the browser default.
+      mockLocale.value = 'de';
+      await nextTick();
+      expect(wrapper.get('[data-testid="team-expiry-warning"]').text()).toContain(
+        new Date('2026-10-20T12:00:00Z').toLocaleString('de')
       );
       expect(
         wrapper.get('[data-testid="team-expiry-warning"]').attributes('dismissible')

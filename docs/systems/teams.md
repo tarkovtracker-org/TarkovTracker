@@ -50,6 +50,8 @@ path.
   and auth-session fences reject stale results. Listener snapshots never assign the deadline.
   A member-list failure still permits the independent authorized deadline read. This makes join
   cancellation and fresh solo warnings work when only memberships are in the Realtime publication.
+  The same authorized row also supplies the current owner, so a transfer shows the warning to the
+  new owner without a team snapshot. The deadline is formatted in the app's selected locale.
 - Membership BEFORE triggers acquire the team row with `NOWAIT`, before pointer maintenance.
   Normal lifecycle RPCs already hold that lock. A contended raw Auth FK cascade aborts with
   `55P03` for whole-transaction retry instead of waiting while holding a membership row.

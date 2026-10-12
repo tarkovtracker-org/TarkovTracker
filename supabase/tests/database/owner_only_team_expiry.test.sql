@@ -1,5 +1,5 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(62);
 
 CREATE TEMP TABLE expiry_users AS SELECT name, gen_random_uuid() AS id
   FROM unnest(ARRAY['owner','member','successor','outsider']) name;
@@ -169,7 +169,7 @@ INSERT INTO private.owner_only_team_cleanup_receipts(completed_at,initialized,di
 SELECT is((SELECT jsonb_array_length(recent_receipts) FROM private.owner_only_team_cleanup_status),20,
   'aggregate report returns only the latest 20 receipts');
 SELECT is((SELECT array_agg(key ORDER BY key) FROM private.owner_only_team_cleanup_status,
-  LATERAL jsonb_object_keys(recent_receipts->0) key),
+  LATERAL jsonb_object_keys(recent_receipts->0) AS keys(key)),
   ARRAY['completed_at','deletion_enabled','disbanded','initialized']::text[], 'receipt fields contain no identities or payloads');
 
 CREATE ROLE expiry_test_observer NOLOGIN;

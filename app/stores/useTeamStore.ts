@@ -540,7 +540,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       });
     }
   };
-  const readOwnerOnlyDeadline = async (teamId: string): Promise<string | null | undefined> => {
+  type TeamRow = Record<string, unknown> | null;
+  const readOwnerOnlyDeadline = async (teamId: string): Promise<TeamRow | undefined> => {
     // Memberships are published even when teams is not. Read the same authorized row shape as
     // the team listener so pre-migration schemas with no deadline column remain compatible.
     try {
@@ -550,7 +551,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         .eq('id', teamId)
         .maybeSingle();
       if (error) throw error;
-      return typeof data?.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null;
+      return (data as TeamRow) ?? null;
     } catch (error) {
       logger.warn('[TeamStore] Failed to refresh team deadline:', error);
       return undefined;
@@ -565,10 +566,15 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     sessionIsCurrent(context) &&
     requestVersion === latestMembersRequestVersion &&
     getTeamIdFromSystemStore(systemStore) === context.teamId;
-  const applyOwnerOnlyDeadline = (deadline: string | null | undefined) => {
-    if (deadline === undefined) return;
+  const applyOwnerOnlyDeadline = (row: TeamRow | undefined) => {
+    if (row === undefined) return;
+    const deadline = row?.owner_only_expires_at;
+    const owner = row?.owner_id;
     teamStore.$patch((state) => {
-      state.ownerOnlyExpiresAt = deadline;
+      state.ownerOnlyExpiresAt = typeof deadline === 'string' ? deadline : null;
+      // Ownership transfers also arrive only as membership role events. Keep the warning's
+      // owner check in step with the same authorized row instead of a stale team snapshot.
+      if (typeof owner === 'string') state.owner = owner;
     });
   };
   const readMembers = async (teamId: string, force: boolean) => {

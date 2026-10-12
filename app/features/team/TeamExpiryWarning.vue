@@ -13,9 +13,11 @@
   const props = defineProps<{ teamId: string | null }>();
   const teamStore = useTeamStore();
   const { $supabase } = useNuxtApp();
+  // Match the translated sentence: format with the app's selected locale, not the browser's.
+  const { locale } = useI18n({ useScope: 'global' });
   const deadline = computed(() => {
     if (teamStore.id !== props.teamId || teamStore.owner !== $supabase.user.id) return null;
     const date = new Date(teamStore.ownerOnlyExpiresAt ?? '');
-    return Number.isFinite(date.getTime()) ? date.toLocaleString() : null;
+    return Number.isFinite(date.getTime()) ? date.toLocaleString(locale.value) : null;
   });
 </script>

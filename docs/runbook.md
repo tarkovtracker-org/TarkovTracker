@@ -1035,9 +1035,9 @@ regressions and deployment postchecks against any recovery migration before decl
 ## Owner-only team expiry rollout
 
 This is a separately approved production procedure. A draft PR, its migration merge or green
-CI authorizes none of these steps. Migration `20261012150355_owner_only_team_expiry.sql` adds
+CI authorizes none of these steps. Migration `20261012174500_owner_only_team_expiry.sql` adds
 schema and triggers only: clocks, cron and deletion are initially off. Forward migration
-`20261012153724_owner_only_team_cleanup_receipts.sql` adds aggregate receipts and the restricted
+`20261012174501_owner_only_team_cleanup_receipts.sql` adds aggregate receipts and the restricted
 observer view without activating either gate. Obtain independent
 concurrency/migration review before merge, then explicit deployment/migration approval under
 the database procedure above. No cost saving has been measured; team rows do not duplicate
