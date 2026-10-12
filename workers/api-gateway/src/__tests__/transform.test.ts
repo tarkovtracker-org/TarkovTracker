@@ -5,7 +5,6 @@ const baseProgress = (taskCompletions: UserProgressData['taskCompletions']): Use
   level: 12,
   pmcFaction: 'USEC',
   displayName: 'Tester',
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions,
   hideoutParts: {},

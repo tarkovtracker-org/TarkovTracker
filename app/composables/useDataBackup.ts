@@ -165,7 +165,6 @@ const ALLOWED_PROGRESS_KEYS = new Set([
   'level',
   'pmcFaction',
   'displayName',
-  'xpOffset',
   'taskCompletions',
   'taskObjectives',
   'hideoutParts',

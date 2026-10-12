@@ -71,7 +71,6 @@ const {
     level: 1,
     pmcFaction: 'USEC',
     displayName: null,
-    xpOffset: 0,
     taskObjectives: {},
     taskCompletions: {},
     hideoutParts: {},
@@ -375,7 +374,6 @@ const progressWithTaskState = (taskId: string, complete: boolean): UserProgressD
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {
     [taskId]: {
@@ -397,7 +395,6 @@ const progressWithLevel = (level: number): UserProgressData => ({
   level,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
   hideoutParts: {},
@@ -1636,7 +1633,6 @@ describe('useTarkov sync integration', () => {
             seasonal: {
               ...seasonal('local-task', base + 10_000),
               displayName: 'old name',
-              xpOffset: 100,
               skillOffsets: { Endurance: 4 },
               traders: { prapor: { level: 4, reputation: 0.8 } },
               skills: { Endurance: 30 },
@@ -1681,7 +1677,6 @@ describe('useTarkov sync integration', () => {
       expect(selected.taskCompletions).toEqual(tasks);
       expect(selected).toMatchObject({
         displayName: null,
-        xpOffset: 0,
         traders: { prapor: { level: 4, reputation: 0.8 } },
         skills: { Endurance: 30 },
       });
@@ -1722,7 +1717,6 @@ describe('useTarkov sync integration', () => {
           progress_data: {
             ...progressWithLevel(2),
             displayName: 'old name',
-            xpOffset: 100,
             skillOffsets: { Endurance: 4 },
             taskCompletions: { remoteTask: { complete: true, timestamp: base + 30_000 } },
             taskObjectives: { objective: { count: 5, timestamp: base + 10_000 } },
@@ -1731,7 +1725,7 @@ describe('useTarkov sync integration', () => {
       ];
       await initializeTarkovSync();
       const selected = useTarkovStore()[mode];
-      expect(selected).toMatchObject({ displayName: null, xpOffset: 0 });
+      expect(selected).toMatchObject({ displayName: null, skillOffsets: {} });
       expect(selected.skillOffsets).toEqual({});
       expect(selected.taskObjectives.objective?.count).toBe(0);
       expect(Object.keys(selected.taskCompletions).sort()).toEqual(['localTask', 'remoteTask']);
@@ -2236,7 +2230,6 @@ describe('useTarkov sync integration', () => {
           ...baseline.pve,
           displayName: 'Other tab',
           pmcFaction: 'BEAR' as const,
-          xpOffset: 1234,
           skillOffsets: { endurance: 3 },
         },
       };
@@ -2286,7 +2279,6 @@ describe('useTarkov sync integration', () => {
         ...progressWithLevel(9),
         displayName: 'Other tab during read',
         pmcFaction: 'BEAR' as const,
-        xpOffset: 1234,
         skillOffsets: { endurance: 3 },
       },
     };
@@ -5334,7 +5326,7 @@ describe('useTarkov sync integration', () => {
                   ...progressWithLevel(25),
                   displayName: 'owner-B',
                   pmcFaction: 'BEAR',
-                  xpOffset: 42,
+                  skillOffsets: { Endurance: 42 },
                 },
               },
             })
@@ -5375,7 +5367,7 @@ describe('useTarkov sync integration', () => {
         expect(store.pvp.level).toBe(source === 'empty' ? 1 : 25);
         expect(store.pvp.displayName).toBe(hasRecovery ? 'owner-B' : null);
         expect(store.pvp.pmcFaction).toBe(hasRecovery ? 'BEAR' : 'USEC');
-        expect(store.pvp.xpOffset).toBe(hasRecovery ? 42 : 0);
+        expect(store.pvp.skillOffsets.Endurance).toBe(hasRecovery ? 42 : undefined);
       }
     );
     it.each([

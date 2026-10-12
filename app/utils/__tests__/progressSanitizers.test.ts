@@ -47,7 +47,7 @@ describe('sanitizeOwnedProgressData', () => {
     expect(sanitizeOwnedProgressData({}).taskAvailability).toEqual({});
     expect(sanitizeOwnedProgressData({ taskAvailability: [] }).taskAvailability).toEqual({});
   });
-  it('drops legacy tarkov.dev payloads while preserving canonical fields', () => {
+  it('drops legacy XP offsets and tarkov.dev payloads while preserving canonical fields', () => {
     const result = sanitizeOwnedProgressData({
       apiUpdateHistory: [{ at: 100, id: 'update-1', source: 'api' }],
       displayName: '  Test Player  ',
@@ -66,6 +66,7 @@ describe('sanitizeOwnedProgressData', () => {
       },
       xpOffset: 321,
     });
+    expect(result).not.toHaveProperty('xpOffset');
     expect(result).toEqual({
       apiUpdateHistory: [{ at: 100, id: 'update-1', source: 'api' }],
       displayName: 'Test Player',
@@ -86,7 +87,6 @@ describe('sanitizeOwnedProgressData', () => {
       },
       taskObjectives: {},
       traders: {},
-      xpOffset: 321,
     });
   });
   it('clamps skill values to the allowed range', () => {
@@ -150,7 +150,6 @@ describe('sanitizeOwnedProgressData', () => {
       pmcFaction: 'USEC',
       skills: {},
       taskCompletions: {},
-      xpOffset: 0,
     });
     expect(undefinedResult).toMatchObject({
       apiUpdateHistory: [],
@@ -161,7 +160,6 @@ describe('sanitizeOwnedProgressData', () => {
       pmcFaction: 'USEC',
       skills: {},
       taskCompletions: {},
-      xpOffset: 0,
     });
   });
   it('preserves valid manual activity history entries', () => {

@@ -248,7 +248,7 @@ describe('settings page', () => {
       global: globalConfig,
     });
     expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
   });
   describe('user states', () => {

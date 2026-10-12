@@ -1773,14 +1773,9 @@
     "profile": "Profile",
     "section_navigation": "Navigation",
     "account_menu": "Account menu",
-    "mode_auto": "Auto",
-    "auto_level_enabled": "Automatic level calculation is enabled",
-    "level_display_auto": "Level {level} (automatic calculation enabled)",
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
-    "decrement_level": "Decrease level",
-    "xp_progress": "XP progress",
-    "xp_settings_link": "View XP and level settings"
+    "decrement_level": "Decrease level"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2275,19 +2270,6 @@
       "warn_system_omnibar": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+T, Ctrl+W, Alt+Tab).",
       "warn_system_undo": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+W, Ctrl+T, Alt+Tab)."
     },
-    "experience": {
-      "title": "Experience & Level",
-      "auto_level_title": "Automatic Level Calculation",
-      "auto_level_description": "When enabled, your level will be automatically calculated based on total XP. When disabled, you can manually set your level independently of XP calculations.",
-      "current_level": "Current Level",
-      "set_total_xp": "Set Total XP",
-      "manual_hint": "Enter your actual total XP to adjust the offset automatically.",
-      "xp_amount": "{amount} XP",
-      "xp_to_next": "{amount} to next",
-      "reset_offset": "Reset XP Offset",
-      "xp_progress_aria": "Experience progress toward next level",
-      "xp_progress_value": "{percent}% toward the next level"
-    },
     "danger_zone": {
       "confirm_instruction": "Type {word} to confirm resetting all data:",
       "confirm_word": "DELETE"
@@ -2409,6 +2391,7 @@
         "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "This Tarkov profile is already linked to another TarkovTracker account, so it was not linked here. The imported progress was saved. Unlink it from the other account, then import again.",
         "save_failed": "The profile was imported on this device, but it could not be saved to your account yet. Check your connection; the import stays on this device until it syncs."
       }

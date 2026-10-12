@@ -11,7 +11,6 @@ const createProgressData = (
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions,
   hideoutParts: {},

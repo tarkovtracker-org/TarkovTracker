@@ -192,7 +192,6 @@ vi.mock('@/stores/useTarkov', () => ({
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
     },
     pve: {
       apiUpdateHistory: [],
@@ -208,7 +207,6 @@ vi.mock('@/stores/useTarkov', () => ({
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
     },
     isTaskObjectiveComplete: (objectiveId: string) => selfCompletedObjectiveIds.has(objectiveId),
     isTaskComplete: (taskId: string) => selfCompletedTaskIds.has(taskId),

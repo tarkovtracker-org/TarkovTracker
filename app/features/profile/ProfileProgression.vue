@@ -310,7 +310,6 @@
     taskObjectives: {},
     traders: {},
     storyChapters: {},
-    xpOffset: 0,
   };
   type StatTone = 'info' | 'primary' | 'success' | 'warning';
   interface SharedProfileResponse {
@@ -695,12 +694,7 @@
     if (isViewingSharedProfile.value) return undefined;
     return buildTarkovDevProfileUrl(tarkovStore.getTarkovUid(), selectedMode.value);
   });
-  const profileLevel = computed(() => {
-    if (isViewingCurrentMode.value && preferencesStore.getUseAutomaticLevelCalculation) {
-      return progressStore.getLevel('self');
-    }
-    return modeData.value.level ?? 1;
-  });
+  const profileLevel = computed(() => modeData.value.level ?? 1);
   const relevantTasks = computed<Task[]>(() => {
     const faction = modeFaction.value;
     const factionFiltered = profileTasks.value.filter((task) => {

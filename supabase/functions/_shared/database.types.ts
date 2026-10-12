@@ -624,7 +624,6 @@ export type Database = {
           trader_sort_direction: string | null
           trader_sort_mode: string | null
           updated_at: string | null
-          use_automatic_level_calculation: boolean | null
           user_id: string
         }
         Insert: {
@@ -705,7 +704,6 @@ export type Database = {
           trader_sort_direction?: string | null
           trader_sort_mode?: string | null
           updated_at?: string | null
-          use_automatic_level_calculation?: boolean | null
           user_id: string
         }
         Update: {
@@ -786,7 +784,6 @@ export type Database = {
           trader_sort_direction?: string | null
           trader_sort_mode?: string | null
           updated_at?: string | null
-          use_automatic_level_calculation?: boolean | null
           user_id?: string
         }
         Relationships: []

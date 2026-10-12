@@ -21,7 +21,6 @@ const defaultProgressData: UserProgressData = {
   taskCompletions: {},
   taskObjectives: {},
   traders: {},
-  xpOffset: 0,
 };
 describe('profileProgressionHelpers', () => {
   it('normalizes mode and user id values from route input', () => {

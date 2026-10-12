@@ -72,6 +72,27 @@ describe('usePreferencesStore', () => {
     vi.stubGlobal('localStorage', localStorageMock);
     vi.stubGlobal('import.meta', { client: true });
   });
+  it.each([true, false])(
+    'removes the retired automatic preference %s from saved storage',
+    (flag) => {
+      currentUserId.value = 'user-1';
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage(
+          { useAutomaticLevelCalculation: flag, showNextQuests: false },
+          'user-1',
+          1234
+        )
+      );
+      const store = usePreferencesStore();
+      expect(store.$state).not.toHaveProperty('useAutomaticLevelCalculation');
+      expect(store.showNextQuests).toBe(false);
+      const saved = JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}');
+      expect(saved.data).not.toHaveProperty('useAutomaticLevelCalculation');
+      expect(saved._timestamp).toBe(1234);
+      expect(saved._userId).toBe('user-1');
+    }
+  );
   describe('Default State Initialization', () => {
     it('should initialize with default state values', () => {
       const store = usePreferencesStore();
@@ -164,7 +185,6 @@ describe('usePreferencesStore', () => {
     it('should initialize other settings with correct defaults', () => {
       const store = usePreferencesStore();
       expect(store.localeOverride).toBeNull();
-      expect(store.useAutomaticLevelCalculation).toBe(false);
       expect(store.dashboardNoticeDismissed).toBe(false);
       expect(store.skillSortMode).toBeNull();
       expect(store.taskFilterPresets).toEqual([]);
@@ -998,10 +1018,6 @@ describe('usePreferencesStore', () => {
       store.localeOverride = 'de';
       expect(store.getLocaleOverride).toBe('de');
     });
-    it('should return useAutomaticLevelCalculation state', () => {
-      const store = usePreferencesStore();
-      expect(store.getUseAutomaticLevelCalculation).toBe(false);
-    });
     it('should return pinnedTaskIds state', () => {
       const store = usePreferencesStore();
       expect(store.getPinnedTaskIds).toEqual([]);
@@ -1380,13 +1396,6 @@ describe('usePreferencesStore', () => {
       expect(store.mapShowPinnedObjectives).toBe(false);
       store.setMapShowTeamObjectives(false);
       expect(store.mapShowTeamObjectives).toBe(false);
-    });
-  });
-  describe('Actions - XP and Level', () => {
-    it('should set use automatic level calculation', () => {
-      const store = usePreferencesStore();
-      store.setUseAutomaticLevelCalculation(true);
-      expect(store.useAutomaticLevelCalculation).toBe(true);
     });
   });
   describe('Actions - Map Settings', () => {

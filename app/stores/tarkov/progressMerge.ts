@@ -14,6 +14,7 @@ import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
+  stripLegacyXpOffset,
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
@@ -342,6 +343,8 @@ export function mergeProgressData(
   remote: UserProgressData | undefined,
   preferNewerCount = false
 ): UserProgressData {
+  local = local ? stripLegacyXpOffset(local) : local;
+  remote = remote ? stripLegacyXpOffset(remote) : remote;
   if (!local && !remote) return {} as UserProgressData;
   if (!local) return structuredClone(remote!);
   if (!remote) return structuredClone(local);
@@ -406,7 +409,6 @@ export function mergeProgressData(
     prestigeLevel: Math.max(local.prestigeLevel || 0, remote.prestigeLevel || 0),
     displayName: remote.displayName || local.displayName,
     pmcFaction: remote.pmcFaction || local.pmcFaction,
-    xpOffset: remote.xpOffset !== undefined ? remote.xpOffset : local.xpOffset,
     lastApiUpdate: resolveApiUpdate(local.lastApiUpdate, remote.lastApiUpdate),
     apiUpdateHistory: mergeApiUpdateHistory(local, remote),
     ...mergeManualActivityHistory(local, remote),
@@ -491,6 +493,5 @@ export const mergePreferringSingleValues = (
   level: preferred.level,
   displayName: preferred.displayName,
   pmcFaction: preferred.pmcFaction,
-  xpOffset: preferred.xpOffset,
   skillOffsets: preferred.skillOffsets,
 });

@@ -940,7 +940,7 @@ describe('native progress authority integration', () => {
       )
     ).toBe(true);
     expect(status.progressSaveStatus.local).toBe('saved');
-    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.Endurance = 50;
     expect(
       await storage.persistActiveProgressValue(
         storage.progressStorageSerializer.serialize(state, 'a', 400)
@@ -949,7 +949,7 @@ describe('native progress authority integration', () => {
     expect(
       storage.parsePersistedProgressState((await a.readCommittedProgressAuthority(false)).raw, 'a')!
         .state.pvp
-    ).toMatchObject({ level: 25, xpOffset: 50 });
+    ).toMatchObject({ level: 25, skillOffsets: { Endurance: 50 } });
     expect(status.progressSaveStatus.local).toBe('saved');
   });
   it('rebases each concurrent runtime mutation on the committed envelope', async () => {

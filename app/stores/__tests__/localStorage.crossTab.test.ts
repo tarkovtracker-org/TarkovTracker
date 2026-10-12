@@ -85,7 +85,7 @@ describe('active progress across tabs', () => {
         tab.progressStorageSerializer.serialize(state, 'owner', 200)
       )
     ).toBe(false);
-    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.Endurance = 50;
     const retry = tab.persistActiveProgressValue(
       tab.progressStorageSerializer.serialize(state, 'owner', 300)
     );
@@ -95,13 +95,13 @@ describe('active progress across tabs', () => {
     );
     await retry;
     const savedRetry = tab.parsePersistedProgressState(save.mock.calls[1]![1], 'owner')!;
-    expect(savedRetry.state.pvp).toMatchObject({ level: 20, xpOffset: 50 });
+    expect(savedRetry.state.pvp).toMatchObject({ level: 20, skillOffsets: { Endurance: 50 } });
     await undo;
     expect(
       tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!.state.pvp
-    ).toMatchObject({ level: 30, xpOffset: 50 });
+    ).toMatchObject({ level: 30, skillOffsets: { Endurance: 50 } });
   });
-  it('accepted remote merge does not promote a stale level beside unsaved xp', async () => {
+  it('accepted remote merge does not promote a stale level beside unsaved skill offsets', async () => {
     auth.owner = 'owner';
     const tab = await openTab();
     const originalState = structuredClone(defaultState);
@@ -116,7 +116,7 @@ describe('active progress across tabs', () => {
     values.set(STORAGE_KEYS.progress, original);
     tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, 'owner'));
     const state = structuredClone(originalState);
-    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.Endurance = 50;
     const current = structuredClone(originalState);
     current.pvp.level = 20;
     values.set(
@@ -143,7 +143,7 @@ describe('active progress across tabs', () => {
     );
     const saved = tab.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!;
     expect(saved.state.pvp.level).toBe(20);
-    expect(saved.state.pvp.xpOffset).toBe(50);
+    expect(saved.state.pvp.skillOffsets.Endurance).toBe(50);
   });
   it.each([false, true])(
     'replays only captured account edits over concurrent same-mode corrections, hydrated=%s',
@@ -171,13 +171,13 @@ describe('active progress across tabs', () => {
       await first.persistActiveProgressValue(
         first.progressStorageSerializer.serialize(a, 'owner', 200)
       );
-      b.pvp.xpOffset = 50;
+      b.pvp.skillOffsets.Endurance = 50;
       await second.persistActiveProgressValue(
         second.progressStorageSerializer.serialize(b, 'owner', 300)
       );
       const saved = second.parsePersistedProgressState(values.get(STORAGE_KEYS.progress), 'owner')!;
       expect(saved.state.pvp.level).toBe(20);
-      expect(saved.state.pvp.xpOffset).toBe(50);
+      expect(saved.state.pvp.skillOffsets.Endurance).toBe(50);
       expect(b.pvp).toEqual(saved.state.pvp);
     }
   );
@@ -191,7 +191,7 @@ describe('active progress across tabs', () => {
     state.pve.traders.prapor = { level: 4, reputation: 1 };
     state.pve.prestigeLevel = 2;
     state.pve.displayName = 'Old';
-    state.pve.xpOffset = 50;
+    state.pve.skillOffsets.Endurance = 50;
     state.pve.taskCompletions.old = { complete: true, failed: true };
     state.pve.skillOffsets.strength = 3;
     state.seasonal.level = 33;
@@ -204,7 +204,7 @@ describe('active progress across tabs', () => {
     correction.pve.traders.prapor = { level: 1, reputation: 0 };
     correction.pve.prestigeLevel = 1;
     correction.pve.displayName = null;
-    correction.pve.xpOffset = 0;
+    correction.pve.skillOffsets.Endurance = 0;
     correction.pve.taskCompletions.old = { complete: false, failed: false };
     delete correction.pve.skillOffsets.strength;
     await writer.persistActiveProgressValue(
@@ -232,7 +232,7 @@ describe('active progress across tabs', () => {
     state.pvp.level = 20;
     state.pvp.skills.strength = 10;
     state.pvp.displayName = 'Old';
-    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.Endurance = 50;
     state.pvp.taskCompletions.old = { complete: true, failed: true };
     state.pvp.skillOffsets.strength = 3;
     state.pve.level = 42;
@@ -243,7 +243,7 @@ describe('active progress across tabs', () => {
     state.pvp.level = 3;
     state.pvp.skills.strength = 3;
     state.pvp.displayName = null;
-    state.pvp.xpOffset = 0;
+    state.pvp.skillOffsets.Endurance = 0;
     state.pvp.taskCompletions.old = { complete: false, failed: false };
     delete state.pvp.skillOffsets.strength;
     const failedIntent = structuredClone(state.pvp);
@@ -295,7 +295,7 @@ describe('active progress across tabs', () => {
       const original = guestEnvelope(state);
       tab.progressStorageSerializer.reset(tab.parsePersistedProgressState(original, null));
       const concurrent = structuredClone(state);
-      concurrent.pvp.xpOffset = 50;
+      concurrent.pvp.skillOffsets.Endurance = 50;
       concurrent.pvp.skills.endurance = 9;
       concurrent.pve.level = 42;
       values.set(
@@ -306,7 +306,7 @@ describe('active progress across tabs', () => {
       if (kind === 'traderReputation') state.pvp.traders.prapor.reputation = 0;
       if (kind === 'skillLevel') state.pvp.skills.strength = 3;
       if (kind === 'prestigeLevel') state.pvp.prestigeLevel = 0;
-      const expected = { ...structuredClone(state.pvp), xpOffset: 50 };
+      const expected = { ...structuredClone(state.pvp), skillOffsets: { Endurance: 50 } };
       expected.skills.endurance = 9;
       expect(
         await tab.persistActiveProgressValue(
@@ -762,7 +762,7 @@ describe('active progress across tabs', () => {
     state.pvp.level = 3;
     state.pvp.taskCompletions.old = { complete: false, failed: false };
     delete state.pvp.skills.strength;
-    state.pvp.xpOffset = 0;
+    state.pvp.skillOffsets.Endurance = 0;
     const third = tab.persistActiveProgressValue(
       tab.progressStorageSerializer.serialize(state, null, 400)
     );
@@ -806,7 +806,7 @@ describe('active progress across tabs', () => {
     expect(saved.state.pvp.level).toBe(3);
     expect(saved.state.pvp.taskCompletions.old).toEqual({ complete: false, failed: false });
     expect(saved.state.pvp.skills).toEqual({});
-    expect(saved.state.pvp.xpOffset).toBe(0);
+    expect(saved.state.pvp.skillOffsets.Endurance).toBe(0);
     expect(saved.state.pvp.displayName).toBe('Live');
     expect(saved.state).toEqual(state);
     expect(tab.getPendingProgressWritesForOwners([null])).toHaveLength(0);
@@ -1655,7 +1655,7 @@ describe('active progress across tabs', () => {
     const state = structuredClone(defaultState);
     state.pvp.level = 5;
     state.pvp.displayName = 'Old';
-    state.pvp.xpOffset = 50;
+    state.pvp.skillOffsets.Endurance = 50;
     state.pvp.skillOffsets.strength = 3;
     state.pvp.taskCompletions.old = { complete: true, timestamp: 100 };
     state.pvp.manualActivityHistory = [
@@ -1675,7 +1675,7 @@ describe('active progress across tabs', () => {
     );
     state.pvp.level = 5;
     state.pvp.displayName = null;
-    state.pvp.xpOffset = 0;
+    state.pvp.skillOffsets.Endurance = 0;
     state.pvp.skillOffsets.strength = 0;
     state.pvp.taskCompletions.old = { complete: false, timestamp: 1001 };
     state.pvp.manualActivityEpoch = 1;
@@ -1691,7 +1691,6 @@ describe('active progress across tabs', () => {
     expect(saved.state.pvp).toMatchObject({
       level: 5,
       displayName: null,
-      xpOffset: 0,
       taskCompletions: { old: { complete: false } },
       manualActivityEpoch: 1,
       manualActivityHistory: [],
@@ -1727,7 +1726,6 @@ describe('active progress across tabs', () => {
         stale[other].level = 40;
         stale[other].displayName = 'Old name';
         stale[other].pmcFaction = 'BEAR';
-        stale[other].xpOffset = 500;
         stale[other].skillOffsets = { strength: 4 };
         stale[other].taskCompletions.old = { complete: true, timestamp: 900 };
         stale[other].storyChapters.old = {

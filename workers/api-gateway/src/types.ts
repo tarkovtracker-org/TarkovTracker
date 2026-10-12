@@ -46,7 +46,6 @@ export interface UserProgressData {
   level: number;
   pmcFaction: 'USEC' | 'BEAR';
   displayName: string | null;
-  xpOffset: number;
   taskObjectives: Record<string, TaskObjective>;
   taskCompletions: Record<string, TaskCompletion>;
   hideoutParts: Record<string, HideoutPart>;

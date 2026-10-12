@@ -146,8 +146,6 @@ export interface PreferencesState {
   showLockedFilter: boolean;
   showCompletedFilter: boolean;
   showFailedFilter: boolean;
-  // XP and Level settings
-  useAutomaticLevelCalculation: boolean;
   dashboardNoticeDismissed: boolean;
   // Map display settings
   showMapExtracts: boolean;
@@ -238,8 +236,6 @@ export const preferencesDefaultState: PreferencesState = {
   showLockedFilter: true,
   showCompletedFilter: true,
   showFailedFilter: true,
-  // XP and Level settings
-  useAutomaticLevelCalculation: false,
   dashboardNoticeDismissed: false,
   // Map display settings
   showMapExtracts: true,
@@ -626,9 +622,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getShowFailedFilter: (state) => {
       return state.showFailedFilter ?? true;
     },
-    getUseAutomaticLevelCalculation: (state) => {
-      return state.useAutomaticLevelCalculation ?? false;
-    },
     // Map display getters
     getShowMapExtracts: (state) => {
       return state.showMapExtracts ?? true;
@@ -914,9 +907,6 @@ export const usePreferencesStore = defineStore('preferences', {
     setMapShowTeamObjectives(show: boolean) {
       this.mapShowTeamObjectives = show;
     },
-    setUseAutomaticLevelCalculation(use: boolean) {
-      this.useAutomaticLevelCalculation = use;
-    },
     // Map display actions
     setShowMapExtracts(show: boolean) {
       this.showMapExtracts = show;
@@ -989,13 +979,13 @@ export const usePreferencesStore = defineStore('preferences', {
           ) {
             return {};
           }
-          return wrapped.data;
+          return sanitizePersistedPreferencesState(wrapped.data);
         }
         const legacyState = parseLegacyPersistedPreferencesState(value);
         if (!legacyState) {
           return {};
         }
-        return legacyState;
+        return sanitizePersistedPreferencesState(legacyState);
       },
     },
     // Pick specific properties to persist (excluding transient state)
@@ -1056,7 +1046,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapShowSelfObjectives',
       'mapShowPinnedObjectives',
       'mapShowTeamObjectives',
-      'useAutomaticLevelCalculation',
       'dashboardNoticeDismissed',
       'hideoutCollapseCompleted',
       'hideoutSortReadyFirst',
