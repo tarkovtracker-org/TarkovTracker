@@ -473,6 +473,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightTeamId: string | null = null;
   let latestMembersRequestVersion = 0;
+  let latestDeadlineRequestVersion = 0;
   // Computed reference to the team document based on system store
   const teamFilter = computed(() => {
     const currentSystemStateTeam = getTeamIdFromSystemStore(systemStore);
@@ -515,6 +516,46 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       });
     }
   };
+  const readOwnerOnlyDeadline = async (teamId: string): Promise<string | null | undefined> => {
+    // Memberships are published even when teams is not. Read the same authorized row shape as
+    // the team listener so pre-migration schemas with no deadline column remain compatible.
+    const { data, error } = await $supabase.client
+      .from('teams')
+      .select('*')
+      .eq('id', teamId)
+      .maybeSingle();
+    if (error) {
+      logger.warn('[TeamStore] Failed to refresh team deadline:', error);
+      return undefined;
+    }
+    return typeof data?.owner_only_expires_at === 'string' ? data.owner_only_expires_at : null;
+  };
+  const deadlineRequestIsCurrent = (
+    teamId: string,
+    membersVersion: number,
+    deadlineVersion: number
+  ) =>
+    membersVersion === latestMembersRequestVersion &&
+    deadlineVersion === latestDeadlineRequestVersion &&
+    getTeamIdFromSystemStore(systemStore) === teamId;
+  const applyOwnerOnlyDeadline = (deadline: string | null | undefined) => {
+    if (deadline === undefined) return;
+    teamStore.$patch((state) => {
+      state.ownerOnlyExpiresAt = deadline;
+    });
+  };
+  const refreshOwnerOnlyDeadline = async (
+    force: boolean,
+    teamId: string,
+    membersVersion: number
+  ) => {
+    if (!force) return;
+    if (!deadlineRequestIsCurrent(teamId, membersVersion, latestDeadlineRequestVersion)) return;
+    const deadlineVersion = ++latestDeadlineRequestVersion;
+    const deadline = await readOwnerOnlyDeadline(teamId);
+    if (!deadlineRequestIsCurrent(teamId, membersVersion, deadlineVersion)) return;
+    applyOwnerOnlyDeadline(deadline);
+  };
   const refreshMembers = async (force = false) => {
     if (!$supabase.user?.loggedIn || !$supabase.user?.id) {
       teamStore.$patch((state) => {
@@ -530,7 +571,12 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         refreshInFlightTeamId = null;
       } else {
         try {
-          return await refreshInFlight;
+          const requestVersion = latestMembersRequestVersion;
+          const result = await refreshInFlight;
+          // A membership event can join an initial non-forced read. Its deadline must still
+          // be read after that request completes, rather than reuse its earlier snapshot.
+          await refreshOwnerOnlyDeadline(force, currentTeamId, requestVersion);
+          return result;
         } catch (error) {
           const status = getErrorStatus(error);
           if (status === 401 || status === 403) {
@@ -561,6 +607,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     const inFlightRequest = (async () => {
       const { getTeamMembers } = useEdgeFunctions();
       const result = await getTeamMembers(currentTeamId, force);
+      await refreshOwnerOnlyDeadline(force, currentTeamId, requestVersion);
       if (requestVersion !== latestMembersRequestVersion) {
         return false;
       }

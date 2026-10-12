@@ -741,6 +741,15 @@ describe('Team realtime resources', () => {
       select: vi.fn(),
     };
     membershipQuery.select.mockReturnValue(membershipQuery);
+    const teamQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { owner_only_expires_at: null }, error: null }),
+    };
+    teamQuery.select.mockReturnValue(teamQuery);
+    teamQuery.eq.mockReturnValue(teamQuery);
     // Mirrors `RealtimeClient.channel()`: an open topic returns the existing
     // channel, so a premature rejoin is observable instead of silently working.
     const openTopics = new Map<string, ChannelRecord>();
@@ -756,7 +765,7 @@ describe('Team realtime resources', () => {
         openTopics.set(topic, record);
         return record.channel;
       }),
-      from: vi.fn(() => membershipQuery),
+      from: vi.fn((table: string) => (table === 'teams' ? teamQuery : membershipQuery)),
       removeChannel: vi.fn((target: unknown) => {
         for (const [topic, record] of openTopics) {
           if (record.channel === target) openTopics.delete(topic);
@@ -796,7 +805,7 @@ describe('Team realtime resources', () => {
     }));
     useSystemStoreWithSupabase().cleanup();
     const teamRecords = () => records.filter((record) => record.topic.startsWith('team:'));
-    return { client, currentUserId, teamRecords, teammateId };
+    return { client, currentUserId, teamRecords, teammateId, teamQuery };
   };
   const firstTeamRecord = (teamRecords: () => ChannelRecord[]): ChannelRecord => {
     const record = teamRecords()[0];
@@ -857,6 +866,104 @@ describe('Team realtime resources', () => {
       options.onData(row);
       options.onData(null);
       expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('refreshes cancellation and a fresh solo deadline from membership events without team publication', async () => {
+    const { teamRecords, currentUserId, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      const membership = firstTeamRecord(teamRecords).handlers.find(
+        ({ config }) => config.table === 'team_memberships'
+      );
+      expect(membership).toBeDefined();
+      mockGetTeamMembers.mockResolvedValue({
+        members: [currentUserId, 'joining-member'],
+        profiles: {},
+      });
+      membership!.handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: '2026-10-21T12:00:00Z' },
+        error: null,
+      });
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      membership!.handler({ eventType: 'DELETE', new: {} });
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z')
+      );
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('refreshes a deadline when a membership event joins an in-flight initial read', async () => {
+    const { teamRecords, teamQuery, currentUserId } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    let finish!: (value: unknown) => void;
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3000);
+      mockGetTeamMembers.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      const calls = mockGetTeamMembers.mock.calls.length;
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-20T12:00:00Z' });
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'INSERT', new: {} });
+      finish({ members: [currentUserId, 'joining-member'], profiles: {} });
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      vi.restoreAllMocks();
+      instance.cleanup();
+    }
+  });
+  it('discards a late deadline response after the active team changes', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    let finish!: (value: unknown) => void;
+    const nextDeadline = '2026-10-22T12:00:00Z';
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      teamQuery.maybeSingle.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: nextDeadline },
+        error: null,
+      });
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2', owner_only_expires_at: nextDeadline });
+      finish({ data: { owner_only_expires_at: '2026-10-23T12:00:00Z' }, error: null });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe(nextDeadline);
     } finally {
       instance.cleanup();
     }

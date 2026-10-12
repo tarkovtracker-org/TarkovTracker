@@ -45,6 +45,9 @@ path.
   deadline shown in a persistent, non-dismissible alert on the current owner's team invite card.
   Creation shows the policy before its button. Clients never derive eligibility from the
   `TeamMembers.vue` display list, old `created_at`, account activity or a client clock.
+  Membership events/reconnects also reread the server deadline through the current team's
+  authorized row, guarded by the membership request version and active team ID. This makes join
+  cancellation and fresh solo warnings work when only memberships are in the Realtime publication.
 - Membership BEFORE triggers acquire the team row with `NOWAIT`, before pointer maintenance.
   Normal lifecycle RPCs already hold that lock. A contended raw Auth FK cascade aborts with
   `55P03` for whole-transaction retry instead of waiting while holding a membership row.
