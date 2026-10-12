@@ -3,6 +3,7 @@ import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   openActiveProgressRepository,
+  ProgressRepositoryDataError,
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
 describe('active progress envelope authority', () => {
@@ -133,6 +134,8 @@ describe('active progress envelope authority', () => {
     { version: 1, revision: -1, raw: 'corrupt', legacyRaw: null },
     { version: 1, revision: 0, raw: 42, legacyRaw: null },
     { version: 1, revision: 0, raw: 'ok', legacyRaw: null, legacyUpdates: [42] },
+    { version: 1, revision: 0, raw: 'ok', legacyRaw: null, legacyUpdates: {} },
+    { version: 1, revision: 0, raw: 'ok', legacyRaw: null, legacyRecoveryOverflow: 'true' },
   ])('fails closed on unsupported or corrupt active records: %j', async (value) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = factory.open('active-test');
@@ -147,10 +150,14 @@ describe('active progress envelope authority', () => {
     });
     db.close();
     const legacy = vi.fn(() => 'must not adopt');
-    await expect(repository.read(token, legacy)).rejects.toBeTruthy();
+    await expect(repository.read(token, legacy)).rejects.toBeInstanceOf(
+      ProgressRepositoryDataError
+    );
     expect(legacy).not.toHaveBeenCalled();
     const mutate = vi.fn(() => ({ raw: 'replacement', result: true }));
-    await expect(repository.mutate(token, mutate)).rejects.toBeTruthy();
+    await expect(repository.mutate(token, mutate)).rejects.toBeInstanceOf(
+      ProgressRepositoryDataError
+    );
     expect(mutate).not.toHaveBeenCalled();
   });
 });

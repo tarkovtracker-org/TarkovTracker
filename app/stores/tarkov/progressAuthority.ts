@@ -1,5 +1,6 @@
 import {
   openActiveProgressRepository,
+  exceedsLegacyRecoveryLimits,
   type ActiveProgressRecord,
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
@@ -11,7 +12,7 @@ type Draft = { raw: string | null; actions: CommitAction[] };
 let repository: Promise<Repository> | undefined;
 let token: ProgressOwnerToken | undefined;
 let accepted: ActiveProgressRecord | undefined;
-let captureFailure: { token: ProgressOwnerToken; raw: string | null } | undefined;
+let captureFailure: { token: ProgressOwnerToken; raws: string[]; overflow: boolean } | undefined;
 let draft: Draft | undefined;
 export const legacyProgressRecoveryCount = ref(0);
 export const legacyProgressRecoveryOverflow = ref(false);
@@ -74,8 +75,15 @@ const isExportablePendingLegacy = (
   owner: string | null
 ): raw is string =>
   isOwnedProgressRecovery(raw, owner) && raw !== record.legacyRaw && raw !== record.lastLegacyRaw;
-const currentFailedRecovery = (): string | null =>
-  captureFailure && matchesReceiptToken(captureFailure.token) ? captureFailure.raw : null;
+const hasCurrentCaptureFailure = (): boolean =>
+  captureFailure !== undefined && matchesReceiptToken(captureFailure.token);
+const currentFailedRecovery = (): string[] =>
+  hasCurrentCaptureFailure() ? captureFailure!.raws : [];
+const hasUnresolvedCaptures = (failure: NonNullable<typeof captureFailure>): boolean =>
+  failure.overflow || failure.raws.length > 0;
+const clearResolvedCaptureFailure = (): void => {
+  if (captureFailure && !hasUnresolvedCaptures(captureFailure)) captureFailure = undefined;
+};
 const resolveCapturedFailure = (record: ActiveProgressRecord): void => {
   if (!captureFailure) return;
   const captured = [
@@ -83,14 +91,30 @@ const resolveCapturedFailure = (record: ActiveProgressRecord): void => {
     record.lastLegacyRaw ?? null,
     ...(record.legacyUpdates ?? []),
   ];
-  if (captured.includes(captureFailure.raw)) captureFailure = undefined;
+  captureFailure.raws = captureFailure.raws.filter((raw) => !captured.includes(raw));
+  clearResolvedCaptureFailure();
+};
+const appendFailedCapture = (failure: NonNullable<typeof captureFailure>, raw: string): void => {
+  if (failure.raws.includes(raw)) return;
+  if (exceedsLegacyRecoveryLimits(failure.raws, raw)) {
+    failure.overflow = true;
+    return;
+  }
+  failure.raws.push(raw);
+};
+const recordFailedCapture = (request: ProgressOwnerToken, raw: string | null): void => {
+  if (raw === null) return;
+  if (!hasCurrentCaptureFailure())
+    captureFailure = { token: structuredClone(request), raws: [], overflow: false };
+  appendFailedCapture(captureFailure!, raw);
+  legacyProgressRecoveryOverflow.value = true;
 };
 export const exportableLegacyUpdates = (
   record: ActiveProgressRecord,
   owner: string | null
 ): string[] => {
   const captured = ownedLegacyUpdates(record, owner);
-  const pending = [readPendingLegacySource(), currentFailedRecovery()].filter((raw) =>
+  const pending = [readPendingLegacySource(), ...currentFailedRecovery()].filter((raw) =>
     isExportablePendingLegacy(record, raw, owner)
   );
   return [...new Set([...captured, ...pending])];
@@ -98,8 +122,7 @@ export const exportableLegacyUpdates = (
 const acceptAuthority = (record: ActiveProgressRecord): void => {
   accepted = record;
   legacyProgressRecoveryOverflow.value =
-    record.legacyRecoveryOverflow === true ||
-    (captureFailure !== undefined && matchesReceiptToken(captureFailure.token));
+    record.legacyRecoveryOverflow === true || hasCurrentCaptureFailure();
   legacyProgressRecoveryCount.value = ownedLegacyUpdates(record, token?.owner ?? null).length;
 };
 const matchesReceiptToken = (request: ProgressOwnerToken): boolean => {
@@ -121,14 +144,32 @@ const adoptCommittedReceipt = (
   if (!accepted || record.revision > accepted.revision) acceptAuthority(record);
   return record.revision === accepted!.revision;
 };
+const readObservedAuthority = async (
+  db: Repository,
+  request: ProgressOwnerToken,
+  source: () => string | null,
+  isCurrent = () => ownsReceiptSession(request)
+): Promise<ActiveProgressRecord> => {
+  let observedRaw: string | null = null;
+  try {
+    const record = await db.read(request, () => {
+      observedRaw = source();
+      return observedRaw;
+    });
+    if (isCurrent()) resolveCapturedFailure(record);
+    return record;
+  } catch (error) {
+    if (isCurrent()) {
+      recordFailedCapture(request, observedRaw);
+    }
+    throw error;
+  }
+};
 export const refreshProgressAuthority = async (source = legacySource): Promise<void> => {
   if (!token) return;
   const request = structuredClone(token);
-  const record = await (await openRepository()).read(request, source);
-  if (ownsReceiptSession(request)) {
-    resolveCapturedFailure(record);
-    acceptAuthority(record);
-  }
+  const record = await readObservedAuthority(await openRepository(), request, source);
+  if (ownsReceiptSession(request)) acceptAuthority(record);
 };
 export const observeProgressAuthority = (onError: (error: unknown) => void): (() => void) => {
   const refresh = () => {
@@ -161,21 +202,10 @@ const hydrateActivatedProgressOwner = async (
   if (!canContinue()) return;
   token = next;
   acceptAuthority(current);
-  let observedRaw: string | null = null;
   try {
-    const observed = await db.read(next, () => {
-      observedRaw = legacySource();
-      return observedRaw;
-    });
-    if (canContinue()) {
-      resolveCapturedFailure(observed);
-      acceptAuthority(observed);
-    }
+    const observed = await readObservedAuthority(db, next, legacySource, canContinue);
+    if (canContinue()) acceptAuthority(observed);
   } catch (error) {
-    if (canContinue()) {
-      captureFailure = { token: structuredClone(next), raw: observedRaw };
-      legacyProgressRecoveryOverflow.value = true;
-    }
     console.warn('Older progress recovery could not be captured', error);
   }
 };
@@ -287,7 +317,11 @@ export const readCommittedProgressAuthority = async (
   observeLegacy = true
 ): Promise<ActiveProgressRecord> => {
   if (!token) throw new DOMException('Progress authority is not hydrated', 'InvalidStateError');
-  return (await openRepository()).read(structuredClone(token), observeLegacy ? legacySource : null);
+  const request = structuredClone(token);
+  const db = await openRepository();
+  return observeLegacy
+    ? readObservedAuthority(db, request, legacySource)
+    : db.read(request, null, false);
 };
 /** Explicit device removal also covers the immutable import and older-tab recovery copies. */
 export const removeOwnedProgressRecovery = async (
@@ -330,10 +364,14 @@ const isExportedPendingLegacy = (
   owner: string | null,
   exported: Set<string>
 ): boolean => isOwnedProgressRecovery(raw, owner) && exported.has(raw);
+const hasCurrentCaptureOverflow = (): boolean =>
+  hasCurrentCaptureFailure() && captureFailure!.overflow;
 const clearExportedCaptureFailure = (exported: Set<string>): void => {
-  if (!captureFailure?.raw || !exported.has(captureFailure.raw)) return;
-  captureFailure = undefined;
-  legacyProgressRecoveryOverflow.value = accepted?.legacyRecoveryOverflow === true;
+  if (!captureFailure) return;
+  captureFailure.raws = captureFailure.raws.filter((raw) => !exported.has(raw));
+  clearResolvedCaptureFailure();
+  legacyProgressRecoveryOverflow.value =
+    accepted?.legacyRecoveryOverflow === true || hasCurrentCaptureFailure();
 };
 /** Explicit cleanup removes only snapshots included in the completed export. */
 export const discardExportedLegacyProgress = async (
@@ -357,7 +395,8 @@ export const discardExportedLegacyProgress = async (
       result: true,
       recovery: {
         legacyRaw: current.legacyRaw,
-        legacyRecoveryOverflow: current.legacyRecoveryOverflow === true,
+        legacyRecoveryOverflow:
+          current.legacyRecoveryOverflow === true || hasCurrentCaptureOverflow(),
         lastLegacyRaw: isExportedPendingLegacy(pending, owner, exported)
           ? pending
           : current.lastLegacyRaw,

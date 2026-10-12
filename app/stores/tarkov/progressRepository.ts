@@ -620,13 +620,11 @@ const decodeActiveRecord = (entry: RecordEntry, legacyRaw: string | null): Activ
   return value as ActiveProgressRecord;
 };
 const validateLegacyOverflow = (value: unknown): void => {
-  if (value !== undefined && typeof value !== 'boolean') {
-    throw new TypeError('Invalid legacy recovery overflow');
-  }
+  if (value !== undefined) requireShape(typeof value === 'boolean', 'owner');
 };
 const MAX_LEGACY_SNAPSHOTS = 20;
 const MAX_LEGACY_CHARACTERS = 5 * 1024 * 1024;
-const exceedsLegacyRecoveryLimits = (updates: Array<string | null>, raw: string): boolean =>
+export const exceedsLegacyRecoveryLimits = (updates: Array<string | null>, raw: string): boolean =>
   updates.length >= MAX_LEGACY_SNAPSHOTS ||
   updates.reduce((total, copy) => total + (copy?.length ?? 0), raw.length) > MAX_LEGACY_CHARACTERS;
 const appendLegacySnapshot = (current: ActiveProgressRecord, raw: string): ActiveProgressRecord => {
@@ -638,8 +636,8 @@ const appendLegacySnapshot = (current: ActiveProgressRecord, raw: string): Activ
 };
 const validateLegacyUpdates = (values: unknown): void => {
   if (values === undefined) return;
-  if (!Array.isArray(values)) throw new TypeError('Invalid legacy progress recovery');
-  values.forEach((value) => requireNullableText(value, 'owner'));
+  requireShape(Array.isArray(values), 'owner');
+  (values as unknown[]).forEach((value) => requireNullableText(value, 'owner'));
 };
 const isKnownLegacySnapshot = (current: ActiveProgressRecord, raw: string | null): boolean =>
   raw === current.legacyRaw || (current.legacyUpdates ?? []).includes(raw);

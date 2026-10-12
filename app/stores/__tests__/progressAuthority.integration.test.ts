@@ -105,6 +105,75 @@ describe('native progress authority integration', () => {
       a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null)
     ).toContain(pending);
   });
+  it('retains consecutive failed captures and does not erase them on an unobserved read failure', async () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
+    const a = await open();
+    const raws = ['a', 'b'].map((value) => JSON.stringify({ _userId: null, data: { value } }));
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    for (const raw of raws)
+      await expect(a.refreshProgressAuthority(() => raw)).rejects.toMatchObject({
+        name: 'QuotaExceededError',
+      });
+    put.mockRestore();
+    vi.spyOn(IDBObjectStore.prototype, 'openCursor').mockImplementationOnce(() => {
+      throw new DOMException('unavailable', 'AbortError');
+    });
+    await expect(a.refreshProgressAuthority()).rejects.toMatchObject({ name: 'AbortError' });
+    const exported = a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null);
+    expect(exported).toEqual(expect.arrayContaining(raws));
+    await a.discardExportedLegacyProgress(null, [raws[0]!]);
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    expect(
+      a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null)
+    ).toContain(raws[1]);
+    await a.discardExportedLegacyProgress(null, [raws[1]!]);
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(false);
+  });
+  it('bounds failed capture retention and keeps a truncation warning after export', async () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
+    const a = await open();
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    for (let value = 0; value < 21; value++) {
+      const raw = JSON.stringify({ _userId: null, data: { value } });
+      await expect(a.refreshProgressAuthority(() => raw)).rejects.toMatchObject({
+        name: 'QuotaExceededError',
+      });
+    }
+    put.mockRestore();
+    const exported = a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null);
+    expect(exported).toHaveLength(20);
+    await a.discardExportedLegacyProgress(null, exported);
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    vi.resetModules();
+    const reopened = await open();
+    expect(reopened.legacyProgressRecoveryOverflow.value).toBe(true);
+  });
+  it('retains a failed refresh capture after its storage event value is overwritten', async () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
+    const a = await open();
+    const missed = JSON.stringify({ _userId: null, data: { missed: true } });
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    await expect(a.refreshProgressAuthority(() => missed)).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+    });
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    put.mockRestore();
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, data: { newer: true } })
+    );
+    await a.refreshProgressAuthority();
+    expect(a.legacyProgressRecoveryOverflow.value).toBe(true);
+    expect(
+      a.exportableLegacyUpdates(await a.readCommittedProgressAuthority(false), null)
+    ).toContain(missed);
+  });
   it('keeps a failed snapshot available when a different legacy snapshot is captured', async () => {
     localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: null, data: {} }));
     await open();
