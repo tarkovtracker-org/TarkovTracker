@@ -25,7 +25,7 @@ overrides:
   fast-xml-parser: '^5.7.1'
   function-bind: 'npm:@socketregistry/function-bind@^1'
   gopd: 'npm:@socketregistry/gopd@^1'
-  handlebars: '^4.7.9'
+  handlebars: '^4.7.10'
   has-symbols: 'npm:@socketregistry/has-symbols@^1'
   has-tostringtag: 'npm:@socketregistry/has-tostringtag@^1'
   hasown: 'npm:@socketregistry/hasown@^1'
