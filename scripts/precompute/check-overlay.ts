@@ -1,13 +1,15 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fetchOverlay } from '@/server/utils/overlay';
+import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
-import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
-import { fetchOverlay } from '@/server/utils/overlay';
 import {
   compareOverlayFleet,
-  compareTaskCatalogs,
+  readTaskCatalogPair,
+  compareImportCatalog,
+  type ImportCatalogComparison,
   type OverlayManifest,
   type CatalogComparison,
 } from './verify-overlay';
@@ -55,26 +57,35 @@ const served = [];
 const catalogs: CatalogComparison[] = [];
 for (const lang of API_SUPPORTED_LANGUAGES)
   for (const gameMode of VALID_GAME_MODES) {
-    try {
-      const [core, objectives] = await Promise.all([
-        getJson(`${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`),
-        getJson(
-          `${productionOrigin}/api/tarkov/tasks-objectives?lang=${lang}&gameMode=${gameMode}&version=${TASK_OBJECTIVES_CACHE_VERSION}`
-        ),
-      ]);
-      served.push({ lang, gameMode, overlay: core.payload.dataOverlay ?? {}, source: core.source });
-      catalogs.push(compareTaskCatalogs(lang, gameMode, core.payload, objectives.payload));
-    } catch (error) {
-      console.error(String(error));
-      catalogs.push(compareTaskCatalogs(lang, gameMode, null, null));
-    }
+    const pair = await readTaskCatalogPair(
+      lang,
+      gameMode,
+      getJson(`${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`),
+      getJson(
+        `${productionOrigin}/api/tarkov/tasks-objectives?lang=${lang}&gameMode=${gameMode}&version=${TASK_OBJECTIVES_CACHE_VERSION}`
+      )
+    );
+    if (pair.served) served.push(pair.served);
+    catalogs.push(pair.catalog);
+    pair.errors.forEach((error) => console.error(error));
   }
 const rows = compareOverlayFleet(published, manifest, served);
+const imports: ImportCatalogComparison[] = [];
+for (const gameMode of VALID_GAME_MODES) {
+  let payload: unknown;
+  try {
+    payload = (await getJson(`${productionOrigin}/api/tarkov/tasks-import?gameMode=${gameMode}`))
+      .payload;
+  } catch (error) {
+    console.error(String(error));
+  }
+  imports.push(compareImportCatalog(gameMode, published, payload));
+}
 const reportDirectory = await mkdtemp(join(tmpdir(), 'tarkov-overlay-fleet-'));
 const output = join(reportDirectory, 'report.json');
 await writeFile(
   output,
-  JSON.stringify({ checkedAt: new Date().toISOString(), rows, catalogs }, null, 2),
+  JSON.stringify({ checkedAt: new Date().toISOString(), rows, catalogs, imports }, null, 2),
   {
     mode: 0o600,
     flag: 'wx',
@@ -88,12 +99,14 @@ console.log(
     propagating: rows.filter((row) => row.status === 'propagating').length,
     drift: rows.filter((row) => row.status === 'drift').length,
     unverified: rows.filter((row) => row.status === 'unverified').length,
-    catalogMismatches: catalogs.filter((row) => row.status !== 'current').length,
+    catalogMismatches: catalogs.filter((row) => row.status !== 'covered').length,
     catalogIdentityDifferences: catalogs.filter((row) => !row.overlayIdentityMatches).length,
+    importMismatches: imports.filter((row) => row.status !== 'current').length,
   })
 );
 if (
   rows.some((row) => row.status === 'drift' || row.status === 'unverified') ||
-  catalogs.some((row) => row.status !== 'current')
+  catalogs.some((row) => row.status !== 'covered') ||
+  imports.some((row) => row.status !== 'current')
 )
   process.exitCode = 1;

@@ -23,21 +23,16 @@ export default defineEventHandler(async (event) => {
       logger.error('Failed to fetch task objectives data:', error);
       throw error;
     }
-    try {
-      const corrected = await applyOverlay(baseResponse, { bypassCache, gameMode, locale: lang });
-      // A cold private-overlay failure must not become a successful 12-hour catalog entry.
-      // Throwing also preserves a good stale entry during edgeCache's background refresh.
-      if (!precomputedOverlayIdentity(corrected)) {
-        throw createError({
-          statusCode: 503,
-          statusMessage: 'Task objective metadata unavailable',
-        });
-      }
-      return corrected;
-    } catch (overlayError) {
-      logger.error('Failed to apply overlay:', overlayError);
-      throw overlayError;
+    const corrected = await applyOverlay(baseResponse, { bypassCache, gameMode, locale: lang });
+    // A cold private-overlay failure must not become a successful 12-hour catalog entry.
+    // Throwing also preserves a good stale entry during edgeCache's background refresh.
+    if (!precomputedOverlayIdentity(corrected)) {
+      throw createError({
+        statusCode: 503,
+        statusMessage: 'Task objective metadata unavailable',
+      });
     }
+    return corrected;
   };
   return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, { cacheKeyPrefix: 'tarkov' });
 });

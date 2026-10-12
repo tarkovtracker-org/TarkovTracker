@@ -1,5 +1,6 @@
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
+import { isTaskImportCatalog } from '@/utils/taskImportCatalog';
 // 12h schedule plus a 2h operational allowance; browser retention is separate.
 export const OVERLAY_PROPAGATION_WINDOW_MS = 14 * 60 * 60 * 1000;
 type Identity = { version?: string; sha256?: string };
@@ -104,26 +105,32 @@ export type CatalogComparison = {
   objectiveCount: number;
   missingTaskIds: string[];
   overlayIdentityMatches: boolean;
-  status: 'current' | 'mismatch' | 'unverified';
+  status: 'covered' | 'mismatch' | 'unverified';
 };
 type CatalogTask = { id: string; objectives?: unknown[] };
 const isCatalogTask = (value: unknown, withObjectives: boolean): boolean => {
   const task = record(value);
   return Boolean(nonempty(task.id)) && (!withObjectives || Array.isArray(task.objectives));
 };
-const catalogTasks = (payload: unknown, withObjectives: boolean): CatalogTask[] | null => {
+const taskArray = (payload: unknown): unknown[] | null => {
   const tasks = record(record(payload).data).tasks;
-  if (!Array.isArray(tasks) || tasks.length === 0) return null;
-  return tasks.every((task) => isCatalogTask(task, withObjectives))
+  return Array.isArray(tasks) && tasks.length > 0 ? tasks : null;
+};
+const uniqueTaskIds = (tasks: unknown[]): boolean =>
+  new Set(tasks.map((task) => record(task).id)).size === tasks.length;
+const catalogTasks = (payload: unknown, withObjectives: boolean): CatalogTask[] | null => {
+  const tasks = taskArray(payload);
+  if (!tasks) return null;
+  return tasks.every((task) => isCatalogTask(task, withObjectives)) && uniqueTaskIds(tasks)
     ? (tasks as CatalogTask[])
     : null;
 };
 const identified = (meta: Identity): boolean => Boolean(meta.version && meta.sha256);
 const comparisonStatus = (valid: boolean, matching: boolean): CatalogComparison['status'] => {
   if (!valid) return 'unverified';
-  return matching ? 'current' : 'mismatch';
+  return matching ? 'covered' : 'mismatch';
 };
-/** Verifies the split catalog contract without publishing either source payload in the report. */
+/** Reports split UI coverage only; coverage does not prove that independently cached fields agree. */
 export function compareTaskCatalogs(
   lang: string,
   gameMode: string,
@@ -148,9 +155,58 @@ export function compareTaskCatalogs(
     coreCount: coreTasks?.length ?? 0,
     objectiveCount: objectiveTasks?.length ?? 0,
     missingTaskIds,
-    // A global overlay SHA can change for unrelated sections while these separately cached
-    // task snapshots remain complete. Report that difference without declaring an import outage.
+    // Import safety is verified against its whole snapshot below, never this split UI pair.
     overlayIdentityMatches: [coreIdentity, objectiveIdentity].every(identified) && sameIdentity,
     status: comparisonStatus(valid, missingTaskIds.length === 0),
+  };
+}
+export type ImportCatalogComparison = {
+  gameMode: string;
+  taskCount: number;
+  sha256?: string;
+  status: 'current' | 'mismatch' | 'unverified';
+};
+/** Release verification is stricter than runtime retention of a whole last-good import snapshot. */
+export function compareImportCatalog(
+  gameMode: string,
+  published: unknown,
+  payload: unknown
+): ImportCatalogComparison {
+  const expected = identity(published);
+  if (!identified(expected) || !isTaskImportCatalog(payload, gameMode))
+    return { gameMode, taskCount: 0, status: 'unverified' };
+  const matching = (['version', 'sha256'] as const).every(
+    (key) => payload.dataOverlay[key] === expected[key]
+  );
+  return {
+    gameMode,
+    taskCount: payload.data.tasks.length,
+    sha256: payload.dataOverlay.sha256,
+    status: matching ? 'current' : 'mismatch',
+  };
+}
+type CatalogSnapshot = { payload: unknown; source: string | null };
+const fulfilledSnapshot = (
+  result: PromiseSettledResult<CatalogSnapshot>
+): CatalogSnapshot | null => (result.status === 'fulfilled' ? result.value : null);
+const readErrors = (result: PromiseSettledResult<CatalogSnapshot>): string[] =>
+  result.status === 'rejected' ? [String(result.reason)] : [];
+/** Retains each endpoint's evidence when the other endpoint fails. */
+export async function readTaskCatalogPair(
+  lang: string,
+  gameMode: string,
+  coreRead: Promise<CatalogSnapshot>,
+  objectiveRead: Promise<CatalogSnapshot>
+): Promise<{ served: ServedOverlay | null; catalog: CatalogComparison; errors: string[] }> {
+  const [coreResult, objectiveResult] = await Promise.allSettled([coreRead, objectiveRead]);
+  const core = fulfilledSnapshot(coreResult);
+  const objectives = fulfilledSnapshot(objectiveResult);
+  const served = core
+    ? { lang, gameMode, overlay: identity(record(core.payload).dataOverlay), source: core.source }
+    : null;
+  return {
+    served,
+    catalog: compareTaskCatalogs(lang, gameMode, core?.payload, objectives?.payload),
+    errors: [...readErrors(coreResult), ...readErrors(objectiveResult)],
   };
 }

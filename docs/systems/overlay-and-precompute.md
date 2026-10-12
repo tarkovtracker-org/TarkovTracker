@@ -82,9 +82,10 @@ sequenceDiagram
 The objective endpoint requires nonempty overlay version/SHA before caching a generated response.
 A missing private overlay returns 503; background refresh failure retains a good stale entry.
 `json-v4` retires earlier objective entries in the server cache, browser request query, and local
-metadata cache together. The operator purge targets current and retired objective keys across
+metadata-store cache together. Other objective consumers may omit the query version; the server
+still reads only the current versioned key. The operator purge targets current and retired objective keys across
 all supported languages and the three upstream modes. This does not alter the core KV release
-keys or introduce objective precompute.
+keys or introduce general objective precompute.
 
 The raw overlay JSON and `OVERLAY_TOKEN` remain server-side. The browser consumes corrected
 task/objective data and overlay identity metadata; applied corrections are therefore visible in
@@ -228,6 +229,15 @@ flowchart LR
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
   `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
+- EFT import has exactly three additional English keys, built by `buildTaskImportKey(mode)`:
+  `tasks-import-json-v1-en-regular`, `tasks-import-json-v1-en-pve`, and
+  `tasks-import-json-v1-en-pvp-season`. The existing runner fetches one task/hideout/trader set per
+  mode, combines the existing core and objective adapters before one overlay pass, validates the
+  whole payload, and writes it with the same seven-day retention. A failed mode retains its old
+  key. These writes are per mode and are not atomic across the three modes or the core fleet.
+  Non-English filtered runs skip import snapshots; an English mode filter refreshes only that mode.
+  `/api/tarkov/tasks-import` directly reads and validates this whole envelope, checks its mode and
+  age, and returns `no-store`. Missing or invalid import data returns 503 without runtime generation.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
   `(lang, gameMode)` combo. Each write retries transport failures, HTTP 429/5xx, and Cloudflare
@@ -253,18 +263,26 @@ Release order: publish the overlay, dispatch precompute with its expected SHA fo
 language/mode combinations, check the manifest, then advance the existing browser cache-purge marker
 and purge corrected edge entries through the established operator workflow. When changing the
 consumer contract, precompute the new versioned keys from the reviewed consumer revision before
-promoting that app revision; old app revisions keep reading their old keys. Missing new keys still
-have the existing live fallback, but that is not proof of production readiness for cold colos.
+promoting that app revision; old app revisions keep reading their old keys. The reviewed runner
+must seed all three new import keys before promoting a consumer that uses them; a successful older
+core-only run or its 48-row manifest does not establish import readiness. Inspect the runner's
+`imports` results as well as the core manifest. Missing core keys still have the existing live
+fallback, but that is not proof of production readiness for cold colos. Missing import keys fail
+closed, so promotion requires explicit successful seeding rather than a request-time fallback.
 
 Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
 new private temporary directory. The command writes
 an artifact comparing the published SHA, last complete precompute and served tasks-core for all
-48 language/mode combinations, plus every core/objective pair's overlay identity, task shape,
-and core-ID coverage. Missing provenance, malformed task arrays, or missing core IDs fail
+48 language/mode combinations, plus every UI core/objective pair's overlay identity, task shape,
+and core-ID coverage, and all three whole English import snapshots against the published release.
+Missing provenance, malformed task arrays, duplicate IDs, or missing core IDs fail
 verification even when all core KV rows are current. Global identity differences are reported
 as diagnostics: a non-task overlay release can change the SHA while the separately cached task
-data remains complete. The pair report contains counts, identity agreement, and missing IDs,
-never raw overlay/catalog payloads.
+data retains ID coverage. A pair's `covered` status establishes coverage only and cannot prove that
+its independently cached counts and gates agree. Import release verification requires one valid
+whole snapshot per mode with the published identity; this operator gate is stricter than bounded
+runtime retention. The report contains counts, identity agreement, and missing IDs, never raw
+overlay/catalog payloads. A failing objective read retains the successful core provenance in the report.
 Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
 target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee
@@ -276,10 +294,13 @@ fallbacks are intentionally reported as drift after a failed release, never as a
 
 - `scripts/precompute/precompute.ts` — pipeline orchestration and `KvWriter` interface.
 - `scripts/precompute/run.ts` — entry point invoked by the workflow.
+- `scripts/precompute/import-snapshots.ts` - three English import snapshots, validation before write.
 - `scripts/precompute/kv.ts` — Cloudflare KV REST writer.
 - `scripts/precompute/nuxt-imports.ts` — bridges Nuxt auto-imports for `tsx`.
 - `.github/workflows/precompute-tarkov-data.yml` — schedule and secrets.
 - `app/server/utils/precomputedTarkov.ts` — shared contract (binding name, envelope, key builder).
+- `app/server/utils/taskImportSnapshot.ts` and `app/utils/taskImportCatalog.ts` - import key,
+  envelope age/scope, and whole catalog validation shared by producer, route and client.
 
 ### Invariants
 
@@ -287,7 +308,8 @@ fallbacks are intentionally reported as drift after a failed release, never as a
   (`buildTasksCorePrecomputedKey`). Never hard-code the key on either side.
 - The envelope version must be bumped any time the envelope shape changes; old envelopes must be
   rejected by `isPrecomputedEnvelope()` and fall through to the edge cache.
-- A missing or corrupt KV entry must fall through to the edge cache path, never 5xx.
+- A missing or corrupt core KV entry falls through to the edge cache path. Import snapshots are
+  intentionally snapshot-only: unavailable data returns 503 before any progress can be applied.
 - The precompute pipeline must reuse `app/server/utils` — it must not re-implement the adapt/overlay
   logic or the outputs will diverge from what the request handler would produce.
 
