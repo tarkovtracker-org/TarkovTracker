@@ -714,7 +714,7 @@ async function reconcileSubscription(
   if (isPastDue) {
     status = 'past_due';
     expiresAt = subscriptionGraceDate(supporter, subscription.id, now, GRACE_PERIOD_DAYS);
-    if (expiresAt <= now.toISOString()) status = 'expired';
+    // Preserve the existing Stripe plan after grace; access expires independently.
   } else if (!isActive) {
     status = 'expired';
     expiresAt = subscriptionEndDate(subscription, now);

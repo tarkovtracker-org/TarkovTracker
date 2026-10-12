@@ -53,7 +53,7 @@ one-time time is banked in `one_time_remaining` instead of counting down. Starti
 pauses the unused balance; additional payments stack onto it. Subscription end resumes the balance
 from the actual end timestamp (including delayed webhook delivery), using `one_time_expires_at`.
 The bank owns its paid tier independently of the subscription tier; unlimited grandfathered credit
-stays unlimited. Refund/chargeback revocation clears the balance. The migration captures existing
+stays unlimited. Chargebacks and disqualification clear all credit; ledger-backed refunds subtract only the refunded payment's unused time. Ordinary invoice refunds preserve independently paid credit. The migration captures existing
 one-time rows lazily; it does not reconstruct credit already lost before rollout. Active/past-due
 subscriptions with current access keep their subscription fields. During deployment, credit-bearing
 webhook writes require `x-supporter-credit-version: 1`; older handlers fail for retry until the new

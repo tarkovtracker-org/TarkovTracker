@@ -122,6 +122,28 @@ describe('resolveTier', () => {
     expect(await resolveTier(baseEnv, 'user-1')).toBe('scav');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+  it('normalizes base URLs for entitlement and rollout fallback reads', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        urls.push(String(input));
+        return urls.length === 1
+          ? new Response(JSON.stringify({ code: 'PGRST205' }), { status: 404 })
+          : supporterResponse([{ tier: 'timmy', status: 'active', expires_at: null }]);
+      })
+    );
+    expect(
+      await resolveTier(
+        { ...baseEnv, SUPABASE_URL: 'https://supabase.example/prefix///?old=true#fragment' },
+        'user-1'
+      )
+    ).toBe('timmy');
+    expect(urls).toEqual([
+      'https://supabase.example/prefix/rest/v1/supporter_entitlements?user_id=eq.user-1&select=tier,status,expires_at&limit=1',
+      'https://supabase.example/prefix/rest/v1/supporters?user_id=eq.user-1&select=tier,status,expires_at&limit=1',
+    ]);
+  });
   it('uses legacy access only when the entitlement view is specifically missing during rollout', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
       String(input).includes('supporter_entitlements')

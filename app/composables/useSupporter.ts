@@ -1,4 +1,8 @@
-import { useSupporterActivity, useSupporterEntitlement } from '@/composables/useSupporterActivity';
+import {
+  useSupporterActivity,
+  useSupporterEntitlement,
+  useSupporterClock,
+} from '@/composables/useSupporterActivity';
 import { logger } from '@/utils/logger';
 import {
   createChannelReleaseLatch,
@@ -44,8 +48,9 @@ export function useSupporter() {
     const currentUserId = $supabase.user?.id ?? null;
     return !currentUserId || currentUserId === userId;
   };
-  const effectiveState = useSupporterEntitlement(supporterState);
-  const isActiveStatus = useSupporterActivity(effectiveState);
+  const now = useSupporterClock();
+  const effectiveState = useSupporterEntitlement(supporterState, now);
+  const isActiveStatus = useSupporterActivity(effectiveState, now);
   const isSupporter = computed(() => supporterState.value?.hasEverSupported === true);
   const isActiveSubscriber = computed(
     () => effectiveState.value?.type === 'subscription' && isActiveStatus.value

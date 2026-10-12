@@ -73,6 +73,13 @@ const isMissingEntitlementView = async (response: Response): Promise<boolean> =>
     return false;
   }
 };
+const supporterReadUrl = (base: string, table: string, query: string): string => {
+  const url = new URL(base);
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/rest/v1/${table}`;
+  url.search = query;
+  url.hash = '';
+  return url.href;
+};
 const fetchSupporterEntitlement = async (
   env: Env,
   userId: string,
@@ -87,10 +94,10 @@ const fetchSupporterEntitlement = async (
   };
   const query = `?user_id=eq.${encodeURIComponent(userId)}&select=tier,status,expires_at&limit=1`;
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/supporter_entitlements${query}`,
+    supporterReadUrl(env.SUPABASE_URL, 'supporter_entitlements', query),
     options
   );
   if (!(await isMissingEntitlementView(response))) return response;
   // Schema may deploy after the Worker; only a specifically missing view permits legacy reads.
-  return await fetch(`${env.SUPABASE_URL}/rest/v1/supporters${query}`, options);
+  return await fetch(supporterReadUrl(env.SUPABASE_URL, 'supporters', query), options);
 };

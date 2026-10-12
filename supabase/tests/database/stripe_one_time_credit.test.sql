@@ -1,8 +1,8 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(96);
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
-  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,936) n;
+  'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,937) n;
 CREATE FUNCTION pg_temp.pay(p_user integer, p_id text, p_paid timestamptz DEFAULT '2026-10-07 00:00:00+00')
 RETURNS public.supporters LANGUAGE sql AS $$
   SELECT public.fulfill_one_time_supporter(p_id,p_paid,jsonb_build_object('user_id',
@@ -577,5 +577,16 @@ UPDATE public.supporters SET status='expired',stripe_subscription_id=NULL,subscr
 SELECT ok((SELECT type='one_time' AND stripe_subscription_id IS NULL AND expires_at=now()+interval '59 days'
   FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000933'),
   'an actual ended subscription releases billing identity without restarting prepaid time');
+-- Old webhook lifetime inserts must not slip through the rollout fence.
+CREATE TEMP TABLE old_lifetime_claim AS SELECT public.claim_stripe_event('evt_old_lifetime_insert','checkout.session.completed') AS claim;
+SELECT set_config('request.headers',jsonb_build_object('x-stripe-event-id','evt_old_lifetime_insert',
+  'x-stripe-claim-token',claim->>'token')::text,true) FROM old_lifetime_claim;
+SELECT set_config('stripe.one_time_payment_id','',true);
+SELECT throws_ok($$INSERT INTO public.supporters(user_id,type,status,tier,has_ever_supported,expires_at)
+  VALUES ('00000000-0000-0000-0000-000000000937','one_time','active','scav',true,NULL)$$,
+  '40001','Supporter credit requires updated webhook','old lifetime inserts retry through receipt fulfillment');
+SELECT is((SELECT count(*) FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000937'),
+  0::bigint,'an old lifetime insert cannot leave unverified refundable access');
+SELECT set_config('request.headers','{}',true);
 SELECT * FROM finish();
 ROLLBACK;

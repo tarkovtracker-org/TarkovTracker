@@ -825,7 +825,9 @@ describe('stored subscription grace preservation', () => {
     );
     await harness.dispatch('customer.subscription.updated', subscription);
     expect(harness.current()).toMatchObject({
-      status: 'expired',
+      status: 'past_due',
+      type: 'subscription',
+      stripe_subscription_id: 'sub_1',
       tier: 'supporter',
       expires_at: expiresAt,
     });

@@ -66,7 +66,7 @@ BEGIN
   -- revoking restored roles or leaving a refunded balance behind.
   IF headers->>'x-stripe-event-id' IS NOT NULL
     AND headers->>'x-supporter-credit-version' IS DISTINCT FROM '1'
-    AND (NEW.one_time_tier IS NOT NULL OR (TG_OP = 'UPDATE' AND
+    AND (NEW.one_time_tier IS NOT NULL OR (NEW.type = 'one_time' AND NEW.status = 'active') OR (TG_OP = 'UPDATE' AND
       (OLD.one_time_tier IS NOT NULL OR (OLD.type = 'one_time' AND OLD.status = 'active' AND OLD.has_ever_supported)))) THEN
     RAISE EXCEPTION 'Supporter credit requires updated webhook' USING ERRCODE = '40001';
   END IF;
