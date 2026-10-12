@@ -101,6 +101,10 @@ describe('DashboardTraderCard', () => {
             props: ['to'],
             template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
           },
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+          },
           NuxtImg: {
             props: ['src', 'alt'],
             template: '<img :src="src" :alt="alt" />',
@@ -155,6 +159,12 @@ describe('DashboardTraderCard', () => {
       path: '/tasks',
       query: { task: 'task-1' },
     });
+  });
+  it('shows an unlinked lock notice while the unlock task is loading', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'task', task: null } });
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.element.tagName).toBe('DIV');
+    expect(requirement.text()).toBe('page.dashboard.traders.unlock_via_task');
   });
   it('hides progress and loyalty controls while locked', () => {
     const wrapper = createWrapper({

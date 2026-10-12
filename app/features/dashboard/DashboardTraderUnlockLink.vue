@@ -1,6 +1,6 @@
 <template>
-  <NuxtLink
-    v-if="link"
+  <component
+    :is="link.to ? 'router-link' : 'div'"
     :to="link.to"
     class="border-warning-500/20 bg-warning-950/20 hover:border-warning-500/40 group flex items-start gap-2 rounded-md border px-3 py-2 text-xs transition-colors"
     data-testid="trader-unlock-requirement"
@@ -14,11 +14,14 @@
       <span class="text-warning-300/90 block font-medium">
         {{ $t(link.labelKey, link.labelParams) }}
       </span>
-      <span class="text-info-400 group-hover:text-info-300 block group-hover:underline">
+      <span
+        v-if="link.target"
+        class="text-info-400 group-hover:text-info-300 block group-hover:underline"
+      >
         {{ link.target }}
       </span>
     </span>
-  </NuxtLink>
+  </component>
 </template>
 <script setup lang="ts">
   import type { TraderUnlockRequirement } from '@/features/dashboard/traderLockStatus';
@@ -32,11 +35,13 @@
     labelParams: { chapter: unlock.chapter.name },
     target: unlock.objective.name,
   });
-  // A task requirement without a task means metadata is still loading; show the lock only.
+  // A task requirement without a task means metadata is still loading; show the lock without a link.
   const link = computed(() => {
     const unlock = props.unlock;
     if (unlock.kind === 'story') return storyLink(unlock);
-    if (!unlock.task) return null;
+    if (!unlock.task) {
+      return { to: undefined, labelKey: 'page.dashboard.traders.unlock_via_task', labelParams: {} };
+    }
     return {
       to: { path: '/tasks', query: { task: unlock.task.id } },
       labelKey: 'page.dashboard.traders.unlock_via_task',
