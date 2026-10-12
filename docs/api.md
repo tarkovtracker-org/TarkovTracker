@@ -52,8 +52,10 @@ redirect, Location or Retry-After. Other hosts and first-party frontend routes k
 existing behavior, including `/api/tarkov/*`; near prefixes such as `/api/v20` are unaffected.
 
 During staging, the ten existing apex/www Worker bindings still intercept these requests and
-return their existing 404. The Pages 410 takes effect after the separately approved binding
-removal. See [the promotion order](./api-ownership.md#legacy-address-retirement).
+return their existing 404 when reached. Cloudflare's current www canonical redirect can return
+308 before that handler. The direct Pages 410 contract requires both separately approved binding
+removal and the narrowly scoped www redirect exception plus verified www Pages ingress; compiled
+tests bypass edge redirects. See [the promotion order](./api-ownership.md#legacy-address-retirement).
 
 Third-party integrations call `api.tarkovtracker.org` directly:
 

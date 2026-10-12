@@ -47,6 +47,7 @@ const retirementRequest = (method) => ({
 async function assertRetirement(response, method, url) {
   assert.equal(response.status, 410, `${url} ${method}`);
   assert.equal(response.headers.get('X-Test-Body-Reads'), '0');
+  assert.equal(response.headers.get('X-Test-Body-Used'), 'false');
   assert.equal(response.headers.get('X-Test-Binding-Reads'), '0');
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
@@ -95,7 +96,7 @@ test('compiled browser preflight permits Authorization and returns bodyless 204'
     headers: {
       Origin: 'https://old-client.example',
       'Access-Control-Request-Method': 'POST',
-      'Access-Control-Request-Headers': 'Authorization, Content-Type, If-None-Match',
+      'Access-Control-Request-Headers': ',Authorization,, Content-Type, If-None-Match,',
       'X-Test-Unread-Body': '1',
       'X-Test-No-Bindings': '1',
     },
@@ -103,6 +104,7 @@ test('compiled browser preflight permits Authorization and returns bodyless 204'
   assert.equal(response.status, 204);
   assert.equal(await response.text(), '');
   assert.equal(response.headers.get('X-Test-Body-Reads'), '0');
+  assert.equal(response.headers.get('X-Test-Body-Used'), 'false');
   assert.equal(response.headers.get('X-Test-Binding-Reads'), '0');
   assert.deepEqual(outbound, []);
 });
@@ -115,6 +117,7 @@ test('compiled normal POST retains body handling and Nitro binding context', asy
   // The disabled verification endpoint keeps its existing 503; retirement cannot capture it.
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('X-Test-Body-Reads'), '1');
+  assert.equal(response.headers.get('X-Test-Body-Used'), 'true');
   assert.equal(response.headers.get('X-Test-Assets-Read'), 'true');
   assert.equal(response.headers.get('X-Test-Environment-Preserved'), 'true');
   assert.notEqual((await response.json()).error, 'legacy_api_retired');

@@ -151,6 +151,37 @@ describe('legacy API retirement HTTP boundary', () => {
     );
     expect(response.status).toBe(204);
   });
+  it.each(['Authorization,', ',, authorization, Content-Type,, If-None-Match, '])(
+    'ignores empty HTTP list elements in preflight headers %s',
+    async (requested) => {
+      const response = await handle(
+        new Request('https://tarkovtracker.org/api/progress', {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'https://client.example',
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': requested,
+          },
+        })
+      );
+      expect(response.status).toBe(204);
+      expect(downstream).not.toHaveBeenCalled();
+    }
+  );
+  it('still rejects unsupported headers mixed with empty list elements', async () => {
+    const response = await handle(
+      new Request('https://tarkovtracker.org/api/progress', {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://client.example',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': ',Authorization,,X-Unsupported,',
+        },
+      })
+    );
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual(EXPECTED_JSON);
+  });
   it.each([
     '/api/v20',
     '/api/v2-other',

@@ -29,6 +29,7 @@ export default {
     const response = await pagesWorker.fetch(request, testEnv, context);
     const result = new Response(response.body, response);
     result.headers.set('X-Test-Body-Reads', String(bodyReads));
+    result.headers.set('X-Test-Body-Used', String(request.bodyUsed));
     result.headers.set('X-Test-Binding-Reads', String(bindingReads.size));
     result.headers.set('X-Test-Assets-Read', String(bindingReads.has('ASSETS')));
     result.headers.set('X-Test-Environment-Preserved', String(globalThis.__env__ === testEnv));

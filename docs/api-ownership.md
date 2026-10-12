@@ -52,7 +52,8 @@ Supabase ownership, W10 authority activation and #1086 remain outside this extra
 Retirement does not change production source ownership. The Pages implementation is
 [`00.legacy-api-retirement.ts`](../app/server/middleware/00.legacy-api-retirement.ts); its exact
 host/path and HTTP contract lives in [api.md](./api.md). Existing `/api/*` Pages Function routing
-already makes it reachable once the overlaid Worker bindings are removed.
+already makes it reachable on the apex once the overlaid Worker bindings are removed. Direct
+www ingress has a separate edge prerequisite below.
 
 The small [Pages entry wrapper](../app/server/pages-entry.ts) is needed because Nitro 2's Pages
 adapter buffers POST bodies before running middleware. That would consume a retired upload and
@@ -74,11 +75,24 @@ Promote in this order, with explicit approval for production merges/deployments 
    Use the anonymous PR preview and compiled Pages Worker HTTP tests before promotion; previews
    on `pages.dev` intentionally do not return the apex-only 410. The production Pages deployment
    must be verified separately; a green preview is not permission to remove live routes.
-2. Only after that verification, promote the separately held route-removal change in both
-   repositories. It leaves **only** `api.tarkovtracker.org/*`. Apply the route change using the
+2. Before removing any legacy binding, separately approve and verify the www edge prerequisite.
+   Cloudflare Single Redirect rule `214cb75a91f343dea59d29f8aaea9275` matches every
+   `www.tarkovtracker.org` request and returns 308 to the apex, preserving path/query. The
+   compiled-worker tests bypass that rule and do not establish direct www ingress. A narrowly
+   scoped exception must exclude only the four retired API families (exact path or slash-delimited
+   descendant) on the exact www host, for every method including OPTIONS. Keep canonical redirects
+   for other paths, including health; never exempt all `/api/*` or disable the rule broadly.
+   Separately verify www reaches the deployed Pages Function: the observed Pages custom domains
+   include only `tarkovtracker.org`, so changing the redirect alone does not prove ingress. Any
+   required hosting/DNS change needs its own explicit approval and is not included in these PRs.
+   The intended contract remains direct 410/204 without redirects; accepting a www redirect
+   instead requires a separate explicit product decision and contract update.
+3. Only after both Pages revision and www edge/ingress verification, promote the separately held
+   route-removal change in both repositories. It leaves **only** `api.tarkovtracker.org/*`.
+   Apply the route change using the
    current production source; this is not authorization to connect the API repository to Worker
    Builds. Updating both sources prevents a later deployment from restoring legacy bindings.
-3. Check apex/www legacy GET/POST => 410 JSON, HEAD => 410 without a body, and valid preflight =>
+4. Check apex/www legacy GET/POST => 410 JSON, HEAD => 410 without a body, and valid preflight =>
    204, including query and trailing-slash variants. Check API `/health` => 200 and a normal
    first-party frontend route. Existing Pages static handling retires apex `/health` with 404;
    without the health Worker bindings, www redirects to that 404. Keep that behavior and verify
@@ -86,10 +100,12 @@ Promote in this order, with explicit approval for production merges/deployments 
    No apex health monitors were found in the repositories or Cloudflare; unknown external
    monitors may still need to move to the API host.
 
-The intermediate Worker 404 remains until step 2. The broad historical Worker `token*`/`progress*`
+The intermediate Worker 404 remains until step 3; the current www redirect can precede it.
+Removing bindings alone cannot establish the direct www contract. The broad historical Worker `token*`/`progress*`
 patterns also intercept unrelated suffixes; after removal those return to normal frontend
-routing, while retirement remains precisely slash-delimited. No DNS, credentials, Worker
-identity, DO namespaces/state, or unrelated routing changes belong in this promotion.
+routing, while retirement remains precisely slash-delimited. These PRs do not change DNS,
+credentials, Worker identity, DO namespaces/state, or unrelated routing. Required www hosting
+work belongs in its separately reviewed and explicitly approved prerequisite.
 
 If Pages verification fails, keep the ten bindings and fix Pages before promotion. After removal,
 an approved rollback can restore those exact ten bindings from the prior config commit, giving

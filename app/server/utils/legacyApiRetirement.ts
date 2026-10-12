@@ -27,7 +27,12 @@ const RESPONSE_HEADERS = {
 function hasAllowedPreflightHeaders(headers: RetirementRequest['headers']): boolean {
   const requested = headers.get('access-control-request-headers');
   if (!requested) return true;
-  return requested.split(',').every((header) => allowedHeaders.has(header.trim().toLowerCase()));
+  // HTTP list recipients ignore empty elements (RFC 9110, section 5.6.1.2).
+  return requested
+    .split(',')
+    .map((header) => header.trim().toLowerCase())
+    .filter(Boolean)
+    .every((header) => allowedHeaders.has(header));
 }
 function isValidPreflight(request: RetirementRequest): boolean {
   if (request.method !== 'OPTIONS') return false;
