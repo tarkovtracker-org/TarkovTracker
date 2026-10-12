@@ -1151,7 +1151,7 @@ describe('Team realtime resources', () => {
       }
     }
   );
-  it.each(['team switch', 'state reset'])(
+  it.each(['team switch', 'unfetched team switch', 'state reset'])(
     'reseeds a fetched warning after %s during a read outage',
     async (scenario) => {
       const { teamRecords, teamQuery } = buildRealtimeHarness();
@@ -1164,11 +1164,11 @@ describe('Team realtime resources', () => {
           ([config]) => config.table === 'teams'
         )?.[0];
         teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
-        if (scenario === 'team switch') {
+        if (scenario !== 'state reset') {
           useSystemStore().$patch((state) => {
             state.pvp_team_id = 'team-2';
           });
-          options.onData({ id: 'team-2' });
+          if (scenario === 'team switch') options.onData({ id: 'team-2' });
         } else {
           options.onData(null);
         }

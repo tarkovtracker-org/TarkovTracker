@@ -507,6 +507,17 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       ? `id=eq.${currentSystemStateTeam}`
       : undefined;
   });
+  // A failed listener fetch for an intermediate team must still end the previous fence.
+  // Clear synchronously, before the newly selected team's refresh can establish its fence.
+  listenerScope.run(() => {
+    watch(
+      teamFilter,
+      () => {
+        authoritativeDeadlineTeamId = null;
+      },
+      { flush: 'sync' }
+    );
+  });
   const snapshotDeadline = (data: Record<string, unknown>): Partial<TeamState> => {
     if (data.id === authoritativeDeadlineTeamId) return {};
     authoritativeDeadlineTeamId = null;
