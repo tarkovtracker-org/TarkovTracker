@@ -1,4 +1,8 @@
 BEGIN;
+-- The stored generated column rewrites supporters under ACCESS EXCLUSIVE; fail
+-- fast instead of queueing every supporter/quota read behind a held lock.
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
 ALTER TABLE public.supporters
   ADD COLUMN one_time_tier text CHECK (one_time_tier IN ('supporter','scav','timmy','chad')),
   ADD COLUMN one_time_expires_at timestamptz,

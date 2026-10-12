@@ -157,9 +157,16 @@ including when no further Stripe event arrives; its underlying supporter RLS sti
 
 The legacy production API gateway mirrors the entitlement reader from
 [TarkovTracker-API PR #4](https://github.com/tarkovtracker-org/TarkovTracker-API/pull/4)
-(commit `d46e7df5457e5d9e008271a66d6617257bd1bb91`). It bounds paid-tier cache lifetime at
-entitlement expiry. Only a missing-view `404/PGRST205` permits the existing table read during
+(commit `92f53ece02d7ab75b83d5745e60d2f113d812fdf`). It bounds paid-tier cache lifetime at
+entitlement expiry, normalizes the Supabase base URL and rejects non-HTTPS bases before sending
+service-role headers. Only a missing-view `404/PGRST205` permits the existing table read during
 schema rollout. The progress-contracts release remains v0.1.0; no pure rules changed.
+
+Only the gateway tolerates the schema being absent. The browser supporter read and
+`discord-role-sync` require the new columns and view, and the merge deploys Pages, Edge Functions
+and the migration in an uncontrolled order. After merge, confirm the migration applied
+(`Supabase Preview` on the merge commit and `supabase migration list --linked`) before treating
+supporter-status read errors as a regression.
 
 For pre-ledger lifetime refunds, the current handler verifies all remaining valid pre-cutoff
 one-time charges and their Checkout Session tiers before reconciling the legacy bank.
