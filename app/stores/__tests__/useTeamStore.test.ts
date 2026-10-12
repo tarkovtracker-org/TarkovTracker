@@ -1106,10 +1106,99 @@ describe('Team realtime resources', () => {
       const options = mockUseSupabaseListener.mock.calls.find(
         ([config]) => config.table === 'teams'
       )?.[0];
-      options.onData({ id: 'team-2', owner_only_expires_at: '2026-10-20T12:00:00Z' });
+      options.onData({ id: 'team-2' });
       await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(instance.teamStore.id).toBe('team-2');
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it.each(['first load', 'team switch'])(
+    'keeps the fetched deadline on %s when the independent read fails',
+    async (scenario) => {
+      const { teamRecords, teamQuery } = buildRealtimeHarness();
+      teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-21T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const teamId = scenario === 'first load' ? 'team-1' : 'team-2';
+        if (scenario === 'team switch') {
+          instance.teamStore.$patch((state) => {
+            state.id = 'team-1';
+            state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+          });
+          useSystemStore().$patch((state) => {
+            state.pvp_team_id = teamId;
+          });
+        }
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        const reads = teamQuery.maybeSingle.mock.calls.length;
+        options.onData({ id: teamId, owner_only_expires_at: deadline });
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        await vi.waitFor(() =>
+          expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it.each(['team switch', 'state reset'])(
+    'reseeds a fetched warning after %s during a read outage',
+    async (scenario) => {
+      const { teamRecords, teamQuery } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-21T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+        if (scenario === 'team switch') {
+          useSystemStore().$patch((state) => {
+            state.pvp_team_id = 'team-2';
+          });
+          options.onData({ id: 'team-2' });
+        } else {
+          options.onData(null);
+        }
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        useSystemStore().$patch((state) => {
+          state.pvp_team_id = 'team-1';
+        });
+        options.onData({ id: 'team-1', owner_only_expires_at: deadline });
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it('allows fetched snapshots to update and cancel the fallback during a read outage', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-21T12:00:00Z' });
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-22T12:00:00Z' });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-22T12:00:00Z');
+      options.onData({ id: 'team-1', owner_only_expires_at: null });
       expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
     } finally {
       instance.cleanup();

@@ -475,6 +475,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let latestMembersRequestVersion = 0;
   let disposed = false;
   let authSessionVersion = 0;
+  // Successful reads fence delayed snapshots, including reads that cancel the warning.
+  let authoritativeDeadlineTeamId: string | null = null;
   type RefreshContext = {
     teamId: string;
     userId: string;
@@ -484,6 +486,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let refreshContext: RefreshContext | null = null;
   const invalidateRefresh = () => {
     authSessionVersion += 1;
+    authoritativeDeadlineTeamId = null;
     latestMembersRequestVersion += 1;
     refreshInFlight = null;
     refreshInFlightTeamId = null;
@@ -504,9 +507,12 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       ? `id=eq.${currentSystemStateTeam}`
       : undefined;
   });
-  // The team whose authorized row last set the deadline; a refresh can finish before the
-  // switched team's snapshot updates teamStore.id.
-  let deadlineTeamId: string | null = null;
+  const snapshotDeadline = (data: Record<string, unknown>): Partial<TeamState> => {
+    if (data.id === authoritativeDeadlineTeamId) return {};
+    authoritativeDeadlineTeamId = null;
+    const deadline = data.owner_only_expires_at;
+    return { ownerOnlyExpiresAt: typeof deadline === 'string' ? deadline : null };
+  };
   // Custom data handler that transforms DB data before patching to store
   const handleTeamData = (data: Record<string, unknown> | null) => {
     if (disposed) return;
@@ -518,11 +524,11 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       } = {
         ...data,
       };
-      // Listener snapshots can predate a membership event. Only the authoritative refresh
-      // below writes the deadline, so a delayed snapshot cannot restore an old warning. A
-      // different team never inherits the previous team's deadline, even if its read fails.
+      // Seed a new team's warning from its fetched row if the independent read fails. Once a
+      // deadline refresh succeeds (including null after a join), snapshots cannot replace it.
+      // A team without a supplied deadline never inherits the previous team's warning.
       delete transformed.ownerOnlyExpiresAt;
-      if (data.id !== deadlineTeamId) transformed.ownerOnlyExpiresAt = null;
+      Object.assign(transformed, snapshotDeadline(data));
       // Map owner_id to owner
       if ('owner_id' in data && typeof data.owner_id === 'string') {
         transformed.owner = data.owner_id;
@@ -573,7 +579,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     getTeamIdFromSystemStore(systemStore) === context.teamId;
   const applyOwnerOnlyDeadline = (row: TeamRow | undefined, teamId: string) => {
     if (row === undefined) return;
-    deadlineTeamId = teamId;
+    authoritativeDeadlineTeamId = teamId;
     const deadline = row?.owner_only_expires_at;
     const owner = row?.owner_id;
     teamStore.$patch((state) => {
