@@ -1870,7 +1870,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.languageCode === requestLanguage;
         if (
           !skipBrowserCache &&
-          (await applyCachedEditionsOrIgnore(this, isCurrent, requestMode, requestLanguage))
+          (await this.reuseOrApplyCachedEditions(isCurrent, requestMode, requestLanguage))
         ) {
           // Revalidate once while the successfully checked catalog remains live in this scope.
           if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
@@ -1915,6 +1915,18 @@ export const useMetadataStore = defineStore('metadata', {
           promiseStore.editionsPromise = null;
         }
       }
+    },
+    async reuseOrApplyCachedEditions(
+      isCurrent: () => boolean,
+      mode: string,
+      language: string
+    ): Promise<boolean> {
+      const scope = `${mode}-${language}`;
+      // A stored copy can lag this live catalog; reuse only proven live data.
+      if (this.hasRevalidatedCatalog(scope)) return true;
+      // Every actual browser-cache adoption must earn its own successful live check.
+      getPromiseStore(this).editionsRevalidatedScopes.delete(scope);
+      return applyCachedEditionsOrIgnore(this, isCurrent, mode, language);
     },
     hasRevalidatedCatalog(scope: string): boolean {
       const promises = getPromiseStore(this);

@@ -111,6 +111,8 @@ Later hydration in the same scope preserves a successfully checked live catalog 
 storage write is pending or failed. Retiring a live catalog on a scope change retires its freshness
 marker too, so returning through browser storage rechecks the catalog. Adopting another cached
 catalog makes that scope retryable.
+Unforced same-scope fetches reuse proven live data instead of a potentially older stored copy;
+forced fetches and explicit revalidation still request live data.
 
 The edition cache keeps its 24-hour storage TTL. Other critical caches retain their own TTLs and
 purge-marker behavior; catalog revalidation does not clear browser storage or reset progress.

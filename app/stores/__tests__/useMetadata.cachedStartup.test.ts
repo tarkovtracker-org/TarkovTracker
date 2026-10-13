@@ -158,6 +158,91 @@ describe('complete cached startup catalog freshness', () => {
       await flushPromises();
     }
   );
+  it.each(['pending', 'failed'])(
+    'preserves live data across an explicit same-scope fetch while its cache write is %s',
+    async (kind) => {
+      const store = prepare();
+      const write = createDeferred<undefined>();
+      vi.mocked(cache.setCachedData).mockReturnValue(write.promise);
+      vi.mocked(cache.getCachedData).mockResolvedValue({
+        editions: [
+          {
+            id: 'standard',
+            value: 1,
+            title: 'Standard',
+            defaultStashLevel: 1,
+            defaultCultistCircleLevel: 0,
+            traderRepBonus: {},
+          },
+        ],
+        storyChapters: [chapter()],
+      });
+      const fetch = vi.fn().mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      try {
+        await warm(store);
+        await startIdle();
+        if (kind === 'failed') write.reject(new Error('cache unavailable'));
+        await flushPromises();
+        await store.fetchEditionsData();
+        await flushPromises();
+        expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        await store.fetchEditionsData(true);
+        expect(fetch).toHaveBeenNthCalledWith(2, '/api/tarkov/editions', {
+          query: { lang: 'en', gameMode: 'regular', cacheBust: '1' },
+        });
+        await store.fetchEditionsData(false, { revalidate: true });
+        expect(fetch).toHaveBeenNthCalledWith(3, '/api/tarkov/editions', {
+          query: { lang: 'en', gameMode: 'regular' },
+        });
+      } finally {
+        if (kind === 'pending') write.resolve(undefined);
+        await flushPromises();
+      }
+    }
+  );
+  it('rechecks browser data after a cancelled refresh loses the settled live proof', async () => {
+    const store = prepare();
+    vi.mocked(cache.setCachedData).mockRejectedValue(new Error('storage unavailable'));
+    vi.mocked(cache.getCachedData).mockResolvedValue({
+      editions: [
+        {
+          id: 'standard',
+          value: 1,
+          title: 'Standard',
+          defaultStashLevel: 1,
+          defaultCultistCircleLevel: 0,
+          traderRepBonus: {},
+        },
+      ],
+      storyChapters: [chapter()],
+    });
+    const obsolete = createDeferred<object>();
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(response())
+      .mockResolvedValueOnce(response())
+      .mockReturnValueOnce(obsolete.promise);
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store);
+    await startIdle();
+    const controller = new AbortController();
+    const forced = store.fetchEditionsData(true, { signal: controller.signal });
+    const rejected = expect(forced).rejects.toMatchObject({ name: 'AbortError' });
+    await flushPromises();
+    controller.abort();
+    obsolete.resolve(response());
+    await rejected;
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+    await store.fetchEditionsData();
+    await flushPromises();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenLastCalledWith('/api/tarkov/editions', {
+      query: { lang: 'en', gameMode: 'regular' },
+    });
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
   it.each([
     ['mode', 'pending', 'network'],
     ['mode', 'failed', 'network'],
