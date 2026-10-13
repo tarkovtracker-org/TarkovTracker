@@ -146,6 +146,26 @@ describe('DrawerItemGroup', () => {
     expect(toggle.attributes('icon')).toBe('i-mdi-chevron-down');
     expect(toggle.classes()).toContain('text-surface-400');
   });
+  it('drops keyboard focus once a click moves focus within the group', async () => {
+    appStore.drawerPinnedGroups.push('/tasks');
+    const wrapper = mountGroup(false, { attachTo: document.body });
+    const group = wrapper.get('[data-testid="drawer-group"]');
+    const parentLink = wrapper.get('a[href="/tasks"]');
+    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
+    (parentLink.element as HTMLElement).focus();
+    await parentLink.trigger('focusin');
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    // A mouse press moves focus to the chevron without :focus-visible.
+    await toggle.trigger('focusin');
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+    await group.trigger('pointerleave', { pointerType: 'mouse' });
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(true);
+    await group.trigger('pointerleave', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
   it('ignores touch hover so a tap on the chevron toggles open and closed', async () => {
     const wrapper = mountGroup();
     const group = wrapper.get('[data-testid="drawer-group"]');
@@ -161,8 +181,9 @@ describe('DrawerItemGroup', () => {
   it('opens for keyboard focus and closes when focus leaves the group', async () => {
     const wrapper = mountGroup(false, { attachTo: document.body });
     const group = wrapper.get('[data-testid="drawer-group"]');
-    (wrapper.get('a[href="/tasks"]').element as HTMLElement).focus();
-    await group.trigger('focusin');
+    const parentLink = wrapper.get('a[href="/tasks"]');
+    (parentLink.element as HTMLElement).focus();
+    await parentLink.trigger('focusin');
     expect(isExpanded(wrapper)).toBe(true);
     await group.trigger('focusout', {
       relatedTarget: wrapper.get('a[href="/tasks/maps"]').element,
@@ -170,6 +191,7 @@ describe('DrawerItemGroup', () => {
     expect(isExpanded(wrapper)).toBe(true);
     await group.trigger('focusout', { relatedTarget: null });
     expect(isExpanded(wrapper)).toBe(false);
+    wrapper.unmount();
   });
   it('expands inline on the collapsed rail without a separate menu', async () => {
     const wrapper = mountGroup(true);

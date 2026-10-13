@@ -119,9 +119,9 @@
     isHovered.value = false;
     releaseSuppression();
   };
-  // A mouse or touch press focuses the chevron without :focus-visible; only keyboard focus opens.
+  // A mouse or touch press focuses without :focus-visible, which also drops earlier keyboard focus.
   const onFocusIn = (event: FocusEvent) => {
-    if ((event.target as HTMLElement).matches(':focus-visible')) isFocused.value = true;
+    isFocused.value = (event.target as HTMLElement).matches(':focus-visible');
   };
   const onFocusOut = (event: FocusEvent) => {
     if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
