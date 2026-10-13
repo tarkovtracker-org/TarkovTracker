@@ -1,4 +1,5 @@
 import { isGameEdition } from '@/utils/editionHelpers';
+import { validStoryUnlock } from '@/utils/storylineUnlocks';
 import { isPlainObject } from './deepMerge';
 import { validProgressionCounters } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
@@ -126,20 +127,6 @@ const validObjectives = (value: unknown): boolean => {
 // chapter as a blank ending row or an uninterpretable route.
 const nonEmptyString = (value: unknown): boolean =>
   typeof value === 'string' && value.trim().length > 0;
-const storyUnlockTypes = new Set(['achievement', 'barter', 'map', 'quest', 'trader', 'other']);
-const optionalUnlockText = (value: unknown): boolean =>
-  value === undefined || nonEmptyString(value);
-const validStoryUnlockType = (value: unknown): boolean =>
-  typeof value === 'string' && storyUnlockTypes.has(value);
-const validStoryUnlock = (value: unknown): boolean => {
-  if (!isPlainObject(value)) return false;
-  return [
-    validStoryUnlockType(value.type),
-    nonEmptyString(value.name),
-    optionalUnlockText(value.id),
-    optionalUnlockText(value.note),
-  ].every(Boolean);
-};
 const validStoryUnlocks = (value: unknown): boolean =>
   value === undefined || (Array.isArray(value) && value.every(validStoryUnlock));
 const validStoryObjectives = (value: unknown): boolean => {

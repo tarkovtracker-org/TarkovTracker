@@ -196,8 +196,10 @@ const chapterUnlockId = (chapter: StorylineChapterView, unlock: StoryObjectiveUn
     map: chapter.mapUnlocks,
     trader: chapter.traderUnlocks,
   };
-  return references[unlock.type]?.find((reference) => reference.name.trim() === unlock.name.trim())
-    ?.id;
+  return references[unlock.type]?.find(
+    (reference) =>
+      typeof reference.name === 'string' && reference.name.trim() === unlock.name.trim()
+  )?.id;
 };
 const objectiveUnlockId = (
   chapter: StorylineChapterView,

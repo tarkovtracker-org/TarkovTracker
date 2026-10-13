@@ -295,6 +295,23 @@ describe('useStorylineChapters', () => {
       expect(view.chapterUnlocks.some((u) => u.type === type && u.id === id)).toBe(false);
     }
   );
+  it.each([
+    ['map' as const, 'mapUnlocks' as const, 7],
+    ['trader' as const, 'traderUnlocks' as const, null],
+  ])(
+    'ignores a cached %s reference with a non-string name when matching unlocks',
+    async (type, field, name) => {
+      const chapter = structuredClone(STORY_CHAPTERS[0]!);
+      chapter[field] = [
+        { id: 'malformed-reference', name },
+      ] as unknown as StoryChapter[typeof field];
+      chapter.objectives!['obj-a']!.unlocks = [{ type, name: 'Valid unlock' }];
+      const { normalizedChapters } = await loadComposable([chapter]);
+      expect(normalizedChapters.value[0]?.objectives[0]?.unlocks).toEqual([
+        { estimated: false, type, id: 'obj-a-unlock-1', label: 'Valid unlock' },
+      ]);
+    }
+  );
   it('keeps unplaced unlocks at chapter level even when objective text mentions the trader', async () => {
     const chapter = structuredClone(STORY_CHAPTERS[0]!);
     chapter.objectives!['obj-a']!.description = 'Talk to Peacekeeper';

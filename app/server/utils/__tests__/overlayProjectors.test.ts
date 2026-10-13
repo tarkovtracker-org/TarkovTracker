@@ -497,6 +497,12 @@ it.each([
   [[null], false],
   [[{ type: 'invented', name: 'Shoreline' }], false],
   [[{ type: ['trader'], name: 'Peacekeeper' }], false],
+  [[Object.assign([], { type: 'trader', name: 'Peacekeeper' })], false],
+  [
+    [Object.assign(Object.create({ inherited: true }), { type: 'trader', name: 'Peacekeeper' })],
+    false,
+  ],
+  [[Object.assign(Object.create(null), { type: 'other', name: 'Unlock' })], true],
   [[{ type: 'trader', name: 'Peacekeeper', id: '' }], false],
   [[{ type: 'trader', name: 'Peacekeeper', note: ' ' }], false],
   [[{ type: 'trader', name: '' }], false],

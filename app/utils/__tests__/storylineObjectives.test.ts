@@ -97,6 +97,25 @@ describe('storylineObjectives', () => {
     ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
     expect(normalized['obj-1']?.unlocks).toEqual([]);
   });
+  it.each([
+    Object.assign([], { type: 'trader', name: 'Peacekeeper' }),
+    Object.assign(Object.create({ inherited: true }), { type: 'trader', name: 'Peacekeeper' }),
+  ])('rejects non-plain cached unlock objects: %j', (unlock) => {
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[0]!, unlocks: [unlock] },
+    ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(normalized['obj-1']?.unlocks).toEqual([]);
+  });
+  it.each(['achievement', 'barter', 'map', 'quest', 'trader', 'other'])(
+    'preserves the supported %s unlock type',
+    (type) => {
+      const unlock = { type, name: 'Unlock' };
+      const normalized = normalizeStoryObjectives([
+        { ...objectives[0]!, unlocks: [unlock] },
+      ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+      expect(normalized['obj-1']?.unlocks).toEqual([unlock]);
+    }
+  );
   it('excludes objectives on mutually exclusive quests from bulk completion', () => {
     expect(getAutoCompletableObjectiveIds(questRouteObjectives, [['quest-a', 'quest-b']])).toEqual([
       'obj-c1',
