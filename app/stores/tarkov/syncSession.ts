@@ -97,6 +97,7 @@ type ControllerOptions = {
   client: SyncRpcClient;
   userId: string;
   hadRemoteData: boolean;
+  initialAcknowledgedState?: UserState;
   /** Runs after each acknowledged upload while this controller is still the live one. */
   onSynced?: () => void;
 };
@@ -106,6 +107,7 @@ const createProgressSyncController = (
 ): ProgressSyncController =>
   useSupabaseSync({
     store: options.store,
+    initialAcknowledgedState: options.initialAcknowledgedState,
     table: 'user_progress',
     debounceMs: SYNC_DEBOUNCE_MS,
     retryDelaysMs: CLOUD_SAVE_RETRY_DELAYS_MS,

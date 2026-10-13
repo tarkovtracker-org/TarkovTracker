@@ -44,7 +44,7 @@
             {{ t('progress_save_status.retry_button') }}
           </UButton>
           <UButton
-            v-if="kind !== 'cloud_pending'"
+            v-if="showExport"
             size="sm"
             color="neutral"
             variant="soft"
@@ -55,7 +55,7 @@
             {{ t('progress_save_status.export_button') }}
           </UButton>
         </div>
-        <p v-if="kind !== 'cloud_pending'" class="text-surface-500 text-xs">
+        <p v-if="showExport" class="text-surface-500 text-xs">
           {{ t('progress_save_status.export_hint') }}
         </p>
       </div>
@@ -71,6 +71,11 @@
   import { logger } from '@/utils/logger';
   type Presentation = { icon: string; iconClass: string; titleClass: string };
   const PRESENTATION: Record<ProgressSaveStatusKind, Presentation> = {
+    live_updates_delayed: {
+      icon: 'i-mdi-cloud-refresh-outline',
+      iconClass: 'text-warning-500 light:text-warning-800',
+      titleClass: 'text-warning-400',
+    },
     cloud_pending: {
       icon: 'i-mdi-cloud-upload-outline',
       iconClass: 'text-surface-400',
@@ -107,6 +112,9 @@
     retryTotal,
     retry,
   } = useProgressSaveStatus();
+  const showExport = computed(
+    () => kind.value !== 'cloud_pending' && kind.value !== 'live_updates_delayed'
+  );
   const presentation = computed(() => PRESENTATION[kind.value ?? 'cloud_pending']);
   const label = computed(() => t(`progress_save_status.${kind.value ?? 'cloud_pending'}_label`));
   /** Routine pending saves follow every edit; only warnings are announced. */
@@ -115,6 +123,7 @@
   );
   /** Only a confirmed local write may be described as locally saved. */
   const localNoteKey = computed(() => {
+    if (kind.value === 'live_updates_delayed') return null;
     if (kind.value === 'local_failed') {
       return cloudPending.value ? 'progress_save_status.cloud_also_pending_note' : null;
     }
