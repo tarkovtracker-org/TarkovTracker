@@ -45,8 +45,8 @@ migration with a recent successful precompute run (snapshots expire after seven 
    with `gh secret set CLOUDFLARE_API_TOKEN --env production-precompute` and
    `gh secret set OVERLAY_TOKEN --env production-precompute`; provide values through private input.
 3. Recheck all workflow consumers, then remove the repository-scoped copies with
-   `gh secret delete CLOUDFLARE_API_TOKEN` and `gh secret delete OVERLAY_TOKEN`, and revoke their old
-   platform credentials. Coordinate this step with the reviewed workflow merge; do not declare the
+   `gh secret delete CLOUDFLARE_API_TOKEN`, `gh secret delete CF_API_TOKEN` (the legacy alias),
+   and `gh secret delete OVERLAY_TOKEN`, and revoke their old platform credentials. Coordinate this step with the reviewed workflow merge; do not declare the
    finding resolved while either repository copy remains accessible.
 4. Verify the environment remains main-only and that a non-main dispatch cannot obtain these
    credentials. Run the reviewed main workflow through the approved operational process and verify
