@@ -5,7 +5,6 @@
         <slot name="header" />
         <NeededItemsFilterBar
           v-model="activeFilter"
-          v-model:search="search"
           v-model:view-mode="viewMode"
           v-model:fir-filter="firFilter"
           v-model:group-by-item="groupByItem"
@@ -199,6 +198,7 @@
   import { usePageHelpState } from '@/composables/usePageHelpState';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useProductAnalytics } from '@/composables/useProductAnalytics';
+  import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';
   import {
@@ -211,7 +211,6 @@
   import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
   import { logger } from '@/utils/logger';
   import { perfNow, roundPerfMs } from '@/utils/perf';
-  import { getQueryString } from '@/utils/routeHelpers';
   const NeededItemsSettingsDrawer = defineAsyncComponent(
     () => import('@/features/neededitems/NeededItemsSettingsDrawer.vue')
   );
@@ -239,13 +238,8 @@
     }
   );
   const route = useRoute();
-  const search = ref(getQueryString(route.query.q) || '');
-  watch(
-    () => route.query.q,
-    (newQ) => {
-      search.value = getQueryString(newQ) || '';
-    }
-  );
+  // The app-bar search writes `?q=`; this page only reads it.
+  const { searchQuery: search } = useRouteSearchQuery();
   const PERF_QUERY_PARAM = 'perfNeededItems';
   const perfDebug = computed(() => {
     const rawValue = route.query[PERF_QUERY_PARAM];

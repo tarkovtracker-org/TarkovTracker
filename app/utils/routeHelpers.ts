@@ -31,3 +31,14 @@ export const normalizeQuery = (query: QueryLike): string => {
     });
   return JSON.stringify(normalized);
 };
+let pendingQueryWrite: Promise<unknown> = Promise.resolve();
+/**
+ * Runs query writes one after another. Each writer builds on the current `route.query`, so two
+ * writes started together (a status tab tapped while the search commits) would otherwise each
+ * drop the other's param. Read `route.query` inside `write`, not before queueing it.
+ */
+export const queueQueryWrite = <T>(write: () => Promise<T> | T): Promise<T> => {
+  const queued = pendingQueryWrite.then(write);
+  pendingQueryWrite = queued.catch(() => undefined);
+  return queued;
+};
