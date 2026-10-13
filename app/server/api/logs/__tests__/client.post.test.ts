@@ -3,6 +3,7 @@ import type { H3Event } from 'h3';
 const {
   mockGetRequestHeader,
   mockReadBody,
+  mockGetRequestWebStream,
   mockSetResponseHeader,
   mockSetResponseStatus,
   mockLogger,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetRequestHeader: vi.fn(),
   mockReadBody: vi.fn(),
+  mockGetRequestWebStream: vi.fn(),
   mockSetResponseHeader: vi.fn(),
   mockSetResponseStatus: vi.fn(),
   mockLogger: {
@@ -31,6 +33,7 @@ vi.mock('h3', async () => {
     defineEventHandler: (handler: unknown) => handler,
     getRequestHeader: mockGetRequestHeader,
     readBody: mockReadBody,
+    getRequestWebStream: mockGetRequestWebStream,
     setResponseHeader: mockSetResponseHeader,
     setResponseStatus: mockSetResponseStatus,
   };
@@ -71,8 +74,35 @@ describe('client logs endpoint', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+  const setBody = (body: unknown) => {
+    mockReadBody.mockResolvedValueOnce(body);
+    mockGetRequestWebStream.mockReturnValueOnce(new Blob([JSON.stringify(body)]).stream());
+  };
+  it.each(['bytes', 'depth'])('drops unsafe %s before logging', async (kind) => {
+    const nested = '['.repeat(10_000) + '0' + ']'.repeat(10_000);
+    const raw =
+      kind === 'bytes'
+        ? JSON.stringify({ args: ['x'.repeat(128 * 1024)] })
+        : '{"args":[' + nested + ']}';
+    mockReadBody.mockResolvedValueOnce(JSON.parse(raw));
+    mockGetRequestWebStream.mockReturnValueOnce(new Blob([raw]).stream());
+    const { default: handler } = await import('@/server/api/logs/client.post');
+    await handler(event);
+    expect(mockLogger.info).not.toHaveBeenCalled();
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
+  });
+  it('preserves ordinary nested diagnostics', async () => {
+    const args = [{ error: { name: 'NetworkError', retry: [true, 3] } }];
+    setBody({ args });
+    const { default: handler } = await import('@/server/api/logs/client.post');
+    await handler(event);
+    expect(mockLogger.info).toHaveBeenCalledWith('Client log', expect.objectContaining({ args }));
+  });
   it('returns 204 for unreadable payloads', async () => {
     mockReadBody.mockRejectedValueOnce(new Error('parse-error'));
+    mockGetRequestWebStream.mockImplementationOnce(() => {
+      throw new Error('parse-error');
+    });
     const { default: handler } = await import('@/server/api/logs/client.post');
     const response = await handler(event);
     expect(response).toBeNull();
@@ -87,7 +117,7 @@ describe('client logs endpoint', () => {
     expect(mockLogger.error).not.toHaveBeenCalled();
   });
   it('logs sanitized payloads at the requested level without client ip', async () => {
-    mockReadBody.mockResolvedValueOnce({
+    setBody({
       args: Array.from({ length: 25 }, (_value, index) => `arg-${index}`),
       href: ' https://tarkovtracker.org/tasks ',
       level: 'warn',
@@ -104,7 +134,7 @@ describe('client logs endpoint', () => {
     expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
   });
   it('falls back to info level and generated timestamp for invalid values', async () => {
-    mockReadBody.mockResolvedValueOnce({
+    setBody({
       args: ['a'],
       href: '',
       level: 'trace',
@@ -130,6 +160,7 @@ describe('client logs endpoint', () => {
     const response = await handler(event);
     expect(response).toBeNull();
     expect(mockReadBody).not.toHaveBeenCalled();
+    expect(mockGetRequestWebStream).not.toHaveBeenCalled();
     expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
     expect(mockLogger.info).not.toHaveBeenCalled();
     expect(mockLogger.warn).not.toHaveBeenCalled();

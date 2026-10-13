@@ -123,6 +123,39 @@ test('compiled normal POST retains body handling and Nitro binding context', asy
   assert.notEqual((await response.json()).error, 'legacy_api_retired');
   assert.deepEqual(outbound, []);
 });
+test('compiled client-log boundary drops oversized bodies before Nitro buffering or bindings', async () => {
+  for (const path of [
+    '/api/logs/client',
+    '/api/logs/client/',
+    '/api/logs/%63lient',
+    '/api/logs/client%2f',
+  ]) {
+    const response = await harness.fetch(`https://tarkovtracker.org${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Test-Unread-Body': '1',
+        'X-Test-No-Bindings': '1',
+      },
+      body: JSON.stringify({ args: ['x'.repeat(128 * 1024)] }),
+    });
+    assert.equal(response.status, 204, path);
+    assert.equal(response.headers.get('X-Test-Body-Reads'), '0');
+    assert.equal(response.headers.get('X-Test-Binding-Reads'), '0');
+    assert.equal(await response.text(), '');
+  }
+});
+test('compiled bounded client logs retain Nitro body handling and ordinary nested diagnostics', async () => {
+  const response = await harness.fetch('https://tarkovtracker.org/api/logs/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://tarkovtracker.org' },
+    body: JSON.stringify({ level: 'warn', args: [{ retry: { count: 3 } }] }),
+  });
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get('X-Test-Body-Used'), 'true');
+  assert.equal(response.headers.get('X-Test-Assets-Read'), 'true');
+  assert.deepEqual(outbound, []);
+});
 test('compiled static assets retain the original Request and ASSETS binding', async () => {
   const response = await harness.fetch('https://tarkovtracker.org/favicon.ico');
   assert.equal(response.status, 200);
