@@ -6,6 +6,7 @@ import type { UseRouteFiltersOptions } from '@/composables/useRouteFilters';
 import type { Ref } from 'vue';
 type QueryRecord = Record<string, string | undefined>;
 const routeState = reactive({
+  path: '/tasks',
   query: reactive<QueryRecord>({}),
 });
 const applyRouteQuery = (query: QueryRecord) => {
@@ -26,6 +27,7 @@ const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
 });
 mockNuxtImport('useRoute', () => () => routeState);
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   push,
   replace,
   beforeEach: vi.fn(),
@@ -119,6 +121,52 @@ describe('useRouteFilters', () => {
     await flushRouteSync();
     expect(push).toHaveBeenLastCalledWith({ query: { other: 'keep', view: undefined } });
     expect(routeState.query.view).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('keeps a param written by a query write queued before the sync', async () => {
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    const view: Ref<string> = ref('all');
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onStoreToRoute: () => ({ view: view.value }),
+      watchSources: [view],
+    });
+    let landSearch = () => {};
+    const search = queueQueryWrite(
+      () => new Promise<void>((resolve) => (landSearch = resolve))
+    ).then(() => applyRouteQuery({ ...routeState.query, q: 'mole' }));
+    await Promise.resolve();
+    view.value = 'maps';
+    await nextTick();
+    landSearch();
+    await search;
+    await flushRouteSync();
+    expect(routeState.query).toMatchObject({ q: 'mole', view: 'maps' });
+    wrapper.unmount();
+  });
+  it('drops a queued sync once its page has navigated away', async () => {
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    const view: Ref<string> = ref('all');
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onStoreToRoute: () => ({ view: view.value }),
+      watchSources: [view],
+    });
+    let landEarlierWrite = () => {};
+    const earlierWrite = queueQueryWrite(
+      () => new Promise<void>((resolve) => (landEarlierWrite = resolve))
+    );
+    view.value = 'maps';
+    await flushRouteSync();
+    push.mockClear();
+    replace.mockClear();
+    routeState.path = '/hideout';
+    landEarlierWrite();
+    await earlierWrite;
+    await flushRouteSync();
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    routeState.path = '/tasks';
     wrapper.unmount();
   });
   it('uses an explicit key override for reading and writing the URL', async () => {

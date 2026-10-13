@@ -38,7 +38,6 @@ const setup = async () => {
 };
 const createDefaultProps = () => ({
   modelValue: 'all' as const,
-  search: '',
   viewMode: 'list' as const,
   filterTabs: [
     { label: 'All', value: 'all' as const, icon: 'i-mdi-format-list-bulleted', count: 3 },
@@ -114,15 +113,6 @@ describe('NeededItemsFilterBar', () => {
     }
     await tabs[1]?.trigger('click');
     expect(wrapper.emitted('update:modelValue')).toEqual([['tasks']]);
-  });
-  it('emits update:search after setting input value', async () => {
-    const NeededItemsFilterBar = await setup();
-    const wrapper = mount(NeededItemsFilterBar, {
-      props: createDefaultProps(),
-      global: createDefaultGlobal(),
-    });
-    await wrapper.find('input').setValue('gpu');
-    expect(wrapper.emitted('update:search')).toEqual([['gpu']]);
   });
   it('emits update:viewMode after triggering list view button', async () => {
     const NeededItemsFilterBar = await setup();

@@ -33,39 +33,10 @@
         </div>
       </template>
     </UTabs>
-    <!-- Unified Filter Bar: Search + Filters + Views -->
+    <!-- Unified Filter Bar: Filters + Views -->
     <div
       class="bg-surface-900 flex flex-col gap-3 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:px-4 sm:py-3"
     >
-      <!-- Search (grows to fill space) -->
-      <div class="flex-1">
-        <label :for="searchInputId" class="sr-only">
-          {{ $t('page.needed_items.search_placeholder') }}
-        </label>
-        <UInput
-          :id="searchInputId"
-          ref="searchInput"
-          :model-value="search"
-          :placeholder="$t('page.needed_items.search_placeholder')"
-          icon="i-mdi-magnify"
-          name="needed-items-search"
-          size="md"
-          :ui="{ trailing: 'pe-1' }"
-          class="w-full"
-          @update:model-value="$emit('update:search', $event)"
-        >
-          <template v-if="search?.length" #trailing>
-            <UButton
-              color="neutral"
-              variant="link"
-              size="sm"
-              icon="i-mdi-close-circle"
-              :aria-label="$t('common.clear_search')"
-              @click="$emit('update:search', '')"
-            />
-          </template>
-        </UInput>
-      </div>
       <!-- Right side controls -->
       <div class="flex flex-wrap items-center gap-2 sm:gap-3">
         <!-- Item count badge -->
@@ -190,7 +161,6 @@
     normalizeNeededItemsFilterType,
     normalizeNeededItemsSortBy,
   } from '@/features/neededitems/neededItemsFilterNormalization';
-  import type { UInputInstance } from '@/types/ui';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';
   type FirFilter = 'all' | 'fir' | 'non-fir';
@@ -205,7 +175,6 @@
   }
   const props = defineProps<{
     modelValue: FilterType;
-    search: string;
     viewMode: ViewMode;
     filterTabs: FilterTab[];
     totalCount: number;
@@ -219,11 +188,9 @@
     sortDirection: SortDirection;
     hideOwned: boolean;
     cardStyle: CardStyle;
-    autoFocus?: boolean;
   }>();
   const emit = defineEmits<{
     'update:modelValue': [value: FilterType];
-    'update:search': [value: string];
     'update:viewMode': [value: ViewMode];
     'update:firFilter': [value: FirFilter];
     'update:groupByItem': [value: boolean];
@@ -236,7 +203,6 @@
     'update:cardStyle': [value: CardStyle];
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const searchInputId = `needed-items-search-${useId()}`;
   const activeFilter = computed({
     get: () => props.modelValue,
     set: (value: unknown) => {
@@ -339,21 +305,6 @@
     emit('update:groupByItem', false);
     emit('update:viewMode', mode);
   };
-  const searchInput = ref<UInputInstance | null>(null);
-  const focusSearch = () => {
-    if (typeof document === 'undefined') return;
-    const active = document.activeElement as HTMLElement | null;
-    if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA') return;
-    if (active?.isContentEditable) return;
-    searchInput.value?.inputRef?.focus();
-  };
-  onMounted(() => {
-    if (props.autoFocus) {
-      nextTick(() => {
-        focusSearch();
-      });
-    }
-  });
   const setGroupedView = () => {
     if (isGroupedViewActive.value) return;
     emit('update:groupByItem', true);
