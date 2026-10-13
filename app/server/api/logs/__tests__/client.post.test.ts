@@ -78,26 +78,36 @@ describe('client logs endpoint', () => {
     mockReadBody.mockResolvedValueOnce(body);
     mockGetRequestWebStream.mockReturnValueOnce(new Blob([JSON.stringify(body)]).stream());
   };
-  it.each(['bytes', 'depth'])('drops unsafe %s before logging', async (kind) => {
+  it.each(
+    (['debug', 'info', 'warn', 'error'] as const).flatMap((level) =>
+      ['bytes', 'depth'].map((kind) => [level, kind] as const)
+    )
+  )('drops unsafe bodies at %s level (%s)', async (level, kind) => {
     const nested = '['.repeat(10_000) + '0' + ']'.repeat(10_000);
     const raw =
       kind === 'bytes'
-        ? JSON.stringify({ args: ['x'.repeat(128 * 1024)] })
-        : '{"args":[' + nested + ']}';
+        ? JSON.stringify({ level, args: ['x'.repeat(128 * 1024)] })
+        : '{"level":"' + level + '","args":[' + nested + ']}';
     mockReadBody.mockResolvedValueOnce(JSON.parse(raw));
     mockGetRequestWebStream.mockReturnValueOnce(new Blob([raw]).stream());
     const { default: handler } = await import('@/server/api/logs/client.post');
     await handler(event);
-    expect(mockLogger.info).not.toHaveBeenCalled();
+    for (const method of Object.values(mockLogger)) expect(method).not.toHaveBeenCalled();
     expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
   });
-  it('preserves ordinary nested diagnostics', async () => {
-    const args = [{ error: { name: 'NetworkError', retry: [true, 3] } }];
-    setBody({ args });
-    const { default: handler } = await import('@/server/api/logs/client.post');
-    await handler(event);
-    expect(mockLogger.info).toHaveBeenCalledWith('Client log', expect.objectContaining({ args }));
-  });
+  it.each(['debug', 'info', 'warn', 'error'] as const)(
+    'preserves ordinary nested diagnostics at %s level',
+    async (level) => {
+      const args = [{ error: { name: 'NetworkError', retry: [true, 3] } }];
+      setBody({ args, level });
+      const { default: handler } = await import('@/server/api/logs/client.post');
+      await handler(event);
+      expect(mockLogger[level]).toHaveBeenCalledWith(
+        'Client log',
+        expect.objectContaining({ args })
+      );
+    }
+  );
   it('returns 204 for unreadable payloads', async () => {
     mockReadBody.mockRejectedValueOnce(new Error('parse-error'));
     mockGetRequestWebStream.mockImplementationOnce(() => {

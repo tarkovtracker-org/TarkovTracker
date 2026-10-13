@@ -9,6 +9,14 @@ function nodeRequestStream(request: IncomingMessage): ReadableStream<Uint8Array>
   let cleanup = () => {};
   return new ReadableStream<Uint8Array>({
     start(controller) {
+      if (request.destroyed || request.aborted) {
+        controller.error(new Error('Client log request already closed'));
+        return;
+      }
+      if (request.readableEnded) {
+        controller.close();
+        return;
+      }
       const onData = (chunk: Uint8Array) => {
         request.pause();
         controller.enqueue(chunk);
@@ -21,12 +29,14 @@ function nodeRequestStream(request: IncomingMessage): ReadableStream<Uint8Array>
         cleanup();
         controller.error(error);
       };
+      const onClose = () => onError(new Error('Client log request closed before end'));
       cleanup = () => {
         request.off('data', onData);
         request.off('end', onEnd);
         request.off('error', onError);
+        request.off('close', onClose);
       };
-      request.on('data', onData).once('end', onEnd).once('error', onError);
+      request.on('data', onData).once('end', onEnd).once('error', onError).once('close', onClose);
       request.pause();
     },
     pull() {
