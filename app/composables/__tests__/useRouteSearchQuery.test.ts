@@ -57,6 +57,31 @@ describe('useRouteSearchQuery', () => {
     routeState.query = {};
     expect(searchQuery.value).toBe('');
   });
+  it('keeps showing the latest value while an older write of other text lands', async () => {
+    let landLastWrite = () => {};
+    const landQuery = async ({ query }: { query: QueryRecord }) => {
+      routeState.query = query;
+    };
+    replace
+      .mockImplementationOnce(landQuery)
+      .mockImplementationOnce(landQuery)
+      .mockImplementationOnce(async ({ query }) => {
+        await new Promise<void>((resolve) => (landLastWrite = resolve));
+        routeState.query = query;
+      });
+    const { searchQuery, setSearchQuery } = useRouteSearchQuery();
+    void setSearchQuery('a');
+    void setSearchQuery('b');
+    const lastWrite = setSearchQuery('a');
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(3));
+    const landedQuery = { ...routeState.query };
+    const shownQuery = searchQuery.value;
+    landLastWrite();
+    await lastWrite;
+    expect(landedQuery).toEqual({ q: 'b' });
+    expect(shownQuery).toBe('a');
+    expect(routeState.query).toEqual({ q: 'a' });
+  });
   it('removes an explicit empty q when the search is cleared', async () => {
     routeState.query = { q: '' };
     await useRouteSearchQuery().setSearchQuery('');
