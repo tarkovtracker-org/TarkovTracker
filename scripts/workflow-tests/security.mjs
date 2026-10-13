@@ -109,7 +109,6 @@ test('Gitleaks extends the default rules and allowlists only the exact public an
     'allowlist must pin the anon key'
   );
 });
-
 test('precompute credentials require a main-only protected environment and exact event checkout', () => {
   const job = jobBlock(read('.github/workflows/precompute-tarkov-data.yml'), 'precompute');
   const header = job.split('    steps:')[0];
