@@ -27,6 +27,34 @@ future rule shared with that API belongs in its progress-contracts package.
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Precompute credential boundary
+
+Production precompute runs only from `refs/heads/main` and checks out the immutable event SHA.
+The `production-precompute` GitHub environment must allow deployments from the `main` branch only,
+with no tag rule. Store `CLOUDFLARE_API_TOKEN` and `OVERLAY_TOKEN` only in that environment. A job
+condition alone is insufficient: a branch author can change its workflow, so the environment policy
+and absence of repository-level credential copies provide the external boundary.
+
+Before merging this safeguard, an authorized operator must coordinate the following credential
+migration with a recent successful precompute run (snapshots expire after seven days):
+
+1. Create `production-precompute` with selected deployment branches and a single branch rule for
+   `main`; verify the policy through the GitHub environment API or repository settings.
+2. Provision replacement credentials: Cloudflare Workers KV Storage Edit restricted to the owning
+   account, and read-only Contents access restricted to the private overlay repository. Store them
+   with `gh secret set CLOUDFLARE_API_TOKEN --env production-precompute` and
+   `gh secret set OVERLAY_TOKEN --env production-precompute`; provide values through private input.
+3. Recheck all workflow consumers, then remove the repository-scoped copies with
+   `gh secret delete CLOUDFLARE_API_TOKEN` and `gh secret delete OVERLAY_TOKEN`, and revoke their old
+   platform credentials. Coordinate this step with the reviewed workflow merge; do not declare the
+   finding resolved while either repository copy remains accessible.
+4. Verify the environment remains main-only and that a non-main dispatch cannot obtain these
+   credentials. Run the reviewed main workflow through the approved operational process and verify
+   snapshot freshness. Never test the boundary by exposing a secret in output.
+
+These are manual production credential changes requiring explicit authorization. A local workflow
+test verifies the committed safeguards, not the live environment policy or secret placement.
+
 ## Overlay corrections
 
 **Summary.** `json.tarkov.dev` is community-maintained and sometimes wrong (e.g. a task's
