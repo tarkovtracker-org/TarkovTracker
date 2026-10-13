@@ -98,11 +98,24 @@ describe('ChapterCard story contract rendering', () => {
             objectiveCompleted: 0,
             objectiveId: '',
             objectiveLabel: '',
-            objectiveTotal: 0,
+            objectiveTotal: 3,
             routeBlockingAlternatives: [],
             routeChoiceIndex: null,
             routeState: 'open',
             systemName: 'YouDidntEscapeFromYourself',
+          },
+          {
+            evidencePending: true,
+            id: 'ending-unmapped',
+            label: 'Unmapped Ending',
+            objectiveCompleted: 0,
+            objectiveId: '',
+            objectiveLabel: '',
+            objectiveTotal: 0,
+            routeBlockingAlternatives: [],
+            routeChoiceIndex: null,
+            routeState: 'open',
+            systemName: 'UnmappedEnding',
           },
         ],
       })
@@ -111,6 +124,8 @@ describe('ChapterCard story contract rendering', () => {
     expect(text).toContain('Escaped From Tarkov For Humanity');
     expect(text).toContain('page.storyline.ending_progress:{"completed":1,"total":2}');
     expect(text).toContain('page.storyline.ending_evidence_pending');
+    expect(text).toContain('page.storyline.ending_progress:{"completed":0,"total":3}');
+    expect(wrapper.findAll('[role="progressbar"]')).toHaveLength(0);
     wrapper.unmount();
   });
   it('renders mutually exclusive quest routes without blocking objective toggles', () => {
@@ -131,11 +146,11 @@ describe('ChapterCard story contract rendering', () => {
             },
             {
               completedCount: 0,
-              evidencePending: false,
+              evidencePending: true,
               id: 'quest-hand-over',
               knownStepsComplete: false,
-              label: 'Hand the case over',
-              totalCount: 1,
+              label: '5d25e2e286f77444001e2e48',
+              totalCount: 0,
             },
           ],
           chosenBranchId: 'quest-keep',
@@ -151,6 +166,8 @@ describe('ChapterCard story contract rendering', () => {
     expect(wrapper.text()).toContain(
       'page.storyline.quest_route_progress:{"completed":1,"total":1}'
     );
+    expect(wrapper.text()).toContain('page.storyline.quest_route_unnamed:{"index":2}');
+    expect(wrapper.text()).not.toContain('5d25e2e286f77444001e2e48');
     expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeUndefined();
     wrapper.unmount();
   });
@@ -236,6 +253,244 @@ describe('ChapterCard story contract rendering', () => {
   it('hides stale saved marks on a read-only profile', () => {
     const wrapper = mountCard(createChapter({ staleObjectiveIds: ['the-ticket-main-10'] }), true);
     expect(wrapper.text()).not.toContain('page.storyline.stale_progress_one');
+    wrapper.unmount();
+  });
+  it('renders route decisions with chosen and blocked options and forwards toggles', async () => {
+    const chosen = objective('obj-keep', {
+      description: 'Keep the case',
+      routeState: 'chosen',
+      routeAlternatives: [{ complete: false, id: 'obj-give', label: 'Give the case' }],
+    });
+    const blocked = objective('obj-give', {
+      description: 'Give the case',
+      routeState: 'blocked',
+      routeBlockingAlternatives: [{ complete: true, id: 'obj-keep', label: 'Keep the case' }],
+    });
+    const optionalChoice = objective('obj-side', { description: 'Side route', type: 'optional' });
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectives: [chosen, blocked],
+        mainObjectiveTotal: 2,
+        mainRouteChoices: [
+          { chosenObjectiveId: 'obj-keep', id: 'route-main', objectives: [chosen, blocked] },
+        ],
+        optionalObjectives: [optionalChoice],
+        optionalRouteChoices: [
+          { chosenObjectiveId: null, id: 'route-optional', objectives: [optionalChoice] },
+        ],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('page.storyline.route_decision:{"index":1}');
+    expect(text).toContain('page.storyline.route_switch_hint');
+    expect(text).toContain('page.storyline.route_selected_hint');
+    expect(text).toContain('page.storyline.route_blocked_by:{"objectives":"Keep the case"}');
+    expect(text).toContain('page.profile.storyline_objectives_optional');
+    expect(wrapper.get('#storyline-objective-the-ticket-obj-give').attributes('disabled')).toBe('');
+    await wrapper.get('#storyline-objective-the-ticket-obj-keep').trigger('change');
+    await wrapper.get('#storyline-objective-the-ticket-obj-side').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([
+      ['the-ticket', 'obj-keep'],
+      ['the-ticket', 'obj-side'],
+    ]);
+    wrapper.unmount();
+    const readOnly = mountCard(
+      createChapter({
+        mainObjectives: [chosen, blocked],
+        mainObjectiveTotal: 2,
+        mainRouteChoices: [
+          { chosenObjectiveId: 'obj-keep', id: 'route-main', objectives: [chosen, blocked] },
+        ],
+      }),
+      true
+    );
+    expect(readOnly.text()).toContain('page.storyline.route_selected_hint');
+    expect(readOnly.text()).not.toContain('page.storyline.route_switch_hint');
+    readOnly.unmount();
+  });
+  it('lays steps, optional objectives, and unlocks out as one chronological timeline', async () => {
+    const step = objective('obj-step', {
+      description: 'Visit Woods',
+      hasEstimatedUnlocks: true,
+      routeAlternatives: [{ complete: false, id: 'obj-other', label: 'Visit Customs' }],
+      unlocks: [
+        { estimated: false, id: 'woods', label: 'Woods', type: 'map' },
+        { estimated: false, id: 'skier', label: 'Skier', type: 'trader' },
+        { estimated: true, id: 'reward', label: 'Rubles', type: 'reward' },
+      ],
+    });
+    const side = objective('obj-optional', { order: 2, type: 'optional' });
+    const last = objective('obj-last', { complete: true, order: 3, routeState: 'chosen' });
+    const wrapper = mountCard(
+      createChapter({
+        complete: true,
+        mainLinearObjectives: [last, step],
+        mainObjectiveCompleted: 1,
+        mainObjectiveTotal: 2,
+        mainObjectives: [step, last],
+        optionalLinearObjectives: [side],
+        optionalObjectives: [side],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('page.storyline.timeline_objective');
+    expect(text).toContain('page.storyline.timeline_unlocks');
+    expect(text).toContain('1/2');
+    expect(text).not.toContain('route_unlocks_here');
+    expect(text).toContain('page.storyline.route_unlock_map:{"name":"Woods"}');
+    expect(text).toContain('page.storyline.route_unlock_trader:{"name":"Skier"}');
+    expect(text).toContain('page.storyline.route_unlock_reward:{"name":"Rubles"}');
+    expect(text).toContain('page.storyline.route_unlocks_estimated');
+    expect(text).toContain('page.storyline.route_choice');
+    expect(text).toContain('page.storyline.route_blocks:{"objectives":"Visit Customs"}');
+    const rows = wrapper.findAll('ol > li');
+    expect(rows.map((row) => row.find('input').attributes('id'))).toEqual([
+      'storyline-objective-the-ticket-obj-step',
+      'storyline-objective-the-ticket-obj-optional',
+      'storyline-objective-the-ticket-obj-last',
+    ]);
+    // The optional objective keeps its place but takes no step number, so the next step is still 2.
+    expect(rows[0]!.text()).toMatch(/^1/);
+    expect(rows[1]!.get('[data-storyline-objective]').classes()).toContain('border-dashed');
+    expect(rows[1]!.text()).toContain('common.optional');
+    expect(rows[2]!.find('[data-storyline-objective]').text()).toContain('Objective obj-last');
+    expect(rows[2]!.text()).not.toMatch(/^2/);
+    expect(rows[2]!.text()).not.toContain('page.storyline.route_chosen');
+    const progress = wrapper.get('[role="progressbar"]');
+    expect(progress.attributes()).toMatchObject({
+      'aria-valuemax': '2',
+      'aria-valuemin': '0',
+      'aria-valuenow': '1',
+    });
+    await wrapper.get('#storyline-objective-the-ticket-obj-step').trigger('change');
+    await wrapper.get('#storyline-objective-the-ticket-obj-optional').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([
+      ['the-ticket', 'obj-step'],
+      ['the-ticket', 'obj-optional'],
+    ]);
+    wrapper.unmount();
+  });
+  it('places route decisions at their position in the timeline', async () => {
+    const first = objective('obj-first');
+    const keep = objective('obj-keep', { order: 2, description: 'Keep the case' });
+    const give = objective('obj-give', { order: 3, description: 'Give the case' });
+    const wrapper = mountCard(
+      createChapter({
+        mainLinearObjectives: [first],
+        mainObjectiveTotal: 2,
+        mainObjectives: [first, keep, give],
+        mainRouteChoices: [{ chosenObjectiveId: null, id: 'route-main', objectives: [keep, give] }],
+      })
+    );
+    const rows = wrapper.findAll('ol > li');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]!.text()).toContain('page.storyline.route_decision:{"index":1}');
+    expect(rows[1]!.text()).toMatch(/^2/);
+    expect(wrapper.text()).not.toContain('page.storyline.timeline_objective');
+    await wrapper.get('#storyline-objective-the-ticket-obj-give').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-give']]);
+    wrapper.unmount();
+  });
+  it('lists route option unlocks in the unlock lane under their option', () => {
+    const keep = objective('obj-keep', {
+      description: 'Keep the case',
+      unlocks: [{ estimated: false, id: 'woods', label: 'Woods', type: 'map' }],
+    });
+    const give = objective('obj-give', { order: 2, description: 'Give the case' });
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectiveTotal: 1,
+        mainObjectives: [keep, give],
+        mainRouteChoices: [{ chosenObjectiveId: null, id: 'route-main', objectives: [keep, give] }],
+      })
+    );
+    expect(wrapper.text()).toContain('page.storyline.timeline_unlocks');
+    // The badge renders once, in the lane, not again inside the option's box.
+    const optionRows = wrapper.findAll('[data-storyline-objective]');
+    expect(optionRows.some((row) => row.text().includes('route_unlock_map'))).toBe(false);
+    const lane = wrapper.get('ol > li').findAll(':scope > div').at(-1)!;
+    expect(lane.text()).toBe('Keep the casepage.storyline.route_unlock_map:{"name":"Woods"}');
+    wrapper.unmount();
+  });
+  it('shows standalone optional steps when a chapter has no main objectives', async () => {
+    const side = objective('obj-optional', { complete: true, type: 'optional' });
+    const chapter = createChapter({ optionalLinearObjectives: [side], optionalObjectives: [side] });
+    const editable = mountCard(chapter);
+    await editable.get('#storyline-objective-the-ticket-obj-optional').trigger('change');
+    expect(editable.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-optional']]);
+    editable.unmount();
+    const wrapper = mountCard(chapter, true);
+    expect(wrapper.text()).toContain('page.storyline.route_optional_steps');
+    expect(wrapper.text()).not.toContain('page.storyline.timeline_objective');
+    expect(wrapper.get('#storyline-objective-the-ticket-obj-optional').attributes('disabled')).toBe(
+      ''
+    );
+    wrapper.unmount();
+  });
+  it('renders requirements, chapter unlocks, and ending route states in the side panel', () => {
+    const ending = {
+      evidencePending: false,
+      objectiveCompleted: 0,
+      objectiveId: 'obj-end',
+      objectiveTotal: 0,
+      routeBlockingAlternatives: [],
+      routeChoiceIndex: null,
+      routeState: 'open' as const,
+      systemName: 'Ending',
+    };
+    const wrapper = mountCard(
+      createChapter({
+        chapterUnlocks: [{ estimated: false, id: 'tour', label: 'Tour', type: 'reward' }],
+        endings: [
+          {
+            ...ending,
+            id: 'ending-chosen',
+            label: 'Savior',
+            objectiveLabel: 'Give the case',
+            routeChoiceIndex: 2,
+            routeState: 'chosen',
+          },
+          {
+            ...ending,
+            id: 'ending-blocked',
+            label: 'Fallen',
+            objectiveLabel: 'Fallen',
+            routeBlockingAlternatives: [{ complete: true, id: 'obj-give', label: 'Give the case' }],
+            routeState: 'blocked',
+          },
+        ],
+        requirements: [{ id: 'req-1', label: 'Finish Tour' }],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('common.requires');
+    expect(text).toContain('Finish Tour');
+    expect(text).toContain('page.storyline.route_unlocks_chapter');
+    expect(text).toContain('page.storyline.route_decision:{"index":2}');
+    expect(text).toContain('Give the case');
+    expect(text).toContain('page.storyline.route_chosen');
+    expect(text).toContain('common.blocked');
+    expect(text).toContain('page.storyline.route_blocked_by:{"objectives":"Give the case"}');
+    wrapper.unmount();
+  });
+  it('toggles the chapter from the icon and the header action', async () => {
+    const wrapper = mountCard(createChapter({ autoStart: false, complete: true }));
+    expect(wrapper.get('h2').text()).toBe('The Ticket');
+    expect(wrapper.get('img').attributes('alt')).toBe('');
+    expect(wrapper.text()).toContain('page.profile.storyline_discovered');
+    expect(wrapper.text()).toContain('common.completed');
+    await wrapper.get('button[aria-label="page.storyline.mark_incomplete"]').trigger('click');
+    for (const button of wrapper.findAll('button:not([aria-label])')) await button.trigger('click');
+    expect(wrapper.emitted('toggleChapter')).toEqual([
+      ['the-ticket'],
+      ['the-ticket'],
+      ['the-ticket'],
+    ]);
+    wrapper.unmount();
+  });
+  it('hides chapter actions on a read-only card', () => {
+    const wrapper = mountCard(createChapter(), true);
+    expect(wrapper.find('button').exists()).toBe(false);
     wrapper.unmount();
   });
 });

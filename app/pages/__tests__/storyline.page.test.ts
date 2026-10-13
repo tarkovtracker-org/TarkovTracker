@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import StorylinePage from '@/pages/storyline.vue';
 const setStoryChapterCompleteMock = vi.fn();
 const setStoryChapterUncompleteMock = vi.fn();
@@ -38,6 +38,28 @@ const router = await vi.hoisted(async () => {
 });
 mockNuxtImport('useRoute', () => () => router.route);
 mockNuxtImport('useRouter', () => () => ({ replace: router.replace }));
+const storyline = await vi.hoisted(async () => {
+  const { ref } = await import('vue');
+  return { normalizedChapters: ref<Record<string, unknown>[]>([]) };
+});
+const createNormalizedChapters = () => [
+  {
+    complete: true,
+    id: 'chapter-0',
+    mainObjectiveCompleted: 2,
+    mainObjectiveTotal: 2,
+    name: 'Chapter 0',
+    normalizedName: 'chapter-0',
+  },
+  {
+    complete: false,
+    id: 'chapter-1',
+    mainObjectiveCompleted: 1,
+    mainObjectiveTotal: 3,
+    name: 'Chapter 1',
+    normalizedName: 'chapter-1',
+  },
+];
 const storylineOptions = vi.fn();
 vi.mock('@/composables/useStorylineChapters', () => ({
   useStorylineChapters: (options: { completedObjectiveIds?: (chapterId: string) => string[] }) => {
@@ -72,13 +94,7 @@ vi.mock('@/composables/useStorylineChapters', () => ({
           },
         },
       ]),
-      normalizedChapters: ref([
-        {
-          complete: false,
-          id: 'chapter-1',
-          title: 'Chapter 1',
-        },
-      ]),
+      normalizedChapters: storyline.normalizedChapters,
     };
   },
 }));
@@ -105,6 +121,7 @@ describe('storyline page', () => {
     chapterCompletionState = {};
     objectiveCompletionState = {};
     router.route.query = {};
+    storyline.normalizedChapters.value = createNormalizedChapters();
   });
   const createWrapper = () =>
     mount(StorylinePage, {
@@ -123,6 +140,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });
@@ -205,6 +224,92 @@ describe('storyline page', () => {
     expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('opens the first incomplete chapter and switches chapters from the rail', async () => {
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-1');
+    const tile = wrapper.get('button[aria-label="Chapter 0 (common.completed)"]');
+    await tile.trigger('click');
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-0');
+    expect(tile.attributes('aria-current')).toBe('true');
+    wrapper.unmount();
+  });
+  it('keeps the shown chapter selected after it is completed and scrolls the rail to it', async () => {
+    // Tiles sit 100px apart and are 80px wide in a 200px rail, so centring tile N scrolls to N*100-60.
+    const scrolledLists: HTMLElement[] = [];
+    const scrollTo = vi.fn(function (this: HTMLElement) {
+      scrolledLists.push(this);
+    });
+    vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(scrollTo);
+    vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return Number(this.dataset.chapterId?.split('-')[1] ?? 0) * 100;
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+    });
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    await nextTick();
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 40 });
+    storyline.normalizedChapters.value = storyline.normalizedChapters.value.map((chapter) => ({
+      ...chapter,
+      complete: true,
+    }));
+    await nextTick();
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-1');
+    expect(wrapper.find('button[aria-label="Chapter 1 (common.completed)"]').exists()).toBe(true);
+    await wrapper.get('button[aria-label="Chapter 0 (common.completed)"]').trigger('click');
+    await nextTick();
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: -60 });
+    expect(scrolledLists.every((list) => list.tagName === 'UL')).toBe(true);
+    wrapper.unmount();
+  });
+  it('opens the chapter named by the chapter query', () => {
+    router.route.query = { chapter: 'chapter-0' };
+    const wrapper = mount(StorylinePage, {
+      global: {
+        stubs: {
+          ChapterCard: {
+            props: ['chapter'],
+            template: '<div data-testid="chapter-detail">{{ chapter.id }}</div>',
+          },
+          UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.get('[data-testid="chapter-detail"]').text()).toBe('chapter-0');
+    wrapper.unmount();
+  });
   it('focuses a deep-linked objective and drops the focus query', async () => {
     router.route.query = { chapter: 'chapter-1', objective: 'obj-1', tab: 'keep' };
     const scrollIntoView = vi.fn();
@@ -228,6 +333,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });
@@ -261,6 +368,8 @@ describe('storyline page', () => {
             `,
           },
           UAlert: true,
+          UTooltip: { template: '<slot />' },
+          UIcon: true,
         },
       },
     });
