@@ -218,6 +218,39 @@ describe('google analytics plugin', () => {
       }
     }
   );
+  it.each([
+    'javascript:referrer-private',
+    'file:///oauth?authorization_id=referrer-private',
+    '/oauth?authorization_id=referrer-private',
+    'https://[referrer-private',
+  ])(
+    'explicitly clears invalid document referrers in tracker defaults and page views (%s)',
+    async (rawReferrer) => {
+      const referrer = vi.spyOn(document, 'referrer', 'get').mockReturnValue(rawReferrer);
+      try {
+        window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+        const plugin = (await import('@/plugins/05.google-analytics.client')).default;
+        plugin({} as Parameters<typeof plugin>[0]);
+        await flushAnalyticsSync();
+        const commands = getNormalizedDataLayer();
+        const globalDefaults = commands.filter(
+          (entry) => Array.isArray(entry) && entry[0] === 'set'
+        );
+        expect(globalDefaults.length).toBeGreaterThanOrEqual(2);
+        for (const defaults of globalDefaults) {
+          expect(defaults).toEqual(['set', expect.objectContaining({ page_referrer: '' })]);
+        }
+        expect(commands).toContainEqual([
+          'event',
+          'page_view',
+          expect.objectContaining({ page_referrer: '' }),
+        ]);
+        expect(JSON.stringify(commands)).not.toContain('referrer-private');
+      } finally {
+        referrer.mockRestore();
+      }
+    }
+  );
   it('consent denial before script loads', async () => {
     analyticsConsentState.value = {
       status: 'declined',

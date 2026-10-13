@@ -93,6 +93,22 @@ describe('microsoft clarity plugin', () => {
     expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
     expect(window.clarity).toBeUndefined();
   });
+  it('skips Clarity when the initial pathname has malformed percent encoding', async () => {
+    window.happyDOM.setURL('https://tarkovtracker.org/%E0%A4%A?client_id=private-sentinel');
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
+  it('skips Clarity when the document referrer cannot be parsed', async () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('https://[private-sentinel');
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
   it('skips Clarity when the same-origin referrer contains an OAuth URL', async () => {
     vi.spyOn(document, 'referrer', 'get').mockReturnValue(
       'https://tarkovtracker.org/oauth/authorize?client_id=private-sentinel'
