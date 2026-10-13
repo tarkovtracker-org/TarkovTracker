@@ -1,3 +1,4 @@
+import { copyCounterGroup, isCounterGroups, isCounterTaskIds } from '@/utils/taskCounters';
 import { compareRequirement } from '@/utils/taskRequirements';
 import type {
   Task,
@@ -11,16 +12,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isId = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 const traderId = (value: unknown): unknown => (isRecord(value) ? value.id : value);
-const uniqueIds = (value: unknown): value is string[] =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.every(isId) &&
-  new Set(value).size === value.length;
-/** A malformed derivation is dropped, so the gate falls back to needing an account value. */
-const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined => {
-  if (!isRecord(raw) || raw.type !== 'distinctTaskCompletions') return undefined;
-  return uniqueIds(raw.taskIds) ? { type: raw.type, taskIds: [...raw.taskIds] } : undefined;
-};
+const normalizeGroups = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
+  isCounterGroups(raw.groups)
+    ? { type: 'taskGroupCompletions', groups: raw.groups.map(copyCounterGroup) }
+    : undefined;
+const normalizeTaskIds = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
+  isCounterTaskIds(raw.taskIds)
+    ? { type: 'distinctTaskCompletions', taskIds: [...raw.taskIds] }
+    : undefined;
+const counterNormalizers: Record<
+  string,
+  (raw: Record<string, unknown>) => TaskCounterDerivation | undefined
+> = { distinctTaskCompletions: normalizeTaskIds, taskGroupCompletions: normalizeGroups };
+/** A malformed or unknown derivation is dropped, so the gate falls back to needing an account value. */
+const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined =>
+  isRecord(raw) && Object.hasOwn(counterNormalizers, String(raw.type))
+    ? counterNormalizers[String(raw.type)]!(raw)
+    : undefined;
 const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement => {
   const valid = [
     isId(raw.id),
