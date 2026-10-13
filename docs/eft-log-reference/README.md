@@ -70,6 +70,14 @@ compressed fixtures verify the 1 KiB inflation and 256 KiB decoded-batch bounds.
 The docs track a snapshot of a log corpus; new game versions can add or change events. Re-run the
 audit after a game patch to check for drift (commands are also in Dictionary Part 4):
 
+Arena token output retains only the documented `ApplicationState`, `MatchingProgressState`, and
+`GameplayState` allowlisted state tokens, using their canonical casing. The historical single-word token
+`Participation` remains the audit key for raw `Participation recreate` records. Generic message/event payloads and
+unknown state values are omitted so names and alphabetic credentials do not enter audit reports.
+The notification section likewise retains only markers documented in the event dictionary,
+including service `Ping` and `ChannelDeleted`; unknown marker words are omitted when running
+these sections alone or as part of `--section all`.
+
 ```bash
 # Full re-audit of a live corpus
 python .eft_log_audit.py \
