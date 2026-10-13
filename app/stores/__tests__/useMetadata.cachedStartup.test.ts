@@ -137,6 +137,27 @@ describe('complete cached startup catalog freshness', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
   });
+  it.each(['pending', 'failed'])(
+    'does not replace a validated live catalog while its cache write is %s',
+    async (kind) => {
+      const store = prepare();
+      const write = createDeferred<undefined>();
+      vi.mocked(cache.setCachedData).mockReturnValue(write.promise);
+      const fetch = vi.fn().mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      await warm(store);
+      await startIdle();
+      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      if (kind === 'failed') write.reject(new Error('cache unavailable'));
+      await flushPromises();
+      await warm(store);
+      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      await startIdle();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      if (kind === 'pending') write.resolve(undefined);
+      await flushPromises();
+    }
+  );
   it.each(invalidations)('drops a queued refresh after %s changes', async (kind) => {
     const store = prepare();
     const controller = new AbortController();
@@ -254,6 +275,25 @@ describe('complete cached startup catalog freshness', () => {
     await startIdle();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it('waits for an already-running catalog refresh before revealing task details', async () => {
+    const store = prepare();
+    const pending = createDeferred<object>();
+    vi.stubGlobal('$fetch', vi.fn().mockReturnValue(pending.promise));
+    await warm(store);
+    await startIdle();
+    const scope = effectScope();
+    try {
+      const ready = scope.run(() => useTaskDetailReadiness())!;
+      await flushPromises();
+      expect(ready.value).toBe(false);
+      pending.resolve(response());
+      await flushPromises();
+      expect(ready.value).toBe(true);
+      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+    } finally {
+      scope.stop();
+    }
   });
   it.each(['owner', 'abort'])(
     'retries a %s-cancelled refresh without joining or publishing its stale response',

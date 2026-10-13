@@ -410,6 +410,11 @@ const applyProgressionCatalog = (
   state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
   migrateMetadataStoryObjectiveIds();
 };
+const cachedProgressionCatalog = (cached: CriticalCacheData['editions']): ProgressionCatalog => ({
+  editions: cached.editions ?? [],
+  storyChapters: cached.storyChapters ?? [],
+  seasonalPerks: cached.seasonalPerks ?? [],
+});
 const cacheProgressionCatalog = (
   state: ProgressionCatalogState,
   mode: string,
@@ -1909,12 +1914,24 @@ export const useMetadataStore = defineStore('metadata', {
         }
       }
     },
+    hasRevalidatedCatalog(scope: string): boolean {
+      const promises = getPromiseStore(this);
+      return (
+        promises.editionsScope === scope &&
+        promises.editionsSettledScope === scope &&
+        promises.editionsRevalidatedScopes.has(scope) &&
+        this.storyChaptersGameMode === gameModeForApiMode(this.getApiGameMode())
+      );
+    },
     applyCriticalCachedData(cachedData: CriticalCacheData): boolean {
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
       if (cachedData.scope !== scope || !cachedData.editions.editions?.every(isGameEdition))
         return false;
       // A cache hydration owns these datasets just like a new network request.
       const promises = getPromiseStore(this);
+      const preserveLiveCatalog = this.hasRevalidatedCatalog(scope);
+      // Persisting a refreshed catalog can lag or fail; cached hydration must not roll it back.
+      if (!preserveLiveCatalog) promises.editionsRevalidatedScopes.delete(scope);
       const requestIds = getPromiseRequestIdStore(this);
       const requestKeys = getPromiseRequestKeyStore(this);
       for (const key of [
@@ -1936,18 +1953,15 @@ export const useMetadataStore = defineStore('metadata', {
       this.hydrateHideoutItems();
       this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
       this.hydratePrestigeItems();
-      this.editions = markRaw(cachedData.editions.editions ?? []);
-      this.storyChapters = markRaw(
-        (cachedData.editions.storyChapters ?? [])
-          .map((chapter) => normalizeStoryChapter(chapter))
-          .sort((a, b) => a.order - b.order)
-      );
-      this.storyChaptersGameMode = gameModeForApiMode(this.getApiGameMode());
-      migrateMetadataStoryObjectiveIds();
-      this.seasonalPerks = perksForMode(
-        cachedData.editions.seasonalPerks ?? [],
-        this.getApiGameMode()
-      );
+      if (!preserveLiveCatalog) {
+        applyProgressionCatalog(
+          this,
+          cachedProgressionCatalog(cachedData.editions),
+          this.getApiGameMode()
+        );
+      } else {
+        migrateMetadataStoryObjectiveIds();
+      }
       this.error = null;
       this.hideoutError = null;
       this.prestigeError = null;

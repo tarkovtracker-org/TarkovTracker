@@ -107,6 +107,8 @@ mode/language scope per session, using the ordinary endpoint without `cacheBust`
 server overlay TTL still applies. Successful checks update the browser catalog; failures retain
 last-good data and remain retryable on a later startup. Queued work and responses from a replaced
 startup, changed scope or aborted caller cannot replace the active catalog.
+Later hydration in the same scope preserves a successfully checked live catalog even if its
+storage write is pending or failed. Adopting another cached catalog makes that scope retryable.
 
 The edition cache keeps its 24-hour storage TTL. Other critical caches retain their own TTLs and
 purge-marker behavior; catalog revalidation does not clear browser storage or reset progress.
