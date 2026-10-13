@@ -487,3 +487,51 @@ it('keeps unknown and misplaced empty sections unconsumed', () => {
     'modes.regular.progressionCounters',
   ]);
 });
+it.each([
+  [undefined, true],
+  [[], true],
+  [[{ type: 'trader', id: 'peacekeeper', name: 'Peacekeeper' }], true],
+  [[{ type: 'map', name: 'Shoreline', note: 'Complete the stage' }], true],
+  [null, false],
+  [{ type: 'trader', name: 'Peacekeeper' }, false],
+  [[null], false],
+  [[{ type: 'invented', name: 'Shoreline' }], false],
+  [[{ type: ['trader'], name: 'Peacekeeper' }], false],
+  [[Object.assign([], { type: 'trader', name: 'Peacekeeper' })], false],
+  [
+    [Object.assign(Object.create({ inherited: true }), { type: 'trader', name: 'Peacekeeper' })],
+    false,
+  ],
+  [[Object.assign(Object.create(null), { type: 'other', name: 'Unlock' })], true],
+  [[{ type: 'trader', name: 'Peacekeeper', id: '' }], false],
+  [[{ type: 'trader', name: 'Peacekeeper', note: ' ' }], false],
+  [[{ type: 'trader', name: '' }], false],
+  [[{ type: 'trader', name: 'Peacekeeper', id: 7 }], false],
+  [[{ type: 'map', name: 'Shoreline', note: 7 }], false],
+])(
+  'validates explicit story unlocks in effective and localized objectives: %j',
+  (unlocks, expected) => {
+    const candidate = {
+      ...overlay,
+      storyChapters: {
+        tour: {
+          objectives: [{ id: 'ticket', description: 'Retrieve ticket', unlocks }],
+        },
+      },
+    };
+    expect(validateOverlayData(candidate)).toBe(expected);
+    const localized = {
+      ...overlay,
+      locales: {
+        de: {
+          storyChapters: {
+            tour: {
+              objectives: { ticket: { unlocks } },
+            },
+          },
+        },
+      },
+    };
+    expect(validateOverlayData(localized)).toBe(expected);
+  }
+);

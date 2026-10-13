@@ -13,6 +13,13 @@
     >
       {{ t(UNLOCK_LABEL_KEYS[unlock.type], { name: unlock.label }) }}
     </UBadge>
+    <span
+      v-for="note in notes"
+      :key="note"
+      class="text-surface-400 basis-full text-xs leading-snug wrap-break-word"
+    >
+      {{ note }}
+    </span>
     <UBadge v-if="estimated" variant="subtle" color="neutral" size="md" icon="i-mdi-clock-outline">
       {{ t('page.storyline.route_unlocks_estimated') }}
     </UBadge>
@@ -21,12 +28,21 @@
 <script setup lang="ts">
   import type { StorylineObjectiveUnlockView } from '@/composables/useStorylineChapters';
   type UnlockType = StorylineObjectiveUnlockView['type'];
-  defineProps<{
+  const props = defineProps<{
     unlocks: StorylineObjectiveUnlockView[];
     estimated?: boolean;
     label?: string;
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const notes = computed(() =>
+    Array.from(
+      new Set(
+        props.unlocks
+          .map((unlock) => unlock.note)
+          .filter((note): note is string => typeof note === 'string' && note.trim().length > 0)
+      )
+    )
+  );
   const UNLOCK_COLORS: Record<UnlockType, 'primary' | 'warning' | 'success'> = {
     map: 'primary',
     trader: 'warning',
