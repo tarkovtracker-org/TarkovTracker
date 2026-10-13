@@ -29,10 +29,14 @@
   });
   let disposed = false;
   let detach = (): void => {};
+  const updateTitle = (): void => {
+    const iframe = container.value?.querySelector('iframe');
+    if (iframe) iframe.title = props.title;
+  };
+  watch(() => props.title, updateTitle);
   const attach = (player: TwitchPlayerInstance, ready: string, offline: string): void => {
     const onReady = (): void => {
-      const iframe = container.value?.querySelector('iframe');
-      if (iframe) iframe.title = props.title;
+      updateTitle();
       emit('ready');
     };
     const onOffline = (): void => {

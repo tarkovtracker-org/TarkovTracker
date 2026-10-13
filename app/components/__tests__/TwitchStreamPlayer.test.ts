@@ -51,6 +51,15 @@ describe('TwitchStreamPlayer', () => {
     expect(listeners.size).toBe(0);
     expect(destroy).toHaveBeenCalledOnce();
   });
+  it('updates the iframe title without recreating the player after a display name change', async () => {
+    const wrapper = mount(TwitchStreamPlayer, { props });
+    await flushPromises();
+    listeners.get('ready')?.();
+    await wrapper.setProps({ title: 'Renamed stream' });
+    expect(wrapper.get('iframe').attributes('title')).toBe('Renamed stream');
+    expect(construct).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
   it('does not create a player when the script resolves after unmount', async () => {
     let finish: (value: typeof Player) => void = () => {};
     loadMock.mockImplementation(
