@@ -102,6 +102,7 @@ const setup = async (options: SetupOptions = {}) => {
   };
   const teammates = options.teammates ?? [];
   const teamMembers = options.teamMembers ?? ['self', ...teammates];
+  const calculateTraderCounts = vi.fn(() => traderCounts);
   vi.resetModules();
   vi.doMock('@/composables/useTaskFiltering', () => ({
     useTaskFiltering: () => ({
@@ -114,7 +115,7 @@ const setup = async (options: SetupOptions = {}) => {
         hideCompletedMapObjectives = false
       ) => (hideCompletedMapObjectives ? mapTaskTotalsHideCompleted : mapTaskTotals),
       calculateStatusCounts: () => statusCounts,
-      calculateTraderCounts: () => traderCounts,
+      calculateTraderCounts,
     }),
   }));
   vi.doMock('@/stores/useMetadata', () => ({
@@ -168,7 +169,7 @@ const setup = async (options: SetupOptions = {}) => {
     }),
   }));
   const { default: TaskFilterBar } = await import('@/features/tasks/TaskFilterBar.vue');
-  return { TaskFilterBar, preferencesStore };
+  return { TaskFilterBar, calculateTraderCounts, preferencesStore };
 };
 const mountTaskFilterBar = (
   TaskFilterBar: Parameters<typeof mount>[0],
@@ -308,6 +309,25 @@ describe('TaskFilterBar', () => {
     await lockedButton!.trigger('click');
     expect(wrapper.emitted('pin-status')).toHaveLength(1);
     expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('locked');
+  });
+  it('keeps All clickable during an all-status search so it can be saved', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup();
+    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
+      activeStatusView: 'all',
+      searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
+    });
+    const allButton = wrapper.findAll('button').find((button) => button.text().startsWith('All'));
+    expect(allButton!.attributes('disabled')).toBeUndefined();
+    await allButton!.trigger('click');
+    expect(wrapper.emitted('pin-status')).toHaveLength(1);
+    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('all');
+  });
+  it('counts traders for the status the list is showing', async () => {
+    const { TaskFilterBar, calculateTraderCounts } = await setup({
+      preferencesStore: { getTaskPrimaryView: 'traders' },
+    });
+    mountTaskFilterBar(TaskFilterBar, 'mole', { activeStatusView: 'all' });
+    expect(calculateTraderCounts).toHaveBeenLastCalledWith('self', 'all');
   });
   it('applies stronger selected styling to the active primary and status views', async () => {
     const { TaskFilterBar } = await setup({

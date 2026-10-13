@@ -150,7 +150,7 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="selectedStatusView === 'all'"
+            :disabled="isStatusApplied('all')"
             :aria-pressed="selectedStatusView === 'all'"
             :class="getStatusButtonClass('all', selectedStatusView === 'all')"
             @click="setSecondaryView('all')"
@@ -184,7 +184,7 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="selectedStatusView === 'available'"
+            :disabled="isStatusApplied('available')"
             :aria-pressed="selectedStatusView === 'available'"
             :class="getStatusButtonClass('available', selectedStatusView === 'available')"
             @click="setSecondaryView('available')"
@@ -210,7 +210,7 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="selectedStatusView === 'locked'"
+            :disabled="isStatusApplied('locked')"
             :aria-pressed="selectedStatusView === 'locked'"
             :class="getStatusButtonClass('locked', selectedStatusView === 'locked')"
             @click="setSecondaryView('locked')"
@@ -232,7 +232,7 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="selectedStatusView === 'completed'"
+            :disabled="isStatusApplied('completed')"
             :aria-pressed="selectedStatusView === 'completed'"
             :class="getStatusButtonClass('completed', selectedStatusView === 'completed')"
             @click="setSecondaryView('completed')"
@@ -253,7 +253,7 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="selectedStatusView === 'failed'"
+            :disabled="isStatusApplied('failed')"
             :aria-pressed="selectedStatusView === 'failed'"
             :class="getStatusButtonClass('failed', selectedStatusView === 'failed')"
             @click="setSecondaryView('failed')"
@@ -464,9 +464,12 @@
     getTaskSecondaryViewForPrimaryView(primaryView.value, preferencesStore.getTaskSecondaryView)
   );
   const selectedStatusView = computed(() => props.activeStatusView ?? secondaryView.value);
+  // Only the tab that is both shown and saved is inert; a temporary search scope stays clickable.
+  const isStatusApplied = (view: TaskSecondaryView) =>
+    selectedStatusView.value === view && secondaryView.value === view;
   const traderCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
-    return calculateTraderCounts(userView, secondaryView.value);
+    return calculateTraderCounts(userView, selectedStatusView.value);
   });
   const traders = computed(() => {
     return metadataStore.sortedTraders.filter((trader) => (traderCounts.value[trader.id] ?? 0) > 0);

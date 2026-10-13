@@ -68,6 +68,22 @@ describe('useTaskSearchQuery', () => {
     expect(search.searchesAllStatuses.value).toBe(true);
     scope.stop();
   });
+  it('pins a tab clicked before the debounced query catches up', async () => {
+    vi.useFakeTimers();
+    const { scope, search } = setup();
+    search.searchQuery.value = 'mole';
+    await nextTick();
+    search.pinStatus();
+    await vi.advanceTimersByTimeAsync(180);
+    expect(search.isSearchActive.value).toBe(true);
+    expect(search.searchesAllStatuses.value).toBe(false);
+    search.searchQuery.value = '';
+    await nextTick();
+    search.searchQuery.value = 'mole';
+    await vi.advanceTimersByTimeAsync(180);
+    expect(search.searchesAllStatuses.value).toBe(true);
+    scope.stop();
+  });
 });
 describe('resolveEffectiveSecondaryView', () => {
   it('widens to all while searching unpinned', () => {

@@ -33,12 +33,14 @@ export function useTaskSearchQuery() {
   });
   const normalizedSearch = computed(() => debouncedSearch.value.toLowerCase().trim());
   const isSearchActive = computed(() => normalizedSearch.value.length > 0);
+  // Track the typed query, not the debounced one, so a tab click right after typing still pins.
+  const hasQuery = computed(() => searchQuery.value.trim().length > 0);
   const isStatusPinned = ref(false);
-  watch(isSearchActive, (active) => {
+  watch(hasQuery, (active) => {
     if (!active) isStatusPinned.value = false;
   });
   const pinStatus = () => {
-    if (isSearchActive.value) isStatusPinned.value = true;
+    if (hasQuery.value) isStatusPinned.value = true;
   };
   const searchesAllStatuses = computed(() => isSearchActive.value && !isStatusPinned.value);
   return {
