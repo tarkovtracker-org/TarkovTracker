@@ -106,11 +106,14 @@ export default defineNuxtPlugin(() => {
       };
     await loadScript();
     window.gtag('js', new Date());
+    // Global defaults apply to automatic events and remain updateable on navigation.
+    window.gtag('set', {
+      page_location: getAnalyticsPageLocation(router.currentRoute.value),
+      page_referrer: getAnalyticsReferrer(document.referrer) ?? '',
+    });
     window.gtag('config', measurementId, {
       allow_ad_personalization_signals: false,
       allow_google_signals: false,
-      page_location: getAnalyticsPageLocation(router.currentRoute.value),
-      page_referrer: getAnalyticsReferrer(document.referrer) ?? '',
       send_page_view: false,
       transport_type: 'beacon',
     });

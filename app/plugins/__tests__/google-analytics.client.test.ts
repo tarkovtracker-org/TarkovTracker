@@ -177,13 +177,18 @@ describe('google analytics plugin', () => {
           '/oauth/consent?view=maps'
         );
         expect(getNormalizedDataLayer()).toContainEqual([
-          'config',
-          runtimeConfig.public.googleAnalyticsMeasurementId,
+          'set',
           expect.objectContaining({
             page_location: `${window.location.origin}/oauth/consent?view=maps`,
             page_referrer: 'https://example.com/oauth',
           }),
         ]);
+        const commands = getNormalizedDataLayer();
+        expect(
+          commands.findIndex((entry) => Array.isArray(entry) && entry[0] === 'set')
+        ).toBeLessThan(
+          commands.findIndex((entry) => Array.isArray(entry) && entry[0] === 'config')
+        );
         expect(getNormalizedDataLayer()).toContainEqual([
           'event',
           'page_view',
