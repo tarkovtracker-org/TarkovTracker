@@ -97,8 +97,8 @@ async function checkFloors(page, surface) {
 test('Ground Zero floors and toolbar remain operable in normal and fullscreen maps', async ({
   page,
 }) => {
-  await page.goto(`${origin}/tasks`);
-  await page.getByRole('button', { name: 'Maps', exact: true }).click();
+  // Open the maps view by URL so the test does not depend on where the view switcher lives.
+  await page.goto(`${origin}/tasks?view=maps`);
   const inline = page
     .locator('[tabindex="0"]')
     .filter({ has: page.locator('.leaflet-container') })
