@@ -2,7 +2,11 @@ import {
   useAnalyticsConsent,
   type AnalyticsConsentStatus,
 } from '@/composables/useAnalyticsConsent';
-import { getAnalyticsPageLocation, getAnalyticsPagePath } from '@/utils/analytics';
+import {
+  getAnalyticsPageLocation,
+  getAnalyticsPagePath,
+  getAnalyticsReferrer,
+} from '@/utils/analytics';
 import { logger } from '@/utils/logger';
 import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
 type Gtag = (...args: unknown[]) => void;
@@ -105,6 +109,8 @@ export default defineNuxtPlugin(() => {
     window.gtag('config', measurementId, {
       allow_ad_personalization_signals: false,
       allow_google_signals: false,
+      page_location: getAnalyticsPageLocation(router.currentRoute.value),
+      page_referrer: getAnalyticsReferrer(document.referrer) ?? '',
       send_page_view: false,
       transport_type: 'beacon',
     });
@@ -120,10 +126,13 @@ export default defineNuxtPlugin(() => {
     if (!pagePath || pageLocation === lastTrackedPageLocation) {
       return;
     }
+    const pageReferrer = lastTrackedPageLocation || getAnalyticsReferrer(document.referrer) || '';
+    // Other events use tracker defaults rather than the preceding event's overrides.
+    window.gtag?.('set', { page_location: pageLocation, page_referrer: pageReferrer });
     window.gtag?.('event', 'page_view', {
       page_location: pageLocation,
       page_path: pagePath,
-      page_referrer: lastTrackedPageLocation || document.referrer || undefined,
+      page_referrer: pageReferrer,
       page_title: document.title,
     });
     lastTrackedPageLocation = pageLocation;
