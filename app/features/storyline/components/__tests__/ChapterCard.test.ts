@@ -74,6 +74,37 @@ const mountCard = (chapter: StorylineNormalizedChapterView, readOnly = false) =>
     },
   });
 describe('ChapterCard story contract rendering', () => {
+  it.each(['main route', 'timeline', 'optional route', 'optional linear', 'chapter'])(
+    'renders distinct unlock notes as visible text for %s',
+    (location) => {
+      const note = 'Unlocked after completing the Woods stage.';
+      const unlocks = [
+        {
+          estimated: false,
+          id: 'peacekeeper',
+          label: 'Peacekeeper',
+          note,
+          type: 'trader' as const,
+        },
+        { estimated: false, id: 'shoreline', label: 'Shoreline', note, type: 'map' as const },
+      ];
+      const step = objective('step', { unlocks });
+      const route = { id: 'route', chosenObjectiveId: null, objectives: [step] };
+      const cases: Record<string, Partial<StorylineNormalizedChapterView>> = {
+        'main route': { mainObjectives: [step], mainRouteChoices: [route] },
+        timeline: { mainObjectives: [step], mainLinearObjectives: [step] },
+        'optional route': { optionalObjectives: [step], optionalRouteChoices: [route] },
+        'optional linear': { optionalObjectives: [step], optionalLinearObjectives: [step] },
+        chapter: { chapterUnlocks: unlocks },
+      };
+      const wrapper = mountCard(createChapter(cases[location]));
+      expect(wrapper.text().split(note)).toHaveLength(2);
+      expect(
+        wrapper.findAll('[title]').some((element) => element.attributes('title') === note)
+      ).toBe(false);
+      wrapper.unmount();
+    }
+  );
   it('renders overlay-declared endings with progress and pending evidence', () => {
     const wrapper = mountCard(
       createChapter({

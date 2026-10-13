@@ -1,4 +1,5 @@
 import { isGameEdition } from '@/utils/editionHelpers';
+import { validStoryUnlock } from '@/utils/storylineUnlocks';
 import { isPlainObject } from './deepMerge';
 import { validProgressionCounters } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
@@ -126,6 +127,14 @@ const validObjectives = (value: unknown): boolean => {
 // chapter as a blank ending row or an uninterpretable route.
 const nonEmptyString = (value: unknown): boolean =>
   typeof value === 'string' && value.trim().length > 0;
+const validStoryUnlocks = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(validStoryUnlock));
+const validStoryObjectives = (value: unknown): boolean => {
+  if (!validObjectives(value)) return false;
+  return overlayEntries(value as OverlayRecords | undefined).every((objective) =>
+    validStoryUnlocks(objective.unlocks)
+  );
+};
 const nonNegativeInteger = (value: unknown): boolean =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0;
 const endingIdentity = (ending: Record<string, unknown>): boolean =>
@@ -146,7 +155,7 @@ const validQuestPairs = (value: unknown): boolean =>
   value === undefined || (Array.isArray(value) && value.every(validQuestPair));
 const validChapterBranches = (chapter: Record<string, unknown>): boolean =>
   [
-    validObjectives(chapter.objectives),
+    validStoryObjectives(chapter.objectives),
     validEndings(chapter.endings),
     validQuestPairs(chapter.mutuallyExclusiveQuestPairs),
   ].every(Boolean);

@@ -37,6 +37,46 @@ path.
 
 ### Invariants
 
+- Teams expire after **168 continuous hours with exactly one membership belonging to the actual
+  owner**, regardless of account activity. Joins clear the clock; last leave, kick or Auth
+  account-deletion cascade starts a fresh clock. Membership role and mode must also agree with
+  the team; empty or inconsistent teams are preserved for separate investigation.
+- `teams.owner_only_since` and `owner_only_expires_at` are server-owned. The latter is the
+  deadline shown in a persistent, non-dismissible alert on the current owner's team invite card.
+  Creation shows the policy before its button. Clients never derive eligibility from the
+  `TeamMembers.vue` display list, old `created_at`, account activity or a client clock.
+  Membership events, reconnects and team snapshots use one authoritative membership/deadline
+  refresh. Events during either read queue one fresh pair, and request, team, instance-lifetime
+  and auth-session fences reject stale results. A new team's fetched snapshot can seed its
+  deadline while the independent read is unavailable; snapshots never replace a successful
+  same-team deadline or owner refresh, including cancellation. These fields stay together when
+  a delayed snapshot predates an ownership transfer and the next read fails. A new team without
+  a supplied deadline clears the previous team's warning, so a failed read never shows another
+  team's date.
+  A member-list failure still permits the independent authorized deadline read. This makes join
+  cancellation and fresh solo warnings work when only memberships are in the Realtime publication.
+  The same authorized row also supplies the current owner, so a transfer shows the warning to the
+  new owner without a team snapshot. The deadline is formatted in the app's selected locale.
+- Membership BEFORE triggers acquire the team row with `NOWAIT`, before pointer maintenance.
+  Normal lifecycle RPCs already hold that lock. A contended raw Auth FK cascade aborts with
+  `55P03` for whole-transaction retry instead of waiting while holding a membership row.
+  Clock maintenance and pointers roll back with failed joins, leaves and kicks.
+- `private.run_owner_only_team_cleanup` is operator-only, limits each transaction to at most
+  100 team locks, skips locked teams, and rereads actual membership in a separate statement after
+  the lock. It uses `disband_team`, preserving personal progress, all mode/Seasonal history,
+  preferences, accounts and tokens. Team rows, memberships and team events expire together.
+- Migrations schedule the hourly `owner-only-team-cleanup` job with warning and deletion gates
+  off. After the warning UI and restricted observer pass acceptance, operators separately approve
+  warning activation and, after 168 hours of verified warning availability, deletion activation.
+  The runner gives existing solo teams a fresh seven days from their own initialization; no
+  migration bulk rewrite or old-age inference is involved. Both the team deadline and global
+  warning floor must pass. `deletion_enabled=false` or unscheduling the job pauses deletion. The
+  [rollout runbook](../runbook.md#owner-only-team-expiry-rollout) owns monitoring and recovery.
+- Committed active batches persist aggregate-only time/count/flag receipts. Receipt failures or
+  disband failures roll back the entire batch; pg_cron records failure instead. The allowlisted
+  observer command `owner-only-teams` reads only a private aggregate view with eligibility/grace/
+  anomaly counts and the latest 20 receipts, never identities or progress. Neither the batch's 100-row cap nor the report's single output row bounds scan work.
+
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and
