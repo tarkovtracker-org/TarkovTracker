@@ -451,6 +451,14 @@ export default defineNuxtConfig({
         const wrapper = wrappers[page.path];
         if (wrapper) page.file = resolve(appDir, 'features/seo-pages', `${wrapper}.vue`);
       }
+      // Task views are routes of the same tracker module (app/utils/taskRouteView.ts).
+      for (const view of ['maps', 'graph']) {
+        pages.push({
+          name: `tasks-${view}`,
+          path: `/tasks/${view}`,
+          file: resolve(appDir, 'features/seo-pages', 'tasks.vue'),
+        });
+      }
     },
     'nitro:init': (nitro) => {
       if (!String(nitro.options.preset || '').includes('cloudflare')) {

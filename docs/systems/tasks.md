@@ -8,6 +8,15 @@ The initial route `q` filters tasks immediately, including tasks loaded later. S
 trim whitespace and ignore case. Later typing and route changes retain the 180 ms debounce;
 clearing search cancels any pending update and restores the visible list immediately.
 
+## Task views
+
+The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list, `/tasks/maps` the
+map view and `/tasks/graph` the trader graph; the sidebar lists Maps and Graph under Tasks. On the
+list, a trader is a filter (`trader` param, toolbar dropdown) rather than a separate view. The
+stored `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy
+`/tasks?view=<view>` links are replaced by the matching route with the other params kept
+(`app/middleware/tasks-legacy-view.global.ts`); `view=traders` lands on the list.
+
 ## Canonical task progression
 
 ### Server-side start requirements

@@ -26,6 +26,8 @@ const publicPages = {
   '/resources/cultistcircle': 'cultistcircle',
 };
 const privatePages = {
+  '/tasks/maps': 'tasks_maps',
+  '/tasks/graph': 'tasks_graph',
   '/settings': 'settings',
   '/progression': 'progression',
   '/prestige': 'prestige',

@@ -22,6 +22,8 @@ export const PUBLIC_SEO_ROUTES: string[] = [
   ...GUIDES.map((resource) => `/resources/${resource.slug}`),
 ];
 const CLIENT_PAGE_KEYS = {
+  '/tasks/maps': 'tasks_maps',
+  '/tasks/graph': 'tasks_graph',
   '/settings': 'settings',
   '/progression': 'progression',
   '/prestige': 'prestige',

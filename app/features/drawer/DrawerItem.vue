@@ -10,6 +10,7 @@
         :color-class="iconClasses"
         :label-text="labelText"
         :badge="props.badge"
+        :nested="props.nested"
       />
     </UTooltip>
     <template v-else>
@@ -22,6 +23,7 @@
         :color-class="iconClasses"
         :label-text="labelText"
         :badge="props.badge"
+        :nested="props.nested"
         has-margin
       />
     </template>
@@ -40,6 +42,8 @@
     href?: string | null;
     isCollapsed: boolean;
     badge?: string | null;
+    /** Renders as a sub-item of the entry above it. */
+    nested?: boolean;
   }>();
   const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
   const iconClasses = computed(() =>

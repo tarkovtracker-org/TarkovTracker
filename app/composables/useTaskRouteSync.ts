@@ -1,11 +1,12 @@
 import { storeToRefs } from 'pinia';
 import { useRouteFilters } from '@/composables/useRouteFilters';
 import { type PreferencesStore, usePreferencesStore } from '@/stores/usePreferences';
-import { isValidPrimaryView, isValidSecondaryView } from '@/types/taskFilter';
+import { isValidSecondaryView } from '@/types/taskFilter';
 import { isValidSortDirection, isValidSortMode } from '@/types/taskSort';
 import { logger } from '@/utils/logger';
 import { getQueryString } from '@/utils/routeHelpers';
 import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
+import { resolveTaskRouteView, type TaskRouteView } from '@/utils/taskRouteView';
 import type { Ref } from '#imports';
 import type { FilterParamConfigs } from '@/composables/useRouteFilters';
 import type { TarkovMap, Trader } from '@/types/tarkov';
@@ -36,7 +37,6 @@ const resolveMapIdFromRoute = (
   return mergedMapMatch?.id ?? firstMapId;
 };
 type TaskRouteParams = {
-  view: string;
   status: string;
   map: string;
   trader: string;
@@ -44,7 +44,6 @@ type TaskRouteParams = {
   sortDir: string;
 };
 const TASK_ROUTE_CONFIGS: FilterParamConfigs<TaskRouteParams> = {
-  view: { default: 'all', validate: isValidPrimaryView },
   status: { default: 'available', validate: isValidSecondaryView },
   map: { default: 'all', validate: () => true },
   trader: { default: 'all', validate: () => true },
@@ -59,34 +58,58 @@ const setIfChanged = <T extends string>(
 ) => {
   if (next && next !== current) set(next);
 };
+/** The route picks the view; on the list route a `trader` param is the trader filter. */
+const resolvePrimaryViewFromRoute = (
+  routeView: TaskRouteView,
+  traderParam: string
+): TaskPrimaryView => {
+  if (routeView !== 'list') return routeView;
+  return traderParam === 'all' ? 'all' : 'traders';
+};
+/** Keeps a stored view that belongs to another route from leaking into this one. */
+const alignPrimaryViewWithRoute = (store: PreferencesStore, routeView: TaskRouteView) => {
+  const current = store.getTaskPrimaryView;
+  const isListView = current === 'all' || current === 'traders';
+  if (routeView === 'list' ? isListView : current === routeView) return;
+  store.setTaskPrimaryView(routeView === 'list' ? 'all' : routeView);
+};
 const resolveTraderIdFromRoute = (traders: Trader[], traderParam: string) =>
   traders.some((t) => t.id === traderParam) ? traderParam : traders[0]?.id;
-const syncViewsFromRoute = (store: PreferencesStore, values: TaskRouteParams) => {
-  const targetView = values.view as TaskPrimaryView;
-  setIfChanged(targetView, store.getTaskPrimaryView, (v) => store.setTaskPrimaryView(v));
-  if (targetView === 'graph') return;
-  setIfChanged(values.status, store.getTaskSecondaryView, (v) => store.setTaskSecondaryView(v));
+const syncViewsFromRoute = (
+  store: PreferencesStore,
+  primaryView: TaskPrimaryView,
+  status: string
+) => {
+  setIfChanged(primaryView, store.getTaskPrimaryView, (v) => store.setTaskPrimaryView(v));
+  if (primaryView === 'graph') return;
+  setIfChanged(status, store.getTaskSecondaryView, (v) => store.setTaskSecondaryView(v));
 };
-const syncMapFromRoute = (store: PreferencesStore, maps: TarkovMap[], values: TaskRouteParams) => {
-  if (values.view !== 'maps') return;
+const syncMapFromRoute = (
+  store: PreferencesStore,
+  maps: TarkovMap[],
+  primaryView: TaskPrimaryView,
+  mapParam: string
+) => {
+  if (primaryView !== 'maps') return;
   if (maps.length === 0) {
     logger.debug('[useTaskRouteSync] Delaying map sync until maps loaded.');
     return;
   }
-  const mapId = resolveMapIdFromRoute(maps, values.map);
+  const mapId = resolveMapIdFromRoute(maps, mapParam === 'all' ? undefined : mapParam);
   setIfChanged(mapId, store.getTaskMapView, (v) => store.setTaskMapView(v));
 };
 const syncTraderFromRoute = (
   store: PreferencesStore,
   traders: Trader[],
-  values: TaskRouteParams
+  primaryView: TaskPrimaryView,
+  traderParam: string
 ) => {
-  if (!isTraderView(values.view)) return;
+  if (!isTraderView(primaryView)) return;
   if (traders.length === 0) {
     logger.debug('[useTaskRouteSync] Delaying trader sync until traders loaded.');
     return;
   }
-  const traderId = resolveTraderIdFromRoute(traders, values.trader);
+  const traderId = resolveTraderIdFromRoute(traders, traderParam);
   setIfChanged(traderId, store.getTaskTraderView, (v) => store.setTaskTraderView(v));
 };
 const syncSortFromRoute = (store: PreferencesStore, values: TaskRouteParams) => {
@@ -95,12 +118,16 @@ const syncSortFromRoute = (store: PreferencesStore, values: TaskRouteParams) => 
     store.setTaskSortDirection(v)
   );
 };
+/** Writes a param only for the view that uses it, keeping a not-yet-loaded route value. */
 const pendingRouteParam = (
   isActive: boolean,
   isLoading: boolean,
   routeValue: string | undefined,
   storeValue: string
-) => (isActive && isLoading && routeValue ? routeValue : storeValue);
+) => {
+  if (!isActive) return undefined;
+  return isLoading && routeValue ? routeValue : storeValue;
+};
 export function useTaskRouteSync({
   maps,
   traders,
@@ -115,18 +142,22 @@ export function useTaskRouteSync({
     getTaskSortMode,
     getTaskSortDirection,
   } = storeToRefs(preferencesStore);
+  const routeView = computed(() => resolveTaskRouteView(route.path));
+  watch(routeView, (view) => alignPrimaryViewWithRoute(preferencesStore, view), {
+    immediate: true,
+  });
   return useRouteFilters<TaskRouteParams>({
     configs: TASK_ROUTE_CONFIGS,
     onRouteToStore: (values) => {
-      syncViewsFromRoute(preferencesStore, values);
-      syncMapFromRoute(preferencesStore, maps.value, values);
-      syncTraderFromRoute(preferencesStore, traders.value, values);
+      const primaryView = resolvePrimaryViewFromRoute(routeView.value, values.trader);
+      syncViewsFromRoute(preferencesStore, primaryView, values.status);
+      syncMapFromRoute(preferencesStore, maps.value, primaryView, values.map);
+      syncTraderFromRoute(preferencesStore, traders.value, primaryView, values.trader);
       syncSortFromRoute(preferencesStore, values);
     },
     onStoreToRoute: () => {
       const primaryView = getTaskPrimaryView.value;
       return {
-        view: primaryView,
         status: getTaskSecondaryViewForPrimaryView(primaryView, getTaskSecondaryView.value),
         map: pendingRouteParam(
           primaryView === 'maps',

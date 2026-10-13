@@ -83,10 +83,10 @@ describe('TaskDisplayCard compact options', () => {
     mockState.hideTaskRewards = false;
     vi.clearAllMocks();
   });
-  it('removes the density selector while keeping default views', () => {
+  it('removes the density selector and keeps only the hideout default view', () => {
     const wrapper = createWrapper();
     expect(wrapper.text()).not.toContain('settings.interface.tasks.density');
-    expect(wrapper.findAll('select-menu-fixed-stub')).toHaveLength(2);
+    expect(wrapper.findAll('select-menu-fixed-stub')).toHaveLength(1);
   });
   it('always shows collapse and reward controls and persists toggles', async () => {
     const wrapper = createWrapper();

@@ -918,6 +918,12 @@
       "user_views": {
         "yourself": "Yourself"
       },
+      "filters": {
+        "trader_aria_label": "Filter tasks by trader",
+        "all_traders": "All traders",
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team"
+      },
       "search": {
         "placeholder": "Search...",
         "aria_label": "Search tasks"
@@ -2573,6 +2579,14 @@
       "tasks": {
         "title": "Tarkov Quest Tracker · TarkovTracker.org",
         "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "Tarkov Hideout Tracker · TarkovTracker.org",

@@ -4,6 +4,7 @@ import { computed, isRef, reactive, ref } from 'vue';
 import type { Task } from '@/types/tarkov';
 type QueryRecord = Record<string, string | string[] | undefined>;
 const routeState = reactive({
+  path: '/tasks',
   query: reactive<QueryRecord>({}),
 });
 const applyRouteQuery = (query: QueryRecord) => {
@@ -66,6 +67,7 @@ describe('useTaskDeepLink', () => {
     vi.resetModules();
     vi.clearAllMocks();
     document.body.innerHTML = '';
+    routeState.path = '/tasks';
     applyRouteQuery({});
     metadataTasks.value = [];
     metadataState.tasksObjectivesHydrated = false;
@@ -180,6 +182,23 @@ describe('useTaskDeepLink', () => {
     await taskDeepLink.handleTaskQueryParam();
     expect(setOnlyTasksWithRequiredKeys).toHaveBeenCalledWith(false);
     expect(preferenceState.onlyTasksWithRequiredKeys).toBe(false);
+  });
+  it('hands a plain task link on the maps route to the list route', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', map: 'map-1' });
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      searchQuery: ref(''),
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(replace).toHaveBeenCalledWith({
+      path: '/tasks',
+      query: expect.objectContaining({ task: 'task-on-map', map: 'map-1' }),
+    });
+    expect(taskDeepLink.pinnedTaskId.value).toBeFalsy();
   });
   it('keeps the deep-linked task focused even when it is already visible', async () => {
     metadataTasks.value = [
