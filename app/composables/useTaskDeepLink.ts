@@ -197,8 +197,11 @@ export function useTaskDeepLink({
     const taskInMetadata = tasks.value.find((t) => t.id === taskId);
     if (!taskInMetadata) return;
     // Settle the cleared search before any hand-off reads the query, or it would restore it.
+    const startPath = router.currentRoute.value.path;
     // Queued behind any pending search write, so that write cannot restore `q` afterwards.
     await setSearchQuery('');
+    // The user may have left while the queue drained; never pull them back to the list.
+    if (router.currentRoute.value.path !== startPath) return;
     if (await handOffToListRoute(objectiveIdToHighlight)) return;
     if (!objectiveIdToHighlight) {
       const isKappaRequired = taskInMetadata.kappaRequired === true;
