@@ -113,6 +113,12 @@ precompute refuses to publish payloads with unconsumed sections.
 | `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                                                                                                                                                                                                                                                                                                                    |
 
+Story objective `unlocks` survive projection and normalization and determine step placement
+directly. Unplaced map/trader unlocks and chapter reward summaries remain chapter-level;
+the view never infers unlock timing from text or distributes rewards across objectives.
+Tour's ordered objective array follows the wiki narrative while retaining raw objective IDs
+and source-subquest links. Stage-completion notes remain available on unlock badges.
+
 Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
 An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
 by mode and language (`json-v3` and `overlay-v3`), and stale responses cannot replace another scope.

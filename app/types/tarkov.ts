@@ -454,6 +454,13 @@ export interface PrestigeLevel {
 export interface TarkovPrestigeQueryResult {
   prestige: PrestigeLevel[];
 }
+/** Explicit unlock placement supplied by the overlay, never inferred from objective wording. */
+export interface StoryObjectiveUnlock {
+  type: 'achievement' | 'barter' | 'map' | 'quest' | 'trader' | 'other';
+  id?: string;
+  name: string;
+  note?: string;
+}
 export interface StoryObjective {
   id: string;
   order: number;
@@ -468,6 +475,7 @@ export interface StoryObjective {
   sourceQuestId?: string;
   /** `client/ending_list` id of the branch this objective belongs to, when the overlay tags one. */
   endingId?: string;
+  unlocks?: StoryObjectiveUnlock[];
 }
 /**
  * Ending branch a chapter can resolve into, restated by the overlay so the branch set is visible

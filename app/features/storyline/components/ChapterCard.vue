@@ -326,6 +326,7 @@
                       variant="subtle"
                       size="xs"
                       :color="getUnlockBadgeColor(unlock.type)"
+                      :title="unlock.note"
                     >
                       {{ getUnlockLabel(unlock.type, unlock.label) }}
                     </UBadge>
@@ -466,6 +467,7 @@
                     variant="subtle"
                     size="xs"
                     :color="getUnlockBadgeColor(unlock.type)"
+                    :title="unlock.note"
                   >
                     {{ getUnlockLabel(unlock.type, unlock.label) }}
                   </UBadge>
@@ -591,6 +593,7 @@
                       variant="subtle"
                       size="xs"
                       :color="getUnlockBadgeColor(unlock.type)"
+                      :title="unlock.note"
                     >
                       {{ getUnlockLabel(unlock.type, unlock.label) }}
                     </UBadge>
@@ -720,6 +723,7 @@
                     variant="subtle"
                     size="xs"
                     :color="getUnlockBadgeColor(unlock.type)"
+                    :title="unlock.note"
                   >
                     {{ getUnlockLabel(unlock.type, unlock.label) }}
                   </UBadge>
@@ -751,6 +755,7 @@
           :key="`chapter-${chapter.id}-${unlock.type}-${unlock.id}`"
           variant="subtle"
           :color="getUnlockBadgeColor(unlock.type)"
+          :title="unlock.note"
           size="xs"
         >
           {{ getUnlockLabel(unlock.type, unlock.label) }}

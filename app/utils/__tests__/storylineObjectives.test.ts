@@ -67,6 +67,21 @@ describe('storylineObjectives', () => {
       sourceQuestId: 'quest-a',
     });
   });
+  it('preserves explicit unlock records when hydrating a cached chapter', () => {
+    const unlocks = [
+      { type: 'trader' as const, id: 'peacekeeper', name: 'Peacekeeper', note: 'Complete Woods' },
+    ];
+    const normalized = normalizeStoryObjectives([{ ...objectives[0]!, unlocks }]);
+    expect(normalized['obj-1']?.unlocks).toEqual(unlocks);
+    expect(normalized['obj-1']?.unlocks).not.toBe(unlocks);
+  });
+  it('ignores malformed cached unlocks instead of fabricating their placement', () => {
+    const unlocks = [null, { type: 'invented', name: 'Shoreline' }, { type: 'trader', name: '' }];
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[0]!, unlocks },
+    ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(normalized['obj-1']?.unlocks).toEqual([]);
+  });
   it('excludes objectives on mutually exclusive quests from bulk completion', () => {
     expect(getAutoCompletableObjectiveIds(questRouteObjectives, [['quest-a', 'quest-b']])).toEqual([
       'obj-c1',

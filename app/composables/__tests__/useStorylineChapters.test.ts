@@ -205,22 +205,91 @@ describe('useStorylineChapters', () => {
         routeState: 'chosen',
       },
     ]);
-    const objectiveAUnlocks = objectiveA.unlocks.map((unlock) => unlock.label);
-    const objectiveBUnlocks = objectiveB.unlocks.map((unlock) => unlock.label);
-    const objectiveCUnlocks = objectiveC.unlocks.map((unlock) => unlock.label);
-    expect(objectiveAUnlocks).toContain('Peacekeeper');
-    expect(objectiveBUnlocks).toContain('Route B Objective');
-    expect(objectiveBUnlocks).toContain('Chapter completion package');
-    expect(objectiveCUnlocks).toContain('Side Objective');
-    expect(objectiveA.hasEstimatedUnlocks).toBe(true);
-    expect(objectiveB.hasEstimatedUnlocks).toBe(true);
+    expect(objectiveA.unlocks).toEqual([]);
+    expect(objectiveB.unlocks).toEqual([]);
+    expect(objectiveC.unlocks).toEqual([]);
+    expect(objectiveA.hasEstimatedUnlocks).toBe(false);
+    expect(objectiveB.hasEstimatedUnlocks).toBe(false);
     expect(objectiveC.hasEstimatedUnlocks).toBe(false);
-    expect(chapter.chapterUnlocks).toEqual([]);
+    expect(chapter.chapterUnlocks.map((unlock) => unlock.label)).toEqual([
+      'Route B Objective',
+      'Side Objective',
+      'Peacekeeper',
+      'Chapter completion package',
+    ]);
     expect(chapter.mainLinearObjectives).toEqual([]);
     expect(chapter.optionalRouteChoices).toEqual([]);
     expect(chapter.optionalLinearObjectives.map((objective) => objective.id)).toEqual([
       'obj-c',
       'obj-d',
+    ]);
+  });
+  it('preserves explicit stage unlocks through projection instead of guessing chapter reward timing', async () => {
+    const { projectStoryChapters } = await import('@/server/utils/overlayProjectors');
+    const chapters = projectStoryChapters(
+      {
+        storyChapters: {
+          tour: {
+            name: 'Tour',
+            order: 1,
+            traderUnlocks: [{ id: '5935c25fb3acc3127c3d8cd9', name: 'Peacekeeper' }],
+            mapUnlocks: [{ id: '5704e554d2720bac5b8b456e', name: 'Shoreline' }],
+            rewards: { description: 'Pathfinder achievement' },
+            objectives: [
+              { id: 'escape', type: 'main', description: 'Escape Ground Zero' },
+              { id: 'talk', type: 'main', description: 'Talk to Skier' },
+              { id: 'kills', type: 'main', description: 'Eliminate any 3 targets on Woods' },
+              {
+                id: 'woods',
+                type: 'main',
+                description: 'Survive and extract from Woods or visit Woods 3 times',
+                sourceQuestId: '6895bf915bcf5c38e90b83d8',
+                unlocks: [
+                  {
+                    type: 'trader',
+                    id: '5935c25fb3acc3127c3d8cd9',
+                    name: 'Peacekeeper',
+                    note: 'Complete the Skier / Woods stage.',
+                  },
+                  { type: 'map', id: '5704e554d2720bac5b8b456e', name: 'Shoreline' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      'regular',
+      'en'
+    );
+    const { normalizedChapters } = await loadComposable(chapters);
+    const chapter = normalizedChapters.value[0]!;
+    expect(chapter.objectives.slice(0, 3).map((o) => o.unlocks)).toEqual([[], [], []]);
+    expect(chapter.objectives[3]?.unlocks).toEqual([
+      {
+        estimated: false,
+        type: 'trader',
+        id: '5935c25fb3acc3127c3d8cd9',
+        label: 'Peacekeeper',
+        note: 'Complete the Skier / Woods stage.',
+      },
+      { estimated: false, type: 'map', id: '5704e554d2720bac5b8b456e', label: 'Shoreline' },
+    ]);
+    expect(chapter.chapterUnlocks).toEqual([
+      { estimated: false, type: 'reward', id: 'tour-reward-1', label: 'Pathfinder achievement' },
+    ]);
+    expect(chapter.objectives.every((o) => !o.hasEstimatedUnlocks)).toBe(true);
+  });
+  it('keeps unplaced unlocks at chapter level even when objective text mentions the trader', async () => {
+    const chapter = structuredClone(STORY_CHAPTERS[0]!);
+    chapter.objectives!['obj-a']!.description = 'Talk to Peacekeeper';
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const view = normalizedChapters.value[0]!;
+    expect(view.objectives.every((o) => o.unlocks.length === 0)).toBe(true);
+    expect(view.chapterUnlocks.map((u) => u.label)).toEqual([
+      'Route B Objective',
+      'Side Objective',
+      'Peacekeeper',
+      'Chapter completion package',
     ]);
   });
   it('ignores missing mutually exclusive links when deriving route alternatives', async () => {
