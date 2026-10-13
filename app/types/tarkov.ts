@@ -473,6 +473,8 @@ export interface StoryObjective {
    * chapters, so treat it as optional and never key persisted progress on it.
    */
   sourceQuestId?: string;
+  /** Raw optional layout parent in the same chapter/subquest; never a completion prerequisite. */
+  parentObjectiveId?: string;
   /** `client/ending_list` id of the branch this objective belongs to, when the overlay tags one. */
   endingId?: string;
   unlocks?: StoryObjectiveUnlock[];

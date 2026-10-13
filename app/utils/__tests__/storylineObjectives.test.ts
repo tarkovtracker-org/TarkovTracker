@@ -48,6 +48,40 @@ const questRouteObjectives = [
   },
 ];
 describe('storylineObjectives', () => {
+  it('preserves valid optional parents through array projection and cached record normalization', () => {
+    const parent = { ...objectives[2]!, sourceQuestId: 'quest-a' };
+    const child = {
+      ...objectives[3]!,
+      sourceQuestId: 'quest-a',
+      parentObjectiveId: parent.id,
+    };
+    const normalized = normalizeStoryObjectives([child, parent]);
+    expect(normalized[child.id]?.parentObjectiveId).toBe(parent.id);
+    expect(normalizeStoryObjectives(normalized)[child.id]?.parentObjectiveId).toBe(parent.id);
+    expect(getAutoCompletableObjectiveIds([child, parent])).toEqual([parent.id, child.id]);
+    expect(child.parentObjectiveId).toBe(parent.id);
+  });
+  it.each([
+    { label: 'missing parent', parent: {}, child: { parentObjectiveId: 'missing' } },
+    { label: 'optional parent', parent: { type: 'optional' }, child: {} },
+    { label: 'another source quest', parent: { sourceQuestId: 'quest-b' }, child: {} },
+    {
+      label: 'unknown source quest',
+      parent: { sourceQuestId: undefined },
+      child: { sourceQuestId: undefined },
+    },
+    { label: 'blank source quest', parent: { sourceQuestId: ' ' }, child: { sourceQuestId: ' ' } },
+    { label: 'self reference', parent: {}, child: { parentObjectiveId: 'obj-4' } },
+    { label: 'main child', parent: {}, child: { type: 'main' } },
+    { label: 'non-string parent', parent: {}, child: { parentObjectiveId: 42 } },
+  ])('drops a link with $label without losing either objective', ({ parent, child }) => {
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[2]!, sourceQuestId: 'quest-a', ...parent },
+      { ...objectives[3]!, sourceQuestId: 'quest-a', parentObjectiveId: 'obj-3', ...child },
+    ] as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(Object.keys(normalized)).toEqual(['obj-3', 'obj-4']);
+    expect(normalized['obj-4']).not.toHaveProperty('parentObjectiveId');
+  });
   it('returns only non-route-choice objective ids', () => {
     expect(getAutoCompletableObjectiveIds(objectives)).toEqual(['obj-3', 'obj-4']);
   });
