@@ -741,6 +741,19 @@ describe('Team realtime resources', () => {
       select: vi.fn(),
     };
     membershipQuery.select.mockReturnValue(membershipQuery);
+    const teamQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      single: vi.fn().mockResolvedValue({
+        data: { id: 'team-1', owner_id: currentUserId, join_code: 'server-code' },
+        error: null,
+      }),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { owner_only_expires_at: null }, error: null }),
+    };
+    teamQuery.select.mockReturnValue(teamQuery);
+    teamQuery.eq.mockReturnValue(teamQuery);
     // Mirrors `RealtimeClient.channel()`: an open topic returns the existing
     // channel, so a premature rejoin is observable instead of silently working.
     const openTopics = new Map<string, ChannelRecord>();
@@ -756,7 +769,7 @@ describe('Team realtime resources', () => {
         openTopics.set(topic, record);
         return record.channel;
       }),
-      from: vi.fn(() => membershipQuery),
+      from: vi.fn((table: string) => (table === 'teams' ? teamQuery : membershipQuery)),
       removeChannel: vi.fn((target: unknown) => {
         for (const [topic, record] of openTopics) {
           if (record.channel === target) openTopics.delete(topic);
@@ -773,7 +786,7 @@ describe('Team realtime resources', () => {
     };
     nuxtApp.$supabase.client = client;
     nuxtApp.$supabase.ready = vi.fn().mockResolvedValue(null);
-    nuxtApp.$supabase.user = { id: currentUserId, loggedIn: true };
+    nuxtApp.$supabase.user = reactive({ id: currentUserId, loggedIn: true });
     mockGetTeamMembers.mockReset();
     mockGetTeamMembers.mockResolvedValue({
       members: [currentUserId, teammateId],
@@ -796,7 +809,7 @@ describe('Team realtime resources', () => {
     }));
     useSystemStoreWithSupabase().cleanup();
     const teamRecords = () => records.filter((record) => record.topic.startsWith('team:'));
-    return { client, currentUserId, teamRecords, teammateId };
+    return { client, currentUserId, teamRecords, teammateId, teamQuery, records };
   };
   const firstTeamRecord = (teamRecords: () => ChannelRecord[]): ChannelRecord => {
     const record = teamRecords()[0];
@@ -810,15 +823,14 @@ describe('Team realtime resources', () => {
     if (!options) throw new Error('Missing team listener');
     options.onData({ id: 'team-1' });
   };
-  it('ignores snapshot refreshes when logged out, throttled, or no longer in a team', async () => {
+  it('refreshes current snapshots but skips them when logged out or no longer in a team', async () => {
     const { teamRecords } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();
     try {
       await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
       const calls = mockGetTeamMembers.mock.calls.length;
       deliverTeamSnapshot();
-      await Promise.resolve();
-      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls);
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
       const app = useNuxtApp();
       app.$supabase.user.loggedIn = false;
       deliverTeamSnapshot();
@@ -827,19 +839,549 @@ describe('Team realtime resources', () => {
       useSystemStore().$patch((state) => {
         state.pvp_team_id = null;
       });
-      // Make the explicit refresh eligible despite the recent successful read.
-      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3000);
       deliverTeamSnapshot();
       await Promise.resolve();
       expect(instance.teamStore.memberProfiles).toEqual({});
-      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls);
+      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1);
     } finally {
       vi.restoreAllMocks();
       instance.cleanup();
     }
   });
+  it('clears a prior deadline on join, old-schema snapshots and disband', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      const row = { id: 'team-1', owner_only_expires_at: '2026-10-20T12:00:00Z' };
+      teamQuery.maybeSingle.mockResolvedValue({ data: row, error: null });
+      options.onData(row);
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(row.owner_only_expires_at)
+      );
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: null },
+        error: null,
+      });
+      options.onData({ ...row, owner_only_expires_at: null });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      teamQuery.maybeSingle.mockResolvedValue({ data: row, error: null });
+      options.onData(row);
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(row.owner_only_expires_at)
+      );
+      teamQuery.maybeSingle.mockResolvedValue({ data: { id: 'team-1' }, error: null });
+      options.onData({ id: 'team-1' });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      options.onData(row);
+      options.onData(null);
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('refreshes cancellation and a fresh solo deadline from membership events without team publication', async () => {
+    const { teamRecords, currentUserId, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      const membership = firstTeamRecord(teamRecords).handlers.find(
+        ({ config }) => config.table === 'team_memberships'
+      );
+      expect(membership).toBeDefined();
+      mockGetTeamMembers.mockResolvedValue({
+        members: [currentUserId, 'joining-member'],
+        profiles: {},
+      });
+      membership!.handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: '2026-10-21T12:00:00Z' },
+        error: null,
+      });
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      membership!.handler({ eventType: 'DELETE', new: {} });
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z')
+      );
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('rereads membership and deadline when events arrive after members resolve but before the deadline', async () => {
+    const { teamRecords, teamQuery, currentUserId, teammateId } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    let finish!: (value: unknown) => void;
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      mockGetTeamMembers.mockResolvedValueOnce({
+        members: [currentUserId, teammateId],
+        profiles: {},
+      });
+      teamQuery.maybeSingle.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      const calls = mockGetTeamMembers.mock.calls.length;
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      const membership = firstTeamRecord(teamRecords).handlers.find(
+        ({ config }) => config.table === 'team_memberships'
+      )!;
+      membership.handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      const freshDeadline = '2026-10-21T12:00:00Z';
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: freshDeadline },
+        error: null,
+      });
+      membership.handler({ eventType: 'DELETE', new: {} });
+      membership.handler({ eventType: 'DELETE', new: {} });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1);
+      finish({ data: { owner_only_expires_at: null }, error: null });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBe(freshDeadline));
+      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 2);
+      expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 2);
+      expect(instance.teamStore.members).toEqual([currentUserId]);
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(2));
+      expect(
+        teamRecords()
+          .at(-1)
+          ?.handlers.find(({ config }) => config.table === 'user_game_mode_progress')?.config
+      ).toMatchObject({ filter: `user_id=in.(${currentUserId})` });
+    } finally {
+      vi.restoreAllMocks();
+      instance.cleanup();
+    }
+  });
+  it('discards a late deadline response after the active team changes', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    let finish!: (value: unknown) => void;
+    const nextDeadline = '2026-10-22T12:00:00Z';
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      teamQuery.maybeSingle.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: nextDeadline },
+        error: null,
+      });
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2', owner_only_expires_at: nextDeadline });
+      finish({ data: { owner_only_expires_at: '2026-10-23T12:00:00Z' }, error: null });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe(nextDeadline);
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it.each(['dispose', 'same-user reauthentication'])(
+    'rejects a delayed refresh after %s while the replacement has a newer deadline',
+    async (change) => {
+      const { teamRecords, teamQuery } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      let replacement = instance;
+      let finish!: (value: unknown) => void;
+      const freshDeadline = '2026-10-22T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const reads = teamQuery.maybeSingle.mock.calls.length;
+        teamQuery.maybeSingle.mockReturnValueOnce(
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+        );
+        firstTeamRecord(teamRecords)
+          .handlers.find(({ config }) => config.table === 'team_memberships')!
+          .handler({ eventType: 'INSERT', new: {} });
+        await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+        teamQuery.maybeSingle.mockResolvedValue({
+          data: { owner_only_expires_at: freshDeadline },
+          error: null,
+        });
+        if (change === 'dispose') {
+          instance.cleanup();
+          replacement = useTeamStoreWithSupabase();
+        } else {
+          const app = useNuxtApp();
+          app.$supabase.user.loggedIn = false;
+          app.$supabase.user.loggedIn = true;
+          deliverTeamSnapshot();
+        }
+        await vi.waitFor(() =>
+          expect(replacement.teamStore.ownerOnlyExpiresAt).toBe(freshDeadline)
+        );
+        finish({ data: { owner_only_expires_at: '2026-10-23T12:00:00Z' }, error: null });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(replacement.teamStore.ownerOnlyExpiresAt).toBe(freshDeadline);
+      } finally {
+        instance.cleanup();
+        if (replacement !== instance) replacement.cleanup();
+      }
+    }
+  );
+  it('never lets a delayed listener snapshot restore a warning after a newer join refresh', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-20T12:00:00Z' });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('refreshes the deadline even when the independent member-list request fails', async () => {
+    const { teamRecords } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const members = [...(instance.teamStore.members ?? [])];
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      mockGetTeamMembers.mockRejectedValueOnce({ statusCode: 503 });
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'INSERT', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull());
+      expect(instance.teamStore.members).toEqual(members);
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('clears the previous team deadline when the next team deadline read fails', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      instance.teamStore.$patch((state) => {
+        state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+      });
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2' });
+      await vi.waitFor(() => expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(reads + 1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(instance.teamStore.id).toBe('team-2');
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it.each(['first load', 'team switch'])(
+    'keeps the fetched deadline on %s when the independent read fails',
+    async (scenario) => {
+      const { teamRecords, teamQuery } = buildRealtimeHarness();
+      teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-21T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const teamId = scenario === 'first load' ? 'team-1' : 'team-2';
+        if (scenario === 'team switch') {
+          instance.teamStore.$patch((state) => {
+            state.id = 'team-1';
+            state.ownerOnlyExpiresAt = '2026-10-20T12:00:00Z';
+          });
+          useSystemStore().$patch((state) => {
+            state.pvp_team_id = teamId;
+          });
+        }
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        const reads = teamQuery.maybeSingle.mock.calls.length;
+        options.onData({ id: teamId, owner_only_expires_at: deadline });
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        await vi.waitFor(() =>
+          expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it.each(['team switch', 'unfetched team switch', 'state reset'])(
+    'reseeds a fetched warning after %s during a read outage',
+    async (scenario) => {
+      const { teamRecords, teamQuery } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-21T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+        if (scenario !== 'state reset') {
+          useSystemStore().$patch((state) => {
+            state.pvp_team_id = 'team-2';
+          });
+          if (scenario === 'team switch') options.onData({ id: 'team-2' });
+        } else {
+          options.onData(null);
+        }
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        useSystemStore().$patch((state) => {
+          state.pvp_team_id = 'team-1';
+        });
+        options.onData({ id: 'team-1', owner_only_expires_at: deadline });
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it('allows fetched snapshots to update and cancel the fallback during a read outage', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-21T12:00:00Z' });
+      options.onData({ id: 'team-1', owner_only_expires_at: '2026-10-22T12:00:00Z' });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-22T12:00:00Z');
+      options.onData({ id: 'team-1', owner_only_expires_at: null });
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBeNull();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('keeps the next team deadline when its refresh finishes before its snapshot', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { id: 'team-2', owner_id: 'owner-2', owner_only_expires_at: '2026-10-21T12:00:00Z' },
+        error: null,
+      });
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      await vi.waitFor(() =>
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z')
+      );
+      const options = mockUseSupabaseListener.mock.calls.find(
+        ([config]) => config.table === 'teams'
+      )?.[0];
+      options.onData({ id: 'team-2', owner_id: 'owner-2' });
+      expect(instance.teamStore.id).toBe('team-2');
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-21T12:00:00Z');
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('clears a stale owner when the authorized team row has no owner', async () => {
+    const { teamRecords, teamQuery } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      instance.teamStore.$patch((state) => {
+        state.owner = 'departed-owner';
+      });
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_id: null, owner_only_expires_at: null },
+        error: null,
+      });
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'UPDATE', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.owner).toBeNull());
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('adopts a transferred owner from the authorized team row without team publication', async () => {
+    const { teamRecords, teamQuery, currentUserId } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      instance.teamStore.$patch((state) => {
+        state.owner = 'departed-owner';
+      });
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_id: currentUserId, owner_only_expires_at: '2026-10-25T12:00:00Z' },
+        error: null,
+      });
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'UPDATE', new: {} });
+      await vi.waitFor(() => expect(instance.teamStore.owner).toBe(currentUserId));
+      expect(instance.teamStore.ownerOnlyExpiresAt).toBe('2026-10-25T12:00:00Z');
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it.each([{ owner_id: 'departed-owner' }, { owner_id: null }, { owner: 'departed-owner' }])(
+    'preserves the refreshed owner and deadline against a delayed snapshot %j',
+    async (staleOwner) => {
+      const { teamRecords, teamQuery, currentUserId } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-25T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        instance.teamStore.$patch((state) => {
+          state.id = 'team-1';
+          state.owner = 'departed-owner';
+        });
+        teamQuery.maybeSingle.mockResolvedValue({
+          data: { owner_id: currentUserId, owner_only_expires_at: deadline },
+          error: null,
+        });
+        firstTeamRecord(teamRecords)
+          .handlers.find(({ config }) => config.table === 'team_memberships')!
+          .handler({ eventType: 'DELETE', new: {} });
+        await vi.waitFor(() => expect(instance.teamStore.owner).toBe(currentUserId));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        const reads = teamQuery.maybeSingle.mock.calls.length;
+        teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        options.onData({ id: 'team-1', ...staleOwner, owner_only_expires_at: null });
+        expect(instance.teamStore.owner).toBe(currentUserId);
+        await vi.waitFor(() =>
+          expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.owner).toBe(currentUserId);
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it('preserves the warning and member state through the real listener when independent reads fail', async () => {
+    const { currentUserId, teamQuery, records } = buildRealtimeHarness();
+    const { useSupabaseListener: actualListener } = await vi.importActual<
+      typeof import('@/composables/supabase/useSupabaseListener')
+    >('@/composables/supabase/useSupabaseListener');
+    const fallback = mockUseSupabaseListener.getMockImplementation()!;
+    mockUseSupabaseListener.mockImplementation((config) =>
+      config.table === 'teams' ? actualListener(config) : fallback(config)
+    );
+    const deadline = '2026-10-22T12:00:00Z';
+    const store = useTeamStore();
+    teamQuery.maybeSingle.mockResolvedValue({
+      data: { owner_only_expires_at: deadline },
+      error: null,
+    });
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamQuery.single).toHaveBeenCalled());
+      await vi.waitFor(() => expect(store.joinCode).toBe('server-code'));
+      await vi.waitFor(() => expect(store.ownerOnlyExpiresAt).toBe(deadline));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.owner).toBe(currentUserId);
+      const members = [...(store.members ?? [])];
+      const profiles = structuredClone(toRaw(store.memberProfiles));
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'Deadline unavailable' },
+      });
+      mockGetTeamMembers.mockRejectedValue({ statusCode: 503 });
+      const subscription = records.find((record) => record.topic === 'public:teams:id=eq.team-1');
+      const handler = subscription?.handlers.find(
+        ({ config }) => config.table === 'teams'
+      )?.handler;
+      expect(handler).toBeDefined();
+      const row = {
+        id: 'team-1',
+        owner_id: currentUserId,
+        join_code: 'changed-code',
+        owner_only_expires_at: '2026-10-20T12:00:00Z',
+      };
+      const reads = teamQuery.maybeSingle.mock.calls.length;
+      handler!({ eventType: 'UPDATE', new: row });
+      await vi.waitFor(() =>
+        expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.joinCode).toBe('changed-code');
+      expect(store.ownerOnlyExpiresAt).toBe(deadline);
+      expect(store.members).toEqual(members);
+      expect(store.memberProfiles).toMatchObject(profiles ?? {});
+      teamQuery.maybeSingle.mockResolvedValue({
+        data: { owner_only_expires_at: null },
+        error: null,
+      });
+      mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+      handler!({ eventType: 'UPDATE', new: row });
+      await vi.waitFor(() => expect(store.ownerOnlyExpiresAt).toBeNull());
+      expect(store.members).toEqual([currentUserId]);
+      handler!({ eventType: 'DELETE', new: {} });
+      expect(store.owner).toBeNull();
+      expect(store.joinCode).toBeNull();
+      expect(store.members).toEqual([]);
+    } finally {
+      instance.cleanup();
+    }
+  });
   it.each(['success', 'forbidden', 'unavailable'])(
-    'coalesces member reads and handles %s for every waiter',
+    'coalesces forced snapshot refreshes into one fresh read and handles %s for every waiter',
     async (outcome) => {
       const { teamRecords, currentUserId } = buildRealtimeHarness();
       const instance = useTeamStoreWithSupabase();
@@ -858,10 +1400,16 @@ describe('Team realtime resources', () => {
         firstTeamRecord(teamRecords).statusCallbacks[0]?.('SUBSCRIBED');
         await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
         deliverTeamSnapshot();
-        if (outcome === 'success') resolve({ members: [currentUserId], profiles: {} });
-        else reject({ statusCode: outcome === 'forbidden' ? 403 : 500 });
+        if (outcome === 'success') {
+          mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+          resolve({ members: [currentUserId], profiles: {} });
+        } else {
+          const error = { statusCode: outcome === 'forbidden' ? 403 : 500 };
+          mockGetTeamMembers.mockRejectedValue(error);
+          reject(error);
+        }
         await new Promise((finish) => setTimeout(finish, 0));
-        expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1);
+        expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 2);
         if (outcome === 'success') expect(instance.teamStore.members).toEqual([currentUserId]);
         else expect(instance.teamStore.members).toHaveLength(2);
       } finally {

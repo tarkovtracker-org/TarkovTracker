@@ -677,6 +677,7 @@ export interface TeamState extends StateTree {
   id?: string | null;
   owner?: string | null;
   joinCode?: string | null;
+  ownerOnlyExpiresAt?: string | null;
   members?: string[];
   memberProfiles?: Record<string, MemberProfile>;
 }
