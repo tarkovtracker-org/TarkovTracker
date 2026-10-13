@@ -119,6 +119,15 @@ the view never infers unlock timing from text or distributes rewards across obje
 Tour's ordered objective array follows the wiki narrative while retaining raw objective IDs
 and source-subquest links. Stage-completion notes remain available on unlock badges.
 
+Optional `parentObjectiveId` values come from the overlay's captured condition parents.
+Projection and client normalization retain a link only when it targets a distinct main objective
+in the same chapter with the same nonempty `sourceQuestId`; an invalid link is dropped without
+dropping its objective. The timeline groups linked optionals beside their main step (below it
+on narrow screens), supporting several children and parents inside route decisions. Unlinked
+optionals keep their original positions. Each objective retains its own checkbox, deep link,
+unlocks and completion state; layout parents never imply completion, prerequisites or item-supply
+relationships. Older overlays without this field keep the standalone layout.
+
 Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
 An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
 by mode and language (`json-v3` and `overlay-v3`), and stale responses cannot replace another scope.

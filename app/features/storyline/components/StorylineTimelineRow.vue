@@ -19,13 +19,22 @@
       <StorylineObjectiveRow v-else-if="entry.objective" v-bind="rowProps(entry.objective)" />
     </div>
     <div v-if="hasOptionals" :class="[lanes.optional, optionalLaneClass]">
-      <StorylineObjectiveRow
-        v-if="optional && entry.objective"
-        class="bg-warning-950/15 border-warning-700/30 border border-dashed"
-        optional
-        accent="warning"
-        v-bind="rowProps(entry.objective)"
-      />
+      <div
+        v-for="objective in optionalObjectives"
+        :key="objective.id"
+        :data-parent-objective-id="objective.parentObjectiveId"
+        class="mb-1 last:mb-0"
+      >
+        <span v-if="entry.routeChoice" class="text-surface-400 block px-2 text-xs leading-snug">
+          {{ parentLabel(objective) }}
+        </span>
+        <StorylineObjectiveRow
+          class="bg-warning-950/15 border-warning-700/30 border border-dashed"
+          optional
+          accent="warning"
+          v-bind="rowProps(objective)"
+        />
+      </div>
     </div>
     <!-- One column on wide layouts so unlocks never add height to a step; below the step otherwise. -->
     <div
@@ -55,11 +64,19 @@
   }>();
   const emit = defineEmits<{ toggleObjective: [objectiveId: string] }>();
   const optional = computed(() => props.entry.step === null);
-  // The optional lane only shows on wide layouts, except for the optional row itself, which is
-  // indented under the rail on narrow ones.
-  const optionalLaneClass = computed(() =>
-    optional.value ? 'ml-2 @3xl/objectives:ml-0' : 'hidden @3xl/objectives:block'
+  const optionalObjectives = computed(() =>
+    optional.value && props.entry.objective
+      ? [props.entry.objective]
+      : props.entry.optionalObjectives
   );
+  const optionalLaneClass = computed(() => {
+    if (optional.value) return 'ml-2 @3xl/objectives:ml-0';
+    if (!optionalObjectives.value.length) return 'hidden @3xl/objectives:block';
+    return 'border-warning-700/40 relative ml-2 border-l border-dashed pl-3 @3xl/objectives:ml-0 @3xl/objectives:border-l-0 @3xl/objectives:pl-0 @3xl/objectives:before:absolute @3xl/objectives:before:top-4 @3xl/objectives:before:-left-4 @3xl/objectives:before:w-4 @3xl/objectives:before:border-t @3xl/objectives:before:border-dashed @3xl/objectives:before:border-warning-700/50';
+  });
+  const parentLabel = (objective: StorylineObjectiveProgress) =>
+    props.entry.routeChoice?.objectives.find((parent) => parent.id === objective.parentObjectiveId)
+      ?.description;
   const rowProps = (objective: StorylineObjectiveProgress) => ({
     hideUnlocks: true,
     objective,

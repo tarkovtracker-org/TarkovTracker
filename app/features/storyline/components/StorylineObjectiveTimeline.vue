@@ -40,12 +40,14 @@
   }>();
   const emit = defineEmits<{ toggleObjective: [objectiveId: string] }>();
   const { t } = useI18n({ useScope: 'global' });
-  const hasOptionals = computed(() => props.entries.some((entry) => entry.step === null));
+  const hasOptionals = computed(() =>
+    props.entries.some((entry) => entry.step === null || entry.optionalObjectives.length > 0)
+  );
   const hasUnlocks = computed(() =>
     props.entries.some((entry) => storylineEntryUnlockGroups(entry).length)
   );
-  // Main steps take the wider lane; optional objectives keep their place in the sequence but sit in
-  // a lane of their own, and unlocks get a fixed column so they never add height to a step.
+  // Explicit optional children share a main row; standalone optionals keep their original place.
+  // Unlocks get a fixed column on wide layouts.
   const lanes = computed(() => ({
     main: hasOptionals.value ? 'min-w-0 flex-3' : 'min-w-0 flex-1',
     optional: 'min-w-0 flex-2',
