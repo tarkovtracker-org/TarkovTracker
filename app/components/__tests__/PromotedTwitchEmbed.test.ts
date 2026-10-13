@@ -137,6 +137,30 @@ describe('PromotedTwitchEmbed', () => {
       wrapper.unmount();
     }
   });
+  it.each(['offline', 'failure'])(
+    'keeps the SDK player after a late %s poll result',
+    async (outcome) => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const wrapper = await mountEmbed();
+      let finish: () => void = () => {};
+      fetchMock.mockImplementation((url: string) => {
+        if (url === '/api/twitch/config') return Promise.resolve(twitchConfig);
+        return new Promise((resolve, reject) => {
+          finish = () =>
+            outcome === 'failure' ? reject(new Error('timeout')) : resolve({ isLive: false });
+        });
+      });
+      await vi.advanceTimersByTimeAsync(300_000);
+      wrapper.getComponent(TwitchStreamPlayer).vm.$emit('ready');
+      finish();
+      await flushPromises();
+      expect(wrapper.find('iframe').exists()).toBe(true);
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+      wrapper.unmount();
+    }
+  );
   it('stops live checks after closing and rechecks on reopen', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     const wrapper = await mountEmbed();

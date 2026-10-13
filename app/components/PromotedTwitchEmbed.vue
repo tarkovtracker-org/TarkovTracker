@@ -148,6 +148,8 @@
   };
   const handlePlayerReady = (): void => {
     if (!isVisible.value) return;
+    // The SDK now owns status; invalidate any poll dispatched before READY.
+    liveGeneration += 1;
     playerManaged = true;
     stopPolling();
   };

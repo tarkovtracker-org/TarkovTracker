@@ -156,9 +156,10 @@ and [Pages Function billing](https://developers.cloudflare.com/pages/functions/p
   must return the committed config with an explicit warning flag; the client must apply that config
   and visibly warn the admin without retrying the database write. The bounded TTL remains the final
   recovery path when invalidation fails.
-- Mounted clients must refresh config on mount and every five minutes while visible; tab returns reuse
-  fresh results. Remote enable, disable, and channel changes must reach continuously open tabs.
-  Config refreshes and live-status checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+- Mounted clients resolve config on mount, including hidden mounts, and refresh it periodically while
+  visible with a five-minute freshness window. Tab returns reuse fresh results. Remote enable,
+  disable, and channel changes must reach continuously open tabs. Hidden tabs stop polling timers;
+  already dispatched requests may settle. Pending lifecycle work must not start timers after unmount.
   Older config versions and stale live-request generations must never overwrite the latest shared
   configuration or player state.
 - Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`
