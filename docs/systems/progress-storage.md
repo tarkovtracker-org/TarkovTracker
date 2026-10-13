@@ -395,8 +395,10 @@ warnings when it can commit.
 ## Manual player levels
 
 Player levels use each mode's saved `level`, including Seasonal history and prestige archives.
-Completing or reversing tasks does not change the level. Users edit it in the drawer;
-a Tarkov.dev profile import converts the imported XP with player-level metadata once and saves
+Completing or reversing tasks does not change the level. Users edit it in the drawer or in
+Settings → Progression; both editors share `usePlayerLevelEditor`, which rejects blank, fractional,
+and out-of-range input (metadata bounds, or the default 1–79 while metadata is absent) instead of
+clamping it, and resets an unsaved draft when the active mode or saved level changes. A Tarkov.dev profile import converts the imported XP with player-level metadata once and saves
 that level. Imports load missing thresholds before writing progress and fail without changing
 progress if thresholds remain unavailable.
 
