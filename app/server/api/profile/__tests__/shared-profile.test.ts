@@ -7,11 +7,13 @@ import {
   stubEdgeCache,
 } from '@/server/utils/__tests__/eventStubs';
 import type { H3Event } from 'h3';
-const { mockGetRequestHeader, mockGetRouterParam, mockFetch } = vi.hoisted(() => ({
+const { mockGetRequestHeader, mockGetRouterParam, mockFetch, mockOverlay } = vi.hoisted(() => ({
   mockGetRequestHeader: vi.fn(),
   mockGetRouterParam: vi.fn(),
   mockFetch: vi.fn(),
+  mockOverlay: vi.fn(),
 }));
+vi.mock('@/server/utils/overlay', () => ({ fetchOverlay: mockOverlay }));
 const runtimeConfig = {
   apiProtection: {
     trustProxy: false,
@@ -84,6 +86,8 @@ describe('Shared Profile API', () => {
     vi.stubGlobal('fetch', mockFetch as typeof fetch);
     vi.clearAllMocks();
     mockFetch.mockReset();
+    mockOverlay.mockReset();
+    mockOverlay.mockResolvedValue({ overlay: null });
     runtimeConfig.apiProtection.trustProxy = false;
     runtimeConfig.sharedProfileCacheTtlMs = 5000;
     runtimeConfig.sharedProfileRateLimitPerMinute = 120;
@@ -117,8 +121,75 @@ describe('Shared Profile API', () => {
     });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid profile id');
+    expect(mockOverlay).not.toHaveBeenCalled();
   });
+  it.each(['pvp', 'pve', 'seasonal'])(
+    'returns the %s effective baseline without modifying recorded progress',
+    async (mode) => {
+      const recorded = {
+        level: 24,
+        storyChapters: {
+          tour: {
+            objectives: {
+              escape: { complete: false, timestamp: 31 },
+              therapist: { complete: false },
+            },
+          },
+        },
+      };
+      mockOverlay.mockResolvedValue({
+        overlay: {
+          storyChapters: {
+            tour: {
+              id: 'tour',
+              order: 1,
+              objectives: {
+                escape: {
+                  id: 'escape',
+                  type: 'main',
+                  description: 'Escape',
+                  completionPolicy: 'tutorial',
+                },
+                therapist: { id: 'therapist', type: 'main', description: 'Talk' },
+              },
+            },
+          },
+        },
+      });
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'mode' ? mode : '11111111-1111-4111-8111-111111111111'
+      );
+      let empty = false;
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.includes('/rpc/')) return { ok: true, json: async () => 2 };
+        if (url.includes('user_game_mode_progress'))
+          return modeProgressResponse(empty ? {} : recorded);
+        if (url.includes('user_preferences')) return preferencesResponse();
+        return progressResponse();
+      });
+      const before = JSON.stringify(recorded);
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.data?.storyChapters?.tour?.objectives).toEqual({
+        escape: { complete: true },
+        therapist: { complete: false },
+      });
+      expect(result.data?.storyChapters?.tour?.complete).not.toBe(true);
+      expect(JSON.stringify(recorded)).toBe(before);
+      empty = true;
+      const blank = await handler(mockEvent as H3Event);
+      expect(blank.data).toEqual({
+        storyChapters: { tour: { objectives: { escape: { complete: true } } } },
+      });
+      expect(
+        mockFetch.mock.calls
+          .filter(([url]) => String(url).includes('/rest/v1/user_game_mode_progress'))
+          .every(([, init]) => !init?.method || init.method === 'GET')
+      ).toBe(true);
+    }
+  );
   it('rejects invalid mode', async () => {
+    // No metadata fetch may bypass the validated account/mode boundary.
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
       if (key === 'mode') return 'invalid';
@@ -169,6 +240,7 @@ describe('Shared Profile API', () => {
     }
   });
   it('serves shared profiles in production mode', async () => {
+    // Old/unavailable policy metadata retains the existing recorded read model.
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     vi.resetModules();

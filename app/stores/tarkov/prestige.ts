@@ -9,6 +9,7 @@ import {
   getCanonicalSkillKey,
   resolveSkillKey as resolveSkillAliasKey,
 } from '@/utils/skillHelpers';
+import { effectiveStoryProgress } from '@/utils/storylineCompletion';
 import { getCompletionFlags } from '@/utils/taskStatus';
 import type {
   GameEdition,
@@ -496,7 +497,10 @@ export const buildPrestigeRequirementRows = (
     const chapter = options.storyChapters.find(
       (chapter) => chapter.id === requirement.storyChapter
     );
-    const chapterProgress = options.modeProgress.storyChapters?.[requirement.storyChapter];
+    const chapterProgress = effectiveStoryProgress(
+      options.modeProgress.storyChapters,
+      options.storyChapters
+    )[requirement.storyChapter];
     const progress =
       requirement.type === 'storyObjectiveStatus'
         ? chapterProgress?.objectives?.[requirement.objective ?? '']

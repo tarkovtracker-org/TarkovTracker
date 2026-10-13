@@ -1,5 +1,27 @@
 # Overlay and precompute
 
+Story objective `completionPolicy: 'tutorial'` is an effective completed baseline
+in every mode and after prestige, reset or import. Its accepted evidence is the
+user's gameplay confirmation, not captured account state. The overlay attaches
+it only to Escape Ground Zero; Tracker never matches localized text or specific
+IDs to infer this policy. Missing/unknown policies retain normal tracked behavior.
+
+`storylineCompletion.ts` owns the metadata-driven read projection for Tracker's
+storyline UI and Nitro profile adapter. It keeps Therapist and chapter completion
+independent, and is used by objective totals, availability, trader-lock reads and
+prestige requirements. Individual/bulk edit guards skip automatic objectives.
+Rendering never writes a mark, completion time or activity history. Stored marks
+remain reversible if producer evidence changes.
+
+Backup exports/imports and cloud synchronization retain recorded progress,
+including old false marks. Shared-profile HTTP `data.storyChapters` is an effective
+read model when policy metadata is available; it is not a backup format and adds
+no inferred objective timestamp. An account with no materialized progress can
+therefore return only its automatic storyline baseline. On unavailable/old metadata it preserves recorded
+progress. The profile UI projects its viewed mode's catalog independently. The
+public token API currently exposes no storyline progress and is unchanged. A
+future rule shared with that API belongs in its progress-contracts package.
+
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
 ## Overlay corrections

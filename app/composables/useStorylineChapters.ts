@@ -1,5 +1,6 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { isEffectiveStoryObjectiveComplete } from '@/utils/storylineCompletion';
 import {
   normalizeStoryObjectives,
   orderedStoryObjectives,
@@ -553,7 +554,10 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
     return chapters.value.map((chapter) => {
       const objectiveProgress = chapter.objectives.map((objective) => ({
         ...objective,
-        complete: isObjectiveComplete(chapter.id, objective.id),
+        complete: isEffectiveStoryObjectiveComplete(
+          objective,
+          isObjectiveComplete(chapter.id, objective.id)
+        ),
       }));
       const objectiveCompleteMap = new Map(
         objectiveProgress.map((objective) => [objective.id, objective.complete])
