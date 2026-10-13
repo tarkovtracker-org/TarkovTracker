@@ -33,16 +33,18 @@ function concatenateChunks(chunks: Uint8Array[], size: number): Uint8Array<Array
 }
 const isContainer = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
+type PendingContainer = { value: object; depth: number };
+function enqueueContainers(value: object, depth: number, pending: PendingContainer[]): void {
+  for (const child of Object.values(value)) {
+    if (isContainer(child)) pending.push({ value: child, depth: depth + 1 });
+  }
+}
 export function hasSafeClientLogDepth(args: unknown[]): boolean {
-  const pending: { value: object; depth: number }[] = [{ value: args, depth: 0 }];
+  const pending: PendingContainer[] = [{ value: args, depth: 0 }];
   while (pending.length) {
     const { value, depth } = pending.pop()!;
     if (depth > MAX_CLIENT_LOG_DEPTH) return false;
-    pending.push(
-      ...Object.values(value)
-        .filter(isContainer)
-        .map((child) => ({ value: child, depth: depth + 1 }))
-    );
+    enqueueContainers(value, depth, pending);
   }
   return true;
 }

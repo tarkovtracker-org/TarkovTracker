@@ -156,6 +156,20 @@ test('compiled bounded client logs retain Nitro body handling and ordinary neste
   assert.equal(response.headers.get('X-Test-Assets-Read'), 'true');
   assert.deepEqual(outbound, []);
 });
+test('compiled client logs handle the widest bounded container array without an argument spread', async () => {
+  const body = JSON.stringify({
+    level: 'debug',
+    args: [Array.from({ length: 43_500 }, () => ({}))],
+  });
+  assert.ok(Buffer.byteLength(body) <= 128 * 1024);
+  const response = await harness.fetch('https://tarkovtracker.org/api/logs/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://tarkovtracker.org' },
+    body,
+  });
+  assert.equal(response.status, 204);
+  assert.deepEqual(outbound, []);
+});
 test('compiled static assets retain the original Request and ASSETS binding', async () => {
   const response = await harness.fetch('https://tarkovtracker.org/favicon.ico');
   assert.equal(response.status, 200);
