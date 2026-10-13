@@ -321,6 +321,8 @@ const prepareEditionScope = (
   scope: string
 ) => {
   if (store.editionsScope && store.editionsScope !== scope) {
+    // Freshness belongs to the live catalog, which this scope change discards.
+    store.editionsRevalidatedScopes.delete(store.editionsScope);
     store.editionsSettledScope = '';
     state.seasonalPerks = markRaw([]);
     state.editions = markRaw([]);
@@ -1870,7 +1872,7 @@ export const useMetadataStore = defineStore('metadata', {
           !skipBrowserCache &&
           (await applyCachedEditionsOrIgnore(this, isCurrent, requestMode, requestLanguage))
         ) {
-          // Revalidate a cached scope once per session; repeat locale/mode switches reuse it.
+          // Revalidate once while the successfully checked catalog remains live in this scope.
           if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
               (error) =>

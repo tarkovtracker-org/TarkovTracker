@@ -103,12 +103,14 @@ flowchart LR
 
 A complete critical browser cache supplies the first paint without waiting for a catalog request.
 Startup then checks editions, storyline chapters and Seasonal perks in the background once per
-mode/language scope per session, using the ordinary endpoint without `cacheBust`. The existing
+active mode/language scope, using the ordinary endpoint without `cacheBust`. The existing
 server overlay TTL still applies. Successful checks update the browser catalog; failures retain
 last-good data and remain retryable on a later startup. Queued work and responses from a replaced
 startup, changed scope or aborted caller cannot replace the active catalog.
 Later hydration in the same scope preserves a successfully checked live catalog even if its
-storage write is pending or failed. Adopting another cached catalog makes that scope retryable.
+storage write is pending or failed. Retiring a live catalog on a scope change retires its freshness
+marker too, so returning through browser storage rechecks the catalog. Adopting another cached
+catalog makes that scope retryable.
 
 The edition cache keeps its 24-hour storage TTL. Other critical caches retain their own TTLs and
 purge-marker behavior; catalog revalidation does not clear browser storage or reset progress.
