@@ -4,11 +4,12 @@
       icon="i-mdi-clipboard-search"
       color="primary"
       variant="soft"
-      :title="t('page.tasks.no_tasks_found')"
+      :title="t(isSearching ? 'page.tasks.no_search_matches' : 'page.tasks.no_tasks_found')"
       :description="
         t(
-          'page.tasks.no_tasks_found_description',
-          'Try adjusting your filters, selecting a different map, or checking other task categories.'
+          isSearching
+            ? 'page.tasks.no_search_matches_description'
+            : 'page.tasks.no_tasks_found_description'
         )
       "
     />
@@ -16,4 +17,7 @@
 </template>
 <script setup lang="ts">
   const { t } = useI18n({ useScope: 'global' });
+  defineProps<{
+    isSearching?: boolean;
+  }>();
 </script>

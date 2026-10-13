@@ -984,6 +984,11 @@
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
       "no_tasks_found_description": "Adjust your filters or level requirements to see available tasks.",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\""
+      },
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",

@@ -7,8 +7,14 @@
         <div v-else>
           <TaskFilterBar
             v-model:search-query="searchQuery"
-            :active-search-count="activeSearchCount"
-            :is-search-active="isSearchActive"
+            :active-status-view="effectiveTaskSecondaryView"
+            :search-status-counts="searchStatusCounts"
+            @pin-status="pinSearchStatus"
+          />
+          <TaskSearchScopeHint
+            :visible="showSearchScopeHint"
+            :query="normalizedSearch"
+            @clear="clearSearch"
           />
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
@@ -169,7 +175,7 @@
               </div>
             </div>
             <div v-if="filteredTasks.length === 0" class="py-6">
-              <TaskEmptyState />
+              <TaskEmptyState :is-searching="isSearchActive" />
               <MapTaskVisibilityNotice
                 v-if="showMapTaskVisibilityNotice"
                 class="mt-4"
@@ -541,6 +547,10 @@
     type MapTaskVisibilityActions,
   } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
+  import {
+    resolveEffectiveSecondaryView,
+    useTaskSearchQuery,
+  } from '@/features/tasks/composables/useTaskSearchQuery';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapHiddenTasksSection from '@/features/tasks/MapHiddenTasksSection.vue';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
@@ -555,6 +565,7 @@
   import TaskCard from '@/features/tasks/TaskCard.vue';
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
+  import TaskSearchScopeHint from '@/features/tasks/TaskSearchScopeHint.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -562,16 +573,11 @@
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
   import { STORAGE_KEYS } from '@/utils/storageKeys';
-  import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { MapViewState } from '@/composables/useLeafletMap';
   import type { TaskActionPayload } from '@/composables/useTaskActions';
   import type { Task } from '@/types/tarkov';
-  import type {
-    TaskFilterAndSortOptions,
-    TaskPrimaryView,
-    TaskSecondaryView,
-  } from '@/types/taskFilter';
+  import type { TaskFilterAndSortOptions, TaskPrimaryView } from '@/types/taskFilter';
   const LeafletMapComponent = defineAsyncComponent(() => import('@/features/maps/LeafletMap.vue'));
   const TaskGraphView = defineAsyncComponent(() => import('@/features/tasks/TaskGraphView.vue'));
   const TaskSettingsDrawer = defineAsyncComponent(
@@ -608,6 +614,24 @@
     storeToRefs(progressStore);
   const { isGlobalTask, visibleTasks, updateVisibleTasks, calculateFilteredTasksForOptions } =
     useTaskFiltering();
+  const {
+    cleanup: cleanupTaskSearch,
+    isSearchActive,
+    normalizedSearch,
+    pinStatus: pinSearchStatus,
+    searchesAllStatuses,
+    searchQuery,
+  } = useTaskSearchQuery();
+  const clearSearch = () => {
+    searchQuery.value = '';
+  };
+  const effectiveTaskSecondaryView = computed(() =>
+    resolveEffectiveSecondaryView(
+      getTaskPrimaryView.value,
+      getTaskSecondaryView.value,
+      searchesAllStatuses.value
+    )
+  );
   const tarkovStore = useTarkovStore();
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
   const { tarkovTime } = useTarkovTime();
@@ -622,6 +646,7 @@
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
+  const showSearchScopeHint = computed(() => searchesAllStatuses.value && !showGraphView.value);
   const {
     isDesktopHelpPanelOpen,
     isDesktopSettingsDrawerOpen,
@@ -633,7 +658,7 @@
     settingsOpen: isSettingsDrawerOpen,
   });
   const shouldShowCompletedObjectives = computed(() => {
-    return ['completed', 'all'].includes(getTaskSecondaryView.value);
+    return ['completed', 'all'].includes(effectiveTaskSecondaryView.value);
   });
   const selectedMapData = computed(() => {
     const mapId = getTaskMapView.value;
@@ -931,12 +956,9 @@
       mergedIds: (map as unknown as { mergedIds?: string[] }).mergedIds || [map.id],
     }));
   });
-  const effectiveTaskSecondaryView = computed(() =>
-    getTaskSecondaryViewForPrimaryView(getTaskPrimaryView.value, getTaskSecondaryView.value)
-  );
   const mapTaskVisibilityFilterOptions = computed<TaskFilterAndSortOptions>(() => ({
     primaryView: getTaskPrimaryView.value as TaskPrimaryView,
-    secondaryView: effectiveTaskSecondaryView.value as TaskSecondaryView,
+    secondaryView: effectiveTaskSecondaryView.value,
     userView: getTaskUserView.value,
     mapView: getTaskMapView.value,
     traderView: getTaskTraderView.value,
@@ -1000,7 +1022,7 @@
   watch(
     [
       getTaskPrimaryView,
-      getTaskSecondaryView,
+      effectiveTaskSecondaryView,
       getTaskUserView,
       getTaskMapView,
       getTaskTraderView,
@@ -1045,12 +1067,9 @@
     () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
   );
   const {
-    activeSearchCount,
-    cleanup: cleanupTaskFilters,
     filteredTasks,
-    isSearchActive,
     mapCompleteTasksCountOnMap,
-    searchQuery,
+    searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
     calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
@@ -1061,7 +1080,9 @@
         overrides
       ),
     getTaskMapView,
+    hideCompletedMapObjectives: getHideCompletedMapObjectives,
     mapTaskVisibilityFilterOptions,
+    normalizedSearch,
     showMapDisplay,
     tasks,
     visibleTasks,
@@ -1176,7 +1197,7 @@
   });
   onBeforeUnmount(() => {
     debouncedRefreshVisibleTasks.cancel();
-    cleanupTaskFilters();
+    cleanupTaskSearch();
     stopResize();
     cleanupMapPopup();
     cleanupNotification();

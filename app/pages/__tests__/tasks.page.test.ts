@@ -46,6 +46,7 @@ type MapObjectiveMark = {
   users?: string[];
 };
 const TASK_SEARCH_DEBOUNCE_MS = 180;
+const TASK_REFRESH_DEBOUNCE_MS = 50;
 const preferencesStoreMock = {
   getTaskPrimaryView: 'all',
   getTaskSecondaryView: 'available',
@@ -295,9 +296,10 @@ const defaultGlobalStubs = {
     template: '<div data-testid="task-card" :data-accent="accentVariant">{{ task.id }}</div>',
   },
   TaskFilterBar: {
-    emits: ['update:searchQuery'],
+    props: ['activeStatusView', 'searchStatusCounts'],
+    emits: ['pin-status', 'update:searchQuery'],
     template:
-      '<div data-testid="task-filter"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /></div>',
+      '<div data-testid="task-filter" :data-active-status="activeStatusView"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /><button data-testid="pin-status" @click="$emit(\'pin-status\')" /></div>',
   },
   TaskEmptyState: true,
   TaskLoadingState: true,
@@ -535,6 +537,46 @@ describe('tasks page', () => {
       secondaryView: 'all',
     });
     expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
+  });
+  it('searches every status while a query is active and restores the tab on clear', async () => {
+    const latestSecondaryView = () => updateVisibleTasksMock.mock.calls.at(-1)?.[0].secondaryView;
+    const filterBar = () => wrapper.find('[data-testid="task-filter"]');
+    const scopeHint = () => wrapper.find('[data-testid="task-search-scope-hint"]');
+    expect(latestSecondaryView()).toBe('available');
+    vi.useFakeTimers();
+    try {
+      await wrapper.find('[data-testid="task-search"]').setValue('saving the mole');
+      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('all');
+      expect(filterBar().attributes('data-active-status')).toBe('all');
+      expect(scopeHint().exists()).toBe(true);
+      expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
+      await scopeHint().find('button').trigger('click');
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('available');
+      expect(filterBar().attributes('data-active-status')).toBe('available');
+      expect(scopeHint().exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('keeps the picked status for the rest of the search once a tab is pinned', async () => {
+    const latestSecondaryView = () => updateVisibleTasksMock.mock.calls.at(-1)?.[0].secondaryView;
+    vi.useFakeTimers();
+    try {
+      await wrapper.find('[data-testid="task-search"]').setValue('mole');
+      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('all');
+      await wrapper.find('[data-testid="pin-status"]').trigger('click');
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('available');
+      expect(wrapper.find('[data-testid="task-search-scope-hint"]').exists()).toBe(false);
+      await wrapper.find('[data-testid="task-search"]').setValue('mol');
+      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('available');
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('keeps initial task slice when tasks arrive after mount', async () => {
     visibleTasksRef.value = [];
