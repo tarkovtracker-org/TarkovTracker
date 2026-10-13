@@ -68,6 +68,16 @@ describe('usableCounterDerivations', () => {
         tier: entry({ derivation: { type: 'taskGroupCompletions', groups: [['a'], ['b', 'a']] } }),
       },
     },
+    ...[
+      [{ anyOf: ['a'] }],
+      [{ anyOf: [] }],
+      [{ anyOf: ['a', 'a'] }],
+      [{ anyOf: ['a', 'b'], extra: 1 }],
+      [{ allOf: ['a', 'b'] }],
+      [{ anyOf: ['a', 'b'] }, ['b']],
+    ].map((groups) => ({
+      pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', groups } }) },
+    })),
     {
       pve: {
         tier: entry({
@@ -79,7 +89,10 @@ describe('usableCounterDerivations', () => {
     expect(usableCounterDerivations({ progressionCounters }, 'pve').size).toBe(0);
   });
   it('accepts task-group derivations', () => {
-    const derivation = { type: 'taskGroupCompletions', groups: [['a', 'b'], ['c']] };
+    const derivation = {
+      type: 'taskGroupCompletions',
+      groups: [['a', 'b'], { anyOf: ['c', 'd'] }],
+    };
     const overlay = { progressionCounters: { pve: { tier: entry({ derivation }) } } };
     expect([...usableCounterDerivations(overlay, 'pve')]).toEqual([['tier', derivation]]);
   });
@@ -155,6 +168,19 @@ describe('attachCounterDerivations', () => {
       gate('tier', 2, { counter: { type: 'taskGroupCompletions', groups } })
     );
     expect(attached!.counter.groups[0]).not.toBe(groups[0]);
+    const anyOf = { anyOf: ['b', 'c'] };
+    const [, , , anyOfTarget] = attachCounterDerivations(
+      tasks(),
+      new Map<string, TaskCounterDerivation>([
+        ['tier', { type: 'taskGroupCompletions', groups: [['a'], anyOf] }],
+      ])
+    );
+    const [anyOfGate] = anyOfTarget!.otherRequirements as unknown as Array<{
+      counter: { groups: unknown[] };
+    }>;
+    expect(anyOfGate!.counter.groups).toEqual([['a'], anyOf]);
+    expect(anyOfGate!.counter.groups[1]).not.toBe(anyOf);
+    expect((anyOfGate!.counter.groups[1] as typeof anyOf).anyOf).not.toBe(anyOf.anyOf);
     const [missing] = attachCounterDerivations(
       [{ id: 'target', otherRequirements: [gate()] }, { id: 'a' }, { id: 'c' }],
       grouped
@@ -228,6 +254,19 @@ describe('applyOverlay progression counters', () => {
     expect(
       evaluate({ a: { complete: true }, b: { complete: true }, c: { complete: true } }).available
     ).toBe(true);
+  });
+  it('counts an anyOf group once any member is complete, end to end', async () => {
+    const derivation = { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'] }, ['c']] };
+    const result = await apply({ pve: { tier: entry({ derivation }) } }, 'pve');
+    const payload = result.data!.tasks as unknown as Task[];
+    const evaluate = (completions: TaskAvailabilityTeamData['completions']) =>
+      buildTaskEvaluations(payload, progress(completions), { requireTraderLevels: false }).target!
+        .self!;
+    expect(evaluate({ a: { complete: true }, b: { complete: true } })).toMatchObject({
+      available: false,
+      blockers: [{ type: 'task_counter', current: 1, required: 2 }],
+    });
+    expect(evaluate({ b: { complete: true }, c: { complete: true } }).available).toBe(true);
   });
   it('applies no derivation in a mode the registry does not cover', async () => {
     const result = await apply({ pve: { tier: entry() } }, 'regular');

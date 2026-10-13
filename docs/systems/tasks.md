@@ -58,9 +58,12 @@ mode, applies only `verified`/`complete` entries whose revision is in
 `SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's derivation to the matching gate as
 `counter` when every contributor is in the same task payload: `{ type: 'distinctTaskCompletions',
 taskIds }` counts each completed task, and `{ type: 'taskGroupCompletions', groups }` counts each
-group once all its tasks are completed (tasks the game credits as one, such as same-threshold
+group the game credits as one. A list group counts once all its tasks are completed (same-threshold
 Gunsmith pairs; whether half a group already counts is unverified, so the tracker takes the
-conservative reading and Mark available covers an earlier in-game unlock). An unknown derivation
+conservative reading and Mark available covers an earlier in-game unlock). An `{ anyOf }` group (two
+or more tasks) counts once any member is completed (faction variants such as the BEAR-only AKM and
+USEC-only M4A1 Gunsmith parts, where a player can only ever complete one). No task may appear in two
+groups. An unknown derivation
 type makes the registry malformed, so the tracker must support a type before the overlay publishes
 it. This runs last in `applyOverlay`, so task
 corrections cannot supply a derivation.

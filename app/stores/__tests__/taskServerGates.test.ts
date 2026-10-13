@@ -357,6 +357,19 @@ describe('registry-derived counters', () => {
     expect(evaluate(grouped, { completions: done('a', 'b', 'c') }).available).toBe(true);
     expect(otherRequirementsSignature(grouped)).toBe(otherRequirementsSignature(derived(2)));
   });
+  it('counts an anyOf group once when any member is complete', () => {
+    const grouped = derived(2, '>=', {
+      type: 'taskGroupCompletions',
+      groups: [{ anyOf: ['a', 'b'] }, ['c', 'd']],
+    });
+    expect(evaluate(grouped, { completions: done('a', 'b', 'c') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('c', 'd') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('b', 'c', 'd') }).available).toBe(true);
+  });
   it('still requires independent gates when the derived counter is met', () => {
     const task = { ...derived(1), minPlayerLevel: 60 };
     expect(evaluate(task, { completions: done('a') }).available).toBe(false);
@@ -373,6 +386,10 @@ describe('registry-derived counters', () => {
     { type: 'taskGroupCompletions', groups: [['a', '']] },
     { type: 'taskGroupCompletions', groups: ['a'] },
     { type: 'taskGroupCompletions', taskIds: ['a'] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a'] }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'a'] }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'], extra: 1 }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'] }, ['b']] },
     'a,b',
   ])('drops malformed derivation %j and falls back to an unknown value', (malformed) => {
     const task = {
