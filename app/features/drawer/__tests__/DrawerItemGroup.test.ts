@@ -25,8 +25,9 @@ const items = [
   { icon: 'i-mdi-graph-outline', localeKey: 'graph', to: '/tasks/graph', class: 'hidden lg:block' },
 ];
 const allHrefs = ['/tasks', '/tasks/traders', '/tasks/maps', '/tasks/graph'];
-const mountGroup = (isCollapsed = false) =>
+const mountGroup = (isCollapsed = false, options: { attachTo?: HTMLElement } = {}) =>
   mount(DrawerItemGroup, {
+    ...options,
     props: {
       icon: 'i-tasks',
       localeKey: 'common.tasks',
@@ -56,7 +57,9 @@ describe('DrawerItemGroup', () => {
     const wrapper = mountGroup();
     expect(isExpanded(wrapper)).toBe(false);
     expect(wrapper.find('[data-testid="popover"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     expect(isExpanded(wrapper)).toBe(true);
     expect(
       wrapper
@@ -64,15 +67,21 @@ describe('DrawerItemGroup', () => {
         .findAll('a')
         .map((a) => a.attributes('href'))
     ).toEqual(allHrefs.slice(1));
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseleave');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerleave', { pointerType: 'mouse' });
     expect(isExpanded(wrapper)).toBe(false);
     expect(wrapper.get('[data-testid="drawer-group-menu"]').attributes('inert')).toBeDefined();
   });
   it('pins on the chevron and stays expanded after leaving and navigating', async () => {
     const wrapper = mountGroup();
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     await wrapper.get('[data-testid="drawer-group-toggle"]').trigger('click');
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseleave');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerleave', { pointerType: 'mouse' });
     await wrapper.get('a[href="/tasks/maps"]').trigger('click');
     routeState.path = '/tasks/maps';
     await wrapper.vm.$nextTick();
@@ -88,18 +97,93 @@ describe('DrawerItemGroup', () => {
     const wrapper = mountGroup();
     routeState.path = '/tasks/maps';
     await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     await wrapper.get('a[href="/tasks/maps"]').trigger('click');
     expect(isExpanded(wrapper)).toBe(false);
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     routeState.path = '/tasks/traders';
     await wrapper.vm.$nextTick();
     expect(isExpanded(wrapper)).toBe(false);
   });
-  it('opens for keyboard focus and closes when focus leaves the group', async () => {
+  it('collapses as soon as the chevron unpins, even while still hovered', async () => {
+    appStore.drawerPinnedGroups.push('/tasks');
     const wrapper = mountGroup();
     const group = wrapper.get('[data-testid="drawer-group"]');
-    await group.trigger('focusin');
+    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    // A mouse click focuses the button without :focus-visible.
+    await toggle.trigger('focusin');
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+    expect(toggle.attributes('icon')).toBe('i-mdi-chevron-down');
+    await group.trigger('pointerleave', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(false);
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(true);
+  });
+  it('pins from hover with a visible pin state, then unpins and closes', async () => {
+    const wrapper = mountGroup();
+    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
+    expect(toggle.attributes('icon')).toBe('i-mdi-pin-outline');
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(true);
+    expect(toggle.attributes('icon')).toBe('i-mdi-pin');
+    expect(toggle.attributes('aria-pressed')).toBe('true');
+    expect(toggle.classes()).toContain('text-primary-400');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerleave', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(true);
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+    expect(toggle.attributes('icon')).toBe('i-mdi-chevron-down');
+    expect(toggle.classes()).toContain('text-surface-400');
+  });
+  it('drops keyboard focus once a click moves focus within the group', async () => {
+    appStore.drawerPinnedGroups.push('/tasks');
+    const wrapper = mountGroup(false, { attachTo: document.body });
+    const group = wrapper.get('[data-testid="drawer-group"]');
+    const parentLink = wrapper.get('a[href="/tasks"]');
+    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
+    (parentLink.element as HTMLElement).focus();
+    await parentLink.trigger('focusin');
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    // A mouse press moves focus to the chevron without :focus-visible.
+    await toggle.trigger('focusin');
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+    await group.trigger('pointerleave', { pointerType: 'mouse' });
+    await group.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(true);
+    await group.trigger('pointerleave', { pointerType: 'mouse' });
+    expect(isExpanded(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+  it('ignores touch hover so a tap on the chevron toggles open and closed', async () => {
+    const wrapper = mountGroup();
+    const group = wrapper.get('[data-testid="drawer-group"]');
+    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
+    await group.trigger('pointerenter', { pointerType: 'touch' });
+    expect(isExpanded(wrapper)).toBe(false);
+    await toggle.trigger('focusin');
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(true);
+    await toggle.trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+  });
+  it('opens for keyboard focus and closes when focus leaves the group', async () => {
+    const wrapper = mountGroup(false, { attachTo: document.body });
+    const group = wrapper.get('[data-testid="drawer-group"]');
+    const parentLink = wrapper.get('a[href="/tasks"]');
+    (parentLink.element as HTMLElement).focus();
+    await parentLink.trigger('focusin');
     expect(isExpanded(wrapper)).toBe(true);
     await group.trigger('focusout', {
       relatedTarget: wrapper.get('a[href="/tasks/maps"]').element,
@@ -107,12 +191,15 @@ describe('DrawerItemGroup', () => {
     expect(isExpanded(wrapper)).toBe(true);
     await group.trigger('focusout', { relatedTarget: null });
     expect(isExpanded(wrapper)).toBe(false);
+    wrapper.unmount();
   });
   it('expands inline on the collapsed rail without a separate menu', async () => {
     const wrapper = mountGroup(true);
     expect(wrapper.find('[data-testid="popover"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="drawer-group-toggle"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     expect(wrapper.get('[data-testid="drawer-group-menu"]').attributes('aria-hidden')).toBe(
       'false'
     );
@@ -123,7 +210,9 @@ describe('DrawerItemGroup', () => {
     expect(wrapper.get('a[href="/tasks"] i').attributes('data-color')).toBe(
       'text-white light:text-surface-50'
     );
-    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper
+      .get('[data-testid="drawer-group"]')
+      .trigger('pointerenter', { pointerType: 'mouse' });
     expect(wrapper.get('a[href="/tasks"] i').attributes('data-color')).toContain(
       'text-surface-300'
     );

@@ -1,9 +1,9 @@
 <template>
   <li
     data-testid="drawer-group"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
-    @focusin="isFocused = true"
+    @pointerenter="onPointerEnter"
+    @pointerleave="onPointerLeave"
+    @focusin="onFocusIn"
     @focusout="onFocusOut"
   >
     <div class="relative" @click="closeTransient">
@@ -21,14 +21,18 @@
         variant="ghost"
         color="neutral"
         size="xs"
-        class="text-surface-400 absolute top-1/2 right-1 -translate-y-1/2 hover:text-white"
-        :icon="isExpanded ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+        class="absolute top-1/2 right-1 -translate-y-1/2"
+        :class="
+          isPinned ? 'text-primary-400 hover:text-primary-300' : 'text-surface-400 hover:text-white'
+        "
+        :icon="toggleIcon"
         :aria-expanded="isExpanded"
         :aria-controls="menuId"
         :aria-pressed="isPinned"
         :aria-label="t(toggleLabelKey, { name: labelText })"
+        :title="t(toggleLabelKey, { name: labelText })"
         data-testid="drawer-group-toggle"
-        @click.stop="appStore.toggleDrawerGroupPin(props.to)"
+        @click.stop="togglePin"
       />
     </div>
     <div
@@ -91,7 +95,11 @@
   const isPinned = computed(() => appStore.drawerPinnedGroups.includes(props.to));
   const isHovered = ref(false);
   const isFocused = ref(false);
-  const isExpanded = computed(() => isPinned.value || isHovered.value || isFocused.value);
+  // Unpinning collapses at once; hover and focus reopen only after the pointer and focus leave.
+  const isSuppressed = ref(false);
+  const isExpanded = computed(
+    () => isPinned.value || (!isSuppressed.value && (isHovered.value || isFocused.value))
+  );
   const isHighlighted = computed(() =>
     isExpanded.value ? isParentActive.value : isGroupActive.value
   );
@@ -100,11 +108,36 @@
     isHovered.value = false;
     isFocused.value = false;
   };
+  const releaseSuppression = () => {
+    if (!isHovered.value && !isFocused.value) isSuppressed.value = false;
+  };
+  // Touch emulates hover on tap and never leaves, so only a real pointer hover opens the group.
+  const onPointerEnter = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') isHovered.value = true;
+  };
+  const onPointerLeave = () => {
+    isHovered.value = false;
+    releaseSuppression();
+  };
+  // A mouse or touch press focuses without :focus-visible, which also drops earlier keyboard focus.
+  const onFocusIn = (event: FocusEvent) => {
+    isFocused.value = (event.target as HTMLElement).matches(':focus-visible');
+  };
   const onFocusOut = (event: FocusEvent) => {
     if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
     isFocused.value = false;
+    releaseSuppression();
+  };
+  const togglePin = () => {
+    isSuppressed.value = isPinned.value;
+    appStore.toggleDrawerGroupPin(props.to);
   };
   watch(() => route.path, closeTransient);
+  // Pinned shows a filled accent pin; hover offers the outline pin; closed offers the chevron.
+  const toggleIcon = computed(() => {
+    if (isPinned.value) return 'i-mdi-pin';
+    return isExpanded.value ? 'i-mdi-pin-outline' : 'i-mdi-chevron-down';
+  });
   const toggleLabelKey = computed(() =>
     isPinned.value ? 'navigation_drawer.unpin_subpages' : 'navigation_drawer.pin_subpages'
   );
