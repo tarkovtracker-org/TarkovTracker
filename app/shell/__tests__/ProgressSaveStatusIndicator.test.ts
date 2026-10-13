@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { liveUpdatesDegraded } from '@/stores/tarkov/progressLiveStatus';
 import {
   recordLocalSave,
   registerCloudRetryHandler,
@@ -57,12 +58,41 @@ describe('ProgressSaveStatusIndicator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetCloudSaveStatus();
+    liveUpdatesDegraded.value = false;
     recordLocalSave(true);
   });
   it('stays hidden while nothing is pending', async () => {
     const wrapper = await mountIndicator();
     expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="progress-save-status-live"]').text()).toBe('');
+  });
+  it('shows delayed live updates independently of successful saves and clears on recovery', async () => {
+    liveUpdatesDegraded.value = true;
+    const wrapper = await mountIndicator();
+    expect(wrapper.get('[data-testid="progress-save-status"]').attributes('data-status')).toBe(
+      'live_updates_delayed'
+    );
+    expect(wrapper.text()).toContain('progress_save_status.live_updates_delayed_description');
+    expect(wrapper.find('[data-testid="progress-save-retry"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="progress-save-export"]').exists()).toBe(false);
+    liveUpdatesDegraded.value = false;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('prioritizes unsaved changes over delayed live updates', async () => {
+    liveUpdatesDegraded.value = true;
+    cloud('failed', { failure: 'offline' });
+    const wrapper = await mountIndicator();
+    expect(wrapper.get('[data-testid="progress-save-status"]').attributes('data-status')).toBe(
+      'cloud_failed'
+    );
+    recordLocalSave(false, 'quota');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid="progress-save-status"]').attributes('data-status')).toBe(
+      'local_failed'
+    );
+    wrapper.unmount();
   });
   it('announces status changes through a persistent live region', async () => {
     const wrapper = await mountIndicator();

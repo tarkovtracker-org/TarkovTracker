@@ -138,7 +138,17 @@ describe('seasonal progress realtime synchronization', () => {
     migrateStoryObjectiveIds: migrateStoryObjectiveIdsMock,
   };
   beforeEach(() => {
-    supabaseContext.client.from.mockReset();
+    supabaseContext.client.from.mockReset().mockImplementation((table: string) => ({
+      select: () => ({
+        abortSignal() {
+          return this;
+        },
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: null, error: null }) }
+            : Promise.resolve({ data: [], error: null }),
+      }),
+    }));
     handlers.clear();
     createdChannels.length = 0;
     openTopics.clear();
@@ -187,6 +197,9 @@ describe('seasonal progress realtime synchronization', () => {
       const result = Promise.withResolvers<unknown>();
       supabaseContext.client.from.mockImplementation((table: string) => ({
         select: () => ({
+          abortSignal() {
+            return this;
+          },
           eq: () =>
             table === 'user_progress'
               ? { single: async () => ({ data: null, error: null }) }
@@ -387,6 +400,9 @@ describe('seasonal progress realtime synchronization', () => {
       };
       supabaseContext.client.from.mockImplementation((table: string) => ({
         select: () => ({
+          abortSignal() {
+            return this;
+          },
           eq: () =>
             table === 'user_progress'
               ? { single: async () => ({ data: null, error: null }) }
@@ -420,6 +436,9 @@ describe('seasonal progress realtime synchronization', () => {
       };
       supabaseContext.client.from.mockImplementation((table: string) => ({
         select: () => ({
+          abortSignal() {
+            return this;
+          },
           eq: () =>
             table === 'user_progress'
               ? { single: async () => ({ data: null, error: null }) }
@@ -459,6 +478,9 @@ describe('seasonal progress realtime synchronization', () => {
     registerSyncControllerGetter(() => ({ pause: vi.fn(), resume: vi.fn(), withSnapshot }));
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? { single: async () => ({ data: null, error: null }) }
@@ -493,7 +515,10 @@ describe('seasonal progress realtime synchronization', () => {
       await setupRealtimeListener(store);
       createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
       await Promise.resolve();
-      expect(logger.warn).toHaveBeenCalledWith('[TarkovStore] Reconnect snapshot failed', failure);
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[Realtime] Subscription degraded; using background refresh',
+        failure
+      );
     } finally {
       registerSyncControllerGetter(() => null);
     }
@@ -641,7 +666,7 @@ describe('seasonal progress realtime synchronization', () => {
     expect(supabaseContext.client.channel).toHaveBeenCalledTimes(2);
     expect(handlers.size).toBeGreaterThan(0);
   });
-  it('waits for the channel to report SUBSCRIBED before resolving setup', async () => {
+  it('finishes setup without waiting for the channel so REST saves remain available', async () => {
     subscribeGate.defer = true;
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const setup = setupRealtimeListener(store);
@@ -654,23 +679,150 @@ describe('seasonal progress realtime synchronization', () => {
       settled = true;
     });
     await Promise.resolve();
-    expect(settled).toBe(false);
+    expect(settled).toBe(true);
     channel.subscribed = true;
     channel.subscribeCallback?.('SUBSCRIBED');
     await setup;
     expect(settled).toBe(true);
   });
-  it('reports an initial subscription failure and releases its channel', async () => {
+  it('retains the channel and REST snapshot reader after an initial subscription failure', async () => {
     subscribeGate.defer = true;
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const setup = setupRealtimeListener(store);
     const error = new Error('Join failed');
-    const rejected = expect(setup).rejects.toThrow('Join failed');
+    const completed = expect(setup).resolves.toBeUndefined();
     await vi.waitFor(() => expect(createdChannels[0]?.subscribeCallback).toBeDefined());
     createdChannels[0]!.subscribeCallback!('CHANNEL_ERROR', error);
-    await rejected;
-    expect(openTopics.size).toBe(0);
-    expect(supabaseContext.client.removeChannel).toHaveBeenCalledWith(createdChannels[0]);
+    await completed;
+    expect(openTopics.size).toBe(1);
+    expect(supabaseContext.client.removeChannel).not.toHaveBeenCalled();
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        abortSignal() {
+          return this;
+        },
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: { game_edition: 2 }, error: null }) }
+            : Promise.resolve({ data: [], error: null }),
+      }),
+    }));
+    const { reconcileRemoteSnapshot } = await import('@/stores/tarkov/realtimeListener');
+    await reconcileRemoteSnapshot();
+    expect(supabaseContext.client.from).toHaveBeenCalledWith('user_progress');
+    expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+    expect(state.gameEdition).toBe(2);
+  });
+  it('replaces a terminally closed channel and ignores statuses from its former owner', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { liveUpdatesDegraded } = await import('@/stores/tarkov/progressLiveStatus');
+    try {
+      await setupRealtimeListener(store);
+      const previous = createdChannels[0]!;
+      const previousMetadataHandler = handlers.get('user_progress')!;
+      previous.subscribeCallback?.('CLOSED');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(supabaseContext.client.removeChannel).toHaveBeenCalledWith(previous);
+      expect(createdChannels).toHaveLength(2);
+      const replacement = createdChannels[1]!;
+      replacement.subscribeCallback?.('SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(liveUpdatesDegraded.value).toBe(false);
+      previous.subscribeCallback?.('CLOSED');
+      const currentEdition = state.gameEdition;
+      previousMetadataHandler({ new: { game_edition: 2, updated_at: new Date().toISOString() } });
+      expect(state.gameEdition).toBe(currentEdition);
+      expect(liveUpdatesDegraded.value).toBe(false);
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(createdChannels).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('continues polling through a stalled leave and only replaces after it settles', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    try {
+      await setupRealtimeListener(store);
+      removalGate.defer = true;
+      createdChannels[0]!.subscribeCallback?.('CLOSED');
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(createdChannels).toHaveLength(1);
+      expect(supabaseContext.client.from).toHaveBeenCalled();
+      resolveRemovals();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(createdChannels).toHaveLength(2);
+      expect(supabaseContext.client.removeChannel).toHaveBeenCalledOnce();
+    } finally {
+      removalGate.defer = false;
+      resolveRemovals();
+      vi.useRealTimers();
+    }
+  });
+  it('retries an unclean terminal leave without joining an occupied topic', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    try {
+      await setupRealtimeListener(store);
+      supabaseContext.client.removeChannel.mockRejectedValueOnce(new Error('temporary failure'));
+      createdChannels[0]!.subscribeCallback?.('CLOSED');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(createdChannels).toHaveLength(1);
+      expect(supabaseContext.client.from).toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(createdChannels).toHaveLength(2);
+      expect(supabaseContext.client.removeChannel).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('aborts stalled metadata and mode reads so fallback cannot hold the save barrier forever', async () => {
+    vi.useFakeTimers();
+    subscribeGate.defer = true;
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    const { liveUpdatesDegraded } = await import('@/stores/tarkov/progressLiveStatus');
+    const signals: AbortSignal[] = [];
+    let held = false;
+    const withSnapshot: WithRemoteSnapshot = async (read) => {
+      held = true;
+      try {
+        return await read((remote) => remote);
+      } finally {
+        held = false;
+      }
+    };
+    registerSyncControllerGetter(() => ({ pause: vi.fn(), resume: vi.fn(), withSnapshot }));
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        abortSignal(signal: AbortSignal) {
+          signals.push(signal);
+          // Auth may stall before fetch starts and never observe the abort signal.
+          const pending = new Promise(() => undefined);
+          return { eq: () => (table === 'user_progress' ? { single: () => pending } : pending) };
+        },
+      }),
+    }));
+    try {
+      await setupRealtimeListener(store);
+      createdChannels[0]!.subscribeCallback?.('SUBSCRIBED');
+      expect(held).toBe(true);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(signals).toHaveLength(2);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+      expect(held).toBe(false);
+      expect(liveUpdatesDegraded.value).toBe(true);
+    } finally {
+      registerSyncControllerGetter(() => null);
+      vi.useRealTimers();
+    }
   });
   it('ignores a superseded join failure without removing the replacement', async () => {
     subscribeGate.defer = true;
@@ -788,6 +940,7 @@ describe('seasonal progress realtime synchronization', () => {
     }
   });
   it('reconciles before the freshness migration without inventing a mode clock', async () => {
+    subscribeGate.defer = true;
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const { progressStorageSerializer } = await import('@/stores/tarkov/localStorage');
     const { parseUserScopedStorage } = await import('@/utils/userScopedStorage');
@@ -795,6 +948,9 @@ describe('seasonal progress realtime synchronization', () => {
     const selects: string[] = [];
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: (columns: string) => ({
+        abortSignal() {
+          return this;
+        },
         eq: () => {
           if (table === 'user_progress')
             return { single: async () => ({ data: null, error: null }) };
@@ -842,6 +998,9 @@ describe('seasonal progress realtime synchronization', () => {
     const failure = { message: 'snapshot unavailable' };
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? { single: async () => ({ data: null, error: null }) }
@@ -853,7 +1012,10 @@ describe('seasonal progress realtime synchronization', () => {
     createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
-    expect(logger.warn).toHaveBeenCalledWith('[TarkovStore] Reconnect snapshot failed', failure);
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[Realtime] Subscription degraded; using background refresh',
+      failure
+    );
     expect(state.pvp.level).toBe(25);
     expect(createdChannels).toHaveLength(1);
   });
@@ -864,6 +1026,9 @@ describe('seasonal progress realtime synchronization', () => {
     const failure = { message: 'snapshot unavailable' };
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? { single: async () => ({ data: null, error: null }) }
@@ -881,6 +1046,9 @@ describe('seasonal progress realtime synchronization', () => {
     const pendingModes: ((value: unknown) => void)[] = [];
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? { single: async () => ({ data: null, error: null }) }
@@ -920,6 +1088,9 @@ describe('seasonal progress realtime synchronization', () => {
     let resolveModes!: (value: unknown) => void;
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? { single: async () => ({ data: null, error: null }) }
@@ -950,6 +1121,9 @@ describe('seasonal progress realtime synchronization', () => {
       });
       supabaseContext.client.from.mockImplementation((table: string) => ({
         select: () => ({
+          abortSignal() {
+            return this;
+          },
           eq: () =>
             table === 'user_progress'
               ? {
@@ -1095,6 +1269,9 @@ describe('seasonal progress realtime synchronization', () => {
     });
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
+        abortSignal() {
+          return this;
+        },
         eq: () =>
           table === 'user_progress'
             ? {

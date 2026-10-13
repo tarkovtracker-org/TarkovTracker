@@ -1,3 +1,4 @@
+import { liveUpdatesDegraded } from '@/stores/tarkov/progressLiveStatus';
 import {
   CLOUD_SAVE_RETRY_DELAYS_MS,
   progressSaveStatus,
@@ -7,7 +8,7 @@ import {
   type LocalSaveFailure,
 } from '@/stores/tarkov/progressSaveStatus';
 export type ProgressSaveStatusKind =
-  'cloud_pending' | 'cloud_retrying' | 'cloud_failed' | 'local_failed';
+  'cloud_pending' | 'cloud_retrying' | 'cloud_failed' | 'local_failed' | 'live_updates_delayed';
 const CLOUD_STATE_KINDS: Record<CloudSaveState, ProgressSaveStatusKind | null> = {
   idle: null,
   pending: 'cloud_pending',
@@ -19,7 +20,8 @@ const CLOUD_STATE_KINDS: Record<CloudSaveState, ProgressSaveStatusKind | null> =
 const resolveKind = (): ProgressSaveStatusKind | null =>
   progressSaveStatus.local === 'failed'
     ? 'local_failed'
-    : CLOUD_STATE_KINDS[progressSaveStatus.cloud.state];
+    : (CLOUD_STATE_KINDS[progressSaveStatus.cloud.state] ??
+      (liveUpdatesDegraded.value ? 'live_updates_delayed' : null));
 const CLOUD_CAUSE_KEYS: Record<CloudSaveFailure, string> = {
   offline: 'progress_save_status.cause_offline',
   rate_limited: 'progress_save_status.cause_rate_limited',

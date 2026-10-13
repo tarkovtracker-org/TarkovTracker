@@ -1,17 +1,9 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { logger } from '@/utils/logger';
-import {
-  createChannelReleaseLatch,
-  subscribeAndWaitForRealtimeChannel,
-  type OwnedRealtimeChannel,
-  type SupabaseRealtimeChannel,
-} from '@/utils/realtimeChannel';
+import { describe, expect, it, vi } from 'vitest';
+import { createChannelReleaseLatch, type OwnedRealtimeChannel } from '@/utils/realtimeChannel';
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
-const { suspension } = vi.hoisted(() => ({ suspension: { active: false } }));
-vi.mock('@/utils/realtimeVisibility', () => ({ isRealtimeSuspended: () => suspension.active }));
 const owned = (topic: string) => ({ topic }) as OwnedRealtimeChannel;
 const deferred = () => {
   let resolve!: (value: boolean) => void;
@@ -74,102 +66,5 @@ describe('createChannelReleaseLatch', () => {
     // The entry is retained so a later attempt still declines the topic.
     expect(latch.isHolding('topic-a')).toBe(true);
     await expect(latch.release('topic-a')).resolves.toBe(false);
-  });
-});
-describe('subscribeAndWaitForRealtimeChannel', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-  const createChannel = () => {
-    let statusCallback: ((status: string, error?: Error) => void) | undefined;
-    const channel = {
-      subscribe: vi.fn((callback?: (status: string, error?: Error) => void) => {
-        statusCallback = callback;
-        return channel;
-      }),
-    } as unknown as SupabaseRealtimeChannel;
-    return { channel, emit: (status: string, error?: Error) => statusCallback?.(status, error) };
-  };
-  it('resolves only after the initial subscription is acknowledged', async () => {
-    const { channel, emit } = createChannel();
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', { topic: 'topic-a' }, 1000);
-    let settled = false;
-    void ready.then(() => {
-      settled = true;
-    });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    emit('SUBSCRIBED');
-    await expect(ready).resolves.toBeUndefined();
-    expect(settled).toBe(true);
-  });
-  it('refreshes on the first join when subscription began while suspended', async () => {
-    const { channel, emit } = createChannel();
-    Object.assign(channel, { socket: {} });
-    const refresh = vi.fn();
-    suspension.active = true;
-    try {
-      const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 10, refresh);
-      suspension.active = false;
-      emit('SUBSCRIBED');
-      await ready;
-      expect(refresh).toHaveBeenCalledOnce();
-    } finally {
-      suspension.active = false;
-    }
-  });
-  it('retains a pending join through a suspended CLOSED transition', async () => {
-    vi.useFakeTimers();
-    const { channel, emit } = createChannel();
-    Object.assign(channel, { socket: {} });
-    const refresh = vi.fn();
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 10, refresh);
-    suspension.active = true;
-    try {
-      emit('CLOSED');
-      await vi.advanceTimersByTimeAsync(20);
-      suspension.active = false;
-      emit('SUBSCRIBED');
-      await expect(ready).resolves.toBeUndefined();
-      expect(refresh).toHaveBeenCalledOnce();
-    } finally {
-      suspension.active = false;
-    }
-  });
-  it('rejects a CLOSED status before the first join', async () => {
-    const { channel, emit } = createChannel();
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 1000);
-    emit('CLOSED');
-    await expect(ready).rejects.toThrow('Realtime subscription failed with status CLOSED');
-    expect(logger.warn).toHaveBeenCalled();
-  });
-  it('ignores normal close warnings after joining while retaining rejoin and error handling', async () => {
-    const { channel, emit } = createChannel();
-    const refresh = vi.fn();
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 1000, refresh);
-    emit('SUBSCRIBED');
-    await ready;
-    vi.mocked(logger.warn).mockClear();
-    emit('CLOSED');
-    expect(logger.warn).not.toHaveBeenCalled();
-    emit('SUBSCRIBED');
-    expect(refresh).toHaveBeenCalledOnce();
-    emit('CHANNEL_ERROR', new Error('Connection lost'));
-    expect(logger.warn).toHaveBeenCalledOnce();
-  });
-  it('rejects on an explicit subscription failure', async () => {
-    const { channel, emit } = createChannel();
-    const error = new Error('private channel denied');
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', { topic: 'topic-a' }, 1000);
-    emit('CHANNEL_ERROR', error);
-    await expect(ready).rejects.toBe(error);
-  });
-  it('rejects when the initial subscription never reports a status', async () => {
-    vi.useFakeTimers();
-    const { channel } = createChannel();
-    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', { topic: 'topic-a' }, 10);
-    const rejection = expect(ready).rejects.toThrow('Realtime subscription timed out after 10ms');
-    await vi.advanceTimersByTimeAsync(10);
-    await rejection;
   });
 });
