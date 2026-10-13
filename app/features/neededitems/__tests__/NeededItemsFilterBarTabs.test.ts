@@ -15,7 +15,6 @@ const filterTabs = [
 ];
 const props = {
   modelValue: 'all' as const,
-  search: '',
   viewMode: 'list' as const,
   filterTabs,
   totalCount: 21,

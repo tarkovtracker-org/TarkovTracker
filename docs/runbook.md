@@ -1275,44 +1275,10 @@ The automatic-level removal migration is schema only. New clients and database w
 existing level until refresh, except through an intentional newer reset epoch. Refresh clients
 before validating manual level editing. See [manual player levels](systems/progress-storage.md#manual-player-levels).
 
-Existing JSON offsets can be removed with `scripts/maintenance/remove-level-calculation-offsets.sql`.
-It includes the same SQL that the database regression test runs, strips only the top-level
-`xpOffset`, and covers frozen PvP/PvE mirrors, normalized modes (all seasons), game-profile
-modes, and prestige archives. It preserves every other JSON value, row freshness clocks,
-metadata write markers, sharing, and account-retention state. It does not recalculate or guess
-missing levels.
-
-This is manual production data maintenance and needs explicit approval after the schema
-migration is merged and applied. Verify project identity and migration history with the
-[database migration procedure](#database-migrations), inspect the current trigger set, and
-choose a quiet window. The migration adds a user index for game-profile progress so every cleanup query can limit its
-scan to the approved owner range. The script creates and drops transaction-scoped maintenance triggers;
-its DDL briefly holds exclusive table locks. Lock waits are limited to 2 seconds and statements
-to 15 seconds. A failure rolls back the entire range; retry only after investigating it.
-No persistent maintenance trigger/function or new public RPC remains.
-
-Use a privileged operator connection through the approved credential mechanism, never the
-read-only observer connection. Pass `PGSERVICE` or the existing connection environment without
-printing credentials. One invocation removes offsets from at most 100 affected users in the
-half-open UUID range; subdivide ranges until they meet the limit. Do not run a whole-table
-range or a loop in one transaction.
-
-```sh
-psql -X --single-transaction --set ON_ERROR_STOP=1 \
-  --set from_user_id='<inclusive UUID>' --set to_user_id='<exclusive UUID>' \
-  --file scripts/maintenance/remove-level-calculation-offsets.sql
-```
-
-The script refuses to run without one transaction or before the preference column has been
-removed. Its bound and updates share table locks, so concurrent writes cannot expand the
-selected users. Running the same range again is a no-op. Confirm completion with a bounded
-count for each table in the approved range using these predicates:
-
-- `user_progress`: `pvp_data ? 'xpOffset' OR pve_data ? 'xpOffset'`
-- `user_game_mode_progress` and `user_profile_mode_progress`: `progress_data ? 'xpOffset'`
-- `user_prestige_runs`: `archived_progress ? 'xpOffset'`
-
-Require zero remaining matches in every approved range, and verify representative saved levels
-and historical records against the pre-cleanup evidence. Rollback is transaction-level on error;
-a successful cleanup permanently removes only the obsolete offsets. Frontend rollback to an
-automatic-level client is unsupported because offsets are no longer authoritative.
+Production JSON offsets were removed by bounded maintenance on 2026-10-12, and a read-only
+sweep of the full user range found no remaining `xpOffset` in `user_progress`,
+`user_game_mode_progress`, `user_profile_mode_progress`, or `user_prestige_runs`. The one-off
+cleanup script has been retired ([#1168](https://github.com/tarkovtracker-org/TarkovTracker/issues/1168));
+recover it from git history only after re-reviewing its lock order against Realtime and auth.
+Frontend rollback to an automatic-level client is unsupported because offsets are no longer
+authoritative.
