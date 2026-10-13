@@ -3,17 +3,20 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
+import { logger } from '@/utils/logger';
 import { queueQueryWrite } from '@/utils/routeHelpers';
 type QueryRecord = Record<string, string | undefined>;
-const routeState = reactive({ query: {} as QueryRecord });
+const routeState = reactive({ path: '/tasks', query: {} as QueryRecord });
 const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
   routeState.query = query;
 });
 mockNuxtImport('useRoute', () => () => routeState);
-mockNuxtImport('useRouter', () => () => ({ replace }));
+vi.mock('@/utils/logger', () => ({ logger: { error: vi.fn() } }));
+mockNuxtImport('useRouter', () => () => ({ currentRoute: { value: routeState }, replace }));
 describe('useRouteSearchQuery', () => {
   beforeEach(() => {
     replace.mockClear();
+    routeState.path = '/tasks';
     routeState.query = {};
   });
   it('writes the query and keeps the other params', async () => {
@@ -86,5 +89,24 @@ describe('useRouteSearchQuery', () => {
     routeState.query = { q: '' };
     await useRouteSearchQuery().setSearchQuery('');
     expect(replace).toHaveBeenCalledWith({ query: { q: undefined } });
+  });
+  it('drops a write queued before navigating to another page', async () => {
+    let landEarlierWrite = () => {};
+    const earlierWriteLanded = new Promise<void>((resolve) => (landEarlierWrite = resolve));
+    const earlierWrite = queueQueryWrite(() => earlierWriteLanded);
+    const search = useRouteSearchQuery().setSearchQuery('mole');
+    routeState.path = '/hideout';
+    landEarlierWrite();
+    await Promise.all([earlierWrite, search]);
+    expect(replace).not.toHaveBeenCalled();
+    expect(routeState.query).toEqual({});
+  });
+  it('logs a failed write instead of rejecting', async () => {
+    const error = new Error('guard failed');
+    replace.mockRejectedValueOnce(error);
+    const { searchQuery, setSearchQuery } = useRouteSearchQuery();
+    await expect(setSearchQuery('mole')).resolves.toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith('[useRouteSearchQuery] Navigation failed:', error);
+    expect(searchQuery.value).toBe('');
   });
 });

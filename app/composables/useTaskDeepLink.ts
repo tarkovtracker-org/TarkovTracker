@@ -1,5 +1,6 @@
 import { storeToRefs } from 'pinia';
 import { useDashboardFocusAnalytics } from '@/composables/useDashboardFocusAnalytics';
+import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -30,6 +31,7 @@ export function useTaskDeepLink({
 }: UseTaskDeepLinkOptions): UseTaskDeepLinkReturn {
   const route = useRoute();
   const router = useRouter();
+  const { setSearchQuery } = useRouteSearchQuery();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const progressStore = useProgressStore();
@@ -195,9 +197,8 @@ export function useTaskDeepLink({
     const taskInMetadata = tasks.value.find((t) => t.id === taskId);
     if (!taskInMetadata) return;
     // Settle the cleared search before any hand-off reads the query, or it would restore it.
-    if (getQueryString(route.query.q)) {
-      await router.replace({ query: { ...route.query, q: undefined } });
-    }
+    // Queued behind any pending search write, so that write cannot restore `q` afterwards.
+    await setSearchQuery('');
     if (await handOffToListRoute(objectiveIdToHighlight)) return;
     if (!objectiveIdToHighlight) {
       const isKappaRequired = taskInMetadata.kappaRequired === true;

@@ -22,6 +22,7 @@ const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
 });
 mockNuxtImport('useRoute', () => () => routeState);
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   replace,
   beforeEach: vi.fn(),
   beforeResolve: vi.fn(),
@@ -211,6 +212,29 @@ describe('useTaskDeepLink', () => {
     expect(replace).toHaveBeenLastCalledWith({
       path: '/tasks',
       query: expect.not.objectContaining({ q: 'mole' }),
+    });
+  });
+  it('clears the page search after a search write still waiting in the queue', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', q: 'mo' });
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    const { useRouteSearchQuery } = await import('@/composables/useRouteSearchQuery');
+    let landEarlierWrite = () => {};
+    const earlierWriteLanded = new Promise<void>((resolve) => (landEarlierWrite = resolve));
+    void queueQueryWrite(() => earlierWriteLanded);
+    const typedSearch = useRouteSearchQuery().setSearchQuery('mole');
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    const deepLink = taskDeepLink.handleTaskQueryParam();
+    landEarlierWrite();
+    await Promise.all([typedSearch, deepLink]);
+    expect(replace).toHaveBeenLastCalledWith({
+      path: '/tasks',
+      query: expect.not.objectContaining({ q: expect.anything() }),
     });
   });
   it('keeps the deep-linked task focused even when it is already visible', async () => {

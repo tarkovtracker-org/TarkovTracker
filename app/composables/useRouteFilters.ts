@@ -106,8 +106,13 @@ const createRouteSyncer =
     if (normalizeQuery(route.query) === normalizeQuery(buildNextQuery())) return;
     isSyncingToRoute.value = true;
     const method = useReplace ? 'replace' : 'push';
-    // Rebuilt when the write runs, so it keeps params an earlier queued write just added.
-    queueQueryWrite(() => router[method]({ query: buildNextQuery() }))
+    const path = router.currentRoute.value.path;
+    // Rebuilt when the write runs, so it keeps params an earlier queued write just added; skipped
+    // once the page navigated away, so its filters never land on the next page.
+    queueQueryWrite(() => {
+      if (router.currentRoute.value.path !== path) return;
+      return router[method]({ query: buildNextQuery() });
+    })
       .catch((error) => {
         logger.error('[useRouteFilters] Navigation failed:', error);
       })

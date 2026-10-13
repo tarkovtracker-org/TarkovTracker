@@ -11,6 +11,7 @@ const routeState = reactive({
 mockNuxtImport('useRoute', () => () => routeState);
 // Search writes go through `?q=`, so the router mock applies them to the route.
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   afterEach: vi.fn(),
   beforeEach: vi.fn(),
   beforeResolve: vi.fn(),

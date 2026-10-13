@@ -24,6 +24,7 @@ const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
 const push = vi.fn(async () => {});
 mockNuxtImport('useRoute', () => () => routeState);
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   push,
   replace,
   afterEach: vi.fn(),
@@ -161,8 +162,9 @@ describe('AppSearch', () => {
     expect(listboxShown()).toBe(true);
   });
   it('scrolls the option picked with the arrow keys into view', async () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
     await mountSearch();
     await typeQuery('gunsmith');
     await press('ArrowUp');
