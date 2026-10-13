@@ -71,8 +71,7 @@
     () =>
       chapter.value.requirements.length > 0 ||
       chapter.value.endings.length > 0 ||
-      chapter.value.questRouteChoices.length > 0 ||
-      chapter.value.chapterUnlocks.length > 0
+      chapter.value.questRouteChoices.length > 0
   );
   const staleProgressLabel = computed(() => {
     const count = chapter.value.staleObjectiveIds.length;
