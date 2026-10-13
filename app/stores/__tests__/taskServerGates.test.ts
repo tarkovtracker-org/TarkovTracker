@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTaskEvaluations, type TaskAvailabilityTeamData } from '@/stores/taskAvailability';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
-import type { RequirementComparison, Task } from '@/types/tarkov';
+import type { RequirementComparison, Task, TaskCounterDerivation } from '@/types/tarkov';
 const gate = (compareMethod: RequirementComparison = '>=', value = 3): Task => ({
   id: 'target',
   otherRequirements: [
@@ -253,7 +253,11 @@ describe('server-side task start gates', () => {
 });
 describe('registry-derived counters', () => {
   const counter = { type: 'distinctTaskCompletions' as const, taskIds: ['a', 'b', 'c', 'd'] };
-  const derived = (value = 2, compareMethod: RequirementComparison = '>='): Task => ({
+  const derived = (
+    value = 2,
+    compareMethod: RequirementComparison = '>=',
+    derivation: TaskCounterDerivation = counter
+  ): Task => ({
     id: 'target',
     otherRequirements: [
       {
@@ -262,7 +266,7 @@ describe('registry-derived counters', () => {
         variableId: 'tier',
         compareMethod,
         value,
-        counter,
+        counter: derivation,
       },
     ],
   });
@@ -339,6 +343,33 @@ describe('registry-derived counters', () => {
     };
     expect(otherRequirementsSignature(derived(3))).toBe(otherRequirementsSignature(plain));
   });
+  it('counts a task group once, and only when every member is complete', () => {
+    const grouped = derived(2, '>=', {
+      type: 'taskGroupCompletions',
+      groups: [['a', 'b'], ['c'], ['d']],
+    });
+    expect(evaluate(grouped, { completions: done('b', 'c') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('a', 'b') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('a', 'b', 'c') }).available).toBe(true);
+    expect(otherRequirementsSignature(grouped)).toBe(otherRequirementsSignature(derived(2)));
+  });
+  it('counts an anyOf group once when any member is complete', () => {
+    const grouped = derived(2, '>=', {
+      type: 'taskGroupCompletions',
+      groups: [{ anyOf: ['a', 'b'] }, ['c', 'd']],
+    });
+    expect(evaluate(grouped, { completions: done('a', 'b', 'c') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('c', 'd') }).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 1, required: 2 }),
+    ]);
+    expect(evaluate(grouped, { completions: done('b', 'c', 'd') }).available).toBe(true);
+  });
   it('still requires independent gates when the derived counter is met', () => {
     const task = { ...derived(1), minPlayerLevel: 60 };
     expect(evaluate(task, { completions: done('a') }).available).toBe(false);
@@ -349,6 +380,16 @@ describe('registry-derived counters', () => {
     { type: 'distinctTaskCompletions', taskIds: ['a', 'a'] },
     { type: 'distinctTaskCompletions', taskIds: ['a', ''] },
     { type: 'distinctTaskCompletions' },
+    { type: 'taskGroupCompletions', groups: [] },
+    { type: 'taskGroupCompletions', groups: [[]] },
+    { type: 'taskGroupCompletions', groups: [['a'], ['b', 'a']] },
+    { type: 'taskGroupCompletions', groups: [['a', '']] },
+    { type: 'taskGroupCompletions', groups: ['a'] },
+    { type: 'taskGroupCompletions', taskIds: ['a'] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a'] }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'a'] }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'], extra: 1 }] },
+    { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'] }, ['b']] },
     'a,b',
   ])('drops malformed derivation %j and falls back to an unknown value', (malformed) => {
     const task = {
