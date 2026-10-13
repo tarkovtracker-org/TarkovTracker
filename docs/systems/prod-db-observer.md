@@ -130,7 +130,9 @@ flowchart LR
   functions, and their bodies can bypass direct grants. The health flag does not claim each function
   writes. Membership administration and privileged server-file, program, signal, maintenance,
   checkpoint, and subscription roles are rejected. Inherited privileges after a role switch count;
-  role attributes count only for the current or switchable role. Catalog telemetry and
+  role attributes count only for the current or switchable role. Relation/column, sequence, function
+  and stored-migration read grants require schema USAGE in that same effective role context. Raw
+  grants in inaccessible schemas do not establish a reachable write/read path. Catalog telemetry and
   migration-version-only reads remain supported. Large-object `UPDATE` grants and explicit parameter
   `SET`/`ALTER SYSTEM` grants are rejected, including PUBLIC and inherited grants. Parameter grants
   can change cluster configuration or enable large-object ACL bypass; ordinary unprivileged session

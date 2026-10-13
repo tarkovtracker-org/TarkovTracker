@@ -127,7 +127,8 @@ select
   ) as can_read_migration_versions,
   exists (
     select 1 from reachable_roles r
-    where coalesce(has_column_privilege(
+    where coalesce(has_schema_privilege(r.oid, to_regnamespace('supabase_migrations'), 'usage'), false)
+      and coalesce(has_column_privilege(
       r.oid,
       (select c.oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'supabase_migrations' and c.relname = 'schema_migrations'),
       'statements',
@@ -144,6 +145,7 @@ select
     join application_schemas n on n.oid = c.relnamespace
     cross join reachable_roles r
     where c.relkind in ('r', 'p', 'v', 'm', 'f')
+      and has_schema_privilege(r.oid, n.oid, 'usage')
       and (
         c.relowner = r.oid
         or has_table_privilege(r.oid, c.oid, 'insert,update,delete,truncate,references,trigger,maintain')
@@ -155,13 +157,15 @@ select
     join application_schemas n on n.oid = c.relnamespace
     cross join reachable_roles r
     where c.relkind = 'S'
+      and has_schema_privilege(r.oid, n.oid, 'usage')
       and (c.relowner = r.oid or has_sequence_privilege(r.oid, c.oid, 'usage,update'))
   ) as has_sequence_write,
   exists (
     select 1 from pg_catalog.pg_proc p
     join application_schemas n on n.oid = p.pronamespace
     cross join reachable_roles r
-    where p.prosecdef and has_function_privilege(r.oid, p.oid, 'execute')
+    where p.prosecdef and has_schema_privilege(r.oid, n.oid, 'usage')
+      and has_function_privilege(r.oid, p.oid, 'execute')
   ) as has_function_write,
   (current_setting('lo_compat_privileges') = 'on' or exists (
     select 1 from pg_catalog.pg_proc p cross join reachable_roles r
