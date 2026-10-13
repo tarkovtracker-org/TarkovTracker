@@ -25,6 +25,8 @@ describe('taskRouteView', () => {
     ['traders', '/tasks'],
     ['all', '/tasks'],
     ['bogus', '/tasks'],
+    ['constructor', '/tasks'],
+    ['toString', '/tasks'],
   ])('sends ?view=%s to %s and keeps the other params', (view, path) => {
     expect(resolveLegacyTaskViewRedirect('/tasks', { view, trader: 'prapor', q: 'mole' })).toEqual({
       path,

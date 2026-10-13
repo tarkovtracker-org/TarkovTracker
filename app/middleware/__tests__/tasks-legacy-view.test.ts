@@ -18,11 +18,9 @@ describe('tasks legacy view middleware', () => {
     navigateToMock.mockClear();
   });
   it('replaces an old ?view=maps link with the maps route', () => {
-    run('/tasks', { view: 'maps', q: 'mole' });
-    expect(navigateToMock).toHaveBeenCalledWith(
-      { path: '/tasks/maps', query: { q: 'mole' } },
-      { replace: true }
-    );
+    const target = { path: '/tasks/maps', query: { q: 'mole' } };
+    expect(run('/tasks', { view: 'maps', q: 'mole' })).toEqual(target);
+    expect(navigateToMock).toHaveBeenCalledWith(target, { replace: true });
   });
   it('lets ordinary task links through', () => {
     expect(run('/tasks', { q: 'mole' })).toBeUndefined();

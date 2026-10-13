@@ -16,12 +16,13 @@ export const resolveTaskRouteView = (path: string): TaskRouteView =>
   ROUTE_VIEW_BY_PATH.get(normalizeTaskPath(path)) ?? 'list';
 export const isTaskListPath = (path: string): boolean =>
   normalizeTaskPath(path) === TASK_ROUTE_PATHS.list;
-const LEGACY_VIEW_PATHS: Record<string, string> = {
-  all: TASK_ROUTE_PATHS.list,
-  traders: TASK_ROUTE_PATHS.list,
-  maps: TASK_ROUTE_PATHS.maps,
-  graph: TASK_ROUTE_PATHS.graph,
-};
+// A Map, so params like `constructor` cannot resolve to inherited object keys.
+const LEGACY_VIEW_PATHS = new Map<string | null | undefined, string>([
+  ['all', TASK_ROUTE_PATHS.list],
+  ['traders', TASK_ROUTE_PATHS.list],
+  ['maps', TASK_ROUTE_PATHS.maps],
+  ['graph', TASK_ROUTE_PATHS.graph],
+]);
 /** Maps a pre-route `/tasks?view=<view>` link to its route, keeping the other query params. */
 export const resolveLegacyTaskViewRedirect = (
   path: string,
@@ -30,5 +31,5 @@ export const resolveLegacyTaskViewRedirect = (
   if (!isTaskListPath(path) || query.view === undefined) return null;
   const { view, ...rest } = query;
   const legacyView = Array.isArray(view) ? view[0] : view;
-  return { path: LEGACY_VIEW_PATHS[legacyView ?? ''] ?? TASK_ROUTE_PATHS.list, query: rest };
+  return { path: LEGACY_VIEW_PATHS.get(legacyView) ?? TASK_ROUTE_PATHS.list, query: rest };
 };

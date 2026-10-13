@@ -86,7 +86,11 @@ describe('TaskDisplayCard compact options', () => {
   it('removes the density selector and keeps only the hideout default view', () => {
     const wrapper = createWrapper();
     expect(wrapper.text()).not.toContain('settings.interface.tasks.density');
-    expect(wrapper.findAll('select-menu-fixed-stub')).toHaveLength(1);
+    const selectors = wrapper.findAll('select-menu-fixed-stub');
+    expect(selectors).toHaveLength(1);
+    expect(selectors[0]!.element.parentElement?.querySelector('p')?.textContent?.trim()).toBe(
+      'common.hideout'
+    );
   });
   it('always shows collapse and reward controls and persists toggles', async () => {
     const wrapper = createWrapper();
