@@ -446,7 +446,7 @@
   }>();
   const emit = defineEmits<{
     'update:searchQuery': [value: string];
-    'pin-status': [];
+    'pin-status': [status: TaskSecondaryView];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
@@ -675,9 +675,11 @@
     }
   };
   // Secondary view (available / locked / completed)
+  // A tab picked during a search only narrows that search; the saved tab is left alone.
   const setSecondaryView = (view: string) => {
-    emit('pin-status');
     const normalizedView = getTaskSecondaryViewForPrimaryView(primaryView.value, view);
+    emit('pin-status', normalizedView);
+    if (props.searchQuery.trim()) return;
     if (preferencesStore.getTaskSecondaryView === normalizedView) return;
     preferencesStore.setTaskSecondaryView(normalizedView);
   };

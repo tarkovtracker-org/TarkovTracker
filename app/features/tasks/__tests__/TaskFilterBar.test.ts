@@ -297,7 +297,7 @@ describe('TaskFilterBar', () => {
     expect(findStatusButton('All')!.attributes('aria-pressed')).toBe('true');
     expect(findStatusButton('available')!.attributes('aria-pressed')).toBe('false');
   });
-  it('emits pin-status before storing a status picked during search', async () => {
+  it('pins a status picked during search without saving it', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
       activeStatusView: 'all',
@@ -307,10 +307,20 @@ describe('TaskFilterBar', () => {
       .findAll('button')
       .find((button) => button.text().startsWith('locked'));
     await lockedButton!.trigger('click');
-    expect(wrapper.emitted('pin-status')).toHaveLength(1);
+    expect(wrapper.emitted('pin-status')).toEqual([['locked']]);
+    expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
+  });
+  it('saves a status picked with no search active', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup();
+    const wrapper = mountTaskFilterBar(TaskFilterBar, '', { activeStatusView: 'available' });
+    const lockedButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('locked'));
+    await lockedButton!.trigger('click');
+    expect(wrapper.emitted('pin-status')).toEqual([['locked']]);
     expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('locked');
   });
-  it('keeps All clickable during an all-status search so it can be saved', async () => {
+  it('keeps All clickable during an all-status search', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
       activeStatusView: 'all',
@@ -319,8 +329,8 @@ describe('TaskFilterBar', () => {
     const allButton = wrapper.findAll('button').find((button) => button.text().startsWith('All'));
     expect(allButton!.attributes('disabled')).toBeUndefined();
     await allButton!.trigger('click');
-    expect(wrapper.emitted('pin-status')).toHaveLength(1);
-    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('all');
+    expect(wrapper.emitted('pin-status')).toEqual([['all']]);
+    expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
   });
   it('keeps the current tab clickable while the typed query is still debouncing', async () => {
     const { TaskFilterBar } = await setup();
@@ -330,7 +340,7 @@ describe('TaskFilterBar', () => {
       .find((button) => button.text().startsWith('available'));
     expect(availableButton!.attributes('disabled')).toBeUndefined();
     await availableButton!.trigger('click');
-    expect(wrapper.emitted('pin-status')).toHaveLength(1);
+    expect(wrapper.emitted('pin-status')).toEqual([['available']]);
   });
   it('counts traders for the status the list is showing', async () => {
     const { TaskFilterBar, calculateTraderCounts } = await setup({

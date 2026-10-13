@@ -299,7 +299,7 @@ const defaultGlobalStubs = {
     props: ['activeStatusView', 'searchStatusCounts'],
     emits: ['pin-status', 'update:searchQuery'],
     template:
-      '<div data-testid="task-filter" :data-active-status="activeStatusView"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /><button data-testid="pin-status" @click="$emit(\'pin-status\')" /></div>',
+      '<div data-testid="task-filter" :data-active-status="activeStatusView"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
   },
   TaskEmptyState: true,
   TaskLoadingState: true,
@@ -560,8 +560,9 @@ describe('tasks page', () => {
       vi.useRealTimers();
     }
   });
-  it('keeps the picked status for the rest of the search once a tab is pinned', async () => {
+  it('narrows only the current search to a picked tab and returns to the saved tab on clear', async () => {
     const latestSecondaryView = () => updateVisibleTasksMock.mock.calls.at(-1)?.[0].secondaryView;
+    const scopeHint = () => wrapper.find('[data-testid="task-search-scope-hint"]');
     vi.useFakeTimers();
     try {
       await wrapper.find('[data-testid="task-search"]').setValue('mole');
@@ -569,11 +570,15 @@ describe('tasks page', () => {
       expect(latestSecondaryView()).toBe('all');
       await wrapper.find('[data-testid="pin-status"]').trigger('click');
       await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
-      expect(latestSecondaryView()).toBe('available');
-      expect(wrapper.find('[data-testid="task-search-scope-hint"]').exists()).toBe(false);
+      expect(latestSecondaryView()).toBe('locked');
+      expect(scopeHint().exists()).toBe(true);
       await wrapper.find('[data-testid="task-search"]').setValue('mol');
       await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('locked');
+      await scopeHint().find('button').trigger('click');
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
       expect(latestSecondaryView()).toBe('available');
+      expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
     } finally {
       vi.useRealTimers();
     }
