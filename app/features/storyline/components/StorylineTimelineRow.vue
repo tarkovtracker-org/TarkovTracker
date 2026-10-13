@@ -1,23 +1,19 @@
 <template>
   <li
-    class="before:bg-surface-700 relative flex flex-col gap-x-4 pb-1.5 pl-9 before:absolute before:inset-y-0 before:left-3.25 before:w-0.5 first:before:top-3 last:pb-0 last:before:bottom-auto last:before:h-3 @3xl/objectives:flex-row"
+    class="before:bg-surface-700 relative flex flex-col gap-x-4 rounded-md py-1 pl-9 transition-colors before:absolute before:inset-y-0 before:left-3.25 before:w-0.5 first:before:top-4 last:before:bottom-auto last:before:h-4 even:bg-white/3 hover:bg-white/6 @3xl/objectives:flex-row"
   >
     <StorylineTimelineNode :step="entry.step" :complete="entry.complete" />
     <div v-if="optional" class="hidden @3xl/objectives:block" :class="lanes.main">
       <span class="border-warning-700/50 mt-4 -ml-5.5 block border-t border-dashed"></span>
     </div>
-    <div v-else :class="lanes.main">
-      <StorylineRouteChoiceGroup
-        v-if="entry.routeChoice"
-        :route-choice="entry.routeChoice"
-        :chapter-id="chapterId"
-        :index="entry.routeIndex ?? entry.step ?? 0"
-        :read-only="readOnly"
-        hide-unlocks
-        @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
-      />
-      <StorylineObjectiveRow v-else-if="entry.objective" v-bind="rowProps(entry.objective)" />
-    </div>
+    <StorylineTimelineStep
+      v-else
+      :class="lanes.main"
+      :entry="entry"
+      :chapter-id="chapterId"
+      :read-only="readOnly"
+      @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
+    />
     <div v-if="hasOptionals" :class="[lanes.optional, optionalLaneClass]">
       <div
         v-for="objective in optionalObjectives"
@@ -48,8 +44,8 @@
 </template>
 <script setup lang="ts">
   import StorylineObjectiveRow from '@/features/storyline/components/StorylineObjectiveRow.vue';
-  import StorylineRouteChoiceGroup from '@/features/storyline/components/StorylineRouteChoiceGroup.vue';
   import StorylineTimelineNode from '@/features/storyline/components/StorylineTimelineNode.vue';
+  import StorylineTimelineStep from '@/features/storyline/components/StorylineTimelineStep.vue';
   import StorylineTimelineUnlocks from '@/features/storyline/components/StorylineTimelineUnlocks.vue';
   import { storylineObjectiveInputId } from '@/features/storyline/objectiveInputId';
   import type { StorylineObjectiveProgress } from '@/composables/useStorylineChapters';
