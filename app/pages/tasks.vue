@@ -667,6 +667,9 @@
   const shouldShowCompletedObjectives = computed(() => {
     return ['completed', 'all'].includes(effectiveTaskSecondaryView.value);
   });
+  const shouldShowLockedObjectives = computed(() =>
+    ['locked', 'all'].includes(effectiveTaskSecondaryView.value)
+  );
   const selectedMapData = computed(() => {
     const mapId = getTaskMapView.value;
     if (!mapId || mapId === 'all') return null;
@@ -741,6 +744,7 @@
     useMapObjectiveMarks({
       mapId: selectedMapId,
       shouldShowCompletedObjectives,
+      shouldShowLockedObjectives,
       tasks: sourceMapTasks,
     });
   const mapPlanTasks = computed(() => {
