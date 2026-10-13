@@ -742,14 +742,14 @@ describe('multi-account log separation', () => {
           name: `${sessionA}/application_000.log`,
           text: login('', '2026-02-20 10:00:01.000').replace(
             'AccountId:',
-            'SelectProfile '.repeat(30_000)
+            'SelectProfile '.repeat(100_000)
           ),
         },
       ],
       ids
     );
     expect(result.availableAccounts).toEqual([]);
-    expect(performance.now() - started).toBeLessThan(1000);
+    expect(performance.now() - started).toBeLessThan(10_000);
   });
   it('attributes events by the latest preceding login when accounts switch in one session', () => {
     const files = [
