@@ -60,13 +60,22 @@ is a best-effort mapping from a global variable to the tasks whose completions d
 ([mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)).
 `app/server/utils/overlayCounters.ts` validates it against the overlay schema and, for the request's
 mode, applies only `verified`/`complete` entries whose revision is in
-`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's contributor list to the matching gate as
-`counter: { type: 'distinctTaskCompletions', taskIds }` when every contributor is in the same task
-payload. This runs last in `applyOverlay`, so task corrections cannot supply a derivation.
+`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's derivation to the matching gate as
+`counter` when every contributor is in the same task payload: `{ type: 'distinctTaskCompletions',
+taskIds }` counts each completed task, and `{ type: 'taskGroupCompletions', groups }` counts each
+group the game credits as one. A list group counts once all its tasks are completed (same-threshold
+Gunsmith pairs; whether half a group already counts is unverified, so the tracker takes the
+conservative reading and Mark available covers an earlier in-game unlock). An `{ anyOf }` group (two
+or more tasks) counts once any member is completed (faction variants such as the BEAR-only AKM and
+USEC-only M4A1 Gunsmith parts, where a player can only ever complete one). No task may appear in two
+groups. An unknown derivation
+type makes the registry malformed, so the tracker must support a type before the overlay publishes
+it. This runs last in `applyOverlay`, so task
+corrections cannot supply a derivation.
 `unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
 
-For a gate carrying `counter`, the evaluator counts that player's completed contributors
-(`task_counter` blocker with current/required on a shortfall). An account without those
+For a gate carrying `counter`, the evaluator counts that player's completed contributors or
+groups (`task_counter` blocker with current/required on a shortfall). An account without those
 completions reads a known shortfall, not unknown. An explicit effective account value takes
 precedence, and an invalid one stays unknown instead of falling back. Gates without a derivation keep
 the unknown behaviour below. The tracker never assumes other missing values are zero, creates
@@ -198,6 +207,10 @@ disabled loyalty gating do not bypass an explicit gate. Catalogs must match each
 shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
 a compatibility fallback when no clear objective placement exists. Story trader blockers name the
 objective and cannot be cleared through Mark available; complete the storyline objective first.
+Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
+`finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
+opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
+locked on the dashboard also locks its tasks.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.

@@ -6,6 +6,7 @@ import {
   type StorylineTraderUnlock,
 } from '@/utils/storylineTraderUnlocks';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
+import { rewardTraderUnlockIds } from '@/utils/traderUnlockRewards';
 import type { Task, Trader } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 type LockTask = Pick<Task, 'id' | 'name' | 'trader' | 'finishRewards' | 'otherRequirements'>;
@@ -31,23 +32,12 @@ export interface TraderLockStatusDeps {
   getTraderReputation?: (traderId: string) => number;
 }
 type StoryGate = ReturnType<typeof storyObjectiveRequirements>[number];
-const rewardEntryId = (entry: unknown): string | undefined => {
-  if (typeof entry === 'string') return entry;
-  const id = (entry as { id?: unknown } | null | undefined)?.id;
-  return typeof id === 'string' ? id : undefined;
-};
-/** json.tarkov.dev ships `traderUnlock` as an id list; older shapes used a single object. */
-const unlockedTraderIds = (task: LockTask): string[] => {
-  const raw: unknown = task.finishRewards?.traderUnlock;
-  const entries: unknown[] = Array.isArray(raw) ? raw : [raw];
-  return entries.map(rewardEntryId).filter((id): id is string => Boolean(id));
-};
 const configuredUnlockTaskIds = (trader: LockTrader, deps: TraderLockStatusDeps) =>
   resolveTraderUnlockTaskIds(trader.normalizedName, deps.gameMode ?? GAME_MODES.PVP);
 const unlockTasksFor = (trader: LockTrader, deps: TraderLockStatusDeps, configured: string[]) => {
   const configuredIds = new Set(configured);
   return (deps.tasks ?? []).filter(
-    (task) => configuredIds.has(task.id) || unlockedTraderIds(task).includes(trader.id)
+    (task) => configuredIds.has(task.id) || rewardTraderUnlockIds(task).includes(trader.id)
   );
 };
 const hasCompletedUnlockTask = (trader: LockTrader, deps: TraderLockStatusDeps) =>
