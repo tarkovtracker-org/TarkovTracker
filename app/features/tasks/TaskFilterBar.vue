@@ -464,9 +464,9 @@
     getTaskSecondaryViewForPrimaryView(primaryView.value, preferencesStore.getTaskSecondaryView)
   );
   const selectedStatusView = computed(() => props.activeStatusView ?? secondaryView.value);
-  // Only the tab that is both shown and saved is inert; a temporary search scope stays clickable.
+  // While searching every tab stays clickable so it can pin the search; otherwise the shown tab is inert.
   const isStatusApplied = (view: TaskSecondaryView) =>
-    selectedStatusView.value === view && secondaryView.value === view;
+    !props.searchQuery.trim() && selectedStatusView.value === view;
   const traderCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
     return calculateTraderCounts(userView, selectedStatusView.value);

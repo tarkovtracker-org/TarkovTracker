@@ -36,8 +36,9 @@ export function useTaskSearchQuery() {
   // Track the typed query, not the debounced one, so a tab click right after typing still pins.
   const hasQuery = computed(() => searchQuery.value.trim().length > 0);
   const isStatusPinned = ref(false);
-  watch(hasQuery, (active) => {
-    if (!active) isStatusPinned.value = false;
+  // Drop the pin only once both the typed and the applied query are empty.
+  watch([hasQuery, isSearchActive], ([typed, applied]) => {
+    if (!typed && !applied) isStatusPinned.value = false;
   });
   const pinStatus = () => {
     if (hasQuery.value) isStatusPinned.value = true;

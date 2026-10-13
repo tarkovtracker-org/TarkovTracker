@@ -85,6 +85,26 @@ describe('useTaskSearchQuery', () => {
     scope.stop();
   });
 });
+describe('useTaskSearchQuery pin lifetime', () => {
+  it('keeps the pin while a replacement query is still debouncing', async () => {
+    vi.useFakeTimers();
+    routeState.query.q = undefined;
+    const { scope, search } = setup();
+    search.searchQuery.value = 'mole';
+    await vi.advanceTimersByTimeAsync(180);
+    search.pinStatus();
+    search.searchQuery.value = '   ';
+    await nextTick();
+    expect(search.isSearchActive.value).toBe(true);
+    expect(search.searchesAllStatuses.value).toBe(false);
+    await vi.advanceTimersByTimeAsync(180);
+    expect(search.isSearchActive.value).toBe(false);
+    search.searchQuery.value = 'mole';
+    await vi.advanceTimersByTimeAsync(180);
+    expect(search.searchesAllStatuses.value).toBe(true);
+    scope.stop();
+  });
+});
 describe('resolveEffectiveSecondaryView', () => {
   it('widens to all while searching unpinned', () => {
     expect(resolveEffectiveSecondaryView('all', 'available', true)).toBe('all');

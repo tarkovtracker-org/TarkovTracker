@@ -322,6 +322,16 @@ describe('TaskFilterBar', () => {
     expect(wrapper.emitted('pin-status')).toHaveLength(1);
     expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('all');
   });
+  it('keeps the current tab clickable while the typed query is still debouncing', async () => {
+    const { TaskFilterBar } = await setup();
+    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', { activeStatusView: 'available' });
+    const availableButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('available'));
+    expect(availableButton!.attributes('disabled')).toBeUndefined();
+    await availableButton!.trigger('click');
+    expect(wrapper.emitted('pin-status')).toHaveLength(1);
+  });
   it('counts traders for the status the list is showing', async () => {
     const { TaskFilterBar, calculateTraderCounts } = await setup({
       preferencesStore: { getTaskPrimaryView: 'traders' },
