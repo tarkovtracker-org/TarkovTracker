@@ -463,6 +463,8 @@ export interface StoryObjectiveUnlock {
 }
 export interface StoryObjective {
   id: string;
+  /** Producer-declared tutorial baseline, shared by all modes and never persisted on render. */
+  completionPolicy?: 'tutorial';
   order: number;
   type: 'main' | 'optional';
   description: string;

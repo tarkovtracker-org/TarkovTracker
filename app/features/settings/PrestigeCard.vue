@@ -462,6 +462,7 @@
   import { type PrestigeRunRecord, useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, getGameModeLabel } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import { storyCatalogForMode } from '@/utils/storylineCompletion';
   type HistoryComparisonRow = {
     delta: number;
     id: string;
@@ -528,7 +529,13 @@
       hideoutStations: metadataStore.hideoutStations,
       prestigeLevels: metadataStore.prestigeLevels,
       modeProgress: currentModeProgress.value,
-      storyChapters: metadataStore.storyChapters,
+      storyChapters: [
+        ...storyCatalogForMode(
+          metadataStore.storyChapters,
+          metadataStore.storyChaptersGameMode,
+          currentMode.value
+        ),
+      ],
       tasks: metadataStore.tasks,
     })
   );

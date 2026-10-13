@@ -125,6 +125,7 @@ const loadComposable = async (
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => ({
       storyChapters,
+      storyChaptersGameMode: 'pvp',
     }),
   }));
   vi.doMock('@/stores/useTarkov', () => ({
@@ -145,6 +146,38 @@ const requireDefined = <T>(value: T | null | undefined, message: string): T => {
   return value;
 };
 describe('useStorylineChapters', () => {
+  it('counts an automatic step without completing its independent dialogue or chapter', async () => {
+    const chapter: StoryChapter = {
+      id: 'tour',
+      name: 'Tour',
+      normalizedName: 'tour',
+      order: 1,
+      wikiLink: '',
+      objectives: {
+        escape: {
+          id: 'escape',
+          type: 'main',
+          order: 1,
+          description: 'Escape',
+          completionPolicy: 'tutorial',
+        },
+        therapist: { id: 'therapist', type: 'main', order: 2, description: 'Talk' },
+      },
+    };
+    const { normalizedChapters } = await loadComposable([chapter], {
+      isObjectiveComplete: () => false,
+      isChapterComplete: () => false,
+    });
+    expect(normalizedChapters.value[0]?.mainObjectiveCompleted).toBe(1);
+    expect(normalizedChapters.value[0]?.mainObjectiveTotal).toBe(2);
+    expect(normalizedChapters.value[0]?.complete).toBe(false);
+    expect(normalizedChapters.value[0]?.objectives.map((objective) => objective.complete)).toEqual([
+      true,
+      false,
+    ]);
+    expect(objectiveCompletionState.size).toBe(0);
+    expect(chapterCompletionState.size).toBe(0);
+  });
   beforeEach(() => {
     objectiveCompletionState.clear();
     chapterCompletionState.clear();
