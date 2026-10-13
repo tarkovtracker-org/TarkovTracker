@@ -159,56 +159,76 @@ describe('complete cached startup catalog freshness', () => {
     }
   );
   it.each([
-    ['mode', 'pending'],
-    ['mode', 'failed'],
-    ['language', 'pending'],
-    ['language', 'failed'],
-  ])('rechecks a retired %s scope when its cache write is %s', async (scopeKind, writeKind) => {
-    const store = prepare();
-    const write = createDeferred<undefined>();
-    vi.mocked(cache.setCachedData).mockReturnValue(write.promise);
-    vi.mocked(cache.getCachedData).mockResolvedValue({
-      editions: [
-        {
-          id: 'standard',
-          value: 1,
-          title: 'Standard',
-          defaultStashLevel: 1,
-          defaultCultistCircleLevel: 0,
-          traderRepBonus: {},
-        },
-      ],
-      storyChapters: [chapter()],
-    });
-    const fetch = vi.fn().mockResolvedValue(response());
-    vi.stubGlobal('$fetch', fetch);
-    try {
-      await warm(store);
-      await startIdle();
-      if (writeKind === 'failed') write.reject(new Error('cache unavailable'));
-      await flushPromises();
-      const changeScope = (away: boolean) => {
-        if (scopeKind === 'mode') store.currentGameMode = away ? 'pve' : 'pvp';
-        else store.languageCode = away ? 'fr' : 'en';
-      };
-      changeScope(true);
-      await store.fetchEditionsData(true);
-      expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
-      changeScope(false);
-      await store.fetchEditionsData();
-      await flushPromises();
-      await warm(store);
-      await startIdle();
-      expect(fetch).toHaveBeenCalledTimes(3);
-      expect(fetch).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-        query: { lang: 'en', gameMode: 'regular' },
+    ['mode', 'pending', 'network'],
+    ['mode', 'failed', 'network'],
+    ['language', 'pending', 'network'],
+    ['language', 'failed', 'network'],
+    ['mode', 'pending', 'cached'],
+    ['mode', 'failed', 'cached'],
+    ['language', 'pending', 'cached'],
+    ['language', 'failed', 'cached'],
+  ])(
+    'rechecks a retired %s scope after a %s cache write and %s replacement',
+    async (scopeKind, writeKind, replacement) => {
+      const store = prepare();
+      const write = createDeferred<undefined>();
+      vi.mocked(cache.setCachedData).mockReturnValue(write.promise);
+      vi.mocked(cache.getCachedData).mockResolvedValue({
+        editions: [
+          {
+            id: 'standard',
+            value: 1,
+            title: 'Standard',
+            defaultStashLevel: 1,
+            defaultCultistCircleLevel: 0,
+            traderRepBonus: {},
+          },
+        ],
+        storyChapters: [chapter()],
       });
-      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
-    } finally {
-      if (writeKind === 'pending') write.resolve(undefined);
-      await flushPromises();
+      const fetch = vi.fn().mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      try {
+        await warm(store);
+        await startIdle();
+        if (writeKind === 'failed') write.reject(new Error('cache unavailable'));
+        await flushPromises();
+        const changeScope = (away: boolean) => {
+          if (scopeKind === 'mode') store.currentGameMode = away ? 'pve' : 'pvp';
+          else store.languageCode = away ? 'fr' : 'en';
+        };
+        changeScope(true);
+        if (replacement === 'cached') {
+          const otherScope = scopeKind === 'mode' ? 'pve-en' : 'regular-fr';
+          if (scopeKind === 'mode') {
+            vi.mocked(store.loadCriticalCacheData).mockResolvedValueOnce(
+              bundle(otherScope) as never
+            );
+            await store.initialize({ gameMode: 'pve' });
+          } else {
+            await store.fetchAllData(false, { cachedData: bundle(otherScope) as never });
+          }
+          await startIdle();
+        } else {
+          await store.fetchEditionsData(true);
+          expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
+        }
+        changeScope(false);
+        await store.fetchEditionsData();
+        await flushPromises();
+        await warm(store);
+        await startIdle();
+        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(fetch).toHaveBeenLastCalledWith('/api/tarkov/editions', {
+          query: { lang: 'en', gameMode: 'regular' },
+        });
+        expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      } finally {
+        if (writeKind === 'pending') write.resolve(undefined);
+        await flushPromises();
+      }
     }
-  });
+  );
   it.each(invalidations)('drops a queued refresh after %s changes', async (kind) => {
     const store = prepare();
     const controller = new AbortController();

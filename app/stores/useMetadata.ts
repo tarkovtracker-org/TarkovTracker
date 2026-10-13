@@ -1932,6 +1932,7 @@ export const useMetadataStore = defineStore('metadata', {
       // A cache hydration owns these datasets just like a new network request.
       const promises = getPromiseStore(this);
       const preserveLiveCatalog = this.hasRevalidatedCatalog(scope);
+      prepareEditionScope(this, promises, scope);
       // Persisting a refreshed catalog can lag or fail; cached hydration must not roll it back.
       if (!preserveLiveCatalog) promises.editionsRevalidatedScopes.delete(scope);
       const requestIds = getPromiseRequestIdStore(this);
