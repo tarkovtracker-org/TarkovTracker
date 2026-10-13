@@ -120,9 +120,9 @@ Tour's ordered objective array follows the wiki narrative while retaining raw ob
 and source-subquest links. Stage-completion notes remain available on unlock badges.
 
 Optional `parentObjectiveId` values come from the overlay's captured condition parents.
-Projection and client normalization retain a link only when it targets a distinct main objective
-in the same chapter with the same nonempty `sourceQuestId`; an invalid link is dropped without
-dropping its objective. The timeline groups linked optionals beside their main step (below it
+Projection and client normalization retain a link only when the child is `optional` and it targets
+a distinct `main` objective in the same chapter with the same nonempty `sourceQuestId`; an invalid
+link is dropped without dropping its objective. The timeline groups linked optionals beside their main step (below it
 on narrow screens), supporting several children and parents inside route decisions. Unlinked
 optionals keep their original positions. Each objective retains its own checkbox, deep link,
 unlocks and completion state; layout parents never imply completion, prerequisites or item-supply
