@@ -4,6 +4,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { getQueryString } from '@/utils/routeHelpers';
+import { isTaskListPath, TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
 import type { Task } from '@/types/tarkov';
 export type UseTaskDeepLinkOptions = {
   searchQuery: Ref<string>;
@@ -183,6 +184,12 @@ export function useTaskDeepLink({
     highlightTask(focusedTaskElement);
     return true;
   };
+  // Only the list shows every task; the maps and graph routes hand plain task links to it.
+  const handOffToListRoute = async (objectiveIdToHighlight: string | undefined) => {
+    if (objectiveIdToHighlight || isTaskListPath(route.path)) return false;
+    await router.replace({ path: TASK_ROUTE_PATHS.list, query: { ...route.query } });
+    return true;
+  };
   const handleTaskQueryParam = async () => {
     const taskId = getQueryString(route.query.task);
     const objectiveIdToHighlight = getQueryString(route.query.highlightObjective);
@@ -192,6 +199,7 @@ export function useTaskDeepLink({
     if (searchQuery.value) {
       searchQuery.value = '';
     }
+    if (await handOffToListRoute(objectiveIdToHighlight)) return;
     if (!objectiveIdToHighlight) {
       const isKappaRequired = taskInMetadata.kappaRequired === true;
       const isLightkeeperRequired = taskInMetadata.lightkeeperRequired === true;

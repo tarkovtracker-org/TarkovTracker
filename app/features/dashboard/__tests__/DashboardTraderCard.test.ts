@@ -8,8 +8,9 @@ const mockState = {
   traderLevel: 1,
   gameMode: 'pvp',
 };
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 mockNuxtImport('useRouter', () => () => ({
-  push: vi.fn(),
+  push: pushMock,
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
@@ -148,6 +149,11 @@ describe('DashboardTraderCard', () => {
       path: '/storyline',
       query: { chapter: 'tour', objective: 'talk-to-prapor' },
     });
+  });
+  it('opens the traders view on this trader', async () => {
+    const wrapper = createWrapper();
+    await wrapper.get('[aria-label="page.dashboard.traders.view_tasks"]').trigger('click');
+    expect(pushMock).toHaveBeenCalledWith({ path: '/tasks/traders', query: { trader: 'prapor' } });
   });
   it('links a task-locked trader to its unlock task', () => {
     const wrapper = createWrapper({

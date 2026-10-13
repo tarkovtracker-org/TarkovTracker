@@ -4,10 +4,11 @@
     :to="props.to ?? undefined"
     :aria-label="props.labelText ?? ''"
     :aria-current="isActive ? 'page' : undefined"
-    class="group flex min-h-10 items-center rounded-sm border-l-2 px-3 py-2 text-sm font-medium transition-colors duration-150"
+    class="group flex items-center rounded-sm border-l-2 px-3 text-sm font-medium transition-colors duration-150"
     :class="[
       props.isCollapsed ? 'justify-center' : '',
-      isActive
+      nestedClass,
+      isHighlighted
         ? 'border-primary-500 bg-surface-800/50 light:text-surface-50 text-white'
         : 'text-surface-300 hover:bg-surface-800/30 light:hover:text-surface-50 border-transparent hover:text-white',
     ]"
@@ -79,6 +80,9 @@
     labelText?: string;
     hasMargin?: boolean;
     badge?: string | null;
+    nested?: boolean;
+    /** Highlights the entry while one of its sub-pages is open. */
+    highlighted?: boolean;
   }>();
   const route = useRoute();
   if (import.meta.env.DEV) {
@@ -94,4 +98,9 @@
   const isNuxtLink = computed(() => !isDisabled.value && !!props.to && !props.href);
   const isAnchor = computed(() => !isDisabled.value && !isNuxtLink.value && !!props.href);
   const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
+  const isHighlighted = computed(() => props.highlighted || isActive.value);
+  const nestedClass = computed(() => {
+    if (!props.nested) return 'min-h-10 py-2';
+    return props.isCollapsed ? 'min-h-8 py-1.5' : 'min-h-8 py-1.5 pl-8 text-[13px]';
+  });
 </script>

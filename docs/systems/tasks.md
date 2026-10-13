@@ -8,6 +8,19 @@ The initial route `q` filters tasks immediately, including tasks loaded later. S
 trim whitespace and ignore case. Later typing and route changes retain the 180 ms debounce;
 clearing search cancels any pending update and restores the visible list immediately.
 
+## Task views
+
+The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
+tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The sidebar
+keeps Tasks compact (`DrawerItemGroup.vue`): mouse or pen hover or keyboard focus animates its
+sub-pages open inline; touch hover and click focus do not. Leaving the group or selecting a route
+closes the unpinned dropdown; its chevron pins it open, saved per device
+(`app_drawerPinnedGroups`). Unpinning collapses it at once, and hover or focus reopens it only
+after the pointer and focus leave the group. No default-view selection is saved; the stored
+`taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
+params kept (`app/middleware/tasks-legacy-view.global.ts`).
+
 ## Canonical task progression
 
 ### Server-side start requirements
