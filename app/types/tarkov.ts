@@ -124,9 +124,12 @@ export interface TaskPrestigeReference {
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
 /**
  * Best-effort counter derivation attached server-side from the overlay's progressionCounters
- * registry: the counter equals the number of completed tasks in `taskIds`.
+ * registry. `distinctTaskCompletions`: the number of completed tasks in `taskIds`.
+ * `taskGroupCompletions`: the number of `groups` whose tasks are all completed.
  */
-export type TaskCounterDerivation = { type: 'distinctTaskCompletions'; taskIds: string[] };
+export type TaskCounterDerivation =
+  | { type: 'distinctTaskCompletions'; taskIds: string[] }
+  | { type: 'taskGroupCompletions'; groups: string[][] };
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';

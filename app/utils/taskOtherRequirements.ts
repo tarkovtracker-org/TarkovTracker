@@ -16,11 +16,28 @@ const uniqueIds = (value: unknown): value is string[] =>
   value.length > 0 &&
   value.every(isId) &&
   new Set(value).size === value.length;
-/** A malformed derivation is dropped, so the gate falls back to needing an account value. */
-const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined => {
-  if (!isRecord(raw) || raw.type !== 'distinctTaskCompletions') return undefined;
-  return uniqueIds(raw.taskIds) ? { type: raw.type, taskIds: [...raw.taskIds] } : undefined;
-};
+const uniqueGroups = (value: unknown): value is string[][] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(uniqueIds) &&
+  new Set(value.flat()).size === value.flat().length;
+const normalizeGroups = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
+  uniqueGroups(raw.groups)
+    ? { type: 'taskGroupCompletions', groups: raw.groups.map((group) => [...group]) }
+    : undefined;
+const normalizeTaskIds = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
+  uniqueIds(raw.taskIds)
+    ? { type: 'distinctTaskCompletions', taskIds: [...raw.taskIds] }
+    : undefined;
+const counterNormalizers: Record<
+  string,
+  (raw: Record<string, unknown>) => TaskCounterDerivation | undefined
+> = { distinctTaskCompletions: normalizeTaskIds, taskGroupCompletions: normalizeGroups };
+/** A malformed or unknown derivation is dropped, so the gate falls back to needing an account value. */
+const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined =>
+  isRecord(raw) && Object.hasOwn(counterNormalizers, String(raw.type))
+    ? counterNormalizers[String(raw.type)]!(raw)
+    : undefined;
 const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement => {
   const valid = [
     isId(raw.id),
