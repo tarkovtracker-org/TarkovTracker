@@ -60,8 +60,9 @@ mode, applies only `verified`/`complete` entries whose revision is in
 taskIds }` counts each completed task, and `{ type: 'taskGroupCompletions', groups }` counts each
 group once all its tasks are completed (tasks the game credits as one, such as same-threshold
 Gunsmith pairs; whether half a group already counts is unverified, so the tracker takes the
-conservative reading and Mark available covers an earlier in-game unlock). An unknown derivation type makes the registry malformed, so the tracker must
-support a type before the overlay publishes it. This runs last in `applyOverlay`, so task
+conservative reading and Mark available covers an earlier in-game unlock). An unknown derivation
+type makes the registry malformed, so the tracker must support a type before the overlay publishes
+it. This runs last in `applyOverlay`, so task
 corrections cannot supply a derivation.
 `unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
 
