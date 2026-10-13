@@ -9,7 +9,7 @@ mode = "smart"
 
 # Atomic, globally-consistent rate limiter shared with the api-gateway Worker.
 # The ApiGatewayRateLimiter Durable Object class is owned and deployed by
-# workers/api-gateway; Pages binds to it by script_name (Pages cannot define a
+# TarkovTracker-API; Pages binds to api-gateway by script_name (Pages cannot define a
 # DO class itself). When this binding is absent the rate limiter degrades to a
 # best-effort Cache API + in-memory path. durable_objects is a non-inheritable
 # key; it is deliberately not repeated under [env.preview] so anonymous previews

@@ -63,20 +63,8 @@ if (plan.full && options.mode !== 'local') {
     ['run', 'lint:fallow', '--base', changes.baseSha || 'origin/main'],
     ['run', 'build'],
     ['run', 'supabase:check'],
-    ['--filter', 'api-gateway', 'run', 'types:check'],
-    ['--filter', 'api-gateway', 'run', 'typecheck'],
-    ['--filter', 'api-gateway', 'run', 'validate:openapi'],
-    [
-      '--filter',
-      'api-gateway',
-      'exec',
-      'wrangler',
-      'deploy',
-      '--config',
-      'wrangler.toml',
-      '--dry-run',
-    ],
-    ['run', 'test:api-gateway'],
+    ['run', 'check:progress-contracts'],
+    ['run', 'verify:api-parity'],
     ['run', 'test:deno']
   );
 }

@@ -917,7 +917,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 
 **Features:**
 
-- Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
+- Weekly dependency update batches for the frontend pnpm workspace (API updates are owned by TarkovTracker-API)
 - Monthly grouped GitHub Actions updates for manual review
 - Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
   behind a minor/patch-only rule
@@ -1013,7 +1013,8 @@ duplicated here:
 ```bash
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
 pnpm run build
-pnpm --filter api-gateway exec wrangler deploy
+# Public API deploys are separately authorized and run only in the API checkout:
+# pnpm run deploy (TarkovTracker-API repository)
 ```
 
 > **Note:** All local deployment commands assume you are in the project root directory.
@@ -1111,7 +1112,7 @@ pnpm run lint:fix
 
 - Verify Cloudflare Worker Git deployment status or deploy with `wrangler`
 - Check worker-specific secrets and bindings
-- Validate `wrangler.toml` and test locally with `pnpm --filter api-gateway run dev`
+- Validate the API repository's `wrangler.toml` and run `pnpm run dev` in the TarkovTracker-API checkout; this repository's Wrangler config belongs to Pages.
 
 ## Best Practices
 
