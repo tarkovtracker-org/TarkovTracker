@@ -123,10 +123,32 @@ HTTP_CRC_ENVELOPE_MARKERS = (b"---> request https", b"<--- response https")
 ENDPOINT_RE = re.compile(rb"(?:(?:https?|wss)://[^/\s\"']+)?((?:/v2)?/client/[A-Za-z0-9_./-]+|/router)(?:\?[^\s\"']*)?", re.I)
 NOTIFICATION_RE = re.compile(rb"Got notification\s*\|\s*([A-Za-z][A-Za-z0-9_]*)", re.I)
 SERVICE_NOTIFICATION_RE = re.compile(rb"Service Notifications\s+([A-Za-z][A-Za-z0-9_]*)", re.I)
+SAFE_NOTIFICATION_MARKERS = {
+    value.lower().encode(): value
+    for value in (
+        "BattlePassUniversalDocuments", "ChatMessageReceived", "CustomizationUpdateRequired",
+        "ExpansionsAccountBalanceIncreased", "ExpansionsAccountOfferPurchased", "ExpansionsAccountTarcoinBalance",
+        "FriendsListAccept", "FriendsListNewRequest", "GroupMatchAbort", "GroupMatchInviteAccept",
+        "GroupMatchInviteCancel", "GroupMatchInviteDecline", "GroupMatchInviteExpired", "GroupMatchInviteSend",
+        "GroupMatchLeaderChanged", "GroupMatchRaidNotReady", "GroupMatchRaidReady", "GroupMatchRaidSettings",
+        "GroupMatchStartGame", "GroupMatchUserLeave", "GroupMatchWasRemoved", "GroupMaxCountReached",
+        "NotificationPopup", "RagfairNewRating", "RagfairOfferSold", "Ping", "ChannelDeleted", "StashRows",
+        "UserConfirmed", "UserMatchCreated", "UserMatchOver", "UserRoomStarted",
+    )
+}
 ARENA_EVENT_RE = re.compile(
-    rb"\b(?:event|message|type|method|action|ApplicationState|MatchingProgressState|GameplayState)\b\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_.-]{2,80})",
+    rb"\b(ApplicationState|MatchingProgressState|GameplayState)\b\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_.-]{2,80})",
     re.I,
 )
+# Only documented state-machine enums may be retained; never echo arbitrary payload words.
+ARENA_SAFE_STATES = {
+    field.lower().encode(): {value.lower().encode(): value for value in values}
+    for field, values in (
+        ("ApplicationState", ("Idle", "Matching", "Gameplay")),
+        ("MatchingProgressState", ("None", "MatchingStarted", "GameFound", "ConnectingToServer", "WorldCreating", "Leaving", "Participation")),
+        ("GameplayState", ("None", "Running", "Dead", "Finished")),
+    )
+}
 SAFE_SHAPE_WORDS = frozenset(
     {
         "active",
@@ -384,12 +406,15 @@ def main() -> None:
                     if scan_notifications and channel.lower() in {"push-notifications", "notifications", "output", "errors", "traces", "traces_all"} and b"notification" in lower:
                         for regex in (NOTIFICATION_RE, SERVICE_NOTIFICATION_RE):
                             for match in regex.finditer(clean):
-                                marker = match.group(1).decode("ascii", "ignore")
-                                session_notifications[session].add((marker, version))
+                                marker = SAFE_NOTIFICATION_MARKERS.get(match.group(1).lower())
+                                if marker is not None:
+                                    session_notifications[session].add((marker, version))
 
                     if scan_arena_tokens and game == "arena":
                         for match in ARENA_EVENT_RE.finditer(clean):
-                            arena_fields[session].add((match.group(1).decode("ascii", "ignore"), channel))
+                            token = ARENA_SAFE_STATES[match.group(1).lower()].get(match.group(2).lower())
+                            if token is not None:
+                                arena_fields[session].add((token, channel))
 
                     if scan_shapes and (not shape_channels or file_channel.lower() in shape_channels):
                         if envelope and re.fullmatch(rb"\d+\.\d+\.\d+\.\d+\.\d+", envelope.group(1)):
