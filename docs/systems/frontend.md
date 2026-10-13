@@ -9,6 +9,14 @@ and mode changes synchronously clear the shared history and close any inline und
 Previously retained callbacks stay invalid even after returning to the original context. A late
 completion cannot remove or restore actions belonging to the new context.
 
+**Files:** `app/stores/useActionHistoryStore.ts`, `app/composables/useTaskNotification.ts`.
+
+**Invariants:** Context invalidation replaces the history array, including when it is empty.
+Ordinary undo mutations preserve that array so a failed undo keeps its inline retry. Current task
+undo callbacks are synchronous. The store guards callback invocation and subsequent history/toast
+bookkeeping; future asynchronous callbacks must independently guard their own writes after each
+await against context invalidation.
+
 ## Language selection
 
 The app bar uses a compact translation icon with native language names and a checked current

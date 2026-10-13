@@ -70,6 +70,36 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it('closes an empty-history status notification on a mode change', async () => {
+    const { notification, tarkovStore, stop } = await setup([]);
+    notification.onTaskAction({
+      action: 'available',
+      taskId: 'task-a',
+      taskName: 'Task A',
+      statusKey: 'status',
+    });
+    expect(notification.taskStatusUpdated.value).toBe(true);
+    tarkovStore.currentGameMode = 'pve';
+    expect(notification.taskStatusUpdated.value).toBe(false);
+    stop();
+  });
+  it('preserves inline retry when an ordinary undo fails', async () => {
+    const { notification, tarkovStore, stop } = await setup([]);
+    notification.onTaskAction({
+      action: 'complete',
+      taskId: 'task-a',
+      taskName: 'Task A',
+      statusKey: 'status',
+    });
+    tarkovStore.setTaskUncompleted.mockImplementationOnce(() => {
+      throw new Error('retry');
+    });
+    const { useActionHistoryStore } = await import('@/stores/useActionHistoryStore');
+    await useActionHistoryStore().undoLastAction();
+    expect(notification.taskStatusUpdated.value).toBe(true);
+    expect(notification.showUndoButton.value).toBe(true);
+    stop();
+  });
   it.each(['owner', 'mode', 'logout'])(
     'invalidates undo across a %s transition and return',
     async (transition) => {

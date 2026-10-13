@@ -44,9 +44,8 @@ export function useTaskNotification(): TaskNotificationReturn {
     taskStatusUpdated.value = false;
   };
   watch(
-    () => actionHistoryStore.undoStack.length,
-    (count) => {
-      if (count !== 0) return;
+    () => actionHistoryStore.undoStack,
+    () => {
       showUndoButton.value = false;
       closeNotification();
     },
