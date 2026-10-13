@@ -1,6 +1,13 @@
 import type { UserProgressData } from '@/types/progress';
 import type { StoryChapter, StoryObjective } from '@/types/tarkov';
+import type { GameMode } from '@/utils/constants';
 type StoryProgress = UserProgressData['storyChapters'];
+/** A cached catalog proves policy only for the mode it was loaded for. */
+export const storyCatalogForMode = (
+  chapters: readonly StoryChapter[],
+  catalogMode: GameMode | null | undefined,
+  mode: GameMode
+): readonly StoryChapter[] => (catalogMode === mode ? chapters : []);
 /** Only recognized producer policies are authoritative; old/unknown metadata stays manual. */
 export const isAutomaticStoryObjective = (
   objective?: Pick<StoryObjective, 'completionPolicy'>

@@ -125,6 +125,7 @@ const loadComposable = async (
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => ({
       storyChapters,
+      storyChaptersGameMode: 'pvp',
     }),
   }));
   vi.doMock('@/stores/useTarkov', () => ({

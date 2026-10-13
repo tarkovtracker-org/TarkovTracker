@@ -107,6 +107,7 @@ import {
   effectiveStoryProgress,
   isAutomaticStoryObjective,
   isEffectiveStoryObjectiveComplete,
+  storyCatalogForMode,
 } from '@/utils/storylineCompletion';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
@@ -241,36 +242,43 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
 const tarkovGetters = {
   ...getters,
   getEffectiveStoryProgress: (state: UserState) => () =>
-    effectiveStoryProgress(
-      state[state.currentGameMode]?.storyChapters,
-      useMetadataStore().storyChapters ?? []
-    ),
+    effectiveStoryProgress(state[state.currentGameMode]?.storyChapters, currentStoryCatalog(state)),
   isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
     isEffectiveStoryObjectiveComplete(
-      catalogStoryObjective(chapterId, objectiveId) ?? {},
+      catalogStoryObjective(state, chapterId, objectiveId) ?? {},
       getters.isStoryObjectiveComplete(state)(chapterId, objectiveId)
     ),
 } satisfies _GettersTree<UserState>;
 /** Metadata store hydration normalizes objectives to ID-keyed records. */
-const catalogStoryObjective = (chapterId: string, objectiveId: string) =>
-  useMetadataStore().storyChapters?.find((chapter) => chapter.id === chapterId)?.objectives?.[
-    objectiveId
-  ];
-const automaticStoryObjective = (chapterId: string, objectiveId: string): boolean => {
-  return isAutomaticStoryObjective(catalogStoryObjective(chapterId, objectiveId));
+const currentStoryCatalog = (state: UserState) => {
+  const metadata = useMetadataStore();
+  return storyCatalogForMode(
+    metadata.storyChapters ?? [],
+    metadata.storyChaptersGameMode,
+    state.currentGameMode
+  );
+};
+const catalogStoryObjective = (state: UserState, chapterId: string, objectiveId: string) =>
+  currentStoryCatalog(state).find((chapter) => chapter.id === chapterId)?.objectives?.[objectiveId];
+const automaticStoryObjective = (
+  state: UserState,
+  chapterId: string,
+  objectiveId: string
+): boolean => {
+  return isAutomaticStoryObjective(catalogStoryObjective(state, chapterId, objectiveId));
 };
 const tarkovActions = {
   ...(actions as UserActions),
   setStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
-    if (automaticStoryObjective(chapterId, objectiveId)) return;
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
     actions.setStoryObjectiveComplete.call(this, chapterId, objectiveId);
   },
   setStoryObjectiveUncomplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
-    if (automaticStoryObjective(chapterId, objectiveId)) return;
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
     actions.setStoryObjectiveUncomplete.call(this, chapterId, objectiveId);
   },
   toggleStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
-    if (automaticStoryObjective(chapterId, objectiveId)) return;
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
     actions.toggleStoryObjectiveComplete.call(this, chapterId, objectiveId);
   },
   setHideoutModuleUncomplete(this: TarkovStoreInstance, hideoutId: string) {

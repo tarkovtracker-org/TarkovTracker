@@ -7,6 +7,7 @@ describe('tutorial completion store boundary', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadata = useMetadataStore();
+    metadata.storyChaptersGameMode = 'pvp';
     metadata.storyChapters = [
       {
         id: 'tour',
@@ -27,6 +28,13 @@ describe('tutorial completion store boundary', () => {
     ];
     const lookup = store.isStoryObjectiveComplete;
     expect(lookup('tour', 'escape')).toBe(true);
+    store.currentGameMode = 'pve';
+    expect(lookup('tour', 'escape')).toBe(false);
+    expect(store.getEffectiveStoryProgress()).toEqual({});
+    metadata.storyChaptersGameMode = 'pve';
+    expect(lookup('tour', 'escape')).toBe(true);
+    metadata.storyChaptersGameMode = 'pvp';
+    store.currentGameMode = 'pvp';
     metadata.storyChapters = [];
     expect(lookup('tour', 'escape')).toBe(false);
     store.pvp.storyChapters = { tour: { objectives: { escape: { complete: true } } } };
@@ -41,6 +49,7 @@ describe('tutorial completion store boundary', () => {
   it('looks up a single objective without projecting unrelated chapter progress', () => {
     setActivePinia(createPinia());
     const metadata = useMetadataStore();
+    metadata.storyChaptersGameMode = 'pvp';
     metadata.storyChapters = [
       {
         id: 'tour',
@@ -64,7 +73,7 @@ describe('tutorial completion store boundary', () => {
         normalizedName: 'other',
         wikiLink: '',
         order: 2,
-        get objectives() {
+        get objectives(): never {
           throw new Error('Unrelated chapter must not be projected for one lookup');
         },
       },
@@ -79,6 +88,7 @@ describe('tutorial completion store boundary', () => {
       setActivePinia(createPinia());
       const store = useTarkovStore();
       const metadata = useMetadataStore();
+      metadata.storyChaptersGameMode = mode;
       metadata.storyChapters = [
         {
           id: 'tour',

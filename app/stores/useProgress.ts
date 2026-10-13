@@ -14,7 +14,7 @@ import { GAME_MODES, SPECIAL_STATIONS, TASK_STATE, type TaskState } from '@/util
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
-import { effectiveStoryProgress } from '@/utils/storylineCompletion';
+import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import {
   getCompletionFlags,
   getTaskStatusFromFlags,
@@ -36,6 +36,7 @@ const createTaskAvailabilityTeamData = (
   level: number
 ): TaskAvailabilityTeamData => {
   const currentData = getGameModeData(store);
+  const metadata = useMetadataStore();
   return {
     mode: store.$state.currentGameMode,
     level,
@@ -46,7 +47,11 @@ const createTaskAvailabilityTeamData = (
     prestigeLevel: currentData.prestigeLevel,
     storyChapters: effectiveStoryProgress(
       currentData.storyChapters,
-      useMetadataStore().storyChapters ?? []
+      storyCatalogForMode(
+        metadata.storyChapters ?? [],
+        metadata.storyChaptersGameMode,
+        store.$state.currentGameMode
+      )
     ),
   };
 };

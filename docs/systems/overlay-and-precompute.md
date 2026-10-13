@@ -10,6 +10,9 @@ IDs to infer this policy. Missing/unknown policies retain normal tracked behavio
 storyline UI and Nitro profile adapter. It keeps Therapist and chapter completion
 independent, and is used by objective totals, availability, trader-lock reads and
 prestige requirements. Individual/bulk edit guards skip automatic objectives.
+Current-store and teammate consumers apply policy only when the loaded
+`storyChaptersGameMode` matches that store's mode; a mode switch never borrows
+the previous catalog. Isolated profile views use their own viewed-mode catalog.
 Rendering never writes a mark, completion time or activity history. Stored marks
 remain reversible if producer evidence changes.
 

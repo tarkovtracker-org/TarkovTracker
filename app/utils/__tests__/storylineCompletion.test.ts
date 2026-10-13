@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
 import { buildPrestigeResetData } from '@/stores/tarkov/prestige';
-import { effectiveStoryProgress } from '@/utils/storylineCompletion';
+import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import {
   normalizeStoryObjectives,
   toggleStoryChapterWithLinearObjectives,
@@ -25,6 +25,17 @@ const chapter: StoryChapter = {
   },
 };
 describe('effective storyline baseline', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'uses policy only from the matching %s catalog',
+    (mode) => {
+      expect(storyCatalogForMode([chapter], mode, mode)).toEqual([chapter]);
+      expect(storyCatalogForMode([chapter], null, mode)).toEqual([]);
+      for (const other of ['pvp', 'pve', 'seasonal'] as const) {
+        if (other === mode) continue;
+        expect(effectiveStoryProgress({}, storyCatalogForMode([chapter], other, mode))).toEqual({});
+      }
+    }
+  );
   it.each(['pvp', 'pve', 'seasonal'] as const)(
     'keeps %s default, reset, prestige and imported marks distinct from the baseline',
     (mode) => {

@@ -4,7 +4,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { effectiveStoryProgress } from '@/utils/storylineCompletion';
+import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmation';
 import {
   hasUnsupportedOtherRequirement,
@@ -258,7 +258,11 @@ export function useTaskActions(
         hasStoryUnlockProgress(chapter.id, {
           storyChapters: effectiveStoryProgress(
             tarkovStore.getCurrentProgressData().storyChapters,
-            metadataStore.storyChapters ?? []
+            storyCatalogForMode(
+              metadataStore.storyChapters ?? [],
+              metadataStore.storyChaptersGameMode,
+              tarkovStore.getCurrentGameMode()
+            )
           ),
         })
     );

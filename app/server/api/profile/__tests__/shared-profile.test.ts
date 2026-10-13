@@ -181,6 +181,15 @@ describe('Shared Profile API', () => {
       expect(blank.data).toEqual({
         storyChapters: { tour: { objectives: { escape: { complete: true } } } },
       });
+      empty = false;
+      mockOverlay.mockResolvedValue({ overlay: { storyChapters: {} } });
+      expect((await handler(mockEvent as H3Event)).data?.storyChapters).toEqual(
+        recorded.storyChapters
+      );
+      mockOverlay.mockRejectedValueOnce(new Error('Metadata unavailable'));
+      expect((await handler(mockEvent as H3Event)).data?.storyChapters).toEqual(
+        recorded.storyChapters
+      );
       expect(
         mockFetch.mock.calls
           .filter(([url]) => String(url).includes('/rest/v1/user_game_mode_progress'))
@@ -197,6 +206,7 @@ describe('Shared Profile API', () => {
     });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid profile mode');
+    expect(mockOverlay).not.toHaveBeenCalled();
   });
   it('returns 500 when Supabase config is missing', async () => {
     runtimeConfig.supabaseUrl = '';
@@ -242,16 +252,19 @@ describe('Shared Profile API', () => {
   it('serves shared profiles in production mode', async () => {
     // Old/unavailable policy metadata retains the existing recorded read model.
     const originalNodeEnv = process.env.NODE_ENV;
+    const storyChapters = { tour: { objectives: { escape: { complete: false, timestamp: 29 } } } };
     process.env.NODE_ENV = 'production';
     vi.resetModules();
     try {
       mockFetch
         .mockResolvedValueOnce(progressResponse())
-        .mockResolvedValueOnce(modeProgressResponse({ displayName: 'PublicPlayer', level: 24 }))
+        .mockResolvedValueOnce(
+          modeProgressResponse({ displayName: 'PublicPlayer', level: 24, storyChapters })
+        )
         .mockResolvedValueOnce(preferencesResponse());
       const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
       await expect(handler(mockEvent as H3Event)).resolves.toEqual({
-        data: { displayName: 'PublicPlayer', level: 24 },
+        data: { displayName: 'PublicPlayer', level: 24, storyChapters },
         gameEdition: 4,
         mode: 'pvp',
         userId: '11111111-1111-4111-8111-111111111111',
