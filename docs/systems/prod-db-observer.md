@@ -121,8 +121,16 @@ flowchart LR
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
 - `canary` must fail before telemetry collection when the observer is privileged, can write
-  application tables or create persistent objects, can read stored migration `statements`, lacks
+  application relations or columns, advance sequences, create persistent objects, owns persistent
+  database objects, can read stored migration `statements`, lacks
   default read-only transactions, or has unbounded statement or lock timeouts.
+- These checks cover every non-system schema and roles reachable through inheritance or `SET ROLE`.
+  Application `SECURITY DEFINER` execution is rejected conservatively: telemetry needs no such
+  functions, and their bodies can bypass direct grants. The health flag does not claim each function
+  writes. Membership administration and privileged server-file, program, signal, maintenance,
+  checkpoint, and subscription roles are rejected. Inherited privileges after a role switch count;
+  role attributes count only for the current or switchable role. Catalog telemetry and
+  migration-version-only reads remain supported.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL

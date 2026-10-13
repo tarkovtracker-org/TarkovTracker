@@ -1128,12 +1128,17 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, read access to stored
+privileged or write-capable roles across non-system schemas, column writes, sequence advancement,
+persistent-object ownership or creation, application `SECURITY DEFINER` execution, read access to stored
 migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
 interpret cumulative counters.
+
+Health checks include inherited roles and roles reachable through `SET ROLE`. Application
+`SECURITY DEFINER` execution is rejected as an unneeded bypass route; the check does not inspect
+function bodies or assert that every such function writes. See the [observer specification](./systems/prod-db-observer.md).
 
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and

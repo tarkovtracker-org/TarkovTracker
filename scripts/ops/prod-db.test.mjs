@@ -59,11 +59,17 @@ let data = [{
   is_superuser: process.env.FAKE_SUPABASE_UNSAFE === 'true',
   can_create_database: false,
   can_create_role: false,
+  can_administer_roles: false,
+  has_unsafe_system_role: false,
   can_replicate: false,
   can_bypass_rls: false,
   is_write_role: false,
   has_table_write: false,
   can_create_in_public: false,
+  can_create_in_schema: false,
+  has_sequence_write: false,
+  has_function_write: false,
+  has_owned_objects: false,
   can_use_migration_schema: true,
   can_read_migration_versions: true,
   can_read_migration_statements: process.env.FAKE_SUPABASE_STATEMENT_ACCESS === 'true',
@@ -78,6 +84,8 @@ let data = [{
   literal_password_received: password.includes('literal$HOME'),
 }];
 if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout;
+if (process.env.FAKE_SUPABASE_PRIVILEGE) data[0][process.env.FAKE_SUPABASE_PRIVILEGE] = true;
+if (process.env.FAKE_SUPABASE_MISSING_PRIVILEGE) delete data[0][process.env.FAKE_SUPABASE_MISSING_PRIVILEGE];
 if (sql.includes('pg_catalog.pg_attribute')) {
   data = [{ column_name: 'id' }, { column_name: 'email' }];
 }
@@ -531,6 +539,30 @@ describe('prod-db command boundary', () => {
   });
 });
 describe('prod-db canary', () => {
+  it.each([
+    'can_administer_roles',
+    'has_unsafe_system_role',
+    'can_create_in_schema',
+    'has_sequence_write',
+    'has_function_write',
+    'has_owned_objects',
+  ])('rejects effective privilege %s before telemetry', (field) => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_PRIVILEGE: field })).toThrow(
+      'unsafe observer configuration'
+    );
+  });
+  it.each([
+    'can_administer_roles',
+    'has_unsafe_system_role',
+    'can_create_in_schema',
+    'has_sequence_write',
+    'has_function_write',
+    'has_owned_objects',
+  ])('fails closed if effective privilege %s is unreported', (field) => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_MISSING_PRIVILEGE: field })).toThrow(
+      `incomplete observer health report; missing: ${field}`
+    );
+  });
   it('runs a telemetry-only canary without data-shape operations', () => {
     const result = JSON.parse(run(['canary']));
     expect(result.operation).toBe('canary');
