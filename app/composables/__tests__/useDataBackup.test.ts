@@ -344,6 +344,14 @@ describe('useDataBackup', () => {
         .spyOn(HTMLAnchorElement.prototype, 'click')
         .mockImplementation(() => undefined);
       try {
+        const recorded = {
+          tour: { objectives: { '6895bc04162304804bdc056e': { complete: false, timestamp: 17 } } },
+        };
+        tarkovStore.getPvPProgressData.mockReturnValueOnce({
+          ...tarkovStore.getPvPProgressData(),
+          storyChapters: recorded,
+        });
+        tarkovStore.getPvPProgressData.mockClear();
         const { exportProgress, exportError } = await loadComposable();
         await exportProgress();
         expect(exportError.value).toBeNull();
@@ -366,6 +374,7 @@ describe('useDataBackup', () => {
               level: 5,
               pmcFaction: 'USEC',
               skills: { Endurance: 10 },
+              storyChapters: recorded,
             }),
             pve: expect.objectContaining({
               displayName: null,

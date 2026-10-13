@@ -1,5 +1,10 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { GAME_MODES } from '@/utils/constants';
+import {
+  isEffectiveStoryObjectiveComplete,
+  storyCatalogForMode,
+} from '@/utils/storylineCompletion';
 import {
   normalizeStoryObjectives,
   orderedStoryObjectives,
@@ -521,7 +526,14 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
   const isObjectiveComplete = options.isObjectiveComplete ?? tarkovStore.isStoryObjectiveComplete;
   const completedObjectiveIds = options.completedObjectiveIds ?? (() => []);
   const chapters = computed<StorylineChapterView[]>(() => {
-    return (options.chapters?.() ?? metadataStore.storyChapters ?? []).map((chapter) => {
+    const catalog =
+      options.chapters?.() ??
+      storyCatalogForMode(
+        metadataStore.storyChapters ?? [],
+        metadataStore.storyChaptersGameMode,
+        tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP
+      );
+    return catalog.map((chapter) => {
       const objectiveMap = normalizeStoryObjectives(chapter.objectives);
       return {
         id: chapter.id,
@@ -553,7 +565,10 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
     return chapters.value.map((chapter) => {
       const objectiveProgress = chapter.objectives.map((objective) => ({
         ...objective,
-        complete: isObjectiveComplete(chapter.id, objective.id),
+        complete: isEffectiveStoryObjectiveComplete(
+          objective,
+          isObjectiveComplete(chapter.id, objective.id)
+        ),
       }));
       const objectiveCompleteMap = new Map(
         objectiveProgress.map((objective) => [objective.id, objective.complete])

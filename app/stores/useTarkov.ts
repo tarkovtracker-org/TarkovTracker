@@ -103,6 +103,12 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
+import {
+  effectiveStoryProgress,
+  isAutomaticStoryObjective,
+  isEffectiveStoryObjectiveComplete,
+  storyCatalogForMode,
+} from '@/utils/storylineCompletion';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
@@ -235,9 +241,46 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
 // ============================================================================
 const tarkovGetters = {
   ...getters,
+  getEffectiveStoryProgress: (state: UserState) => () =>
+    effectiveStoryProgress(state[state.currentGameMode]?.storyChapters, currentStoryCatalog(state)),
+  isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
+    isEffectiveStoryObjectiveComplete(
+      catalogStoryObjective(state, chapterId, objectiveId) ?? {},
+      getters.isStoryObjectiveComplete(state)(chapterId, objectiveId)
+    ),
 } satisfies _GettersTree<UserState>;
+/** Metadata store hydration normalizes objectives to ID-keyed records. */
+const currentStoryCatalog = (state: UserState) => {
+  const metadata = useMetadataStore();
+  return storyCatalogForMode(
+    metadata.storyChapters ?? [],
+    metadata.storyChaptersGameMode,
+    state.currentGameMode
+  );
+};
+const catalogStoryObjective = (state: UserState, chapterId: string, objectiveId: string) =>
+  currentStoryCatalog(state).find((chapter) => chapter.id === chapterId)?.objectives?.[objectiveId];
+const automaticStoryObjective = (
+  state: UserState,
+  chapterId: string,
+  objectiveId: string
+): boolean => {
+  return isAutomaticStoryObjective(catalogStoryObjective(state, chapterId, objectiveId));
+};
 const tarkovActions = {
   ...(actions as UserActions),
+  setStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.setStoryObjectiveComplete.call(this, chapterId, objectiveId);
+  },
+  setStoryObjectiveUncomplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.setStoryObjectiveUncomplete.call(this, chapterId, objectiveId);
+  },
+  toggleStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.toggleStoryObjectiveComplete.call(this, chapterId, objectiveId);
+  },
   setHideoutModuleUncomplete(this: TarkovStoreInstance, hideoutId: string) {
     actions.setHideoutModuleUncomplete.call(this, hideoutId);
     const removedModules = enforceHideoutPrereqs(this);
@@ -321,7 +364,8 @@ const tarkovActions = {
   },
   /** Ensure every completed task has all its objectives complete. Returns changes made. */
   repairCompletedTaskObjectives(this: TarkovStoreInstance) {
-    return repairCompletedProgress(this, useMetadataStore().tasks ?? []);
+    const metadata = useMetadataStore();
+    return repairCompletedProgress(this, metadata.tasks ?? [], metadata.storyChapters ?? []);
   },
   async resetOnlineProfile(this: TarkovStoreInstance) {
     const { $supabase } = useNuxtApp();

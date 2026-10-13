@@ -14,6 +14,8 @@ import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { fetchWithTimeout, isAbortError } from '@/server/utils/fetchWithTimeout';
 import { resolveGameModeSeason } from '@/server/utils/gameModeSeason';
 import { createLogger } from '@/server/utils/logger';
+import { fetchOverlay } from '@/server/utils/overlay';
+import { projectStoryChapters } from '@/server/utils/overlayProjectors';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
   consumeSharedRateLimit,
@@ -37,8 +39,10 @@ import {
   sanitizeTraderMap,
   toFiniteNumber,
 } from '@/utils/progressSanitizers';
+import { effectiveStoryProgress } from '@/utils/storylineCompletion';
 import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
+import type { StoryChapter } from '@/types/tarkov';
 const logger = createLogger('SharedProfileApi');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REST_FETCH_TIMEOUT_MS = 8000;
@@ -236,6 +240,28 @@ const sanitizeProgressPayload = (
     sanitized.lastApiUpdate = lastApiUpdate;
   }
   return sanitized;
+};
+/** Effective read model; backups continue exporting the unmodified recorded store. */
+const projectStoryReadModel = (
+  data: SanitizedProgressData | null,
+  chapters: StoryChapter[]
+): SanitizedProgressData | null => {
+  const storyChapters = effectiveStoryProgress(data?.storyChapters, chapters);
+  return data || Object.keys(storyChapters).length ? { ...data, storyChapters } : data;
+};
+const enrichStoryProgress = async (
+  data: SanitizedProgressData | null,
+  mode: GameMode
+): Promise<SanitizedProgressData | null> => {
+  try {
+    const { overlay } = await fetchOverlay();
+    if (!overlay) return data;
+    const chapters = projectStoryChapters(overlay, API_GAME_MODES[mode], 'en');
+    return projectStoryReadModel(data, chapters);
+  } catch {
+    logger.warn('Story baseline metadata unavailable; preserving recorded profile progress');
+    return data;
+  }
 };
 const normalizeStatusList = (statuses: unknown): string[] => {
   if (!Array.isArray(statuses)) {
@@ -687,7 +713,7 @@ export default defineEventHandler(async (event) => {
     includeDisplayName: !hideDisplayName,
   });
   const payload: SharedProfilePayload = {
-    data: await enrichProgressTaskFailures(sanitizedData, mode),
+    data: await enrichProgressTaskFailures(await enrichStoryProgress(sanitizedData, mode), mode),
     gameEdition: typeof progressRow.game_edition === 'number' ? progressRow.game_edition : 1,
     mode,
     userId,

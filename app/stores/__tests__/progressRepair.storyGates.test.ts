@@ -23,6 +23,38 @@ const gated = (id: string): Task => ({
   ],
 });
 describe('story gate repair', () => {
+  it('does not backfill an automatic baseline when a completed task proves the gate', () => {
+    const pvp = progress({
+      taskCompletions: { fil: { complete: true } },
+      storyChapters: { tour: { objectives: { talk: { complete: false, timestamp: 5 } } } },
+    });
+    const before = JSON.stringify(pvp);
+    expect(
+      repairCompletedProgress(
+        { pvp },
+        [gated('fil')],
+        [
+          {
+            id: 'tour',
+            name: 'Tour',
+            normalizedName: 'tour',
+            order: 1,
+            wikiLink: '',
+            objectives: {
+              talk: {
+                id: 'talk',
+                type: 'main',
+                order: 1,
+                description: 'Tutorial',
+                completionPolicy: 'tutorial',
+              },
+            },
+          },
+        ]
+      )
+    ).toBe(0);
+    expect(JSON.stringify(pvp)).toBe(before);
+  });
   it('records the story objective a completed task was gated on', () => {
     const pvp = progress({ taskCompletions: { fil: { complete: true, failed: false } } });
     expect(repairCompletedProgress({ pvp }, [gated('fil')])).toBe(1);

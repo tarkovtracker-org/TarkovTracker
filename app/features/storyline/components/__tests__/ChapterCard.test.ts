@@ -74,6 +74,29 @@ const mountCard = (chapter: StorylineNormalizedChapterView, readOnly = false) =>
     },
   });
 describe('ChapterCard story contract rendering', () => {
+  it('renders the tutorial baseline checked and read-only while dialogue stays independent', () => {
+    const escape = objective('escape', {
+      complete: true,
+      completionPolicy: 'tutorial',
+      routeState: 'chosen',
+    });
+    const therapist = objective('therapist');
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectives: [escape, therapist],
+        mainLinearObjectives: [escape, therapist],
+        objectives: [escape, therapist],
+      })
+    );
+    const inputs = wrapper.findAll('input[type="checkbox"]');
+    expect((inputs[0]!.element as HTMLInputElement).checked).toBe(true);
+    expect((inputs[0]!.element as HTMLInputElement).disabled).toBe(true);
+    expect((inputs[1]!.element as HTMLInputElement).checked).toBe(false);
+    expect((inputs[1]!.element as HTMLInputElement).disabled).toBe(false);
+    expect(wrapper.text()).toContain('page.storyline.completed_during_tutorial');
+    expect(wrapper.emitted('toggleObjective')).toBeUndefined();
+    wrapper.unmount();
+  });
   it.each(['main route', 'timeline', 'optional route', 'optional linear', 'chapter'])(
     'renders distinct unlock notes as visible text for %s',
     (location) => {

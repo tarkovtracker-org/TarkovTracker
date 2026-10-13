@@ -48,6 +48,7 @@
 </template>
 <script setup lang="ts">
   import StorylineUnlockBadges from '@/features/storyline/components/StorylineUnlockBadges.vue';
+  import { isAutomaticStoryObjective } from '@/utils/storylineCompletion';
   import type { StorylineObjectiveProgress } from '@/composables/useStorylineChapters';
   type Accent = 'success' | 'warning' | 'info';
   interface Props {
@@ -69,7 +70,12 @@
     warning: 'accent-warning-500',
     info: 'accent-info-500',
   };
-  const disabled = computed(() => props.readOnly || props.objective.routeState === 'blocked');
+  const disabled = computed(
+    () =>
+      props.readOnly ||
+      isAutomaticStoryObjective(props.objective) ||
+      props.objective.routeState === 'blocked'
+  );
   const choiceClass = () => {
     if (props.objective.routeState === 'chosen') return 'border-success-700/40 bg-success-950/20';
     if (disabled.value) return 'border-error-700/30 bg-error-950/10 cursor-not-allowed opacity-70';
@@ -102,6 +108,9 @@
     return { class: 'text-error-300', text: t('page.storyline.route_blocked_by', { objectives }) };
   };
   const note = computed(() => {
+    if (isAutomaticStoryObjective(props.objective)) {
+      return { class: 'text-surface-400', text: t('page.storyline.completed_during_tutorial') };
+    }
     if (props.choice && props.objective.routeState === 'chosen') {
       return { class: 'text-success-300', text: t('page.storyline.route_selected_hint') };
     }
