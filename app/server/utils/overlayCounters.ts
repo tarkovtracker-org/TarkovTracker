@@ -8,6 +8,12 @@
  *
  * Contract: https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md
  */
+import {
+  copyCounterGroup,
+  counterTaskIds,
+  isCounterGroups,
+  isCounterTaskIds,
+} from '@/utils/taskCounters';
 import { isPlainObject } from './deepMerge';
 import type { OverlayData } from './overlayTypes';
 import type { TaskCounterDerivation } from '@/types/tarkov';
@@ -15,7 +21,11 @@ import type { TaskCounterDerivation } from '@/types/tarkov';
 export const SUPPORTED_COUNTER_REVISIONS: ReadonlySet<string> = new Set(['1.1.0']);
 const COUNTER_MODES: ReadonlySet<string> = new Set(['regular', 'pve', 'pvp-season']);
 const ENTRY_KEYS = ['revision', 'verification', 'coverage', 'derivation', 'proof'];
-const DERIVATION_KEYS = ['type', 'taskIds'];
+/** Exact keys per derivation type; an unknown type invalidates the whole registry. */
+const DERIVATION_KEYS: Record<string, string[]> = {
+  distinctTaskCompletions: ['type', 'taskIds'],
+  taskGroupCompletions: ['type', 'groups'],
+};
 const PROOF_LINK = /^https?:\/\/\S+$/;
 type CounterEntry = {
   revision: string;
@@ -33,13 +43,15 @@ const hasExactKeys = (value: Record<string, unknown>, keys: string[]): boolean =
 const uniqueList = (value: unknown, valid: (entry: unknown) => boolean): boolean =>
   Array.isArray(value) &&
   [value.length > 0, value.every(valid), new Set(value).size === value.length].every(Boolean);
+const validContributors = (value: Record<string, unknown>): boolean =>
+  value.type === 'taskGroupCompletions'
+    ? isCounterGroups(value.groups)
+    : isCounterTaskIds(value.taskIds);
 const validDerivation = (value: unknown): boolean =>
   isPlainObject(value) &&
-  [
-    hasExactKeys(value, DERIVATION_KEYS),
-    value.type === 'distinctTaskCompletions',
-    uniqueList(value.taskIds, nonEmpty),
-  ].every(Boolean);
+  Object.hasOwn(DERIVATION_KEYS, String(value.type)) &&
+  hasExactKeys(value, DERIVATION_KEYS[String(value.type)]!) &&
+  validContributors(value);
 const validEntry = (entry: unknown): boolean =>
   isPlainObject(entry) &&
   [
@@ -65,20 +77,25 @@ const isUsable = (entry: CounterEntry): boolean =>
     entry.coverage === 'complete',
     SUPPORTED_COUNTER_REVISIONS.has(entry.revision),
   ].every(Boolean);
-/** Contributor lists by `variableId` for one mode; empty unless the registry is valid. */
+/** Derivations by `variableId` for one mode; empty unless the registry is valid. */
 export const usableCounterDerivations = (
   overlay: Pick<OverlayData, 'progressionCounters'>,
   mode: string
-): Map<string, string[]> => {
+): Map<string, TaskCounterDerivation> => {
   const registry = overlay.progressionCounters;
   if (!validProgressionCounters(registry) || !Object.hasOwn(registry, mode)) return new Map();
   return new Map(
     Object.entries(registry[mode]!)
       .filter(([, entry]) => isUsable(entry))
-      .map(([variableId, entry]) => [variableId, entry.derivation.taskIds])
+      .map(([variableId, entry]) => [variableId, entry.derivation])
   );
 };
 type TaskWithGates = { id: string; otherRequirements?: unknown };
+/** A fresh copy, so attached gates never share arrays with the registry or each other. */
+const copyDerivation = (derivation: TaskCounterDerivation): TaskCounterDerivation =>
+  derivation.type === 'taskGroupCompletions'
+    ? { type: derivation.type, groups: derivation.groups.map(copyCounterGroup) }
+    : { type: derivation.type, taskIds: [...derivation.taskIds] };
 /**
  * The registry is the only source of a derivation: any `counter` already on a gate (for example
  * from a task correction) is replaced, and one is attached only when every contributor exists in
@@ -86,19 +103,19 @@ type TaskWithGates = { id: string; otherRequirements?: unknown };
  */
 const withCounter = (
   requirement: unknown,
-  derivations: Map<string, string[]>,
+  derivations: Map<string, TaskCounterDerivation>,
   taskIds: ReadonlySet<string>
 ): unknown => {
   if (!isPlainObject(requirement) || requirement.type !== 'globalVariable') return requirement;
   const gate: Record<string, unknown> = { ...requirement };
   delete gate.counter;
-  const contributors = derivations.get(String(gate.variableId));
-  if (!contributors?.every((id) => taskIds.has(id))) return gate;
-  return { ...gate, counter: { type: 'distinctTaskCompletions', taskIds: [...contributors] } };
+  const derivation = derivations.get(String(gate.variableId));
+  if (!derivation || !counterTaskIds(derivation).every((id) => taskIds.has(id))) return gate;
+  return { ...gate, counter: copyDerivation(derivation) };
 };
 export const attachCounterDerivations = <T extends TaskWithGates>(
   tasks: T[],
-  derivations: Map<string, string[]>
+  derivations: Map<string, TaskCounterDerivation>
 ): T[] => {
   const taskIds = new Set(tasks.map((task) => task.id));
   return tasks.map((task) =>
