@@ -7,8 +7,18 @@ const isNonEmptyString = (value: unknown): value is string =>
 const optionalText = (value: unknown): string | undefined =>
   isNonEmptyString(value) ? value : undefined;
 const unlockTypes = new Set(['achievement', 'barter', 'map', 'quest', 'trader', 'other']);
+const nonBlankUnlockText = (value: unknown): boolean =>
+  typeof value === 'string' && value.trim().length > 0;
+const optionalUnlockText = (value: unknown): boolean =>
+  value === undefined || nonBlankUnlockText(value);
 const validStoryUnlock = (unlock: StoryObjectiveUnlock): boolean =>
-  Boolean(unlock) && unlockTypes.has(unlock.type) && isNonEmptyString(unlock.name);
+  Boolean(unlock) &&
+  [
+    unlockTypes.has(unlock.type),
+    nonBlankUnlockText(unlock.name),
+    optionalUnlockText(unlock.id),
+    optionalUnlockText(unlock.note),
+  ].every(Boolean);
 const normalizeUnlocks = (
   value: StoryObjectiveLike['unlocks']
 ): StoryObjectiveUnlock[] | undefined =>

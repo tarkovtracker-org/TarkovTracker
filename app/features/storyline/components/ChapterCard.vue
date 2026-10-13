@@ -326,10 +326,16 @@
                       variant="subtle"
                       size="xs"
                       :color="getUnlockBadgeColor(unlock.type)"
-                      :title="unlock.note"
                     >
                       {{ getUnlockLabel(unlock.type, unlock.label) }}
                     </UBadge>
+                    <span
+                      v-for="note in getUnlockNotes(objective.unlocks)"
+                      :key="note"
+                      class="text-surface-400 basis-full text-[11px] leading-tight wrap-break-word"
+                    >
+                      {{ note }}
+                    </span>
                     <UBadge
                       v-if="objective.hasEstimatedUnlocks"
                       variant="subtle"
@@ -467,10 +473,16 @@
                     variant="subtle"
                     size="xs"
                     :color="getUnlockBadgeColor(unlock.type)"
-                    :title="unlock.note"
                   >
                     {{ getUnlockLabel(unlock.type, unlock.label) }}
                   </UBadge>
+                  <span
+                    v-for="note in getUnlockNotes(objective.unlocks)"
+                    :key="note"
+                    class="text-surface-400 basis-full text-[11px] leading-tight wrap-break-word"
+                  >
+                    {{ note }}
+                  </span>
                   <UBadge
                     v-if="objective.hasEstimatedUnlocks"
                     variant="subtle"
@@ -593,10 +605,16 @@
                       variant="subtle"
                       size="xs"
                       :color="getUnlockBadgeColor(unlock.type)"
-                      :title="unlock.note"
                     >
                       {{ getUnlockLabel(unlock.type, unlock.label) }}
                     </UBadge>
+                    <span
+                      v-for="note in getUnlockNotes(objective.unlocks)"
+                      :key="note"
+                      class="text-surface-400 basis-full text-[11px] leading-tight wrap-break-word"
+                    >
+                      {{ note }}
+                    </span>
                     <UBadge
                       v-if="objective.hasEstimatedUnlocks"
                       variant="subtle"
@@ -723,10 +741,16 @@
                     variant="subtle"
                     size="xs"
                     :color="getUnlockBadgeColor(unlock.type)"
-                    :title="unlock.note"
                   >
                     {{ getUnlockLabel(unlock.type, unlock.label) }}
                   </UBadge>
+                  <span
+                    v-for="note in getUnlockNotes(objective.unlocks)"
+                    :key="note"
+                    class="text-surface-400 basis-full text-[11px] leading-tight wrap-break-word"
+                  >
+                    {{ note }}
+                  </span>
                   <UBadge
                     v-if="objective.hasEstimatedUnlocks"
                     variant="subtle"
@@ -755,11 +779,17 @@
           :key="`chapter-${chapter.id}-${unlock.type}-${unlock.id}`"
           variant="subtle"
           :color="getUnlockBadgeColor(unlock.type)"
-          :title="unlock.note"
           size="xs"
         >
           {{ getUnlockLabel(unlock.type, unlock.label) }}
         </UBadge>
+        <span
+          v-for="note in getUnlockNotes(chapter.chapterUnlocks)"
+          :key="note"
+          class="text-surface-400 basis-full text-[11px] leading-tight wrap-break-word"
+        >
+          {{ note }}
+        </span>
       </div>
     </div>
     <div
@@ -805,6 +835,14 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const { toWikiUrl } = useWikiLink();
+  const getUnlockNotes = (unlocks: StorylineObjectiveUnlockView[]): string[] =>
+    Array.from(
+      new Set(
+        unlocks
+          .map((unlock) => unlock.note)
+          .filter((note): note is string => typeof note === 'string' && note.trim().length > 0)
+      )
+    );
   const getUnlockBadgeColor = (type: StorylineObjectiveUnlockView['type']) => {
     if (type === 'map') {
       return 'primary';

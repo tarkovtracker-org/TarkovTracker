@@ -129,10 +129,12 @@ const nonEmptyString = (value: unknown): boolean =>
 const storyUnlockTypes = new Set(['achievement', 'barter', 'map', 'quest', 'trader', 'other']);
 const optionalUnlockText = (value: unknown): boolean =>
   value === undefined || nonEmptyString(value);
+const validStoryUnlockType = (value: unknown): boolean =>
+  typeof value === 'string' && storyUnlockTypes.has(value);
 const validStoryUnlock = (value: unknown): boolean => {
   if (!isPlainObject(value)) return false;
   return [
-    storyUnlockTypes.has(String(value.type)),
+    validStoryUnlockType(value.type),
     nonEmptyString(value.name),
     optionalUnlockText(value.id),
     optionalUnlockText(value.note),
