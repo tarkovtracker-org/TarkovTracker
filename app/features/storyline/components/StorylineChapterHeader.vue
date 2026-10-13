@@ -1,5 +1,5 @@
 <template>
-  <header class="flex items-center gap-3 @3xl/card:gap-4">
+  <header class="flex flex-wrap items-center gap-3 @3xl/card:gap-4 @4xl/card:flex-nowrap">
     <component
       :is="canToggle ? 'button' : 'div'"
       :type="canToggle ? 'button' : undefined"
@@ -58,6 +58,17 @@
         </UBadge>
       </div>
     </div>
+    <!-- Chapter-wide rewards sit beside the actions so they do not claim a sidebar column. -->
+    <section
+      v-if="chapter.chapterUnlocks.length"
+      class="order-last w-full min-w-0 @4xl/card:order-0 @4xl/card:w-auto @4xl/card:max-w-xs @4xl/card:text-right"
+    >
+      <h3 :class="STORYLINE_LABEL_CLASS">{{ t('page.storyline.route_unlocks_chapter') }}</h3>
+      <StorylineUnlockBadges
+        class="mt-1.5 @4xl/card:justify-end"
+        :unlocks="chapter.chapterUnlocks"
+      />
+    </section>
     <UButton
       v-if="canToggle"
       class="hidden shrink-0 @3xl/card:inline-flex"
@@ -72,6 +83,8 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
+  import StorylineUnlockBadges from '@/features/storyline/components/StorylineUnlockBadges.vue';
+  import { STORYLINE_LABEL_CLASS } from '@/features/storyline/storylineClasses';
   import type { StorylineNormalizedChapterView } from '@/composables/useStorylineChapters';
   const props = defineProps<{
     chapter: StorylineNormalizedChapterView;

@@ -1,12 +1,12 @@
 <template>
   <span
     v-if="step === null"
-    class="bg-warning-500/80 absolute top-2.75 left-2.25 size-2.5 rotate-45"
+    class="bg-warning-500/80 absolute top-3.75 left-2.25 size-2.5 rotate-45"
     aria-hidden="true"
   ></span>
   <span
     v-else
-    class="absolute top-0.5 left-0 flex size-7 items-center justify-center rounded-full border text-xs font-semibold tabular-nums"
+    class="absolute top-1.5 left-0 flex size-7 items-center justify-center rounded-full border text-xs font-semibold tabular-nums"
     :class="complete ? STEP_NODE_CLASS.complete : STEP_NODE_CLASS.open"
     aria-hidden="true"
   >

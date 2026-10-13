@@ -61,6 +61,8 @@
     readOnly?: boolean;
     /** The parent renders the unlock badges itself, e.g. in a timeline's unlocks column. */
     hideUnlocks?: boolean;
+    /** The surrounding row owns the hover highlight, e.g. a striped timeline row. */
+    plain?: boolean;
   }
   const props = withDefaults(defineProps<Props>(), { accent: 'success' });
   const emit = defineEmits<{ toggle: [] }>();
@@ -83,7 +85,8 @@
   };
   const rowClass = computed(() => {
     if (props.choice) return `rounded-md border p-2.5 ${choiceClass()}`;
-    return `rounded-md px-2 py-1.5 ${disabled.value ? 'opacity-65' : 'hover:bg-white/5'}`;
+    if (disabled.value) return 'rounded-md px-2 py-1.5 opacity-65';
+    return `rounded-md px-2 py-1.5 ${props.plain ? '' : 'hover:bg-white/5'}`;
   });
   const labelClass = computed(() => (disabled.value ? 'cursor-not-allowed' : 'cursor-pointer'));
   const listLabels = (entries: { label: string }[]) =>

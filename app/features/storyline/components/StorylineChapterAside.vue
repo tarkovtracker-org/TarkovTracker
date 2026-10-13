@@ -17,16 +17,11 @@
       v-if="chapter.questRouteChoices.length"
       :quest-routes="chapter.questRouteChoices"
     />
-    <section v-if="chapter.chapterUnlocks.length" :class="STORYLINE_PANEL_CLASS">
-      <h3 :class="STORYLINE_LABEL_CLASS">{{ t('page.storyline.route_unlocks_chapter') }}</h3>
-      <StorylineUnlockBadges class="mt-2" :unlocks="chapter.chapterUnlocks" />
-    </section>
   </aside>
 </template>
 <script setup lang="ts">
   import StorylineChapterEndings from '@/features/storyline/components/StorylineChapterEndings.vue';
   import StorylineQuestRoutes from '@/features/storyline/components/StorylineQuestRoutes.vue';
-  import StorylineUnlockBadges from '@/features/storyline/components/StorylineUnlockBadges.vue';
   import {
     STORYLINE_LABEL_CLASS,
     STORYLINE_PANEL_CLASS,
