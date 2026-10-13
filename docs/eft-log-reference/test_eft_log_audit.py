@@ -232,6 +232,29 @@ class TestEftLogAuditCLI(unittest.TestCase):
         self.assertEqual(modes_by_session.get(("main", "1.1.0.1.46911", "S")), 1)
         self.assertEqual(modes_by_session.get(("main", "1.1.0.1.46911", "P")), 1)
 
+    def test_arena_output_omits_free_text_and_unknown_state_values(self):
+        arena_log = next(self.arena_root.rglob("*.log"))
+        with arena_log.open("ab") as log:
+            log.write(
+                b"2026-08-29 13:00:03.100 +00:00|0.4.2.5.42886|Info|lifecycle|message: VeryPrivateNickname\n"
+                b"2026-08-29 13:00:04.100 +00:00|0.4.2.5.42886|Info|lifecycle|GameplayState: AlphabeticPrivateKey\n"
+                b"2026-08-29 13:00:05.100 +00:00|0.4.2.5.42886|Info|lifecycle|action='AlternatePrivateToken'\n"
+                b"2026-08-29 13:00:06.100 +00:00|0.4.2.5.42886|Info|lifecycle|gameplaystate: running\n"
+                b"2026-08-29 13:00:07.100 +00:00|0.4.2.5.42886|Info|output|message: Service Notifications NotificationPrivateName\n"
+                b"2026-08-29 13:00:08.100 +00:00|0.4.2.5.42886|Info|output|message: Got notification | AlternatePrivateMarker\n"
+            )
+        out_file = Path(self.tmp_dir.name) / "private-report.json"
+        with patch.object(sys, "argv", [
+            ".eft_log_audit.py", "--main-root", str(self.main_root),
+            "--arena-root", str(self.arena_root), "--section", "all", "--out", str(out_file),
+        ]):
+            mod.main()
+        text = out_file.read_text(encoding="utf-8")
+        for secret in ("VeryPrivateNickname", "AlphabeticPrivateKey", "AlternatePrivateToken", "NotificationPrivateName", "AlternatePrivateMarker"):
+            self.assertNotIn(secret, text)
+        tokens = {item["token"] for item in json.loads(text)["arena_structured_event_tokens"]}
+        self.assertEqual(tokens, {"Gameplay", "GameFound", "Running"})
+
     def test_missing_root_warning(self):
         non_existent = Path(self.tmp_dir.name) / "NonExistent"
         test_args = [
