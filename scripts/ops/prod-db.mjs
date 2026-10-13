@@ -48,6 +48,10 @@ const MIGRATION_HISTORY_GRANT_HINT =
   'the observer role needs read-only history access, granted out of band by an operator: ' +
   'GRANT USAGE ON SCHEMA supabase_migrations TO <observer_role>; ' +
   'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO <observer_role>;';
+const OWNER_ONLY_TEAM_SQL = `select owner_only, populated, empty, inconsistent,
+  awaiting_clock, in_grace, due, warnings_started_at, deletion_enabled, recent_receipts
+from private.owner_only_team_cleanup_status
+limit 1`;
 const PROJECT_HOST_PATTERN = /^db\.([a-z0-9]{16,32})\.supabase\.(?:co|com|in)$/;
 const POOLER_USERNAME_PATTERN = /^[^.]+\.([a-z0-9]{16,32})$/;
 const SENSITIVE_COLUMN_PATTERN =
@@ -155,6 +159,7 @@ function usage(message) {
   scripts/ops/prod-db canary
   scripts/ops/prod-db <db-stats|schema|table-stats|index-stats|traffic|outliers|calls|locks|blocking|long-running|vacuum|bloat|role-stats>
   scripts/ops/prod-db migration-history
+  scripts/ops/prod-db owner-only-teams
   scripts/ops/prod-db sample --table <table> [--limit <1-20>]
   scripts/ops/prod-db distribution --table <table> --column <column> [--limit <1-50>]
   scripts/ops/prod-db count --table <table>
@@ -1415,6 +1420,7 @@ const COMMAND_HANDLERS = new Map([
   ['health', () => runQuery(HEALTH_SQL, 'health')],
   ['schema', runSchema],
   ['migration-history', runMigrationHistory],
+  ['owner-only-teams', () => runQuery(OWNER_ONLY_TEAM_SQL, 'owner-only-teams')],
   ['preflight', runPreflightCommand],
   ['sample', runSampleCommand],
   ['distribution', runDistributionCommand],
