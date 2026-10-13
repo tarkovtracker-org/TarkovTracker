@@ -634,7 +634,7 @@ function validateCanaryHealth(report) {
     [health.has_sequence_write, 'observer role can advance or modify application sequences'],
     [health.has_function_write, 'observer role can execute application SECURITY DEFINER functions'],
     [health.has_owned_objects, 'observer role owns persistent database objects'],
-    [health.has_large_object_write, 'observer role can modify large objects'],
+    [health.has_large_object_write, 'observer role can modify or create large objects'],
     [health.has_parameter_write, 'observer role has privileged parameter grants'],
     [health.can_create_in_database, 'observer role can create schemas'],
     [health.can_read_migration_statements, 'observer role can read stored migration statements'],
