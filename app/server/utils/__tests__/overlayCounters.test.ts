@@ -6,7 +6,7 @@ import {
   usableCounterDerivations,
 } from '@/server/utils/overlayCounters';
 import { buildTaskEvaluations, type TaskAvailabilityTeamData } from '@/stores/taskAvailability';
-import type { Task } from '@/types/tarkov';
+import type { Task, TaskCounterDerivation } from '@/types/tarkov';
 const entry = (overrides: Record<string, unknown> = {}) => ({
   revision: '1.1.0',
   verification: 'verified',
@@ -45,7 +45,9 @@ describe('usableCounterDerivations', () => {
         regular: { other: entry() },
       },
     };
-    expect([...usableCounterDerivations(overlay, 'pve')]).toEqual([['tier', ['a', 'b', 'c']]]);
+    expect([...usableCounterDerivations(overlay, 'pve')]).toEqual([
+      ['tier', { type: 'distinctTaskCompletions', taskIds: ['a', 'b', 'c'] }],
+    ]);
     expect([...usableCounterDerivations(overlay, 'regular').keys()]).toEqual(['other']);
     expect(usableCounterDerivations(overlay, 'pvp-season').size).toBe(0);
   });
@@ -56,8 +58,43 @@ describe('usableCounterDerivations', () => {
     {},
     { pve: { tier: entry({ extra: 1 }) } },
     { pvp: { tier: entry() } },
+    { pve: { tier: entry({ derivation: { type: 'sum', taskIds: ['a'] } }) } },
+    { pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', taskIds: ['a'] } }) } },
+    { pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', groups: [] } }) } },
+    { pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', groups: [[]] } }) } },
+    { pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', groups: ['a'] } }) } },
+    {
+      pve: {
+        tier: entry({ derivation: { type: 'taskGroupCompletions', groups: [['a'], ['b', 'a']] } }),
+      },
+    },
+    ...[
+      [{ anyOf: ['a'] }],
+      [{ anyOf: [] }],
+      [{ anyOf: ['a', 'a'] }],
+      [{ anyOf: ['a', 'b'], extra: 1 }],
+      [{ allOf: ['a', 'b'] }],
+      [{ anyOf: ['a', 'b'] }, ['b']],
+    ].map((groups) => ({
+      pve: { tier: entry({ derivation: { type: 'taskGroupCompletions', groups } }) },
+    })),
+    {
+      pve: {
+        tier: entry({
+          derivation: { type: 'taskGroupCompletions', groups: [['a']], taskIds: ['a'] },
+        }),
+      },
+    },
   ])('derives nothing from an absent, empty or malformed registry: %j', (progressionCounters) => {
     expect(usableCounterDerivations({ progressionCounters }, 'pve').size).toBe(0);
+  });
+  it('accepts task-group derivations', () => {
+    const derivation = {
+      type: 'taskGroupCompletions',
+      groups: [['a', 'b'], { anyOf: ['c', 'd'] }],
+    };
+    const overlay = { progressionCounters: { pve: { tier: entry({ derivation }) } } };
+    expect([...usableCounterDerivations(overlay, 'pve')]).toEqual([['tier', derivation]]);
   });
   it('does not read an inherited mode', () => {
     const progressionCounters = Object.create({ pve: { tier: entry() } });
@@ -65,7 +102,9 @@ describe('usableCounterDerivations', () => {
   });
 });
 describe('attachCounterDerivations', () => {
-  const derivations = new Map([['tier', ['a', 'b', 'c']]]);
+  const derivations = new Map<string, TaskCounterDerivation>([
+    ['tier', { type: 'distinctTaskCompletions', taskIds: ['a', 'b', 'c'] }],
+  ]);
   it('attaches contributors to the matching gate only', () => {
     const input = [
       ...tasks(),
@@ -114,7 +153,39 @@ describe('attachCounterDerivations', () => {
     const counter = (
       target!.otherRequirements as unknown as Array<{ counter: { taskIds: string[] } }>
     )[0]!.counter;
-    expect(counter.taskIds).not.toBe(derivations.get('tier'));
+    expect(counter.taskIds).not.toBe((derivations.get('tier') as { taskIds: string[] }).taskIds);
+  });
+  it('attaches a task-group derivation only when every member exists, as a copy', () => {
+    const groups = [['a', 'b'], ['c']];
+    const grouped = new Map<string, TaskCounterDerivation>([
+      ['tier', { type: 'taskGroupCompletions', groups }],
+    ]);
+    const [, , , target] = attachCounterDerivations(tasks(), grouped);
+    const [attached] = target!.otherRequirements as unknown as Array<{
+      counter: { groups: string[][] };
+    }>;
+    expect(attached).toEqual(
+      gate('tier', 2, { counter: { type: 'taskGroupCompletions', groups } })
+    );
+    expect(attached!.counter.groups[0]).not.toBe(groups[0]);
+    const anyOf = { anyOf: ['b', 'c'] };
+    const [, , , anyOfTarget] = attachCounterDerivations(
+      tasks(),
+      new Map<string, TaskCounterDerivation>([
+        ['tier', { type: 'taskGroupCompletions', groups: [['a'], anyOf] }],
+      ])
+    );
+    const [anyOfGate] = anyOfTarget!.otherRequirements as unknown as Array<{
+      counter: { groups: unknown[] };
+    }>;
+    expect(anyOfGate!.counter.groups).toEqual([['a'], anyOf]);
+    expect(anyOfGate!.counter.groups[1]).not.toBe(anyOf);
+    expect((anyOfGate!.counter.groups[1] as typeof anyOf).anyOf).not.toBe(anyOf.anyOf);
+    const [missing] = attachCounterDerivations(
+      [{ id: 'target', otherRequirements: [gate()] }, { id: 'a' }, { id: 'c' }],
+      grouped
+    );
+    expect(missing!.otherRequirements).toEqual([gate()]);
   });
 });
 describe('applyOverlay progression counters', () => {
@@ -167,6 +238,35 @@ describe('applyOverlay progression counters', () => {
       blockers: [{ type: 'task_counter', current: 1, required: 2, compareMethod: '>=' }],
     });
     expect(evaluate({ a: { complete: true }, c: { complete: true } }).available).toBe(true);
+  });
+  it('counts a task group only once all its members are complete, end to end', async () => {
+    const derivation = { type: 'taskGroupCompletions', groups: [['a', 'b'], ['c']] };
+    const result = await apply({ pve: { tier: entry({ derivation }) } }, 'pve');
+    expect(result.dataOverlay.unconsumedSections).toEqual([]);
+    const payload = result.data!.tasks as unknown as Task[];
+    const evaluate = (completions: TaskAvailabilityTeamData['completions']) =>
+      buildTaskEvaluations(payload, progress(completions), { requireTraderLevels: false }).target!
+        .self!;
+    expect(evaluate({ b: { complete: true }, c: { complete: true } })).toMatchObject({
+      available: false,
+      blockers: [{ type: 'task_counter', current: 1, required: 2 }],
+    });
+    expect(
+      evaluate({ a: { complete: true }, b: { complete: true }, c: { complete: true } }).available
+    ).toBe(true);
+  });
+  it('counts an anyOf group once any member is complete, end to end', async () => {
+    const derivation = { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'] }, ['c']] };
+    const result = await apply({ pve: { tier: entry({ derivation }) } }, 'pve');
+    const payload = result.data!.tasks as unknown as Task[];
+    const evaluate = (completions: TaskAvailabilityTeamData['completions']) =>
+      buildTaskEvaluations(payload, progress(completions), { requireTraderLevels: false }).target!
+        .self!;
+    expect(evaluate({ a: { complete: true }, b: { complete: true } })).toMatchObject({
+      available: false,
+      blockers: [{ type: 'task_counter', current: 1, required: 2 }],
+    });
+    expect(evaluate({ b: { complete: true }, c: { complete: true } }).available).toBe(true);
   });
   it('applies no derivation in a mode the registry does not cover', async () => {
     const result = await apply({ pve: { tier: entry() } }, 'regular');

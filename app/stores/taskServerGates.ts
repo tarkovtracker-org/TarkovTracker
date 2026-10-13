@@ -1,4 +1,5 @@
 import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
+import { counterValue } from '@/utils/taskCounters';
 import {
   globalVariableRequirementMet,
   normalizeOtherRequirements,
@@ -55,8 +56,9 @@ const storyObjectiveBlockers = (
   ];
 };
 /**
- * Best-effort registry derivation: count completed contributors. It is an estimate, so a player's
- * in-game confirmation overrides a derived shortfall; an explicit account value never does.
+ * Best-effort registry derivation: count completed contributors, or groups whose members are all
+ * complete. It is an estimate, so a player's in-game confirmation overrides a derived shortfall;
+ * an explicit account value never does.
  */
 const counterBlockers = (
   requirement: VariableRequirement,
@@ -64,7 +66,7 @@ const counterBlockers = (
   data: TaskAvailabilityTeamData,
   confirmed: boolean
 ): TaskBlocker[] => {
-  const current = counter.taskIds.filter((id) => isTaskComplete(data.completions[id])).length;
+  const current = counterValue(counter, (id) => isTaskComplete(data.completions[id]));
   if (confirmed || compareRequirement(current, requirement.compareMethod, requirement.value))
     return [];
   return [
