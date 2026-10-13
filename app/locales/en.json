@@ -752,6 +752,8 @@
     "storyline": {
       "subtitle": "Track your progress through Tarkov story chapters.",
       "chapters_complete": "chapters complete",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "Work in Progress",
       "wip_badge": "WIP",
       "wip_description": "This feature is still being built out. Content and functionality will be expanded and refined over time as we continue organizing the data. Thanks for your patience!",
@@ -767,6 +769,7 @@
       "quest_route_evidence_pending": "No steps captured yet",
       "quest_route_conflict": "More than one route reads as finished; only one is possible in game.",
       "quest_route_progress": "{completed}/{total} steps",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "1 saved objective mark no longer matches the current story data and needs re-checking.",
       "stale_progress_other": "{count} saved objective marks no longer match the current story data and need re-checking.",
       "route_choice": "Route choice",
@@ -775,16 +778,16 @@
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
       "route_choose_one": "Choose one",
-      "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
       "route_switch_hint": "To switch routes, uncheck the selected route first.",
-      "route_unlocks_here": "Unlocks here",
       "route_unlocks_chapter": "Chapter unlocks",
       "route_unlocks_estimated": "Estimated timing",
       "route_unlock_map": "Map: {name}",
       "route_unlock_trader": "Trader: {name}",
-      "route_unlock_reward": "Reward: {name}"
+      "route_unlock_reward": "Reward: {name}",
+      "timeline_objective": "Objective",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",

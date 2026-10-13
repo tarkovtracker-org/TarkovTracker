@@ -7,7 +7,7 @@
     </StorylinePage>
     <template #fallback>
       <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
-        <div class="mx-auto max-w-350">
+        <div class="mx-auto max-w-480">
           <PageHeader v-bind="header" />
         </div>
       </div>
@@ -24,5 +24,6 @@
   }));
   definePageMeta({
     layout: 'default',
+    usesWindowScroll: true,
   });
 </script>
