@@ -8,7 +8,7 @@ import type { NavigationGuard } from 'vue-router';
 type ClarityApi = ((...args: unknown[]) => void) & { q?: unknown[][] };
 const { beforeEachGuard, externalNavigate } = vi.hoisted(() => ({
   beforeEachGuard: vi.fn(),
-  externalNavigate: vi.fn(() => false),
+  externalNavigate: vi.fn(() => Promise.resolve()),
 }));
 mockNuxtImport('useRouter', () => () => ({ beforeEach: beforeEachGuard }));
 mockNuxtImport('navigateTo', () => externalNavigate);

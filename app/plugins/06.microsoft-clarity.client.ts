@@ -44,7 +44,8 @@ const protectOAuthNavigation = () => {
   // Keep sensitive URLs out of the current recorder's history hooks entirely.
   const removeOAuthGuard = useRouter().beforeEach((to) => {
     if (isOAuthPath(to.path)) {
-      return navigateTo(to.fullPath, { external: true });
+      void navigateTo(to.fullPath, { external: true });
+      return false;
     }
   });
   if (import.meta.hot) {
