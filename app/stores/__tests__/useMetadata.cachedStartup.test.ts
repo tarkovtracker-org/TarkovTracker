@@ -1,0 +1,226 @@
+// @vitest-environment happy-dom
+import { flushPromises } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as persistence from '@/stores/tarkov/progressPersistence';
+import { getPromiseStore } from '@/stores/tarkov/promiseStore';
+import { useMetadataStore } from '@/stores/useMetadata';
+import { useTarkovStore } from '@/stores/useTarkov';
+import * as cache from '@/utils/tarkovCache';
+import { createDeferred } from '@/utils/test-helpers';
+import type { StoryChapter } from '@/types/tarkov';
+const idle = vi.hoisted(() => ({ tasks: [] as Array<() => void> }));
+vi.mock('@/utils/idleScheduler', () => ({
+  queueIdleTask: vi.fn(
+    (task: () => void | Promise<void>) =>
+      new Promise<void>((resolve, reject) => {
+        idle.tasks.push(() => {
+          void Promise.resolve().then(task).then(resolve, reject);
+        });
+      })
+  ),
+}));
+vi.mock('@/utils/logger', () => ({
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+const parentId = 'a'.repeat(24);
+const childId = 'b'.repeat(24);
+const invalidations = ['mode', 'language', 'owner', 'abort'] as const;
+const chapter = (linked = false): StoryChapter => ({
+  id: 'tour',
+  name: 'Tour',
+  normalizedName: 'tour',
+  order: 1,
+  wikiLink: '',
+  objectives: {
+    [parentId]: {
+      id: parentId,
+      description: 'Main',
+      type: 'main',
+      sourceQuestId: 'quest',
+      order: 1,
+    },
+    [childId]: {
+      id: childId,
+      description: 'Optional',
+      type: 'optional',
+      sourceQuestId: 'quest',
+      order: 2,
+      ...(linked ? { parentObjectiveId: parentId } : {}),
+    },
+  },
+});
+const bundle = (scope = 'regular-en') => ({
+  scope,
+  tasksCore: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] },
+  hideout: { hideoutStations: [{ id: 'station', name: 'Station', levels: [] }] },
+  prestige: { prestige: [] },
+  editions: { editions: [], storyChapters: [chapter()] },
+});
+const response = () => ({ data: { editions: [], storyChapters: [chapter(true)] } });
+const startIdle = async () => {
+  idle.tasks.splice(0).forEach((task) => task());
+  await flushPromises();
+};
+const prepare = () => {
+  const store = useMetadataStore();
+  for (const key of [
+    'loadStaticMapData',
+    'checkCachePurge',
+    'fetchBootstrapData',
+    'fetchItemsLiteData',
+    'fetchTaskObjectivesData',
+    'fetchTaskRewardsData',
+  ] as const)
+    vi.spyOn(store, key).mockResolvedValue(undefined);
+  vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(bundle() as never);
+  return store;
+};
+const warm = (store: ReturnType<typeof useMetadataStore>, options = {}) =>
+  store.fetchAllData(false, { cachedData: bundle() as never, ...options });
+describe('complete cached startup catalog freshness', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    idle.tasks.length = 0;
+    vi.spyOn(cache, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cache, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cache, 'cleanupExpiredCache').mockResolvedValue(0);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  it('renders cached data without waiting, then adopts fresh links without progress writes', async () => {
+    const store = prepare();
+    const progress = useTarkovStore();
+    progress.pvp.storyChapters = {
+      tour: { objectives: { [parentId]: { complete: true, timestamp: 1 } } },
+    };
+    const progressBefore = JSON.stringify(progress.$state);
+    const mutation = vi.spyOn(persistence, 'executeProgressMutation');
+    const sync = vi.spyOn(persistence, 'syncProgressState');
+    const pending = createDeferred<object>();
+    const fetch = vi.fn().mockReturnValue(pending.promise);
+    vi.stubGlobal('$fetch', fetch);
+    await store.initialize({ gameMode: 'pvp' });
+    expect(store.initialized).toBe(true);
+    expect(store.storyChapters[0]?.objectives?.[childId]).not.toHaveProperty('parentObjectiveId');
+    expect(fetch).not.toHaveBeenCalled();
+    await startIdle();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('/api/tarkov/editions', {
+      query: { lang: 'en', gameMode: 'regular' },
+    });
+    pending.resolve(response());
+    await flushPromises();
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+    expect(JSON.stringify(progress.$state)).toBe(progressBefore);
+    expect(mutation).not.toHaveBeenCalled();
+    expect(sync).not.toHaveBeenCalled();
+    await warm(store, { cachedData: { ...bundle(), editions: response().data } as never });
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it('keeps the last-good cache after failure and retries on a later cached startup', async () => {
+    const store = prepare();
+    const fetch = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(response());
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store);
+    await startIdle();
+    expect(store.storyChapters[0]?.objectives?.[childId]).not.toHaveProperty('parentObjectiveId');
+    expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
+    await warm(store);
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it.each(invalidations)('drops a queued refresh after %s changes', async (kind) => {
+    const store = prepare();
+    const controller = new AbortController();
+    let owner = true;
+    const fetch = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store, { signal: controller.signal, isOwner: () => owner });
+    expect(idle.tasks).toHaveLength(1);
+    const invalidate = {
+      mode: () => {
+        store.currentGameMode = 'pve';
+      },
+      language: () => {
+        store.languageCode = 'de';
+      },
+      owner: () => {
+        owner = false;
+      },
+      abort: () => controller.abort(),
+    };
+    invalidate[kind]();
+    await startIdle();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(invalidations)('rejects an in-flight result after %s changes', async (kind) => {
+    const store = prepare();
+    const controller = new AbortController();
+    let owner = true;
+    const pending = createDeferred<object>();
+    const fetch = vi.fn().mockReturnValue(pending.promise);
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store, { signal: controller.signal, isOwner: () => owner });
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const invalidate = {
+      mode: () => {
+        store.currentGameMode = 'pve';
+      },
+      language: () => {
+        store.languageCode = 'de';
+      },
+      owner: () => {
+        owner = false;
+      },
+      abort: () => controller.abort(),
+    };
+    invalidate[kind]();
+    pending.resolve(response());
+    await flushPromises();
+    expect(store.storyChapters[0]?.objectives?.[childId]).not.toHaveProperty('parentObjectiveId');
+    expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
+  });
+  it('starts only the latest queued cached startup', async () => {
+    const store = prepare();
+    const pending = createDeferred<object>();
+    const fetch = vi.fn().mockReturnValue(pending.promise);
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store);
+    await warm(store);
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    pending.resolve(response());
+    await flushPromises();
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it.each(['owner', 'abort'])(
+    'retries a %s-cancelled refresh without joining or publishing its stale response',
+    async (kind) => {
+      const store = prepare();
+      const controller = new AbortController();
+      let owner = true;
+      const obsolete = createDeferred<object>();
+      const fetch = vi.fn().mockReturnValueOnce(obsolete.promise).mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      await warm(store, { signal: controller.signal, isOwner: () => owner });
+      await startIdle();
+      if (kind === 'owner') owner = false;
+      if (kind === 'abort') controller.abort();
+      const retry = store.fetchEditionsData(false, { revalidate: true });
+      await flushPromises();
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await retry;
+      obsolete.resolve({ data: { editions: [], storyChapters: [chapter()] } });
+      await flushPromises();
+      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(true);
+      expect(store.editionsError).toBeNull();
+    }
+  );
+});

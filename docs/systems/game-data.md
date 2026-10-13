@@ -99,6 +99,18 @@ flowchart LR
   respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
+### Cached startup catalogs
+
+A complete critical browser cache supplies the first paint without waiting for a catalog request.
+Startup then checks editions, storyline chapters and Seasonal perks in the background once per
+mode/language scope per session, using the ordinary endpoint without `cacheBust`. The existing
+server overlay TTL still applies. Successful checks update the browser catalog; failures retain
+last-good data and remain retryable on a later startup. Queued work and responses from a replaced
+startup, changed scope or aborted caller cannot replace the active catalog.
+
+The edition cache keeps its 24-hour storage TTL. Other critical caches retain their own TTLs and
+purge-marker behavior; catalog revalidation does not clear browser storage or reset progress.
+
 ### Data layers and contracts
 
 Game data passes through four layers; each consumer should state which one it reads.
