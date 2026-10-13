@@ -10,7 +10,7 @@ const RECORD_PATTERN =
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|([^\r\n]*)/gm;
 const SESSION_VERSION_PATTERN = /(?:^|[_\s-])(\d+\.\d+\.\d+\.\d+\.\d+)(?=$|[_\s-])/;
 const ACCOUNT_SIGNAL_PATTERN =
-  /\b(?:SelectProfile|PrepareSelectedProfileLocally|CompleteSelectedProfile)\b[^\r\n]*?\bAccountId:\s*(\d+)/;
+  /\b(?:SelectProfile|PrepareSelectedProfileLocally|CompleteSelectedProfile)\b|\bAccountId:\s*(\d+)|[\r\n]/g;
 const UNKNOWN_MODE = 'unknown' as const;
 export const UNKNOWN_LOG_VERSION = 'unknown';
 export const UNIDENTIFIED_LOG_ACCOUNT = 'unidentified';
@@ -350,6 +350,18 @@ function collectDeclaredModeSignal(
     timeline.push({ mode: declared, timestamp });
   }
 }
+/** Scan each token once: repeated profile markers must not retry the remaining record. */
+function profileAccountId(message: string): string | undefined {
+  let selectedProfile = false;
+  for (const match of message.matchAll(ACCOUNT_SIGNAL_PATTERN)) {
+    if (match[1]) {
+      if (selectedProfile) return match[1];
+      continue;
+    }
+    selectedProfile = !/[\r\n]/.test(match[0]);
+  }
+  return undefined;
+}
 /** Reads the numeric account ID from profile-selection records; profile IDs differ per mode. */
 function collectAccountSignal(
   record: LogRecord,
@@ -358,7 +370,7 @@ function collectAccountSignal(
   budget?: EftLogImportBudget
 ): void {
   if (!['application', 'output'].includes(record.channel)) return;
-  const accountId = ACCOUNT_SIGNAL_PATTERN.exec(record.message)?.[1];
+  const accountId = profileAccountId(record.message);
   if (!accountId) return;
   budget?.retain(accountId.length);
   accounts.push({ accountId: copyEvidenceString(accountId), timestamp });
