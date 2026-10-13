@@ -110,10 +110,10 @@ export default defineNuxtPlugin(() => {
     logger.error('[Analytics] Invalid Microsoft Clarity project ID format');
     return;
   }
-  protectOAuthNavigation();
   if (hasOAuthDocument()) {
     return;
   }
+  protectOAuthNavigation();
   const { state } = useAnalyticsConsent();
   let scriptLoadPromise: Promise<void> | null = null;
   let syncRequestId = 0;

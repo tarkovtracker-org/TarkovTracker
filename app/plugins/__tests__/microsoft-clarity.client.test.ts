@@ -3,14 +3,15 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import { createMemoryHistory, createRouter, type NavigationGuard } from 'vue-router';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
-import type { NavigationGuard } from 'vue-router';
 type ClarityApi = ((...args: unknown[]) => void) & { q?: unknown[][] };
-const { beforeEachGuard, externalNavigate } = vi.hoisted(() => ({
+const { beforeEachGuard, externalNavigate, routerOverride } = vi.hoisted(() => ({
   beforeEachGuard: vi.fn(),
+  routerOverride: { current: null as import('vue-router').Router | null },
   externalNavigate: vi.fn(() => Promise.resolve()),
 }));
-mockNuxtImport('useRouter', () => () => ({ beforeEach: beforeEachGuard }));
+mockNuxtImport('useRouter', () => () => routerOverride.current ?? { beforeEach: beforeEachGuard });
 mockNuxtImport('navigateTo', () => externalNavigate);
 const shouldEnableAnalyticsIntegrations = vi.fn(() => true);
 const clarityAcceptedConsent = [
@@ -60,6 +61,7 @@ describe('microsoft clarity plugin', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    routerOverride.current = null;
     vi.stubEnv('MODE', 'development');
     window.happyDOM.setURL('https://tarkovtracker.org/tasks');
     vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
@@ -99,6 +101,29 @@ describe('microsoft clarity plugin', () => {
     const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
+  it.each([
+    '/oauth/authorize?client_id=private-sentinel',
+    '/auth/callback?code=private-sentinel',
+    '/settings?discord_linked=1&code=private-sentinel#account',
+    '/tasks#access_token=private-sentinel',
+  ])('allows Nuxt forced initial router replacement on skipped document %s', async (fullPath) => {
+    window.happyDOM.setURL(`https://tarkovtracker.org${fullPath}`);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
+    });
+    routerOverride.current = router;
+    const resolvedInitialRoute = router.resolve(fullPath);
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    // Nuxt's app:created hook forces this replace after client plugins have run.
+    const failure = await router.replace({ ...resolvedInitialRoute, force: true });
+    expect(window.location.assign).not.toHaveBeenCalled();
+    expect(failure).toBeUndefined();
+    expect(router.currentRoute.value.fullPath).toBe(fullPath);
     expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
     expect(window.clarity).toBeUndefined();
   });

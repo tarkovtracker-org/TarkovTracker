@@ -674,7 +674,9 @@ is valid, Microsoft Clarity skips documents on `/oauth`, `/oauth/*`, and `/auth/
 (including encoded or case-varied paths). It also skips URLs with credential query or
 hash parameters, including Discord linking callbacks on `/settings`, and documents
 whose same-origin referrer contains one of these sensitive URLs. Malformed URLs also
-skip recording. The router guard starts a native full page navigation and cancels the
+skip recording and do not install the router guard, allowing Nuxt's forced initial
+route replacement to finish without reloading the document. On recorded documents,
+the router guard starts a native full page navigation and cancels the
 SPA navigation. If only the fragment changes on the current path and query, it appends
 the existing `_tt_retry` cache-busting parameter to force a new document. This keeps
 the sensitive destination out of the current recorder's
