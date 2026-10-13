@@ -164,6 +164,20 @@ select
     where p.prosecdef and has_function_privilege(r.oid, p.oid, 'execute')
   ) as has_function_write,
   exists (
+    select 1 from pg_catalog.pg_largeobject_metadata l
+    cross join lateral aclexplode(coalesce(l.lomacl, acldefault('L', l.lomowner))) a
+    cross join reachable_roles r
+    where a.privilege_type = 'UPDATE'
+      and (a.grantee = 0 or pg_has_role(r.oid, a.grantee, 'usage'))
+  ) as has_large_object_write,
+  exists (
+    select 1 from pg_catalog.pg_parameter_acl p
+    cross join lateral aclexplode(p.paracl) a
+    cross join reachable_roles r
+    where a.privilege_type in ('SET', 'ALTER SYSTEM')
+      and (a.grantee = 0 or pg_has_role(r.oid, a.grantee, 'usage'))
+  ) as has_parameter_write,
+  exists (
     select 1 from pg_catalog.pg_shdepend d
     cross join reachable_roles r
     where d.refclassid = 'pg_catalog.pg_authid'::regclass and d.deptype = 'o'
@@ -587,6 +601,8 @@ function validateCanaryHealth(report) {
     'has_sequence_write',
     'has_function_write',
     'has_owned_objects',
+    'has_large_object_write',
+    'has_parameter_write',
     'can_create_in_database',
     'can_read_migration_statements',
     'default_transaction_read_only',
@@ -609,6 +625,8 @@ function validateCanaryHealth(report) {
     [health.has_sequence_write, 'observer role can advance or modify application sequences'],
     [health.has_function_write, 'observer role can execute application SECURITY DEFINER functions'],
     [health.has_owned_objects, 'observer role owns persistent database objects'],
+    [health.has_large_object_write, 'observer role can modify large objects'],
+    [health.has_parameter_write, 'observer role has privileged parameter grants'],
     [health.can_create_in_database, 'observer role can create schemas'],
     [health.can_read_migration_statements, 'observer role can read stored migration statements'],
     [health.default_transaction_read_only !== 'on', 'default_transaction_read_only is not on'],

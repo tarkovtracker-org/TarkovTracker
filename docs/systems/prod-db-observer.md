@@ -8,7 +8,8 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 humans. It uses Supabase CLI inspection commands for database telemetry and a restricted SQL
 library for schema and bounded data-shape reports. The wrapper normalizes every result to JSON so
 callers do not depend on Supabase CLI presentation formatting. It never applies migrations or
-accepts arbitrary SQL.
+accepts arbitrary SQL. Health and canary require PostgreSQL 17 or newer: effective role switching
+uses PostgreSQL 16 membership options, and table privilege checks include PostgreSQL 17 `MAINTAIN`.
 
 ### Diagram
 
@@ -130,7 +131,10 @@ flowchart LR
   writes. Membership administration and privileged server-file, program, signal, maintenance,
   checkpoint, and subscription roles are rejected. Inherited privileges after a role switch count;
   role attributes count only for the current or switchable role. Catalog telemetry and
-  migration-version-only reads remain supported.
+  migration-version-only reads remain supported. Large-object `UPDATE` grants and explicit parameter
+  `SET`/`ALTER SYSTEM` grants are rejected, including PUBLIC and inherited grants. Parameter grants
+  can change cluster configuration or enable large-object ACL bypass; ordinary unprivileged session
+  settings and large-object SELECT alone remain supported.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL
