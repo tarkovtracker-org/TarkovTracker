@@ -125,6 +125,53 @@ describe('useOmnibarSearch', () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(results.value.items).toHaveLength(5);
   });
+  it('ranks exact, prefix, substring, then loose name matches', async () => {
+    metadataState.items = [
+      createItem('loose', 'Shalt'),
+      createItem('contains', 'Rock salt'),
+      createItem('prefix', 'Salt bag'),
+      createItem('exact', 'Salt'),
+    ];
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'salt';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.items.map((item) => item.id)).toEqual([
+      'exact',
+      'prefix',
+      'contains',
+      'loose',
+    ]);
+  });
+  it('finds names from a typo-tolerant subsequence', async () => {
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'gnsmth';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['t3']);
+  });
+  it('ranks a task name hit above a reward item hit', async () => {
+    metadataState.tasks = [
+      createTask('reward', 'Delivery from the Past', 'Customs', 'Prapor', 'Graphics card'),
+      createTask('name', 'Graphics Test'),
+    ];
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'graphics';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['name', 'reward']);
+  });
+  it('ranks even a weak fuzzy name hit above a map hit', async () => {
+    metadataState.tasks = [createTask('map', 'Delivery', 'Labs'), createTask('name', 'Taxib')];
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'ab';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['name', 'map']);
+  });
+  it('reports pending until the typed query reaches the results', async () => {
+    const { searchQuery, isPending } = useOmnibarSearch();
+    searchQuery.value = 'debut';
+    expect(isPending.value).toBe(true);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(isPending.value).toBe(false);
+  });
   it('derives the current context from the active route name', () => {
     routeState.name = 'tasks';
     expect(useOmnibarSearch().currentContext.value).toBe('tasks');
