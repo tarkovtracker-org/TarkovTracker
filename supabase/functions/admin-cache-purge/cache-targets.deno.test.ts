@@ -33,21 +33,20 @@ Deno.test('current non-task purge targets match live handler key scopes', async 
       /`((?:bootstrap|hideout|items|items-lite|map-spawns|prestige)-[^`]+)`/
     )?.[1];
     assertEquals(typeof template, 'string', `Missing cache key in ${route} handler`);
+    const keyTemplate = template!.replace(/\$\{\w+_CACHE_VERSION\}/, version ?? '');
+    const expected = new Set<string>();
     for (const origin of origins)
       for (const mode of modes)
         for (const lang of languages) {
-          const key = template!
-            .replace(/\$\{\w+_CACHE_VERSION\}/, version ?? '')
-            .replace('${lang}', lang)
-            .replace('${gameMode}', mode);
+          const key = keyTemplate.replace('${lang}', lang).replace('${gameMode}', mode);
+          expected.add(`${origin}/__edge-cache/tarkov/${key}`);
           assertEquals(targets.has(`${origin}/__edge-cache/tarkov/${key}`), true, key);
         }
-  }
-  for (const origin of origins) {
-    const bootstrap = urls.filter((url) =>
-      url.startsWith(`${origin}/__edge-cache/tarkov/bootstrap-json-v2-`)
+    const prefix = keyTemplate.split('${')[0];
+    const currentTargets = urls.filter((url) =>
+      origins.some((origin) => url.startsWith(`${origin}/__edge-cache/tarkov/${prefix}`))
     );
-    assertEquals(bootstrap.length, modes.length);
+    assertEquals(currentTargets.sort(), [...expected].sort(), route);
   }
 });
 Deno.test('purges current and retired objective catalogs for every language and mode', () => {
