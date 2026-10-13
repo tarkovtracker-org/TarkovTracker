@@ -29,6 +29,7 @@ const AUTH_CREDENTIAL_KEYS = new Set([
   'provider_token',
   'refresh_token',
   'sb_flow_id',
+  'state',
   'token',
 ]);
 const isOAuthPath = (path: string): boolean => {

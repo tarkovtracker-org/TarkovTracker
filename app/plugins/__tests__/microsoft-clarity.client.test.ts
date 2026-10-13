@@ -90,6 +90,8 @@ describe('microsoft clarity plugin', () => {
     '/%61uth/%63allback',
     '/AUTH/CALLBACK',
     '/settings?discord_linked=1&code=private-sentinel#account',
+    '/tasks?state=private-sentinel',
+    '/settings?discord_linked=1&error=access_denied&state=private-sentinel',
     '/settings?%63ode=private-sentinel',
     '/tasks#access_token=private-sentinel&refresh_token=private-sentinel',
   ])('skips Clarity entirely on initial OAuth URL %s', async (path) => {
@@ -122,6 +124,8 @@ describe('microsoft clarity plugin', () => {
     '/%61uth/%63allback',
     '/AUTH/CALLBACK',
     '/settings?discord_linked=1&code=private-sentinel',
+    '/tasks?state=private-sentinel',
+    '/settings?discord_linked=1&error=access_denied&state=private-sentinel',
   ])('skips Clarity when the same-origin referrer contains sensitive URL %s', async (path) => {
     vi.spyOn(document, 'referrer', 'get').mockReturnValue(`https://tarkovtracker.org${path}`);
     const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
@@ -138,6 +142,8 @@ describe('microsoft clarity plugin', () => {
     '/%61uth/%63allback',
     '/AUTH/CALLBACK',
     '/settings?discord_linked=1&code=private-sentinel#account',
+    '/tasks?state=private-sentinel',
+    '/settings?discord_linked=1&error=access_denied&state=private-sentinel',
   ])('leaves the recorded URL unchanged while externally navigating to %s', async (fullPath) => {
     const script = document.createElement('script');
     script.id = 'tt-microsoft-clarity';
