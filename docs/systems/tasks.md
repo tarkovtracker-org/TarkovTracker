@@ -272,7 +272,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
    team membership. The composable returns both map marks and an objective-visibility map, each
    entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
-   that objective themselves.
+   that objective themselves. Under the Locked and All status filters, `tasks.vue` passes
+   `shouldShowLockedObjectives`, so objectives of locked (not failed) tasks with no other owner
+   draw as self markers; a teammate who needs the objective still owns it.
 2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
 3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
    aggregates bring-mode equipment and alternative key groups independently for each group. It

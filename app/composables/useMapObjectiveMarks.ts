@@ -29,6 +29,8 @@ export type MapObjectiveVisibility = {
 interface MapObjectiveMarksOptions {
   mapId: ComputedRef<string | null | undefined>;
   shouldShowCompletedObjectives: ComputedRef<boolean>;
+  // The Locked and All filters list tasks the player has not unlocked; draw their objectives too.
+  shouldShowLockedObjectives?: ComputedRef<boolean>;
   tasks: ComputedRef<Task[]>;
 }
 interface ObjectiveLocations {
@@ -46,12 +48,20 @@ interface ObjectiveUsersOptions {
   selfComplete: boolean;
   selfTaskComplete: boolean;
   selfTaskFailed: boolean;
+  selfTaskUnlocked: boolean;
   shouldShowCompletedObjectives: boolean;
+  shouldShowLockedObjectives: boolean;
   unlockedTasks: BooleanProgressMap;
   objectiveCompletions: BooleanProgressMap;
   tasksCompletions: BooleanProgressMap;
   tasksFailed: BooleanProgressMap;
 }
+type SelfObjectiveState = Pick<
+  ObjectiveUsersOptions,
+  'selfNeedsObjective' | 'selfComplete' | 'selfTaskComplete' | 'selfTaskFailed' | 'selfTaskUnlocked'
+>;
+const selfStillNeedsObjective = (state: Omit<SelfObjectiveState, 'selfNeedsObjective'>): boolean =>
+  state.selfTaskUnlocked && !state.selfTaskComplete && !state.selfTaskFailed && !state.selfComplete;
 export const mapObjectiveCategory = (pinned: boolean, users: string[]): MapObjectiveCategory => {
   if (pinned) return 'pinned';
   if (users.includes('self')) return 'self';
@@ -93,41 +103,29 @@ const canShowCompletedObjective = (
   if (!selfTaskComplete) return false;
   return !selfTaskFailed;
 };
-const getObjectiveUsers = ({
-  taskId,
-  objectiveId,
-  teammateIds,
-  selfNeedsObjective,
+const canShowLockedObjective = ({
+  selfTaskUnlocked,
   selfComplete,
   selfTaskComplete,
   selfTaskFailed,
-  shouldShowCompletedObjectives,
-  unlockedTasks,
-  objectiveCompletions,
-  tasksCompletions,
-  tasksFailed,
-}: ObjectiveUsersOptions): string[] => {
-  const teammateUsers = getTeammateUsers({
-    taskId,
-    objectiveId,
-    teammateIds,
-    unlockedTasks,
-    objectiveCompletions,
-    tasksCompletions,
-    tasksFailed,
-  });
+  shouldShowLockedObjectives,
+}: ObjectiveUsersOptions): boolean => {
+  if (!shouldShowLockedObjectives || selfTaskUnlocked) return false;
+  return !selfComplete && !selfTaskComplete && !selfTaskFailed;
+};
+const canShowSelfFallback = (options: ObjectiveUsersOptions): boolean =>
+  canShowCompletedObjective(
+    options.selfComplete,
+    options.selfTaskComplete,
+    options.selfTaskFailed,
+    options.shouldShowCompletedObjectives
+  ) || canShowLockedObjective(options);
+const getObjectiveUsers = (options: ObjectiveUsersOptions): string[] => {
   const users: string[] = [];
-  if (selfNeedsObjective) users.push('self');
-  users.push(...teammateUsers);
+  if (options.selfNeedsObjective) users.push('self');
+  users.push(...getTeammateUsers(options));
   if (users.length > 0) return users;
-  return canShowCompletedObjective(
-    selfComplete,
-    selfTaskComplete,
-    selfTaskFailed,
-    shouldShowCompletedObjectives
-  )
-    ? ['self']
-    : [];
+  return canShowSelfFallback(options) ? ['self'] : [];
 };
 const getZoneLocation = (
   zone: ObjectiveZone,
@@ -253,6 +251,7 @@ const collectMapTaskIds = (
 export function useMapObjectiveMarks({
   mapId,
   shouldShowCompletedObjectives,
+  shouldShowLockedObjectives,
   tasks,
 }: MapObjectiveMarksOptions): {
   mapObjectiveMarks: ComputedRef<MapObjectiveMark[]>;
@@ -266,6 +265,16 @@ export function useMapObjectiveMarks({
   const tarkovStore = useTarkovStore();
   const { objectiveCompletions, tasksCompletions, tasksFailed, unlockedTasks } =
     storeToRefs(progressStore);
+  const showLockedObjectives = computed(() => shouldShowLockedObjectives?.value === true);
+  const getSelfObjectiveState = (taskId: string, objectiveId: string): SelfObjectiveState => {
+    const state = {
+      selfComplete: tarkovStore.isTaskObjectiveComplete(objectiveId),
+      selfTaskComplete: tarkovStore.isTaskComplete(taskId),
+      selfTaskFailed: tarkovStore.isTaskFailed(taskId),
+      selfTaskUnlocked: unlockedTasks.value[taskId]?.self === true,
+    };
+    return { ...state, selfNeedsObjective: selfStillNeedsObjective(state) };
+  };
   const mapObjectiveEntries = computed<MapObjectiveEntry[]>(() => {
     if (!mapId.value) return [];
     const selectedMapId = mapId.value;
@@ -280,21 +289,14 @@ export function useMapObjectiveMarks({
       const objectiveMaps = metadataStore.objectiveMaps?.[task.id] ?? [];
       const objectiveGps = metadataStore.objectiveGPS?.[task.id] ?? [];
       task.objectives.forEach((obj) => {
-        const selfComplete = tarkovStore.isTaskObjectiveComplete(obj.id);
-        const selfTaskComplete = tarkovStore.isTaskComplete(task.id);
-        const selfTaskFailed = tarkovStore.isTaskFailed(task.id);
-        const selfTaskUnlocked = unlockedTasks.value[task.id]?.self === true;
-        const selfNeedsObjective =
-          selfTaskUnlocked && !selfTaskComplete && !selfTaskFailed && !selfComplete;
+        const selfState = getSelfObjectiveState(task.id, obj.id);
         const users = getObjectiveUsers({
           taskId: task.id,
           objectiveId: obj.id,
           teammateIds,
-          selfNeedsObjective,
-          selfComplete,
-          selfTaskComplete,
-          selfTaskFailed,
+          ...selfState,
           shouldShowCompletedObjectives: shouldShowCompletedObjectives.value,
+          shouldShowLockedObjectives: showLockedObjectives.value,
           unlockedTasks: unlockedTasks.value,
           objectiveCompletions: objectiveCompletions.value,
           tasksCompletions: tasksCompletions.value,
@@ -312,7 +314,10 @@ export function useMapObjectiveMarks({
         entries.push({
           taskId: task.id,
           objectiveId: obj.id,
-          visibility: { category: mapObjectiveCategory(pinned, users), selfNeedsObjective },
+          visibility: {
+            category: mapObjectiveCategory(pinned, users),
+            selfNeedsObjective: selfState.selfNeedsObjective,
+          },
           mark: hasLocation ? { id: obj.id, zones, possibleLocations, users, pinned } : null,
         });
       });
