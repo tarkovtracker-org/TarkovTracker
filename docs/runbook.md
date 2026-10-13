@@ -1225,21 +1225,24 @@ first edit ([decision record](./decision-browser-progress.md#historical-rollback
 The progression and overlay changes ship together through PR #826, which supersedes PR #825.
 Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
 v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
-Only the combined revision may publish v3 entries. There is no intermediate application release.
+Only the reviewed combined producer contract may publish v3 entries. Split producer and consumer
+changes when preseeding is required: first land the compatible producer on `main`, while the
+application continues reading v2 keys.
 
 For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
-`.github/workflows/precompute-tarkov-data.yml` from the approved combined revision before merging
-or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
-48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
+`.github/workflows/precompute-tarkov-data.yml` on `main` after the reviewed producer changes land
+and before merging or promoting the v3 consumer. Leave both workflow inputs, `lang` and
+`gameMode`, empty to include all 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
 verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
 revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
 a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
 identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
 `overlay-precompute-manifest-json-v3` contains all 48 matching identities.
 
-Before rollout, confirm neither original PR revision has a production deployment or an in-flight
-precompute run. After the v3 population is verified, merge the combined PR only and
-close #825 as superseded. The scheduled workflow then refreshes the combined v3 contract.
+Before rollout, confirm no incompatible original PR revision has a production deployment or an
+in-flight precompute run. After the fresh v3 population and matching overlay identities are
+verified, merge the consumer PR and close #825 as superseded. The scheduled workflow then
+refreshes the combined v3 contract.
 Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
 entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
 standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
@@ -1252,16 +1255,19 @@ fleet verification before closing issue #729.
 503 while a key is missing, so seed before Pages deploys the consumer
 ([release order](./systems/overlay-and-precompute.md#release-verification)):
 
-1. Read the published overlay `$meta.sha256`. Dispatch `precompute-tarkov-data.yml` on the PR
-   branch with `lang=en`, no mode, and that `expectedOverlaySha`. Require the run's
+1. Split producer and consumer changes if preseeding is required. Land the reviewed producer
+   changes on `main` while keeping the existing consumer compatible. Read the published overlay
+   `$meta.sha256`, then dispatch `precompute-tarkov-data.yml` on `main` with `lang=en`, no mode,
+   and that `expectedOverlaySha`. Require the run's
    `importSnapshots.failures` to be empty.
 2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
    overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
-3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
-   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+3. Only after the fresh matching snapshots are verified, merge the consumer PR. After Pages
+   deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
    environment or a secret store) reports no import mismatches.
-4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
-   entries and the import keys share the release.
+4. If the overlay changes before consumer promotion, repeat the dispatch and snapshot verification
+   with the new approved `expectedOverlaySha` before merging. Use an unfiltered run on `main` so
+   all 48 core entries and the import keys share the release.
 
 Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
 which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail

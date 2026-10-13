@@ -351,25 +351,28 @@ Only a complete, unfiltered, failure-free run updates `overlay-precompute-manife
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
 
-Release order: publish the overlay, dispatch precompute with its expected SHA for all 48 supported
-language/mode combinations, check the manifest, then advance the existing browser cache-purge marker
-and purge corrected edge entries through the established operator workflow. When changing the
-consumer contract, precompute the new versioned keys from the reviewed consumer revision before
-promoting that app revision; old app revisions keep reading their old keys. The reviewed runner
-must seed all three new import keys before promoting a consumer that uses them; a successful older
-core-only run or its 48-row manifest does not establish import readiness. Inspect the runner's
-`imports` results as well as the core manifest. Missing core keys still have the existing live
-fallback, but that is not proof of production readiness for cold colos. Missing import keys fail
-closed, so promotion requires explicit successful seeding rather than a request-time fallback.
+Release order: reviewed producer changes first land on `main`, then publish the overlay and
+dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to its verified SHA
+for all 48 supported language/mode combinations. Check the matching manifest before advancing the
+existing browser cache-purge marker and purging corrected edge entries through the established
+operator workflow. When changing the consumer contract, split producer and consumer changes into
+separate releases whenever preseeding is required: land the compatible producer first, seed the new
+versioned keys, then promote the consumer. Old app revisions keep reading their old keys.
+The reviewed runner must seed all three new import keys before promoting a consumer that uses
+them; a successful older core-only run or its 48-row manifest does not establish import readiness.
+Inspect the runner's `imports` results as well as the core manifest. Missing core keys still have
+the existing live fallback, but that is not proof of production readiness for cold colos. Missing
+import keys fail closed, so promotion requires explicit successful seeding.
 
-Initial promotion is held by leaving the consumer PR in draft until an approved `workflow_dispatch`
-of `precompute-tarkov-data.yml` on its reviewed branch succeeds with `lang=en`, no mode filter,
-and the verified overlay SHA. That dispatch runs the reviewed producer and writes three English
-core keys and three whole import keys. Read back each import envelope from the existing production
-namespace and verify its version, scope, storage age, task/objective validity and overlay identity
-before making the PR ready or merging it. Production Pages deploys `main` automatically; a runbook
-warning or an unrelated successful CI build is not a deploy gate. This PR does not add build-time
-KV credentials, change Pages settings, or execute that dispatch.
+Hold the consumer PR in draft until an approved `workflow_dispatch` on `main` succeeds with
+`lang=en`, no mode filter, and `expectedOverlaySha` set to the verified overlay SHA. That dispatch
+runs the reviewed producer already on `main` and writes three English core keys and three whole
+import keys. Read back each import envelope from the existing production namespace and verify its
+version, scope, fresh storage age, task/objective validity and matching overlay identity before
+making the consumer PR ready or merging it. Production Pages deploys `main` automatically, so a
+producer release must remain compatible with the existing consumer and must not enable the new
+consumer before its snapshots are verified. A runbook warning or an unrelated successful CI build
+is not a deploy gate. This process does not add build-time KV credentials or change Pages settings.
 
 Actions previews remain isolated: the Pages preview configuration has no `TARKOV_DATA` binding.
 The snapshot-only import endpoint therefore returns 503 there, while the ordinary public metadata

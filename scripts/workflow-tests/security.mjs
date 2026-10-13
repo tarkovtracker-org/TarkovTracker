@@ -115,11 +115,12 @@ test('precompute credentials require a main-only protected environment and exact
   const header = job.split('    steps:')[0];
   assert.match(header, /^ {4}if: github.ref == 'refs\/heads\/main'$/m);
   assert.match(header, /^ {4}environment: production-precompute$/m);
-  assert.match(
-    job,
-    /uses: actions\/checkout@[a-f0-9]{40}[^\n]*\n {8}with:\n {10}ref: \$\{\{ github.sha \}\}/
-  );
-  assert.match(job, /persist-credentials: false/);
+  const checkout = job.match(
+    /uses: actions\/checkout@[a-f0-9]{40}[^\n]*\n {8}with:\n((?: {10}[^\n]*\n)+)/
+  )?.[1];
+  assert.ok(checkout, 'checkout must have a with block');
+  assert.match(checkout, /^ {10}ref: \$\{\{ github.sha \}\}$/m);
+  assert.match(checkout, /^ {10}persist-credentials: false$/m);
   const run = workflowStep(job, 'Precompute and write to KV');
   assert.match(run, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets.CLOUDFLARE_API_TOKEN \}\}/);
   assert.match(run, /OVERLAY_TOKEN: \$\{\{ secrets.OVERLAY_TOKEN \}\}/);
