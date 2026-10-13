@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
+import TwitchStreamPlayer from '@/components/TwitchStreamPlayer.vue';
 import { usePromotedTwitch } from '@/composables/usePromotedTwitch';
 import { logger } from '@/utils/logger';
 const { fetchMock } = vi.hoisted(() => ({
@@ -39,6 +40,11 @@ const mountEmbed = async () => {
         ClientOnly: { template: '<div><slot /></div>' },
         UButton: UButtonStub,
         UIcon: UIconStub,
+        TwitchStreamPlayer: {
+          props: ['channel', 'title'],
+          emits: ['ready', 'offline'],
+          template: '<iframe :src="`https://player.twitch.tv/?channel=${channel}&muted=true`" />',
+        },
       },
     },
   });
@@ -63,14 +69,147 @@ describe('PromotedTwitchEmbed', () => {
     usePromotedTwitch().resetConfig();
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+  it('makes no live requests for a dismissed stream over twelve hours', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    sessionStorage.setItem('tt-twitch-dismissed', '1');
+    const wrapper = await mountEmbed();
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(0);
+    expect(wrapper.find('button[aria-label="Reopen stream"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('does not refresh fresh data when repeatedly returning to the tab', async () => {
+    const wrapper = await mountEmbed();
+    for (let i = 0; i < 10; i++) {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+  it('checks an offline channel at most once every five minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    liveResult = { isLive: false };
+    const wrapper = await mountEmbed();
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+    wrapper.unmount();
+  });
+  it('uses player events without live polling until the stream ends', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const wrapper = await mountEmbed();
+    wrapper.getComponent(TwitchStreamPlayer).vm.$emit('ready');
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+    wrapper.getComponent(TwitchStreamPlayer).vm.$emit('offline');
+    await nextTick();
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    liveResult = { isLive: false };
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+    wrapper.unmount();
+  });
+  it('resumes discovery on return when the SDK reports offline in a hidden tab', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const wrapper = await mountEmbed();
+    wrapper.getComponent(TwitchStreamPlayer).vm.$emit('ready');
+    let hidden = true;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      wrapper.getComponent(TwitchStreamPlayer).vm.$emit('offline');
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+      expect(wrapper.find('iframe').exists()).toBe(true);
+    } finally {
+      if (originalDescriptor) Object.defineProperty(document, 'hidden', originalDescriptor);
+      else delete (document as { hidden?: boolean }).hidden;
+      wrapper.unmount();
+    }
+  });
+  it.each(['offline', 'failure'])(
+    'keeps the SDK player after a late %s poll result',
+    async (outcome) => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const wrapper = await mountEmbed();
+      let finish: () => void = () => {};
+      fetchMock.mockImplementation((url: string) => {
+        if (url === '/api/twitch/config') return Promise.resolve(twitchConfig);
+        return new Promise((resolve, reject) => {
+          finish = () =>
+            outcome === 'failure' ? reject(new Error('timeout')) : resolve({ isLive: false });
+        });
+      });
+      await vi.advanceTimersByTimeAsync(300_000);
+      wrapper.getComponent(TwitchStreamPlayer).vm.$emit('ready');
+      finish();
+      await flushPromises();
+      expect(wrapper.find('iframe').exists()).toBe(true);
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+      wrapper.unmount();
+    }
+  );
+  it('stops live checks after closing and rechecks on reopen', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const wrapper = await mountEmbed();
+    await wrapper.get('button[aria-label="Close player"]').trigger('click');
+    await vi.advanceTimersByTimeAsync(900_000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+    liveResult = { isLive: false };
+    await wrapper.get('button[aria-label="Reopen stream"]').trigger('click');
+    await flushPromises();
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('backs off failed checks instead of retrying on timers or tab returns', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/twitch/config'
+        ? Promise.resolve(twitchConfig)
+        : Promise.reject(new Error('offline'))
+    );
+    const wrapper = await mountEmbed();
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(599_999);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+    wrapper.unmount();
+  });
+  it('continues discovery after a dismissed channel changes and the SDK is unavailable', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    sessionStorage.setItem('tt-twitch-dismissed', '1');
+    const wrapper = await mountEmbed();
+    usePromotedTwitch().applyConfig({ ...twitchConfig, channel: 'replacement', version: 2 });
+    await flushPromises();
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+    wrapper.unmount();
   });
   it('fetches config without checking or polling live status when disabled', async () => {
     twitchConfig.enabled = false;
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const wrapper = await mountEmbed();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/twitch/config',
+      expect.objectContaining({ retry: 0 })
+    );
     expect(fetchMock).not.toHaveBeenCalledWith('/api/twitch/live', expect.anything());
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 300_000);
     expect(setIntervalSpy).not.toHaveBeenCalledWith(expect.any(Function), 60_000);
@@ -95,11 +234,19 @@ describe('PromotedTwitchEmbed', () => {
           ClientOnly: { template: '<div><slot /></div>' },
           UButton: UButtonStub,
           UIcon: UIconStub,
+          TwitchStreamPlayer: {
+            props: ['channel', 'title'],
+            emits: ['ready', 'offline'],
+            template: '<iframe :src="`https://player.twitch.tv/?channel=${channel}&muted=true`" />',
+          },
         },
       },
     });
     await nextTick();
-    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/twitch/config',
+      expect.objectContaining({ retry: 0 })
+    );
     wrapper.unmount();
     resolveConfig?.({
       channel: 'replacement',
@@ -123,21 +270,29 @@ describe('PromotedTwitchEmbed', () => {
     };
     const configCallback = setIntervalSpy.mock.calls.find((call) => call[1] === 300_000)?.[0] as
       (() => void) | undefined;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     configCallback?.();
     await flushPromises();
     await nextTick();
     expect(fetchMock.mock.calls.filter((call) => call[0] === '/api/twitch/config')).toHaveLength(2);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
       query: { channel: 'replacement' },
+      retry: 0,
+      timeout: 10_000,
     });
     expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
     wrapper.unmount();
   });
   it('renders the player iframe when the channel is live', async () => {
     const wrapper = await mountEmbed();
-    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/twitch/config',
+      expect.objectContaining({ retry: 0 })
+    );
     expect(fetchMock).toHaveBeenCalledWith('/api/twitch/live', {
       query: { channel: 'teststreamer' },
+      retry: 0,
+      timeout: 10_000,
     });
     const iframe = wrapper.find('iframe');
     expect(iframe.exists()).toBe(true);
@@ -184,6 +339,7 @@ describe('PromotedTwitchEmbed', () => {
     sessionStorage.setItem('tt-twitch-dismissed', '1');
     const wrapper = await mountEmbed();
     await wrapper.get('button[aria-label="Reopen stream"]').trigger('click');
+    await flushPromises();
     await nextTick();
     expect(wrapper.find('iframe').exists()).toBe(true);
     expect(sessionStorage.getItem('tt-twitch-dismissed')).toBeNull();
@@ -198,6 +354,7 @@ describe('PromotedTwitchEmbed', () => {
     const pollCallback = setIntervalSpy.mock.calls.find(
       (call) => call[1] === 60_000
     )?.[0] as () => void;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     pollCallback();
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -216,6 +373,8 @@ describe('PromotedTwitchEmbed', () => {
     await nextTick();
     expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
       query: { channel: 'replacement' },
+      retry: 0,
+      timeout: 10_000,
     });
     expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
     wrapper.unmount();
@@ -231,6 +390,7 @@ describe('PromotedTwitchEmbed', () => {
       }
       return Promise.resolve(liveResult);
     });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     document.dispatchEvent(new Event('visibilitychange'));
     usePromotedTwitch().applyConfig({
       channel: 'replacement',
@@ -304,7 +464,9 @@ describe('PromotedTwitchEmbed', () => {
     const pollCallback = setIntervalSpy.mock.calls.find(
       (call) => call[1] === 60_000
     )?.[0] as () => void;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     pollCallback();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     pollCallback();
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -328,6 +490,7 @@ describe('PromotedTwitchEmbed', () => {
     const pollCallback = setIntervalSpy.mock.calls.find(
       (call) => call[1] === 60_000
     )?.[0] as () => void;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     pollCallback();
     usePromotedTwitch().applyConfig({
       channel: 'replacement',
@@ -358,6 +521,7 @@ describe('PromotedTwitchEmbed', () => {
     const pollCallback = setIntervalSpy.mock.calls.find(
       (call) => call[1] === 60_000
     )?.[0] as () => void;
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
     pollCallback();
     usePromotedTwitch().applyConfig({
       channel: 'replacement',
@@ -391,6 +555,7 @@ describe('PromotedTwitchEmbed', () => {
     const wrapper = await mountEmbed();
     await wrapper.get('button[aria-label="Close player"]').trigger('click');
     await wrapper.get('button[aria-label="Reopen stream"]').trigger('click');
+    await flushPromises();
     expect(warnSpy).toHaveBeenCalledWith(
       '[PromotedTwitchEmbed] Failed to clear stored dismissal',
       expect.any(Error)
@@ -452,6 +617,8 @@ describe('PromotedTwitchEmbed', () => {
       await flushPromises();
       expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
         query: { channel: 'teststreamer' },
+        retry: 0,
+        timeout: 10_000,
       });
     } finally {
       if (originalDescriptor) {
@@ -484,6 +651,8 @@ describe('PromotedTwitchEmbed', () => {
       await flushPromises();
       expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
         query: { channel: 'replacement' },
+        retry: 0,
+        timeout: 10_000,
       });
     } finally {
       if (originalDescriptor) {
@@ -508,6 +677,7 @@ describe('PromotedTwitchEmbed', () => {
       await flushPromises();
       expect(clearIntervalSpy).toHaveBeenCalled();
       const callsWhileHidden = fetchMock.mock.calls.length;
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 300_000);
       hidden = false;
       document.dispatchEvent(new Event('visibilitychange'));
       await flushPromises();

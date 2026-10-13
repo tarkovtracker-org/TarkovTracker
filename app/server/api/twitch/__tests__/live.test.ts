@@ -2,14 +2,21 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
-const { fetchMock, getQueryMock, setResponseHeadersMock, useRuntimeConfigMock } = vi.hoisted(
-  () => ({
-    fetchMock: vi.fn(),
-    getQueryMock: vi.fn(),
-    setResponseHeadersMock: vi.fn(),
-    useRuntimeConfigMock: vi.fn(),
-  })
-);
+const {
+  fetchMock,
+  getQueryMock,
+  setResponseHeadersMock,
+  useRuntimeConfigMock,
+  warnMock,
+  errorMock,
+} = vi.hoisted(() => ({
+  fetchMock: vi.fn(),
+  warnMock: vi.fn(),
+  errorMock: vi.fn(),
+  getQueryMock: vi.fn(),
+  setResponseHeadersMock: vi.fn(),
+  useRuntimeConfigMock: vi.fn(),
+}));
 mockNuxtImport('useRuntimeConfig', () => useRuntimeConfigMock);
 vi.mock('h3', () => ({
   defineEventHandler: (handler: unknown) => handler,
@@ -17,7 +24,7 @@ vi.mock('h3', () => ({
   setResponseHeaders: setResponseHeadersMock,
 }));
 vi.mock('@/server/utils/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn() }),
+  createLogger: () => ({ error: errorMock, warn: warnMock }),
 }));
 const loadHandler = async () => {
   vi.resetModules();
@@ -32,6 +39,8 @@ const liveResponse = (live: boolean) => ({
 describe('/api/twitch/live', () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    warnMock.mockClear();
+    errorMock.mockClear();
     getQueryMock.mockReset();
     setResponseHeadersMock.mockReset();
     useRuntimeConfigMock.mockReturnValue({ twitchClientId: 'test-client-id' });
@@ -39,6 +48,8 @@ describe('/api/twitch/live', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
   it('returns isLive true when the channel has an active stream', async () => {
     getQueryMock.mockReturnValue({ channel: 'TestStreamer' });
@@ -87,11 +98,59 @@ describe('/api/twitch/live', () => {
     await handler({});
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('coalesces simultaneous checks for the same channel', async () => {
+    getQueryMock.mockReturnValue({ channel: 'teststreamer' });
+    let finish: (value: ReturnType<typeof liveResponse>) => void = () => {};
+    fetchMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const handler = await loadHandler();
+    const first = handler({});
+    const second = handler({});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    finish(liveResponse(true));
+    expect(await Promise.all([first, second])).toEqual([{ isLive: true }, { isLive: true }]);
+  });
+  it('retains cached results when checks alternate channels', async () => {
+    fetchMock.mockResolvedValue(liveResponse(true));
+    const handler = await loadHandler();
+    for (const channel of ['first', 'second', 'first']) {
+      getQueryMock.mockReturnValue({ channel });
+      await handler({});
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('does not cache failed checks', async () => {
+    getQueryMock.mockReturnValue({ channel: 'teststreamer' });
+    fetchMock.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(liveResponse(true));
+    const handler = await loadHandler();
+    expect(await handler({})).toEqual({ isLive: false });
+    expect(await handler({})).toEqual({ isLive: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('refreshes expired channel results', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1);
+    getQueryMock.mockReturnValue({ channel: 'teststreamer' });
+    fetchMock.mockResolvedValue(liveResponse(true));
+    const handler = await loadHandler();
+    await handler({});
+    await vi.advanceTimersByTimeAsync(1);
+    now.mockReturnValue(60_002);
+    fetchMock.mockResolvedValue(liveResponse(false));
+    expect(await handler({})).toEqual({ isLive: false });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it('returns isLive false when Twitch responds with an error status', async () => {
     getQueryMock.mockReturnValue({ channel: 'teststreamer' });
     fetchMock.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
     const handler = await loadHandler();
     expect(await handler({})).toEqual({ isLive: false });
+    expect(warnMock).toHaveBeenCalledWith('Twitch live check failed:', 'Twitch GQL returned 503');
+    expect(errorMock).not.toHaveBeenCalled();
   });
   it('returns isLive false when the Twitch request throws', async () => {
     getQueryMock.mockReturnValue({ channel: 'teststreamer' });

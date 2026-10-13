@@ -123,7 +123,7 @@ describe('/api/twitch/config', () => {
     });
     expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
   });
-  it('reads the database on each handler execution (edge cache fills)', async () => {
+  it('reads the database on each handler execution', async () => {
     adminSupabaseFetchMock
       .mockResolvedValueOnce([
         {
