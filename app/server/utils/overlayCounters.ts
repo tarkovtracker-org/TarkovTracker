@@ -8,10 +8,15 @@
  *
  * Contract: https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md
  */
-import { copyCounterGroup, counterTaskIds, groupMembers } from '@/utils/taskCounters';
+import {
+  copyCounterGroup,
+  counterTaskIds,
+  isCounterGroups,
+  isCounterTaskIds,
+} from '@/utils/taskCounters';
 import { isPlainObject } from './deepMerge';
 import type { OverlayData } from './overlayTypes';
-import type { TaskCounterDerivation, TaskCounterGroup } from '@/types/tarkov';
+import type { TaskCounterDerivation } from '@/types/tarkov';
 /** Game-rules revisions whose counter mappings this consumer applies. */
 export const SUPPORTED_COUNTER_REVISIONS: ReadonlySet<string> = new Set(['1.1.0']);
 const COUNTER_MODES: ReadonlySet<string> = new Set(['regular', 'pve', 'pvp-season']);
@@ -38,20 +43,10 @@ const hasExactKeys = (value: Record<string, unknown>, keys: string[]): boolean =
 const uniqueList = (value: unknown, valid: (entry: unknown) => boolean): boolean =>
   Array.isArray(value) &&
   [value.length > 0, value.every(valid), new Set(value).size === value.length].every(Boolean);
-const nonEmptyIdList = (value: unknown): boolean => uniqueList(value, nonEmpty);
-/** `{ anyOf }` needs at least two members; one member is just a single-task group. */
-const anyOfGroup = (value: unknown): boolean =>
-  isPlainObject(value) &&
-  hasExactKeys(value, ['anyOf']) &&
-  nonEmptyIdList(value.anyOf) &&
-  (value.anyOf as unknown[]).length > 1;
-const validGroup = (value: unknown): boolean => nonEmptyIdList(value) || anyOfGroup(value);
-/** Every group is a non-empty id list or `{ anyOf }`, and no task belongs to two groups. */
-const validGroups = (value: unknown): boolean =>
-  uniqueList(value, validGroup) &&
-  uniqueList((value as TaskCounterGroup[]).flatMap(groupMembers), nonEmpty);
 const validContributors = (value: Record<string, unknown>): boolean =>
-  value.type === 'taskGroupCompletions' ? validGroups(value.groups) : nonEmptyIdList(value.taskIds);
+  value.type === 'taskGroupCompletions'
+    ? isCounterGroups(value.groups)
+    : isCounterTaskIds(value.taskIds);
 const validDerivation = (value: unknown): boolean =>
   isPlainObject(value) &&
   Object.hasOwn(DERIVATION_KEYS, String(value.type)) &&

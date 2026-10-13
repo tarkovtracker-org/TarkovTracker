@@ -1,5 +1,27 @@
 import type { TaskCounterDerivation, TaskCounterGroup } from '@/types/tarkov';
-export const groupMembers = (group: TaskCounterGroup): string[] =>
+const isTaskId = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+/** Counter contract shared by the server validator and the client normalizer. */
+export const isCounterTaskIds = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(isTaskId) &&
+  new Set(value).size === value.length;
+const isAnyOfGroup = (value: unknown): value is { anyOf: string[] } =>
+  value !== null &&
+  typeof value === 'object' &&
+  Object.keys(value).join() === 'anyOf' &&
+  isCounterTaskIds((value as { anyOf: unknown }).anyOf);
+/** `{ anyOf }` needs at least two members; one member is just a single-task group. */
+const isCounterGroup = (value: unknown): value is TaskCounterGroup =>
+  isCounterTaskIds(value) || (isAnyOfGroup(value) && value.anyOf.length > 1);
+/** A non-empty list of groups in which no task belongs to two groups. */
+export const isCounterGroups = (value: unknown): value is TaskCounterGroup[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(isCounterGroup) &&
+  isCounterTaskIds(value.flatMap(groupMembers));
+const groupMembers = (group: TaskCounterGroup): string[] =>
   Array.isArray(group) ? group : group.anyOf;
 /** A fresh copy, so normalized or attached derivations never share arrays. */
 export const copyCounterGroup = (group: TaskCounterGroup): TaskCounterGroup =>

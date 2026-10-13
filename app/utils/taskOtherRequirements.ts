@@ -1,9 +1,8 @@
-import { copyCounterGroup, groupMembers } from '@/utils/taskCounters';
+import { copyCounterGroup, isCounterGroups, isCounterTaskIds } from '@/utils/taskCounters';
 import { compareRequirement } from '@/utils/taskRequirements';
 import type {
   Task,
   TaskCounterDerivation,
-  TaskCounterGroup,
   TaskOtherRequirement,
   RequirementComparison,
 } from '@/types/tarkov';
@@ -13,30 +12,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isId = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 const traderId = (value: unknown): unknown => (isRecord(value) ? value.id : value);
-const uniqueIds = (value: unknown): value is string[] =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.every(isId) &&
-  new Set(value).size === value.length;
-const isAnyOfGroup = (value: unknown): value is { anyOf: string[] } =>
-  isRecord(value) &&
-  Object.keys(value).length === 1 &&
-  uniqueIds(value.anyOf) &&
-  value.anyOf.length > 1;
-const isCounterGroup = (value: unknown): value is TaskCounterGroup =>
-  uniqueIds(value) || isAnyOfGroup(value);
-/** No task may belong to two groups. */
-const uniqueGroups = (value: unknown): value is TaskCounterGroup[] =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.every(isCounterGroup) &&
-  uniqueIds(value.flatMap(groupMembers));
 const normalizeGroups = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
-  uniqueGroups(raw.groups)
+  isCounterGroups(raw.groups)
     ? { type: 'taskGroupCompletions', groups: raw.groups.map(copyCounterGroup) }
     : undefined;
 const normalizeTaskIds = (raw: Record<string, unknown>): TaskCounterDerivation | undefined =>
-  uniqueIds(raw.taskIds)
+  isCounterTaskIds(raw.taskIds)
     ? { type: 'distinctTaskCompletions', taskIds: [...raw.taskIds] }
     : undefined;
 const counterNormalizers: Record<
