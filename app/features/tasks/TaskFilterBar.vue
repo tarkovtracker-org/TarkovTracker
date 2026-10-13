@@ -150,9 +150,9 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="secondaryView === 'all'"
-            :aria-pressed="secondaryView === 'all'"
-            :class="getStatusButtonClass('all', secondaryView === 'all')"
+            :disabled="isStatusApplied('all')"
+            :aria-pressed="selectedStatusView === 'all'"
+            :class="getStatusButtonClass('all', selectedStatusView === 'all')"
             @click="setSecondaryView('all')"
           >
             <UIcon
@@ -184,9 +184,9 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="secondaryView === 'available'"
-            :aria-pressed="secondaryView === 'available'"
-            :class="getStatusButtonClass('available', secondaryView === 'available')"
+            :disabled="isStatusApplied('available')"
+            :aria-pressed="selectedStatusView === 'available'"
+            :class="getStatusButtonClass('available', selectedStatusView === 'available')"
             @click="setSecondaryView('available')"
           >
             <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -210,9 +210,9 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="secondaryView === 'locked'"
-            :aria-pressed="secondaryView === 'locked'"
-            :class="getStatusButtonClass('locked', secondaryView === 'locked')"
+            :disabled="isStatusApplied('locked')"
+            :aria-pressed="selectedStatusView === 'locked'"
+            :class="getStatusButtonClass('locked', selectedStatusView === 'locked')"
             @click="setSecondaryView('locked')"
           >
             <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -232,9 +232,9 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="secondaryView === 'completed'"
-            :aria-pressed="secondaryView === 'completed'"
-            :class="getStatusButtonClass('completed', secondaryView === 'completed')"
+            :disabled="isStatusApplied('completed')"
+            :aria-pressed="selectedStatusView === 'completed'"
+            :class="getStatusButtonClass('completed', selectedStatusView === 'completed')"
             @click="setSecondaryView('completed')"
           >
             <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -253,9 +253,9 @@
             color="neutral"
             size="sm"
             class="leading-none"
-            :disabled="secondaryView === 'failed'"
-            :aria-pressed="secondaryView === 'failed'"
-            :class="getStatusButtonClass('failed', secondaryView === 'failed')"
+            :disabled="isStatusApplied('failed')"
+            :aria-pressed="selectedStatusView === 'failed'"
+            :class="getStatusButtonClass('failed', selectedStatusView === 'failed')"
             @click="setSecondaryView('failed')"
           >
             <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -435,15 +435,18 @@
     normalizeSecondaryView,
     normalizeSortMode,
   } from '@/utils/taskFilterNormalization';
+  import type { TaskStatusCounts } from '@/features/tasks/composables/useTaskFilters';
   import type { TaskSecondaryView } from '@/types/taskFilter';
   import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
   const props = defineProps<{
     searchQuery: string;
-    activeSearchCount?: number;
-    isSearchActive?: boolean;
+    /** Status the list currently filters by; `all` while a search spans every status. */
+    activeStatusView?: TaskSecondaryView;
+    searchStatusCounts?: TaskStatusCounts | null;
   }>();
-  defineEmits<{
+  const emit = defineEmits<{
     'update:searchQuery': [value: string];
+    'pin-status': [];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
@@ -460,9 +463,13 @@
   const secondaryView = computed(() =>
     getTaskSecondaryViewForPrimaryView(primaryView.value, preferencesStore.getTaskSecondaryView)
   );
+  const selectedStatusView = computed(() => props.activeStatusView ?? secondaryView.value);
+  // While searching every tab stays clickable so it can pin the search; otherwise the shown tab is inert.
+  const isStatusApplied = (view: TaskSecondaryView) =>
+    !props.searchQuery.trim() && selectedStatusView.value === view;
   const traderCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
-    return calculateTraderCounts(userView, secondaryView.value);
+    return calculateTraderCounts(userView, selectedStatusView.value);
   });
   const traders = computed(() => {
     return metadataStore.sortedTraders.filter((trader) => (traderCounts.value[trader.id] ?? 0) > 0);
@@ -575,16 +582,7 @@
     const userView = preferencesStore.getTaskUserView;
     return calculateStatusCounts(userView);
   });
-  const displayStatusCounts = computed(() => {
-    if (!props.isSearchActive || props.activeSearchCount === undefined) {
-      return statusCounts.value;
-    }
-    const activeView = secondaryView.value;
-    return {
-      ...statusCounts.value,
-      [activeView]: props.activeSearchCount,
-    };
-  });
+  const displayStatusCounts = computed(() => props.searchStatusCounts ?? statusCounts.value);
   type SortOption = {
     value: TaskSortMode;
     label: string;
@@ -678,6 +676,7 @@
   };
   // Secondary view (available / locked / completed)
   const setSecondaryView = (view: string) => {
+    emit('pin-status');
     const normalizedView = getTaskSecondaryViewForPrimaryView(primaryView.value, view);
     if (preferencesStore.getTaskSecondaryView === normalizedView) return;
     preferencesStore.setTaskSecondaryView(normalizedView);
