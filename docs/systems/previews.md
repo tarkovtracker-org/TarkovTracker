@@ -4,6 +4,12 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 ## Actions-owned Cloudflare previews
 
+Merge-group CI completions also request this trusted pipeline for the live queue integration
+commit. They always deploy/smoke-test the anonymous build and publish on that queue SHA, with
+exact-ref, current-main first-parent and attempt-specific CI proof repeated before upload and
+success. Queue builds never inherit a member PR's preview result or fork command grant. Activation
+is staged; see [merge queue rollout](../merge-queue-rollout.md).
+
 Open, ready ordinary same-repository PRs targeting main request a preview after successful
 current PR CI, without a command or merge intent. `ready_for_review` and `reopened` reuse
 already-passed current CI; they do not request another build. Drafts pause and `/preview stop`

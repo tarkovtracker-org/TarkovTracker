@@ -131,6 +131,62 @@ test('the Validate profile step passes production inputs through and clears them
   assert.equal(staging.buildEnv.SUPABASE_ANON_KEY, '');
   assert.throws(() => resolveProfileOutputs({ EVENT_NAME: 'pull_request', PR_NUMBER: '' }));
 });
+test('queue CI dispatches, deploys and reports only its live integration revision', async (t) => {
+  const branch = 'gh-readonly-queue/main/pr-42-example';
+  const previewBranch = previewBranchName({ branch });
+  const f = fakeGithub(t, {
+    run: { event: 'merge_group', head_branch: branch, pull_requests: [] },
+    commits: { [HEAD]: { tree: { sha: TREE }, parents: [{ sha: BASE }, { sha: MERGE }] } },
+    manifest: {
+      pullRequest: null,
+      headSha: HEAD,
+      baseSha: BASE,
+      checkedOutSha: HEAD,
+      previewBranch,
+      appUrl: previewAppUrl(previewBranch),
+    },
+  });
+  const core = fakeCore();
+  const args = { github: f.github, core, workspace: tempDir(t) };
+  const automatic = await planPreview({ ...args, context: workflowRunContext(f.state.run) });
+  assert.equal(automatic.action, 'request');
+  assert.equal(f.state.dispatches.length, 1);
+  const decision = await planPreview({
+    ...args,
+    workspace: tempDir(t),
+    context: workflowDispatchContext(),
+    inputs: { run_id: '900' },
+  });
+  assert.equal(decision.action, 'deploy');
+  assert.equal(decision.runEvent, 'merge_group');
+  assert.equal(decision.baseSha, BASE);
+  await verifyForDeploy({
+    ...args,
+    context: workflowDispatchContext(),
+    decision,
+    destination: tempDir(t),
+  });
+  assert.equal(
+    await publishResult({
+      ...args,
+      context: workflowDispatchContext(),
+      decision,
+      outcomes: { deploy: 'success', smoke: 'success' },
+    }),
+    'success'
+  );
+  assert.equal(f.state.statuses.at(-1).sha, HEAD);
+  f.state.queueSha = MERGE;
+  await assert.rejects(
+    verifyForDeploy({
+      ...args,
+      context: workflowDispatchContext(),
+      decision,
+      destination: tempDir(t),
+    }),
+    /Queue revision moved/
+  );
+});
 /* ------------------------------------------------------------------------------------------ */
 /* Archive                                                                                     */
 /* ------------------------------------------------------------------------------------------ */
@@ -378,6 +434,8 @@ function repoEndpoints(state) {
         return { data: commit };
       },
       getRef: async ({ ref }) => {
+        if (ref === `heads/${state.run.head_branch}` && state.run.event === 'merge_group')
+          return { data: { object: { sha: state.queueSha ?? state.run.head_sha } } };
         assert.equal(ref, 'heads/main');
         return { data: { object: { sha: state.mainSha } } };
       },
