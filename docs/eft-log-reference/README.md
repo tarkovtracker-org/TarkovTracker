@@ -74,7 +74,8 @@ Arena token output retains only the documented `ApplicationState`, `MatchingProg
 `GameplayState` enum values, using their canonical casing. Generic message/event payloads and
 unknown state values are omitted so names and alphabetic credentials do not enter audit reports.
 The notification section likewise retains only markers documented in the event dictionary,
-including service `Ping` and `ChannelDeleted`; unknown payload words are omitted in every section.
+including service `Ping` and `ChannelDeleted`; unknown marker words are omitted when running
+these sections alone or as part of `--section all`.
 
 ```bash
 # Full re-audit of a live corpus
