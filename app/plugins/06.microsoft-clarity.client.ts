@@ -21,9 +21,33 @@ const CLARITY_CONSENT_DENIED = {
   ad_Storage: 'denied',
   analytics_Storage: 'denied',
 } as const;
+const AUTH_CREDENTIAL_KEYS = new Set([
+  'access_token',
+  'authorization_id',
+  'code',
+  'provider_refresh_token',
+  'provider_token',
+  'refresh_token',
+  'sb_flow_id',
+  'token',
+]);
 const isOAuthPath = (path: string): boolean => {
   try {
-    return /^\/oauth(?:\/|$)/i.test(decodeURIComponent(path));
+    return /^\/(?:oauth(?:\/|$)|auth\/callback(?:\/|$))/i.test(decodeURIComponent(path));
+  } catch {
+    return true;
+  }
+};
+const hasCredentialParams = (url: URL): boolean => {
+  const hashParams = new URLSearchParams(url.hash.replace(/^#\??/, ''));
+  return [...url.searchParams.keys(), ...hashParams.keys()].some((key) =>
+    AUTH_CREDENTIAL_KEYS.has(key.toLowerCase())
+  );
+};
+const isSensitiveUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value, window.location.origin);
+    return isOAuthPath(url.pathname) || hasCredentialParams(url);
   } catch {
     return true;
   }
@@ -34,17 +58,29 @@ const hasOAuthReferrer = (): boolean => {
   }
   try {
     const referrer = new URL(document.referrer);
-    return referrer.origin === window.location.origin && isOAuthPath(referrer.pathname);
+    return referrer.origin === window.location.origin && isSensitiveUrl(referrer.href);
   } catch {
     return true;
   }
 };
-const hasOAuthDocument = () => isOAuthPath(window.location.pathname) || hasOAuthReferrer();
+const hasOAuthDocument = () => isSensitiveUrl(window.location.href) || hasOAuthReferrer();
+const getDocumentNavigationUrl = (fullPath: string): string => {
+  const destination = new URL(fullPath, window.location.origin);
+  if (
+    destination.pathname + destination.search ===
+    window.location.pathname + window.location.search
+  ) {
+    // A fragment-only assign would keep the recorder alive in the same document.
+    destination.searchParams.append('_tt_retry', String(Date.now()));
+    return destination.pathname + destination.search + destination.hash;
+  }
+  return fullPath;
+};
 const protectOAuthNavigation = () => {
   // Keep sensitive URLs out of the current recorder's history hooks entirely.
   const removeOAuthGuard = useRouter().beforeEach((to) => {
-    if (isOAuthPath(to.path)) {
-      void navigateTo(to.fullPath, { external: true });
+    if (isSensitiveUrl(to.fullPath)) {
+      window.location.assign(getDocumentNavigationUrl(to.fullPath));
       return false;
     }
   });

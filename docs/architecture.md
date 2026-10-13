@@ -669,14 +669,20 @@ directly from the process environment; see
 | `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
 | `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
-**Analytics privacy:** Microsoft Clarity is never initialized on `/oauth` or `/oauth/*`
-documents, including encoded or case-varied paths, or when the same-origin document
-referrer is an OAuth route. The router sends OAuth navigation through a full page load
-before committing the sensitive URL to browser history, so an existing recorder stays
-on the previous URL and the new document skips Clarity. Consent denial alone does not
+**Analytics privacy:** When analytics integrations are enabled and the Clarity project ID
+is valid, Microsoft Clarity skips documents on `/oauth`, `/oauth/*`, and `/auth/callback`
+(including encoded or case-varied paths). It also skips URLs with credential query or
+hash parameters, including Discord linking callbacks on `/settings`, and documents
+whose same-origin referrer contains one of these sensitive URLs. Malformed URLs also
+skip recording. The router guard starts a native full page navigation and cancels the
+SPA navigation. If only the fragment changes on the current path and query, it appends
+the existing `_tt_retry` cache-busting parameter to force a new document. This keeps
+the sensitive destination out of the current recorder's
+`pushState`/`replaceState` hooks. The destination still appears in normal browser
+navigation history; its new document skips Clarity. Consent denial alone does not
 prevent URL/referrer collection. Ordinary routes retain SPA navigation and the existing
-analytics consent flow. A document skipped for an OAuth referrer remains unrecorded
-until another full page load with a benign URL and referrer.
+analytics consent flow. Skipped documents remain unrecorded until a full page load
+with a benign URL and referrer.
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
