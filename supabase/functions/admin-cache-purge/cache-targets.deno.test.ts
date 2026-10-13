@@ -19,6 +19,36 @@ const languages = [
   'zh',
 ];
 const modes = ['regular', 'pve', 'pvp-season'];
+const origins = ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
+Deno.test('current non-task purge targets match live handler key scopes', async () => {
+  const urls = buildTarkovCacheUrls(origins);
+  const targets = new Set(urls);
+  assertEquals(targets.size, urls.length);
+  for (const route of ['bootstrap', 'hideout', 'items', 'items-lite', 'map-spawns', 'prestige']) {
+    const source = await Deno.readTextFile(
+      new URL(`../../../app/server/api/tarkov/${route}.get.ts`, import.meta.url)
+    );
+    const version = source.match(/const \w+_CACHE_VERSION = '([^']+)'/)?.[1];
+    const template = source.match(
+      /`((?:bootstrap|hideout|items|items-lite|map-spawns|prestige)-[^`]+)`/
+    )?.[1];
+    assertEquals(typeof template, 'string', `Missing cache key in ${route} handler`);
+    const keyTemplate = template!.replace(/\$\{\w+_CACHE_VERSION\}/, version ?? '');
+    const expected = new Set<string>();
+    for (const origin of origins)
+      for (const mode of modes)
+        for (const lang of languages) {
+          const key = keyTemplate.replace('${lang}', lang).replace('${gameMode}', mode);
+          expected.add(`${origin}/__edge-cache/tarkov/${key}`);
+          assertEquals(targets.has(`${origin}/__edge-cache/tarkov/${key}`), true, key);
+        }
+    const prefix = keyTemplate.split('${')[0];
+    const currentTargets = urls.filter((url) =>
+      origins.some((origin) => url.startsWith(`${origin}/__edge-cache/tarkov/${prefix}`))
+    );
+    assertEquals(currentTargets.sort(), [...expected].sort(), route);
+  }
+});
 Deno.test('purges current and retired objective catalogs for every language and mode', () => {
   const targets = new Set(buildTarkovCacheUrls(['https://tarkovtracker.org']));
   for (const lang of languages)

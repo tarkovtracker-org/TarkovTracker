@@ -12,6 +12,12 @@ const TARKOV_CACHE_KEYS = [
   { key: 'items', includesGameMode: false },
   { key: 'items-lite', includesGameMode: false },
   { key: 'prestige', includesGameMode: false },
+  { key: 'bootstrap-json-v2', includesLanguage: false, includesGameMode: true },
+  { key: 'hideout-json-v5', includesGameMode: true },
+  { key: 'items-json-v2', includesGameMode: true },
+  { key: 'items-lite-json-v2', includesGameMode: true },
+  { key: 'map-spawns-json-v1', includesGameMode: true },
+  { key: 'prestige-json-v3', includesGameMode: true },
 ];
 // Keep in sync with app/utils/constants.ts (API_SUPPORTED_LANGUAGES).
 const TARKOV_LANGUAGES = [
@@ -35,18 +41,15 @@ const TARKOV_LANGUAGES = [
 const TARKOV_GAME_MODES = ['regular', 'pve', 'pvp-season'];
 function buildEntryUrls(
   cacheBase: string,
-  entry: { key: string; includesGameMode: boolean }
+  entry: { key: string; includesLanguage?: boolean; includesGameMode: boolean }
 ): string[] {
-  const urls: string[] = [];
-  for (const lang of TARKOV_LANGUAGES) {
-    if (entry.includesGameMode) {
-      for (const gameMode of TARKOV_GAME_MODES)
-        urls.push(`${cacheBase}/${entry.key}-${lang}-${gameMode}`);
-    } else urls.push(`${cacheBase}/${entry.key}-${lang}`);
-  }
-  return urls;
+  const languages = entry.includesLanguage === false ? [''] : TARKOV_LANGUAGES;
+  const modes = entry.includesGameMode ? TARKOV_GAME_MODES : [''];
+  return languages.flatMap((lang) =>
+    modes.map((mode) => `${cacheBase}/${[entry.key, lang, mode].filter(Boolean).join('-')}`)
+  );
 }
-/** Builds the existing operator purge targets without invoking auth, Deno.serve, or Cloudflare. */
+/** Builds current and retired operator purge targets without invoking auth or Cloudflare. */
 export function buildTarkovCacheUrls(origins: string[]): string[] {
   const urls: string[] = [];
   for (const origin of origins) {
