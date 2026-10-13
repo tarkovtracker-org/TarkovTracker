@@ -1,3 +1,4 @@
+import { isAutomaticStoryObjective } from '@/utils/storylineCompletion';
 import { validStoryUnlock } from '@/utils/storylineUnlocks';
 import type { StoryChapter, StoryObjective, StoryObjectiveUnlock } from '@/types/tarkov';
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
@@ -80,6 +81,7 @@ export const normalizeStoryObjectives = (
       continue;
     }
     objectiveMap[objectiveId] = {
+      completionPolicy: entry.objective.completionPolicy === 'tutorial' ? 'tutorial' : undefined,
       description:
         typeof entry.objective.description === 'string' && entry.objective.description.length > 0
           ? entry.objective.description
@@ -181,6 +183,7 @@ export const getAutoCompletableObjectiveIds = (
   return orderedStoryObjectives(objectives)
     .filter(
       (objective) =>
+        !isAutomaticStoryObjective(objective) &&
         !objective.mutuallyExclusiveWith?.length &&
         !belongsToExclusiveQuest(objective, exclusiveQuestIds)
     )

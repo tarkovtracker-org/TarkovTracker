@@ -58,6 +58,7 @@
   import { useStorylineRouteFocus } from '@/features/storyline/useStorylineRouteFocus';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { isAutomaticStoryObjective } from '@/utils/storylineCompletion';
   import { toggleStoryChapterWithLinearObjectives } from '@/utils/storylineObjectives';
   const { t } = useI18n({ useScope: 'global' });
   const tarkovStore = useTarkovStore();
@@ -120,11 +121,12 @@
     });
   };
   const toggleObjective = (chapterId: string, objectiveId: string) => {
+    const chapter = chapters.value.find((entry) => entry.id === chapterId);
+    if (isAutomaticStoryObjective(chapter?.objectiveMap[objectiveId])) return;
     if (tarkovStore.isStoryObjectiveComplete(chapterId, objectiveId)) {
       tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
       return;
     }
-    const chapter = chapters.value.find((entry) => entry.id === chapterId);
     const linkedIds = chapter?.objectiveMap[objectiveId]?.mutuallyExclusiveWith ?? [];
     if (linkedIds.some((linkedId) => tarkovStore.isStoryObjectiveComplete(chapterId, linkedId))) {
       return;
