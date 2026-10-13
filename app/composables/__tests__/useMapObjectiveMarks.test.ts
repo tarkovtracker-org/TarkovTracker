@@ -186,9 +186,12 @@ describe('useMapObjectiveMarks', () => {
         expect.objectContaining({ id: 'obj-l', users: ['teammate-a'] }),
       ]);
     });
-    it('does not draw a failed task as locked', async () => {
+    it.each([
+      ['failed', failedTaskIds],
+      ['completed', completedTaskIds],
+    ])('does not draw a %s task as locked', async (_state, taskIds) => {
       const { useMapObjectiveMarks } = await setup();
-      failedTaskIds.value = new Set(['task-locked']);
+      taskIds.value = new Set(['task-locked']);
       const result = useMapObjectiveMarks({
         mapId: computed(() => 'customs'),
         shouldShowCompletedObjectives: computed(() => false),
