@@ -1,4 +1,4 @@
-import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
@@ -220,6 +220,19 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (_key: string, fallback?: string) => fallback ?? _key,
   }),
 }));
+// Each task view has its own route; keep the mocked route on the view the test picks.
+const TASK_VIEW_PATHS: Record<string, string> = { maps: '/tasks/maps', graph: '/tasks/graph' };
+mockNuxtImport('useRoute', (original) => () => {
+  const route = original();
+  return {
+    get query() {
+      return route.query;
+    },
+    get path() {
+      return TASK_VIEW_PATHS[preferencesStoreMock.getTaskPrimaryView] ?? '/tasks';
+    },
+  };
+});
 vi.mock('vue-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => ({ query: {} }),

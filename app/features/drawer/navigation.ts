@@ -20,3 +20,7 @@ export const isNavigationRouteActive = (
   }
   return routePath === targetPath;
 };
+export const getDrawerIconClass = (isActive: boolean): string =>
+  isActive
+    ? 'text-white light:text-surface-50'
+    : 'text-surface-300 group-hover:text-white light:group-hover:text-surface-50';

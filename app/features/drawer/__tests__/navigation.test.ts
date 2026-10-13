@@ -32,4 +32,9 @@ describe('isNavigationRouteActive', () => {
     expect(isNavigationRouteActive('/tasks', '/tasks')).toBe(true);
     expect(isNavigationRouteActive('/tasks', '/tasks/extra')).toBe(false);
   });
+  it('marks only the task view sub-item active on its route', () => {
+    expect(isNavigationRouteActive('/tasks', '/tasks/maps')).toBe(false);
+    expect(isNavigationRouteActive('/tasks/maps', '/tasks/maps')).toBe(true);
+    expect(isNavigationRouteActive('/tasks/graph', '/tasks/maps')).toBe(false);
+  });
 });

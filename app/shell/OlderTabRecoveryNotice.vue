@@ -30,7 +30,7 @@
             color="neutral"
             variant="link"
             :aria-label="t('common.close')"
-            :class="ui.close()"
+            :class="ui.close?.()"
             data-testid="older-tab-recovery-dismiss"
             @click="dismiss"
           />

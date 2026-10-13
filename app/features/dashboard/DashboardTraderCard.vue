@@ -313,8 +313,7 @@
     target.blur();
   };
   const navigateToTraderTasks = () => {
-    preferencesStore.setTaskPrimaryView('traders');
     preferencesStore.setTaskTraderView(props.trader.id);
-    router.push('/tasks');
+    router.push({ path: '/tasks/traders', query: { trader: props.trader.id } });
   };
 </script>
