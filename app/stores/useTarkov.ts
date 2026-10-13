@@ -103,7 +103,11 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
-import { effectiveStoryProgress, isAutomaticStoryObjective } from '@/utils/storylineCompletion';
+import {
+  effectiveStoryProgress,
+  isAutomaticStoryObjective,
+  isEffectiveStoryObjectiveComplete,
+} from '@/utils/storylineCompletion';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
@@ -242,16 +246,18 @@ const tarkovGetters = {
       useMetadataStore().storyChapters ?? []
     ),
   isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
-    effectiveStoryProgress(
-      state[state.currentGameMode]?.storyChapters,
-      useMetadataStore().storyChapters ?? []
-    )[chapterId]?.objectives?.[objectiveId]?.complete === true,
+    isEffectiveStoryObjectiveComplete(
+      catalogStoryObjective(chapterId, objectiveId) ?? {},
+      getters.isStoryObjectiveComplete(state)(chapterId, objectiveId)
+    ),
 } satisfies _GettersTree<UserState>;
+/** Metadata store hydration normalizes objectives to ID-keyed records. */
+const catalogStoryObjective = (chapterId: string, objectiveId: string) =>
+  useMetadataStore().storyChapters?.find((chapter) => chapter.id === chapterId)?.objectives?.[
+    objectiveId
+  ];
 const automaticStoryObjective = (chapterId: string, objectiveId: string): boolean => {
-  const chapter = useMetadataStore().storyChapters?.find((entry) => entry.id === chapterId);
-  return isAutomaticStoryObjective(
-    Object.values(chapter?.objectives ?? {}).find((entry) => entry.id === objectiveId)
-  );
+  return isAutomaticStoryObjective(catalogStoryObjective(chapterId, objectiveId));
 };
 const tarkovActions = {
   ...(actions as UserActions),
