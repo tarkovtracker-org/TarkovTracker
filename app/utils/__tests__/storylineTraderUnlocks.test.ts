@@ -64,6 +64,11 @@ describe('storyline trader unlock catalog', () => {
     };
     expect(storylineTraderUnlocks([chapter]).size).toBe(0);
   });
+  it('does not collapse distinct ID pairs containing delimiters', () => {
+    const first = { ...tour([objective('third', [traderUnlock('prapor')])]), id: 'first:second' };
+    const second = { ...tour([objective('second:third', [traderUnlock('prapor')])]), id: 'first' };
+    expect(storylineTraderUnlocks([first, second]).has('prapor')).toBe(false);
+  });
   it('deduplicates a placement but does not invent semantics for multiple objective placements', () => {
     const chapter = tour([objective('open', [traderUnlock('prapor'), traderUnlock('prapor')])]);
     expect(storylineTraderUnlocks([chapter]).size).toBe(1);

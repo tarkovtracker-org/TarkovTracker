@@ -3,6 +3,7 @@ import {
   isStorylineTraderUnlocked,
   storylineTraderUnlocks,
   type TraderUnlockChapter,
+  type StorylineTraderUnlock,
 } from '@/utils/storylineTraderUnlocks';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
 import type { Task, Trader } from '@/types/tarkov';
@@ -22,6 +23,8 @@ export interface TraderLockStatusDeps {
   isTaskComplete: (taskId: string) => boolean;
   gameMode?: GameMode;
   storyChapters?: readonly LockChapter[] | null;
+  /** Shared computed map for consumers resolving several traders from the same catalog. */
+  storyTraderUnlocks?: ReadonlyMap<string, StorylineTraderUnlock>;
   isStoryObjectiveComplete?: (chapterId: string, objectiveId: string) => boolean;
   isStoryChapterComplete?: (chapterId: string) => boolean;
   getTraderLevel?: (traderId: string) => number;
@@ -93,7 +96,7 @@ const hasTraderProgress = (trader: LockTrader, deps: TraderLockStatusDeps) =>
   hasCompletedUnlockTask(trader, deps) ||
   hasTraderStanding(trader, deps);
 const explicitStoryRequirement = (
-  gate: import('@/utils/storylineTraderUnlocks').StorylineTraderUnlock,
+  gate: StorylineTraderUnlock,
   deps: TraderLockStatusDeps
 ): TraderUnlockRequirement | null => {
   const recorded = Boolean(deps.isStoryObjectiveComplete?.(gate.chapter.id, gate.objective.id));
@@ -108,7 +111,8 @@ const storyRequirement = (
   trader: LockTrader,
   deps: TraderLockStatusDeps
 ): TraderUnlockRequirement | null => {
-  const explicit = storylineTraderUnlocks(deps.storyChapters ?? []).get(trader.id);
+  const gates = deps.storyTraderUnlocks ?? storylineTraderUnlocks(deps.storyChapters ?? []);
+  const explicit = gates.get(trader.id);
   if (explicit) return explicitStoryRequirement(explicit, deps);
   const found = storyGateFor(trader, deps);
   if (!found || storyGateMet(found.gate, deps) || hasTraderProgress(trader, deps)) return null;

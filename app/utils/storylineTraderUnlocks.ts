@@ -38,7 +38,7 @@ export const storylineTraderUnlocks = (
   const candidates = new Map<string, Map<string, StorylineTraderUnlock>>();
   for (const { traderId, gate } of chapters.flatMap(chapterTraderUnlocks)) {
     const gates = candidates.get(traderId) ?? new Map<string, StorylineTraderUnlock>();
-    gates.set(`${gate.chapter.id}:${gate.objective.id}`, gate);
+    gates.set(JSON.stringify([gate.chapter.id, gate.objective.id]), gate);
     candidates.set(traderId, gates);
   }
   return new Map(

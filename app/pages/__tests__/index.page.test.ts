@@ -308,6 +308,49 @@ describe('dashboard page', () => {
       await nextTick();
       expect(renderedCards(wrapper)).toContain('prapor-id:none');
     });
+    it('reuses the gate map for progress changes and rebuilds it after mode changes', async () => {
+      const complete = ref(false);
+      const mode = ref('pvp');
+      const objective = praporGateMetadata.storyChapters[0]!.objectives['open-prapor'];
+      const readUnlocks = vi.fn(() => objective.unlocks);
+      const catalog = {
+        ...praporGateMetadata,
+        storyChapters: [
+          {
+            ...praporGateMetadata.storyChapters[0],
+            objectives: {
+              'open-prapor': {
+                ...objective,
+                get unlocks() {
+                  return readUnlocks();
+                },
+              },
+            },
+          },
+        ],
+      };
+      const { DashboardPage } = await setup({ traderStats: traders }, {}, catalog, {
+        getCurrentGameMode: () => mode.value,
+        isStoryObjectiveComplete: () => complete.value,
+      });
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedCards(wrapper)).toContain('prapor-id:story');
+      expect(readUnlocks).toHaveBeenCalledTimes(1);
+      complete.value = true;
+      await nextTick();
+      expect(renderedCards(wrapper)).toContain('prapor-id:none');
+      expect(readUnlocks).toHaveBeenCalledTimes(1);
+      complete.value = false;
+      mode.value = 'pve';
+      await nextTick();
+      expect(renderedCards(wrapper)).toContain('prapor-id:none');
+      mode.value = 'pvp';
+      await nextTick();
+      expect(renderedCards(wrapper)).toContain('prapor-id:story');
+      expect(readUnlocks).toHaveBeenCalledTimes(2);
+    });
     it('does not borrow trader gates from the previous mode catalog', async () => {
       const { DashboardPage } = await setup({ traderStats: traders }, {}, praporGateMetadata, {
         getCurrentGameMode: () => 'pve',
