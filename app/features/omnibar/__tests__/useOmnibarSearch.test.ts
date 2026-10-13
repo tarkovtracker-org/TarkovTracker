@@ -158,6 +158,13 @@ describe('useOmnibarSearch', () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(results.value.tasks.map((task) => task.id)).toEqual(['name', 'reward']);
   });
+  it('ranks even a weak fuzzy name hit above a map hit', async () => {
+    metadataState.tasks = [createTask('map', 'Delivery', 'Labs'), createTask('name', 'Taxib')];
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'ab';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['name', 'map']);
+  });
   it('reports pending until the typed query reaches the results', async () => {
     const { searchQuery, isPending } = useOmnibarSearch();
     searchQuery.value = 'debut';

@@ -135,6 +135,43 @@ describe('AppSearch', () => {
     expect(push).not.toHaveBeenCalled();
     expect(listboxShown()).toBe(false);
   });
+  it('waits for the typed query before jumping on Enter', async () => {
+    await mountSearch();
+    await typeQuery('workbench');
+    await input().setValue('gunsmith');
+    await press('Enter');
+    expect(push).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(push).toHaveBeenCalledWith({ path: '/tasks', query: { task: 't1' } });
+  });
+  it('commits a pending page query when focus leaves the box', async () => {
+    setRoute('tasks', '/tasks');
+    await mountSearch();
+    input().element.focus();
+    await input().setValue('mole');
+    input().element.blur();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(replace).toHaveBeenCalledWith({ query: { q: 'mole' } });
+  });
+  it('reopens the results when the focused input is clicked after Escape', async () => {
+    await mountSearch();
+    await typeQuery('gunsmith');
+    await press('Escape');
+    await input().trigger('click');
+    expect(listboxShown()).toBe(true);
+  });
+  it('scrolls the option picked with the arrow keys into view', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    await mountSearch();
+    await typeQuery('gunsmith');
+    await press('ArrowUp');
+    await nextTick();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(
+      wrapper!.findAll('[data-testid="app-search-option"]')[1]!.element
+    );
+  });
   it('starts from the page query and follows outside changes while blurred', async () => {
     setRoute('needed-items', '/needed-items', { q: 'salewa' });
     await mountSearch();

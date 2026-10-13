@@ -1,5 +1,5 @@
 import { logger } from '@/utils/logger';
-import { getQueryString, normalizeQuery } from '@/utils/routeHelpers';
+import { getQueryString, normalizeQuery, queueQueryWrite } from '@/utils/routeHelpers';
 import type { WatchSource } from 'vue';
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
 type FilterParamCodec<T> = {
@@ -101,12 +101,13 @@ const createRouteSyncer =
     router: ReturnType<typeof useRouter>,
     isSyncingToRoute: Ref<boolean>
   ) =>
-  (nextQuery: LocationQueryRaw, useReplace = false) => {
+  (buildNextQuery: () => LocationQueryRaw, useReplace = false) => {
     if (isSyncingToRoute.value) return;
-    if (normalizeQuery(route.query) === normalizeQuery(nextQuery)) return;
+    if (normalizeQuery(route.query) === normalizeQuery(buildNextQuery())) return;
     isSyncingToRoute.value = true;
     const method = useReplace ? 'replace' : 'push';
-    router[method]({ query: nextQuery })
+    // Rebuilt when the write runs, so it keeps params an earlier queued write just added.
+    queueQueryWrite(() => router[method]({ query: buildNextQuery() }))
       .catch((error) => {
         logger.error('[useRouteFilters] Navigation failed:', error);
       })
@@ -140,7 +141,7 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
   const hasInitialized = ref(false);
   const syncRoute = createRouteSyncer(route, useRouter(), isSyncingToRoute);
   const syncStoreToRoute = (useReplace = false) => {
-    syncRoute(buildQuery(route.query, configs, onStoreToRoute()), useReplace);
+    syncRoute(() => buildQuery(route.query, configs, onStoreToRoute()), useReplace);
   };
   const syncStateFromRoute = () => {
     if (isSyncingToRoute.value) return;

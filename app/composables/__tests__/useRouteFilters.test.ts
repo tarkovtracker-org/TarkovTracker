@@ -121,6 +121,27 @@ describe('useRouteFilters', () => {
     expect(routeState.query.view).toBeUndefined();
     wrapper.unmount();
   });
+  it('keeps a param written by a query write queued before the sync', async () => {
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    const view: Ref<string> = ref('all');
+    const wrapper = await mountFilters({
+      configs: { view: viewConfig },
+      onStoreToRoute: () => ({ view: view.value }),
+      watchSources: [view],
+    });
+    let landSearch = () => {};
+    const search = queueQueryWrite(
+      () => new Promise<void>((resolve) => (landSearch = resolve))
+    ).then(() => applyRouteQuery({ ...routeState.query, q: 'mole' }));
+    await Promise.resolve();
+    view.value = 'maps';
+    await nextTick();
+    landSearch();
+    await search;
+    await flushRouteSync();
+    expect(routeState.query).toMatchObject({ q: 'mole', view: 'maps' });
+    wrapper.unmount();
+  });
   it('uses an explicit key override for reading and writing the URL', async () => {
     applyRouteQuery({ sortDir: 'maps' });
     const onRouteToStore = vi.fn();

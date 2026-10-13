@@ -11,9 +11,9 @@ export interface SearchResult {
 }
 export type OmnibarContext = 'tasks' | 'hideout' | 'items' | 'global';
 const MAX_RESULTS_PER_GROUP = 5;
-// Map, trader, and reward hits only count as substring matches, ranked below a fuzzy name hit,
-// so a loose subsequence across long reward lists cannot flood the results.
-const RELATED_FIELD_SCORE = 0.5;
+// Map, trader, and reward hits only count as substring matches, ranked below any fuzzy name hit
+// (subsequence scores start above 0.3), so long reward lists cannot crowd out name matches.
+const RELATED_FIELD_SCORE = 0.3;
 const bestScore = (texts: (string | undefined)[], query: string): number =>
   Math.max(0, ...texts.map((text) => (text ? fuzzyMatchScore(text, query) : 0)));
 const includesQuery = (text: string | undefined, query: string): boolean =>

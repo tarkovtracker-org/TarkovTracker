@@ -29,6 +29,7 @@
       }"
       data-testid="app-search-input"
       @focus="onFocus"
+      @click="onFocus"
       @keydown="onKeydown"
     >
       <template #trailing>
@@ -174,9 +175,15 @@
     cancelWrite();
     writeTimer = setTimeout(writeRoute, ROUTE_WRITE_DELAY_MS);
   };
+  // Leaving the box commits the typed query, so a status tab click right after typing sees it.
+  const flushWrite = () => {
+    if (writeTimer) writeRoute();
+  };
+  const isEnterQueued = ref(false);
   const close = () => {
     isOpen.value = false;
     activeIndex.value = -1;
+    isEnterQueued.value = false;
   };
   const inputElement = () => searchInput.value?.inputRef ?? null;
   const focusInput = () => {
@@ -212,6 +219,7 @@
     const root = event.currentTarget as HTMLElement;
     if (root.contains(event.relatedTarget as Node | null)) return;
     isFocused.value = false;
+    flushWrite();
     close();
   };
   const select = (option: AppSearchOption) => {
@@ -242,6 +250,17 @@
     if (isPageSearch.value) writeRoute();
     close();
   };
+  // A jump search waits for the typed query's results instead of jumping to a stale one.
+  const shouldWaitForResults = () => isPending.value && !isPageSearch.value && !activeOption.value;
+  const onEnterKey = () => {
+    if (shouldWaitForResults()) isEnterQueued.value = true;
+    else onEnter();
+  };
+  watch(isPending, (pending) => {
+    if (pending || !isEnterQueued.value) return;
+    isEnterQueued.value = false;
+    onEnter();
+  });
   const onEscape = () => {
     if (isDropdownVisible.value) return close();
     inputElement()?.blur();
@@ -249,7 +268,7 @@
   const KEY_HANDLERS: Record<string, () => void> = {
     ArrowDown: () => moveActive(1),
     ArrowUp: () => moveActive(-1),
-    Enter: onEnter,
+    Enter: onEnterKey,
     Escape: onEscape,
   };
   const onKeydown = (event: KeyboardEvent) => {

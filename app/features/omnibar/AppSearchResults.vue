@@ -69,6 +69,15 @@
     hover: [index: number];
     select: [option: AppSearchOption];
   }>();
+  // Keyboard navigation keeps the active option inside the scrolled dropdown.
+  watch(
+    () => props.activeIndex,
+    (index) => {
+      const option = props.groups.flatMap((group) => group.options)[index];
+      if (option) document.getElementById(option.domId)?.scrollIntoView?.({ block: 'nearest' });
+    },
+    { flush: 'post' }
+  );
   const optionClass = (option: AppSearchOption) =>
     option.index === props.activeIndex
       ? 'bg-primary-500/10 text-primary-300'
