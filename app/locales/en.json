@@ -1155,6 +1155,7 @@
         "story_route": "Meet the required task statuses for {tasks}, or progress one of these story chapters: {chapters}.",
         "failed_branch": "Blocked by failed task: {task}.",
         "faction": "Available to {faction} characters.",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
         "global_variable": "Server progression value {comparison} {required} required (current: {current}).",

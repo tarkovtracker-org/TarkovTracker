@@ -183,6 +183,16 @@ catalogs share one request but validate independently; story, edition or prestig
 successful task and objective data with an error indicator. Profiles prefer the selected mode's
 editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
 remain fatal.
+Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
+and every pending task owned by that trader, including tasks without their own story requirements.
+Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
+unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
+gate. Exact objective completion (including the producer-declared tutorial baseline) opens the
+trader; chapter completion, standing, other completed tasks, task availability confirmations and
+disabled loyalty gating do not bypass an explicit gate. Catalogs must match each user's mode;
+shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
+a compatibility fallback when no clear objective placement exists. Story trader blockers name the
+objective and cannot be cleared through Mark available; complete the storyline objective first.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
