@@ -217,6 +217,9 @@
   const select = (option: AppSearchOption) => {
     cancelWrite();
     inputElement()?.blur();
+    // Clearing the draft must not write `?q=`, even if blur left focus where it was.
+    isFocused.value = false;
+    close();
     draft.value = '';
     void router.push(option.to);
   };
