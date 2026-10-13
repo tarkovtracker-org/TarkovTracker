@@ -625,11 +625,15 @@ export default defineEventHandler(async (event): Promise<ChangelogResponse> => {
     const { baseUrl, timeoutMs } = getGitHubConfig(runtimeConfig);
     const query = getQuery(event);
     const limit = clamp(
-      parseNumber(query.limit, changelogConfig.DEFAULT_LIMIT),
+      Math.trunc(parseNumber(query.limit, changelogConfig.DEFAULT_LIMIT)),
       1,
       changelogConfig.MAX_LIMIT
     );
-    const releaseLimit = clamp(parseNumber(query.releases, changelogConfig.RELEASE_LIMIT), 1, 10);
+    const releaseLimit = clamp(
+      Math.trunc(parseNumber(query.releases, changelogConfig.RELEASE_LIMIT)),
+      1,
+      10
+    );
     const responseCacheKey = `${baseUrl}:limit=${limit}:releases=${releaseLimit}`;
     const localCachedResponse = getLocalResponseCacheEntry(responseCacheKey);
     if (localCachedResponse) {

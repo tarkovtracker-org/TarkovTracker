@@ -6,7 +6,7 @@
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
           <TaskFilterBar
-            v-model:search-query="searchQuery"
+            :is-search-active="hasSearchQuery"
             :active-status-view="effectiveTaskSecondaryView"
             :search-status-counts="searchStatusCounts"
             @pin-status="pinSearchStatus"
@@ -618,6 +618,7 @@
     useTaskFiltering();
   const {
     cleanup: cleanupTaskSearch,
+    hasQuery: hasSearchQuery,
     isSearchActive,
     normalizedSearch,
     pinnedStatus: pinnedSearchStatus,
@@ -1100,7 +1101,6 @@
     handleTaskQueryParam,
     cleanup: cleanupDeepLink,
   } = useTaskDeepLink({
-    searchQuery,
     filteredTasks,
     leafletMapRef,
   });
