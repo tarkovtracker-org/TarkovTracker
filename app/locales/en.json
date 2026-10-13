@@ -1804,7 +1804,9 @@
     "account_menu": "Account menu",
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
-    "decrement_level": "Decrease level"
+    "decrement_level": "Decrease level",
+    "show_subpages": "Show {name} pages",
+    "hide_subpages": "Hide {name} pages"
   },
   "profile": {
     "season_short": "S{season}"

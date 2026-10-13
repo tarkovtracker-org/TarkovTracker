@@ -30,7 +30,7 @@
   </li>
 </template>
 <script setup lang="ts">
-  import { isNavigationRouteActive } from '@/features/drawer/navigation';
+  import { getDrawerIconClass, isNavigationRouteActive } from '@/features/drawer/navigation';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const props = defineProps<{
@@ -46,11 +46,7 @@
     nested?: boolean;
   }>();
   const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
-  const iconClasses = computed(() =>
-    isActive.value
-      ? 'text-white light:text-surface-50'
-      : 'text-surface-300 group-hover:text-white light:group-hover:text-surface-50'
-  );
+  const iconClasses = computed(() => getDrawerIconClass(isActive.value));
   const labelText = computed(() => {
     if (props.localeKey) return t(props.localeKey);
     return props.text ?? '';

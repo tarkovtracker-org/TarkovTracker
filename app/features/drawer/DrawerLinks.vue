@@ -19,28 +19,13 @@
         :is-collapsed="props.isCollapsed"
         :badge="t('page.storyline.wip_badge')"
       ></DrawerItem>
-      <DrawerItem
+      <DrawerItemGroup
         icon="i-heroicons-clipboard-document-list"
         locale-key="common.tasks"
         to="/tasks"
+        :items="taskViewItems"
         :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
-      <DrawerItem
-        icon="i-mdi-map-outline"
-        locale-key="common.maps"
-        to="/tasks/maps"
-        :is-collapsed="props.isCollapsed"
-        nested
-      ></DrawerItem>
-      <DrawerItem
-        class="hidden lg:block"
-        icon="i-mdi-graph-outline"
-        locale-key="page.tasks.primary_views.graph"
-        to="/tasks/graph"
-        :is-collapsed="props.isCollapsed"
-        :badge="t('page.storyline.wip_badge')"
-        nested
-      ></DrawerItem>
+      />
       <DrawerItem
         icon="i-heroicons-cube"
         locale-key="common.needed_items"
@@ -70,6 +55,7 @@
 </template>
 <script setup lang="ts">
   import DrawerItem from '@/features/drawer/DrawerItem.vue';
+  import DrawerItemGroup, { type DrawerGroupChild } from '@/features/drawer/DrawerItemGroup.vue';
   const props = defineProps({
     isCollapsed: {
       type: Boolean,
@@ -77,4 +63,14 @@
     },
   });
   const { t } = useI18n({ useScope: 'global' });
+  const taskViewItems = computed<DrawerGroupChild[]>(() => [
+    { icon: 'i-mdi-map-outline', localeKey: 'common.maps', to: '/tasks/maps' },
+    {
+      icon: 'i-mdi-graph-outline',
+      localeKey: 'page.tasks.primary_views.graph',
+      to: '/tasks/graph',
+      badge: t('page.storyline.wip_badge'),
+      class: 'hidden lg:block',
+    },
+  ]);
 </script>
