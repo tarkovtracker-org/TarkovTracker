@@ -622,7 +622,11 @@ describe('useDataBackup', () => {
         'superseded'
       );
       sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
-      window.history.replaceState({}, '', '/settings?tab=data#debug');
+      window.history.replaceState(
+        {},
+        '',
+        '/settings?tab=data&authorization_id=query-private&%43ODE=code-private&token=token-private&token=repeat-private#access_token=fragment-private'
+      );
       let backupBlob: Blob | null = null;
       const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
       const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
@@ -668,10 +672,19 @@ describe('useDataBackup', () => {
         expect(debugJson.runtime).toEqual(
           expect.objectContaining({
             path: '/settings',
-            query: '?tab=data',
-            hash: '#debug',
+            query: '',
+            hash: '',
           })
         );
+        for (const secret of [
+          'query-private',
+          'code-private',
+          'token-private',
+          'repeat-private',
+          'fragment-private',
+        ]) {
+          expect(debugText).not.toContain(secret);
+        }
         expect(debugJson.state.tarkov.tarkovUid).toBeNull();
         expect(debugJson.state.tarkov.pvp.displayName).toBeNull();
         expect(debugJson.state.preferences.taskUserView).toMatch(/^user:(sha256|fnv1a):/);
