@@ -114,6 +114,29 @@ describe('PromotedTwitchEmbed', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
     wrapper.unmount();
   });
+  it('resumes discovery on return when the SDK reports offline in a hidden tab', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const wrapper = await mountEmbed();
+    wrapper.getComponent(TwitchStreamPlayer).vm.$emit('ready');
+    let hidden = true;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      wrapper.getComponent(TwitchStreamPlayer).vm.$emit('offline');
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(1);
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/twitch/live')).toHaveLength(2);
+      expect(wrapper.find('iframe').exists()).toBe(true);
+    } finally {
+      if (originalDescriptor) Object.defineProperty(document, 'hidden', originalDescriptor);
+      else delete (document as { hidden?: boolean }).hidden;
+      wrapper.unmount();
+    }
+  });
   it('stops live checks after closing and rechecks on reopen', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     const wrapper = await mountEmbed();

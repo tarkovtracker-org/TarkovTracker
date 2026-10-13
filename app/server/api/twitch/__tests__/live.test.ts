@@ -2,14 +2,21 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
-const { fetchMock, getQueryMock, setResponseHeadersMock, useRuntimeConfigMock } = vi.hoisted(
-  () => ({
-    fetchMock: vi.fn(),
-    getQueryMock: vi.fn(),
-    setResponseHeadersMock: vi.fn(),
-    useRuntimeConfigMock: vi.fn(),
-  })
-);
+const {
+  fetchMock,
+  getQueryMock,
+  setResponseHeadersMock,
+  useRuntimeConfigMock,
+  warnMock,
+  errorMock,
+} = vi.hoisted(() => ({
+  fetchMock: vi.fn(),
+  warnMock: vi.fn(),
+  errorMock: vi.fn(),
+  getQueryMock: vi.fn(),
+  setResponseHeadersMock: vi.fn(),
+  useRuntimeConfigMock: vi.fn(),
+}));
 mockNuxtImport('useRuntimeConfig', () => useRuntimeConfigMock);
 vi.mock('h3', () => ({
   defineEventHandler: (handler: unknown) => handler,
@@ -17,7 +24,7 @@ vi.mock('h3', () => ({
   setResponseHeaders: setResponseHeadersMock,
 }));
 vi.mock('@/server/utils/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn() }),
+  createLogger: () => ({ error: errorMock, warn: warnMock }),
 }));
 const loadHandler = async () => {
   vi.resetModules();
@@ -32,6 +39,8 @@ const liveResponse = (live: boolean) => ({
 describe('/api/twitch/live', () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    warnMock.mockClear();
+    errorMock.mockClear();
     getQueryMock.mockReset();
     setResponseHeadersMock.mockReset();
     useRuntimeConfigMock.mockReturnValue({ twitchClientId: 'test-client-id' });
@@ -140,6 +149,8 @@ describe('/api/twitch/live', () => {
     fetchMock.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
     const handler = await loadHandler();
     expect(await handler({})).toEqual({ isLive: false });
+    expect(warnMock).toHaveBeenCalledWith('Twitch live check failed:', 'Twitch GQL returned 503');
+    expect(errorMock).not.toHaveBeenCalled();
   });
   it('returns isLive false when the Twitch request throws', async () => {
     getQueryMock.mockReturnValue({ channel: 'teststreamer' });

@@ -60,6 +60,21 @@ describe('TwitchStreamPlayer', () => {
     expect(construct).toHaveBeenCalledOnce();
     wrapper.unmount();
   });
+  it('shows a titled loading indicator while the SDK script is pending', async () => {
+    let finish: (value: typeof Player) => void = () => {};
+    loadMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const wrapper = mount(TwitchStreamPlayer, { props });
+    expect(wrapper.get('[role="status"]').attributes('aria-label')).toBe('Test stream');
+    finish(Player);
+    await flushPromises();
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('does not create a player when the script resolves after unmount', async () => {
     let finish: (value: typeof Player) => void = () => {};
     loadMock.mockImplementation(

@@ -91,7 +91,8 @@ flowchart LR
    A live result mounts `TwitchStreamPlayer`, which loads the official SDK once per page. Once the SDK
    emits `READY`, live API polling stops; `OFFLINE` removes the player and resumes discovery after
    five minutes. If the SDK fails to load, a direct iframe preserves playback with five-minute polling.
-   SDK listeners and the player are destroyed on removal. Video requests go directly to Twitch.
+   A titled loading indicator covers pending SDK loads. SDK listeners and the player are destroyed
+   on removal. Video requests go directly to Twitch.
 7. Dismissal removes the player and stops live requests, including across remounts in the same tab.
    The reopen button remains available while the feature is enabled; reopening checks current status
    instead of displaying a stale player. Channel changes clear dismissal after initial config resolution
@@ -146,19 +147,18 @@ and [Pages Function billing](https://developers.cloudflare.com/pages/functions/p
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
-  Cloudflare serves cache hits without executing the Pages Function; the route and its database read
-  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
-  outage cannot pin the env-default fallback at the edge.
+- Successful config responses must carry the `promoted-twitch-config` cache tag and bounded browser/CDN
+  TTLs. These headers do not guarantee an avoided Pages Function invocation; every execution reads
+  the database. Failed database reads must return `no-store` so an outage cannot pin fallback config.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
   commits, then schedule a second purge after a delay longer than the config read timeout so an
   in-flight stale fill cannot survive successful invalidation. If immediate invalidation fails, it
   must return the committed config with an explicit warning flag; the client must apply that config
   and visibly warn the admin without retrying the database write. The bounded TTL remains the final
   recovery path when invalidation fails.
-- Mounted clients must refresh config every five minutes while visible and on mount/focus so remote
-  enable, disable, and channel changes reach continuously open tabs. Config refreshes and live-status
-  checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+- Mounted clients must refresh config on mount and every five minutes while visible; tab returns reuse
+  fresh results. Remote enable, disable, and channel changes must reach continuously open tabs.
+  Config refreshes and live-status checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
   Older config versions and stale live-request generations must never overwrite the latest shared
   configuration or player state.
 - Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`

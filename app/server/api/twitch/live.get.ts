@@ -48,7 +48,10 @@ export default defineEventHandler(async (event) => {
     setResponseHeaders(event, LIVE_HEADERS);
     return result ?? { isLive: false };
   } catch (err) {
-    logger.error('Twitch live check failed:', err);
+    logger.warn(
+      'Twitch live check failed:',
+      err instanceof Error ? err.message : 'Unknown upstream error'
+    );
     setResponseHeaders(event, { 'cache-control': 'no-store' });
     return { isLive: false };
   }

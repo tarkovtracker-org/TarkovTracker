@@ -1,5 +1,17 @@
 <template>
-  <div>
+  <div class="relative">
+    <div
+      v-if="loading"
+      role="status"
+      :aria-label="title"
+      aria-busy="true"
+      class="absolute inset-0 flex items-center justify-center bg-black"
+    >
+      <span
+        aria-hidden="true"
+        class="size-8 animate-spin rounded-full border-2 border-white/20 border-t-white"
+      />
+    </div>
     <iframe
       v-if="failed"
       :src="fallbackUrl"
@@ -18,6 +30,7 @@
   const emit = defineEmits<{ ready: []; offline: [] }>();
   const container = ref<HTMLElement | null>(null);
   const failed = ref(false);
+  const loading = ref(true);
   const fallbackUrl = computed(() => {
     const params = new URLSearchParams({
       channel: props.channel,
@@ -66,6 +79,8 @@
     } catch {
       // Keep the plain iframe and bounded status polling if the SDK is blocked.
       if (!disposed) failed.value = true;
+    } finally {
+      loading.value = false;
     }
   });
   onBeforeUnmount(() => {
