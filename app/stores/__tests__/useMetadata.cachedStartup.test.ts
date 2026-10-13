@@ -314,6 +314,118 @@ describe('complete cached startup catalog freshness', () => {
       }
     }
   );
+  it.each(['mode', 'language', 'owner-disposal'])(
+    'does not let a superseded awaited cache gate replace current work after %s changes',
+    async (kind) => {
+      const store = prepare();
+      vi.mocked(cache.getCachedData).mockResolvedValue({
+        editions: [
+          {
+            id: 'standard',
+            value: 1,
+            title: 'Standard',
+            defaultStashLevel: 1,
+            defaultCultistCircleLevel: 0,
+            traderRepBonus: {},
+          },
+        ],
+        storyChapters: [chapter()],
+      });
+      const fetch = vi.fn().mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      await warm(store);
+      if (kind !== 'owner-disposal') await startIdle();
+      const initialRequests = fetch.mock.calls.length;
+      const entered = createDeferred<undefined>();
+      const resume = createDeferred<undefined>();
+      const currentResponse = createDeferred<object>();
+      const realGate = store.reuseOrApplyCachedEditions.bind(store);
+      vi.spyOn(store, 'reuseOrApplyCachedEditions').mockImplementationOnce(async (...args) => {
+        const result = await realGate(...args);
+        entered.resolve(undefined);
+        await resume.promise;
+        return result;
+      });
+      let owner = true;
+      const caller = effectScope();
+      const superseded = caller.run(() => {
+        onScopeDispose(() => {
+          owner = false;
+        });
+        return store.fetchEditionsData(false, { isOwner: () => owner });
+      })!;
+      await entered.promise;
+      if (kind === 'mode') store.currentGameMode = 'pve';
+      if (kind === 'language') store.languageCode = 'fr';
+      if (kind === 'owner-disposal') caller.stop();
+      const scope = kind === 'mode' ? 'pve-en' : kind === 'language' ? 'regular-fr' : 'regular-en';
+      fetch.mockReturnValue(currentResponse.promise);
+      await store.fetchAllData(false, { cachedData: bundle(scope) as never, isOwner: () => true });
+      await startIdle();
+      const latest = store.ensureEditionsData();
+      try {
+        expect(fetch).toHaveBeenCalledTimes(initialRequests + 1);
+        resume.resolve(undefined);
+        await superseded;
+        await flushPromises();
+        expect(fetch).toHaveBeenCalledTimes(initialRequests + 1);
+        currentResponse.resolve(response());
+        await latest;
+        expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      } finally {
+        caller.stop();
+        resume.resolve(undefined);
+        currentResponse.resolve(response());
+        await Promise.allSettled([superseded, latest]);
+        await flushPromises();
+      }
+    }
+  );
+  it.each(['scope', 'owner-disposal'])(
+    'does not publish historical live freshness after %s supersedes the loader continuation',
+    async (kind) => {
+      const store = prepare();
+      const fetch = vi.fn().mockResolvedValue(response());
+      vi.stubGlobal('$fetch', fetch);
+      let owner = true;
+      const caller = effectScope();
+      vi.mocked(cache.setCachedData).mockImplementationOnce(async () => {
+        queueMicrotask(() => {
+          if (kind === 'scope') {
+            store.currentGameMode = 'pve';
+            store.applyCriticalCachedData(bundle('pve-en') as never);
+          } else caller.stop();
+        });
+      });
+      try {
+        await caller.run(() => {
+          onScopeDispose(() => {
+            owner = false;
+          });
+          return store.fetchEditionsData(false, { revalidate: true, isOwner: () => owner });
+        });
+        expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
+        store.currentGameMode = 'pvp';
+        await warm(store);
+        await startIdle();
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      } finally {
+        caller.stop();
+        await flushPromises();
+      }
+    }
+  );
+  it('does not clear current catalog errors from a superseded deferred request body', async () => {
+    const store = prepare();
+    const superseded = store.fetchEditionsData();
+    store.currentGameMode = 'pve';
+    store.applyCriticalCachedData(bundle('pve-en') as never);
+    const currentError = new Error('current scope failed');
+    store.editionsError = currentError;
+    await superseded;
+    expect(store.editionsError).toBe(currentError);
+  });
   it.each(invalidations)('drops a queued refresh after %s changes', async (kind) => {
     const store = prepare();
     const controller = new AbortController();

@@ -1862,7 +1862,6 @@ export const useMetadataStore = defineStore('metadata', {
       this.seasonalPerks = perksForMode(this.seasonalPerks, requestMode);
       // Register the promise before requests can settle or throw synchronously.
       const promise = Promise.resolve().then(async () => {
-        this.editionsError = null;
         const isCurrent = () =>
           isEditionRequestActive(options) &&
           promiseStore.editionsPromise === promise &&
@@ -1872,6 +1871,8 @@ export const useMetadataStore = defineStore('metadata', {
           !skipBrowserCache &&
           (await this.reuseOrApplyCachedEditions(isCurrent, requestMode, requestLanguage))
         ) {
+          if (!isCurrent()) return;
+          this.editionsError = null;
           // Revalidate once while the successfully checked catalog remains live in this scope.
           if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
@@ -1885,6 +1886,7 @@ export const useMetadataStore = defineStore('metadata', {
         }
         throwIfAborted(options.signal);
         if (!isCurrent()) return;
+        this.editionsError = null;
         this.editionsLoading = true;
         liveEditionRequests.add(promise);
         const loaded = await loadProgressionCatalog(this, promiseStore, {
@@ -1896,7 +1898,7 @@ export const useMetadataStore = defineStore('metadata', {
           scope,
         });
         // A successful live load is as fresh as a revalidation.
-        if (loaded) {
+        if (loaded && isCurrent()) {
           promiseStore.editionsRevalidatedScopes.add(scope);
         }
       });
