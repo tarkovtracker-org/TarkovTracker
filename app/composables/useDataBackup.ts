@@ -1088,8 +1088,9 @@ export function useDataBackup(): UseDataBackupReturn {
         },
         runtime: {
           path: window.location.pathname,
-          query: window.location.search,
-          hash: window.location.hash,
+          // URL query and fragment values may contain credentials or private identifiers.
+          query: '',
+          hash: '',
           language: navigator.language ?? null,
           languages: Array.isArray(navigator.languages) ? [...navigator.languages] : [],
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
