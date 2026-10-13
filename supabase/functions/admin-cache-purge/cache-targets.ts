@@ -7,6 +7,7 @@ const TARKOV_CACHE_KEYS = [
   { key: 'tasks-objectives-json-v3', includesGameMode: true },
   { key: 'tasks-objectives-json-v4', includesGameMode: true },
   { key: 'tasks-rewards', includesGameMode: true },
+  { key: 'tasks-rewards-json-v2', includesGameMode: true },
   { key: 'hideout', includesGameMode: true },
   { key: 'items', includesGameMode: false },
   { key: 'items-lite', includesGameMode: false },
