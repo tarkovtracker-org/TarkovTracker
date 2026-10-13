@@ -1824,9 +1824,11 @@ export const useMetadataStore = defineStore('metadata', {
     async ensureEditionsData() {
       const promises = getPromiseStore(this);
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
-      promises.editionsRequestVersion += 1;
-      if (promises.editionsScope === scope && promises.editionsPromise)
+      // Joining an eager request consumes deferred work; cached readiness still needs freshness.
+      if (promises.editionsScope === scope && promises.editionsPromise) {
+        promises.editionsRequestVersion += 1;
         return promises.editionsPromise;
+      }
       // Readiness reuses settled failures too; explicit fetch/refresh retries them.
       if (promises.editionsSettledScope === scope) return;
       return this.fetchEditionsData();

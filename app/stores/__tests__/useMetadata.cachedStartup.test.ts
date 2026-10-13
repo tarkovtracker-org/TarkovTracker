@@ -2,6 +2,8 @@
 import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { effectScope, onScopeDispose } from 'vue';
+import { useTaskDetailReadiness } from '@/composables/useTaskDetailReadiness';
 import * as persistence from '@/stores/tarkov/progressPersistence';
 import { getPromiseStore } from '@/stores/tarkov/promiseStore';
 import { useMetadataStore } from '@/stores/useMetadata';
@@ -71,6 +73,7 @@ const prepare = () => {
     'fetchItemsLiteData',
     'fetchTaskObjectivesData',
     'fetchTaskRewardsData',
+    'fetchObjectiveModeCountDifferences',
   ] as const)
     vi.spyOn(store, key).mockResolvedValue(undefined);
   vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(bundle() as never);
@@ -197,6 +200,59 @@ describe('complete cached startup catalog freshness', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     pending.resolve(response());
     await flushPromises();
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it('keeps the queued freshness check when task readiness reuses the hydrated catalog', async () => {
+    const store = prepare();
+    const fetch = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store);
+    await store.ensureEditionsData();
+    expect(fetch).not.toHaveBeenCalled();
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+  });
+  it('revalidates a warm startup after the real task-detail readiness composable uses cached editions', async () => {
+    const store = prepare();
+    const pending = createDeferred<object>();
+    const fetch = vi.fn().mockReturnValue(pending.promise);
+    vi.stubGlobal('$fetch', fetch);
+    await warm(store);
+    const scope = effectScope();
+    try {
+      const ready = scope.run(() => useTaskDetailReadiness())!;
+      await flushPromises();
+      expect(ready.value).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      await startIdle();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(store.storyChapters[0]?.objectives?.[childId]).not.toHaveProperty('parentObjectiveId');
+      pending.resolve(response());
+      await flushPromises();
+      expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
+      expect(ready.value).toBe(true);
+    } finally {
+      scope.stop();
+    }
+  });
+  it('drops disposed caller work and lets a later startup retry without a cache purge', async () => {
+    const store = prepare();
+    const controller = new AbortController();
+    const scope = effectScope();
+    const fetch = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal('$fetch', fetch);
+    await scope.run(() => {
+      onScopeDispose(() => controller.abort());
+      return warm(store, { signal: controller.signal });
+    });
+    scope.stop();
+    await startIdle();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getPromiseStore(store).editionsRevalidatedScopes.has('regular-en')).toBe(false);
+    await warm(store);
+    await startIdle();
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
   });
   it.each(['owner', 'abort'])(
