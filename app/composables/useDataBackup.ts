@@ -35,6 +35,8 @@ const MAX_BACKUP_SIZE = 5 * 1024 * 1024;
 // Current, original, captured recovery and one pending copy: 20 Mi characters
 // may expand to 120 MiB in JSON escaping, with room for archive metadata.
 const MAX_RECOVERY_ARCHIVE_SIZE = 128 * 1024 * 1024;
+// Retained edits (20), failed captures (20), and one pending copy fit with slack.
+const MAX_RECOVERY_OLDER_ENTRIES = 64;
 const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
 const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
@@ -429,7 +431,8 @@ function collectRecoveryArchiveEntries(
   owner: string | null
 ): RecoveryArchiveResult {
   const older = json.older_tab_edits ?? [];
-  if (!Array.isArray(older)) return { ok: false, error: 'invalid_device_archive' };
+  if (!Array.isArray(older) || older.length > MAX_RECOVERY_OLDER_ENTRIES)
+    return { ok: false, error: 'invalid_device_archive' };
   const candidates = [
     { kind: 'current' as const, index: 0, raw: json.current },
     { kind: 'original' as const, index: 0, raw: json.original },
@@ -1008,6 +1011,8 @@ export function useDataBackup(): UseDataBackupReturn {
       throw new Error(t('settings.data_management.recovery_owner_changed'));
     const belongsToOwner = (raw: string | null) => isOwnedProgressRecovery(raw, owner);
     const copies = [...exportableLegacyUpdates(record, owner)];
+    if (copies.length > MAX_RECOVERY_OLDER_ENTRIES)
+      throw new Error(t('settings.data_management.invalid_device_archive'));
     await downloadJsonFile(
       'tarkovtracker-device-progress',
       {

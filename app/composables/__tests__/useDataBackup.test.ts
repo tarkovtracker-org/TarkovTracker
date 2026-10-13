@@ -1740,6 +1740,51 @@ describe('older-tab recovery review', () => {
     expect(backup.importState.value).toBe('error');
     expect(backup.importPreview.value).toBeNull();
   });
+  it.each([null, '', JSON.stringify({ _userId: 'foreign' })])(
+    'rejects excessive recovery slots before processing any entry (%s)',
+    async (slot) => {
+      const good = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      const backup = useDataBackup();
+      const parse = vi.spyOn(JSON, 'parse');
+      try {
+        await backup.parseBackupFile(
+          createFile(
+            JSON.stringify({
+              _format: 'tarkovtracker-device-progress',
+              _version: 1,
+              current: good,
+              original: null,
+              older_tab_edits: Array(65).fill(slot),
+            })
+          )
+        );
+        expect(backup.importState.value).toBe('error');
+        expect(backup.importError.value).toBe('settings.data_management.invalid_device_archive');
+        expect(parse).not.toHaveBeenCalledWith(good);
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+      } finally {
+        parse.mockRestore();
+      }
+    }
+  );
+  it('previews archives at the recovery slot limit', async () => {
+    const good = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    const backup = useDataBackup();
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-device-progress',
+          _version: 1,
+          current: good,
+          original: null,
+          older_tab_edits: Array(64).fill(good),
+        })
+      )
+    );
+    expect(backup.importState.value).toBe('preview');
+    expect(backup.recoveryArchiveEntries.value).toHaveLength(65);
+    expect(tarkovStore.$patch).not.toHaveBeenCalled();
+  });
   it('rejects malformed selected recovery and owner changes without discarding other archive entries', async () => {
     const good = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
     const malformed = JSON.stringify({ _userId: 'user-123', data: { gameEdition: 99 } });
@@ -1861,6 +1906,35 @@ describe('older-tab recovery review', () => {
       owned.mockRestore();
       clear.mockRestore();
       click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+  it('rejects excessive recovery export without creating a discard receipt', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const read = vi
+      .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+      .mockResolvedValue({ version: 1, revision: 1, raw: null, legacyRaw: null });
+    const copies = Array(65).fill('copy');
+    const owned = vi.spyOn(progressAuthority, 'exportableLegacyUpdates').mockReturnValue(copies);
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:recovery'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      const backup = useDataBackup();
+      await expect(backup.exportDeviceProgressRecovery()).rejects.toThrow(
+        'settings.data_management.invalid_device_archive'
+      );
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+      expect(backup.recoveryExportPending.value).toBe(false);
+      await expect(backup.confirmRecoveryArchiveSaved()).rejects.toThrow(
+        'settings.data_management.recovery_archive_download_required'
+      );
+      expect(copies).toHaveLength(65);
+    } finally {
+      click.mockRestore();
+      read.mockRestore();
+      owned.mockRestore();
       vi.unstubAllGlobals();
     }
   });
