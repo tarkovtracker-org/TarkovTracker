@@ -1,5 +1,5 @@
 <template>
-  <header class="flex flex-wrap items-center gap-3 @3xl/card:flex-nowrap @3xl/card:gap-4">
+  <header class="flex flex-wrap items-center gap-3 @3xl/card:gap-4 @4xl/card:flex-nowrap">
     <component
       :is="canToggle ? 'button' : 'div'"
       :type="canToggle ? 'button' : undefined"
@@ -61,11 +61,11 @@
     <!-- Chapter-wide rewards sit beside the actions so they do not claim a sidebar column. -->
     <section
       v-if="chapter.chapterUnlocks.length"
-      class="order-last w-full min-w-0 @3xl/card:order-0 @3xl/card:w-auto @3xl/card:max-w-md @3xl/card:text-right"
+      class="order-last w-full min-w-0 @4xl/card:order-0 @4xl/card:w-auto @4xl/card:max-w-xs @4xl/card:text-right"
     >
       <h3 :class="STORYLINE_LABEL_CLASS">{{ t('page.storyline.route_unlocks_chapter') }}</h3>
       <StorylineUnlockBadges
-        class="mt-1.5 @3xl/card:justify-end"
+        class="mt-1.5 @4xl/card:justify-end"
         :unlocks="chapter.chapterUnlocks"
       />
     </section>

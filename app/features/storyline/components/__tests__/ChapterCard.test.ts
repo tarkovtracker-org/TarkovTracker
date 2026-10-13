@@ -543,6 +543,7 @@ describe('ChapterCard story contract rendering', () => {
       })
     );
     expect(wrapper.findAll('ol > li')).toHaveLength(1);
+    expect(wrapper.get('ol > li > div').find('span[aria-hidden="true"]').exists()).toBe(true);
     expect(wrapper.get('[data-parent-objective-id="parent"]').text()).toContain('Keep the case');
     expect(wrapper.find('#storyline-objective-the-ticket-child').exists()).toBe(true);
     expect(wrapper.text()).toContain('common.optional');
@@ -584,7 +585,7 @@ describe('ChapterCard story contract rendering', () => {
     );
     wrapper.unmount();
   });
-  it('renders requirements, chapter unlocks, and ending route states in the side panel', () => {
+  it('renders requirements and ending route states beside header unlocks', () => {
     const ending = {
       evidencePending: false,
       objectiveCompleted: 0,

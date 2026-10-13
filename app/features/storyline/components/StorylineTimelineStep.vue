@@ -11,22 +11,21 @@
       hide-unlocks
       @toggle-objective="(objectiveId) => emit('toggleObjective', objectiveId)"
     />
-    <template v-else-if="entry.objective">
-      <StorylineObjectiveRow
-        class="min-w-0"
-        plain
-        hide-unlocks
-        :objective="entry.objective"
-        :input-id="storylineObjectiveInputId(chapterId, entry.objective.id)"
-        :read-only="readOnly"
-        @toggle="emit('toggleObjective', entry.objective.id)"
-      />
-      <span
-        v-if="entry.optionalObjectives.length"
-        class="border-warning-700/50 mt-4 hidden min-w-2 flex-1 border-t border-dashed @3xl/objectives:block"
-        aria-hidden="true"
-      ></span>
-    </template>
+    <StorylineObjectiveRow
+      v-else-if="entry.objective"
+      class="min-w-0"
+      plain
+      hide-unlocks
+      :objective="entry.objective"
+      :input-id="storylineObjectiveInputId(chapterId, entry.objective.id)"
+      :read-only="readOnly"
+      @toggle="emit('toggleObjective', entry.objective.id)"
+    />
+    <span
+      v-if="entry.optionalObjectives.length"
+      class="border-warning-700/50 mt-4 hidden min-w-2 flex-1 border-t border-dashed @3xl/objectives:block"
+      aria-hidden="true"
+    ></span>
   </div>
 </template>
 <script setup lang="ts">
