@@ -4,7 +4,14 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
+import type { NavigationGuard } from 'vue-router';
 type ClarityApi = ((...args: unknown[]) => void) & { q?: unknown[][] };
+const { beforeEachGuard, externalNavigate } = vi.hoisted(() => ({
+  beforeEachGuard: vi.fn(),
+  externalNavigate: vi.fn(() => false),
+}));
+mockNuxtImport('useRouter', () => () => ({ beforeEach: beforeEachGuard }));
+mockNuxtImport('navigateTo', () => externalNavigate);
 const shouldEnableAnalyticsIntegrations = vi.fn(() => true);
 const clarityAcceptedConsent = [
   'consentv2',
@@ -54,6 +61,8 @@ describe('microsoft clarity plugin', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('MODE', 'development');
+    window.happyDOM.setURL('https://tarkovtracker.org/tasks');
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('');
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = false;
     analyticsConsentState.value = {
       status: 'accepted',
@@ -67,8 +76,84 @@ describe('microsoft clarity plugin', () => {
   });
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
     document.head.innerHTML = '';
     delete window.clarity;
+  });
+  it.each([
+    '/oauth',
+    '/oauth/authorize?client_id=private-sentinel',
+    '/%6Fauth/callback',
+    '/OAUTH/callback',
+  ])('skips Clarity entirely on initial OAuth URL %s', async (path) => {
+    window.happyDOM.setURL(`https://tarkovtracker.org${path}`);
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
+  it('skips Clarity when the same-origin referrer contains an OAuth URL', async () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue(
+      'https://tarkovtracker.org/oauth/authorize?client_id=private-sentinel'
+    );
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
+  it.each(['/oauth/authorize?client_id=private-sentinel', '/%6Fauth/callback', '/OAUTH/callback'])(
+    'leaves the recorded URL unchanged while externally navigating to %s',
+    async (fullPath) => {
+      const script = document.createElement('script');
+      script.id = 'tt-microsoft-clarity';
+      document.head.appendChild(script);
+      const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+      plugin({} as Parameters<typeof plugin>[0]);
+      const guard = beforeEachGuard.mock.calls[0]?.[0] as NavigationGuard;
+      expect(guard).toBeTypeOf('function');
+      const oldUrl = window.location.href;
+      const result = await guard(
+        { path: fullPath.split('?')[0], fullPath } as Parameters<NavigationGuard>[0],
+        {} as Parameters<NavigationGuard>[1],
+        vi.fn()
+      );
+      expect(externalNavigate).toHaveBeenCalledWith(fullPath, { external: true });
+      expect(result).toBe(false);
+      expect(window.location.href).toBe(oldUrl);
+    }
+  );
+  it.each([
+    'https://other.example/oauth/authorize',
+    'https://tarkovtracker.org/tasks',
+    'https://tarkovtracker.org/oauth-guide',
+  ])('allows Clarity for a benign referrer %s', async (referrer) => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue(referrer);
+    const script = document.createElement('script');
+    script.id = 'tt-microsoft-clarity';
+    document.head.appendChild(script);
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(window.clarity).toBeTypeOf('function');
+  });
+  it('preserves SPA navigation for ordinary routes', async () => {
+    const script = document.createElement('script');
+    script.id = 'tt-microsoft-clarity';
+    document.head.appendChild(script);
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    const guard = beforeEachGuard.mock.calls[0]?.[0] as NavigationGuard;
+    expect(guard).toBeTypeOf('function');
+    expect(
+      await guard(
+        { path: '/tasks', fullPath: '/tasks' } as Parameters<NavigationGuard>[0],
+        {} as Parameters<NavigationGuard>[1],
+        vi.fn()
+      )
+    ).toBeUndefined();
+    expect(externalNavigate).not.toHaveBeenCalled();
   });
   it('sends consent after the first accepted load completes', async () => {
     const script = document.createElement('script');

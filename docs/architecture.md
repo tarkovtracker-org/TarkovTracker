@@ -669,6 +669,15 @@ directly from the process environment; see
 | `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
 | `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
+**Analytics privacy:** Microsoft Clarity is never initialized on `/oauth` or `/oauth/*`
+documents, including encoded or case-varied paths, or when the same-origin document
+referrer is an OAuth route. The router sends OAuth navigation through a full page load
+before committing the sensitive URL to browser history, so an existing recorder stays
+on the previous URL and the new document skips Clarity. Consent denial alone does not
+prevent URL/referrer collection. Ordinary routes retain SPA navigation and the existing
+analytics consent flow. A document skipped for an OAuth referrer remains unrecorded
+until another full page load with a benign URL and referrer.
+
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are platform-managed canonical

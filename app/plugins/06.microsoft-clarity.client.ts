@@ -21,6 +21,36 @@ const CLARITY_CONSENT_DENIED = {
   ad_Storage: 'denied',
   analytics_Storage: 'denied',
 } as const;
+const isOAuthPath = (path: string): boolean => {
+  try {
+    return /^\/oauth(?:\/|$)/i.test(decodeURIComponent(path));
+  } catch {
+    return true;
+  }
+};
+const hasOAuthReferrer = (): boolean => {
+  if (!document.referrer) {
+    return false;
+  }
+  try {
+    const referrer = new URL(document.referrer);
+    return referrer.origin === window.location.origin && isOAuthPath(referrer.pathname);
+  } catch {
+    return true;
+  }
+};
+const hasOAuthDocument = () => isOAuthPath(window.location.pathname) || hasOAuthReferrer();
+const protectOAuthNavigation = () => {
+  // Keep sensitive URLs out of the current recorder's history hooks entirely.
+  const removeOAuthGuard = useRouter().beforeEach((to) => {
+    if (isOAuthPath(to.path)) {
+      return navigateTo(to.fullPath, { external: true });
+    }
+  });
+  if (import.meta.hot) {
+    import.meta.hot.dispose(removeOAuthGuard);
+  }
+};
 export default defineNuxtPlugin(() => {
   if (import.meta.env.MODE === 'test') {
     return;
@@ -40,6 +70,10 @@ export default defineNuxtPlugin(() => {
   }
   if (!CLARITY_ID_PATTERN.test(projectId)) {
     logger.error('[Analytics] Invalid Microsoft Clarity project ID format');
+    return;
+  }
+  protectOAuthNavigation();
+  if (hasOAuthDocument()) {
     return;
   }
   const { state } = useAnalyticsConsent();
