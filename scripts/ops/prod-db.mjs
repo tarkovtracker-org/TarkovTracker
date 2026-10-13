@@ -163,13 +163,13 @@ select
     cross join reachable_roles r
     where p.prosecdef and has_function_privilege(r.oid, p.oid, 'execute')
   ) as has_function_write,
-  exists (
+  (current_setting('lo_compat_privileges') = 'on' or exists (
     select 1 from pg_catalog.pg_largeobject_metadata l
     cross join lateral aclexplode(coalesce(l.lomacl, acldefault('L', l.lomowner))) a
     cross join reachable_roles r
     where a.privilege_type = 'UPDATE'
       and (a.grantee = 0 or pg_has_role(r.oid, a.grantee, 'usage'))
-  ) as has_large_object_write,
+  )) as has_large_object_write,
   exists (
     select 1 from pg_catalog.pg_parameter_acl p
     cross join lateral aclexplode(p.paracl) a

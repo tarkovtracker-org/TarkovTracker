@@ -134,7 +134,8 @@ flowchart LR
   migration-version-only reads remain supported. Large-object `UPDATE` grants and explicit parameter
   `SET`/`ALTER SYSTEM` grants are rejected, including PUBLIC and inherited grants. Parameter grants
   can change cluster configuration or enable large-object ACL bypass; ordinary unprivileged session
-  settings and large-object SELECT alone remain supported.
+  settings and large-object SELECT alone remain supported. Enabled `lo_compat_privileges` is
+  rejected even without object or parameter grants, because it disables large-object ACL checks.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL
