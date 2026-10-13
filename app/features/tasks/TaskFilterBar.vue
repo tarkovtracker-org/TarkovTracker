@@ -3,31 +3,6 @@
     <div
       class="bg-surface-900 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4"
     >
-      <div class="w-full sm:w-40 2xl:w-56">
-        <UInput
-          id="task-search"
-          :model-value="searchQuery"
-          name="task-search"
-          :placeholder="t('page.tasks.search.placeholder')"
-          :aria-label="t('page.tasks.search.aria_label')"
-          icon="i-mdi-magnify"
-          size="sm"
-          :ui="{ trailing: 'pe-1' }"
-          class="w-full"
-          @update:model-value="$emit('update:searchQuery', $event)"
-        >
-          <template v-if="searchQuery?.length" #trailing>
-            <UButton
-              color="neutral"
-              variant="link"
-              size="xs"
-              icon="i-mdi-close-circle"
-              :aria-label="t('common.clear_search')"
-              @click="$emit('update:searchQuery', '')"
-            />
-          </template>
-        </UInput>
-      </div>
       <div
         class="flex max-w-full min-w-0 flex-1 scrollbar-none items-center gap-1 overflow-x-auto [-webkit-overflow-scrolling:touch] sm:flex-none"
       >
@@ -298,13 +273,13 @@
   import type { TaskSecondaryView } from '@/types/taskFilter';
   import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
   const props = defineProps<{
-    searchQuery: string;
+    /** A search is typed, so status tabs narrow it instead of saving a preference. */
+    isSearchActive?: boolean;
     /** Status the list currently filters by; `all` while a search spans every status. */
     activeStatusView?: TaskSecondaryView;
     searchStatusCounts?: TaskStatusCounts | null;
   }>();
   const emit = defineEmits<{
-    'update:searchQuery': [value: string];
     'pin-status': [status: TaskSecondaryView];
   }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -322,7 +297,7 @@
   const selectedStatusView = computed(() => props.activeStatusView ?? secondaryView.value);
   // While searching every tab stays clickable so it can pin the search; otherwise the shown tab is inert.
   const isStatusApplied = (view: TaskSecondaryView) =>
-    !props.searchQuery.trim() && selectedStatusView.value === view;
+    !props.isSearchActive && selectedStatusView.value === view;
   const traderCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
     return calculateTraderCounts(userView, selectedStatusView.value);
@@ -480,7 +455,7 @@
   const setSecondaryView = (view: string) => {
     const normalizedView = getTaskSecondaryViewForPrimaryView(primaryView.value, view);
     emit('pin-status', normalizedView);
-    if (props.searchQuery.trim()) return;
+    if (props.isSearchActive) return;
     if (preferencesStore.getTaskSecondaryView === normalizedView) return;
     preferencesStore.setTaskSecondaryView(normalizedView);
   };
