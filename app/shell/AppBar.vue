@@ -17,28 +17,12 @@
           @click.stop="changeNavigationDrawer"
         />
       </AppTooltip>
-      <!-- Center: Omnibar Search -->
+      <!-- Center: app search (filters Tasks and Needed Items in place, jumps elsewhere) -->
       <div class="flex min-w-0 flex-1 items-center">
-        <button
-          type="button"
-          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-0 text-left transition-colors sm:w-full sm:max-w-sm sm:min-w-0 sm:shrink sm:justify-between sm:px-2.5 lg:max-w-md"
-          :aria-label="t('omnibar.open_aria', 'Open global search')"
-          :aria-keyshortcuts="omnibarAriaKeyshortcuts"
-          @click="openOmnibar"
-        >
-          <span class="text-surface-400 flex min-w-0 items-center gap-2 text-xs">
-            <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4 shrink-0" />
-            <span class="hidden truncate sm:inline">
-              {{ t('omnibar.trigger_label', 'Search...') }}
-            </span>
-          </span>
-          <span class="hidden shrink-0 items-center gap-0.5 lg:flex">
-            <template v-for="(part, index) in omnibarShortcutParts" :key="index">
-              <span v-if="index > 0" class="text-surface-500 text-[10px]">+</span>
-              <UKbd size="sm">{{ part }}</UKbd>
-            </template>
-          </span>
-        </button>
+        <AppSearch
+          :shortcut-parts="omnibarShortcutParts"
+          :key-shortcuts="omnibarAriaKeyshortcuts"
+        />
       </div>
       <!-- Right: Status indicators + grouped controls -->
       <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -229,7 +213,6 @@
         </div>
       </div>
     </div>
-    <Omnibar v-if="omnibarMounted" v-model:open="omnibarOpen" />
     <SignOutConfirmModal v-if="isLoggedIn" />
   </header>
 </template>
@@ -241,6 +224,7 @@
   import { useSignOut } from '@/composables/useSignOut';
   import { useSupporter } from '@/composables/useSupporter';
   import { useTheme } from '@/composables/useTheme';
+  import AppSearch from '@/features/omnibar/AppSearch.vue';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -263,26 +247,9 @@
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
-  const Omnibar = defineAsyncComponent(() => import('@/features/omnibar/Omnibar.vue'));
   const ActivityLogPanel = defineAsyncComponent(() => import('@/shell/ActivityLogPanel.vue'));
   // Initialize global keyboard shortcuts (Undo/Search defaults: Ctrl+Z/Ctrl+K, user-configurable)
   useKeybinds();
-  const omnibarMounted = ref(false);
-  const omnibarOpen = ref(false);
-  function openOmnibar() {
-    omnibarMounted.value = true;
-    omnibarOpen.value = true;
-  }
-  const handleToggleOmnibar = () => {
-    omnibarMounted.value = true;
-    omnibarOpen.value = !omnibarOpen.value;
-  };
-  onMounted(() => {
-    window.addEventListener('toggle-omnibar', handleToggleOmnibar);
-  });
-  onUnmounted(() => {
-    window.removeEventListener('toggle-omnibar', handleToggleOmnibar);
-  });
   const getOmnibarShortcutParts = () => {
     const shortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
     return shortcut.split('+').map((part) => part.trim());

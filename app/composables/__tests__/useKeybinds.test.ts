@@ -36,10 +36,10 @@ describe('useKeybinds', () => {
   let toggleSpy: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     toggleSpy = vi.fn();
-    window.addEventListener('toggle-omnibar', toggleSpy as EventListener);
+    window.addEventListener('focus-app-search', toggleSpy as EventListener);
   });
   afterEach(() => {
-    window.removeEventListener('toggle-omnibar', toggleSpy as EventListener);
+    window.removeEventListener('focus-app-search', toggleSpy as EventListener);
     vi.restoreAllMocks();
   });
   const press = (init: Partial<KeyboardEvent>) => {

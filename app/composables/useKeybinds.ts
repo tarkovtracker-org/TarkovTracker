@@ -3,6 +3,8 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { DEFAULT_KEYBINDS, keybindsConflict, matchesKeybind } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
+/** Asks the app-bar search to take focus; dispatched by the search shortcuts. */
+export const FOCUS_APP_SEARCH_EVENT = 'focus-app-search';
 export function useKeybinds(): void {
   const preferencesStore = usePreferencesStore();
   const actionHistoryStore = useActionHistoryStore();
@@ -37,13 +39,13 @@ export function useKeybinds(): void {
     }
     if (matchesShortcut(omnibarShortcut)) {
       event.preventDefault();
-      window.dispatchEvent(new CustomEvent('toggle-omnibar'));
+      window.dispatchEvent(new CustomEvent(FOCUS_APP_SEARCH_EVENT));
       return;
     }
     // Secondary global-search shortcut: "/" (GitHub-style), no modifiers
     if (event.key === '/' && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
-      window.dispatchEvent(new CustomEvent('toggle-omnibar'));
+      window.dispatchEvent(new CustomEvent(FOCUS_APP_SEARCH_EVENT));
       return;
     }
   };
