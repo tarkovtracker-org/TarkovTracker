@@ -136,6 +136,9 @@ flowchart LR
   can change cluster configuration or enable large-object ACL bypass; ordinary unprivileged session
   settings and large-object SELECT alone remain supported. Enabled `lo_compat_privileges` is
   rejected even without object or parameter grants, because it disables large-object ACL checks.
+  Execution of built-in large-object creators/importers is also rejected: public defaults can allow
+  persistent creation before any owned object or UPDATE grant exists. Provisioning must account for
+  PUBLIC execution; see the runbook.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL

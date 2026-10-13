@@ -164,6 +164,11 @@ select
     where p.prosecdef and has_function_privilege(r.oid, p.oid, 'execute')
   ) as has_function_write,
   (current_setting('lo_compat_privileges') = 'on' or exists (
+    select 1 from pg_catalog.pg_proc p cross join reachable_roles r
+    where p.pronamespace = 'pg_catalog'::regnamespace
+      and p.proname in ('lo_create', 'lo_creat', 'lo_from_bytea', 'lo_import')
+      and has_function_privilege(r.oid, p.oid, 'execute')
+  ) or exists (
     select 1 from pg_catalog.pg_largeobject_metadata l
     cross join lateral aclexplode(coalesce(l.lomacl, acldefault('L', l.lomowner))) a
     cross join reachable_roles r
