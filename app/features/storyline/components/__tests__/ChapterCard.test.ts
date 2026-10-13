@@ -422,6 +422,109 @@ describe('ChapterCard story contract rendering', () => {
     expect(wrapper.emitted('toggleObjective')).toEqual([['the-ticket', 'obj-give']]);
     wrapper.unmount();
   });
+  it('groups several optional children on their main row with independent IDs, progress and unlocks', async () => {
+    const parent = objective('parent', { order: 2, complete: true, sourceQuestId: 'quest-a' });
+    const first = objective('first', {
+      order: 1,
+      type: 'optional',
+      sourceQuestId: 'quest-a',
+      parentObjectiveId: parent.id,
+      unlocks: [{ estimated: false, id: 'woods', label: 'Woods', type: 'map' }],
+    });
+    const second = objective('second', {
+      order: 4,
+      type: 'optional',
+      sourceQuestId: 'quest-a',
+      parentObjectiveId: parent.id,
+    });
+    const unlinked = objective('unlinked', { order: 3, type: 'optional' });
+    const last = objective('last', { order: 5 });
+    const chapter = createChapter({
+      mainObjectives: [parent, last],
+      mainLinearObjectives: [parent, last],
+      mainObjectiveTotal: 2,
+      mainObjectiveCompleted: 1,
+      optionalObjectives: [first, unlinked, second],
+      optionalLinearObjectives: [second, unlinked, first],
+    });
+    const wrapper = mountCard(chapter);
+    const rows = wrapper.findAll('ol > li');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.findAll('input').map((input) => input.attributes('id'))).toEqual([
+      'storyline-objective-the-ticket-parent',
+      'storyline-objective-the-ticket-first',
+      'storyline-objective-the-ticket-second',
+    ]);
+    expect(rows[1]!.get('input').attributes('id')).toBe('storyline-objective-the-ticket-unlinked');
+    expect(rows[2]!.text()).toMatch(/^2/);
+    expect(rows[0]!.text()).toContain('page.storyline.route_unlock_map:{"name":"Woods"}');
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1');
+    expect(
+      wrapper.get<HTMLInputElement>('#storyline-objective-the-ticket-parent').element.checked
+    ).toBe(true);
+    const childInput = wrapper.get<HTMLInputElement>('#storyline-objective-the-ticket-first');
+    expect(childInput.element.checked).toBe(false);
+    await childInput.trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([['the-ticket', 'first']]);
+    await wrapper.get('#storyline-objective-the-ticket-parent').trigger('change');
+    expect(wrapper.emitted('toggleObjective')).toEqual([
+      ['the-ticket', 'first'],
+      ['the-ticket', 'parent'],
+    ]);
+    await wrapper.setProps({ readOnly: true });
+    expect(
+      rows[0]!.findAll('input').every((input) => input.attributes('disabled') !== undefined)
+    ).toBe(true);
+    wrapper.unmount();
+  });
+  it.each(['missing', 'other-quest'])(
+    'leaves an optional with a %s parent in its own timeline row',
+    (kind) => {
+      const parent = objective('parent', { sourceQuestId: 'quest-a' });
+      const child = objective('child', {
+        type: 'optional',
+        order: 2,
+        parentObjectiveId: kind === 'missing' ? 'missing' : parent.id,
+        sourceQuestId: kind === 'other-quest' ? 'quest-b' : 'quest-a',
+      });
+      const wrapper = mountCard(
+        createChapter({
+          mainObjectives: [parent],
+          mainLinearObjectives: [parent],
+          optionalObjectives: [child],
+          optionalLinearObjectives: [child],
+        })
+      );
+      expect(wrapper.findAll('ol > li')).toHaveLength(2);
+      expect(wrapper.findAll('input')).toHaveLength(2);
+      wrapper.unmount();
+    }
+  );
+  it('labels a linked optional with its parent when that parent is a route option', () => {
+    const parent = objective('parent', { description: 'Keep the case', sourceQuestId: 'quest-a' });
+    const other = objective('other', {
+      description: 'Hand over the case',
+      sourceQuestId: 'quest-b',
+    });
+    const child = objective('child', {
+      type: 'optional',
+      parentObjectiveId: parent.id,
+      sourceQuestId: 'quest-a',
+    });
+    const wrapper = mountCard(
+      createChapter({
+        mainObjectives: [parent, other],
+        mainRouteChoices: [{ id: 'choice', chosenObjectiveId: null, objectives: [parent, other] }],
+        optionalObjectives: [child],
+        optionalLinearObjectives: [child],
+      })
+    );
+    expect(wrapper.findAll('ol > li')).toHaveLength(1);
+    expect(wrapper.get('[data-parent-objective-id="parent"]').text()).toContain('Keep the case');
+    expect(wrapper.find('#storyline-objective-the-ticket-child').exists()).toBe(true);
+    expect(wrapper.text()).toContain('common.optional');
+    wrapper.unmount();
+  });
   it('lists route option unlocks in the unlock lane under their option', () => {
     const keep = objective('obj-keep', {
       description: 'Keep the case',

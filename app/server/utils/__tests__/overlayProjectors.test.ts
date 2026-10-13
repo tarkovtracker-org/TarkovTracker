@@ -61,6 +61,53 @@ const overlay: OverlayData = {
   },
 };
 describe('endpoint overlay projectors', () => {
+  it('retains valid optional parents after localization and drops links invalidated by mode patches', () => {
+    const data: OverlayData = {
+      storyChapters: {
+        tour: {
+          name: 'Tour',
+          order: 1,
+          objectives: {
+            main: { id: 'main', type: 'main', sourceQuestId: 'quest-a', description: 'Hand over' },
+            child: {
+              id: 'child',
+              type: 'optional',
+              sourceQuestId: 'quest-a',
+              parentObjectiveId: 'main',
+              description: 'Find',
+            },
+          },
+        },
+        other: {
+          name: 'Other',
+          order: 2,
+          objectives: {
+            orphan: {
+              id: 'orphan',
+              type: 'optional',
+              sourceQuestId: 'quest-a',
+              parentObjectiveId: 'main',
+            },
+          },
+        },
+      },
+      locales: {
+        de: { storyChapters: { tour: { objectives: { child: { description: 'Finden' } } } } },
+      },
+      modes: {
+        pve: { storyChapters: { tour: { objectives: { main: { sourceQuestId: 'quest-b' } } } } },
+      },
+    };
+    const regular = projectStoryChapters(data, 'regular', 'de');
+    expect(regular[0]?.objectives?.child).toMatchObject({
+      parentObjectiveId: 'main',
+      description: 'Finden',
+    });
+    expect(regular[1]?.objectives?.orphan).not.toHaveProperty('parentObjectiveId');
+    const pve = projectStoryChapters(data, 'pve', 'de');
+    expect(pve[0]?.objectives?.child).not.toHaveProperty('parentObjectiveId');
+    expect(pve[0]?.objectives?.child?.description).toBe('Finden');
+  });
   it('patches and appends prestige conditions before task resolution and localization', () => {
     const raw = projectRawPrestige(
       {
