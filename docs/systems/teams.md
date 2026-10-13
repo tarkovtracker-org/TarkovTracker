@@ -49,8 +49,10 @@ path.
   refresh. Events during either read queue one fresh pair, and request, team, instance-lifetime
   and auth-session fences reject stale results. A new team's fetched snapshot can seed its
   deadline while the independent read is unavailable; snapshots never replace a successful
-  same-team refresh, including cancellation. A new team without a supplied deadline clears the
-  previous team's warning, so a failed read never shows another team's date.
+  same-team deadline or owner refresh, including cancellation. These fields stay together when
+  a delayed snapshot predates an ownership transfer and the next read fails. A new team without
+  a supplied deadline clears the previous team's warning, so a failed read never shows another
+  team's date.
   A member-list failure still permits the independent authorized deadline read. This makes join
   cancellation and fresh solo warnings work when only memberships are in the Realtime publication.
   The same authorized row also supplies the current owner, so a transfer shows the warning to the

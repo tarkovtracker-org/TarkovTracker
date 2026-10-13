@@ -477,6 +477,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let authSessionVersion = 0;
   // Successful reads fence delayed snapshots, including reads that cancel the warning.
   let authoritativeDeadlineTeamId: string | null = null;
+  let authoritativeOwnerTeamId: string | null = null;
   type RefreshContext = {
     teamId: string;
     userId: string;
@@ -487,6 +488,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const invalidateRefresh = () => {
     authSessionVersion += 1;
     authoritativeDeadlineTeamId = null;
+    authoritativeOwnerTeamId = null;
     latestMembersRequestVersion += 1;
     refreshInFlight = null;
     refreshInFlightTeamId = null;
@@ -514,6 +516,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       teamFilter,
       () => {
         authoritativeDeadlineTeamId = null;
+        authoritativeOwnerTeamId = null;
       },
       { flush: 'sync' }
     );
@@ -521,8 +524,14 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const snapshotDeadline = (data: Record<string, unknown>): Partial<TeamState> => {
     if (data.id === authoritativeDeadlineTeamId) return {};
     authoritativeDeadlineTeamId = null;
+    authoritativeOwnerTeamId = null;
     const deadline = data.owner_only_expires_at;
     return { ownerOnlyExpiresAt: typeof deadline === 'string' ? deadline : null };
+  };
+  const snapshotOwner = (data: Record<string, unknown>): Partial<TeamState> => {
+    if (data.id === authoritativeOwnerTeamId) return {};
+    const owner = data.owner_id;
+    return typeof owner === 'string' || owner === null ? { owner } : {};
   };
   // Custom data handler that transforms DB data before patching to store
   const handleTeamData = (data: Record<string, unknown> | null) => {
@@ -536,16 +545,11 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         ...data,
       };
       // Seed a new team's warning from its fetched row if the independent read fails. Once a
-      // deadline refresh succeeds (including null after a join), snapshots cannot replace it.
+      // deadline or owner refresh succeeds, snapshots cannot replace the supplied field.
       // A team without a supplied deadline never inherits the previous team's warning.
       delete transformed.ownerOnlyExpiresAt;
-      Object.assign(transformed, snapshotDeadline(data));
-      // Map owner_id to owner
-      if ('owner_id' in data && typeof data.owner_id === 'string') {
-        transformed.owner = data.owner_id;
-      } else if ('owner_id' in data && data.owner_id === null) {
-        transformed.owner = null;
-      }
+      delete transformed.owner;
+      Object.assign(transformed, snapshotDeadline(data), snapshotOwner(data));
       // Map join_code to joinCode
       if ('join_code' in data && typeof data.join_code === 'string') {
         transformed.joinCode = data.join_code;
@@ -597,7 +601,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       state.ownerOnlyExpiresAt = typeof deadline === 'string' ? deadline : null;
       // Ownership transfers also arrive only as membership role events. Keep the warning's
       // owner check in step with the same authorized row instead of a stale team snapshot.
-      if (typeof owner === 'string' || owner === null) state.owner = owner;
+      if (typeof owner === 'string' || owner === null) {
+        state.owner = owner;
+        authoritativeOwnerTeamId = teamId;
+      }
     });
   };
   const readMembers = async (teamId: string, force: boolean) => {

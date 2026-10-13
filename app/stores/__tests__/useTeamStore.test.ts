@@ -1274,6 +1274,46 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it.each([{ owner_id: 'departed-owner' }, { owner_id: null }, { owner: 'departed-owner' }])(
+    'preserves the refreshed owner and deadline against a delayed snapshot %j',
+    async (staleOwner) => {
+      const { teamRecords, teamQuery, currentUserId } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      const deadline = '2026-10-25T12:00:00Z';
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        instance.teamStore.$patch((state) => {
+          state.id = 'team-1';
+          state.owner = 'departed-owner';
+        });
+        teamQuery.maybeSingle.mockResolvedValue({
+          data: { owner_id: currentUserId, owner_only_expires_at: deadline },
+          error: null,
+        });
+        firstTeamRecord(teamRecords)
+          .handlers.find(({ config }) => config.table === 'team_memberships')!
+          .handler({ eventType: 'DELETE', new: {} });
+        await vi.waitFor(() => expect(instance.teamStore.owner).toBe(currentUserId));
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+        const reads = teamQuery.maybeSingle.mock.calls.length;
+        teamQuery.maybeSingle.mockRejectedValue(new Error('deadline unavailable'));
+        const options = mockUseSupabaseListener.mock.calls.find(
+          ([config]) => config.table === 'teams'
+        )?.[0];
+        options.onData({ id: 'team-1', ...staleOwner, owner_only_expires_at: null });
+        expect(instance.teamStore.owner).toBe(currentUserId);
+        await vi.waitFor(() =>
+          expect(teamQuery.maybeSingle.mock.calls.length).toBeGreaterThan(reads)
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.owner).toBe(currentUserId);
+        expect(instance.teamStore.ownerOnlyExpiresAt).toBe(deadline);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
   it('preserves the warning and member state through the real listener when independent reads fail', async () => {
     const { currentUserId, teamQuery, records } = buildRealtimeHarness();
     const { useSupabaseListener: actualListener } = await vi.importActual<

@@ -46,8 +46,8 @@ function collect(child) {
 function connection(sql) {
   return collect(spawn('docker', [...psql, '-c', sql]));
 }
-async function waitFor(sql, signal) {
-  const deadline = Date.now() + 10_000;
+async function waitFor(sql, signal, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
   while (query(sql) !== '1') {
     assert.ok(Date.now() < deadline, 'Timed out observing the actual PostgreSQL session state');
     await delay(25, undefined, { signal });
@@ -212,9 +212,14 @@ try {
     ${setCronActive(false)}
     COMMIT;`);
   created = true;
-  // Pausing does not stop a sweep that already started; let it finish before fixtures exist.
-  await waitFor(`SELECT (count(*) = 0)::int FROM cron.job_run_details
-    WHERE status NOT IN ('succeeded','failed') AND jobid IN (SELECT jobid ${cronJob})`);
+  // Pausing does not stop a sweep that already started. Cover its 60s statement timeout plus
+  // scheduler bookkeeping before creating fixtures; session-observation waits remain shorter.
+  await waitFor(
+    `SELECT (count(*) = 0)::int FROM cron.job_run_details
+      WHERE status NOT IN ('succeeded','failed') AND jobid IN (SELECT jobid ${cronJob})`,
+    undefined,
+    70_000
+  );
   await joinWins();
   await cleanupWins(false);
   await cleanupWins(true);
