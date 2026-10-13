@@ -26,15 +26,17 @@ params kept (`app/middleware/tasks-legacy-view.global.ts`).
 `app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
 adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
 comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
-account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
+account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's effective storyline objective
+(a recorded mark or producer-declared tutorial baseline; see [storyline policy](./overlay-and-precompute.md))
 (not by an in-game confirmation). A task that is available, started, completed or failed has passed its
 start gates, so Mark available, Mark complete, Mark failed, the prerequisites Mark available
 completes, and imported EFT starts, completions and failures all record that objective
 (`recordImpliedStoryObjectives`). A task's recorded state proves its gates (`provesStartGates`) when
 it is completed, manually failed, or confirmed available; automatic branch failures do not count
 because they do not prove the task was started. The completed-task repair (`repairCompletedProgress`)
-backfills the objective for every gated task whose state proves it, on each progress and task-catalog
-load, stamped past any unmark, so the two cannot disagree; it never unmarks. Undoing Mark complete or
+backfills ordinary tracked objectives for every gated task whose state proves it, on each progress and task-catalog
+load, stamped past any unmark, so the two cannot disagree; it never unmarks. Repair and
+the metadata projection never backfill a tutorial baseline or fabricate its completion time. Undoing Mark complete or
 Mark failed releases only the objectives that action newly recorded, unless another task's state
 still proves them; a manual uncomplete leaves them recorded. Completing or uncompleting an objective stamps a clock after the entry's
 existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from

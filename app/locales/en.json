@@ -757,6 +757,7 @@
       "chapter_nav_label": "Story chapters",
       "chapter_eyebrow": "Chapter",
       "wip_title": "Work in Progress",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "WIP",
       "wip_description": "This feature is still being built out. Content and functionality will be expanded and refined over time as we continue organizing the data. Thanks for your patience!",
       "no_data": "No storyline chapter data available.",

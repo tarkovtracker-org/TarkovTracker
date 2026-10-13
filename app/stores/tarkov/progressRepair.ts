@@ -4,12 +4,13 @@ import {
 } from '@tarkovtracker/progress-contracts/requirementStatus';
 import { GAME_MODE_VALUES, MANUAL_FAIL_TASK_IDS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { effectiveStoryProgress } from '@/utils/storylineCompletion';
 import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
 import { provesStartGates } from '@/utils/taskProgress';
 import type { UserProgressData } from '@/stores/progressState';
 import type { TaskCompletion, TaskObjectiveProgress } from '@/types/progress';
-import type { Task, TaskObjective as TaskObjectiveDefinition } from '@/types/tarkov';
+import type { StoryChapter, Task, TaskObjective as TaskObjectiveDefinition } from '@/types/tarkov';
 type TaskLookup = ReadonlyMap<string, Task>;
 type ModeStates = Partial<Record<GameMode, UserProgressData | undefined>>;
 type Completions = Record<string, TaskCompletion>;
@@ -247,9 +248,18 @@ const markStoryObjective = (
   objectives[objectiveId] = { complete: true, timestamp: nextClock(previous?.timestamp ?? 0) };
   return 1;
 };
-const markTaskStoryGates = (modeData: UserProgressData, task: Task): number =>
+const markTaskStoryGates = (
+  modeData: UserProgressData,
+  task: Task,
+  chapters: readonly StoryChapter[]
+): number =>
   storyObjectiveRequirements(task).reduce(
-    (sum, gate) => sum + markStoryObjective(modeData, gate.storyChapter.id, gate.objective.id),
+    (sum, gate) =>
+      effectiveStoryProgress(modeData.storyChapters, chapters)[gate.storyChapter.id]?.objectives?.[
+        gate.objective.id
+      ]?.complete === true
+        ? sum
+        : sum + markStoryObjective(modeData, gate.storyChapter.id, gate.objective.id),
     0
   );
 /**
@@ -257,18 +267,20 @@ const markTaskStoryGates = (modeData: UserProgressData, task: Task): number =>
  * objectives met. Backfills progress recorded before a gate existed or on a path that did not
  * record it; never unmarks.
  */
-const repairModeStoryGates: ModeRepair = (modeData, tasks) => {
-  let repaired = 0;
-  for (const task of tasks.values()) {
-    const proven = provesStartGates(
-      task,
-      modeData.taskCompletions?.[task.id],
-      modeData.taskAvailability?.[task.id]
-    );
-    if (proven) repaired += markTaskStoryGates(modeData, task);
-  }
-  return repaired;
-};
+const repairModeStoryGates =
+  (chapters: readonly StoryChapter[]): ModeRepair =>
+  (modeData, tasks) => {
+    let repaired = 0;
+    for (const task of tasks.values()) {
+      const proven = provesStartGates(
+        task,
+        modeData.taskCompletions?.[task.id],
+        modeData.taskAvailability?.[task.id]
+      );
+      if (proven) repaired += markTaskStoryGates(modeData, task, chapters);
+    }
+    return repaired;
+  };
 const toLookup = (tasks: readonly Task[]): TaskLookup =>
   new Map(tasks.map((task) => [task.id, task]));
 const repairModes = (
@@ -298,10 +310,14 @@ export const repairFailedProgress = (state: ModeStates, tasks: readonly Task[]):
     'Repaired failed task states'
   );
 /** Complete objectives and story gates of completed tasks in every mode. Returns changes made. */
-export const repairCompletedProgress = (state: ModeStates, tasks: readonly Task[]): number =>
+export const repairCompletedProgress = (
+  state: ModeStates,
+  tasks: readonly Task[],
+  chapters: readonly StoryChapter[] = []
+): number =>
   repairModes(
     state,
     tasks,
-    [repairModeCompletedObjectives, repairModeStoryGates],
+    [repairModeCompletedObjectives, repairModeStoryGates(chapters)],
     'Repaired completed task objectives and story gates'
   );
