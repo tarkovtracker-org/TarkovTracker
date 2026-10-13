@@ -989,7 +989,9 @@
       "no_search_matches": "No tasks match your search.",
       "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
       "search_scope": {
-        "all_statuses": "Searching all statuses for \"{query}\""
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
       },
       "loading": "Loading tasks",
       "map": {
