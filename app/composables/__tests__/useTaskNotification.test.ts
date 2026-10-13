@@ -96,6 +96,7 @@ describe('useTaskNotification', () => {
     });
     const { useActionHistoryStore } = await import('@/stores/useActionHistoryStore');
     await useActionHistoryStore().undoLastAction();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-a');
     expect(notification.taskStatusUpdated.value).toBe(true);
     expect(notification.showUndoButton.value).toBe(true);
     stop();
