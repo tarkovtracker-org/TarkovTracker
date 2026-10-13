@@ -347,4 +347,16 @@ describe('changelog endpoint', () => {
       Authorization: 'token fixture-token',
     });
   });
+  it('shares cached responses across equivalent fractional limits', async () => {
+    const handler = await loadHandler();
+    mocks.query.mockReturnValue({ limit: '2.1', releases: '2.1' });
+    await handler(event);
+    expect(requests()[0]).toBe('https://api.github.com/repos/owner/repo/releases?per_page=2');
+    const initialRequests = mocks.fetch.mock.calls.length;
+    mocks.query.mockReturnValue({ limit: ['2.9'], releases: '2.9' });
+    await handler(event);
+    mocks.query.mockReturnValue({ limit: 2, releases: 2 });
+    await handler(event);
+    expect(mocks.fetch).toHaveBeenCalledTimes(initialRequests);
+  });
 });
