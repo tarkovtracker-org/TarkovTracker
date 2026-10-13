@@ -247,8 +247,9 @@ describe('storyline page', () => {
   });
   it('keeps the shown chapter selected after it is completed and scrolls the rail to it', async () => {
     // Tiles sit 100px apart and are 80px square in a 200px rail, so centring tile N scrolls the
-    // sideways list to N*100-60. The vertical rail lays tiles 90px apart below a 10px list offset in
-    // a 300px nav, so it scrolls to 10+N*90-110.
+    // sideways list to N*100-60. The vertical rail lays tiles 90px apart below a 40px list offset in
+    // a 100px nav, so it scrolls to 40+N*90-10; both targets are positive, so a browser would not clamp
+    // them and a selected tile below the visible rail is covered.
     const scrollCalls: Array<[string, ScrollToOptions]> = [];
     const scrollTo = vi.fn(function (this: HTMLElement, ...args: unknown[]) {
       scrollCalls.push([this.tagName, args[0] as ScrollToOptions]);
@@ -262,12 +263,12 @@ describe('storyline page', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (
       this: HTMLElement
     ) {
-      return this.tagName === 'UL' ? 10 : Number(this.dataset.chapterId?.split('-')[1] ?? 0) * 90;
+      return this.tagName === 'UL' ? 40 : Number(this.dataset.chapterId?.split('-')[1] ?? 0) * 90;
     });
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80);
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100);
     onTestFinished(() => {
       vi.restoreAllMocks();
     });
@@ -287,7 +288,7 @@ describe('storyline page', () => {
     await nextTick();
     expect(scrollCalls).toEqual([
       ['UL', { left: 40 }],
-      ['NAV', { top: -10 }],
+      ['NAV', { top: 120 }],
     ]);
     storyline.normalizedChapters.value = storyline.normalizedChapters.value.map((chapter) => ({
       ...chapter,
@@ -300,7 +301,7 @@ describe('storyline page', () => {
     await nextTick();
     expect(scrollCalls.slice(2)).toEqual([
       ['UL', { left: -60 }],
-      ['NAV', { top: -100 }],
+      ['NAV', { top: 30 }],
     ]);
     wrapper.unmount();
   });
