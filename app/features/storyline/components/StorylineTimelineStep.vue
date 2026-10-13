@@ -23,7 +23,8 @@
     />
     <span
       v-if="entry.optionalObjectives.length"
-      class="border-warning-700/50 mt-4 hidden min-w-2 flex-1 border-t border-dashed @3xl/objectives:block"
+      class="border-warning-700/50 mt-4 hidden border-t border-dashed @3xl/objectives:block"
+      :class="entry.routeChoice ? 'w-2 shrink-0' : 'min-w-2 flex-1'"
       aria-hidden="true"
     ></span>
   </div>
