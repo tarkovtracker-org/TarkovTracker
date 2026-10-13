@@ -5,7 +5,8 @@ import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalizat
 import type { TaskSecondaryView } from '@/types/taskFilter';
 /**
  * Owns the Tasks search query. While a query is active the page searches every
- * status, until the user picks a status tab for that search.
+ * status, until the user picks a status tab for that search. That pick lasts only
+ * for the search; clearing it returns to the saved tab.
  */
 export function useTaskSearchQuery() {
   const route = useRoute();
@@ -35,32 +36,34 @@ export function useTaskSearchQuery() {
   const isSearchActive = computed(() => normalizedSearch.value.length > 0);
   // Track the typed query, not the debounced one, so a tab click right after typing still pins.
   const hasQuery = computed(() => searchQuery.value.trim().length > 0);
-  const isStatusPinned = ref(false);
+  const pinnedStatus = ref<TaskSecondaryView | null>(null);
   // Drop the pin only once both the typed and the applied query are empty.
   watch([hasQuery, isSearchActive], ([typed, applied]) => {
-    if (!typed && !applied) isStatusPinned.value = false;
+    if (!typed && !applied) pinnedStatus.value = null;
   });
-  const pinStatus = () => {
-    if (hasQuery.value) isStatusPinned.value = true;
+  const pinStatus = (status: TaskSecondaryView) => {
+    if (hasQuery.value) pinnedStatus.value = status;
   };
-  const searchesAllStatuses = computed(() => isSearchActive.value && !isStatusPinned.value);
+  /** Status the search shows instead of the saved tab, or null when not searching. */
+  const searchStatusOverride = computed<TaskSecondaryView | null>(
+    () => pinnedStatus.value ?? (isSearchActive.value ? 'all' : null)
+  );
   return {
     cleanup() {
       updateDebouncedSearch.cancel();
     },
     isSearchActive,
     normalizedSearch,
+    pinnedStatus: computed(() => pinnedStatus.value),
     pinStatus,
-    searchesAllStatuses,
     searchQuery,
+    searchStatusOverride,
   };
 }
-/** The status the task list filters by, widened to `all` while searching unpinned. */
+/** The status the task list filters by: the search override when set, else the saved tab. */
 export const resolveEffectiveSecondaryView = (
   primaryView: string,
   storedSecondaryView: unknown,
-  searchesAllStatuses: boolean
-): TaskSecondaryView => {
-  if (searchesAllStatuses) return 'all';
-  return getTaskSecondaryViewForPrimaryView(primaryView, storedSecondaryView);
-};
+  searchStatusOverride: TaskSecondaryView | null
+): TaskSecondaryView =>
+  getTaskSecondaryViewForPrimaryView(primaryView, searchStatusOverride ?? storedSecondaryView);

@@ -51,66 +51,62 @@ describe('useTaskSearchQuery', () => {
     expect(search.searchQuery.value).toBe('foo');
     scope.stop();
   });
-  it('searches all statuses until a status is pinned, and resets the pin on clear', async () => {
+  it('overrides with all while searching, then the picked tab, and drops both on clear', async () => {
     vi.useFakeTimers();
     const { scope, search } = setup();
-    search.pinStatus();
-    expect(search.searchesAllStatuses.value).toBe(false);
+    search.pinStatus('locked');
+    expect(search.searchStatusOverride.value).toBeNull();
     search.searchQuery.value = 'mole';
     await vi.advanceTimersByTimeAsync(180);
-    expect(search.searchesAllStatuses.value).toBe(true);
-    search.pinStatus();
-    expect(search.searchesAllStatuses.value).toBe(false);
+    expect(search.searchStatusOverride.value).toBe('all');
+    search.pinStatus('locked');
+    expect(search.pinnedStatus.value).toBe('locked');
+    expect(search.searchStatusOverride.value).toBe('locked');
     search.searchQuery.value = '';
     await nextTick();
+    expect(search.searchStatusOverride.value).toBeNull();
     search.searchQuery.value = 'mole';
     await vi.advanceTimersByTimeAsync(180);
-    expect(search.searchesAllStatuses.value).toBe(true);
+    expect(search.searchStatusOverride.value).toBe('all');
     scope.stop();
   });
-  it('pins a tab clicked before the debounced query catches up', async () => {
+  it('applies a tab clicked before the debounced query catches up', async () => {
     vi.useFakeTimers();
     const { scope, search } = setup();
     search.searchQuery.value = 'mole';
     await nextTick();
-    search.pinStatus();
+    search.pinStatus('completed');
+    expect(search.searchStatusOverride.value).toBe('completed');
     await vi.advanceTimersByTimeAsync(180);
     expect(search.isSearchActive.value).toBe(true);
-    expect(search.searchesAllStatuses.value).toBe(false);
-    search.searchQuery.value = '';
-    await nextTick();
-    search.searchQuery.value = 'mole';
-    await vi.advanceTimersByTimeAsync(180);
-    expect(search.searchesAllStatuses.value).toBe(true);
+    expect(search.searchStatusOverride.value).toBe('completed');
     scope.stop();
   });
-});
-describe('useTaskSearchQuery pin lifetime', () => {
   it('keeps the pin while a replacement query is still debouncing', async () => {
     vi.useFakeTimers();
-    routeState.query.q = undefined;
     const { scope, search } = setup();
     search.searchQuery.value = 'mole';
     await vi.advanceTimersByTimeAsync(180);
-    search.pinStatus();
+    search.pinStatus('locked');
     search.searchQuery.value = '   ';
     await nextTick();
     expect(search.isSearchActive.value).toBe(true);
-    expect(search.searchesAllStatuses.value).toBe(false);
+    expect(search.searchStatusOverride.value).toBe('locked');
     await vi.advanceTimersByTimeAsync(180);
-    expect(search.isSearchActive.value).toBe(false);
+    expect(search.searchStatusOverride.value).toBeNull();
     search.searchQuery.value = 'mole';
     await vi.advanceTimersByTimeAsync(180);
-    expect(search.searchesAllStatuses.value).toBe(true);
+    expect(search.searchStatusOverride.value).toBe('all');
     scope.stop();
   });
 });
 describe('resolveEffectiveSecondaryView', () => {
-  it('widens to all while searching unpinned', () => {
-    expect(resolveEffectiveSecondaryView('all', 'available', true)).toBe('all');
+  it('uses the search override when set', () => {
+    expect(resolveEffectiveSecondaryView('all', 'available', 'all')).toBe('all');
+    expect(resolveEffectiveSecondaryView('all', 'available', 'locked')).toBe('locked');
   });
-  it('restores the stored status when not searching all statuses', () => {
-    expect(resolveEffectiveSecondaryView('all', 'available', false)).toBe('available');
-    expect(resolveEffectiveSecondaryView('all', 'locked', false)).toBe('locked');
+  it('uses the saved status without an override, and graph forces all', () => {
+    expect(resolveEffectiveSecondaryView('all', 'available', null)).toBe('available');
+    expect(resolveEffectiveSecondaryView('graph', 'available', 'locked')).toBe('all');
   });
 });
