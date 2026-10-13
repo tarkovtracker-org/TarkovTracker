@@ -47,6 +47,8 @@ type MapObjectiveMark = {
 };
 const TASK_SEARCH_DEBOUNCE_MS = 180;
 const TASK_REFRESH_DEBOUNCE_MS = 50;
+// Nuxt's navigation-repaint hook holds each route change for up to 100ms.
+const ROUTE_NAVIGATION_MS = 100;
 const preferencesStoreMock = {
   getTaskPrimaryView: 'all',
   getTaskSecondaryView: 'available',
@@ -310,9 +312,9 @@ const defaultGlobalStubs = {
   },
   TaskFilterBar: {
     props: ['activeStatusView', 'searchStatusCounts'],
-    emits: ['pin-status', 'update:searchQuery'],
+    emits: ['pin-status'],
     template:
-      '<div data-testid="task-filter" :data-active-status="activeStatusView"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
+      '<div data-testid="task-filter" :data-active-status="activeStatusView"><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
   },
   TaskEmptyState: true,
   TaskLoadingState: true,
@@ -346,6 +348,9 @@ describe('tasks page', () => {
     const raw = wrapper.find('[data-testid="leaflet-map"]').attributes('data-marks') ?? '[]';
     return JSON.parse(raw) as MapObjectiveMark[];
   };
+  // The app-bar search writes `?q=`, which the page reads.
+  const setSearch = (q: string) =>
+    wrapper.vm.$router.replace({ query: { ...wrapper.vm.$route.query, q: q || undefined } });
   const flushTransition = async () => {
     await nextTick();
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -400,7 +405,8 @@ describe('tasks page', () => {
     TasksPage = module.default;
     await mountPage();
   });
-  afterEach(() => {
+  afterEach(async () => {
+    await setSearch('');
     wrapper?.unmount();
   });
   it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
@@ -558,14 +564,16 @@ describe('tasks page', () => {
     expect(latestSecondaryView()).toBe('available');
     vi.useFakeTimers();
     try {
-      await wrapper.find('[data-testid="task-search"]').setValue('saving the mole');
-      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      void setSearch('saving the mole');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
       expect(latestSecondaryView()).toBe('all');
       expect(filterBar().attributes('data-active-status')).toBe('all');
       expect(scopeHint().exists()).toBe(true);
       expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
       await scopeHint().find('button').trigger('click');
-      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
       expect(latestSecondaryView()).toBe('available');
       expect(filterBar().attributes('data-active-status')).toBe('available');
       expect(scopeHint().exists()).toBe(false);
@@ -578,18 +586,22 @@ describe('tasks page', () => {
     const scopeHint = () => wrapper.find('[data-testid="task-search-scope-hint"]');
     vi.useFakeTimers();
     try {
-      await wrapper.find('[data-testid="task-search"]').setValue('mole');
-      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      void setSearch('mole');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
       expect(latestSecondaryView()).toBe('all');
       await wrapper.find('[data-testid="pin-status"]').trigger('click');
       await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
       expect(latestSecondaryView()).toBe('locked');
       expect(scopeHint().exists()).toBe(true);
-      await wrapper.find('[data-testid="task-search"]').setValue('mol');
-      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS);
+      void setSearch('mol');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
       expect(latestSecondaryView()).toBe('locked');
       await scopeHint().find('button').trigger('click');
-      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
       expect(latestSecondaryView()).toBe('available');
       expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
     } finally {
@@ -928,8 +940,8 @@ describe('tasks page', () => {
     expect(wrapper.find(mapVisibilitySelector).exists()).toBe(true);
     vi.useFakeTimers();
     try {
-      await wrapper.find('[data-testid="task-search"]').setValue('no-match-query');
-      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS);
+      void setSearch('no-match-query');
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS);
       await nextTick();
       expect(wrapper.find(mapVisibilitySelector).exists()).toBe(false);
     } finally {

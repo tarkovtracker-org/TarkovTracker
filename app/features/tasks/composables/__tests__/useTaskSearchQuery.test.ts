@@ -9,6 +9,16 @@ const routeState = reactive({
   query: reactive<Record<string, string | undefined>>({}),
 });
 mockNuxtImport('useRoute', () => () => routeState);
+// Search writes go through `?q=`, so the router mock applies them to the route.
+mockNuxtImport('useRouter', () => () => ({
+  afterEach: vi.fn(),
+  beforeEach: vi.fn(),
+  beforeResolve: vi.fn(),
+  onError: vi.fn(),
+  replace: vi.fn(async ({ query }: { query: Record<string, string | undefined> }) => {
+    routeState.query.q = query.q;
+  }),
+}));
 const setup = () => {
   const scope = effectScope();
   const search = scope.run(() => useTaskSearchQuery())!;

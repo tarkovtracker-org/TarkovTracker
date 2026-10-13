@@ -90,7 +90,7 @@ Ranking causes and improvements must be measured separately from these rendering
 │   │   ├── kappa/           # Kappa completion tracker
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
-│   │   ├── omnibar/         # Global search/command omnibar
+│   │   ├── omnibar/         # Inline app-bar search and jump results
 │   │   ├── profile/         # Profile and shared progress views
 │   │   ├── resources/       # Resource guides
 │   │   ├── settings/        # User settings

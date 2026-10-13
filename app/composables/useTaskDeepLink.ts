@@ -7,7 +7,6 @@ import { getQueryString } from '@/utils/routeHelpers';
 import { isTaskListPath, TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
 import type { Task } from '@/types/tarkov';
 export type UseTaskDeepLinkOptions = {
-  searchQuery: Ref<string>;
   filteredTasks: Ref<Task[]>;
   leafletMapRef: Ref<{
     activateObjectivePopup: (id: string) => boolean;
@@ -26,7 +25,6 @@ export interface UseTaskDeepLinkReturn {
 }
 type TaskStatus = 'available' | 'locked' | 'completed' | 'failed';
 export function useTaskDeepLink({
-  searchQuery,
   filteredTasks,
   leafletMapRef,
 }: UseTaskDeepLinkOptions): UseTaskDeepLinkReturn {
@@ -196,8 +194,9 @@ export function useTaskDeepLink({
     if (!taskId) return;
     const taskInMetadata = tasks.value.find((t) => t.id === taskId);
     if (!taskInMetadata) return;
-    if (searchQuery.value) {
-      searchQuery.value = '';
+    // Settle the cleared search before any hand-off reads the query, or it would restore it.
+    if (getQueryString(route.query.q)) {
+      await router.replace({ query: { ...route.query, q: undefined } });
     }
     if (await handOffToListRoute(objectiveIdToHighlight)) return;
     if (!objectiveIdToHighlight) {

@@ -141,13 +141,8 @@
     "retry_succeeded": "Your changes were saved to the cloud. You can sign out safely."
   },
   "omnibar": {
-    "title": "Search",
-    "description": "Search tasks, needed items, and hideout stations",
-    "trigger_label": "Search tasks, items, traders…",
-    "open_aria": "Open global search",
     "aria_label": "Global search",
     "placeholder": "Search tasks, needed items, hideout...",
-    "hint_min_chars": "Type at least 2 characters to search...",
     "no_results": "No results found for \"{query}\".",
     "group_tasks": "Tasks / Quests",
     "group_hideout": "Hideout Stations"
@@ -923,10 +918,6 @@
         "team_aria_label": "Show progress for {name}",
         "whole_team": "Whole team"
       },
-      "search": {
-        "placeholder": "Search...",
-        "aria_label": "Search tasks"
-      },
       "sort": {
         "none": "Default order",
         "impact": "Impact",
@@ -1219,7 +1210,6 @@
     },
     "needed_items": {
       "loading": "Loading task and hideout data",
-      "search_placeholder": "Search items, tasks, or hideout stations...",
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",

@@ -155,7 +155,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-no-keys' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref([]),
       leafletMapRef: ref(null),
     });
@@ -175,7 +174,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-no-keys' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref([]),
       leafletMapRef: ref(null),
     });
@@ -189,7 +187,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-on-map', map: 'map-1' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref(metadataTasks.value),
       leafletMapRef: ref(null),
     });
@@ -199,6 +196,22 @@ describe('useTaskDeepLink', () => {
       query: expect.objectContaining({ task: 'task-on-map', map: 'map-1' }),
     });
     expect(taskDeepLink.pinnedTaskId.value).toBeFalsy();
+  });
+  it('clears the page search before handing a task link to the list route', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', q: 'mole' });
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(replace).toHaveBeenNthCalledWith(1, { query: { task: 'task-on-map', q: undefined } });
+    expect(replace).toHaveBeenLastCalledWith({
+      path: '/tasks',
+      query: expect.not.objectContaining({ q: 'mole' }),
+    });
   });
   it('keeps the deep-linked task focused even when it is already visible', async () => {
     metadataTasks.value = [
@@ -215,7 +228,6 @@ describe('useTaskDeepLink', () => {
     document.body.appendChild(taskElement);
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref(metadataTasks.value),
       leafletMapRef: ref(null),
     });
@@ -239,7 +251,6 @@ describe('useTaskDeepLink', () => {
       const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
       const filteredTasks = ref<Task[]>(metadataTasks.value);
       const taskDeepLink = useTaskDeepLink({
-        searchQuery: ref(''),
         filteredTasks,
         leafletMapRef: ref(null),
       });
@@ -273,7 +284,6 @@ describe('useTaskDeepLink', () => {
       const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
       const filteredTasks = ref<Task[]>([]);
       const taskDeepLink = useTaskDeepLink({
-        searchQuery: ref(''),
         filteredTasks,
         leafletMapRef: ref(null),
       });

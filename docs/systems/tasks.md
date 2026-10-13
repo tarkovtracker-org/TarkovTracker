@@ -8,6 +8,11 @@ The initial route `q` filters tasks immediately, including tasks loaded later. S
 trim whitespace and ignore case. Later typing and route changes retain the 180 ms debounce;
 clearing search cancels any pending update and restores the visible list immediately.
 
+The app-bar search (`app/features/omnibar/AppSearch.vue`) is the only search box. On Tasks and
+Needed Items, typing writes the page's `q` (debounced 150 ms, with `router.replace`) and its dropdown
+offers jump results for the other entities; elsewhere the dropdown jumps to tasks, items, or hideout
+stations. Opening a `?task=` link clears `q` first so the linked task is not filtered out.
+
 ## Task views
 
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
