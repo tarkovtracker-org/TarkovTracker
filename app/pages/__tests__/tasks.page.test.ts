@@ -1094,6 +1094,28 @@ describe('tasks page', () => {
       }),
     ]);
   });
+  it.each([
+    { status: 'locked', expected: ['obj-1'] },
+    { status: 'all', expected: ['obj-1'] },
+    { status: 'available', expected: [] },
+  ])(
+    'draws locked task markers for the $status filter: $expected',
+    async ({ status, expected }) => {
+      const task = createDefaultTask({
+        id: 'task-map-objective',
+        name: 'Map Objective Task',
+        objectives: [createMapObjective()],
+      });
+      visibleTasksRef.value = [task];
+      preferencesStoreMock.getTaskPrimaryView = 'maps';
+      preferencesStoreMock.getTaskMapView = 'map-1';
+      preferencesStoreMock.getTaskSecondaryView = status;
+      metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+      progressStoreMock.unlockedTasks = { [task.id]: { self: false } };
+      await mountPage();
+      expect(getLeafletMarks().map((mark) => mark.id)).toEqual(expected);
+    }
+  );
   it('keeps self marker ownership when objective is active for self and teammate', async () => {
     const task = createDefaultTask({
       id: 'task-map-objective',

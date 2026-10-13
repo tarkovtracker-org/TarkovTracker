@@ -1795,6 +1795,7 @@
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
+    "level_input": "Current level, {min} to {max}",
     "pin_subpages": "Keep {name} pages open",
     "unpin_subpages": "Collapse {name} pages"
   },
@@ -2254,6 +2255,20 @@
       "save_failed_description": "Failed to save display name. Please try again.",
       "active_mode": "Active",
       "game_edition_hint": "Select the game edition you own so tracking matches your available content."
+    },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
     },
     "skills": {
       "title": "Skills Management",

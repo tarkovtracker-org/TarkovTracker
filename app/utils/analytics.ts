@@ -2,6 +2,7 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationNormalizedLoaded } f
 const IGNORED_QUERY_KEYS = new Set([
   '_tt_retry',
   'access_token',
+  'authorization_id',
   'code',
   'error',
   'error_code',
@@ -92,4 +93,14 @@ export const getAnalyticsPageLocation = (route?: AnalyticsRouteLike): string => 
     return '/';
   }
   return `${window.location.origin}${getAnalyticsPagePath(route)}`;
+};
+/** Referrers are external input; retain origin/path without query or fragment values. */
+export const getAnalyticsReferrer = (referrer: string): string | undefined => {
+  try {
+    const url = new URL(referrer);
+    if (!['https:', 'http:'].includes(url.protocol)) return undefined;
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return undefined;
+  }
 };

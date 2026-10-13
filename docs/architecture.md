@@ -669,6 +669,23 @@ directly from the process environment; see
 | `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
 | `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
+**Analytics privacy:** When analytics integrations are enabled and the Clarity project ID
+is valid, Microsoft Clarity skips documents on `/oauth`, `/oauth/*`, and `/auth/callback`
+(including encoded or case-varied paths). It also skips URLs with credential query or
+hash parameters, including Discord linking callbacks on `/settings`, and documents
+whose same-origin referrer contains one of these sensitive URLs. Malformed URLs also
+skip recording and do not install the router guard, allowing Nuxt's forced initial
+route replacement to finish without reloading the document. On recorded documents,
+the router guard starts a native full page navigation and cancels the
+SPA navigation. If only the fragment changes on the current path and query, it appends
+the existing `_tt_retry` cache-busting parameter to force a new document. This keeps
+the sensitive destination out of the current recorder's
+`pushState`/`replaceState` hooks. The destination still appears in normal browser
+navigation history; its new document skips Clarity. Consent denial alone does not
+prevent URL/referrer collection. Ordinary routes retain SPA navigation and the existing
+analytics consent flow. Skipped documents remain unrecorded until a full page load
+with a benign URL and referrer.
+
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are platform-managed canonical
