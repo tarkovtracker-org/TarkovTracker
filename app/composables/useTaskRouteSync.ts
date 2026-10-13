@@ -58,20 +58,13 @@ const setIfChanged = <T extends string>(
 ) => {
   if (next && next !== current) set(next);
 };
-/** The route picks the view; on the list route a `trader` param is the trader filter. */
-const resolvePrimaryViewFromRoute = (
-  routeView: TaskRouteView,
-  traderParam: string
-): TaskPrimaryView => {
-  if (routeView !== 'list') return routeView;
-  return traderParam === 'all' ? 'all' : 'traders';
-};
+/** The route picks the view; the list route is the stored `all` view. */
+const resolvePrimaryViewFromRoute = (routeView: TaskRouteView): TaskPrimaryView =>
+  routeView === 'list' ? 'all' : routeView;
 /** Keeps a stored view that belongs to another route from leaking into this one. */
 const alignPrimaryViewWithRoute = (store: PreferencesStore, routeView: TaskRouteView) => {
-  const current = store.getTaskPrimaryView;
-  const isListView = current === 'all' || current === 'traders';
-  if (routeView === 'list' ? isListView : current === routeView) return;
-  store.setTaskPrimaryView(routeView === 'list' ? 'all' : routeView);
+  const primaryView = resolvePrimaryViewFromRoute(routeView);
+  setIfChanged(primaryView, store.getTaskPrimaryView, (v) => store.setTaskPrimaryView(v));
 };
 const resolveTraderIdFromRoute = (traders: Trader[], traderParam: string) =>
   traders.some((t) => t.id === traderParam) ? traderParam : traders[0]?.id;
@@ -149,7 +142,7 @@ export function useTaskRouteSync({
   return useRouteFilters<TaskRouteParams>({
     configs: TASK_ROUTE_CONFIGS,
     onRouteToStore: (values) => {
-      const primaryView = resolvePrimaryViewFromRoute(routeView.value, values.trader);
+      const primaryView = resolvePrimaryViewFromRoute(routeView.value);
       syncViewsFromRoute(preferencesStore, primaryView, values.status);
       syncMapFromRoute(preferencesStore, maps.value, primaryView, values.map);
       syncTraderFromRoute(preferencesStore, traders.value, primaryView, values.trader);

@@ -919,8 +919,6 @@
         "yourself": "Yourself"
       },
       "filters": {
-        "trader_aria_label": "Filter tasks by trader",
-        "all_traders": "All traders",
         "team_aria_label": "Show progress for {name}",
         "whole_team": "Whole team"
       },
@@ -1805,8 +1803,8 @@
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
-    "show_subpages": "Show {name} pages",
-    "hide_subpages": "Hide {name} pages"
+    "pin_subpages": "Keep {name} pages open",
+    "unpin_subpages": "Collapse {name} pages"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2581,6 +2579,10 @@
       "tasks": {
         "title": "Tarkov Quest Tracker · TarkovTracker.org",
         "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal."
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
       },
       "tasks_maps": {
         "title": "Tarkov Quest Map View · TarkovTracker.org",

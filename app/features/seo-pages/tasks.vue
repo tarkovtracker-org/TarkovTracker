@@ -22,6 +22,7 @@
   const route = useRoute();
   const HEADER_KEYS: Record<TaskRouteView, { title: string; description: string }> = {
     list: { title: 'common.tasks', description: 'seo.routes.tasks.description' },
+    traders: { title: 'common.traders', description: 'seo.routes.tasks_traders.description' },
     maps: { title: 'common.maps', description: 'seo.routes.tasks_maps.description' },
     graph: {
       title: 'page.tasks.primary_views.graph',

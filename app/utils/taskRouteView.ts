@@ -1,7 +1,8 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
-export type TaskRouteView = 'list' | 'maps' | 'graph';
+export type TaskRouteView = 'list' | 'traders' | 'maps' | 'graph';
 export const TASK_ROUTE_PATHS: Record<TaskRouteView, string> = {
   list: '/tasks',
+  traders: '/tasks/traders',
   maps: '/tasks/maps',
   graph: '/tasks/graph',
 };
@@ -19,7 +20,7 @@ export const isTaskListPath = (path: string): boolean =>
 // A Map, so params like `constructor` cannot resolve to inherited object keys.
 const LEGACY_VIEW_PATHS = new Map<string | null | undefined, string>([
   ['all', TASK_ROUTE_PATHS.list],
-  ['traders', TASK_ROUTE_PATHS.list],
+  ['traders', TASK_ROUTE_PATHS.traders],
   ['maps', TASK_ROUTE_PATHS.maps],
   ['graph', TASK_ROUTE_PATHS.graph],
 ]);

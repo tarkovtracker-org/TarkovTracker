@@ -452,7 +452,7 @@ export default defineNuxtConfig({
         if (wrapper) page.file = resolve(appDir, 'features/seo-pages', `${wrapper}.vue`);
       }
       // Task views are routes of the same tracker module (app/utils/taskRouteView.ts).
-      for (const view of ['maps', 'graph']) {
+      for (const view of ['traders', 'maps', 'graph']) {
         pages.push({
           name: `tasks-${view}`,
           path: `/tasks/${view}`,

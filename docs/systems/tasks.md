@@ -10,14 +10,14 @@ clearing search cancels any pending update and restores the visible list immedia
 
 ## Task views
 
-The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list, `/tasks/maps` the
-map view and `/tasks/graph` the trader graph. The sidebar lists Maps and Graph under Tasks
-(`DrawerItemGroup.vue`): a chevron hides them for the session, and the collapsed rail shows them in
-a hover menu and as icons while on a tasks route. No view is saved; the route decides. On the
-list, a trader is a filter (`trader` param, toolbar dropdown) rather than a separate view. The
-stored `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy
-`/tasks?view=<view>` links are replaced by the matching route with the other params kept
-(`app/middleware/tasks-legacy-view.global.ts`); `view=traders` lands on the list.
+The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
+tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The sidebar
+keeps Tasks compact (`DrawerItemGroup.vue`): hovering or tapping it opens a menu of all four views,
+and its chevron pins them inline, saved per device (`app_drawerPinnedGroups`). No default-view
+selection is saved; the stored `taskPrimaryView` preference follows the route and is kept for
+compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
+params kept (`app/middleware/tasks-legacy-view.global.ts`).
 
 ## Canonical task progression
 

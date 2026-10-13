@@ -64,6 +64,7 @@
   });
   const { t } = useI18n({ useScope: 'global' });
   const taskViewItems = computed<DrawerGroupChild[]>(() => [
+    { icon: 'i-mdi-account-group-outline', localeKey: 'common.traders', to: '/tasks/traders' },
     { icon: 'i-mdi-map-outline', localeKey: 'common.maps', to: '/tasks/maps' },
     {
       icon: 'i-mdi-graph-outline',

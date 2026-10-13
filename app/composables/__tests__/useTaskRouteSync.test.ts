@@ -225,7 +225,7 @@ describe('useTaskRouteSync', () => {
     wrapper.unmount();
   });
   it('falls back to the first trader and syncs sort params from the route', async () => {
-    setRoute('/tasks', { trader: 'unknown', sort: 'alphabetical', sortDir: 'asc' });
+    setRoute('/tasks/traders', { trader: 'unknown', sort: 'alphabetical', sortDir: 'asc' });
     const maps = ref<TarkovMap[]>([]);
     const traders = ref<Trader[]>([
       { id: 'trader-1', name: 'Trader One' } as Trader,
@@ -247,7 +247,7 @@ describe('useTaskRouteSync', () => {
     wrapper.unmount();
   });
   it('preserves pending trader query until traders load', async () => {
-    setRoute('/tasks', { trader: 'trader-2' });
+    setRoute('/tasks/traders', { trader: 'trader-2' });
     const maps = ref<TarkovMap[]>([]);
     const traders = ref<Trader[]>([]);
     const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
@@ -299,7 +299,7 @@ describe('useTaskRouteSync', () => {
     wrapper.unmount();
   });
   it('keeps a pending trader deep link when another watcher selects a fallback trader', async () => {
-    setRoute('/tasks', { trader: 'trader-2' });
+    setRoute('/tasks/traders', { trader: 'trader-2' });
     const traders = ref<Trader[]>([]);
     const wrapper = await mountWithTraderFallback(traders);
     await flushRouteSync();
@@ -311,7 +311,7 @@ describe('useTaskRouteSync', () => {
     wrapper.unmount();
   });
   it('syncs the fallback trader to the route when the deep-linked trader is unknown', async () => {
-    setRoute('/tasks', { trader: 'missing' });
+    setRoute('/tasks/traders', { trader: 'missing' });
     const traders = ref<Trader[]>([]);
     const wrapper = await mountWithTraderFallback(traders);
     await flushRouteSync();
@@ -335,6 +335,8 @@ describe('useTaskRouteSync', () => {
   it.each([
     ['/tasks/maps', 'all', 'maps'],
     ['/tasks/graph', 'traders', 'graph'],
+    ['/tasks/traders', 'all', 'traders'],
+    ['/tasks', 'traders', 'all'],
     ['/tasks', 'maps', 'all'],
     ['/tasks/', 'graph', 'all'],
   ])('derives the view from %s when the stored view is %s', async (path, stored, expected) => {
@@ -346,14 +348,14 @@ describe('useTaskRouteSync', () => {
     expect(routeState.query.view).toBeUndefined();
     wrapper.unmount();
   });
-  it('keeps the stored trader filter on the list route', async () => {
+  it('shows every trader on the list route', async () => {
     storeState.taskPrimaryView = 'traders';
     storeState.taskTraderView = 'trader-2';
     setRoute('/tasks', {});
     const wrapper = await mountRouteSync();
     await flushRouteSync();
-    expect(storeState.taskPrimaryView).toBe('traders');
-    expect(routeState.query.trader).toBe('trader-2');
+    expect(storeState.taskPrimaryView).toBe('all');
+    expect(routeState.query.trader).toBeUndefined();
     expect(routeState.query.map).toBeUndefined();
     wrapper.unmount();
   });

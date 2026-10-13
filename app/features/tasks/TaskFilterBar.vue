@@ -159,13 +159,6 @@
       <div
         class="ml-auto flex w-full min-w-0 items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-wrap"
       >
-        <TaskTraderFilter
-          v-if="showTraderFilter"
-          v-model="traderFilter"
-          :traders="traderFilterOptions"
-          :counts="traderCounts"
-          :allow-any="!isGraphView"
-        />
         <TaskTeamFilter />
         <SelectMenuFixed
           v-model="taskSortMode"
@@ -245,13 +238,54 @@
         </UButton>
       </div>
     </div>
+    <div
+      v-if="isTraderView && traders.length > 0"
+      class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
+    >
+      <div
+        class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+      >
+        <UButton
+          v-for="trader in traders"
+          :key="trader.id"
+          type="button"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          :disabled="preferencesStore.getTaskTraderView === trader.id"
+          :aria-pressed="preferencesStore.getTaskTraderView === trader.id"
+          :class="[
+            'gap-2',
+            ...getSegmentButtonClass(preferencesStore.getTaskTraderView === trader.id),
+          ]"
+          @click="onTraderSelect(trader.id)"
+        >
+          <div class="relative">
+            <div class="bg-surface-800 h-8 w-8 overflow-hidden rounded-full">
+              <img
+                v-if="trader.imageLink"
+                :src="trader.imageLink"
+                :alt="trader.name"
+                class="h-full w-full object-cover"
+              />
+              <UIcon v-else name="i-mdi-account-circle" class="text-surface-500 h-full w-full" />
+            </div>
+            <span
+              class="bg-pve-500 light:text-surface-50 absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold text-white"
+            >
+              {{ traderCounts[trader.id] }}
+            </span>
+          </div>
+          <span class="text-xs font-medium whitespace-nowrap">{{ trader.name }}</span>
+        </UButton>
+      </div>
+    </div>
   </div>
 </template>
 <script setup lang="ts">
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import TaskTeamFilter from '@/features/tasks/TaskTeamFilter.vue';
-  import TaskTraderFilter from '@/features/tasks/TaskTraderFilter.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { TASK_SORT_MODES } from '@/types/taskSort';
@@ -293,22 +327,16 @@
     const userView = preferencesStore.getTaskUserView;
     return calculateTraderCounts(userView, selectedStatusView.value);
   });
-  // The graph needs a trader with tasks; the list filter offers every trader.
-  const graphTraders = computed(() => {
+  // The traders and graph views show one trader at a time, picked from those with tasks left.
+  const isTraderView = computed(() => primaryView.value === 'traders' || isGraphView.value);
+  const traders = computed(() => {
     return metadataStore.sortedTraders.filter((trader) => (traderCounts.value[trader.id] ?? 0) > 0);
   });
-  const traderFilterOptions = computed(() =>
-    isGraphView.value ? graphTraders.value : metadataStore.sortedTraders
-  );
-  const showTraderFilter = computed(() => primaryView.value !== 'maps');
-  const traderFilter = computed({
-    get: () => (primaryView.value === 'all' ? 'all' : preferencesStore.getTaskTraderView),
-    set: (traderId: string) => {
-      if (traderId === 'all') return preferencesStore.setTaskPrimaryView('all');
+  const onTraderSelect = (traderId: string) => {
+    if (preferencesStore.getTaskTraderView !== traderId) {
       preferencesStore.setTaskTraderView(traderId);
-      if (!isGraphView.value) preferencesStore.setTaskPrimaryView('traders');
-    },
-  });
+    }
+  };
   const showStatusAllDivider = computed(() => {
     return (
       showAllStatusButton.value &&
@@ -471,9 +499,9 @@
     }
   };
   watch(
-    [primaryView, graphTraders, () => preferencesStore.getTaskTraderView],
-    ([view, visibleTraders, selectedTrader]) => {
-      if (view !== 'graph') return;
+    [isTraderView, traders, () => preferencesStore.getTaskTraderView],
+    ([showsTrader, visibleTraders, selectedTrader]) => {
+      if (!showsTrader) return;
       if (visibleTraders.some((trader) => trader.id === selectedTrader)) return;
       ensureSelectedTrader(visibleTraders);
     },

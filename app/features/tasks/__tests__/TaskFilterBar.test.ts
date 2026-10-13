@@ -18,13 +18,6 @@ const USelectMenuStub = {
   emits: ['update:modelValue'],
   template: '<select @change="$emit(\'update:modelValue\', $event.target.value)"></select>',
 };
-const TaskTraderFilterStub = {
-  name: 'TaskTraderFilter',
-  props: ['modelValue', 'traders', 'counts', 'allowAny'],
-  emits: ['update:modelValue'],
-  template:
-    '<div data-testid="trader-filter" :data-value="modelValue" :data-allow-any="String(Boolean(allowAny))"><span v-for="trader in traders" :key="trader.id" data-testid="trader-option">{{ trader.name }}</span></div>',
-};
 type SetupOptions = {
   preferencesStore?: Partial<{
     getTaskPrimaryView: string;
@@ -39,7 +32,7 @@ type SetupOptions = {
     getShowFailedFilter: boolean;
     getHideCompletedMapObjectives: boolean;
   }>;
-  sortedTraders?: Array<{ id: string; name: string }>;
+  sortedTraders?: Array<{ id: string; name: string; imageLink?: string }>;
   traderCounts?: Record<string, number>;
   mapTaskTotals?: Record<string, number>;
   mapTaskTotalsHideCompleted?: Record<string, number>;
@@ -72,7 +65,9 @@ const setup = async (options: SetupOptions = {}) => {
     setTaskSortDirection: vi.fn(),
   };
   Object.assign(preferencesStore, options.preferencesStore ?? {});
-  const sortedTraders = options.sortedTraders ?? [{ id: 'trader-1', name: 'Trader One' }];
+  const sortedTraders = (options.sortedTraders ?? [{ id: 'trader-1', name: 'Trader One' }]).map(
+    (trader) => ({ imageLink: `/img/${trader.id}.webp`, ...trader })
+  );
   const traderCounts = options.traderCounts ?? { 'trader-1': 2 };
   const mapTaskTotals = options.mapTaskTotals ?? { 'map-1': 2 };
   const mapTaskTotalsHideCompleted = options.mapTaskTotalsHideCompleted ?? { 'map-1': 1 };
@@ -147,7 +142,6 @@ const mountTaskFilterBar = (
       stubs: {
         AppTooltip: { template: '<span><slot /></span>' },
         TaskTeamFilter: true,
-        TaskTraderFilter: TaskTraderFilterStub,
         UBadge: true,
         UButton: UButtonStub,
         UIcon: true,
@@ -157,6 +151,11 @@ const mountTaskFilterBar = (
     },
   });
 };
+type FilterBarWrapper = ReturnType<typeof mountTaskFilterBar>;
+const findTraderButton = (wrapper: FilterBarWrapper, name: string) =>
+  wrapper.findAll('button').find((button) => button.find(`img[alt="${name}"]`).exists());
+const traderButtonNames = (wrapper: FilterBarWrapper) =>
+  wrapper.findAll('button img').map((image) => image.attributes('alt'));
 describe('TaskFilterBar', () => {
   it('emits search updates', async () => {
     const { TaskFilterBar } = await setup();
@@ -168,57 +167,63 @@ describe('TaskFilterBar', () => {
     const { TaskFilterBar, preferencesStore } = await setup({
       preferencesStore: { getTaskPrimaryView: 'maps' },
     });
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    mountTaskFilterBar(TaskFilterBar);
     expect(preferencesStore.setTaskMapView).toHaveBeenCalledWith('map-1');
-    expect(wrapper.find('[data-testid="trader-filter"]').exists()).toBe(false);
   });
-  it('offers every trader with an any option on the list', async () => {
+  it('shows no trader strip on the list or maps routes', async () => {
+    for (const view of ['all', 'maps']) {
+      const { TaskFilterBar } = await setup({ preferencesStore: { getTaskPrimaryView: view } });
+      const wrapper = mountTaskFilterBar(TaskFilterBar);
+      expect(traderButtonNames(wrapper)).toEqual([]);
+    }
+  });
+  it('lays out every trader with tasks left and its count on the traders route', async () => {
     const { TaskFilterBar } = await setup({
+      preferencesStore: { getTaskPrimaryView: 'traders', getTaskTraderView: 'trader-1' },
+      sortedTraders: [
+        { id: 'trader-1', name: 'Trader One' },
+        { id: 'trader-2', name: 'Trader Two' },
+        { id: 'trader-3', name: 'Trader Three' },
+      ],
+      traderCounts: { 'trader-1': 2, 'trader-2': 0, 'trader-3': 5 },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    expect(traderButtonNames(wrapper)).toEqual(['Trader One', 'Trader Three']);
+    const selected = findTraderButton(wrapper, 'Trader One')!;
+    expect(selected.attributes('aria-pressed')).toBe('true');
+    expect(selected.text()).toContain('2');
+    expect(findTraderButton(wrapper, 'Trader Three')!.text()).toContain('5');
+  });
+  it('switches the shown trader from the strip', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup({
+      preferencesStore: { getTaskPrimaryView: 'traders', getTaskTraderView: 'trader-1' },
       sortedTraders: [
         { id: 'trader-1', name: 'Trader One' },
         { id: 'trader-2', name: 'Trader Two' },
       ],
-      traderCounts: { 'trader-1': 2, 'trader-2': 0 },
+      traderCounts: { 'trader-1': 2, 'trader-2': 1 },
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const filter = wrapper.find('[data-testid="trader-filter"]');
-    expect(filter.attributes('data-value')).toBe('all');
-    expect(filter.attributes('data-allow-any')).toBe('true');
-    expect(wrapper.findAll('[data-testid="trader-option"]').map((option) => option.text())).toEqual(
-      ['Trader One', 'Trader Two']
-    );
-  });
-  it('shows the stored trader when the list is filtered by trader', async () => {
-    const { TaskFilterBar } = await setup({
-      preferencesStore: { getTaskPrimaryView: 'traders', getTaskTraderView: 'trader-1' },
-    });
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    expect(wrapper.find('[data-testid="trader-filter"]').attributes('data-value')).toBe('trader-1');
-  });
-  it('filters the list by the picked trader', async () => {
-    const { TaskFilterBar, preferencesStore } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    wrapper.findComponent({ name: 'TaskTraderFilter' }).vm.$emit('update:modelValue', 'trader-1');
-    expect(preferencesStore.setTaskTraderView).toHaveBeenCalledWith('trader-1');
-    expect(preferencesStore.setTaskPrimaryView).toHaveBeenCalledWith('traders');
-  });
-  it('clears the trader filter back to every trader', async () => {
-    const { TaskFilterBar, preferencesStore } = await setup({
-      preferencesStore: { getTaskPrimaryView: 'traders', getTaskTraderView: 'trader-1' },
-    });
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    wrapper.findComponent({ name: 'TaskTraderFilter' }).vm.$emit('update:modelValue', 'all');
-    expect(preferencesStore.setTaskPrimaryView).toHaveBeenCalledWith('all');
-    expect(preferencesStore.setTaskTraderView).not.toHaveBeenCalled();
-  });
-  it('keeps the graph on its route when picking a trader', async () => {
-    const { TaskFilterBar, preferencesStore } = await setup({
-      preferencesStore: { getTaskPrimaryView: 'graph', getTaskTraderView: 'trader-1' },
-    });
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    wrapper.findComponent({ name: 'TaskTraderFilter' }).vm.$emit('update:modelValue', 'trader-1');
+    await findTraderButton(wrapper, 'Trader Two')!.trigger('click');
+    expect(preferencesStore.setTaskTraderView).toHaveBeenCalledWith('trader-2');
     expect(preferencesStore.setTaskPrimaryView).not.toHaveBeenCalled();
   });
+  it.each(['traders', 'graph'])(
+    'moves the %s view to the first trader when the current one has no tasks',
+    async (view) => {
+      const { TaskFilterBar, preferencesStore } = await setup({
+        preferencesStore: { getTaskPrimaryView: view, getTaskTraderView: 'trader-2' },
+        sortedTraders: [
+          { id: 'trader-1', name: 'Trader One' },
+          { id: 'trader-2', name: 'Trader Two' },
+        ],
+        traderCounts: { 'trader-1': 3, 'trader-2': 0 },
+      });
+      const wrapper = mountTaskFilterBar(TaskFilterBar);
+      expect(preferencesStore.setTaskTraderView).toHaveBeenCalledWith('trader-1');
+      expect(traderButtonNames(wrapper)).toEqual(['Trader One']);
+    }
+  );
   it('toggles sort direction', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar);
@@ -243,58 +248,6 @@ describe('TaskFilterBar', () => {
     expect(mapButton).toBeTruthy();
     expect(mapButton!.text()).toContain('1');
     expect(mapButton!.text()).not.toContain('4');
-  });
-  it('offers the graph only traders with tasks for the active filter', async () => {
-    const { TaskFilterBar } = await setup({
-      preferencesStore: {
-        getTaskPrimaryView: 'graph',
-        getTaskTraderView: 'trader-1',
-      },
-      sortedTraders: [
-        { id: 'trader-1', name: 'Trader One' },
-        { id: 'trader-2', name: 'Trader Two' },
-      ],
-      traderCounts: {
-        'trader-1': 2,
-        'trader-2': 0,
-      },
-    });
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const filter = wrapper.find('[data-testid="trader-filter"]');
-    expect(filter.attributes('data-allow-any')).toBe('false');
-    expect(wrapper.findAll('[data-testid="trader-option"]').map((option) => option.text())).toEqual(
-      ['Trader One']
-    );
-  });
-  it('auto-selects the first graph trader when the current one has no tasks', async () => {
-    const { TaskFilterBar, preferencesStore } = await setup({
-      preferencesStore: {
-        getTaskPrimaryView: 'graph',
-        getTaskTraderView: 'trader-2',
-      },
-      sortedTraders: [
-        { id: 'trader-1', name: 'Trader One' },
-        { id: 'trader-2', name: 'Trader Two' },
-      ],
-      traderCounts: {
-        'trader-1': 3,
-        'trader-2': 0,
-      },
-    });
-    mountTaskFilterBar(TaskFilterBar);
-    expect(preferencesStore.setTaskTraderView).toHaveBeenCalledWith('trader-1');
-  });
-  it('leaves an empty trader filter alone on the list', async () => {
-    const { TaskFilterBar, preferencesStore } = await setup({
-      preferencesStore: { getTaskPrimaryView: 'traders', getTaskTraderView: 'trader-2' },
-      sortedTraders: [
-        { id: 'trader-1', name: 'Trader One' },
-        { id: 'trader-2', name: 'Trader Two' },
-      ],
-      traderCounts: { 'trader-1': 3, 'trader-2': 0 },
-    });
-    mountTaskFilterBar(TaskFilterBar);
-    expect(preferencesStore.setTaskTraderView).not.toHaveBeenCalled();
   });
   it('shows per-status search counts and highlights the effective status while searching', async () => {
     const { TaskFilterBar } = await setup();

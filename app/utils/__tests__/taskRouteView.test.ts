@@ -10,6 +10,7 @@ describe('taskRouteView', () => {
     ['/tasks/', 'list'],
     ['/tasks/maps', 'maps'],
     ['/tasks/maps/', 'maps'],
+    ['/tasks/traders', 'traders'],
     ['/tasks/graph', 'graph'],
     ['/tasks/unknown', 'list'],
   ])('resolves %s to the %s view', (path, view) => {
@@ -22,7 +23,7 @@ describe('taskRouteView', () => {
   it.each([
     ['maps', '/tasks/maps'],
     ['graph', '/tasks/graph'],
-    ['traders', '/tasks'],
+    ['traders', '/tasks/traders'],
     ['all', '/tasks'],
     ['bogus', '/tasks'],
     ['constructor', '/tasks'],
