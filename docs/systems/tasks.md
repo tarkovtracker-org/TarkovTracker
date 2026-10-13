@@ -207,6 +207,10 @@ disabled loyalty gating do not bypass an explicit gate. Catalogs must match each
 shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
 a compatibility fallback when no clear objective placement exists. Story trader blockers name the
 objective and cannot be cleared through Mark available; complete the storyline objective first.
+Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
+`finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
+opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
+locked on the dashboard also locks its tasks.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
