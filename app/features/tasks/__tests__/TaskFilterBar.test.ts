@@ -7,12 +7,6 @@ const UButtonStub = {
   emits: ['click'],
   template: '<button v-bind="$attrs" :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
 };
-const UInputStub = {
-  props: ['modelValue'],
-  emits: ['update:modelValue'],
-  template:
-    '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-};
 const USelectMenuStub = {
   props: ['modelValue'],
   emits: ['update:modelValue'],
@@ -133,11 +127,11 @@ const setup = async (options: SetupOptions = {}) => {
 };
 const mountTaskFilterBar = (
   TaskFilterBar: Parameters<typeof mount>[0],
-  searchQuery = '',
+  isSearchActive = false,
   extraProps: Record<string, unknown> = {}
 ) => {
   return mount(TaskFilterBar, {
-    props: { searchQuery, ...extraProps },
+    props: { isSearchActive, ...extraProps },
     global: {
       stubs: {
         AppTooltip: { template: '<span><slot /></span>' },
@@ -145,7 +139,6 @@ const mountTaskFilterBar = (
         UBadge: true,
         UButton: UButtonStub,
         UIcon: true,
-        UInput: UInputStub,
         USelectMenu: USelectMenuStub,
       },
     },
@@ -157,12 +150,6 @@ const findTraderButton = (wrapper: FilterBarWrapper, name: string) =>
 const traderButtonNames = (wrapper: FilterBarWrapper) =>
   wrapper.findAll('button img').map((image) => image.attributes('alt'));
 describe('TaskFilterBar', () => {
-  it('emits search updates', async () => {
-    const { TaskFilterBar } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar);
-    await wrapper.find('input').setValue('propane');
-    expect(wrapper.emitted('update:searchQuery')).toEqual([['propane']]);
-  });
   it('lands the maps route on the first map when none is picked', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({
       preferencesStore: { getTaskPrimaryView: 'maps' },
@@ -251,7 +238,7 @@ describe('TaskFilterBar', () => {
   });
   it('shows per-status search counts and highlights the effective status while searching', async () => {
     const { TaskFilterBar } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
       searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
     });
@@ -264,7 +251,7 @@ describe('TaskFilterBar', () => {
   });
   it('pins a status picked during search without saving it', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
       searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
     });
@@ -277,7 +264,7 @@ describe('TaskFilterBar', () => {
   });
   it('saves a status picked with no search active', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar, '', { activeStatusView: 'available' });
+    const wrapper = mountTaskFilterBar(TaskFilterBar, false, { activeStatusView: 'available' });
     const lockedButton = wrapper
       .findAll('button')
       .find((button) => button.text().startsWith('locked'));
@@ -287,7 +274,7 @@ describe('TaskFilterBar', () => {
   });
   it('keeps All clickable during an all-status search', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', {
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
       searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
     });
@@ -299,7 +286,7 @@ describe('TaskFilterBar', () => {
   });
   it('keeps the current tab clickable while the typed query is still debouncing', async () => {
     const { TaskFilterBar } = await setup();
-    const wrapper = mountTaskFilterBar(TaskFilterBar, 'mole', { activeStatusView: 'available' });
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'available' });
     const availableButton = wrapper
       .findAll('button')
       .find((button) => button.text().startsWith('available'));
@@ -311,7 +298,7 @@ describe('TaskFilterBar', () => {
     const { TaskFilterBar, calculateTraderCounts } = await setup({
       preferencesStore: { getTaskPrimaryView: 'traders' },
     });
-    mountTaskFilterBar(TaskFilterBar, 'mole', { activeStatusView: 'all' });
+    mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'all' });
     expect(calculateTraderCounts).toHaveBeenLastCalledWith('self', 'all');
   });
   it('applies stronger selected styling to the active status view', async () => {

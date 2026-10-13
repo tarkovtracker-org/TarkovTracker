@@ -22,6 +22,7 @@ const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
 });
 mockNuxtImport('useRoute', () => () => routeState);
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   replace,
   beforeEach: vi.fn(),
   beforeResolve: vi.fn(),
@@ -155,7 +156,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-no-keys' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref([]),
       leafletMapRef: ref(null),
     });
@@ -175,7 +175,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-no-keys' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref([]),
       leafletMapRef: ref(null),
     });
@@ -189,7 +188,6 @@ describe('useTaskDeepLink', () => {
     applyRouteQuery({ task: 'task-on-map', map: 'map-1' });
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref(metadataTasks.value),
       leafletMapRef: ref(null),
     });
@@ -199,6 +197,64 @@ describe('useTaskDeepLink', () => {
       query: expect.objectContaining({ task: 'task-on-map', map: 'map-1' }),
     });
     expect(taskDeepLink.pinnedTaskId.value).toBeFalsy();
+  });
+  it('clears the page search before handing a task link to the list route', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', q: 'mole' });
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(replace).toHaveBeenNthCalledWith(1, { query: { task: 'task-on-map', q: undefined } });
+    expect(replace).toHaveBeenLastCalledWith({
+      path: '/tasks',
+      query: expect.not.objectContaining({ q: 'mole' }),
+    });
+  });
+  it('clears the page search after a search write still waiting in the queue', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', q: 'mo' });
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    const { useRouteSearchQuery } = await import('@/composables/useRouteSearchQuery');
+    let landEarlierWrite = () => {};
+    const earlierWriteLanded = new Promise<void>((resolve) => (landEarlierWrite = resolve));
+    void queueQueryWrite(() => earlierWriteLanded);
+    const typedSearch = useRouteSearchQuery().setSearchQuery('mole');
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    const deepLink = taskDeepLink.handleTaskQueryParam();
+    landEarlierWrite();
+    await Promise.all([typedSearch, deepLink]);
+    expect(replace).toHaveBeenLastCalledWith({
+      path: '/tasks',
+      query: expect.not.objectContaining({ q: expect.anything() }),
+    });
+  });
+  it('stops handling a task link once the user leaves while the search clear waits', async () => {
+    metadataTasks.value = [{ id: 'task-on-map', name: 'Map Task', requiredKeys: [] }];
+    routeState.path = '/tasks/maps';
+    applyRouteQuery({ task: 'task-on-map', q: 'mo' });
+    const { queueQueryWrite } = await import('@/utils/routeHelpers');
+    let landEarlierWrite = () => {};
+    const earlierWriteLanded = new Promise<void>((resolve) => (landEarlierWrite = resolve));
+    void queueQueryWrite(() => earlierWriteLanded);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    const deepLink = taskDeepLink.handleTaskQueryParam();
+    routeState.path = '/hideout';
+    landEarlierWrite();
+    await deepLink;
+    expect(replace).not.toHaveBeenCalled();
   });
   it('keeps the deep-linked task focused even when it is already visible', async () => {
     metadataTasks.value = [
@@ -215,7 +271,6 @@ describe('useTaskDeepLink', () => {
     document.body.appendChild(taskElement);
     const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
     const taskDeepLink = useTaskDeepLink({
-      searchQuery: ref(''),
       filteredTasks: ref(metadataTasks.value),
       leafletMapRef: ref(null),
     });
@@ -239,7 +294,6 @@ describe('useTaskDeepLink', () => {
       const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
       const filteredTasks = ref<Task[]>(metadataTasks.value);
       const taskDeepLink = useTaskDeepLink({
-        searchQuery: ref(''),
         filteredTasks,
         leafletMapRef: ref(null),
       });
@@ -273,7 +327,6 @@ describe('useTaskDeepLink', () => {
       const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
       const filteredTasks = ref<Task[]>([]);
       const taskDeepLink = useTaskDeepLink({
-        searchQuery: ref(''),
         filteredTasks,
         leafletMapRef: ref(null),
       });

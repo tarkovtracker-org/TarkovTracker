@@ -35,6 +35,7 @@ const replace = vi.fn(async ({ query }: { query: QueryRecord }) => {
 });
 mockNuxtImport('useRoute', () => () => routeState);
 mockNuxtImport('useRouter', () => () => ({
+  currentRoute: { value: routeState },
   push,
   replace,
   beforeEach: vi.fn(),
