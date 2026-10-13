@@ -279,6 +279,20 @@ describe('useStorylineChapters', () => {
     ]);
     expect(chapter.objectives.every((o) => !o.hasEstimatedUnlocks)).toBe(true);
   });
+  it.each([
+    ['map' as const, 'map-1', 'Route B Objective'],
+    ['trader' as const, 'trader-1', 'Peacekeeper'],
+  ])(
+    'deduplicates an explicit %s unlock with no source ID against the chapter summary',
+    async (type, id, name) => {
+      const chapter = structuredClone(STORY_CHAPTERS[0]!);
+      chapter.objectives!['obj-a']!.unlocks = [{ type, name }];
+      const { normalizedChapters } = await loadComposable([chapter]);
+      const view = normalizedChapters.value[0]!;
+      expect(view.objectives[0]?.unlocks).toEqual([{ estimated: false, type, id, label: name }]);
+      expect(view.chapterUnlocks.some((u) => u.type === type && u.label === name)).toBe(false);
+    }
+  );
   it('keeps unplaced unlocks at chapter level even when objective text mentions the trader', async () => {
     const chapter = structuredClone(STORY_CHAPTERS[0]!);
     chapter.objectives!['obj-a']!.description = 'Talk to Peacekeeper';

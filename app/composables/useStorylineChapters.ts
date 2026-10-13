@@ -191,15 +191,29 @@ const parseChapterRewards = (
 };
 const unlockKey = (unlock: Pick<StorylineObjectiveUnlockView, 'type' | 'id'>): string =>
   `${unlock.type}:${unlock.id}`;
+const chapterUnlockId = (chapter: StorylineChapterView, unlock: StoryObjectiveUnlock) => {
+  const references: Partial<Record<StoryObjectiveUnlock['type'], StorylineLinkEntry[]>> = {
+    map: chapter.mapUnlocks,
+    trader: chapter.traderUnlocks,
+  };
+  return references[unlock.type]?.find((reference) => reference.name === unlock.name)?.id;
+};
+const objectiveUnlockId = (
+  chapter: StorylineChapterView,
+  objectiveId: string,
+  unlock: StoryObjectiveUnlock,
+  index: number
+): string => unlock.id ?? chapterUnlockId(chapter, unlock) ?? `${objectiveId}-unlock-${index + 1}`;
 const objectiveUnlockView = (
+  chapter: StorylineChapterView,
   objectiveId: string,
   unlock: StoryObjectiveUnlock,
   index: number
 ): StorylineObjectiveUnlockView => ({
   estimated: false,
-  id: unlock.id ?? `${objectiveId}-unlock-${index + 1}`,
+  id: objectiveUnlockId(chapter, objectiveId, unlock, index),
   label: unlock.name,
-  ...(unlock.note ? { note: unlock.note } : {}),
+  note: unlock.note,
   type: unlock.type === 'map' || unlock.type === 'trader' ? unlock.type : 'reward',
 });
 const remainingChapterUnlocks = (
@@ -573,7 +587,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
           ...objective,
           hasEstimatedUnlocks: false,
           unlocks: (objective.unlocks ?? []).map((unlock, index) =>
-            objectiveUnlockView(objective.id, unlock, index)
+            objectiveUnlockView(chapter, objective.id, unlock, index)
           ),
           routeAlternatives,
           routeBlockingAlternatives,
