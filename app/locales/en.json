@@ -100,7 +100,7 @@
   },
   "progress_save_status": {
     "live_updates_delayed_label": "Live updates delayed",
-    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’re checking for updates and reconnecting automatically.",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "Progress save status: {status}",
     "cloud_pending_label": "Saving progress to the cloud",
     "cloud_retrying_label": "Cloud save retrying",

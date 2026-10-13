@@ -1481,6 +1481,7 @@ describe('useTarkov sync integration', () => {
     expect(listSupersededProgressCopies('user-1')).toEqual([]);
   });
   afterEach(async () => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     resetTarkovSync('test teardown');
     await nextTick();

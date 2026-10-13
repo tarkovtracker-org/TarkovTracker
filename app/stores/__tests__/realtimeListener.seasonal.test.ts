@@ -696,6 +696,22 @@ describe('seasonal progress realtime synchronization', () => {
     await completed;
     expect(openTopics.size).toBe(1);
     expect(supabaseContext.client.removeChannel).not.toHaveBeenCalled();
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        abortSignal() {
+          return this;
+        },
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: { game_edition: 2 }, error: null }) }
+            : Promise.resolve({ data: [], error: null }),
+      }),
+    }));
+    const { reconcileRemoteSnapshot } = await import('@/stores/tarkov/realtimeListener');
+    await reconcileRemoteSnapshot();
+    expect(supabaseContext.client.from).toHaveBeenCalledWith('user_progress');
+    expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+    expect(state.gameEdition).toBe(2);
   });
   it('replaces a terminally closed channel and ignores statuses from its former owner', async () => {
     vi.useFakeTimers();
