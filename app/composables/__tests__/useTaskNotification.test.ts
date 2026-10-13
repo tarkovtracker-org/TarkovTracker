@@ -1,9 +1,13 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
-import { effectScope } from 'vue';
+import { effectScope, reactive } from 'vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { UserProgressData } from '@/stores/progressState';
 import type { Task } from '@/types/tarkov';
+const sessionUser = reactive({ id: 'owner-a', loggedIn: true });
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: sessionUser } }));
 const createTarkovStore = (options: {
   isTaskComplete?: (taskId: string) => boolean;
   progressData?: Partial<UserProgressData>;
@@ -12,7 +16,8 @@ const createTarkovStore = (options: {
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   const manualActivityHistory: unknown[] = [];
-  return {
+  return reactive({
+    currentGameMode: 'pvp',
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
@@ -35,10 +40,12 @@ const createTarkovStore = (options: {
     clearManualActivityHistory: vi.fn(() => {
       manualActivityHistory.length = 0;
     }),
-  };
+  });
 };
 const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore>[0] = {}) => {
   setActivePinia(createPinia());
+  sessionUser.id = 'owner-a';
+  sessionUser.loggedIn = true;
   const tarkovStore = createTarkovStore(options);
   const metadataStore = { tasks };
   vi.resetModules();
@@ -63,6 +70,47 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it.each(['owner', 'mode', 'logout'])(
+    'invalidates undo across a %s transition and return',
+    async (transition) => {
+      const { notification, tarkovStore, stop } = await setup([]);
+      notification.onTaskAction({
+        action: 'complete',
+        taskId: 'task-a',
+        taskName: 'Task A',
+        statusKey: 'status',
+      });
+      expect(notification.showUndoButton.value).toBe(true);
+      if (transition === 'owner') sessionUser.id = 'owner-b';
+      if (transition === 'mode') tarkovStore.currentGameMode = 'pve';
+      if (transition === 'logout') sessionUser.loggedIn = false;
+      expect(notification.showUndoButton.value).toBe(false);
+      sessionUser.id = 'owner-a';
+      sessionUser.loggedIn = true;
+      tarkovStore.currentGameMode = 'pvp';
+      notification.undoLastAction();
+      expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+      stop();
+    }
+  );
+  it('invalidates retained global undo after the registering component is disposed', async () => {
+    const { notification, tarkovStore, stop } = await setup([]);
+    notification.onTaskAction({
+      action: 'complete',
+      taskId: 'task-a',
+      taskName: 'Task A',
+      statusKey: 'status',
+    });
+    const { useActionHistoryStore } = await import('@/stores/useActionHistoryStore');
+    const history = useActionHistoryStore();
+    const retainedUndo = history.undoStack[0]!.undo;
+    stop();
+    tarkovStore.currentGameMode = 'pve';
+    tarkovStore.currentGameMode = 'pvp';
+    await history.undoLastAction();
+    await retainedUndo();
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+  });
   it.each(['complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
     'keeps manual %s and its undo out of activity history',
     async (action) => {

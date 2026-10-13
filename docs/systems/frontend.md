@@ -2,6 +2,13 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Task undo
+
+Task undo history belongs to the current signed-in owner and game mode. Account changes, logout,
+and mode changes synchronously clear the shared history and close any inline undo notification.
+Previously retained callbacks stay invalid even after returning to the original context. A late
+completion cannot remove or restore actions belonging to the new context.
+
 ## Language selection
 
 The app bar uses a compact translation icon with native language names and a checked current
