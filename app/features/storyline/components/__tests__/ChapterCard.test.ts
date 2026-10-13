@@ -630,6 +630,15 @@ describe('ChapterCard story contract rendering', () => {
     expect(text).toContain('page.storyline.route_blocked_by:{"objectives":"Give the case"}');
     wrapper.unmount();
   });
+  it('shows chapter unlocks in the header instead of a sidebar', () => {
+    const wrapper = mountCard(
+      createChapter({
+        chapterUnlocks: [{ estimated: false, id: 'tour', label: 'Tour', type: 'reward' }],
+      })
+    );
+    expect(wrapper.find('header').text()).toContain('page.storyline.route_unlocks_chapter');
+    expect(wrapper.find('aside').exists()).toBe(false);
+  });
   it('toggles the chapter from the icon and the header action', async () => {
     const wrapper = mountCard(createChapter({ autoStart: false, complete: true }));
     expect(wrapper.get('h2').text()).toBe('The Ticket');
