@@ -14,6 +14,8 @@
           <TaskSearchScopeHint
             :visible="showSearchScopeHint"
             :query="normalizedSearch"
+            :pinned-status="pinnedSearchStatus"
+            :return-status="savedTaskSecondaryView"
             @clear="clearSearch"
           />
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
@@ -618,18 +620,22 @@
     cleanup: cleanupTaskSearch,
     isSearchActive,
     normalizedSearch,
+    pinnedStatus: pinnedSearchStatus,
     pinStatus: pinSearchStatus,
-    searchesAllStatuses,
     searchQuery,
+    searchStatusOverride,
   } = useTaskSearchQuery();
   const clearSearch = () => {
     searchQuery.value = '';
   };
+  const savedTaskSecondaryView = computed(() =>
+    resolveEffectiveSecondaryView(getTaskPrimaryView.value, getTaskSecondaryView.value, null)
+  );
   const effectiveTaskSecondaryView = computed(() =>
     resolveEffectiveSecondaryView(
       getTaskPrimaryView.value,
       getTaskSecondaryView.value,
-      searchesAllStatuses.value
+      searchStatusOverride.value
     )
   );
   const tarkovStore = useTarkovStore();
@@ -646,7 +652,7 @@
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
-  const showSearchScopeHint = computed(() => searchesAllStatuses.value && !showGraphView.value);
+  const showSearchScopeHint = computed(() => isSearchActive.value && !showGraphView.value);
   const {
     isDesktopHelpPanelOpen,
     isDesktopSettingsDrawerOpen,
