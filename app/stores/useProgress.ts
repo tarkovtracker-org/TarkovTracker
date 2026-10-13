@@ -37,6 +37,11 @@ const createTaskAvailabilityTeamData = (
 ): TaskAvailabilityTeamData => {
   const currentData = getGameModeData(store);
   const metadata = useMetadataStore();
+  const storyCatalog = storyCatalogForMode(
+    metadata.storyChapters ?? [],
+    metadata.storyChaptersGameMode,
+    store.$state.currentGameMode
+  );
   return {
     mode: store.$state.currentGameMode,
     level,
@@ -45,14 +50,8 @@ const createTaskAvailabilityTeamData = (
     confirmations: currentData.taskAvailability ?? {},
     traders: currentData.traders ?? {},
     prestigeLevel: currentData.prestigeLevel,
-    storyChapters: effectiveStoryProgress(
-      currentData.storyChapters,
-      storyCatalogForMode(
-        metadata.storyChapters ?? [],
-        metadata.storyChaptersGameMode,
-        store.$state.currentGameMode
-      )
-    ),
+    storyCatalog,
+    storyChapters: effectiveStoryProgress(currentData.storyChapters, storyCatalog),
   };
 };
 const hasTaskAvailabilityInputs = (tasks: Task[], teamIds: string[]) =>

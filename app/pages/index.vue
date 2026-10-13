@@ -109,6 +109,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, sortTraderStats } from '@/utils/constants';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { storyCatalogForMode } from '@/utils/storylineCompletion';
   import type { TraderSortMode, TraderSortDirection } from '@/utils/constants';
   const { isOpen: isHelpOpen } = usePageHelpState('dashboard');
   const { isDesktopHelpPanelOpen, isMobileHelpPanelOpen } = usePageSideRailState({
@@ -155,7 +156,11 @@
     tasks: metadataStore.tasks,
     isTaskComplete: (id: string) => tarkovStore.isTaskComplete(id),
     gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
-    storyChapters: metadataStore.storyChapters,
+    storyChapters: storyCatalogForMode(
+      metadataStore.storyChapters ?? [],
+      metadataStore.storyChaptersGameMode,
+      tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP
+    ),
     isStoryObjectiveComplete: tarkovStore.isStoryObjectiveComplete,
     isStoryChapterComplete: tarkovStore.isStoryChapterComplete,
     getTraderLevel: tarkovStore.getTraderLevel,

@@ -5,7 +5,7 @@ import {
   type TaskEvaluationOptions,
 } from '@/stores/taskAvailability';
 import { normalizeTraderRequirements } from '@/utils/taskRequirements';
-import type { Task, RequirementComparison } from '@/types/tarkov';
+import type { Task, RequirementComparison, StoryChapter } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const data = (overrides: Partial<TaskAvailabilityTeamData> = {}): TaskAvailabilityTeamData => ({
   completions: {},
@@ -255,4 +255,105 @@ it('fails closed on missing failed-branch references and foreign factions', () =
 it('fails closed when a failed-branch requirement has no task reference', () => {
   const task = { id: 'target', failedRequirements: [{}] } as Task;
   expect(evaluate(task).blockers).toContainEqual({ type: 'unknown', reason: 'failed_requirement' });
+});
+const traderGateCatalog = [
+  {
+    id: 'tour',
+    name: 'Tour',
+    normalizedName: 'tour',
+    wikiLink: '',
+    order: 1,
+    objectives: {
+      'unlock-trader': {
+        id: 'unlock-trader',
+        order: 1,
+        type: 'main',
+        description: 'Unlock trader',
+        unlocks: [{ type: 'trader', id: 'trader-id', name: 'Trader' }],
+      },
+    },
+  },
+] satisfies StoryChapter[];
+describe('storyline trader task availability', () => {
+  const task: Task = { id: 'ungated-task', trader: { id: 'trader-id', name: 'Trader' } };
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'enforces objective unlocks without task-level gates in %s',
+    (mode) => {
+      expect(
+        evaluate(task, data({ mode, storyCatalog: traderGateCatalog })).blockers
+      ).toContainEqual({
+        type: 'trader_unlock',
+        trader: task.trader,
+        chapterIds: ['tour'],
+        objective: { id: 'unlock-trader', name: 'Unlock trader' },
+      });
+    }
+  );
+  it('does not bypass the gate with reputation, chapter completion, other tasks or disabled loyalty gating', () => {
+    const progress = data({
+      storyCatalog: traderGateCatalog,
+      traders: { 'trader-id': { level: 4, reputation: 0.2 } },
+      storyChapters: { tour: { complete: true } },
+      completions: { 'other-task': true },
+    });
+    expect(
+      evaluate(task, progress, [{ ...task, id: 'other-task' }], { requireTraderLevels: false })
+        .available
+    ).toBe(false);
+  });
+  it('opens after the exact objective is recorded', () => {
+    const progress = data({
+      storyCatalog: traderGateCatalog,
+      storyChapters: { tour: { objectives: { 'unlock-trader': { complete: true } } } },
+    });
+    expect(evaluate(task, progress).available).toBe(true);
+  });
+  it('does not let an unlocked story route bypass the trader objective', () => {
+    const storyTask = {
+      ...task,
+      storyUnlocks: [{ id: 'tour', name: 'Tour' }],
+      taskRequirements: [{ task: { id: 'missing' }, status: ['complete'] }],
+    };
+    const progress = data({
+      storyCatalog: traderGateCatalog,
+      storyChapters: { tour: { objectives: { unrelated: { complete: true } } } },
+      confirmations: { [task.id]: { timestamp: 1, requirements: '[]' } },
+    });
+    expect(evaluate(storyTask, progress).blockers.map((blocker) => blocker.type)).toEqual([
+      'trader_unlock',
+    ]);
+  });
+  it('keeps independent task gates after the trader unlock objective is complete', () => {
+    expect(
+      evaluate(
+        { ...task, minPlayerLevel: 10 },
+        data({
+          storyCatalog: traderGateCatalog,
+          storyChapters: { tour: { objectives: { 'unlock-trader': { complete: true } } } },
+        })
+      ).blockers
+    ).toMatchObject([{ type: 'player_level', required: 10 }]);
+  });
+  it('opens tutorial traders without storing an objective mark', () => {
+    const chapter = traderGateCatalog[0]!;
+    const objective = chapter.objectives['unlock-trader'];
+    const progress = data({
+      storyCatalog: [
+        {
+          ...chapter,
+          objectives: { 'unlock-trader': { ...objective, completionPolicy: 'tutorial' } },
+        },
+      ],
+    });
+    expect(evaluate(task, progress).available).toBe(true);
+    expect(progress.storyChapters).toEqual({});
+  });
+  it('keeps unrelated traders available', () => {
+    expect(
+      evaluate(
+        { ...task, trader: { id: 'other-trader', name: 'Other' } },
+        data({ storyCatalog: traderGateCatalog })
+      ).available
+    ).toBe(true);
+  });
 });

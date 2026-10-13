@@ -1,6 +1,6 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
 /**
  * Creates dashboard stats mock with configurable data states
@@ -87,7 +87,7 @@ const setup = async (
     traderSortMode?: 'default' | 'progress' | 'level';
     traderSortDirection?: 'asc' | 'desc';
   } = {},
-  metadata: { tasks?: unknown[]; storyChapters?: unknown[] } = {},
+  metadata: { tasks?: unknown[]; storyChapters?: unknown[]; storyChaptersGameMode?: string } = {},
   tarkovOverrides: Record<string, unknown> = {}
 ) => {
   const {
@@ -123,6 +123,7 @@ const setup = async (
     useMetadataStore: () => ({
       tasks: metadata.tasks ?? [],
       storyChapters: metadata.storyChapters ?? [],
+      storyChaptersGameMode: metadata.storyChaptersGameMode ?? 'pvp',
     }),
   }));
   vi.doMock('@/stores/usePreferences', () => ({
@@ -275,6 +276,47 @@ describe('dashboard page', () => {
       wrapper
         .findAll('[data-testid="trader-card"]')
         .map((node) => `${node.attributes('data-id')}:${node.attributes('data-unlock')}`);
+    const praporGateMetadata = {
+      ...metadata,
+      storyChapters: [
+        {
+          ...metadata.storyChapters[0],
+          objectives: {
+            'open-prapor': {
+              id: 'open-prapor',
+              order: 1,
+              type: 'main',
+              description: 'Hand over weapons to Mechanic',
+              unlocks: [{ type: 'trader', id: 'prapor-id', name: 'Prapor' }],
+            },
+          },
+        },
+      ],
+    };
+    it('renders Prapor locked until his explicit storyline objective is complete', async () => {
+      const complete = ref(false);
+      const { DashboardPage } = await setup({ traderStats: traders }, {}, praporGateMetadata, {
+        getTraderReputation: () => 0.2,
+        isStoryObjectiveComplete: (_chapter: string, objective: string) =>
+          objective === 'open-prapor' && complete.value,
+      });
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedCards(wrapper)).toContain('prapor-id:story');
+      complete.value = true;
+      await nextTick();
+      expect(renderedCards(wrapper)).toContain('prapor-id:none');
+    });
+    it('does not borrow trader gates from the previous mode catalog', async () => {
+      const { DashboardPage } = await setup({ traderStats: traders }, {}, praporGateMetadata, {
+        getCurrentGameMode: () => 'pve',
+      });
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedCards(wrapper)).toContain('prapor-id:none');
+    });
     it('renders every trader in one grid with locked traders last', async () => {
       const { DashboardPage } = await setup({ traderStats: traders }, {}, metadata);
       const wrapper = await mountSuspended(DashboardPage, {

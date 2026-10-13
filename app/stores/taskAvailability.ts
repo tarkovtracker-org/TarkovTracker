@@ -1,5 +1,6 @@
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
+import { isStorylineTraderUnlocked, storylineTraderUnlocks } from '@/utils/storylineTraderUnlocks';
 import {
   compareRequirement,
   getTaskTraderRequirements,
@@ -15,6 +16,7 @@ import {
 import type { UserProgressData } from '@/types/progress';
 import type {
   RequirementComparison,
+  StoryChapter,
   Task,
   TaskRequirement,
   TaskRequirementDiagnostic,
@@ -31,6 +33,8 @@ export type TaskAvailabilityTeamData = {
   traders: Record<string, { level?: number; reputation?: number }>;
   prestigeLevel?: number;
   storyChapters?: UserProgressData['storyChapters'];
+  /** Objective unlock metadata from this user's mode only. */
+  storyCatalog?: readonly StoryChapter[];
 };
 export type TaskBlocker = {
   type:
@@ -187,6 +191,7 @@ const createTeamEvaluator = (
   data: TaskAvailabilityTeamData,
   options: TaskEvaluationOptions
 ) => {
+  const storyTraderGates = storylineTraderUnlocks(data.storyCatalog ?? []);
   const memo = new Map<string, TaskAvailabilityResult>();
   const visiting = new Set<string>();
   const activeRequirementResult = (
@@ -266,6 +271,21 @@ const createTeamEvaluator = (
       },
     ];
   };
+  const storyTraderBlockers = (task: Task): TaskBlocker[] => {
+    const gate = storyTraderGates.get(task.trader?.id ?? '');
+    if (!gate) return [];
+    const recorded =
+      data.storyChapters?.[gate.chapter.id]?.objectives?.[gate.objective.id]?.complete === true;
+    if (isStorylineTraderUnlocked(gate, recorded)) return [];
+    return [
+      {
+        type: 'trader_unlock',
+        trader: { id: task.trader!.id, name: traderDisplayName(task, task.trader!.id) },
+        chapterIds: [gate.chapter.id],
+        objective: { id: gate.objective.id, name: gate.objective.description },
+      },
+    ];
+  };
   const unlockBlockers = (task: Task): TaskBlocker[] => {
     const traderName = traderNameFor(task);
     if (!traderName) return [];
@@ -307,7 +327,8 @@ const createTeamEvaluator = (
       ...prestigeBlockers(task),
       ...taskServerGateBlockers(task, data),
       ...prerequisiteBlockers(task),
-      ...unlockBlockers(task)
+      ...unlockBlockers(task),
+      ...storyTraderBlockers(task)
     );
     visiting.delete(key);
     const evaluated = result(blockers);

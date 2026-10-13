@@ -55,10 +55,12 @@ export const useTaskBlockerText = () => {
     objective: blocker.objective?.name ?? '',
     chapter: (blocker.chapterIds ?? []).map((id) => chapters.value.get(id) ?? id).join(', '),
   });
+  const blockerKey = (blocker: TaskBlocker) =>
+    blocker.type === 'trader_unlock' && blocker.objective ? 'trader_story_unlock' : blocker.type;
   return (blocker: TaskBlocker): string =>
     blocker.type === 'prerequisite'
       ? prerequisiteText(blocker)
-      : t(`page.tasks.blockers.${blocker.type}`, {
+      : t(`page.tasks.blockers.${blockerKey(blocker)}`, {
           ...numericParams(blocker),
           ...namedParams(blocker),
         });

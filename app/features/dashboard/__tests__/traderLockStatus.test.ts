@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveTraderUnlock } from '@/features/dashboard/traderLockStatus';
 import { GAME_MODES, TASK_ID_REGISTRY } from '@/utils/constants';
 import type { LockTrader, TraderLockStatusDeps } from '@/features/dashboard/traderLockStatus';
+import type { StoryChapter } from '@/types/tarkov';
 const RAGMAN = { id: 'ragman-id', normalizedName: 'ragman' };
 const PEACEKEEPER = { id: 'peacekeeper-id', normalizedName: 'peacekeeper' };
 const PRAPOR = { id: 'prapor-id', normalizedName: 'prapor' };
@@ -155,5 +156,59 @@ describe('resolveTraderUnlock', () => {
       expect(resolve(RAGMAN, { tasks })?.kind).toBe('task');
       expect(resolve(RAGMAN, { tasks, isTaskComplete: (id) => id === unlockTask.id })).toBeNull();
     });
+  });
+});
+const explicitTour = {
+  ...TOUR,
+  objectives: {
+    'open-prapor': {
+      id: 'open-prapor',
+      order: 1,
+      type: 'main',
+      description: 'Hand over any 2 weapons found in raid to Mechanic',
+      unlocks: [{ type: 'trader', id: PRAPOR.id, name: 'Prapor' }],
+    },
+  },
+} satisfies Pick<StoryChapter, 'id' | 'name' | 'traderUnlocks' | 'objectives'>;
+describe('explicit storyline trader unlocks', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'locks Prapor without task-level gates in %s',
+    (gameMode) => {
+      expect(resolve(PRAPOR, { gameMode, tasks: [], storyChapters: [explicitTour] })).toEqual({
+        kind: 'story',
+        chapter: { id: 'tour', name: 'Tour' },
+        objective: { id: 'open-prapor', name: explicitTour.objectives['open-prapor'].description },
+      });
+    }
+  );
+  it.each<Partial<TraderLockStatusDeps>>([
+    { getTraderReputation: () => 0.2 },
+    { getTraderLevel: () => 4 },
+    { isStoryChapterComplete: () => true },
+    { isTaskComplete: () => true },
+  ])('does not bypass an explicit objective with inferred progress %j', (progress) => {
+    expect(resolve(PRAPOR, { ...progress, storyChapters: [explicitTour] })?.kind).toBe('story');
+  });
+  it('opens only after the declared objective is complete', () => {
+    expect(
+      resolve(PRAPOR, {
+        storyChapters: [explicitTour],
+        isStoryObjectiveComplete: (chapter, objective) =>
+          chapter === 'tour' && objective === 'open-prapor',
+      })
+    ).toBeNull();
+  });
+  it('opens tutorial traders without a recorded mark', () => {
+    const objective = explicitTour.objectives['open-prapor'];
+    expect(
+      resolve(PRAPOR, {
+        storyChapters: [
+          {
+            ...explicitTour,
+            objectives: { [objective.id]: { ...objective, completionPolicy: 'tutorial' } },
+          },
+        ],
+      })
+    ).toBeNull();
   });
 });
