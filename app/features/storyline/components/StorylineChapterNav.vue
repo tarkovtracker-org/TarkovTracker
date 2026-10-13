@@ -1,5 +1,5 @@
 <template>
-  <nav :aria-label="t('page.storyline.chapter_nav_label')">
+  <nav ref="navRef" :aria-label="t('page.storyline.chapter_nav_label')">
     <ul
       ref="listRef"
       class="relative -mx-3 flex snap-x gap-2 overflow-x-auto px-3 py-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-1"
@@ -67,15 +67,20 @@
   };
   const tileLabel = (chapter: StorylineNormalizedChapterView) =>
     `${chapter.name}${tileProgress(chapter)}`;
-  // On narrow screens the rail scrolls sideways, so keep the selected tile in view. Only the list's
-  // own horizontal offset moves; the page never scrolls, and the vertical desktop rail is unaffected.
+  // Keep the selected tile in view. On narrow screens the list scrolls sideways; on wide screens the
+  // nav is the vertical rail. Only the rail's own offsets move, never the page, and each scroll is a
+  // no-op on the layout where that element does not scroll.
+  const navRef = ref<HTMLElement | null>(null);
   const listRef = ref<HTMLElement | null>(null);
   const revealSelected = () => {
+    const nav = navRef.value;
     const list = listRef.value;
     const tiles = list?.querySelectorAll<HTMLElement>('[data-chapter-id]') ?? [];
     const tile = [...tiles].find((element) => element.dataset.chapterId === props.selectedId);
-    if (!list || !tile) return;
+    if (!nav || !list || !tile) return;
     list.scrollTo({ left: tile.offsetLeft - (list.clientWidth - tile.offsetWidth) / 2 });
+    const tileTop = list.offsetTop + tile.offsetTop;
+    nav.scrollTo({ top: tileTop - (nav.clientHeight - tile.offsetHeight) / 2 });
   };
   onMounted(revealSelected);
   watch(() => props.selectedId, revealSelected, { flush: 'post' });
