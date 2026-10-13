@@ -205,6 +205,9 @@ Whole English task catalog used by EFT log import, read only from the precompute
 
 Fetches task rewards (start, finish, failure).
 
+The admin `tarkov-data` purge includes the current `tasks-rewards-json-v2-<lang>-<gameMode>`
+edge-cache family for both apex and www origins, alongside its legacy retirement targets.
+
 **Query Parameters:**
 
 | Parameter  | Type   | Default   | Description                                   |
