@@ -411,5 +411,5 @@ permits an intentional reset. API level writes discard any inherited offset mark
 normal merge, so API updates continue to set levels. The existing missing-column retry in
 preference sync allows cached clients to save other preferences after the column is dropped.
 
-Physical removal of existing JSON offsets is separate bounded maintenance, described in the
+Existing production JSON offsets were removed by completed one-off maintenance; see the
 [runbook](../runbook.md#retired-automatic-level-cleanup). Keep historical migrations immutable.
