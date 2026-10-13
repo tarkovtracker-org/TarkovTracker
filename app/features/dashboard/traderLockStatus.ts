@@ -1,9 +1,15 @@
 import { GAME_MODES, resolveTraderUnlockTaskIds } from '@/utils/constants';
+import {
+  isStorylineTraderUnlocked,
+  storylineTraderUnlocks,
+  type TraderUnlockChapter,
+  type StorylineTraderUnlock,
+} from '@/utils/storylineTraderUnlocks';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
-import type { StoryChapter, Task, Trader } from '@/types/tarkov';
+import type { Task, Trader } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 type LockTask = Pick<Task, 'id' | 'name' | 'trader' | 'finishRewards' | 'otherRequirements'>;
-type LockChapter = Pick<StoryChapter, 'id' | 'name' | 'traderUnlocks'>;
+type LockChapter = TraderUnlockChapter;
 export type LockTrader = Pick<Trader, 'id' | 'normalizedName'>;
 export type TraderUnlockRequirement =
   | { kind: 'task'; task: { id: string; name: string } | null }
@@ -16,7 +22,9 @@ export interface TraderLockStatusDeps {
   tasks: LockTask[] | null | undefined;
   isTaskComplete: (taskId: string) => boolean;
   gameMode?: GameMode;
-  storyChapters?: LockChapter[] | null;
+  storyChapters?: readonly LockChapter[] | null;
+  /** Shared computed map for consumers resolving several traders from the same catalog. */
+  storyTraderUnlocks?: ReadonlyMap<string, StorylineTraderUnlock>;
   isStoryObjectiveComplete?: (chapterId: string, objectiveId: string) => boolean;
   isStoryChapterComplete?: (chapterId: string) => boolean;
   getTraderLevel?: (traderId: string) => number;
@@ -87,10 +95,25 @@ const hasTraderProgress = (trader: LockTrader, deps: TraderLockStatusDeps) =>
   hasCompletedTraderTask(trader, deps) ||
   hasCompletedUnlockTask(trader, deps) ||
   hasTraderStanding(trader, deps);
+const explicitStoryRequirement = (
+  gate: StorylineTraderUnlock,
+  deps: TraderLockStatusDeps
+): TraderUnlockRequirement | null => {
+  const recorded = Boolean(deps.isStoryObjectiveComplete?.(gate.chapter.id, gate.objective.id));
+  if (isStorylineTraderUnlocked(gate, recorded)) return null;
+  return {
+    kind: 'story',
+    chapter: gate.chapter,
+    objective: { id: gate.objective.id, name: gate.objective.description },
+  };
+};
 const storyRequirement = (
   trader: LockTrader,
   deps: TraderLockStatusDeps
 ): TraderUnlockRequirement | null => {
+  const gates = deps.storyTraderUnlocks ?? storylineTraderUnlocks(deps.storyChapters ?? []);
+  const explicit = gates.get(trader.id);
+  if (explicit) return explicitStoryRequirement(explicit, deps);
   const found = storyGateFor(trader, deps);
   if (!found || storyGateMet(found.gate, deps) || hasTraderProgress(trader, deps)) return null;
   return {

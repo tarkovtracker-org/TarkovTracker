@@ -766,6 +766,7 @@
             confirmations: modeData.value.taskAvailability ?? {},
             traders: modeData.value.traders ?? {},
             prestigeLevel: modeData.value.prestigeLevel,
+            storyCatalog: profileChapters.value,
             storyChapters: effectiveStoryProgress(
               modeData.value.storyChapters,
               profileChapters.value

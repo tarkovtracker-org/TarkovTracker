@@ -109,6 +109,8 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, sortTraderStats } from '@/utils/constants';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { storyCatalogForMode } from '@/utils/storylineCompletion';
+  import { storylineTraderUnlocks } from '@/utils/storylineTraderUnlocks';
   import type { TraderSortMode, TraderSortDirection } from '@/utils/constants';
   const { isOpen: isHelpOpen } = usePageHelpState('dashboard');
   const { isDesktopHelpPanelOpen, isMobileHelpPanelOpen } = usePageSideRailState({
@@ -151,11 +153,20 @@
       tarkovStore.getTraderReputation
     );
   });
+  const traderStoryCatalog = computed(() =>
+    storyCatalogForMode(
+      metadataStore.storyChapters ?? [],
+      metadataStore.storyChaptersGameMode,
+      tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP
+    )
+  );
+  const traderStoryUnlocks = computed(() => storylineTraderUnlocks(traderStoryCatalog.value));
   const traderLockDeps = computed(() => ({
     tasks: metadataStore.tasks,
     isTaskComplete: (id: string) => tarkovStore.isTaskComplete(id),
     gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
-    storyChapters: metadataStore.storyChapters,
+    storyChapters: traderStoryCatalog.value,
+    storyTraderUnlocks: traderStoryUnlocks.value,
     isStoryObjectiveComplete: tarkovStore.isStoryObjectiveComplete,
     isStoryChapterComplete: tarkovStore.isStoryChapterComplete,
     getTraderLevel: tarkovStore.getTraderLevel,
