@@ -157,6 +157,100 @@ describe('google analytics plugin', () => {
       '/tasks?trader=54cb57776803fa99248b456e&view=maps'
     );
   });
+  it.each(['authorization_id', 'Authorization_ID', '%61uthorization_id'])(
+    'omits OAuth identifiers from page URLs and referrers (%s)',
+    async (key) => {
+      currentRoute.value = createRoute(`/oauth/consent?${key}=route-private&view=maps`);
+      currentRoute.value.query.authorization_id = ['repeat-private', 'second-private'];
+      const referrer = vi
+        .spyOn(document, 'referrer', 'get')
+        .mockReturnValue(
+          'https://example.com/oauth?authorization_id=referrer-private#token=fragment-private'
+        );
+      try {
+        window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+        const plugin = (await import('@/plugins/05.google-analytics.client')).default;
+        plugin({} as Parameters<typeof plugin>[0]);
+        await flushAnalyticsSync();
+        expectAnalyticsInitialized(
+          runtimeConfig.public.googleAnalyticsMeasurementId,
+          '/oauth/consent?view=maps'
+        );
+        expect(getNormalizedDataLayer()).toContainEqual([
+          'set',
+          expect.objectContaining({
+            page_location: `${window.location.origin}/oauth/consent?view=maps`,
+            page_referrer: 'https://example.com/oauth',
+          }),
+        ]);
+        const commands = getNormalizedDataLayer();
+        expect(
+          commands.findIndex((entry) => Array.isArray(entry) && entry[0] === 'set')
+        ).toBeLessThan(
+          commands.findIndex((entry) => Array.isArray(entry) && entry[0] === 'config')
+        );
+        expect(getNormalizedDataLayer()).toContainEqual([
+          'event',
+          'page_view',
+          expect.objectContaining({ page_referrer: 'https://example.com/oauth' }),
+        ]);
+        await afterEachHandler?.(createRoute('/tasks?authorization_id=next-private&view=maps'));
+        expect(getNormalizedDataLayer()).toContainEqual([
+          'set',
+          expect.objectContaining({
+            page_location: `${window.location.origin}/tasks?view=maps`,
+            page_referrer: `${window.location.origin}/oauth/consent?view=maps`,
+          }),
+        ]);
+        const emitted = JSON.stringify(getNormalizedDataLayer());
+        for (const secret of [
+          'route-private',
+          'repeat-private',
+          'second-private',
+          'referrer-private',
+          'fragment-private',
+          'next-private',
+        ]) {
+          expect(emitted).not.toContain(secret);
+        }
+      } finally {
+        referrer.mockRestore();
+      }
+    }
+  );
+  it.each([
+    'javascript:referrer-private',
+    'file:///oauth?authorization_id=referrer-private',
+    '/oauth?authorization_id=referrer-private',
+    'https://[referrer-private',
+  ])(
+    'explicitly clears invalid document referrers in tracker defaults and page views (%s)',
+    async (rawReferrer) => {
+      const referrer = vi.spyOn(document, 'referrer', 'get').mockReturnValue(rawReferrer);
+      try {
+        window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+        const plugin = (await import('@/plugins/05.google-analytics.client')).default;
+        plugin({} as Parameters<typeof plugin>[0]);
+        await flushAnalyticsSync();
+        const commands = getNormalizedDataLayer();
+        const globalDefaults = commands.filter(
+          (entry) => Array.isArray(entry) && entry[0] === 'set'
+        );
+        expect(globalDefaults.length).toBeGreaterThanOrEqual(2);
+        for (const defaults of globalDefaults) {
+          expect(defaults).toEqual(['set', expect.objectContaining({ page_referrer: '' })]);
+        }
+        expect(commands).toContainEqual([
+          'event',
+          'page_view',
+          expect.objectContaining({ page_referrer: '' }),
+        ]);
+        expect(JSON.stringify(commands)).not.toContain('referrer-private');
+      } finally {
+        referrer.mockRestore();
+      }
+    }
+  );
   it('consent denial before script loads', async () => {
     analyticsConsentState.value = {
       status: 'declined',
