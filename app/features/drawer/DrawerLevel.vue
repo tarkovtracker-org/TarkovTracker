@@ -6,7 +6,7 @@
           {{ t('common.level') }}
         </div>
         <span class="text-center text-2xl leading-tight font-bold">
-          {{ displayedLevel }}
+          {{ savedLevel }}
         </span>
       </div>
     </template>
@@ -53,7 +53,7 @@
                 :aria-label="
                   t(
                     'navigation_drawer.level_display_editable',
-                    { level: displayedLevel },
+                    { level: savedLevel },
                     'Level {level}, click or press Enter to edit'
                   )
                 "
@@ -61,21 +61,33 @@
                 @keyup.enter="startEditingLevel"
                 @keydown.space.prevent="startEditingLevel"
               >
-                {{ displayedLevel }}
+                {{ savedLevel }}
               </span>
               <input
                 v-else
                 ref="levelInput"
-                v-model.number="levelInputValue"
+                v-model="draft"
                 type="number"
-                :min="minPlayerLevel"
-                :max="maxPlayerLevel"
+                inputmode="numeric"
+                step="1"
+                :min="minLevel"
+                :max="maxLevel"
+                :aria-label="t('navigation_drawer.level_input', { min: minLevel, max: maxLevel })"
                 class="no-spinner mx-auto block h-8 w-12 border-0 bg-transparent p-0 text-center text-3xl leading-8 font-bold outline-none focus:ring-0"
-                @input="enforceMaxLevel"
-                @blur="saveLevel"
+                v-bind="levelInputErrorAttrs"
+                @blur="finishEditingLevel"
                 @keyup.enter="saveLevel"
+                @keydown.esc.prevent="cancelEditingLevel"
               />
             </div>
+            <p
+              v-if="showLevelError"
+              :id="levelErrorId"
+              class="text-error-400 mt-1 text-center text-xs leading-tight"
+              role="alert"
+            >
+              {{ errorMessage }}
+            </p>
           </span>
           <span
             class="flex shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5"
@@ -84,7 +96,7 @@
               <button
                 type="button"
                 :class="[STEPPER_BUTTON_CLASS, 'border-b border-white/10']"
-                :disabled="displayedLevel >= maxPlayerLevel"
+                :disabled="savedLevel >= maxLevel"
                 :aria-label="t('navigation_drawer.increment_level')"
                 @click="incrementLevel"
               >
@@ -95,7 +107,7 @@
               <button
                 type="button"
                 :class="STEPPER_BUTTON_CLASS"
-                :disabled="displayedLevel <= minPlayerLevel"
+                :disabled="savedLevel <= minLevel"
                 :aria-label="t('navigation_drawer.decrement_level')"
                 @click="decrementLevel"
               >
@@ -109,8 +121,8 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { usePlayerLevelEditor } from '@/composables/usePlayerLevelEditor';
   import { useMetadataStore } from '@/stores/useMetadata';
-  import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import type { PlayerLevel } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
@@ -118,55 +130,65 @@
     isCollapsed: boolean;
   }
   defineProps<DrawerLevelProps>();
-  const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
-  const minPlayerLevel = computed<number>(() => metadataStore.minPlayerLevel);
-  const maxPlayerLevel = computed<number>(() => metadataStore.maxPlayerLevel);
+  const editingLevel = ref<boolean>(false);
+  // A mode switch or hydration while editing discards the draft instead of saving it elsewhere.
+  const { applyDraft, draft, errorMessage, maxLevel, minLevel, resetDraft, savedLevel, stepLevel } =
+    usePlayerLevelEditor({
+      onDraftReset: () => {
+        editingLevel.value = false;
+      },
+    });
+  const levelErrorId = useId();
+  const showLevelError = computed<boolean>(() => editingLevel.value && !!errorMessage.value);
+  const levelInputErrorAttrs = computed(() =>
+    errorMessage.value
+      ? ({
+          'aria-invalid': true,
+          'aria-describedby': levelErrorId,
+          class: 'text-error-400',
+        } as const)
+      : {}
+  );
   const playerLevels = computed<PlayerLevel[]>(() => metadataStore.playerLevels);
   const STEPPER_BUTTON_CLASS =
     'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 light:text-surface-300 light:hover:bg-surface-700/50 light:hover:text-surface-50';
-  const displayedLevel = computed<number>(() => tarkovStore.playerLevel());
   const isDataReady = computed<boolean>(() => {
     return !metadataStore.loading && metadataStore.playerLevels.length > 0;
   });
   const groupIcon = computed<string>(() => {
-    const level = displayedLevel.value;
+    const level = savedLevel.value;
     const entry = playerLevels.value.find((pl) => pl.level === level);
     return entry?.levelBadgeImageLink ?? '';
   });
   const groupImageLoadFailed = ref<boolean>(false);
-  const editingLevel = ref<boolean>(false);
-  const levelInputValue = ref<number>(tarkovStore.playerLevel());
   const levelInput = ref<HTMLInputElement | null>(null);
   function startEditingLevel(): void {
+    resetDraft();
     editingLevel.value = true;
-    levelInputValue.value = tarkovStore.playerLevel();
     void nextTick(() => {
       levelInput.value?.focus();
     });
   }
-  function enforceMaxLevel(): void {
-    const currentValue = Number(levelInputValue.value);
-    if (Number.isFinite(currentValue) && currentValue > maxPlayerLevel.value) {
-      levelInputValue.value = maxPlayerLevel.value;
-    }
-  }
+  /** Enter saves a valid level; an invalid one keeps the editor open with its error shown. */
   function saveLevel(): void {
-    let newLevel = Number(levelInputValue.value);
-    if (!Number.isFinite(newLevel)) newLevel = minPlayerLevel.value;
-    newLevel = Math.max(minPlayerLevel.value, Math.min(maxPlayerLevel.value, newLevel));
-    tarkovStore.setLevel(newLevel);
+    if (applyDraft()) editingLevel.value = false;
+  }
+  function cancelEditingLevel(): void {
+    resetDraft();
+    editingLevel.value = false;
+  }
+  /** Leaving the field saves a valid level and discards an invalid one rather than guessing. */
+  function finishEditingLevel(): void {
+    if (!editingLevel.value) return;
+    if (!applyDraft()) resetDraft();
     editingLevel.value = false;
   }
   function incrementLevel(): void {
-    if (tarkovStore.playerLevel() < maxPlayerLevel.value) {
-      tarkovStore.setLevel(tarkovStore.playerLevel() + 1);
-    }
+    stepLevel(1);
   }
   function decrementLevel(): void {
-    if (tarkovStore.playerLevel() > minPlayerLevel.value) {
-      tarkovStore.setLevel(tarkovStore.playerLevel() - 1);
-    }
+    stepLevel(-1);
   }
   watch(groupIcon, () => {
     groupImageLoadFailed.value = false;
