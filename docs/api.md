@@ -626,6 +626,10 @@ while a background refresh runs (stale-while-revalidate).
 
 ### Cache Busting
 
+The admin `tarkov-data` purge targets current versioned bootstrap, hideout, items, items-lite,
+map-spawns and prestige cache keys alongside retained legacy retirement targets. Bootstrap keys
+are mode-only; the other current catalogs include language and mode for both apex and www origins.
+
 Pass `cacheBust=1` query parameter to bypass cache.
 
 ---
