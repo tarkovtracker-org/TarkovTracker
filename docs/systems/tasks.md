@@ -13,8 +13,10 @@ clearing search cancels any pending update and restores the visible list immedia
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
 tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
 tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The sidebar
-keeps Tasks compact (`DrawerItemGroup.vue`): hovering or tapping it opens a menu of all four views,
-and its chevron pins them inline, saved per device (`app_drawerPinnedGroups`). No default-view
+keeps Tasks compact (`DrawerItemGroup.vue`): hovering or focusing it animates its sub-pages open
+inline. Leaving the group or selecting a route closes the unpinned dropdown; its chevron pins
+it open, saved per device (`app_drawerPinnedGroups`). Touch users can use the chevron to expand
+it. No default-view
 selection is saved; the stored `taskPrimaryView` preference follows the route and is kept for
 compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).

@@ -39,80 +39,96 @@ const mountGroup = (isCollapsed = false) =>
         DrawerItemIcon: { props: ['colorClass'], template: '<i :data-color="colorClass" />' },
         NuxtLink: { props: ['to'], template: '<a v-bind="$attrs" :href="to"><slot /></a>' },
         UTooltip: { template: '<span><slot /></span>' },
-        UPopover: {
-          props: { mode: String, enableTouch: Boolean },
-          template:
-            '<div data-testid="popover" :data-mode="mode" :data-touch="enableTouch"><slot /><div data-testid="popover-content"><slot name="content" /></div></div>',
-        },
+        UPopover: { template: '<div data-testid="popover"><slot /></div>' },
         UButton: { template: '<button v-bind="$attrs"><slot /></button>' },
       },
     },
   });
-const railHrefs = (wrapper: ReturnType<typeof mountGroup>) =>
-  wrapper
-    .findAll('a')
-    .filter((link) => !link.element.closest('[data-testid="popover-content"]'))
-    .map((link) => link.attributes('href'));
-const menuHrefs = (wrapper: ReturnType<typeof mountGroup>) =>
-  wrapper
-    .get('[data-testid="drawer-group-menu"]')
-    .findAll('a')
-    .map((link) => link.attributes('href'));
+const isExpanded = (wrapper: ReturnType<typeof mountGroup>) =>
+  wrapper.get('[data-testid="drawer-group-toggle"]').attributes('aria-expanded') === 'true';
 describe('DrawerItemGroup', () => {
   beforeEach(() => {
     routeState.path = '/';
     appStore.drawerPinnedGroups.splice(0);
     appStore.toggleDrawerGroupPin.mockClear();
   });
-  it('stays compact and offers every view in a hover and touch menu', () => {
+  it('expands inline on hover and closes when leaving the whole group', async () => {
     const wrapper = mountGroup();
-    expect(railHrefs(wrapper)).toEqual(['/tasks']);
-    const popover = wrapper.get('[data-testid="popover"]');
-    expect(popover.attributes('data-mode')).toBe('hover');
-    expect(popover.attributes('data-touch')).toBe('true');
-    expect(menuHrefs(wrapper)).toEqual(allHrefs);
-    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
-    expect(toggle.attributes('aria-expanded')).toBe('false');
-    expect(toggle.attributes('aria-label')).toBe('navigation_drawer.pin_subpages');
-  });
-  it('pins the views inline with the chevron and unpins them again', async () => {
-    const wrapper = mountGroup();
-    const toggle = wrapper.get('[data-testid="drawer-group-toggle"]');
-    await toggle.trigger('click');
-    expect(appStore.toggleDrawerGroupPin).toHaveBeenCalledTimes(1);
-    expect(appStore.toggleDrawerGroupPin).toHaveBeenCalledWith('/tasks');
-    expect(railHrefs(wrapper)).toEqual(allHrefs);
+    expect(isExpanded(wrapper)).toBe(false);
     expect(wrapper.find('[data-testid="popover"]').exists()).toBe(false);
-    expect(toggle.attributes('aria-expanded')).toBe('true');
-    expect(toggle.attributes('aria-label')).toBe('navigation_drawer.unpin_subpages');
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    expect(isExpanded(wrapper)).toBe(true);
+    expect(
+      wrapper
+        .get('[data-testid="drawer-group-menu"]')
+        .findAll('a')
+        .map((a) => a.attributes('href'))
+    ).toEqual(allHrefs.slice(1));
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseleave');
+    expect(isExpanded(wrapper)).toBe(false);
+    expect(wrapper.get('[data-testid="drawer-group-menu"]').attributes('inert')).toBeDefined();
+  });
+  it('pins on the chevron and stays expanded after leaving and navigating', async () => {
+    const wrapper = mountGroup();
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper.get('[data-testid="drawer-group-toggle"]').trigger('click');
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseleave');
+    await wrapper.get('a[href="/tasks/maps"]').trigger('click');
+    routeState.path = '/tasks/maps';
+    await wrapper.vm.$nextTick();
+    expect(isExpanded(wrapper)).toBe(true);
+    expect(appStore.toggleDrawerGroupPin).toHaveBeenCalledWith('/tasks');
+    expect(wrapper.get('[data-testid="drawer-group-toggle"]').attributes('aria-label')).toBe(
+      'navigation_drawer.unpin_subpages'
+    );
+    await wrapper.get('[data-testid="drawer-group-toggle"]').trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+  });
+  it('closes an unpinned dropdown on selection, including the current route', async () => {
+    const wrapper = mountGroup();
+    routeState.path = '/tasks/maps';
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    await wrapper.get('a[href="/tasks/maps"]').trigger('click');
+    expect(isExpanded(wrapper)).toBe(false);
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    routeState.path = '/tasks/traders';
+    await wrapper.vm.$nextTick();
+    expect(isExpanded(wrapper)).toBe(false);
+  });
+  it('opens for keyboard focus and closes when focus leaves the group', async () => {
+    const wrapper = mountGroup();
+    const group = wrapper.get('[data-testid="drawer-group"]');
+    await group.trigger('focusin');
+    expect(isExpanded(wrapper)).toBe(true);
+    await group.trigger('focusout', {
+      relatedTarget: wrapper.get('a[href="/tasks/maps"]').element,
+    });
+    expect(isExpanded(wrapper)).toBe(true);
+    await group.trigger('focusout', { relatedTarget: null });
+    expect(isExpanded(wrapper)).toBe(false);
+  });
+  it('expands inline on the collapsed rail without a separate menu', async () => {
+    const wrapper = mountGroup(true);
+    expect(wrapper.find('[data-testid="popover"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="drawer-group-toggle"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    expect(wrapper.get('[data-testid="drawer-group-menu"]').attributes('aria-hidden')).toBe(
+      'false'
+    );
+  });
+  it('highlights the closed parent for child routes and only the parent while open', async () => {
+    routeState.path = '/tasks/maps';
+    const wrapper = mountGroup();
+    expect(wrapper.get('a[href="/tasks"] i').attributes('data-color')).toBe(
+      'text-white light:text-surface-50'
+    );
+    await wrapper.get('[data-testid="drawer-group"]').trigger('mouseenter');
+    expect(wrapper.get('a[href="/tasks"] i').attributes('data-color')).toContain(
+      'text-surface-300'
+    );
     expect(wrapper.get('a[href="/tasks/graph"]').element.closest('li')?.className).toContain(
       'hidden lg:block'
     );
-    await toggle.trigger('click');
-    expect(railHrefs(wrapper)).toEqual(['/tasks']);
-  });
-  it('keeps the menu on the collapsed rail and hides the pin toggle', () => {
-    const wrapper = mountGroup(true);
-    expect(railHrefs(wrapper)).toEqual(['/tasks']);
-    expect(menuHrefs(wrapper)).toEqual(allHrefs);
-    expect(wrapper.find('[data-testid="drawer-group-toggle"]').exists()).toBe(false);
-  });
-  it('lights up the compact group on any of its views', () => {
-    routeState.path = '/tasks/maps';
-    const trigger = mountGroup().get('[data-testid="popover"] > a');
-    expect(trigger.find('i').attributes('data-color')).toBe('text-white light:text-surface-50');
-    expect(trigger.attributes('aria-current')).toBeUndefined();
-    expect(trigger.classes()).toContain('border-primary-500');
-    routeState.path = '/settings';
-    expect(mountGroup().get('[data-testid="popover"] > a i').attributes('data-color')).toContain(
-      'text-surface-300'
-    );
-  });
-  it('highlights only the pinned parent on its own route', () => {
-    appStore.drawerPinnedGroups.push('/tasks');
-    routeState.path = '/tasks/maps';
-    expect(mountGroup().get('i').attributes('data-color')).toContain('text-surface-300');
-    routeState.path = '/tasks';
-    expect(mountGroup().get('i').attributes('data-color')).toBe('text-white light:text-surface-50');
   });
 });
