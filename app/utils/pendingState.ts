@@ -69,8 +69,11 @@ const advanceReadBaseline = (cursor: { next?: RemoteAdvance }, baseline: Snapsho
   }
   return { cursor, baseline };
 };
-export const createPendingStateTracker = (getState: () => unknown) => {
-  let baseline = snapshotSyncState(getState());
+export const createPendingStateTracker = (
+  getState: () => unknown,
+  initialAcknowledgedState = getState()
+) => {
+  let baseline = snapshotSyncState(initialAcknowledgedState);
   const replacements = new Map<string, symbol>();
   // Only in-flight captures retain earlier links. The tracker holds the tail,
   // so completed reads do not leave an ever-growing event history.

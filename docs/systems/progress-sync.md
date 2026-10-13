@@ -35,6 +35,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
+  When startup confirms no cloud metadata or mode rows and performs no upload, an immediate save
+  controller carrying retained startup intent receives cloned defaults as its acknowledged baseline.
+  A failed first handoff upload retains changed paths through join snapshots and retries, while
+  untouched defaults accept remote updates. Deferred controllers adopt the state present when they start.
   Startup captures this tab's serializer baseline before awaiting cloud reads; failed initialization
   retains it for the same account. Retrying compares memory-only edits with that baseline rather than
   treating another tab's newer envelope as the source of this tab's stale values. Session transitions
@@ -230,8 +234,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   at session teardowns; `app/composables/useAppInitialization.ts` preserves newer-run lifecycle
   state when a superseded initialization completes or rejects late
 - `app/stores/tarkov/progressSaveStatus.ts`, `app/composables/useProgressSaveStatus.ts`,
-  `app/shell/ProgressSaveStatusIndicator.vue` — truthful local/cloud save status, bounded cloud
-  retry, manual retry, and export guidance
+  `app/shell/ProgressSaveStatusIndicator.vue`, `app/stores/tarkov/progressLiveStatus.ts` — truthful
+  local/cloud save status, delayed live updates, bounded cloud retry, manual retry, and export guidance
 - `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/supersededProgress.ts`,
   `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, export-only superseded progress,
   and redundancy-only storage cleanup
@@ -282,8 +286,20 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
   so rejoining early yields a channel that never joins and never reports an error. An unclean leave
   skips the rejoin rather than binding to an occupied topic.
-- Own-progress listener setup waits for the initial `SUBSCRIBED` acknowledgement, rejects on an
-  explicit channel failure, and times out a join that reports no status. A newer setup or teardown
+- Own-progress startup still requires a successful authoritative REST load before saving starts.
+  Listener setup registers the REST snapshot reader and subscribes without waiting for a join.
+  Realtime failure does not reset the loaded save controller or its safe pre-retry reconciliation.
+  The SDK handles join/transport retries. A terminal `CLOSED` channel is replaced only after
+  a clean leave; replacement attempts share the fallback polling schedule. A failed status or a
+  silent join after 15 seconds exposes “Live updates delayed” separately from local/cloud save status. Unsaved changes take priority in the indicator.
+  Foreground, online tabs poll the existing REST reader every 30–45 seconds while degraded. Reads
+  are single-flight and preserve pending local edits through the snapshot barrier. A 15-second
+  deadline releases the barrier even if authentication stalls before fetch can observe cancellation.
+  The first successful join and every rejoin reconcile a fresh snapshot to close the load/join gap;
+  a join during an older read queues a fresh read before clearing the delayed status. Failed catch-up
+  reads keep polling even when the socket has joined. Hidden/offline tabs pause fallback reads and
+  refresh when visible/online again. Teardown cancels recovery timers and event listeners.
+  A newer setup or teardown
   invalidates older work at each asynchronous boundary and rejects progress and metadata callbacks
   from the superseded listener, including while its channel is leaving. A different user's topic may
   proceed while the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.

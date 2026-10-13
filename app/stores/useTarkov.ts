@@ -896,12 +896,16 @@ const retireRecoveryCopyOnFirstSync = (userId: string, retirementPending: boolea
 };
 type ProgressSyncStart = {
   hadRemoteData: boolean;
+  initialAcknowledgedState?: UserState;
   /** Memory-only or recovered changes the startup load did not upload. */
   hasUnsavedHandoff: boolean;
   onSynced: () => void;
 };
 const shouldStartSyncNow = (store: TarkovStore, start: ProgressSyncStart): boolean =>
   start.hadRemoteData || hasProgress(store.$state) || start.hasUnsavedHandoff;
+/** A deferred controller adopts its current state; only retained startup intent needs a seed. */
+const initialHandoffAcknowledgement = (start: ProgressSyncStart): UserState | undefined =>
+  start.hasUnsavedHandoff ? start.initialAcknowledgedState : undefined;
 const startProgressSync = (
   store: TarkovStore,
   userId: string,
@@ -910,7 +914,14 @@ const startProgressSync = (
 ): void => {
   const { $supabase } = useNuxtApp();
   const { hadRemoteData, onSynced } = start;
-  const options = { store, client: $supabase.client, userId, hadRemoteData, onSynced };
+  const options = {
+    store,
+    client: $supabase.client,
+    userId,
+    hadRemoteData,
+    onSynced,
+    initialAcknowledgedState: initialHandoffAcknowledgement(start),
+  };
   if (!shouldStartSyncNow(store, start)) {
     progressSync.startWhenProgressExists(options, isStartupCurrent);
     return;
@@ -965,12 +976,13 @@ export async function initializeTarkovSync() {
   }
   const syncStart = {
     hadRemoteData: loadResult.hadRemoteData,
+    initialAcknowledgedState: loadResult.initialAcknowledgedState,
     hasUnsavedHandoff: hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
     onSynced: retireRecoveryCopyOnFirstSync(userId, startupCloudState.retirementPending),
   };
   startProgressSync(tarkovStore, userId, syncStart, isStartupCurrent);
-  // MULTI-DEVICE CONFLICT RESOLUTION: awaited so initialization does not report success before
-  // Realtime acknowledges the channel; failed or stalled joins reject to the app init boundary.
+  // Register the REST reconciliation reader and start live updates. A join outage
+  // falls back to polling without resetting the successfully loaded save controller.
   if (!isStartupCurrent()) return;
   await setupRealtimeListener(tarkovStore);
 }

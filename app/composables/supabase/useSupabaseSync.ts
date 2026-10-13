@@ -29,6 +29,8 @@ export interface SupabaseSyncConfig<
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
 > {
   store: Store<string, TState>;
+  /** Known cloud baseline when pending intent already exists before this controller starts. */
+  initialAcknowledgedState?: TState;
   table: string;
   transform?: (state: TState) => TPayload | null;
   sync?: (payload: TPayload) => Promise<{ error: SupabaseErrorLike | null }>;
@@ -175,6 +177,7 @@ export function useSupabaseSync<
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
 >({
   store,
+  initialAcknowledgedState,
   table,
   transform,
   sync,
@@ -192,7 +195,7 @@ export function useSupabaseSync<
   let lastSyncedPayload: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
-  const pendingState = createPendingStateTracker(() => store.$state);
+  const pendingState = createPendingStateTracker(() => store.$state, initialAcknowledgedState);
   let disposed = false;
   let syncQueue: Promise<TPayload | null> | null = null;
   let retryAttempt = 0;
