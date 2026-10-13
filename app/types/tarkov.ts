@@ -124,9 +124,17 @@ export interface TaskPrestigeReference {
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
 /**
  * Best-effort counter derivation attached server-side from the overlay's progressionCounters
- * registry: the counter equals the number of completed tasks in `taskIds`.
+ * registry. `distinctTaskCompletions`: the number of completed tasks in `taskIds`.
+ * `taskGroupCompletions`: the number of settled `groups`.
  */
-export type TaskCounterDerivation = { type: 'distinctTaskCompletions'; taskIds: string[] };
+export type TaskCounterDerivation =
+  | { type: 'distinctTaskCompletions'; taskIds: string[] }
+  | { type: 'taskGroupCompletions'; groups: TaskCounterGroup[] };
+/**
+ * Tasks the game credits as one: a list counts once every member is completed, `anyOf` once any
+ * member is (faction variants a player can only ever complete one of).
+ */
+export type TaskCounterGroup = string[] | { anyOf: string[] };
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';
