@@ -2259,7 +2259,7 @@
     "player_level": {
       "title": "Current Level",
       "label": "Current level",
-      "description": "Your saved {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
       "range_hint": "Enter a whole number from {min} to {max}.",
       "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
       "saved_title": "Level Updated",

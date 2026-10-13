@@ -52,6 +52,8 @@ beforeEach(() => {
   store.$reset();
   store.pvp.level = 37;
   store.pve.level = 12;
+  metadata.minPlayerLevel = 1;
+  metadata.maxPlayerLevel = 79;
   metadata.playerLevels = [{ level: 1 }, { level: 79 }];
   toastAdd.mockReset();
 });
@@ -80,6 +82,23 @@ describe('parsePlayerLevel', () => {
   });
 });
 describe('Settings current level card', () => {
+  it('uses metadata bounds for hints, validation, and saves', async () => {
+    metadata.minPlayerLevel = 10;
+    metadata.maxPlayerLevel = 40;
+    metadata.playerLevels = [{ level: 10 }, { level: 40 }];
+    const wrapper = await mountCard();
+    expect(wrapper.text()).toContain('Enter a whole number from 10 to 40.');
+    for (const value of ['9', '41']) {
+      await submitCard(wrapper, value);
+      expect(wrapper.text()).toContain('Level must be between 10 and 40.');
+      expect(applyButton(wrapper).element.disabled).toBe(true);
+      expect(store.pvp.level).toBe(37);
+    }
+    for (const value of ['10', '40']) {
+      await submitCard(wrapper, value);
+      expect(store.pvp.level).toBe(Number(value));
+    }
+  });
   it('shows the supported range and applies a valid level to the active mode only', async () => {
     const wrapper = await mountCard();
     expect(wrapper.text()).toContain('Enter a whole number from 1 to 79.');
@@ -139,6 +158,31 @@ describe('Settings current level card', () => {
   });
 });
 describe('drawer level editor', () => {
+  it('uses metadata bounds for validation and stepper limits', async () => {
+    metadata.minPlayerLevel = 10;
+    metadata.maxPlayerLevel = 40;
+    metadata.playerLevels = [{ level: 10 }, { level: 40 }];
+    const wrapper = await mountDrawer();
+    const input = await openDrawerEditor(wrapper);
+    expect(input.attributes('aria-label')).toBe('Current level, 10 to 40');
+    for (const value of ['9', '41']) {
+      await input.setValue(value);
+      await input.trigger('keyup', { key: 'Enter' });
+      expect(wrapper.get('[role="alert"]').text()).toBe('Level must be between 10 and 40.');
+      expect(store.pvp.level).toBe(37);
+    }
+    await input.setValue('40');
+    await input.trigger('keyup', { key: 'Enter' });
+    expect(store.pvp.level).toBe(40);
+    expect(wrapper.get('button[aria-label="Increase level"]').attributes()).toHaveProperty(
+      'disabled'
+    );
+    store.setLevel(10);
+    await nextTick();
+    expect(wrapper.get('button[aria-label="Decrease level"]').attributes()).toHaveProperty(
+      'disabled'
+    );
+  });
   it('keeps an invalid Enter open with feedback, then Escape restores the saved level', async () => {
     const wrapper = await mountDrawer();
     const input = await openDrawerEditor(wrapper);
