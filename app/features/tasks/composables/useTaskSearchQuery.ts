@@ -1,6 +1,6 @@
+import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
 import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { logger } from '@/utils/logger';
-import { getQueryString } from '@/utils/routeHelpers';
 import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
 import type { TaskSecondaryView } from '@/types/taskFilter';
 /**
@@ -9,14 +9,7 @@ import type { TaskSecondaryView } from '@/types/taskFilter';
  * for the search; clearing it returns to the saved tab.
  */
 export function useTaskSearchQuery() {
-  const route = useRoute();
-  const searchQuery = ref(getQueryString(route.query.q) || '');
-  watch(
-    () => route.query.q,
-    (newQ) => {
-      searchQuery.value = getQueryString(newQ) || '';
-    }
-  );
+  const { searchQuery } = useRouteSearchQuery();
   const debouncedSearch = ref(searchQuery.value);
   const updateDebouncedSearch = debounce((value: string) => {
     debouncedSearch.value = value;
@@ -52,6 +45,7 @@ export function useTaskSearchQuery() {
     cleanup() {
       updateDebouncedSearch.cancel();
     },
+    hasQuery,
     isSearchActive,
     normalizedSearch,
     pinnedStatus: computed(() => pinnedStatus.value),

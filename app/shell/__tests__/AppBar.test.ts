@@ -74,8 +74,13 @@ vi.mock('@/composables/useKeybinds', () => ({
 vi.mock('@/shell/ActivityLogPanel.vue', () => ({
   default: { name: 'ActivityLogPanel', template: '<div />' },
 }));
-vi.mock('@/features/omnibar/Omnibar.vue', () => ({
-  default: { name: 'Omnibar', template: '<div />' },
+vi.mock('@/features/omnibar/AppSearch.vue', () => ({
+  default: {
+    name: 'AppSearch',
+    props: ['shortcutParts', 'keyShortcuts'],
+    template:
+      '<div data-testid="app-search" :data-shortcut="shortcutParts.join(\'+\')" :data-aria="keyShortcuts" />',
+  },
 }));
 const mockThemeModeRef = ref<'dark' | 'light'>('dark');
 const mockIsLightThemeRef = ref(false);
@@ -146,7 +151,6 @@ const mountAppBar = async () => {
         NuxtLink: {
           template: '<a><slot /></a>',
         },
-        Omnibar: true,
         ProgressSaveStatusIndicator: true,
         SignOutConfirmModal: true,
         UButton: {
@@ -491,16 +495,11 @@ describe('AppBar responsive layout', () => {
     }
     wrapper.unmount();
   });
-  it('collapses the search trigger to a 32x32 icon button below sm', async () => {
+  it('renders the inline app search with the configured shortcut', async () => {
     const wrapper = await mountAppBar();
-    const search = wrapper.find('button[aria-label="omnibar.open_aria"]');
-    expect(search.exists()).toBe(true);
-    const classes = (search.attributes('class') || '').split(/\s+/);
-    expect(classes).toEqual(expect.arrayContaining(['h-8', 'w-8', 'shrink-0', 'sm:w-full']));
-    const label = search
-      .findAll('span')
-      .find((s) => s.text() === 'omnibar.trigger_label' && s.findAll('span').length === 0);
-    expect(label?.classes()).toEqual(expect.arrayContaining(['hidden', 'sm:inline']));
+    const search = wrapper.find('[data-testid="app-search"]');
+    expect(search.attributes('data-shortcut')).toBe('Ctrl+K');
+    expect(search.attributes('data-aria')).toBe('Control+K');
     wrapper.unmount();
   });
   it('renders Log In as icon-only below sm while keeping its accessible label', async () => {
