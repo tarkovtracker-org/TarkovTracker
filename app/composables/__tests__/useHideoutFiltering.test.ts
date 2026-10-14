@@ -267,5 +267,14 @@ describe('useHideoutFiltering', () => {
       ]);
       expect(idsFor('maxed')).toEqual(['station-maxed']);
     });
+    it('shows every station when the stored view is not a known status', async () => {
+      const { hideoutFiltering } = await initHideoutTest({ view: 'legacy', reverseStations: true });
+      expect(hideoutFiltering.visibleStations.value.map((station) => station.id)).toEqual([
+        'station-available',
+        'station-locked',
+        'station-maxed',
+        'station-skill-locked',
+      ]);
+    });
   });
 });

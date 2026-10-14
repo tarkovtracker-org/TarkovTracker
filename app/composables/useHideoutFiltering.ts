@@ -5,6 +5,7 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import type { HideoutStation } from '@/types/tarkov';
 export type HideoutPrimaryView = 'available' | 'maxed' | 'locked' | 'all';
+const STATION_STATUS_VIEWS: readonly HideoutPrimaryView[] = ['available', 'maxed', 'locked'];
 export type HideoutStationCounts = {
   available: number;
   maxed: number;
@@ -35,7 +36,8 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     if (!nextLevel) return false;
     return arePrereqsMet(nextLevel);
   };
-  // Stations whose next level can be built now come first; the rest keep their upstream order.
+  // Stations whose next level has its station, skill and trader prerequisites met come first; the
+  // rest keep their upstream order. Item requirements do not affect the order.
   const sortStationsByReadiness = (stations: HideoutStation[]): HideoutStation[] =>
     stations
       .map((station, index) => ({
@@ -73,8 +75,11 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     stations: HideoutStation[],
     view: HideoutPrimaryView
   ): HideoutStation[] =>
+    // A stored view that is not a station status (stale or synced from elsewhere) shows every station.
     sortStationsByReadiness(
-      view === 'all' ? stations : stations.filter((s) => getStationStatus(s) === view)
+      STATION_STATUS_VIEWS.includes(view)
+        ? stations.filter((s) => getStationStatus(s) === view)
+        : stations
     );
   const visibleStations = computed(() => {
     if (isStoreLoading.value) return [];
