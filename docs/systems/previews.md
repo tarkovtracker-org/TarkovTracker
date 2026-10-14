@@ -5,7 +5,8 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 ## Actions-owned Cloudflare previews
 
 Merge-group CI completions also request this trusted pipeline for the live queue integration
-commit. They always deploy/smoke-test the anonymous build and publish on that queue SHA, with
+commit. They deploy/smoke-test the anonymous build unless an authenticated prior success
+for the same SHA and digest is reused. Results publish on that queue SHA, with
 exact-ref, current-main first-parent and attempt-specific CI proof repeated before upload and
 success. Queue builds never inherit a member PR's preview result or fork command grant. Activation
 is staged; see [merge queue rollout](../merge-queue-rollout.md).

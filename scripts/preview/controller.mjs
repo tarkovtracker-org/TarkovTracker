@@ -4,7 +4,7 @@ import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { readPreviewRequest } from './request-authorization.mjs';
-import { queueRevision, requireQueueCi } from './merge-queue.mjs';
+import { QueueValidationError, queueRevision, requireQueueCi } from './merge-queue.mjs';
 import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
 import {
   ciResultCheck,
@@ -569,11 +569,19 @@ async function evaluatePull({ github, context, inputs, workspace }, state) {
   await authorizeReadiness(github, context, inputs, state);
   return deployDecision({ github, context, state, workspace });
 }
+async function queueProof(proof) {
+  try {
+    return await proof();
+  } catch (error) {
+    if (error instanceof QueueValidationError) throw failure(error.message);
+    throw error;
+  }
+}
 async function evaluateQueue({ github, context, state, workspace }) {
-  const revision = await queueRevision(github, context, state.candidate);
+  const revision = await queueProof(() => queueRevision(github, context, state.candidate));
   state.candidate.queueBaseSha = revision.baseSha;
   state.candidate.queueTreeSha = revision.treeSha;
-  await requireQueueCi(github, context, state.run);
+  await queueProof(() => requireQueueCi(github, context, state.run));
   state.previewAuthorization = 'queue';
   return deployDecision({ github, context, state, workspace });
 }
@@ -970,17 +978,31 @@ async function freshnessErrors(github, context, decision) {
     ? await pullFreshnessErrors(github, context, decision)
     : [];
   const run = await getRun(github, context.repo, decision.runId);
-  await queueFreshness(github, context, decision, run);
+  const queueErrors = await queueFreshness(github, context, decision, run);
   const mismatch = await dispatchFreshnessMismatch(github, context, decision, run);
-  return [...pullErrors, ...runFreshnessErrors(run, decision), ...(mismatch ? [mismatch] : [])];
+  return [
+    ...pullErrors,
+    ...queueErrors,
+    ...runFreshnessErrors(run, decision),
+    ...(mismatch ? [mismatch] : []),
+  ];
 }
-async function queueFreshness(github, context, decision, run) {
-  if (decision.runEvent !== 'merge_group') return;
+async function checkQueueFreshness(github, context, decision, run) {
   const candidate = candidateFromDecision(decision);
   const revision = await queueRevision(github, context, candidate);
-  if (revision.baseSha !== decision.baseSha) throw new Error('Queue base changed.');
+  if (revision.baseSha !== decision.baseSha) return ['Queue base changed.'];
   checkRunState(run, candidate);
   await requireQueueCi(github, context, run);
+  return [];
+}
+async function queueFreshness(github, context, decision, run) {
+  if (decision.runEvent !== 'merge_group') return [];
+  try {
+    return await checkQueueFreshness(github, context, decision, run);
+  } catch (error) {
+    if (error instanceof QueueValidationError) return [error.message];
+    throw error;
+  }
 }
 async function dispatchFreshnessMismatch(github, context, decision, run) {
   if (!decision.pullRequest || decision.runEvent !== 'workflow_dispatch') return null;

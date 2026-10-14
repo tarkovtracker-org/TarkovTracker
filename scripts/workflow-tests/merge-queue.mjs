@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 import { queueRevision, requireQueueCi } from '../preview/merge-queue.mjs';
 import { resolveProfileOutputs } from '../preview/build-profile.mjs';
 const head = 'a'.repeat(40);
@@ -32,15 +33,29 @@ function fixture() {
       rest: {
         actions: { listJobsForWorkflowRunAttempt: 'jobs' },
         git: {
-          getRef: async ({ ref }) => ({
-            data: { object: { sha: ref === 'heads/main' ? state.base : state.head } },
-          }),
-          getCommit: async () => ({
-            data: { tree: { sha: state.tree }, parents: [{ sha: state.parent }] },
-          }),
+          getRef: async ({ owner, repo, ref }) => {
+            assert.deepEqual({ owner, repo }, { owner: 'example', repo: 'repo' });
+            assert.ok([`heads/${branch}`, 'heads/main'].includes(ref), ref);
+            return { data: { object: { sha: ref === 'heads/main' ? state.base : state.head } } };
+          },
+          getCommit: async ({ owner, repo, commit_sha }) => {
+            assert.deepEqual({ owner, repo }, { owner: 'example', repo: 'repo' });
+            assert.equal(commit_sha, head);
+            return { data: { tree: { sha: state.tree }, parents: [{ sha: state.parent }] } };
+          },
         },
       },
-      paginate: async () => state.jobs,
+      paginate: async (endpoint, params) => {
+        assert.equal(endpoint, 'jobs');
+        assert.deepEqual(params, {
+          owner: 'example',
+          repo: 'repo',
+          run_id: 1,
+          attempt_number: 2,
+          per_page: 100,
+        });
+        return state.jobs;
+      },
     },
   };
 }
@@ -97,8 +112,9 @@ test('queue builds use anonymous preview settings, not production identifiers', 
 test('queue workflow runs full validation and retains existing merge protections during rollout', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.match(ci, /merge_group:\n    types: \[checks_requested\]/);
-  assert.match(ci, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
-  assert.match(ci, /github.event.merge_group.base_sha/);
+  const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
+  assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
+  assert.match(classify, /BASE_SHA:.*github.event.merge_group.base_sha/);
   assert.match(
     readFileSync('.github/workflows/preview-state.yml', 'utf8'),
     /github.event.workflow_run.event == 'merge_group'/

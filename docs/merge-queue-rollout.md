@@ -35,10 +35,13 @@ the queue until all of the following are established:
 4. Adapt Crowdin's strict-policy validator and immediate-merge/main-CI assumptions. Queue
    submission is not a completed merge; do not dispatch main CI for a still-queued candidate.
    Adapt Dependabot's merge-state handling as needed and verify job-token queue events trigger CI.
-5. Establish required review admission. Existing bot comments are not GitHub approval rules;
+5. Define and validate Pages retention/cleanup for ephemeral queue preview branches before
+   activation. Each re-formed queue group has its own branch; GitHub ref deletion does not
+   remove its Pages deployment.
+6. Establish required review admission. Existing bot comments are not GitHub approval rules;
    enqueue only after reviews are complete and findings resolved, including independent review
    for the risk classes in `AGENTS.md`. Never use `--admin`.
-6. With explicit rollout authorization, activate the queue template and remove strict freshness
+7. With explicit rollout authorization, activate the queue template and remove strict freshness
    only once equivalent queue integration checks are enforced. Keep both required contexts,
    GitHub Actions provider pins, `ALLGREEN`, no bypass actors, and deletion/non-fast-forward rules.
 

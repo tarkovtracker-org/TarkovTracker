@@ -2,6 +2,7 @@
 // preview uploader only while the exact queue ref and CI attempt remain live.
 import { PRODUCTION_BRANCH } from './profile.mjs';
 const SHA = /^[0-9a-f]{40}$/;
+export class QueueValidationError extends Error {}
 const PREFIX = `gh-readonly-queue/${PRODUCTION_BRANCH}/`;
 function isQueueBranch(branch) {
   return typeof branch === 'string' && branch.startsWith(PREFIX);
@@ -9,7 +10,9 @@ function isQueueBranch(branch) {
 function requireQueueIdentity(context, candidate) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   if (candidate.headRepo !== repository || !isQueueBranch(candidate.headBranch))
-    throw new Error('Queue candidate must belong to this repository and target main.');
+    throw new QueueValidationError(
+      'Queue candidate must belong to this repository and target main.'
+    );
 }
 function queueParent(commit) {
   return commit.parents?.[0]?.sha;
@@ -20,17 +23,26 @@ function queueTree(commit) {
 function checkedRevision(commit, main) {
   const baseSha = queueParent(commit);
   if (!SHA.test(String(baseSha)) || baseSha !== main.object.sha)
-    throw new Error('Queue base is no longer current main.');
-  if (!SHA.test(String(queueTree(commit)))) throw new Error('Queue tree is missing.');
+    throw new QueueValidationError('Queue base is no longer current main.');
+  if (!SHA.test(String(queueTree(commit))))
+    throw new QueueValidationError('Queue tree is missing.');
   return { baseSha, treeSha: commit.tree.sha };
+}
+async function queueRef(github, repo, ref) {
+  try {
+    return await github.rest.git.getRef({ ...repo, ref });
+  } catch (error) {
+    if ([404, 422].includes(error.status))
+      throw new QueueValidationError(
+        'Queue ref is no longer available; wait for a fresh queue run.'
+      );
+    throw error;
+  }
 }
 export async function queueRevision(github, context, candidate) {
   requireQueueIdentity(context, candidate);
-  const { data: ref } = await github.rest.git.getRef({
-    ...context.repo,
-    ref: `heads/${candidate.headBranch}`,
-  });
-  if (ref.object.sha !== candidate.headSha) throw new Error('Queue revision moved.');
+  const { data: ref } = await queueRef(github, context.repo, `heads/${candidate.headBranch}`);
+  if (ref.object.sha !== candidate.headSha) throw new QueueValidationError('Queue revision moved.');
   const { data: commit } = await github.rest.git.getCommit({
     ...context.repo,
     commit_sha: candidate.headSha,
@@ -49,7 +61,8 @@ export async function requireQueueCi(github, context, run) {
     per_page: 100,
   });
   const results = jobs.filter((job) => job.name === 'CI Result');
-  if (results.length !== 1) throw new Error('Queue CI Result is missing or ambiguous.');
+  if (results.length !== 1)
+    throw new QueueValidationError('Queue CI Result is missing or ambiguous.');
   const result = results[0];
   if (
     ![
@@ -60,5 +73,5 @@ export async function requireQueueCi(github, context, run) {
       result.conclusion === 'success',
     ].every(Boolean)
   )
-    throw new Error('Queue CI Result did not succeed for this attempt.');
+    throw new QueueValidationError('Queue CI Result did not succeed for this attempt.');
 }
