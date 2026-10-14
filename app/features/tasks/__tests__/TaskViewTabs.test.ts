@@ -2,10 +2,23 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import TaskViewTabs from '@/features/tasks/TaskViewTabs.vue';
 import type { LocationQuery } from 'vue-router';
 const routeState: { path: string; query: LocationQuery } = { path: '/tasks', query: {} };
+const pendingSearch = ref<string | null>(null);
 mockNuxtImport('useRoute', () => () => routeState);
+vi.mock('@/composables/useRouteSearchQuery', async () => {
+  const { computed } = await import('vue');
+  const { getQueryString } = await import('@/utils/routeHelpers');
+  return {
+    useRouteSearchQuery: () => ({
+      searchQuery: computed(
+        () => pendingSearch.value ?? (getQueryString(routeState.query.q) || '')
+      ),
+    }),
+  };
+});
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -28,6 +41,7 @@ describe('TaskViewTabs', () => {
   beforeEach(() => {
     routeState.path = '/tasks';
     routeState.query = {};
+    pendingSearch.value = null;
   });
   it('links every task view route', () => {
     const wrapper = mountTabs();
@@ -51,6 +65,15 @@ describe('TaskViewTabs', () => {
     const wrapper = mountTabs();
     expect(linkTarget(wrapper, 'list')).toEqual({ path: '/tasks', query: { q: 'mole' } });
     expect(linkTarget(wrapper, 'maps')).toEqual({ path: '/tasks/maps', query: { q: 'mole' } });
+  });
+  it('carries a search that has not reached the URL yet', () => {
+    routeState.query = { q: 'mol' };
+    pendingSearch.value = 'mole';
+    const wrapper = mountTabs();
+    expect(linkTarget(wrapper, 'traders')).toEqual({
+      path: '/tasks/traders',
+      query: { q: 'mole' },
+    });
   });
   it('hides the Graph tab below the large breakpoint', () => {
     const graph = mountTabs().get('[data-testid="task-view-tab-graph"]');

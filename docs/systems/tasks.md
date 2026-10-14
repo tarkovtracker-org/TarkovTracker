@@ -18,8 +18,10 @@ stations. Opening a `?task=` link clears `q` first so the linked task is not fil
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
 tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
 tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. Tabs in the
-page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across;
-status, sort, trader and map come back from preferences. The sidebar keeps one Tasks entry,
+page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
+including a search still being debounced into the URL; sort, trader and map come back from
+preferences, and so does status everywhere except Graph, which always shows every status without
+overwriting the saved one. The sidebar keeps one Tasks entry,
 highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).

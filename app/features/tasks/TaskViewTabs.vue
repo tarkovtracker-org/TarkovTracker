@@ -29,7 +29,7 @@
   </nav>
 </template>
 <script setup lang="ts">
-  import { getQueryString } from '@/utils/routeHelpers';
+  import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
   import {
     resolveTaskRouteView,
     TASK_ROUTE_PATHS,
@@ -56,11 +56,13 @@
   ];
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
+  const { searchQuery } = useRouteSearchQuery();
   const activeView = computed(() => resolveTaskRouteView(route.path));
   // Only the search carries over: status, sort, trader and map are restored from preferences,
-  // and the Graph route's forced status must not overwrite the list's saved one.
+  // and the Graph route's forced status must not overwrite the list's saved one. The search
+  // includes a debounced write that has not reached `?q=` yet, so a quick tab click keeps it.
   const carriedQuery = computed(() => {
-    const search = getQueryString(route.query.q);
+    const search = searchQuery.value;
     return search ? { q: search } : {};
   });
   const tabs = computed(() =>
