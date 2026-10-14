@@ -2,13 +2,21 @@
   <ClientOnly>
     <TasksPage>
       <template #header>
-        <PageHeader v-bind="header" class="mb-4" />
+        <PageHeader v-bind="header" class="mb-4">
+          <template #actions>
+            <TaskViewTabs />
+          </template>
+        </PageHeader>
       </template>
     </TasksPage>
     <template #fallback>
       <div class="px-3 py-6 sm:px-6">
         <div class="mx-auto max-w-350">
-          <PageHeader v-bind="header" class="mb-4" />
+          <PageHeader v-bind="header" class="mb-4">
+            <template #actions>
+              <TaskViewTabs />
+            </template>
+          </PageHeader>
         </div>
       </div>
     </template>
@@ -16,6 +24,7 @@
 </template>
 <script setup lang="ts">
   import PageHeader from '@/components/ui/PageHeader.vue';
+  import TaskViewTabs from '@/features/tasks/TaskViewTabs.vue';
   import TasksPage from '@/pages/tasks.vue';
   import { resolveTaskRouteView, type TaskRouteView } from '@/utils/taskRouteView';
   const { t } = useI18n({ useScope: 'global' });
