@@ -23,7 +23,8 @@ export type PersistedPreferencesStateWithLegacy = PersistedPreferencesState & {
   hideoutSortReadyFirst?: unknown;
   hideoutCollapseCompleted?: unknown;
 };
-// Hideout ready-first ordering is always on and the collapse-completed switch was removed.
+// Keys from retired or renamed preferences; a saved state holding any of them is re-persisted after
+// sanitizing.
 const LEGACY_PREFERENCE_KEYS = [
   'useAutomaticLevelCalculation',
   'taskCardDensity',
