@@ -485,5 +485,6 @@ const runFixtures = () => {
   const cleanCheck = spawnSync(process.execPath, [script, checkFile], { cwd: root });
   if (cleanCheck.status !== 0) throw new Error('Clean check mode should pass');
 };
-if (process.env.VITEST) it('passes formatter regression fixtures', runFixtures);
+// Each fixture spawns its own Node process in series, which can exceed the 30s default on a busy CI shard.
+if (process.env.VITEST) it('passes formatter regression fixtures', runFixtures, 120_000);
 else runFixtures();
