@@ -57,6 +57,7 @@ function fixture() {
       listWorkflowRunArtifacts: vi.fn(),
     },
     repos: {
+      listReleases: vi.fn(),
       listCommitStatusesForRef: vi.fn(),
     },
   };
@@ -67,21 +68,22 @@ function fixture() {
     artifacts: previewArtifacts,
   };
   const github = {
-    paginate: vi.fn((endpoint) =>
-      Promise.resolve(
-        endpoint === rest.repos.listCommitStatusesForRef
-          ? evidence.statuses
-          : endpoint === rest.actions.listJobsForWorkflowRun
-            ? evidence.jobs
-            : endpoint === rest.actions.listWorkflowRunArtifacts
-              ? evidence.artifacts
-              : evidence.checks
-      )
-    ),
+    paginate: vi.fn((endpoint) => {
+      const results = new Map([
+        [rest.repos.listReleases, []],
+        [rest.repos.listCommitStatusesForRef, evidence.statuses],
+        [rest.actions.listJobsForWorkflowRun, evidence.jobs],
+        [rest.actions.listWorkflowRunArtifacts, evidence.artifacts],
+        [rest.checks.listForRef, evidence.checks],
+      ]);
+      if (!results.has(endpoint)) throw new Error('Unexpected paginated endpoint');
+      return Promise.resolve(results.get(endpoint));
+    }),
     rest: {
       checks: rest.checks,
       actions: rest.actions,
       repos: {
+        listReleases: rest.repos.listReleases,
         listCommitStatusesForRef: rest.repos.listCommitStatusesForRef,
         getCommit: vi.fn().mockResolvedValue({ data: commit }),
         getContent: vi.fn(({ ref, path }) =>

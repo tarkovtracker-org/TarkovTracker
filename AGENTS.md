@@ -11,8 +11,8 @@ Merges follow the merge class below.
 - Nuxt 4 with prerendered public documents and client-rendered trackers/accounts (no server-side personalized fetching), Vue 3 Composition API, strict
   TypeScript, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 - `app/`: application, features, stores, composables, shell, server routes; Tarkov.dev proxy in
-  `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/api-gateway/`: public
-  API Worker. `scripts/precompute/`: scheduled KV pipeline.
+  `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/contract-tests/`:
+  consumer integration with the separately owned public API Worker. `scripts/precompute/`: scheduled KV pipeline.
 - `app/locales/en.json` is the translation source; other locale files are Crowdin-owned.
 - Shared pure progress rules are owned by `tarkovtracker-org/TarkovTracker-API` and consumed here
   as `@tarkovtracker/progress-contracts` from an immutable release. Ownership: `docs/api-ownership.md`.
@@ -20,12 +20,11 @@ Merges follow the merge class below.
 ## Commands
 
 - Install `pnpm install` | Dev `pnpm run dev` | Build `pnpm run build` | Static `pnpm run generate`
-- Test `pnpm run test` | Gateway `pnpm run test:api-gateway` | Supabase `pnpm run supabase:check`
+- Test `pnpm run test` | Supabase `pnpm run supabase:check`
 - Contract pins `pnpm run check:progress-contracts` | Versioned API parity `pnpm run verify:api-parity`
-- Standalone legacy gateway `pnpm run verify:api-standalone`
 - Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
 - Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
-- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi`
+- i18n `pnpm run i18n:check`
 - Brief `pnpm run brief --file <path>` (`--symbol <file:export>`, `--base <ref>`): consumers, docs,
   tests, and checks before editing; advisory, read its Uncertainty section
 
@@ -35,8 +34,9 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 
 ## Validation
 
-- TypeScript changes: typecheck. Code changes: lint. Locale changes: `pnpm run i18n:check`. API gateway
-  changes: also the checks in `workers/api-gateway/AGENTS.md`.
+- TypeScript changes: typecheck. Code changes: lint. Locale changes: `pnpm run i18n:check`. External API integration
+  changes: also the checks in `workers/contract-tests/AGENTS.md`; public API runtime changes belong
+  in `tarkovtracker-org/TarkovTracker-API`.
 - Formatting is enforced by the hook and CI `format:check`; do not run the broad format command
   unless the hook was bypassed.
 - Fix Fallow findings instead of suppressing them; keep new functions at cyclomatic 4 or less
@@ -67,7 +67,7 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 
 - `supabase/**`, SQL functions, account/team/token lifecycle, or production DB work:
   `supabase/AGENTS.md`.
-- `workers/api-gateway/**`: `workers/api-gateway/AGENTS.md`.
+- `workers/contract-tests/**`: `workers/contract-tests/AGENTS.md`.
 - When a change alters documented behavior or invariants, update the owning doc in the same change.
 
 ## Workflow and review

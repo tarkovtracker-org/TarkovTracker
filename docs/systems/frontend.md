@@ -2,6 +2,21 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Task undo
+
+Task undo history belongs to the current signed-in owner and game mode. Account changes, logout,
+and mode changes synchronously clear the shared history and close any inline undo notification.
+Previously retained callbacks stay invalid even after returning to the original context. A late
+completion cannot remove or restore actions belonging to the new context.
+
+**Files:** `app/stores/useActionHistoryStore.ts`, `app/composables/useTaskNotification.ts`.
+
+**Invariants:** Context invalidation replaces the history array, including when it is empty.
+Ordinary undo mutations preserve that array so a failed undo keeps its inline retry. Current task
+undo callbacks are synchronous. The store guards callback invocation and subsequent history/toast
+bookkeeping; future asynchronous callbacks must independently guard their own writes after each
+await against context invalidation.
+
 ## Language selection
 
 The app bar uses a compact translation icon with native language names and a checked current
@@ -23,9 +38,10 @@ The cooldown does not apply server-side or prevent direct calls to the public pr
 
 **Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
 an administrator can change the active channel, display name, and enabled state without a frontend
-redeploy. The override is stored in a service-role-only settings table. The public config route is
-cached at the edge with a bounded TTL and explicitly invalidated after an admin update; live status is
-also edge-cached per TTL, so mounted clients do not invoke the Pages Function for every poll.
+redeploy. The override is stored in a service-role-only settings table. The public config route
+advertises bounded browser/CDN cache TTLs and is explicitly invalidated after an admin update.
+These headers do not by themselves bypass Pages Function invocations. Request volume is bounded
+in the client; a mounted Twitch SDK player supplies status events without live API polling.
 
 ### Diagram
 
@@ -36,12 +52,14 @@ flowchart LR
     Gate --> Settings[(public.app_settings)]
     Write --> Audit[(admin_audit_log)]
     Write -->|immediate + delayed purge| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
-    Embed[PromotedTwitchEmbed] -->|mount, focus + every 5m| Read[GET /api/twitch/config]
-    Read --> Edge[Edge cache, 1h TTL]
-    Edge --> Settings
-    Edge --> Fallback[Public runtime config fallback]
-    Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
-    Live --> LiveEdge[Edge cache, 30s TTL]
+    Embed[PromotedTwitchEmbed] -->|mount + every 5m when stale| Read[GET /api/twitch/config]
+    Read -.-> Headers[Cache headers, browser 5m / CDN 1h]
+    Read --> Settings
+    Read --> Fallback[Public runtime config fallback]
+    Embed -->|every 5m without an active SDK player| Live[GET /api/twitch/live]
+    Live --> LiveEdge[Per-isolate cache, 60s TTL]
+    Embed --> Player[Twitch SDK player]
+    Player -->|READY / OFFLINE events| Embed
 ```
 
 ### Flow
@@ -71,26 +89,43 @@ flowchart LR
    without changing the already returned save result.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
-   on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
+   of breaking the embed. The route reads the database whenever the Pages Function executes.
+   Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
    five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of one hour
-   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`), so Cloudflare serves
-   cache hits without invoking the Function. The bounded TTL remains the final recovery path
+   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`). These are cache policy
+   headers, not proof of a cache hit or an avoided Function request. The bounded TTL is a recovery path
    if invalidation fails, while the delayed second purge prevents a successful invalidation from
    being undone by an in-flight stale fill. When the database read fails, the fallback response is
    sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
    Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
    responses include the settings version.
-5. `PromotedTwitchEmbed` fetches config on mount, every five minutes while visible, and again on tab
-   focus. Browser and edge caching absorb those refreshes between fills. It watches the shared client
-   state for immediate propagation of admin saves in the same tab and polls `/api/twitch/live` every
-   60 seconds while `enabled === true`, pausing both timers while the tab is hidden. It ignores
-   fetched configs older than the latest shared version, so a browser cache hit or overlapping focus
-   request cannot revert an admin save. Live responses are edge-cached for 30 seconds, so the CDN
-   absorbs the polling traffic instead of the Function.
-   Channel changes advance a request generation so stale live results cannot apply after a channel
-   cycles back. Channel changes replace the player URL and clear a stored dismissal, disabling hides
-   an active player, and an unavailable config endpoint keeps the build-time fallback working.
+5. `PromotedTwitchEmbed` fetches config on mount and at most once every five minutes while visible.
+   Tab returns reuse fresh results instead of issuing extra requests. Shared client state still applies
+   admin saves immediately; fetched configs older than the latest shared version are ignored.
+6. Live discovery runs only while enabled, visible, and not dismissed, at most once every five minutes.
+   A live result mounts `TwitchStreamPlayer`, which loads the official SDK once per page. Once the SDK
+   emits `READY`, live API polling stops; `OFFLINE` removes the player and resumes discovery after
+   five minutes. If the SDK fails to load, a direct iframe preserves playback with five-minute polling.
+   A titled loading indicator covers pending SDK loads. SDK listeners and the player are destroyed
+   on removal. Video requests go directly to Twitch.
+7. Dismissal removes the player and stops live requests, including across remounts in the same tab.
+   The reopen button remains available while the feature is enabled; reopening checks current status
+   instead of displaying a stale player. Channel changes clear dismissal after initial config resolution
+   and advance a request generation, so stale live results cannot apply after a channel cycles back.
+   Hidden tabs stop both timers. Client requests have a ten-second timeout and no automatic retry;
+   failed live requests back off from ten to thirty minutes, resetting after success.
+8. The live route keeps up to 100 channels for 60 seconds in an isolate-local LRU cache and coalesces
+   simultaneous checks for the same channel. Twitch requests time out after five seconds. Failures are
+   not cached. This reduces upstream subrequests within an instance, not Function invocations or
+   globally shared work across regions. Browser responses retain their 30-second freshness.
+
+**Request budget.** Excluding initial loads, channel changes, and manual reopen actions, a continuously
+visible tab makes 144 config requests over 12 hours. An active SDK player or dismissed stream adds no
+periodic live requests; offline discovery or SDK fallback adds at most 144. Previously live polling
+added 720 requests regardless of dismissal. Browser cache hits may reduce actual network requests.
+These budgets are client call counts, not claims about the historical traffic spike or billing savings.
+See [Cloudflare's cache execution order](https://developers.cloudflare.com/workers/reference/how-the-cache-works/)
+and [Pages Function billing](https://developers.cloudflare.com/pages/functions/pricing/).
 
 ### Files
 
@@ -100,7 +135,8 @@ flowchart LR
   post-commit cache purge.
 - `app/server/api/twitch/config.get.ts` — public fallback/override resolution and edge-cache
   headers.
-- `app/server/api/twitch/live.get.ts` — live-status check with short edge caching.
+- `app/server/api/twitch/live.get.ts` — live-status check with bounded per-isolate caching.
+- `app/components/TwitchStreamPlayer.vue` and `app/utils/twitchPlayer.ts` — SDK lifecycle and iframe fallback.
 - `app/components/PromotedTwitchEmbed.vue` — bounded config refresh, live polling, and player state
   updates.
 - `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
@@ -126,19 +162,19 @@ flowchart LR
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
-  Cloudflare serves cache hits without executing the Pages Function; the route and its database read
-  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
-  outage cannot pin the env-default fallback at the edge.
+- Successful config responses must carry the `promoted-twitch-config` cache tag and bounded browser/CDN
+  TTLs. These headers do not guarantee an avoided Pages Function invocation; every execution reads
+  the database. Failed database reads must return `no-store` so an outage cannot pin fallback config.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
   commits, then schedule a second purge after a delay longer than the config read timeout so an
   in-flight stale fill cannot survive successful invalidation. If immediate invalidation fails, it
   must return the committed config with an explicit warning flag; the client must apply that config
   and visibly warn the admin without retrying the database write. The bounded TTL remains the final
   recovery path when invalidation fails.
-- Mounted clients must refresh config every five minutes while visible and on mount/focus so remote
-  enable, disable, and channel changes reach continuously open tabs. Config refreshes and live-status
-  checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+- Mounted clients resolve config on mount, including hidden mounts, and refresh it periodically while
+  visible with a five-minute freshness window. Tab returns reuse fresh results. Remote enable,
+  disable, and channel changes must reach continuously open tabs. Hidden tabs stop polling timers;
+  already dispatched requests may settle. Pending lifecycle work must not start timers after unmount.
   Older config versions and stale live-request generations must never overwrite the latest shared
   configuration or player state.
 - Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`

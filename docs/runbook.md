@@ -122,75 +122,29 @@ for staging, alias closure, Access-protected automation, exact production approv
 readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
 Production deployment, Cloudflare mutations and merge require separate approval.
 
-Merging to `main` deploys through three integrations — none of them GitHub Actions. Each one builds
-and deploys only when its trigger matches the merge, and surfaces as a check on the merge commit
-when it runs:
+Tracker merges deploy Pages and Supabase through their integrations. The API Worker builds
+independently from API-repository merges matching its watch paths; none of these deploys are
+GitHub Actions deployments. Checks appear on the corresponding source repository's commit:
 
-| What                                 | Mechanism                    | Check on the merge commit     |
-| ------------------------------------ | ---------------------------- | ----------------------------- |
-| Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
-| `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
-| DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+| What                                  | Mechanism                    | Check on the source commit    |
+| ------------------------------------- | ---------------------------- | ----------------------------- |
+| Frontend                              | Cloudflare Pages Git build   | `Cloudflare Pages`            |
+| `api-gateway` Worker (API repository) | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
+| DB migrations **and** Edge Functions  | Supabase GitHub integration  | `Supabase Preview`            |
 
-The Worker build is path-filtered. Its `Deploy default branch` trigger runs `npx wrangler deploy`
-in root directory `workers/api-gateway`, with no build command. It builds `main` only when any
-commit in a push changes a file under one of its build watch paths (marked below), or when
-Cloudflare skips
-[watch-path matching](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)
-(0 changed files, 20+ commits or 3000+ files in one push). A merge outside the watch paths gets no
-Worker build, no `Workers Builds: api-gateway` check and no new Worker deployment; that is expected,
-not a broken integration.
+The existing `api-gateway` Worker deploys only from `tarkovtracker-org/TarkovTracker-API/main`,
+root `/`, with empty build command and deploy command `pnpm run deploy`. That command prepares
+the generated workspace contracts before Wrangler bundles the Worker. The old Tracker source
+trigger is disconnected. Build caching remains enabled and preview builds remain disabled.
 
-Every build input is watched, plus `patches/**` and `.nvmrc`, so dependency and shared-code merges
-redeploy the Worker without a manual build. Besides its directory, the build reads the
-sources it bundles, every `package.json` and `tsconfig.json` esbuild applies to them, the pnpm
-workspace files that install Wrangler and esbuild, and the `nuxt.config.ts` and transitive local
-imports the install's `postinstall` evaluates. Its inputs, kept in sync with the code by
-`scripts/workflow-tests/worker-build-inputs.mjs`:
-
-<!-- api-gateway-build-inputs:start -->
-
-- `workers/api-gateway/**` — watched
-- `app/features/resources/resourceData.ts` — watched (`nuxt prepare` import)
-- `app/locales/en.json` — watched (`nuxt prepare` import)
-- `app/utils/apiProtectionConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/buildCommit.ts` — watched (`nuxt prepare` import)
-- `app/utils/csp.ts` — watched (`nuxt prepare` import)
-- `app/utils/entryRecoveryScript.ts` — watched (`nuxt prepare` import)
-- `app/utils/locales.ts` — watched (`nuxt prepare` import)
-- `app/utils/nuxtSecurityConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/prerenderOutput.ts` — watched (`nuxt prepare` import)
-- `app/utils/routeSeo.ts` — watched (`nuxt prepare` import)
-- `app/utils/runtimeConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/shellConfig.ts` — watched (`nuxt prepare` import)
-- `app/utils/stripBareNodeImports.ts` — watched (`nuxt prepare` import)
-- `app/utils/theme.ts` — watched (`nuxt prepare` import)
-- `app/utils/turnstileKeys.ts` — watched (`nuxt prepare` import)
-- `package.json` — watched (module type for the bundled files above; pnpm version and the
-  `postinstall` that workspace installs run)
-- `tsconfig.json` — watched (compiles the bundled files above; extends the generated
-  `.nuxt/tsconfig.json`)
-- `nuxt.config.ts` — watched (the `postinstall` `nuxt prepare` writes `.nuxt/tsconfig.json`
-  from it; the `app/utils/` modules it imports must also load for that install to succeed)
-- `pnpm-lock.yaml` — watched (pins Wrangler, esbuild and every installed package)
-- `pnpm-workspace.yaml` — watched (workspace membership, esbuild override, allowed build
-  scripts)
-
-<!-- api-gateway-build-inputs:end -->
-
-The legacy gateway now consumes the immutable progress-contracts release through its watched
-`package.json` and root `pnpm-lock.yaml`. Keep `workers/api-gateway/**` and all existing trigger
-watch paths until the separately approved production source cutover. This preparation does not
-modify the integration. Source ownership and release updates: [where changes belong](api-ownership.md).
-
-A new build input must be added to the trigger's watch paths in the same change, or production
-keeps the previous Worker build until a watched file changes.
-The check also rejects a deploy redirect (`.wrangler/deploy/config.json`), `wrangler.json` or
-`wrangler.jsonc` in `workers/api-gateway`, `workers/` or the repository root, which that deploy
-command would use instead of `workers/api-gateway/wrangler.toml`, and `wrangler.toml` settings it
-does not model. The root `.nvmrc` is watched so a Node bump rebuilds the Worker, although
-Cloudflare documents Node version files only in the build's root directory, `workers/api-gateway`,
-which has none.
+Its watched API-repository inputs are `src/**`, `progress-contracts/**`,
+`scripts/prepare-contracts.mjs`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+`tsconfig.json`, `worker-configuration.d.ts`, `wrangler.toml`, `.nvmrc` and `.npmrc`, with no
+exclusions. Tracker-only merges do not deploy the API Worker. For API deployment, secrets and
+rollback, use [API operations](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/docs/operations.md).
+Consumer source/tag pins, compiled contracts and all-mode integration tests remain here:
+[API ownership](api-ownership.md). `/health` reports a fixed version; verify build SHA to active
+Worker version through Workers Builds and the deployment record.
 
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
@@ -254,23 +208,25 @@ integration fails or is unavailable, not the normal path.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
-   already provisioned on the production `api-gateway` Worker:
+   already provisioned on the production `api-gateway` Worker. Run these commands only from
+   the TarkovTracker-API checkout; Tracker's root Wrangler config is for Pages:
 
    ```bash
-   wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
-   wrangler secret put IP_HASH_SECRET --config workers/api-gateway/wrangler.toml   # set if missing
+   pnpm exec wrangler secret list --config wrangler.toml
+   # If absent, provision it only with explicit secret-change authorization:
+   pnpm exec wrangler secret put IP_HASH_SECRET --config wrangler.toml
    ```
 
-   The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
+   The api-gateway Worker auto-deploys from the API repository's `main` on merge. If `IP_HASH_SECRET` is absent at
    deploy time, `abuse_gate_429` and `abuse_gate_unavailable` log lines emit `ip_hash: null`,
    defeating the IP-level abuse observability the change introduced. Provision the secret **before**
    merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
 5. Confirm the `Cloudflare Pages` and `Supabase Preview` checks succeeded on the merge commit. If
-   the push changed `workers/api-gateway/**` or bypassed watch-path matching, also confirm
-   `Workers Builds: api-gateway` succeeded on it. Otherwise, if it changed an unwatched
-   [Worker build input](#deployment), no check appears and the Worker still needs a build.
+   an API-repository merge matches the Worker watch paths (or matching is bypassed by Cloudflare),
+   also confirm its `Workers Builds: api-gateway` check and exact active version there. Unwatched
+   docs-only changes normally create no Worker build/check. Tracker merges do not deploy the API.
    `/health` reports a fixed version, so it identifies no build.
 6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
    `supabase/functions/` on merge; confirm each changed function reports a new version in the
@@ -287,7 +243,7 @@ integration fails or is unavailable, not the normal path.
    `supabase/config.toml`.
 
 7. Confirm workers are serving the expected revision:
-   - `workers/api-gateway`
+   - `api-gateway` from the API repository
 8. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
@@ -1079,6 +1035,74 @@ regressions and deployment postchecks against any recovery migration before decl
   `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The 2.101
   Go binary (`supabase-2.101` in `~/.local/bin`) can run `db diff` when the 2.108 wrapper cannot.
 
+## Owner-only team expiry rollout
+
+The migrations install schema, aggregate receipts and the hourly `owner-only-team-cleanup`
+pg_cron job (`17 * * * *`, 60-second statement timeout, at most 100 teams per batch).
+Both gates stay off: `warnings_started_at=NULL` and `deletion_enabled=false`. The scheduled
+runner is inert until warning activation. Database migrations and frontend deployment are
+independent; applying migrations must never consume an owner's warning period before the
+warning UI is verified live. Follow the database procedure above for deployment approval.
+
+1. Before production activation, use an isolated local/preview database with warnings enabled
+   and deletion disabled. Verify the persistent owner warning and date on desktop/mobile,
+   reload persistence, PvP/PvE/Seasonal switches, join cancellation, a fresh 168-hour clock after
+   the last member leaves, and disband fallback with personal progress and other-mode teams
+   preserved. Run the committed concurrency and expiry tests for failure/response ordering.
+2. Separately approve provisioning the dedicated observer's aggregate-view grant. Grant no
+   base-table reads or cleanup execution:
+
+   ```sql
+   GRANT USAGE ON SCHEMA private TO pi_prod_observer;
+   GRANT SELECT ON private.owner_only_team_cleanup_status TO pi_prod_observer;
+   ```
+
+   Run `scripts/ops/prod-db canary` and `scripts/ops/prod-db owner-only-teams` using that restricted
+   role. Confirm the report succeeds within the observer timeout, contains only aggregate counts
+   and receipts, and both gates are off. The telemetry canary alone does not exercise this view.
+   A failed report or unverified warning UI blocks activation.
+
+3. After the production warning UI is live and the observer checks pass, obtain explicit approval
+   to start warnings (a manual production mutation). In a bounded transaction, call
+   `SELECT private.begin_owner_only_team_warnings();` while deletion remains disabled. Confirm
+   activation time with `scripts/ops/prod-db owner-only-teams` and the named job is active in
+   `cron.job`. The runner initializes existing solo teams in batches of 100, giving each at
+   least 168 hours from its own initialization; new solo transitions are stamped immediately.
+4. Keep deletion disabled for a full 168 hours of verified warning availability. Before enabling
+   deletion, repeat the warning/lifecycle acceptance and observer report checks; inspect
+   `cron.job_run_details` for failures and runtime, and confirm committed initialization receipts.
+   Obtain separate explicit approval to set `deletion_enabled=true`. No team expires until both
+   its own deadline and `warnings_started_at + 168 hours` have passed. Hourly batching, lock
+   contention and backlog may delay expiry.
+5. Monitor `scripts/ops/prod-db owner-only-teams` for owner-only/populated/empty/inconsistent
+   counts, awaiting-clock/in-grace/deadline-reached counts, activation state and the latest 20
+   aggregate receipts. Each committed batch records completion time, initialized/disbanded
+   counts and the deletion flag. Failed transactions record no receipt; inspect pg_cron status.
+   Receipts retain thirty days at hourly cadence, pruning at most 100 older rows per batch.
+   Empty, missing-owner or role/mode-inconsistent teams remain for separate investigation.
+   The cap bounds locks and mutations, not scan work; measure runtime before approving deletion
+   and tune in a reviewed change if the scan approaches the 60-second timeout.
+
+A single disband or receipt failure rolls back the entire batch. No deletion receipt is committed
+for that failed run; pg_cron records failure and the next hourly run retries. Persistent failures
+can stall the earliest candidates and need investigation before resuming deletion. Do not silently skip or partially commit failed teams.
+
+Pause deletion by setting `deletion_enabled=false`; the next batch initializes clocks but
+does not disband. The flag update waits for an in-flight batch's settings share lock, so a batch
+already running completes atomically. Unschedule the named job to pause all batches. Neither
+pause resets clocks. If warning availability is interrupted by a failed app deployment or rollback,
+keep deletion disabled. After restoring and verifying the warning UI, obtain approval to restart
+the global warning floor with `warnings_started_at=clock_timestamp()` and wait another full 168
+hours before re-enabling deletion. Preserve individual team clocks; the global floor prevents an
+old deadline from allowing immediate deletion after warning restoration. If a new policy/grace
+period is desired, prepare a separately reviewed forward change rather than resetting deadlines through user activity. Do not drop the warning
+UI while deletion remains enabled. Existing account-deletion retry handlers must retain
+whole-transaction handling of `55P03`; failed cascades leave all data unchanged for retry.
+
+Expired team rows/events cannot be recreated by toggling a flag; use the approved recovery
+procedure/backups if necessary. Personal progress needs no recovery because disband never
+deletes it. Do not rollback applied migration history.
+
 ## Production database observer
 
 The repository-owned `scripts/ops/prod-db` command is the canonical read-only production inspection
@@ -1226,6 +1250,23 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`rate-limiting.md`](./rate-limiting.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
+### Browser progress authority (#1092) rollback
+
+After this release, IndexedDB `tarkovtracker-active-progress-v1` owns browser progress. The
+`v2_progress` localStorage copy is imported once and then only observed, so it is stale after the
+first edit ([decision record](./decision-browser-progress.md#historical-rollback-requirements-and-remaining-acceptance)).
+
+- Fix forward. Prefer a repair release that still reads IndexedDB; revert later changes, not this
+  reader.
+- Do not redeploy a pre-#1092 frontend as routine rollback. It reads the stale localStorage copy:
+  guest edits made since the release disappear, and signed-in tabs can sync stale local state.
+- If an old-code rollback is unavoidable, first announce that users should open Settings →
+  Backup & Restore and use "Export locally saved device data and recovery copies". After the
+  IndexedDB release returns, edits made by old code appear only as older-tab recovery copies in
+  that card; users restore them from there.
+- Verify a release by editing in two tabs, reloading both and confirming the edit persists with
+  no recovery warning.
+
 ### Combined task cache contract rollout (v2 to v3)
 
 The progression and overlay changes ship together through PR #826, which supersedes PR #825.
@@ -1251,3 +1292,40 @@ entries remain within their seven-day TTL. Roll back to the previous v2 applicat
 standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
 this cache-key rollout. After deployment, run `pnpm run verify:overlay` and retain the served
 fleet verification before closing issue #729.
+
+### EFT import snapshot rollout (#1161)
+
+`/api/tarkov/tasks-import` reads only `tasks-import-json-v1-en-{regular,pve,pvp-season}` and returns
+503 while a key is missing, so seed before Pages deploys the consumer
+([release order](./systems/overlay-and-precompute.md#release-verification)):
+
+1. Read the published overlay `$meta.sha256`. Dispatch `precompute-tarkov-data.yml` on the PR
+   branch with `lang=en`, no mode, and that `expectedOverlaySha`. Require the run's
+   `importSnapshots.failures` to be empty.
+2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
+   overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
+3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
+   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+   environment or a secret store) reports no import mismatches.
+4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
+   entries and the import keys share the release.
+
+Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
+which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail
+for affected modes. Purge the `json-v3` objective targets with `admin-cache-purge` after rolling
+back so they regenerate with the overlay. The 7-day import keys can be left to expire.
+
+### Retired automatic-level cleanup
+
+The automatic-level removal migration is schema only. New clients and database writes discard
+`xpOffset` while keeping each mode's saved level. Cached automatic clients cannot overwrite an
+existing level until refresh, except through an intentional newer reset epoch. Refresh clients
+before validating manual level editing. See [manual player levels](systems/progress-storage.md#manual-player-levels).
+
+Production JSON offsets were removed by bounded maintenance on 2026-10-12, and a read-only
+sweep of the full user range found no remaining `xpOffset` in `user_progress`,
+`user_game_mode_progress`, `user_profile_mode_progress`, or `user_prestige_runs`. The one-off
+cleanup script has been retired ([#1168](https://github.com/tarkovtracker-org/TarkovTracker/issues/1168));
+recover it from git history only after re-reviewing its lock order against Realtime and auth.
+Frontend rollback to an automatic-level client is unsupported because offsets are no longer
+authoritative.

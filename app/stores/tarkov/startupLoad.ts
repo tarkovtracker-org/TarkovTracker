@@ -57,6 +57,8 @@ const LOAD_RETRY_DELAY_MS = 500;
 const NO_ROWS_ERROR_CODE = 'PGRST116';
 export type StartupLoadResult = {
   hadRemoteData: boolean;
+  /** Default baseline for retained startup intent when no cloud metadata or mode rows exist. */
+  initialAcknowledgedState?: UserState;
   /** Local progress was uploaded to an account with no cloud record. */
   migratedLocalState: boolean;
   needsRemoteCleanup: boolean;
@@ -149,7 +151,7 @@ const adoptSnapshot = (
   snapshot: PersistedProgressSnapshot,
   state: UserState
 ): LocalProgress => {
-  progressStorageSerializer.reset(snapshot);
+  progressStorageSerializer.reset(snapshot, true);
   return {
     ...local,
     state,
@@ -660,6 +662,8 @@ const loadStartupProgress = async (ctx: StartupLoadContext): Promise<StartupLoad
   logger.debug('[TarkovStore] Initial load complete');
   return {
     hadRemoteData: loaded.hadRemoteData,
+    initialAcknowledgedState:
+      resolution.state === null ? cloneStateSnapshot(defaultState) : undefined,
     migratedLocalState: resolution.migrated === true,
     needsRemoteCleanup: resolution.needsRemoteCleanup,
     ok: true,

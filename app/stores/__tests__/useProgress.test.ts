@@ -1,7 +1,9 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
-import { nextTick, ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
+import type { UserProgressData } from '@/types/progress';
+import type { StoryChapter } from '@/types/tarkov';
 type TraderProgress = Record<string, { level?: number; reputation?: number }>;
 const createProgressData = (
   taskCompletions: Record<string, unknown>,
@@ -10,7 +12,6 @@ const createProgressData = (
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions,
   hideoutParts: {},
@@ -19,6 +20,7 @@ const createProgressData = (
   skills: {},
   prestigeLevel: 0,
   skillOffsets: {},
+  storyChapters: {} as UserProgressData['storyChapters'],
 });
 const createStoreState = ({
   currentGameMode = 'pvp',
@@ -47,6 +49,8 @@ const setupMocks = ({
   tasks = [{ id: 'task-1', name: 'Task One' }],
   traders = [],
   tasksRequireTraderLevels,
+  storyChapters = [],
+  storyChaptersGameMode = 'pvp',
 }: {
   selfCompletions?: Record<string, unknown>;
   teammateCompletions?: Record<string, unknown>;
@@ -55,6 +59,8 @@ const setupMocks = ({
   tasks?: Array<Record<string, unknown>>;
   traders?: Array<Record<string, unknown>>;
   tasksRequireTraderLevels?: boolean;
+  storyChapters?: StoryChapter[];
+  storyChaptersGameMode?: 'pvp' | 'pve' | 'seasonal';
 }) => {
   vi.resetModules();
   setActivePinia(createPinia());
@@ -75,7 +81,7 @@ const setupMocks = ({
     usePreferencesStore: () => ({
       teamIsHidden: () => false,
       taskTeamAllHidden: false,
-      getUseAutomaticLevelCalculation: false,
+      getUseAutomaticLevelCalculation: true,
       getTasksRequireTraderLevels: tasksRequireTraderLevels ?? true,
     }),
   }));
@@ -83,8 +89,13 @@ const setupMocks = ({
     useMetadataStore: () => ({
       tasks,
       traders,
+      storyChapters,
+      storyChaptersGameMode,
       hideoutStations: [],
-      playerLevels: [],
+      playerLevels: [
+        { level: 1, exp: 0 },
+        { level: 60, exp: 1000 },
+      ],
       editions: [],
     }),
   }));
@@ -103,6 +114,26 @@ const reputationRequirement = (
   compareMethod: '>=' | '<=' = '>='
 ) => ({ id, requirementType: 'reputation' as const, compareMethod, trader, value });
 describe('useProgressStore', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'uses the saved %s level despite stale automatic preferences and quest XP changes',
+    async (mode) => {
+      const selfState = reactive(createStoreState({ currentGameMode: mode }));
+      Object.assign(selfState[mode], {
+        level: 37,
+        prestigeLevel: 3,
+        xpOffset: 1000000,
+        taskCompletions: { 'task-1': { complete: true } },
+      });
+      setupMocks({ selfState, tasks: [{ id: 'task-1', experience: 1000000 }] });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.getLevel('self')).toBe(37);
+      selfState[mode].taskCompletions = { 'task-1': { complete: false } };
+      await nextTick();
+      expect(store.getLevel('self')).toBe(37);
+      expect(selfState[mode].prestigeLevel).toBe(3);
+    }
+  );
   it('treats boolean teammate completions as completed', async () => {
     setupMocks({
       selfCompletions: { 'task-1': { complete: false, failed: false } },
@@ -349,5 +380,62 @@ describe('useProgressStore', () => {
     const { useProgressStore } = await import('@/stores/useProgress');
     const store = useProgressStore();
     expect(store.unlockedTasks['ref-task']?.self).toBe(true);
+  });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});
+describe('mode-scoped storyline trader availability', () => {
+  const catalog: StoryChapter[] = [
+    {
+      id: 'tour',
+      name: 'Tour',
+      normalizedName: 'tour',
+      order: 1,
+      wikiLink: '',
+      objectives: {
+        open: {
+          id: 'open',
+          order: 1,
+          type: 'main',
+          description: 'Unlock Prapor',
+          unlocks: [{ type: 'trader', id: 'prapor', name: 'Prapor' }],
+        },
+      },
+    },
+  ];
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'uses each %s player objective progress independently',
+    async (mode) => {
+      const selfState = createStoreState({ currentGameMode: mode });
+      const teammateState = createStoreState({ currentGameMode: mode });
+      selfState[mode].storyChapters = { tour: { objectives: { open: { complete: true } } } };
+      setupMocks({
+        selfState,
+        teammateState,
+        storyChapters: catalog,
+        storyChaptersGameMode: mode,
+        tasks: [{ id: 'task', trader: { id: 'prapor', name: 'Prapor' } }],
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const progress = useProgressStore();
+      expect(progress.taskEvaluations.task?.self?.available).toBe(true);
+      expect(progress.taskEvaluations.task?.['teammate-1']?.blockers[0]?.type).toBe(
+        'trader_unlock'
+      );
+    }
+  );
+  it('does not borrow a previous mode catalog for another player', async () => {
+    setupMocks({
+      selfState: createStoreState({ currentGameMode: 'pve' }),
+      storyChapters: catalog,
+      storyChaptersGameMode: 'pvp',
+      tasks: [{ id: 'task', trader: { id: 'prapor', name: 'Prapor' } }],
+    });
+    const { useProgressStore } = await import('@/stores/useProgress');
+    const progress = useProgressStore();
+    expect(progress.taskEvaluations.task?.self?.available).toBe(true);
+    expect(progress.taskEvaluations.task?.['teammate-1']?.available).toBe(false);
   });
 });

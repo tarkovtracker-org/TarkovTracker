@@ -4,7 +4,6 @@ import { addFallbackCrafts, addFallbackItems } from '@/server/utils/overlayAddit
 import {
   projectEditions,
   projectRawPrestige,
-  projectSeasonalPerks,
   projectStoryChapters,
 } from '@/server/utils/overlayProjectors';
 import { unknownOverlaySections, validateOverlayData } from '@/server/utils/overlayValidation';
@@ -62,6 +61,53 @@ const overlay: OverlayData = {
   },
 };
 describe('endpoint overlay projectors', () => {
+  it('retains valid optional parents after localization and drops links invalidated by mode patches', () => {
+    const data: OverlayData = {
+      storyChapters: {
+        tour: {
+          name: 'Tour',
+          order: 1,
+          objectives: {
+            main: { id: 'main', type: 'main', sourceQuestId: 'quest-a', description: 'Hand over' },
+            child: {
+              id: 'child',
+              type: 'optional',
+              sourceQuestId: 'quest-a',
+              parentObjectiveId: 'main',
+              description: 'Find',
+            },
+          },
+        },
+        other: {
+          name: 'Other',
+          order: 2,
+          objectives: {
+            orphan: {
+              id: 'orphan',
+              type: 'optional',
+              sourceQuestId: 'quest-a',
+              parentObjectiveId: 'main',
+            },
+          },
+        },
+      },
+      locales: {
+        de: { storyChapters: { tour: { objectives: { child: { description: 'Finden' } } } } },
+      },
+      modes: {
+        pve: { storyChapters: { tour: { objectives: { main: { sourceQuestId: 'quest-b' } } } } },
+      },
+    };
+    const regular = projectStoryChapters(data, 'regular', 'de');
+    expect(regular[0]?.objectives?.child).toMatchObject({
+      parentObjectiveId: 'main',
+      description: 'Finden',
+    });
+    expect(regular[1]?.objectives?.orphan).not.toHaveProperty('parentObjectiveId');
+    const pve = projectStoryChapters(data, 'pve', 'de');
+    expect(pve[0]?.objectives?.child).not.toHaveProperty('parentObjectiveId');
+    expect(pve[0]?.objectives?.child?.description).toBe('Finden');
+  });
   it('patches and appends prestige conditions before task resolution and localization', () => {
     const raw = projectRawPrestige(
       {
@@ -148,16 +194,13 @@ describe('endpoint overlay projectors', () => {
     );
     expect(raw.tasks).toEqual([{ id: 'synthetic', name: 'Upstream' }]);
   });
-  it('applies shared then mode edition data and gates perks to Seasonal', () => {
+  it('applies shared then mode edition data', () => {
     const scoped = { ...overlay, modes: { pve: { editions: { standard: { value: 2 } } } } };
     expect(projectEditions(scoped, 'pve')[0]).toMatchObject({
       id: 'standard',
       title: 'Standard',
       value: 2,
     });
-    expect(projectSeasonalPerks(overlay, 'regular')).toEqual([]);
-    expect(projectSeasonalPerks(overlay, 'pve')).toEqual([]);
-    expect(projectSeasonalPerks(overlay, 'pvp-season')).toHaveLength(1);
   });
   it('adapts missing items without shadowing existing upstream records', () => {
     const existing = { id: 'existing', name: 'Rich upstream', types: ['barter'] } as TarkovItem;
@@ -491,3 +534,51 @@ it('keeps unknown and misplaced empty sections unconsumed', () => {
     'modes.regular.progressionCounters',
   ]);
 });
+it.each([
+  [undefined, true],
+  [[], true],
+  [[{ type: 'trader', id: 'peacekeeper', name: 'Peacekeeper' }], true],
+  [[{ type: 'map', name: 'Shoreline', note: 'Complete the stage' }], true],
+  [null, false],
+  [{ type: 'trader', name: 'Peacekeeper' }, false],
+  [[null], false],
+  [[{ type: 'invented', name: 'Shoreline' }], false],
+  [[{ type: ['trader'], name: 'Peacekeeper' }], false],
+  [[Object.assign([], { type: 'trader', name: 'Peacekeeper' })], false],
+  [
+    [Object.assign(Object.create({ inherited: true }), { type: 'trader', name: 'Peacekeeper' })],
+    false,
+  ],
+  [[Object.assign(Object.create(null), { type: 'other', name: 'Unlock' })], true],
+  [[{ type: 'trader', name: 'Peacekeeper', id: '' }], false],
+  [[{ type: 'trader', name: 'Peacekeeper', note: ' ' }], false],
+  [[{ type: 'trader', name: '' }], false],
+  [[{ type: 'trader', name: 'Peacekeeper', id: 7 }], false],
+  [[{ type: 'map', name: 'Shoreline', note: 7 }], false],
+])(
+  'validates explicit story unlocks in effective and localized objectives: %j',
+  (unlocks, expected) => {
+    const candidate = {
+      ...overlay,
+      storyChapters: {
+        tour: {
+          objectives: [{ id: 'ticket', description: 'Retrieve ticket', unlocks }],
+        },
+      },
+    };
+    expect(validateOverlayData(candidate)).toBe(expected);
+    const localized = {
+      ...overlay,
+      locales: {
+        de: {
+          storyChapters: {
+            tour: {
+              objectives: { ticket: { unlocks } },
+            },
+          },
+        },
+      },
+    };
+    expect(validateOverlayData(localized)).toBe(expected);
+  }
+);

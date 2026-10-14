@@ -179,6 +179,25 @@ GitHub has computed the test merge; other pending reasons are left alone.
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
+- Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches, separate from
+  production. Seed/refresh its three English core keys and three English import snapshot keys
+  explicitly with a reviewed producer and seven-day TTL; the production precompute workflow does
+  not refresh preview data. A maintainer owns this manual refresh. Until
+  [#1161](https://github.com/tarkovtracker-org/TarkovTracker/pull/1161) merges, select its
+  independently reviewed snapshot-producer revision: this configuration change does not add that
+  producer, and main's existing core-only runner cannot seed import snapshots. The producer is
+  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) from that selected revision, with
+  `PRECOMPUTE_LANG=en`, a pinned `EXPECTED_OVERLAY_SHA`, and `TARKOV_DATA_KV_NAMESPACE_ID` set to
+  the preview namespace. An approved broker writer can invoke the same exported `runPrecompute`
+  and `runImportPrecompute` functions without exposing credentials. Refresh before import
+  verification and at least every six days while an import preview remains active.
+  Missing or expired import snapshots return 503 and block import verification until a valid
+  release is reseeded; ordinary preview smoke tests do not establish import-snapshot readiness.
+  Every approved preview runtime has read/write/delete access to this shared, expendable store.
+  Only merged public game catalogs belong there, never raw overlays, credentials, or user progress;
+  revalidate the seeded release before importing because another preview can change these keys.
+  The trusted deployment job reads `wrangler.toml` from the default branch, so binding changes
+  take effect only after that configuration is merged and the preview is redeployed.
 - Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
   `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
@@ -273,5 +292,5 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `scripts/preview/deployment.mjs`, `scripts/preview/verify-deployment.mjs` — deployment record evidence
 - `scripts/preview/smoke/preview.smoke.mjs`, `scripts/preview/smoke/readiness.mjs` — smoke suite
 - `scripts/ci/github-ci-gate.sh`, `scripts/release/release-recovery.mjs` — dual-gate waits for automation
-- `wrangler.toml` — isolated `[env.preview.vars]`
+- `wrangler.toml` — isolated preview variables and game-data KV binding
 - `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests

@@ -1,5 +1,4 @@
 import { logger } from '@/utils/logger';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 /**
  * The channel type `SupabaseClient.channel()` actually returns.
@@ -22,7 +21,6 @@ export type OwnedRealtimeChannel = {
   /** Topic the channel was created with; leaves are tracked per topic. */
   topic: string;
 };
-export const REALTIME_SUBSCRIPTION_TIMEOUT_MS = 15_000;
 /**
  * Tracks in-flight channel leaves so a topic is not rejoined before it is free.
  *
@@ -127,79 +125,3 @@ export const logChannelSubscribeFailure = (
   });
   return true;
 };
-/**
- * Starts a channel subscription and waits for the initial join acknowledgement.
- *
- * `RealtimeChannel.subscribe()` is intentionally callback-based: returning from
- * the method only starts the join. Waiting for `SUBSCRIBED` prevents callers from
- * treating a channel as ready while the socket is still joining. A timeout turns
- * a stalled socket into an explicit failure instead of leaving initialization
- * pending forever.
- *
- * @param channel - The channel to subscribe.
- * @param label - Log prefix identifying the caller.
- * @param context - Diagnostic fields included in status logs.
- * @param timeoutMs - Maximum time to wait for the initial join acknowledgement.
- * @returns A promise that resolves after `SUBSCRIBED` or rejects on failure.
- */
-export const subscribeAndWaitForRealtimeChannel = (
-  channel: SupabaseRealtimeChannel,
-  label: string,
-  context: Record<string, unknown>,
-  timeoutMs = REALTIME_SUBSCRIPTION_TIMEOUT_MS,
-  onRejoined?: () => void
-): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    let settled = false;
-    let joined = false;
-    const suspended = () => channel.socket && isRealtimeSuspended(channel.socket);
-    let needsRefresh = Boolean(suspended());
-    const timeoutJoin = () => {
-      if (suspended()) {
-        timeout = setTimeout(timeoutJoin, timeoutMs);
-        return;
-      }
-      const error = new Error(`Realtime subscription timed out after ${timeoutMs}ms for ${label}`);
-      logger.warn(`[${label}] Realtime subscription timed out:`, {
-        ...context,
-        timeoutMs,
-      });
-      settle(error);
-    };
-    let timeout = setTimeout(timeoutJoin, timeoutMs);
-    const settle = (error?: Error): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      if (error) reject(error);
-      else resolve();
-    };
-    // A join that follows an earlier join or a suspended socket is a rejoin, so
-    // the caller has to refetch whatever it missed while the channel was down.
-    const handleJoined = (): void => {
-      if (joined || needsRefresh) onRejoined?.();
-      needsRefresh = false;
-      joined = true;
-      settle();
-    };
-    // Any other status leaves the channel unsubscribed. While the socket is
-    // deliberately suspended that is expected, so it is not a failure.
-    const handleNonJoinStatus = (status: string, error?: Error): void => {
-      needsRefresh = true;
-      if (suspended()) return;
-      if (
-        logChannelSubscribeFailure(label, status, error, context, { treatClosedAsFailure: !joined })
-      ) {
-        settle(error ?? new Error(`Realtime subscription failed with status ${status}`));
-      }
-    };
-    try {
-      channel.subscribe((status: string, error?: Error) => {
-        logger.debug(`[${label}] Realtime subscription status: ${status}`);
-        if (status === 'SUBSCRIBED') handleJoined();
-        else handleNonJoinStatus(status, error);
-      });
-    } catch (error) {
-      settle(error instanceof Error ? error : new Error(String(error)));
-    }
-  });

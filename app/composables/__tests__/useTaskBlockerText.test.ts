@@ -20,6 +20,16 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('canonical blocker text', () => {
+  it('names the trader and exact storyline unlock objective', () => {
+    expect(
+      useTaskBlockerText()({
+        type: 'trader_unlock',
+        trader: { id: 'prapor', name: 'Prapor' },
+        chapterIds: ['story'],
+        objective: { id: 'open', name: 'Hand over weapons to Mechanic' },
+      })
+    ).toBe('Unlock Prapor: Hand over weapons to Mechanic (Story route)');
+  });
   it.each([
     [[], 'completed'],
     [['Complete', 'Failed'], 'completed or failed'],

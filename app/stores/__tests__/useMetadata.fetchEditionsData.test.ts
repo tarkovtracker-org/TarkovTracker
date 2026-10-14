@@ -397,7 +397,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
-  it('revalidates a cached scope once per session without a cache bust', async () => {
+  it('revalidates a retired cached scope without a cache bust', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'pve';
     store.languageCode = 'de';
@@ -419,17 +419,21 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/editions', {
       query: { lang: 'de', gameMode: 'pve' },
     });
-    // Switching away and back serves the cache again without another request.
+    await store.ensureEditionsData();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Returning after retiring the live catalog must check the cached copy again.
     store.languageCode = 'en';
     await store.fetchEditionsData();
     await flushPromises();
     store.languageCode = 'de';
     await store.fetchEditionsData();
     await flushPromises();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-      query: { lang: 'en', gameMode: 'pve' },
+      query: { lang: 'de', gameMode: 'pve' },
     });
+    expect(store.editions[0]?.id).toBe('fresh-edition');
+    expect(store.storyChapters[0]?.id).toBe('fresh-chapter');
   });
   it('requests and caches the current mode/language catalog', async () => {
     const store = useMetadataStore();
@@ -446,7 +450,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',
-      'overlay-v2-pve',
+      'overlay-v3-pve',
       'de',
       expect.any(Object),
       expect.any(Number)

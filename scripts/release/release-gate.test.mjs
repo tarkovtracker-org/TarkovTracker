@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { releaseEligibility } from './release-gate.mjs';
 const sha = 'a'.repeat(40);
+const now = Date.parse('2026-10-13T20:30:29Z');
 function fixture() {
   const run = {
     id: 123,
@@ -25,16 +26,101 @@ function fixture() {
   };
   const main = { object: { sha } };
   const runs = [run];
+  const releases = [];
   const github = {
+    paginate: vi.fn(async () => releases),
     rest: {
+      repos: { listReleases: vi.fn() },
       actions: {
         listWorkflowRuns: vi.fn(async () => ({ data: { workflow_runs: runs } })),
       },
       git: { getRef: vi.fn().mockResolvedValue({ data: main }) },
     },
   };
-  return { run, runs, main, context, github };
+  return { run, runs, main, context, github, releases, now };
 }
+function published(published_at, changes = {}) {
+  return { draft: false, prerelease: false, published_at, ...changes };
+}
+describe('weekly publication cadence', () => {
+  it('skips a scheduled release after a manual publication earlier that day', async () => {
+    const f = fixture();
+    f.releases.push(published('2026-10-13T17:22:07Z'));
+    expect(await releaseEligibility(f)).toMatchObject({ release: false });
+    expect(f.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+  it('permits an explicit dispatch during the cooldown without bypassing CI', async () => {
+    const f = fixture();
+    f.context.eventName = 'workflow_dispatch';
+    f.releases.push(published('2026-10-13T17:22:07Z'));
+    expect((await releaseEligibility(f)).release).toBe(true);
+    expect(f.github.paginate).not.toHaveBeenCalled();
+    f.run.conclusion = 'failure';
+    expect((await releaseEligibility(f)).release).toBe(false);
+  });
+  it('requires seven full days, including the exact boundary', async () => {
+    const f = fixture();
+    f.releases.push(published('2026-10-06T20:30:29Z'));
+    expect((await releaseEligibility({ ...f, now: now - 1 })).release).toBe(false);
+    expect((await releaseEligibility(f)).release).toBe(true);
+  });
+  it('uses the newest stable publication across all pages, ignoring creation order and previews', async () => {
+    const f = fixture();
+    f.releases.push(
+      published('2026-09-29T19:54:42Z'),
+      published('2026-10-13T20:00:00Z', { draft: true }),
+      published('2026-10-13T20:00:00Z', { prerelease: true }),
+      published('2026-10-13T17:22:07Z')
+    );
+    expect((await releaseEligibility(f)).release).toBe(false);
+    expect(f.github.paginate).toHaveBeenCalledWith(f.github.rest.repos.listReleases, {
+      owner: 'owner',
+      repo: 'repo',
+      per_page: 100,
+    });
+    f.releases.pop();
+    expect((await releaseEligibility(f)).release).toBe(true);
+  });
+});
+describe('automatic release retries', () => {
+  it.each(['10/13/2026', '2026-10-13', '2026-10-13T20:00:00+00:00', '2026-02-30T20:00:00Z'])(
+    'rejects malformed stable publication timestamp %s',
+    async (timestamp) => {
+      const f = fixture();
+      f.releases.push(published(timestamp));
+      await expect(releaseEligibility(f)).rejects.toThrow(
+        'Invalid stable release publication date'
+      );
+    }
+  );
+  it('retries an overdue release the following day after main advances during its build', async () => {
+    const f = fixture();
+    f.releases.push(published('2026-09-29T19:54:42Z'));
+    expect((await releaseEligibility(f)).release).toBe(true);
+    f.main.object.sha = 'b'.repeat(40);
+    expect((await releaseEligibility(f)).release).toBe(false);
+    // The next scheduled run validates its own fresh candidate, never substitutes a stale SHA.
+    f.context.sha = f.main.object.sha;
+    f.run.head_sha = f.context.sha;
+    expect(await releaseEligibility({ ...f, now: now + 86_400_000 })).toMatchObject({
+      release: true,
+      sha: f.context.sha,
+    });
+  });
+  it('rechecks publication history before publishing a previously eligible candidate', async () => {
+    const f = fixture();
+    expect((await releaseEligibility(f)).release).toBe(true);
+    f.releases.push(published('2026-10-13T20:00:00Z'));
+    expect((await releaseEligibility(f)).release).toBe(false);
+  });
+  it('fails closed when release history is unavailable or a stable publication date is invalid', async () => {
+    const f = fixture();
+    f.releases.push(published(null));
+    await expect(releaseEligibility(f)).rejects.toThrow('Invalid stable release publication date');
+    f.github.paginate.mockRejectedValue(new Error('Release history unavailable'));
+    await expect(releaseEligibility(f)).rejects.toThrow('Release history unavailable');
+  });
+});
 describe('release eligibility', () => {
   it.each(['schedule', 'workflow_dispatch'])(
     'releases the %s trigger commit when its main CI passed and it is still main',

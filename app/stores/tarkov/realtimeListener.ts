@@ -14,6 +14,7 @@ import {
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
 import { isAcknowledgedMetadataEcho } from '@/stores/tarkov/metadataEchoes';
+import { liveUpdatesDegraded } from '@/stores/tarkov/progressLiveStatus';
 import {
   coerceGameMode,
   hasRetainableModeProgress,
@@ -45,14 +46,19 @@ import {
 import {
   createChannelReleaseLatch,
   removeOwnedChannel,
-  subscribeAndWaitForRealtimeChannel,
   type OwnedRealtimeChannel,
-  REALTIME_SUBSCRIPTION_TIMEOUT_MS,
 } from '@/utils/realtimeChannel';
+import { startRealtimeRecovery } from '@/utils/realtimeRecovery';
 import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
+let stopLiveUpdates: (() => void) | null = null;
+const stopProgressRecovery = (): void => {
+  stopLiveUpdates?.();
+  stopLiveUpdates = null;
+  liveUpdatesDegraded.value = false;
+};
 const mayHaveUnacknowledgedLocalChanges = (): boolean =>
   (getRegisteredSyncController()?.hasPendingChanges?.() ?? true) || hasUnsavedProgressChanges();
 /**
@@ -347,50 +353,17 @@ const setupStillOwnsChannel = (
   currentUserId: string,
   generation: number
 ): boolean => stillOwnsSetup(currentUserId, generation) && realtimeChannel === owned;
-/** Tears down a channel only while this setup still owns it. */
-const abandonProgressChannel = async (owned: OwnedRealtimeChannel): Promise<void> => {
-  if (realtimeChannel === owned) await releaseProgressChannel(owned);
-};
-/**
- * Awaits the initial join and hands the channel back on the way out if this
- * setup lost ownership.
- *
- * A newer setup or teardown intentionally supersedes this request, so its
- * subscription failure is no longer actionable and must not reject the newer
- * request or surface as an initialization failure.
- */
-const joinProgressChannel = async (
-  owned: OwnedRealtimeChannel,
-  currentUserId: string,
-  generation: number,
-  onRejoined: () => void
-): Promise<void> => {
-  try {
-    await subscribeAndWaitForRealtimeChannel(
-      owned.channel,
-      'TarkovStore',
-      { table: 'user_progress' },
-      REALTIME_SUBSCRIPTION_TIMEOUT_MS,
-      onRejoined
-    );
-  } catch (error) {
-    await abandonProgressChannel(owned);
-    if (!stillOwnsSetup(currentUserId, generation)) return;
-    throw error;
-  }
-  if (!setupStillOwnsChannel(owned, currentUserId, generation)) {
-    await abandonProgressChannel(owned);
-  }
-};
 /**
  * Starts listener setup immediately and lets the newest request win.
  *
- * A setup suspends across a channel leave and subscription acknowledgement. The
+ * A setup suspends only across a channel leave. The
  * generation check invalidates stale work at every asynchronous boundary while
  * the release latch only blocks a rejoin of the same topic.
  */
 export function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const generation = ++listenerGeneration;
+  stopProgressRecovery();
+  activeSnapshotRefresh = null;
   return runSetupRealtimeListener(tarkovStore, generation);
 }
 async function runSetupRealtimeListener(
@@ -551,48 +524,58 @@ async function runSetupRealtimeListener(
   };
   const client = $supabase.client;
   const topic = progressTopic(currentUserId);
-  const channel = client
-    .channel(topic)
-    .on(
-      'postgres_changes' as const,
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'user_progress',
-        filter: `user_id=eq.${currentUserId}`,
-      },
-      (payload) => handleProgressChange(payload)
-    )
-    .on(
-      'postgres_changes' as const,
-      {
-        event: '*',
-        schema: 'public',
-        table: 'user_game_mode_progress',
-        filter: `user_id=eq.${currentUserId}`,
-      },
-      (payload) => handleModeProgressChange(payload)
-    )
-    .on(
-      'postgres_changes' as const,
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'user_progress',
-        filter: `user_id=eq.${currentUserId}`,
-      },
-      (payload) => handleProgressChange(payload)
-    );
+  const createProgressChannel = () => {
+    const channel = client.channel(topic);
+    const acceptsPayload = () => channel === owned.channel && !replacing;
+    return channel
+      .on(
+        'postgres_changes' as const,
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_progress',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          if (acceptsPayload()) handleProgressChange(payload);
+        }
+      )
+      .on(
+        'postgres_changes' as const,
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_game_mode_progress',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          if (acceptsPayload()) handleModeProgressChange(payload);
+        }
+      )
+      .on(
+        'postgres_changes' as const,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_progress',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          if (acceptsPayload()) handleProgressChange(payload);
+        }
+      );
+  };
   let refreshGeneration = 0;
   // The refresh is stale once a newer reconnect starts, the user changes, or the
   // socket is suspended.
   const snapshotIsStale = (request: number): boolean =>
     !isCurrentRealtimeUser() || request !== refreshGeneration;
-  const readProgressSnapshotRows = () =>
+  const readProgressSnapshotRows = (signal: AbortSignal) =>
     Promise.all([
       client
         .from('user_progress')
         .select('current_game_mode,game_edition,tarkov_uid,updated_at')
+        .abortSignal(signal)
         .eq('user_id', currentUserId)
         .single(),
       readWithProgressFreshness((includeFreshness) => {
@@ -600,12 +583,33 @@ async function runSetupRealtimeListener(
         return includeFreshness
           ? query
               .select('game_mode,season_number,progress_data,updated_at,progress_updated_at')
+              .abortSignal(signal)
               .eq('user_id', currentUserId)
           : query
               .select('game_mode,season_number,progress_data,updated_at')
+              .abortSignal(signal)
               .eq('user_id', currentUserId);
       }),
     ]);
+  const snapshotRequests = new Set<AbortController>();
+  // A failed fallback read must release the save controller's snapshot barrier.
+  const readBoundedSnapshot = async () => {
+    const abort = new AbortController();
+    snapshotRequests.add(abort);
+    const timeout = setTimeout(() => abort.abort(), 15_000);
+    let rejectAbort: () => void;
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      rejectAbort = () => reject(new Error('Progress snapshot cancelled or timed out'));
+      abort.signal.addEventListener('abort', rejectAbort, { once: true });
+    });
+    try {
+      return await Promise.race([readProgressSnapshotRows(abort.signal), cancelled]);
+    } finally {
+      abort.signal.removeEventListener('abort', rejectAbort!);
+      clearTimeout(timeout);
+      snapshotRequests.delete(abort);
+    }
+  };
   const applySnapshotMetadata = (metadataRow: unknown, reconcile: RemoteStateMerge) => {
     if (metadataRow) handleProgressChange({ new: metadataRow, old: null }, reconcile);
   };
@@ -621,7 +625,7 @@ async function runSetupRealtimeListener(
   /** Resolves true only when this request's snapshot was merged. */
   const readSnapshot = async (reconcile: RemoteStateMerge, request: number): Promise<boolean> => {
     if (snapshotIsStale(request)) return false;
-    const [metadata, modes] = await readProgressSnapshotRows();
+    const [metadata, modes] = await readBoundedSnapshot();
     if (snapshotIsStale(request)) return false;
     assertSnapshotReadable(metadata.error, modes.error);
     applySnapshotMetadata(metadata.data, reconcile);
@@ -651,19 +655,63 @@ async function runSetupRealtimeListener(
     }
     if (!merged) throw new Error('Remote progress snapshot unavailable');
   };
-  const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
-  // No await between the claim and the join: `joinProgressChannel` reaches
-  // `channel.subscribe()` synchronously, so ownership cannot change in between.
+  let owned = { channel: createProgressChannel(), client, topic } satisfies OwnedRealtimeChannel;
+  let leaving: Promise<boolean> | undefined;
+  let replacing = false;
+  // Claim ownership and subscribe in one synchronous segment so teardown cannot
+  // remove the channel between publishing it and starting the join.
   if (!claimProgressChannel(owned, currentUserId, generation)) {
     await releaseProgressChannel(owned);
     return;
   }
   activeSnapshotRefresh = refreshBeforeRetry;
-  await joinProgressChannel(owned, currentUserId, generation, () => {
-    runSnapshotRefresh().catch((error: unknown) => {
-      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
-    });
+  const recovery = startRealtimeRecovery({
+    refresh: refreshBeforeRetry,
+    reconnect: async () => {
+      replacing = true;
+      if (!leaving) {
+        leaving = removeOwnedChannel(owned, 'TarkovStore');
+        channelRelease.hold(owned, leaving);
+        const attempted = leaving;
+        void attempted.then((clean) => {
+          if (!clean && leaving === attempted) leaving = undefined;
+        });
+      }
+      let timeout: ReturnType<typeof setTimeout>;
+      const deadline = new Promise<boolean>((resolve) => {
+        timeout = setTimeout(() => resolve(false), 15_000);
+      });
+      const clean = await Promise.race([leaving, deadline]).finally(() => clearTimeout(timeout));
+      if (!setupStillOwnsChannel(owned, currentUserId, generation)) return;
+      if (!clean) throw new Error('Closed progress channel has not left cleanly');
+      owned = { channel: createProgressChannel(), client, topic };
+      realtimeChannel = owned;
+      leaving = undefined;
+      replacing = false;
+      subscribeOwnedChannel();
+    },
+    isCurrent: () => setupStillOwnsChannel(owned, currentUserId, generation),
+    isSuspended: () => Boolean(client.realtime && isRealtimeSuspended(client.realtime)),
+    onDegraded: (degraded) => {
+      liveUpdatesDegraded.value = degraded;
+    },
   });
+  stopLiveUpdates = () => {
+    recovery.stop();
+    for (const request of snapshotRequests) request.abort();
+  };
+  const subscribeOwnedChannel = () => {
+    const subscribing = owned;
+    try {
+      subscribing.channel.subscribe((status, error) => {
+        if (replacing || !setupStillOwnsChannel(subscribing, currentUserId, generation)) return;
+        recovery.onStatus(status, error);
+      });
+    } catch (error) {
+      recovery.onStatus('CLOSED', error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+  subscribeOwnedChannel();
 }
 /**
  * Removes the channel and stops its timers. Bumping the generation invalidates
@@ -671,6 +719,7 @@ async function runSetupRealtimeListener(
  */
 async function teardownProgressChannel(): Promise<void> {
   listenerGeneration += 1;
+  stopProgressRecovery();
   activeSnapshotRefresh = null;
   if (realtimeChannel) {
     // Remove through the client that created the channel: `$supabase.client` is

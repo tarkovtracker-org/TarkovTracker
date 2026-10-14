@@ -138,8 +138,20 @@ Explicit failure notifications use the persistent manual-failure flag so automat
 discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
-All destination task/objective catalogs are
-loaded before mutations, without changing the active metadata store. Destination catalogs
+All destination catalogs are loaded before mutations, without changing the active metadata store.
+`/api/tarkov/tasks-import` reads one English precomputed snapshot for each requested upstream mode.
+The producer combines core fields, objectives and fail conditions from one raw task set, then applies
+the private overlay once. Import never joins the independently cached UI core/objective projections.
+Snapshot validation follows the [producer contract](./overlay-and-precompute.md#key-contract). Missing provenance,
+duplicate task/objective IDs, invalid counts, wrong scope, corrupt data or a
+snapshot older than seven days rejects the preview before any progress or mode change. Failed
+refreshes retain each mode's last-good entry. Runtime use of a whole last-good snapshot does not
+require its global overlay SHA to match the separately cached UI release; a non-task overlay change
+cannot cause an import outage by itself. The snapshot route and request are `no-store`, and the
+route never runs upstream adaptation on a Worker request. Seed the three import keys from the
+reviewed app revision before promoting it (see [overlay and precompute](./overlay-and-precompute.md)).
+The UI objective route and local metadata cache use `TASK_OBJECTIVES_CACHE_VERSION` (`json-v4`)
+to retire earlier incomplete corrected entries. Destination catalogs
 determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
 failures explicitly warn that some progress may remain applied. Users can select the same logs
 to retry; state-setting operations preserve successful completions.
@@ -147,6 +159,17 @@ Seasonal events outside the active season are skipped; assigning unresolved out-
 events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
 guard shows the date warning and disables confirmation immediately for an invalid selection.
 Malformed/skipped records are reported in the preview.
-Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
+Accounts are separated by the `AccountId` on `SelectProfile`, `PrepareSelectedProfileLocally`,
+and `CompleteSelectedProfile` lines in the `application` and `output` channels (`ProfileId`
+differs per mode, so it is never the key). Each event belongs to the latest preceding selection
+in its session (an event at the same millisecond as a selection stays unidentified),
+so an account switch inside one session splits correctly. Quest-event counts cover only the selected account. The preview defaults
+to the most recently played account and imports one account at a time (`account: null` selects
+every account and is used only to discover destination modes). Events before a session's first
+retained selection also remain available in the `unidentified` bucket, alongside sessions with
+no recorded selection: it joins the only identified account, but stays
+separate when two or more accounts exist. Account IDs stay in memory and are shown only as a
+four-character suffix. Switching accounts resets version selection to that account's defaults.
+Version filters are compatibility filters, not wipe/prestige boundaries: users must
 select the character sessions they intend to restore. Missing logs, objective handovers, XP,
 skills, and hideout progress cannot be reconstructed from these quest notifications.

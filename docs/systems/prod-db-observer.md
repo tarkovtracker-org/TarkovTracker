@@ -66,6 +66,12 @@ flowchart LR
    current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
    `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
    observable without migration or Management API credentials.
+   `owner-only-teams` reads one explicitly allowlisted aggregate view for team-expiry eligibility,
+   grace/deadline/anomaly counts, activation state and at most 20 aggregate batch receipts. The
+   view exposes no IDs, names, join codes or progress. Grant only private-schema usage and SELECT
+   on that view out of band; the observer needs no access to its underlying tables or functions.
+   This report is excluded from the telemetry-only canary. A single output row does not bound the
+   aggregation scan; the normal observer timeout applies, and a failing report blocks activation.
 9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
    observer role. The wrapper reads only `PROD_DB_*` keys from the repository-root `.env` when they
    are not already exported; explicit environment variables take precedence and other keys in that

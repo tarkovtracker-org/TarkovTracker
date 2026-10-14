@@ -59,17 +59,6 @@
           <div class="grid gap-4 md:grid-cols-2">
             <div class="space-y-2">
               <p class="text-surface-200 text-sm font-semibold">
-                {{ $t('common.tasks') }}
-              </p>
-              <SelectMenuFixed
-                v-model="taskDefaultView"
-                :items="taskViewOptions"
-                value-key="value"
-                label-key="label"
-              />
-            </div>
-            <div class="space-y-2">
-              <p class="text-surface-200 text-sm font-semibold">
                 {{ $t('common.hideout') }}
               </p>
               <SelectMenuFixed
@@ -121,15 +110,6 @@
     get: () => preferencesStore.getHideTaskRewards,
     set: (val) => preferencesStore.setHideTaskRewards(val),
   });
-  const taskDefaultView = computed({
-    get: () => preferencesStore.getTaskPrimaryView,
-    set: (val) => preferencesStore.setTaskPrimaryView(val),
-  });
-  const taskViewOptions = computed(() => [
-    { label: t('common.list'), value: 'all' },
-    { label: t('tasks.view.map'), value: 'maps' },
-    { label: t('common.traders'), value: 'traders' },
-  ]);
   const hideoutDefaultView = computed({
     get: () => preferencesStore.getHideoutPrimaryView,
     set: (val) => preferencesStore.setHideoutPrimaryView(val),

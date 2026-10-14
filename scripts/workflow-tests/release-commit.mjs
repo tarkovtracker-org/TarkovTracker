@@ -17,6 +17,24 @@ function releaseFixture(t) {
   writeFileSync(join(f.repo, 'CHANGELOG.md'), '# 1.2.3\n');
   return f;
 }
+function assertDailyReleaseSchedule(release) {
+  assert.match(workflowEvent(release, 'schedule'), /^ {4}- cron: '0 15 \* \* \*'(?:\s+#.*)?$/m);
+}
+test('automatic releases get a daily catch-up opportunity instead of losing a whole week', () => {
+  assertDailyReleaseSchedule(readFileSync('.github/workflows/release.yml', 'utf8'));
+});
+test('comments cannot satisfy the daily catch-up schedule requirement', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  const weekly = release.replace("- cron: '0 15 * * *'", "- cron: '0 15 * * 2'");
+  assert.notEqual(weekly, release);
+  const comment = "    # cron: '0 15 * * *'\n";
+  assert.throws(() =>
+    assertDailyReleaseSchedule(weekly.replace('  schedule:\n', `  schedule:\n${comment}`))
+  );
+  assert.throws(() =>
+    assertDailyReleaseSchedule(release.replace("- cron: '0 15 * * *'", "# cron: '0 15 * * *'"))
+  );
+});
 test('release validates a staging commit before promoting that identical SHA without PAT bypass', (t) => {
   const f = releaseFixture(t);
   const result = f.release();

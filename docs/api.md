@@ -6,7 +6,7 @@ Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration
 Team routes: /api/team/* (Supabase JWT auth).
 Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
 Game modes in API: regular (pvp), pve, pvp-season (seasonal).
-Rate limits: §Rate Limits. OpenAPI spec: workers/api-gateway/src/openapi.ts.
+Rate limits: §Rate Limits. OpenAPI spec: [API source](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/openapi.ts).
 -->
 
 ## Overview
@@ -26,7 +26,38 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 
 ## Progress API Host (api.tarkovtracker.org)
 
-The progress API gateway (token, progress, team progress) is served exclusively on `https://api.tarkovtracker.org` (clean paths, with `/api/v2/*` accepted as a path alias on the subdomain). Legacy `/api/` and `/api/v2/` routes on `tarkovtracker.org` have been retired and removed from production.
+The functional progress API gateway (token, progress, team progress) is served exclusively on
+`https://api.tarkovtracker.org` (clean paths, with `/api/v2/*` accepted as a path alias on the
+subdomain). On exactly `tarkovtracker.org` and `www.tarkovtracker.org`, the legacy families
+`/api/v2`, `/api/token`, `/api/progress` and `/api/team/progress` (each exact path or slash-delimited
+descendant) are retired. Pages returns HTTP **410 Gone** with static JSON:
+
+```json
+{
+  "error": "legacy_api_retired",
+  "message": "This legacy API address has been retired. Update your API base URL to https://api.tarkovtracker.org. See the documentation for migration instructions.",
+  "api_base_url": "https://api.tarkovtracker.org",
+  "documentation_url": "https://api.tarkovtracker.org/"
+}
+```
+
+The Pages entry wrapper returns before Nitro buffers a request body. The early retirement
+middleware uses the same response helper before API protection in other Nitro runtimes.
+Retirement authenticates nothing, reads no submitted body, and performs no outbound requests
+or binding calls. Responses use `no-store`;
+HEAD has no body. Valid browser preflight returns 204, allowing GET, HEAD, POST, PUT, PATCH,
+DELETE and OPTIONS with Accept, Authorization, Content-Type, If-None-Match and User-Agent.
+Wildcard CORS applies only to this static response, without credential support. The Pages
+response has no redirect, Location or Retry-After. Other hosts and first-party frontend routes keep their
+existing behavior, including `/api/tarkov/*`; near prefixes such as `/api/v20` are unaffected.
+
+These responses come directly from the apex. The apex/www Worker bindings for these families are
+removed; the API Worker binds only `api.tarkovtracker.org/*`. On `www.tarkovtracker.org`, the
+Cloudflare canonical redirect answers first with 308 to the same apex path and query, which then
+returns the 410/204 above; a 308 preserves method and body. Browsers do not follow redirects for
+preflights, so cross-origin browser calls to www fail CORS instead of reading the 410. Compiled
+tests bypass edge redirects.
+See [the retirement record](./api-ownership.md#legacy-address-retirement).
 
 Third-party integrations call `api.tarkovtracker.org` directly:
 
@@ -149,11 +180,33 @@ Fetches task objectives and fail conditions.
 
 **Cache TTL:** 12 hours
 
+Requires overlay provenance. A cache miss that cannot apply a valid overlay returns `503` instead
+of caching uncorrected objectives; a good stale entry keeps serving during background refresh.
+
+---
+
+### GET /api/tarkov/tasks-import
+
+Whole English task catalog used by EFT log import, read only from the precomputed snapshot
+(`tasks-import-json-v1-en-<gameMode>`). There is no runtime generation or language parameter.
+
+**Query Parameters:**
+
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
+
+**Caching:** `Cache-Control: no-store`. Missing, corrupt, wrong-mode or expired snapshots return
+`503`. Seeding and verification: [overlay and precompute](systems/overlay-and-precompute.md#release-verification).
+
 ---
 
 ### GET /api/tarkov/tasks-rewards
 
 Fetches task rewards (start, finish, failure).
+
+The admin `tarkov-data` purge includes the current `tasks-rewards-json-v2-<lang>-<gameMode>`
+edge-cache family for both apex and www origins, alongside its legacy retirement targets.
 
 **Query Parameters:**
 
@@ -231,7 +284,10 @@ response is cached per language **and** game mode.
 
 ### GET /api/tarkov/editions
 
-Fetches game editions, story chapters, and seasonal perks projected from the overlay.
+Fetches mode-scoped game editions and story chapters from the overlay. In `pvp-season`, seasonal
+perk metadata comes from the localized `json.tarkov.dev/pvp-season/season` catalog, augmented by
+overlay effects matched by perk ID. All upstream perks are retained, including perks without an
+effect patch. Other modes return an empty seasonal perk list.
 
 **Query Parameters:**
 
@@ -240,8 +296,17 @@ Fetches game editions, story chapters, and seasonal perks projected from the ove
 | `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-This endpoint is served directly from the overlay rather than through `edgeCache`, so it returns no
-`X-Cache-Status` header. It answers `503` when the overlay is unavailable.
+Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-season-<overlay-sha>`; the overlay is
+applied after that cache read. Seasonal responses expose `X-Cache-Status`, including `STALE` when
+last-good metadata is served during refresh. Other modes still read only the overlay. An unavailable
+or malformed upstream catalog fails with `502` on a cold read; unknown overlay IDs or an unavailable
+overlay fail with `503`. Metadata is checked against the current overlay before cache admission;
+incompatible refreshes retain last-good metadata. The overlay is also checked after cache reads,
+so an overlay introducing unknown IDs still returns `503` rather than silently dropping effects.
+Error responses explicitly use `Cache-Control: no-store`, replacing any policy set by the metadata
+cache before a projection failure.
+Successful responses use `Cache-Control: no-cache` so the internal metadata TTL cannot hide newer
+overlay effects or story corrections. A changed overlay SHA selects a fresh metadata entry.
 
 ---
 
@@ -564,6 +629,10 @@ while a background refresh runs (stale-while-revalidate).
 
 ### Cache Busting
 
+The admin `tarkov-data` purge targets current versioned bootstrap, hideout, items, items-lite,
+map-spawns and prestige cache keys alongside retained legacy retirement targets. Bootstrap keys
+are mode-only; the other current catalogs include language and mode for both apex and www origins.
+
 Pass `cacheBust=1` query parameter to bypass cache.
 
 ---
@@ -621,4 +690,4 @@ seasons create new progress rows without overwriting earlier Seasonal history.
 
 ## Data Overlay
 
-All task data is enhanced with community corrections from the [tarkov-data-overlay](https://github.com/tarkovtracker-org/tarkov-data-overlay) repository.
+All task data is enhanced with community corrections from the `tarkov-data-overlay` dataset.

@@ -77,3 +77,7 @@ describe('progress storage quota relief', () => {
     expect(safeRemoveItem).not.toHaveBeenCalledWith(quarantineKey);
   });
 });
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
+});

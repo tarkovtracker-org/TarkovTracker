@@ -49,6 +49,7 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
+import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
@@ -82,7 +83,16 @@ import type {
 } from '@/types/tarkov';
 // Player levels carry no translatable text, so bootstrap is cached once per game mode.
 const requestSignals = new WeakMap<Promise<unknown>, AbortSignal>();
+// A replacement startup must not join a request fenced to its previous owner.
+const editionRequestOwners = new WeakMap<Promise<unknown>, () => boolean>();
 const liveEditionRequests = new WeakSet<Promise<void>>();
+type EditionRequestOptions = {
+  revalidate?: boolean;
+  signal?: AbortSignal;
+  isOwner?: () => boolean;
+};
+const isEditionRequestActive = (options: EditionRequestOptions): boolean =>
+  !options.signal?.aborted && (options.isOwner?.() ?? true);
 const throwIfAborted = (signal?: AbortSignal) => signal?.throwIfAborted();
 const matchesOptionalRequestValue = <T>(
   requested: T | undefined,
@@ -103,9 +113,10 @@ const canReuseMetadataRequest = (
 const canJoinEditionRequest = (
   existing: Promise<void> | null,
   forceRefresh: boolean,
-  options: { revalidate?: boolean; signal?: AbortSignal }
+  options: EditionRequestOptions
 ): existing is Promise<void> => {
   if (!canReuseMetadataRequest(existing, forceRefresh, options.signal)) return false;
+  if (editionRequestOwners.get(existing) !== options.isOwner) return false;
   return !options.revalidate || liveEditionRequests.has(existing);
 };
 const canApplyRequestSignal = (signal: AbortSignal | undefined, ignoreAbort: boolean): boolean =>
@@ -128,12 +139,11 @@ const ENGLISH_LANGUAGE_CODE = 'en';
 const TASKS_CORE_CACHE_VERSION = 'json-v3';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 const ITEMS_CACHE_VERSION = 'json-v2';
-const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v5';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
 const PRESTIGE_CACHE_VERSION = 'json-v3';
-const EDITIONS_CACHE_VERSION = 'overlay-v2';
+const EDITIONS_CACHE_VERSION = 'overlay-v3';
 const settledEditionScope = (requested: string, current: string) =>
   requested === current ? requested : '';
 /**
@@ -311,6 +321,8 @@ const prepareEditionScope = (
   scope: string
 ) => {
   if (store.editionsScope && store.editionsScope !== scope) {
+    // Freshness belongs to the live catalog, which this scope change discards.
+    store.editionsRevalidatedScopes.delete(store.editionsScope);
     store.editionsSettledScope = '';
     state.seasonalPerks = markRaw([]);
     state.editions = markRaw([]);
@@ -400,6 +412,11 @@ const applyProgressionCatalog = (
   state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
   migrateMetadataStoryObjectiveIds();
 };
+const cachedProgressionCatalog = (cached: CriticalCacheData['editions']): ProgressionCatalog => ({
+  editions: cached.editions ?? [],
+  storyChapters: cached.storyChapters ?? [],
+  seasonalPerks: cached.seasonalPerks ?? [],
+});
 const cacheProgressionCatalog = (
   state: ProgressionCatalogState,
   mode: string,
@@ -1119,6 +1136,28 @@ export const useMetadataStore = defineStore('metadata', {
         window.clearTimeout(timeoutId);
       }
     },
+    /** Keep cached first paint while checking the catalog once per owned session scope. */
+    scheduleCachedEditionsRevalidation(isOwner: () => boolean, signal?: AbortSignal) {
+      const promises = getPromiseStore(this);
+      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
+      if (promises.editionsRevalidatedScopes.has(scope)) return;
+      const requestVersion = promises.editionsRequestVersion;
+      void queueIdleTask(
+        () => {
+          if (
+            !isOwner() ||
+            promises.editionsRequestVersion !== requestVersion ||
+            promises.editionsRevalidatedScopes.has(scope)
+          )
+            return;
+          return this.fetchEditionsData(false, { revalidate: true, signal, isOwner });
+        },
+        { timeout: 3500, minTime: 8, priority: 'normal' }
+      ).catch((error) => {
+        if (!signal?.aborted)
+          logger.warn('[MetadataStore] Cached catalog revalidation failed:', error);
+      });
+    },
     /**
      * Fetch all metadata from the API
      * @param forceRefresh - If true, bypass cache and fetch fresh data
@@ -1166,6 +1205,7 @@ export const useMetadataStore = defineStore('metadata', {
         if (cacheApplied) {
           hideoutPromise = Promise.resolve();
           tasksCorePromise = Promise.resolve();
+          this.scheduleCachedEditionsRevalidation(isCurrent, options.signal);
         } else {
           hideoutPromise = this.fetchHideoutData(forceRefresh, options.signal);
           void hideoutPromise.catch(() => {});
@@ -1791,9 +1831,11 @@ export const useMetadataStore = defineStore('metadata', {
     async ensureEditionsData() {
       const promises = getPromiseStore(this);
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
-      promises.editionsRequestVersion += 1;
-      if (promises.editionsScope === scope && promises.editionsPromise)
+      // Joining an eager request consumes deferred work; cached readiness still needs freshness.
+      if (promises.editionsScope === scope && promises.editionsPromise) {
+        promises.editionsRequestVersion += 1;
         return promises.editionsPromise;
+      }
       // Readiness reuses settled failures too; explicit fetch/refresh retries them.
       if (promises.editionsSettledScope === scope) return;
       return this.fetchEditionsData();
@@ -1801,12 +1843,11 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * @param forceRefresh - Skip the browser cache and ask the server to bypass its caches.
      * @param options.revalidate - Skip the browser cache only (background freshness check).
+     * @param options.isOwner - Fence background startup results to their initiating owner.
      */
-    async fetchEditionsData(
-      forceRefresh = false,
-      options: { revalidate?: boolean; signal?: AbortSignal } = {}
-    ) {
+    async fetchEditionsData(forceRefresh = false, options: EditionRequestOptions = {}) {
       throwIfAborted(options.signal);
+      if (!isEditionRequestActive(options)) return;
       const skipBrowserCache = forceRefresh || options.revalidate === true;
       const promiseStore = getPromiseStore(this);
       const requestMode = this.getApiGameMode();
@@ -1821,17 +1862,18 @@ export const useMetadataStore = defineStore('metadata', {
       this.seasonalPerks = perksForMode(this.seasonalPerks, requestMode);
       // Register the promise before requests can settle or throw synchronously.
       const promise = Promise.resolve().then(async () => {
-        this.editionsError = null;
         const isCurrent = () =>
-          !options.signal?.aborted &&
+          isEditionRequestActive(options) &&
           promiseStore.editionsPromise === promise &&
           this.getApiGameMode() === requestMode &&
           this.languageCode === requestLanguage;
         if (
           !skipBrowserCache &&
-          (await applyCachedEditionsOrIgnore(this, isCurrent, requestMode, requestLanguage))
+          (await this.reuseOrApplyCachedEditions(isCurrent, requestMode, requestLanguage))
         ) {
-          // Revalidate a cached scope once per session; repeat locale/mode switches reuse it.
+          if (!isCurrent()) return;
+          this.editionsError = null;
+          // Revalidate once while the successfully checked catalog remains live in this scope.
           if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
               (error) =>
@@ -1844,6 +1886,7 @@ export const useMetadataStore = defineStore('metadata', {
         }
         throwIfAborted(options.signal);
         if (!isCurrent()) return;
+        this.editionsError = null;
         this.editionsLoading = true;
         liveEditionRequests.add(promise);
         const loaded = await loadProgressionCatalog(this, promiseStore, {
@@ -1855,18 +1898,19 @@ export const useMetadataStore = defineStore('metadata', {
           scope,
         });
         // A successful live load is as fresh as a revalidation.
-        if (loaded) {
+        if (loaded && isCurrent()) {
           promiseStore.editionsRevalidatedScopes.add(scope);
         }
       });
       if (options.signal) requestSignals.set(promise, options.signal);
+      if (options.isOwner) editionRequestOwners.set(promise, options.isOwner);
       if (skipBrowserCache) liveEditionRequests.add(promise);
       promiseStore.editionsPromise = promise;
       try {
         await promise;
       } finally {
         if (promiseStore.editionsPromise === promise) {
-          promiseStore.editionsSettledScope = options.signal?.aborted
+          promiseStore.editionsSettledScope = !isEditionRequestActive(options)
             ? ''
             : settledEditionScope(scope, `${this.getApiGameMode()}-${this.languageCode}`);
           this.editionsLoading = false;
@@ -1874,12 +1918,37 @@ export const useMetadataStore = defineStore('metadata', {
         }
       }
     },
+    async reuseOrApplyCachedEditions(
+      isCurrent: () => boolean,
+      mode: string,
+      language: string
+    ): Promise<boolean> {
+      const scope = `${mode}-${language}`;
+      // A stored copy can lag this live catalog; reuse only proven live data.
+      if (this.hasRevalidatedCatalog(scope)) return true;
+      // Every actual browser-cache adoption must earn its own successful live check.
+      getPromiseStore(this).editionsRevalidatedScopes.delete(scope);
+      return applyCachedEditionsOrIgnore(this, isCurrent, mode, language);
+    },
+    hasRevalidatedCatalog(scope: string): boolean {
+      const promises = getPromiseStore(this);
+      return (
+        promises.editionsScope === scope &&
+        promises.editionsSettledScope === scope &&
+        promises.editionsRevalidatedScopes.has(scope) &&
+        this.storyChaptersGameMode === gameModeForApiMode(this.getApiGameMode())
+      );
+    },
     applyCriticalCachedData(cachedData: CriticalCacheData): boolean {
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
       if (cachedData.scope !== scope || !cachedData.editions.editions?.every(isGameEdition))
         return false;
       // A cache hydration owns these datasets just like a new network request.
       const promises = getPromiseStore(this);
+      const preserveLiveCatalog = this.hasRevalidatedCatalog(scope);
+      prepareEditionScope(this, promises, scope);
+      // Persisting a refreshed catalog can lag or fail; cached hydration must not roll it back.
+      if (!preserveLiveCatalog) promises.editionsRevalidatedScopes.delete(scope);
       const requestIds = getPromiseRequestIdStore(this);
       const requestKeys = getPromiseRequestKeyStore(this);
       for (const key of [
@@ -1901,18 +1970,15 @@ export const useMetadataStore = defineStore('metadata', {
       this.hydrateHideoutItems();
       this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
       this.hydratePrestigeItems();
-      this.editions = markRaw(cachedData.editions.editions ?? []);
-      this.storyChapters = markRaw(
-        (cachedData.editions.storyChapters ?? [])
-          .map((chapter) => normalizeStoryChapter(chapter))
-          .sort((a, b) => a.order - b.order)
-      );
-      this.storyChaptersGameMode = gameModeForApiMode(this.getApiGameMode());
-      migrateMetadataStoryObjectiveIds();
-      this.seasonalPerks = perksForMode(
-        cachedData.editions.seasonalPerks ?? [],
-        this.getApiGameMode()
-      );
+      if (!preserveLiveCatalog) {
+        applyProgressionCatalog(
+          this,
+          cachedProgressionCatalog(cachedData.editions),
+          this.getApiGameMode()
+        );
+      } else {
+        migrateMetadataStoryObjectiveIds();
+      }
       this.error = null;
       this.hideoutError = null;
       this.prestigeError = null;

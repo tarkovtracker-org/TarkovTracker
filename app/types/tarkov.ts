@@ -124,9 +124,17 @@ export interface TaskPrestigeReference {
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
 /**
  * Best-effort counter derivation attached server-side from the overlay's progressionCounters
- * registry: the counter equals the number of completed tasks in `taskIds`.
+ * registry. `distinctTaskCompletions`: the number of completed tasks in `taskIds`.
+ * `taskGroupCompletions`: the number of settled `groups`.
  */
-export type TaskCounterDerivation = { type: 'distinctTaskCompletions'; taskIds: string[] };
+export type TaskCounterDerivation =
+  | { type: 'distinctTaskCompletions'; taskIds: string[] }
+  | { type: 'taskGroupCompletions'; groups: TaskCounterGroup[] };
+/**
+ * Tasks the game credits as one: a list counts once every member is completed, `anyOf` once any
+ * member is (faction variants a player can only ever complete one of).
+ */
+export type TaskCounterGroup = string[] | { anyOf: string[] };
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';
@@ -454,8 +462,17 @@ export interface PrestigeLevel {
 export interface TarkovPrestigeQueryResult {
   prestige: PrestigeLevel[];
 }
+/** Explicit unlock placement supplied by the overlay, never inferred from objective wording. */
+export interface StoryObjectiveUnlock {
+  type: 'achievement' | 'barter' | 'map' | 'quest' | 'trader' | 'other';
+  id?: string;
+  name: string;
+  note?: string;
+}
 export interface StoryObjective {
   id: string;
+  /** Producer-declared tutorial baseline, shared by all modes and never persisted on render. */
+  completionPolicy?: 'tutorial';
   order: number;
   type: 'main' | 'optional';
   description: string;
@@ -466,8 +483,11 @@ export interface StoryObjective {
    * chapters, so treat it as optional and never key persisted progress on it.
    */
   sourceQuestId?: string;
+  /** Raw optional layout parent in the same chapter/subquest; never a completion prerequisite. */
+  parentObjectiveId?: string;
   /** `client/ending_list` id of the branch this objective belongs to, when the overlay tags one. */
   endingId?: string;
+  unlocks?: StoryObjectiveUnlock[];
 }
 /**
  * Ending branch a chapter can resolve into, restated by the overlay so the branch set is visible
@@ -669,6 +689,7 @@ export interface TeamState extends StateTree {
   id?: string | null;
   owner?: string | null;
   joinCode?: string | null;
+  ownerOnlyExpiresAt?: string | null;
   members?: string[];
   memberProfiles?: Record<string, MemberProfile>;
 }

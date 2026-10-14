@@ -71,7 +71,6 @@ export interface UserProgressData {
   level: number;
   pmcFaction: 'USEC' | 'BEAR';
   displayName: string | null;
-  xpOffset: number;
   taskObjectives: { [objectiveId: string]: TaskObjectiveProgress };
   taskCompletions: { [taskId: string]: TaskCompletion };
   taskAvailability?: { [taskId: string]: TaskAvailabilityConfirmation };

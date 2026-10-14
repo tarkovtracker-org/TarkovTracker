@@ -152,7 +152,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
-      query: { gameMode: 'pve', lang: 'en', version: 'json-v3' },
+      query: { gameMode: 'pve', lang: 'en', version: 'json-v4' },
     });
     // A language switch reloads the catalog; the counts come from the session memo.
     store.languageCode = 'fr';
@@ -170,7 +170,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     vi.stubGlobal('$fetch', fetchMock);
     await store.fetchObjectiveModeCountDifferences();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'json-v3-counts-regular', 'en');
+    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'json-v4-counts-regular', 'en');
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 5, pve: 2 } });
   });
   it('retries other-mode counts after a failed load', async () => {

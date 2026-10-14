@@ -17,6 +17,7 @@ import type { PreferencesState } from '@/stores/usePreferences';
 export type PersistedPreferencesState = Partial<Omit<PreferencesState, 'saving'>>;
 export type PersistedPreferencesStateWithLegacy = PersistedPreferencesState & {
   taskCardDensity?: unknown;
+  useAutomaticLevelCalculation?: unknown;
   neededItemsHideCollected?: boolean;
   onlyTasksWithSuggestedKeys?: boolean;
 };
@@ -24,6 +25,7 @@ export const requiresLegacyPreferencesMigration = (
   persistedState: PersistedPreferencesStateWithLegacy
 ): boolean => {
   return (
+    'useAutomaticLevelCalculation' in persistedState ||
     'taskCardDensity' in persistedState ||
     'neededItemsHideCollected' in persistedState ||
     'onlyTasksWithSuggestedKeys' in persistedState
@@ -175,6 +177,7 @@ export const sanitizePersistedPreferencesState = (
   const sanitizedState = clonePreferencesSnapshot(
     persistedState
   ) as PersistedPreferencesStateWithLegacy;
+  delete sanitizedState.useAutomaticLevelCalculation;
   delete sanitizedState.taskCardDensity;
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
   if (

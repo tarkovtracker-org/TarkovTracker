@@ -27,10 +27,21 @@ const {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
     exportProgress: vi.fn(async () => undefined),
+    exportDeviceProgressRecovery: vi.fn(async () => {
+      backupState.recoveryExportPending.value = true;
+    }),
+    confirmRecoveryArchiveSaved: vi.fn(async () => undefined),
+    reviewRecoveryArchiveEntry: vi.fn(),
+    reviewOlderTabProgress: vi.fn(async () => undefined),
     parseBackupFile: vi.fn(async () => undefined),
     resetImport: vi.fn(),
   },
   backupState: {
+    recoveryExportPending: {} as Ref<boolean>,
+    recoveryArchiveEntries: {} as Ref<Array<{ kind: string; index: number }>>,
+    selectedRecoveryArchiveEntry: {} as Ref<number | null>,
+    legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
+    legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -75,6 +86,7 @@ const {
     parseFiles: vi.fn(async () => undefined),
     reset: vi.fn(),
     setIncludedVersions: vi.fn(),
+    setAccount: vi.fn(),
   },
   eftLogsState: {
     isParsing: {} as Ref<boolean>,
@@ -120,6 +132,15 @@ vi.mock('@/composables/useDataBackup', () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
     debugExportError: backupState.debugExportError,
     exportProgress: backupFns.exportProgress,
+    exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
+    confirmRecoveryArchiveSaved: backupFns.confirmRecoveryArchiveSaved,
+    recoveryExportPending: backupState.recoveryExportPending,
+    recoveryArchiveEntries: backupState.recoveryArchiveEntries,
+    selectedRecoveryArchiveEntry: backupState.selectedRecoveryArchiveEntry,
+    reviewRecoveryArchiveEntry: backupFns.reviewRecoveryArchiveEntry,
+    reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
+    legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
+    legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -154,6 +175,7 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseFile: eftLogsFns.parseFile,
     parseFiles: eftLogsFns.parseFiles,
     setIncludedVersions: eftLogsFns.setIncludedVersions,
+    setAccount: eftLogsFns.setAccount,
     confirmImport: eftLogsFns.confirmImport,
     reset: eftLogsFns.reset,
   }),
@@ -213,6 +235,15 @@ describe('DataManagementCard', () => {
     backupFns.confirmBackupImport.mockReset();
     backupFns.exportDebugSnapshot.mockReset();
     backupFns.exportProgress.mockReset();
+    backupState.recoveryExportPending = ref(false);
+    backupState.recoveryArchiveEntries = ref([]);
+    backupState.selectedRecoveryArchiveEntry = ref(null);
+    backupFns.confirmRecoveryArchiveSaved.mockReset();
+    backupFns.exportDeviceProgressRecovery.mockReset().mockImplementation(async () => {
+      backupState.recoveryExportPending.value = true;
+    });
+    backupState.legacyProgressRecoveryCount.value = 0;
+    backupState.legacyProgressRecoveryOverflow.value = false;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -225,6 +256,7 @@ describe('DataManagementCard', () => {
     eftLogsFns.parseFiles.mockReset();
     eftLogsFns.reset.mockReset();
     eftLogsFns.setIncludedVersions.mockReset();
+    eftLogsFns.setAccount.mockReset();
     tarkovStoreState.setTarkovUid.mockClear();
     tarkovStoreState.setTarkovUid.mockImplementation((uid: number | null) => {
       tarkovStoreState.tarkovUid = uid;
@@ -300,6 +332,12 @@ describe('DataManagementCard', () => {
               '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
             props: ['disabled', 'label', 'modelValue'],
             emits: ['update:model-value'],
+          },
+          URadioGroup: {
+            template:
+              '<div role="radiogroup" :aria-label="legend"><button v-for="item in items" :key="item.value" type="button" class="account-option" :data-selected="item.value === modelValue" @click="$emit(\'update:modelValue\', item.value)">{{ item.label }}</button></div>',
+            props: ['disabled', 'items', 'legend', 'modelValue'],
+            emits: ['update:modelValue'],
           },
           USeparator: true,
         },
@@ -880,6 +918,69 @@ describe('DataManagementCard', () => {
       })
     );
   });
+  it('shows the multi-account notice and switches the previewed account', async () => {
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = {
+      availableAccounts: [
+        { id: '2222222222', sessionCount: 3, lastSeen: Date.parse('2026-02-21T10:00:00Z') },
+        { id: '1111111111', sessionCount: 2, lastSeen: Date.parse('2026-02-20T10:00:00Z') },
+      ],
+      availableVersions: ['1.2.0.0.47888'],
+      chatMessageCount: 2,
+      completionEventCount: 1,
+      dedupedCompletionEventCount: 1,
+      dedupedStartedEventCount: 0,
+      filesParsed: 1,
+      hasMultipleAccounts: true,
+      includedVersions: ['1.2.0.0.47888'],
+      matchedStartedTaskIds: [],
+      matchedStartedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      matchedTaskIds: ['61604635c725987e815b1a46'],
+      matchedTaskIdsByMode: { pve: [], pvp: ['61604635c725987e815b1a46'], unknown: [] },
+      questIds: ['61604635c725987e815b1a46'],
+      scannedEntries: 20,
+      selectedAccount: '2222222222',
+      sourceFileName: 'Logs.zip',
+      startedEventCount: 0,
+      startedQuestIds: [],
+      unmatchedQuestIds: [],
+      unmatchedStartedQuestIds: [],
+      versionSessionCounts: { '1.2.0.0.47888': 5 },
+    };
+    const wrapper = createWrapper();
+    expect(wrapper.text()).toContain('settings.log_import.multiple_accounts_title');
+    expect(wrapper.find('[role="radiogroup"]').attributes('aria-label')).toBe(
+      'settings.log_import.account_filter_label'
+    );
+    const options = wrapper.findAll('.account-option');
+    expect(options).toHaveLength(2);
+    expect(options.map((o) => o.attributes('data-selected'))).toEqual(['true', 'false']);
+    expect(wrapper.text()).not.toContain('2222222222');
+    expect(wrapper.text()).not.toContain('1111111111');
+    await options[1]!.trigger('click');
+    expect(eftLogsFns.setAccount).toHaveBeenCalledWith('1111111111');
+    wrapper.unmount();
+  });
+  it('hides the account selector when at most one account is available', () => {
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = {
+      availableAccounts: [{ id: '1111111111', sessionCount: 1, lastSeen: null }],
+      hasMultipleAccounts: false,
+      matchedStartedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      matchedTaskIds: [],
+      matchedTaskIdsByMode: { pve: [], pvp: [], unknown: [] },
+      questIds: [],
+      selectedAccount: '1111111111',
+      sourceFileName: 'Logs.zip',
+      startedQuestIds: [],
+      unmatchedQuestIds: [],
+      unmatchedStartedQuestIds: [],
+    };
+    const wrapper = createWrapper();
+    expect(wrapper.find('.account-option').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('settings.log_import.multiple_accounts_title');
+    wrapper.unmount();
+  });
   it('hides EFT mode toggle when all matched events are auto-detected', () => {
     eftLogsState.importState.value = 'preview';
     eftLogsState.previewData.value = {
@@ -1027,5 +1128,73 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper();
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);
+  });
+  it('routes archive copy selection into the existing preview', async () => {
+    backupState.recoveryArchiveEntries.value = [
+      { kind: 'original', index: 0 },
+      { kind: 'older', index: 1 },
+    ];
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="recovery-archive-entry-1"]').trigger('click');
+    expect(backupFns.reviewRecoveryArchiveEntry).toHaveBeenCalledWith(1);
+  });
+  it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
+    backupState.legacyProgressRecoveryOverflow.value = true;
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(wrapper.text()).toContain('settings.data_management.older_tab_recovery_full');
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith();
+    expect(backupFns.confirmRecoveryArchiveSaved).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
+  });
+  it('requires confirmation before exporting and clearing older copies', async () => {
+    backupState.legacyProgressRecoveryCount.value = 2;
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledWith();
+    expect(backupFns.confirmRecoveryArchiveSaved).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(backupFns.confirmRecoveryArchiveSaved).toHaveBeenCalledOnce();
+  });
+  it('asks for a new recovery archive after the account changes', async () => {
+    backupState.legacyProgressRecoveryOverflow.value = true;
+    backupFns.confirmRecoveryArchiveSaved.mockRejectedValueOnce(
+      new Error('settings.data_management.recovery_owner_changed')
+    );
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'settings.data_management.recovery_owner_changed' })
+    );
+  });
+  it('keeps saved-file confirmation and reports a failed native cleanup', async () => {
+    backupState.legacyProgressRecoveryCount.value = 1;
+    backupFns.confirmRecoveryArchiveSaved.mockRejectedValueOnce(new Error('cleanup failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-saved-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        description: 'settings.data_management.recovery_cleanup_failed',
+      })
+    );
+    expect(wrapper.find('[data-testid="older-tab-cleanup-saved-confirm"]').exists()).toBe(true);
+  });
+  it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
+    backupState.legacyProgressRecoveryCount.value = 1;
+    backupFns.exportDeviceProgressRecovery.mockRejectedValueOnce(new Error('export failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await wrapper.get('[data-testid="older-tab-cleanup"]').trigger('click');
+    await wrapper.get('[data-testid="older-tab-cleanup-confirm"]').trigger('click');
+    expect(toastAddMock).toHaveBeenCalledWith(expect.objectContaining({ color: 'error' }));
+    expect(wrapper.find('[data-testid="older-tab-cleanup-confirm"]').exists()).toBe(true);
   });
 });

@@ -152,11 +152,9 @@ describe('performReset seasonal', () => {
       const local = structuredClone(defaultState);
       const remote = structuredClone(defaultState);
       local[mode].displayName = null;
-      local[mode].xpOffset = 0;
       local[mode].skillOffsets = {};
       local[mode].taskObjectives.objective = { count: 0, timestamp: 20 };
       remote[mode].displayName = 'older name';
-      remote[mode].xpOffset = 100;
       remote[mode].skillOffsets = { Endurance: 4 };
       remote[mode].taskObjectives.objective = { count: 5, timestamp: 10 };
       remote[mode].taskCompletions.remoteTask = { complete: true, timestamp: 10 };
@@ -166,7 +164,7 @@ describe('performReset seasonal', () => {
         modeUpdatedAt: {},
       });
       expect(result.gameEdition).toBe(4);
-      expect(result[mode]).toMatchObject({ displayName: null, xpOffset: 0, skillOffsets: {} });
+      expect(result[mode]).toMatchObject({ displayName: null, skillOffsets: {} });
       expect(result[mode].skillOffsets).toEqual({});
       expect(result[mode].taskObjectives.objective?.count).toBe(0);
       expect(result[mode].taskCompletions.remoteTask?.complete).toBe(true);
@@ -225,15 +223,13 @@ describe('performReset seasonal', () => {
       const older = localWins ? remote : local;
       preferred.pvp.displayName = null;
       preferred.pvp.skillOffsets = {};
-      preferred.pvp.xpOffset = 0;
       older.pvp.displayName = 'old name';
       older.pvp.skillOffsets = { Endurance: 4 };
-      older.pvp.xpOffset = 100;
       older.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
       const result = resolveInitialSyncState(local, remote, localWins ? 30 : 10, 20, 1, 1, {
         mergeModeSnapshots: true,
       });
-      expect(result.pvp).toMatchObject({ displayName: null, skillOffsets: {}, xpOffset: 0 });
+      expect(result.pvp).toMatchObject({ displayName: null, skillOffsets: {} });
       expect(result.pvp.skillOffsets).toEqual({});
       expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
     }
@@ -429,4 +425,8 @@ describe('startup manual activity history', () => {
       ).toEqual([]);
     }
   );
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

@@ -21,6 +21,9 @@
         marginLeft: mainMarginLeft,
       }"
     >
+      <ClientOnly>
+        <OlderTabRecoveryNotice />
+      </ClientOnly>
       <div :class="contentWrapperClass">
         <slot />
       </div>
@@ -48,6 +51,7 @@
   import AppBar from '@/shell/AppBar.vue';
   import AppFooter from '@/shell/AppFooter.vue';
   import NavDrawer from '@/shell/NavDrawer.vue';
+  import OlderTabRecoveryNotice from '@/shell/OlderTabRecoveryNotice.vue';
   import { useAppStore } from '@/stores/useApp';
   import { logger } from '@/utils/logger';
   import { SHELL_DRAWER_COLLAPSED_WIDTH, SHELL_DRAWER_EXPANDED_WIDTH } from '@/utils/shellConfig';

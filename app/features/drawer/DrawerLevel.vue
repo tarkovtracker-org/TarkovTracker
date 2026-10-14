@@ -6,7 +6,7 @@
           {{ t('common.level') }}
         </div>
         <span class="text-center text-2xl leading-tight font-bold">
-          {{ displayedLevel }}
+          {{ savedLevel }}
         </span>
       </div>
     </template>
@@ -43,73 +43,60 @@
               class="text-surface-400 mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
             >
               <span>{{ t('common.level') }}</span>
-              <span class="text-surface-500 text-[0.5rem]">·</span>
-              <span
-                class="text-[0.55rem]"
-                :class="
-                  useAutomaticLevel ? 'text-accent-400 light:text-accent-700' : 'text-surface-400'
-                "
-              >
-                {{ useAutomaticLevel ? t('navigation_drawer.mode_auto') : t('common.manual') }}
-              </span>
             </div>
             <div class="flex h-8 items-center justify-center text-center">
-              <AppTooltip
-                v-if="!editingLevel || useAutomaticLevel"
-                :text="useAutomaticLevel ? t('navigation_drawer.auto_level_enabled') : ''"
+              <span
+                v-if="!editingLevel"
+                class="hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors"
+                tabindex="0"
+                role="button"
+                :aria-label="
+                  t(
+                    'navigation_drawer.level_display_editable',
+                    { level: savedLevel },
+                    'Level {level}, click or press Enter to edit'
+                  )
+                "
+                @click="startEditingLevel"
+                @keyup.enter="startEditingLevel"
+                @keydown.space.prevent="startEditingLevel"
               >
-                <span
-                  :class="
-                    useAutomaticLevel
-                      ? 'mx-auto block h-8 w-12 text-center text-3xl leading-8 font-bold'
-                      : 'hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors'
-                  "
-                  :tabindex="useAutomaticLevel ? '-1' : '0'"
-                  :role="useAutomaticLevel ? undefined : 'button'"
-                  :aria-disabled="useAutomaticLevel ? 'true' : undefined"
-                  :aria-label="
-                    useAutomaticLevel
-                      ? t(
-                          'navigation_drawer.level_display_auto',
-                          { level: displayedLevel },
-                          'Level {level} (automatic calculation enabled)'
-                        )
-                      : t(
-                          'navigation_drawer.level_display_editable',
-                          { level: displayedLevel },
-                          'Level {level}, click or press Enter to edit'
-                        )
-                  "
-                  @click="!useAutomaticLevel && startEditingLevel()"
-                  @keydown.enter="!useAutomaticLevel && startEditingLevel()"
-                  @keydown.space.prevent="!useAutomaticLevel && startEditingLevel()"
-                >
-                  {{ displayedLevel }}
-                </span>
-              </AppTooltip>
+                {{ savedLevel }}
+              </span>
               <input
                 v-else
                 ref="levelInput"
-                v-model.number="levelInputValue"
+                v-model="draft"
                 type="number"
-                :min="minPlayerLevel"
-                :max="maxPlayerLevel"
+                inputmode="numeric"
+                step="1"
+                :min="minLevel"
+                :max="maxLevel"
+                :aria-label="t('navigation_drawer.level_input', { min: minLevel, max: maxLevel })"
                 class="no-spinner mx-auto block h-8 w-12 border-0 bg-transparent p-0 text-center text-3xl leading-8 font-bold outline-none focus:ring-0"
-                @input="enforceMaxLevel"
-                @blur="saveLevel"
+                v-bind="levelInputErrorAttrs"
+                @blur="finishEditingLevel"
                 @keyup.enter="saveLevel"
+                @keydown.esc.prevent="cancelEditingLevel"
               />
             </div>
+            <p
+              v-if="showLevelError"
+              :id="levelErrorId"
+              class="text-error-400 mt-1 text-center text-xs leading-tight"
+              role="alert"
+            >
+              {{ errorMessage }}
+            </p>
           </span>
           <span
-            v-if="!useAutomaticLevel"
             class="flex shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5"
           >
             <AppTooltip :text="t('navigation_drawer.increment_level')">
               <button
                 type="button"
                 :class="[STEPPER_BUTTON_CLASS, 'border-b border-white/10']"
-                :disabled="displayedLevel >= maxPlayerLevel"
+                :disabled="savedLevel >= maxLevel"
                 :aria-label="t('navigation_drawer.increment_level')"
                 @click="incrementLevel"
               >
@@ -120,7 +107,7 @@
               <button
                 type="button"
                 :class="STEPPER_BUTTON_CLASS"
-                :disabled="displayedLevel <= minPlayerLevel"
+                :disabled="savedLevel <= minLevel"
                 :aria-label="t('navigation_drawer.decrement_level')"
                 @click="decrementLevel"
               >
@@ -129,104 +116,79 @@
             </AppTooltip>
           </span>
         </div>
-        <NuxtLink
-          v-if="useAutomaticLevel"
-          to="/settings"
-          class="hover:border-surface-600 mt-1.5 block cursor-pointer rounded border border-white/5 bg-white/5 px-2 py-1 no-underline transition-all hover:bg-white/10"
-          :aria-label="t('navigation_drawer.xp_settings_link')"
-        >
-          <div class="mb-0.5 flex items-center justify-between text-[0.6rem]">
-            <span class="text-surface-400">{{ formatNumber(xpCalculation.totalXP.value) }} XP</span>
-            <span class="text-surface-500">
-              {{ formatNumber(xpCalculation.xpToNextLevel.value) }} needed
-            </span>
-          </div>
-          <div class="bg-surface-800/35 h-2 overflow-hidden rounded-full">
-            <div
-              class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
-              :style="{ width: `${xpCalculation.xpProgress.value}%` }"
-              role="progressbar"
-              :aria-valuenow="Math.round(xpCalculation.xpProgress.value)"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="t('navigation_drawer.xp_progress')"
-            ></div>
-          </div>
-        </NuxtLink>
       </div>
     </template>
   </div>
 </template>
 <script setup lang="ts">
-  import { useXpCalculation } from '@/composables/useXpCalculation';
+  import { usePlayerLevelEditor } from '@/composables/usePlayerLevelEditor';
   import { useMetadataStore } from '@/stores/useMetadata';
-  import { usePreferencesStore } from '@/stores/usePreferences';
-  import { useTarkovStore } from '@/stores/useTarkov';
-  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import type { PlayerLevel } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
-  const formatNumber = useLocaleNumberFormatter();
   interface DrawerLevelProps {
     isCollapsed: boolean;
   }
   defineProps<DrawerLevelProps>();
-  const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
-  const preferencesStore = usePreferencesStore();
-  const xpCalculation = useXpCalculation();
-  const minPlayerLevel = computed<number>(() => metadataStore.minPlayerLevel);
-  const maxPlayerLevel = computed<number>(() => metadataStore.maxPlayerLevel);
-  const playerLevels = computed<PlayerLevel[]>(() => metadataStore.playerLevels);
-  const useAutomaticLevel = computed<boolean>(
-    () => preferencesStore.getUseAutomaticLevelCalculation
+  const editingLevel = ref<boolean>(false);
+  // A mode switch or hydration while editing discards the draft instead of saving it elsewhere.
+  const { applyDraft, draft, errorMessage, maxLevel, minLevel, resetDraft, savedLevel, stepLevel } =
+    usePlayerLevelEditor({
+      onDraftReset: () => {
+        editingLevel.value = false;
+      },
+    });
+  const levelErrorId = useId();
+  const showLevelError = computed<boolean>(() => editingLevel.value && !!errorMessage.value);
+  const levelInputErrorAttrs = computed(() =>
+    errorMessage.value
+      ? ({
+          'aria-invalid': true,
+          'aria-describedby': levelErrorId,
+          class: 'text-error-400',
+        } as const)
+      : {}
   );
+  const playerLevels = computed<PlayerLevel[]>(() => metadataStore.playerLevels);
   const STEPPER_BUTTON_CLASS =
     'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 light:text-surface-300 light:hover:bg-surface-700/50 light:hover:text-surface-50';
-  const displayedLevel = computed<number>(() => {
-    return useAutomaticLevel.value ? xpCalculation.derivedLevel.value : tarkovStore.playerLevel();
-  });
   const isDataReady = computed<boolean>(() => {
     return !metadataStore.loading && metadataStore.playerLevels.length > 0;
   });
   const groupIcon = computed<string>(() => {
-    const level = displayedLevel.value;
+    const level = savedLevel.value;
     const entry = playerLevels.value.find((pl) => pl.level === level);
     return entry?.levelBadgeImageLink ?? '';
   });
   const groupImageLoadFailed = ref<boolean>(false);
-  const editingLevel = ref<boolean>(false);
-  const levelInputValue = ref<number>(tarkovStore.playerLevel());
   const levelInput = ref<HTMLInputElement | null>(null);
   function startEditingLevel(): void {
+    resetDraft();
     editingLevel.value = true;
-    levelInputValue.value = tarkovStore.playerLevel();
     void nextTick(() => {
       levelInput.value?.focus();
     });
   }
-  function enforceMaxLevel(): void {
-    const currentValue = Number(levelInputValue.value);
-    if (Number.isFinite(currentValue) && currentValue > maxPlayerLevel.value) {
-      levelInputValue.value = maxPlayerLevel.value;
-    }
-  }
+  /** Enter saves a valid level; an invalid one keeps the editor open with its error shown. */
   function saveLevel(): void {
-    let newLevel = Number(levelInputValue.value);
-    if (!Number.isFinite(newLevel)) newLevel = minPlayerLevel.value;
-    newLevel = Math.max(minPlayerLevel.value, Math.min(maxPlayerLevel.value, newLevel));
-    tarkovStore.setLevel(newLevel);
+    if (applyDraft()) editingLevel.value = false;
+  }
+  function cancelEditingLevel(): void {
+    resetDraft();
+    editingLevel.value = false;
+  }
+  /** Leaving the field saves a valid level and discards an invalid one rather than guessing. */
+  function finishEditingLevel(): void {
+    if (!editingLevel.value) return;
+    if (!applyDraft()) resetDraft();
     editingLevel.value = false;
   }
   function incrementLevel(): void {
-    if (tarkovStore.playerLevel() < maxPlayerLevel.value) {
-      tarkovStore.setLevel(tarkovStore.playerLevel() + 1);
-    }
+    stepLevel(1);
   }
   function decrementLevel(): void {
-    if (tarkovStore.playerLevel() > minPlayerLevel.value) {
-      tarkovStore.setLevel(tarkovStore.playerLevel() - 1);
-    }
+    stepLevel(-1);
   }
   watch(groupIcon, () => {
     groupImageLoadFailed.value = false;

@@ -8,6 +8,24 @@ The initial route `q` filters tasks immediately, including tasks loaded later. S
 trim whitespace and ignore case. Later typing and route changes retain the 180 ms debounce;
 clearing search cancels any pending update and restores the visible list immediately.
 
+The app-bar search (`app/features/omnibar/AppSearch.vue`) replaced the page search boxes on Tasks and
+Needed Items (Resources keeps its own). There, typing writes the page's `q` (debounced 150 ms, with `router.replace`) and its dropdown
+offers jump results for the other entities; elsewhere the dropdown jumps to tasks, items, or hideout
+stations. Opening a `?task=` link clears `q` first so the linked task is not filtered out.
+
+## Task views
+
+The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
+tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The sidebar
+keeps Tasks compact (`DrawerItemGroup.vue`): mouse or pen hover or keyboard focus animates its
+sub-pages open inline; touch hover and click focus do not. Leaving the group or selecting a route
+closes the unpinned dropdown; its chevron pins it open, saved per device
+(`app_drawerPinnedGroups`). Unpinning collapses it at once, and hover or focus reopens it only
+after the pointer and focus leave the group. No default-view selection is saved; the stored
+`taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
+params kept (`app/middleware/tasks-legacy-view.global.ts`).
+
 ## Canonical task progression
 
 ### Server-side start requirements
@@ -15,15 +33,17 @@ clearing search cancels any pending update and restores the visible list immedia
 `app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
 adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
 comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
-account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
+account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's effective storyline objective
+(a recorded mark or producer-declared tutorial baseline; see [storyline policy](./overlay-and-precompute.md))
 (not by an in-game confirmation). A task that is available, started, completed or failed has passed its
 start gates, so Mark available, Mark complete, Mark failed, the prerequisites Mark available
 completes, and imported EFT starts, completions and failures all record that objective
 (`recordImpliedStoryObjectives`). A task's recorded state proves its gates (`provesStartGates`) when
 it is completed, manually failed, or confirmed available; automatic branch failures do not count
 because they do not prove the task was started. The completed-task repair (`repairCompletedProgress`)
-backfills the objective for every gated task whose state proves it, on each progress and task-catalog
-load, stamped past any unmark, so the two cannot disagree; it never unmarks. Undoing Mark complete or
+backfills ordinary tracked objectives for every gated task whose state proves it, on each progress and task-catalog
+load, stamped past any unmark, so the two cannot disagree; it never unmarks. Repair and
+the metadata projection never backfill a tutorial baseline or fabricate its completion time. Undoing Mark complete or
 Mark failed releases only the objectives that action newly recorded, unless another task's state
 still proves them; a manual uncomplete leaves them recorded. Completing or uncompleting an objective stamps a clock after the entry's
 existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from
@@ -40,13 +60,22 @@ is a best-effort mapping from a global variable to the tasks whose completions d
 ([mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)).
 `app/server/utils/overlayCounters.ts` validates it against the overlay schema and, for the request's
 mode, applies only `verified`/`complete` entries whose revision is in
-`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's contributor list to the matching gate as
-`counter: { type: 'distinctTaskCompletions', taskIds }` when every contributor is in the same task
-payload. This runs last in `applyOverlay`, so task corrections cannot supply a derivation.
+`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's derivation to the matching gate as
+`counter` when every contributor is in the same task payload: `{ type: 'distinctTaskCompletions',
+taskIds }` counts each completed task, and `{ type: 'taskGroupCompletions', groups }` counts each
+group the game credits as one. A list group counts once all its tasks are completed (same-threshold
+Gunsmith pairs; whether half a group already counts is unverified, so the tracker takes the
+conservative reading and Mark available covers an earlier in-game unlock). An `{ anyOf }` group (two
+or more tasks) counts once any member is completed (faction variants such as the BEAR-only AKM and
+USEC-only M4A1 Gunsmith parts, where a player can only ever complete one). No task may appear in two
+groups. An unknown derivation
+type makes the registry malformed, so the tracker must support a type before the overlay publishes
+it. This runs last in `applyOverlay`, so task
+corrections cannot supply a derivation.
 `unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
 
-For a gate carrying `counter`, the evaluator counts that player's completed contributors
-(`task_counter` blocker with current/required on a shortfall). An account without those
+For a gate carrying `counter`, the evaluator counts that player's completed contributors or
+groups (`task_counter` blocker with current/required on a shortfall). An account without those
 completions reads a known shortfall, not unknown. An explicit effective account value takes
 precedence, and an invalid one stays unknown instead of falling back. Gates without a derivation keep
 the unknown behaviour below. The tracker never assumes other missing values are zero, creates
@@ -168,6 +197,20 @@ catalogs share one request but validate independently; story, edition or prestig
 successful task and objective data with an error indicator. Profiles prefer the selected mode's
 editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
 remain fatal.
+Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
+and every pending task owned by that trader, including tasks without their own story requirements.
+Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
+unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
+gate. Exact objective completion (including the producer-declared tutorial baseline) opens the
+trader; chapter completion, standing, other completed tasks, task availability confirmations and
+disabled loyalty gating do not bypass an explicit gate. Catalogs must match each user's mode;
+shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
+a compatibility fallback when no clear objective placement exists. Story trader blockers name the
+objective and cannot be cleared through Mark available; complete the storyline objective first.
+Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
+`finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
+opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
+locked on the dashboard also locks its tasks.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
@@ -242,7 +285,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
    team membership. The composable returns both map marks and an objective-visibility map, each
    entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
-   that objective themselves.
+   that objective themselves. Under the Locked and All status filters, `tasks.vue` passes
+   `shouldShowLockedObjectives`, so objectives of locked (not failed) tasks with no other owner
+   draw as self markers; a teammate who needs the objective still owns it.
 2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
 3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
    aggregates bring-mode equipment and alternative key groups independently for each group. It

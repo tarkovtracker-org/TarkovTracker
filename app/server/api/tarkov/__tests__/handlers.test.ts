@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import type { H3Event } from 'h3';
 const CACHE_META_HEADERS = {
   'Cache-Control': 'public, max-age=0, must-revalidate',
@@ -18,6 +19,7 @@ const {
   mockCreateTarkovJsonTaskObjectivesFetcher,
   mockCreateTarkovJsonTaskRewardsFetcher,
   mockCreateTarkovJsonTasksCoreFetcher,
+  mockFetchTarkovJsonEndpoint,
   mockEdgeCache,
   mockFetch,
   mockGetPrecomputedStore,
@@ -31,7 +33,9 @@ const {
   mockShouldBypassCache,
   mockValidateGameMode,
 } = vi.hoisted(() => ({
-  mockFetchOverlay: vi.fn(async () => ({ overlay: {}, meta: { status: 'fresh' } })),
+  mockFetchOverlay: vi.fn<
+    () => Promise<{ overlay: object | null; meta: { status: string; sha256?: string } }>
+  >(async () => ({ overlay: {}, meta: { status: 'fresh', sha256: 'overlay-sha' } })),
   mockApplyOverlay: vi.fn(),
   mockCreateTarkovJsonBootstrapFetcher: vi.fn(),
   mockCreateTarkovJsonHideoutFetcher: vi.fn(),
@@ -41,6 +45,7 @@ const {
   mockCreateTarkovJsonTaskObjectivesFetcher: vi.fn(),
   mockCreateTarkovJsonTaskRewardsFetcher: vi.fn(),
   mockCreateTarkovJsonTasksCoreFetcher: vi.fn(),
+  mockFetchTarkovJsonEndpoint: vi.fn(),
   mockEdgeCache: vi.fn(),
   mockFetch: vi.fn(),
   mockGetPrecomputedStore: vi.fn(),
@@ -114,6 +119,7 @@ vi.mock('~/server/utils/tarkov-json', () => ({
   createTarkovJsonTaskObjectivesFetcher: mockCreateTarkovJsonTaskObjectivesFetcher,
   createTarkovJsonTaskRewardsFetcher: mockCreateTarkovJsonTaskRewardsFetcher,
   createTarkovJsonTasksCoreFetcher: mockCreateTarkovJsonTasksCoreFetcher,
+  fetchTarkovJsonEndpoint: mockFetchTarkovJsonEndpoint,
 }));
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 describe('Tarkov API handlers', () => {
@@ -135,6 +141,28 @@ describe('Tarkov API handlers', () => {
     mockCreateTarkovJsonTaskObjectivesFetcher.mockReturnValue(baseFetcher);
     mockCreateTarkovJsonTaskRewardsFetcher.mockReturnValue(baseFetcher);
     mockCreateTarkovJsonTasksCoreFetcher.mockReturnValue(baseFetcher);
+    mockFetchTarkovJsonEndpoint.mockResolvedValue({
+      perks: {
+        personal: [
+          {
+            id: 'perk',
+            name: 'Upstream',
+            description: 'Description',
+            points: 2,
+            exclusiveToPerks: [],
+          },
+        ],
+        common: [
+          {
+            id: 'metadata-only',
+            name: 'Metadata only',
+            description: 'No effect patch',
+            points: null,
+            exclusiveToPerks: [],
+          },
+        ],
+      },
+    });
     mockApplyOverlay.mockImplementation(async (payload) => payload);
     mockSanitizeTaskRewards.mockImplementation((payload) => payload);
     mockEdgeCache.mockImplementation(async (_eventArg, _key, fetcher: () => Promise<unknown>) => {
@@ -262,17 +290,81 @@ describe('Tarkov API handlers', () => {
           editions: { standard: { title: 'Standard', value: 1 } },
           storyChapters: { shared: { name: 'Shared', order: 1 } },
           modes: { pve: { storyChapters: { added: { name: 'PvE chapter', order: 2 } } } },
-          seasonalPerks: { perk: { name: 'Perk', effects: [] } },
+          seasonalPerks: { perk: { id: 'perk', effects: [{ effectId: 'health', value: 1.25 }] } },
         },
-        meta: { status: 'fresh' },
+        meta: { status: 'fresh', sha256: 'overlay-sha' },
       });
       const { default: handler } = await import('@/server/api/tarkov/editions.get');
       const response = await handler(event);
       expect(response.data.editions[0]?.id).toBe('standard');
       expect(mockFetchOverlay).toHaveBeenCalledWith(false);
       expect(response.data.storyChapters).toHaveLength(gameMode === 'pve' ? 2 : 1);
-      expect(response.data.seasonalPerks).toHaveLength(gameMode === 'pvp-season' ? 1 : 0);
+      expect(response.data.seasonalPerks).toHaveLength(gameMode === 'pvp-season' ? 2 : 0);
+      if (gameMode === 'pvp-season') {
+        expect(response.data.seasonalPerks[0]).toMatchObject({
+          id: 'perk',
+          name: 'Upstream',
+          type: 'personal',
+          points: 2,
+          effects: [{ effectId: 'health', value: 1.25 }],
+        });
+        expect(response.data.seasonalPerks[1]?.effects).toEqual([]);
+        expect(mockFetchTarkovJsonEndpoint).toHaveBeenCalledWith('season', {
+          lang: 'en',
+          gameMode,
+        });
+        expect(mockEdgeCache).toHaveBeenCalledWith(
+          event,
+          'seasonal-perks-json-v1-en-pvp-season-overlay-sha',
+          expect.any(Function),
+          111,
+          { cacheKeyPrefix: 'tarkov' }
+        );
+      } else {
+        expect(mockFetchTarkovJsonEndpoint).not.toHaveBeenCalled();
+        expect(mockEdgeCache).not.toHaveBeenCalled();
+      }
       expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, response);
+    }
+  );
+  it('uses the requested language and applies effects after a cached metadata read', async () => {
+    mockValidateGameMode.mockReturnValue('pvp-season');
+    mockGetValidatedLanguage.mockReturnValue('de');
+    const cached = [
+      {
+        id: 'perk',
+        type: 'personal',
+        name: 'Name DE',
+        description: 'Description DE',
+        points: -2,
+        mutuallyExclusiveSeasonalPerkIds: [],
+        effects: [],
+      },
+    ];
+    mockEdgeCache.mockResolvedValueOnce(cached);
+    mockFetchOverlay.mockResolvedValueOnce({
+      overlay: { seasonalPerks: { perk: { effects: [{ effectId: 'health' }] } } },
+      meta: { status: 'cached', sha256: 'overlay-sha' },
+    });
+    const { default: handler } = await import('@/server/api/tarkov/editions.get');
+    const response = await handler(event);
+    expect(response.data.seasonalPerks).toEqual([
+      { ...cached[0], effects: [{ effectId: 'health' }] },
+    ]);
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(
+      'seasonal-perks-json-v1-de-pvp-season-overlay-sha'
+    );
+    expect(mockFetchTarkovJsonEndpoint).not.toHaveBeenCalled();
+  });
+  it.each([new Error('upstream unavailable'), { perks: { common: [] } }])(
+    'does not publish partial Seasonal catalogs when upstream fails (%#)',
+    async (payload) => {
+      mockValidateGameMode.mockReturnValue('pvp-season');
+      if (payload instanceof Error) mockFetchTarkovJsonEndpoint.mockRejectedValueOnce(payload);
+      else mockFetchTarkovJsonEndpoint.mockResolvedValueOnce(payload);
+      const { default: handler } = await import('@/server/api/tarkov/editions.get');
+      await expect(handler(event)).rejects.toThrow();
+      expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
     }
   );
   it.each(['editions', 'prestige'] as const)(
@@ -389,6 +481,10 @@ describe('Tarkov API handlers', () => {
     );
   });
   it('applies overlay for tasks-objectives with versioned cache key', async () => {
+    mockApplyOverlay.mockImplementation(async (payload) => ({
+      ...payload,
+      dataOverlay: { status: 'fresh', version: 'catalog-test', sha256: 'catalog-sha' },
+    }));
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await handler(event);
     expect(mockCreateTarkovJsonTaskObjectivesFetcher).toHaveBeenCalledWith({
@@ -402,11 +498,34 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v3-en-regular',
+      'tasks-objectives-json-v4-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }
     );
+  });
+  it('rejects missing objective overlay provenance before admitting a cache entry', async () => {
+    mockApplyOverlay.mockResolvedValue({
+      data: { tasks: [{ id: 'upstream-task', objectives: [] }] },
+      dataOverlay: { status: 'missing', error: 'HTTP 404' },
+    });
+    const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+  });
+  it.each(
+    API_SUPPORTED_LANGUAGES.flatMap((lang) =>
+      ['regular', 'pve', 'pvp-season'].map((mode) => [lang, mode])
+    )
+  )('retires poisoned objective cache keys for %s/%s', async (lang, mode) => {
+    mockGetValidatedLanguage.mockReturnValue(lang);
+    mockValidateGameMode.mockReturnValue(mode);
+    mockApplyOverlay.mockResolvedValue({
+      data: { tasks: [] },
+      dataOverlay: { version: 'catalog-test', sha256: 'catalog-sha' },
+    });
+    const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
+    await handler(event);
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v4-${lang}-${mode}`);
   });
   it('sanitizes and overlays tasks-rewards before caching', async () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-rewards.get');

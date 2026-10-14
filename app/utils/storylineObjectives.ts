@@ -1,4 +1,6 @@
-import type { StoryChapter, StoryObjective } from '@/types/tarkov';
+import { isAutomaticStoryObjective } from '@/utils/storylineCompletion';
+import { validStoryUnlock } from '@/utils/storylineUnlocks';
+import type { StoryChapter, StoryObjective, StoryObjectiveUnlock } from '@/types/tarkov';
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
 type StoryObjectiveLike = Partial<StoryObjective> & { id?: string };
 type StoryQuestPairs = NonNullable<StoryChapter['mutuallyExclusiveQuestPairs']>;
@@ -6,6 +8,12 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 const optionalText = (value: unknown): string | undefined =>
   isNonEmptyString(value) ? value : undefined;
+const normalizeUnlocks = (
+  value: StoryObjectiveLike['unlocks']
+): StoryObjectiveUnlock[] | undefined =>
+  Array.isArray(value)
+    ? value.filter(validStoryUnlock).map((unlock) => ({ ...unlock }))
+    : undefined;
 const compareIds = (left: string, right: string): number => left.localeCompare(right);
 const normalizeObjectiveType = (type: StoryObjectiveLike['type']): StoryObjective['type'] => {
   return type === 'optional' ? 'optional' : 'main';
@@ -44,6 +52,25 @@ const normalizeObjectiveEntries = (
     index,
   }));
 };
+/** Parent links group presentation only; completion and route rules remain independent. */
+export const isStoryObjectiveParent = (
+  objective: Pick<StoryObjective, 'id' | 'type' | 'sourceQuestId'>,
+  parent: Pick<StoryObjective, 'id' | 'type' | 'sourceQuestId'> | undefined
+): boolean => {
+  if (!parent || objective.id === parent.id) return false;
+  return [
+    objective.type === 'optional',
+    parent.type === 'main',
+    Boolean(objective.sourceQuestId?.trim()),
+    objective.sourceQuestId === parent.sourceQuestId,
+  ].every(Boolean);
+};
+const normalizeObjectiveParents = (objectives: Record<string, StoryObjective>): void => {
+  for (const objective of Object.values(objectives)) {
+    const parent = objectives[objective.parentObjectiveId ?? ''];
+    if (!isStoryObjectiveParent(objective, parent)) delete objective.parentObjectiveId;
+  }
+};
 export const normalizeStoryObjectives = (
   objectives: StoryObjectiveInput
 ): Record<string, StoryObjective> => {
@@ -54,6 +81,7 @@ export const normalizeStoryObjectives = (
       continue;
     }
     objectiveMap[objectiveId] = {
+      completionPolicy: entry.objective.completionPolicy === 'tutorial' ? 'tutorial' : undefined,
       description:
         typeof entry.objective.description === 'string' && entry.objective.description.length > 0
           ? entry.objective.description
@@ -66,10 +94,13 @@ export const normalizeStoryObjectives = (
           ? entry.objective.notes
           : undefined,
       order: normalizeObjectiveOrder(entry.objective.order, entry.index + 1),
+      parentObjectiveId: optionalText(entry.objective.parentObjectiveId),
       sourceQuestId: optionalText(entry.objective.sourceQuestId),
       type: normalizeObjectiveType(entry.objective.type),
+      unlocks: normalizeUnlocks(entry.objective.unlocks),
     };
   }
+  normalizeObjectiveParents(objectiveMap);
   for (const objective of Object.values(objectiveMap)) {
     const linkedIds = objective.mutuallyExclusiveWith ?? [];
     for (const linkedId of linkedIds) {
@@ -152,6 +183,7 @@ export const getAutoCompletableObjectiveIds = (
   return orderedStoryObjectives(objectives)
     .filter(
       (objective) =>
+        !isAutomaticStoryObjective(objective) &&
         !objective.mutuallyExclusiveWith?.length &&
         !belongsToExclusiveQuest(objective, exclusiveQuestIds)
     )

@@ -1,5 +1,6 @@
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
+import { isStorylineTraderUnlocked, storylineTraderUnlocks } from '@/utils/storylineTraderUnlocks';
 import {
   compareRequirement,
   getTaskTraderRequirements,
@@ -12,9 +13,11 @@ import {
   isTaskFailed,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
+import { rewardTraderUnlockTasks } from '@/utils/traderUnlockRewards';
 import type { UserProgressData } from '@/types/progress';
 import type {
   RequirementComparison,
+  StoryChapter,
   Task,
   TaskRequirement,
   TaskRequirementDiagnostic,
@@ -31,6 +34,8 @@ export type TaskAvailabilityTeamData = {
   traders: Record<string, { level?: number; reputation?: number }>;
   prestigeLevel?: number;
   storyChapters?: UserProgressData['storyChapters'];
+  /** Objective unlock metadata from this user's mode only. */
+  storyCatalog?: readonly StoryChapter[];
 };
 export type TaskBlocker = {
   type:
@@ -185,8 +190,15 @@ const missingTaskResult = (taskId: string) =>
 const createTeamEvaluator = (
   tasksById: Map<string, Task>,
   data: TaskAvailabilityTeamData,
-  options: TaskEvaluationOptions
+  options: TaskEvaluationOptions,
+  rewardUnlocks: ReadonlyMap<string, string[]>
 ) => {
+  const storyTraderGates = storylineTraderUnlocks(data.storyCatalog ?? []);
+  /** Configured unlock tasks plus any task whose finish reward unlocks this trader. */
+  const unlockTaskIds = (task: Task, traderName: string) => [
+    ...resolveTraderUnlockTaskIds(traderName, data.mode),
+    ...(rewardUnlocks.get(task.trader?.id ?? '') ?? []),
+  ];
   const memo = new Map<string, TaskAvailabilityResult>();
   const visiting = new Set<string>();
   const activeRequirementResult = (
@@ -266,12 +278,25 @@ const createTeamEvaluator = (
       },
     ];
   };
+  const storyTraderBlockers = (task: Task): TaskBlocker[] => {
+    const gate = storyTraderGates.get(task.trader?.id ?? '');
+    if (!gate) return [];
+    const recorded =
+      data.storyChapters?.[gate.chapter.id]?.objectives?.[gate.objective.id]?.complete === true;
+    if (isStorylineTraderUnlocked(gate, recorded)) return [];
+    return [
+      {
+        type: 'trader_unlock',
+        trader: { id: task.trader!.id, name: traderDisplayName(task, task.trader!.id) },
+        chapterIds: [gate.chapter.id],
+        objective: { id: gate.objective.id, name: gate.objective.description },
+      },
+    ];
+  };
   const unlockBlockers = (task: Task): TaskBlocker[] => {
     const traderName = traderNameFor(task);
     if (!traderName) return [];
-    const ids = resolveTraderUnlockTaskIds(traderName, data.mode).filter(
-      (id) => id !== task.id && tasksById.has(id)
-    );
+    const ids = unlockTaskIds(task, traderName).filter((id) => id !== task.id && tasksById.has(id));
     if (traderUnlocked(ids, data)) return [];
     return [
       {
@@ -307,7 +332,8 @@ const createTeamEvaluator = (
       ...prestigeBlockers(task),
       ...taskServerGateBlockers(task, data),
       ...prerequisiteBlockers(task),
-      ...unlockBlockers(task)
+      ...unlockBlockers(task),
+      ...storyTraderBlockers(task)
     );
     visiting.delete(key);
     const evaluated = result(blockers);
@@ -323,8 +349,9 @@ export const buildTaskEvaluations = (
 ): TaskEvaluationMap => {
   const evaluations: TaskEvaluationMap = Object.fromEntries(tasks.map((task) => [task.id, {}]));
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  const rewardUnlocks = rewardTraderUnlockTasks(tasks);
   for (const [teamId, data] of teams) {
-    const evaluate = createTeamEvaluator(tasksById, data, options);
+    const evaluate = createTeamEvaluator(tasksById, data, options, rewardUnlocks);
     for (const task of tasks) evaluations[task.id]![teamId] = evaluate(task.id);
   }
   return evaluations;

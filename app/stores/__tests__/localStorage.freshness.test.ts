@@ -10,6 +10,41 @@ import { resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 describe('local mode freshness', () => {
+  it('retains acknowledged local history additions when hydration also includes remote entries', () => {
+    const before = structuredClone(defaultState);
+    const snapshot = {
+      state: before,
+      storedUserId: 'user-1',
+      timestamp: 10,
+      hadDeprecatedProgressData: false,
+    };
+    const serializer = createProgressStorageSerializer(() => snapshot);
+    serializer.reset(snapshot);
+    const state = structuredClone(before);
+    const local = {
+      id: 'local',
+      timestamp: 20,
+      type: 'task' as const,
+      action: 'complete' as const,
+      title: 'Local',
+    };
+    const remote = { ...local, id: 'remote', title: 'Remote' };
+    state.pvp.manualActivityHistory = [local];
+    const next = structuredClone(state);
+    next.pvp.manualActivityHistory = [local, remote];
+    serializer.acceptRemote({
+      state,
+      userId: 'user-1',
+      remote: next,
+      next,
+      updatedAtByMode: { pvp: 30, pve: 10, seasonal: 10 },
+      metadataTimestamp: 10,
+    });
+    const raw = serializer.serialize(next, 'user-1', 40);
+    expect(
+      serializer.takeGuestSource(raw)?.hydrationIntent?.after.state.pvp.manualActivityHistory
+    ).toEqual([local]);
+  });
   it('strips reconciliation evidence before cloning a retained baseline', () => {
     const state = structuredClone(defaultState);
     const clone = vi.spyOn(globalThis, 'structuredClone');
@@ -419,4 +454,8 @@ describe('local mode freshness', () => {
     );
     expect(parsed?._modeTimestamps).toEqual({ pvp: 20 });
   });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

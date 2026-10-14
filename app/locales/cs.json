@@ -92,7 +92,6 @@
     "user_avatar_alt": "Avatar uživatele",
     "supporter_badge_aria": "Spravujte své předplatné podporovatele ({tier})",
     "help_community_aria": "Nápověda a komunita",
-    "community_section": "Komunita",
     "keyboard_shortcuts": "Klávesové zkratky",
     "report_problem": "Nahlásit problém",
     "login_aria": "Přihlaste se ke svému účtu",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "Máte nepřečtenou aktivitu",
     "mark_read": "Označit jako přečtené",
-    "clear": "Vymazat",
     "empty": "Zatím nebyla zaznamenána žádná aktivita.",
     "badge_api": "Synchronizace API",
     "api_synced": "Pokrok synchronizován přes API",
@@ -158,11 +156,7 @@
       "uncompleted": "Nedokončený úkol: {name}",
       "failed": "Selhaný úkol: {name}",
       "reset_failed": "Zrušení stavu selhání úkolu: {name}",
-      "available": "Odemčený úkol: {name}",
-      "undo_completed": "Zrušení dokončení úkolu: {name}",
-      "undo_uncompleted": "Zrušení označení úkolu jako nedokončený: {name}",
-      "undo_reset_failed": "Obnovení stavu selhání úkolu: {name}",
-      "undo_failed": "Zrušení označení úkolu jako selhaný: {name}"
+      "available": "Odemčený úkol: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "Řadit obchodníky",
           "direction_aria_label": "Přepnout směr řazení"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Podpořit TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "Odznak podporovatele",
       "perk_discord": "Role podporovatele na Discordu (propojte účet a připojte se k našemu serveru)",
       "perk_tier_role": "Role úrovně {tier} na Discordu",
-      "perk_early_access": "Předčasný přístup k novým funkcím",
       "perk_priority_support": "Prioritní podpora",
       "perk_feature_voting": "Priorita při hlasování o funkcích",
       "one_time_title": "Jednorázový příspěvek",
@@ -873,11 +874,6 @@
       "savings_note": "Ušetříte {amount} oproti měsíční platbě",
       "kofi_deprecation_title": "Ko-fi (záložní možnost)",
       "kofi_deprecation_detail": "Předplatná a jednorázové příspěvky výše nyní probíhají přes Stripe, což znamená nižší poplatky a větší část vaší podpory se dostane přímo k nám. Ko-fi zůstává k dispozici jako záloha pouze pro jednorázová přání.",
-      "alt_payments_title": "Další způsoby plateb již brzy",
-      "alt_payments_coming_soon": "Pracujeme na přidání dalších možností plateb, aby každý mohl přispět způsobem, který mu nejlépe vyhovuje.",
-      "alt_payment_crypto": "Kryptoměny",
-      "alt_payment_gift_cards": "Dárkové karty",
-      "alt_payments_more": "A další",
       "checkout_error_title": "Platební transakce selhala",
       "checkout_error_generic": "Platbu se nepodařilo zahájit. Zkuste to prosím za okamžik.",
       "manage_subscription_cta": "Spravovat předplatné",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "Jazyk",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "Spravujte svůj účet, průběh hry a nastavení aplikací.",
     "tabs": {
       "progression": "Pokrok",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "Prestige Unavailable",
-      "persistent_mode_unsupported": "Prestige není k dispozici pro trvalý PvE režim.",
       "seasonal_mode_unsupported": "Prestige není k dispozici v Sezonním PvP.",
       "current_level": "Současná úroveň Prestige",
       "set_current": "Nastavit aktuální Prestige",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "Nelze najít? Otevřete BSG Launcher -> Nastavení hry -> Protokoly a zkopírujte tuto cestu.",
       "avoid_session_folder_label": "Nevybírat složku relace:",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape od Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "Účet",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Zahrnout logy",
       "version_filter_hint": "Nejnovější hlavní verze je vybrána ve výchozím nastavení. Upravte tak, aby zahrnovala starší vymazání.",
       "version_filter_tooltip": "Protokoly jsou seskupeny podle verze relace. Nejnovější hlavní je ve výchozím nastavení vybrán tak, aby nedocházelo ke směšování starých vymazaných dat.",

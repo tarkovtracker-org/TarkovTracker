@@ -225,7 +225,6 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
   taskAvailability: {},
@@ -396,15 +395,19 @@ export const hasDeprecatedTarkovDevProfileData = (value: unknown): boolean => {
   }
   return ['pvp', 'pve', 'seasonal'].some((mode) => hasDeprecatedTarkovDevProfileData(value[mode]));
 };
-// Keep this canonical sanitizer aligned with the persisted DB sanitizer in the
-// tarkovDevProfile cleanup migration when changing stored progress fields.
+/** Retire only the legacy XP offset while preserving opaque progress extensions. */
+export const stripLegacyXpOffset = <T extends UserProgressData>(value: T): T => {
+  const stripped = { ...value };
+  Reflect.deleteProperty(stripped, 'xpOffset');
+  return stripped;
+};
+// Keep this canonical sanitizer aligned with the persisted DB sanitizer when changing stored fields.
 export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   const sanitized: UserProgressData = createDefaultOwnedProgressData();
   if (!isRecord(value)) {
     return sanitized;
   }
   const level = toFiniteNumber(value.level);
-  const xpOffset = toFiniteNumber(value.xpOffset);
   const prestigeLevel = toFiniteNumber(value.prestigeLevel);
   const progressEpoch = toFiniteNumber(value.progressEpoch);
   const lastApiUpdate = sanitizeApiUpdateMeta(value.lastApiUpdate);
@@ -429,9 +432,6 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   sanitized.manualActivityEpoch = sanitizeManualActivityEpoch(value.manualActivityEpoch);
   if (level !== null) {
     sanitized.level = Math.max(1, Math.trunc(level));
-  }
-  if (xpOffset !== null) {
-    sanitized.xpOffset = Math.trunc(xpOffset);
   }
   if (prestigeLevel !== null) {
     sanitized.prestigeLevel = Math.max(0, Math.min(6, Math.trunc(prestigeLevel)));
@@ -488,7 +488,6 @@ export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgre
     return {};
   }
   const level = toFiniteNumber(value.level);
-  const xpOffset = toFiniteNumber(value.xpOffset);
   const prestigeLevel = toFiniteNumber(value.prestigeLevel);
   const sanitized: Partial<UserProgressData> = {
     displayName: sanitizeDisplayName(value.displayName),
@@ -505,9 +504,6 @@ export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgre
   };
   if (level !== null) {
     sanitized.level = Math.max(1, Math.trunc(level));
-  }
-  if (xpOffset !== null) {
-    sanitized.xpOffset = Math.trunc(xpOffset);
   }
   if (prestigeLevel !== null) {
     sanitized.prestigeLevel = Math.max(0, Math.min(6, Math.trunc(prestigeLevel)));

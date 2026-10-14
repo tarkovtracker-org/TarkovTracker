@@ -44,7 +44,7 @@ the loader never reaches a real import.
 ### Files
 
 - `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
-- `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
+- `package.json` — `test`, `test:coverage`, and `verify:api-parity` scripts
 - `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
 - `scripts/workflow-tests/workflows.mjs` — asserts the shard command and required check names
 - `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
@@ -115,9 +115,14 @@ See [the workflow guide](../workflow-automation.md#fallow-changed-file-gate) for
 
 ## Release validation and publication
 
-Release runs on a weekly schedule or explicit dispatch on `main`, batching every commit since the
-previous tag; deploys never wait for it. `scripts/release/release-gate.mjs` takes the run's trigger commit
-as the candidate, requires the newest same-repository main CI run (push or dispatch of
+Release checks run daily at 15:00 UTC on `main`, with scheduled publication due seven full days
+after the newest stable GitHub release (including manual releases). Explicit dispatch may publish
+sooner. Daily checks retry overdue releases after unfinished CI, main advancement, or a failed
+attempt; they skip dependency setup and building while a release is not due. Drafts and prereleases
+do not reset the interval, and unreadable publication history fails closed. Releases batch every
+commit since the previous tag; deploys never wait for them. `scripts/release/release-gate.mjs` takes
+the run's trigger commit as the candidate, requires the newest same-repository main CI run
+(push or dispatch of
 `.github/workflows/ci.yml`) for that exact SHA to have succeeded, and checks current main before
 setup and immediately before publishing, reusing CI's test shards and database validation. The
 checkout stays pinned to the validated SHA. The production build still runs in Release.

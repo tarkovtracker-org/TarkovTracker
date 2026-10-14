@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   checkProgressContracts,
   compareCompiledContracts,
@@ -17,9 +17,7 @@ function withOwnerFixture(check) {
   const root = mkdtempSync(join(tmpdir(), 'contracts-owner-'));
   try {
     mkdirSync(join(root, 'workers/contract-tests'), { recursive: true });
-    mkdirSync(join(root, 'workers/api-gateway'), { recursive: true });
-    for (const file of ['package.json', 'workers/api-gateway/package.json'])
-      writeFileSync(join(root, file), JSON.stringify(manifest()));
+    writeFileSync(join(root, 'package.json'), JSON.stringify(manifest()));
     writeFileSync(
       join(root, 'workers/contract-tests/api-version.json'),
       JSON.stringify({ contracts })
@@ -36,7 +34,7 @@ describe('published progress contract pins', () => {
     ['src', (owner) => mkdirSync(join(owner, 'src'))],
   ])('rejects a second rule owner with %s even when all release pins agree', (_, add) => {
     withOwnerFixture((root, owner) => {
-      mkdirSync(owner);
+      mkdirSync(owner, { recursive: true });
       add(owner);
       expect(() => checkProgressContracts(root)).toThrow('second source owner');
     });
@@ -48,20 +46,19 @@ describe('published progress contract pins', () => {
       expect(checkProgressContracts(root)).toEqual({ contracts });
     });
   });
-  it('accepts the same release in both consumers and the lockfile', () => {
-    expect(inspectReleasePins({ contracts }, manifest(), manifest(), lock)).toEqual([]);
+  it('accepts the frontend release and lockfile without a local gateway', () => {
+    expect(inspectReleasePins({ contracts }, manifest(), lock)).toEqual([]);
   });
-  it.each(['frontend', 'gateway'])('rejects an independently drifting %s dependency', (owner) => {
+  it('rejects a drifting frontend dependency', () => {
     const changed = manifest();
     changed.dependencies['@tarkovtracker/progress-contracts'] = 'workspace:*';
-    const consumers = owner === 'frontend' ? [changed, manifest()] : [manifest(), changed];
-    expect(inspectReleasePins({ contracts }, ...consumers, lock)).toHaveLength(1);
+    expect(inspectReleasePins({ contracts }, changed, lock)).toHaveLength(1);
   });
   it.each(['sha512-reviewed', 'https://example.test/v0.1.0/contracts.tgz'])(
     'rejects a changed lockfile digest or URL: %s',
     (field) => {
       expect(
-        inspectReleasePins({ contracts }, manifest(), manifest(), lock.replace(field, 'changed'))
+        inspectReleasePins({ contracts }, manifest(), lock.replace(field, 'changed'))
       ).toHaveLength(1);
     }
   );

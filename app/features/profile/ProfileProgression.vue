@@ -278,6 +278,7 @@
     isCurrentProfileVisibilityRequest,
     loadCurrentProfileVisibility,
   } from '@/utils/profileVisibility';
+  import { effectiveStoryProgress, isAutomaticStoryObjective } from '@/utils/storylineCompletion';
   import {
     orderedStoryObjectives,
     toggleStoryChapterWithLinearObjectives,
@@ -310,7 +311,6 @@
     taskObjectives: {},
     traders: {},
     storyChapters: {},
-    xpOffset: 0,
   };
   type StatTone = 'info' | 'primary' | 'success' | 'warning';
   interface SharedProfileResponse {
@@ -695,12 +695,7 @@
     if (isViewingSharedProfile.value) return undefined;
     return buildTarkovDevProfileUrl(tarkovStore.getTarkovUid(), selectedMode.value);
   });
-  const profileLevel = computed(() => {
-    if (isViewingCurrentMode.value && preferencesStore.getUseAutomaticLevelCalculation) {
-      return progressStore.getLevel('self');
-    }
-    return modeData.value.level ?? 1;
-  });
+  const profileLevel = computed(() => modeData.value.level ?? 1);
   const relevantTasks = computed<Task[]>(() => {
     const faction = modeFaction.value;
     const factionFiltered = profileTasks.value.filter((task) => {
@@ -771,7 +766,11 @@
             confirmations: modeData.value.taskAvailability ?? {},
             traders: modeData.value.traders ?? {},
             prestigeLevel: modeData.value.prestigeLevel,
-            storyChapters: modeData.value.storyChapters,
+            storyCatalog: profileChapters.value,
+            storyChapters: effectiveStoryProgress(
+              modeData.value.storyChapters,
+              profileChapters.value
+            ),
           },
         ],
       ]),
@@ -896,7 +895,10 @@
     return count;
   });
   const storyChapterCompletionState = computed<Record<string, boolean>>(() => {
-    const storyProgress = modeData.value.storyChapters ?? {};
+    const storyProgress = effectiveStoryProgress(
+      modeData.value.storyChapters,
+      profileChapters.value
+    );
     const state: Record<string, boolean> = {};
     for (const chapter of profileChapters.value) {
       state[chapter.id] = storyProgress[chapter.id]?.complete === true;
@@ -904,7 +906,10 @@
     return state;
   });
   const storyObjectiveCompletionState = computed<Record<string, Record<string, boolean>>>(() => {
-    const storyProgress = modeData.value.storyChapters ?? {};
+    const storyProgress = effectiveStoryProgress(
+      modeData.value.storyChapters,
+      profileChapters.value
+    );
     const state: Record<string, Record<string, boolean>> = {};
     for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];
@@ -951,22 +956,19 @@
     if (!canEditStoryProgress()) {
       return;
     }
+    const chapter = profileChapters.value.find((value) => value.id === chapterId);
+    const objective = orderedStoryObjectives(chapter?.objectives).find(
+      (value) => value.id === objectiveId
+    );
+    if (isAutomaticStoryObjective(objective)) return;
     const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;
     if (objectiveState) {
       tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
       return;
     }
-    const chapter = profileChapters.value.find((value) => value.id === chapterId);
-    if (chapter) {
-      const objective = orderedStoryObjectives(chapter.objectives).find(
-        (value) => value.id === objectiveId
-      );
-      const linkedIds = objective?.mutuallyExclusiveWith ?? [];
-      if (
-        linkedIds.some((linkedId) => storyObjectiveCompletionState.value[chapterId]?.[linkedId])
-      ) {
-        return;
-      }
+    const linkedIds = objective?.mutuallyExclusiveWith ?? [];
+    if (linkedIds.some((linkedId) => storyObjectiveCompletionState.value[chapterId]?.[linkedId])) {
+      return;
     }
     tarkovStore.setStoryObjectiveComplete(chapterId, objectiveId);
   };
@@ -990,7 +992,10 @@
     return count;
   });
   const completedStoryMainObjectives = computed(() => {
-    const storyProgress = modeData.value.storyChapters ?? {};
+    const storyProgress = effectiveStoryProgress(
+      modeData.value.storyChapters,
+      profileChapters.value
+    );
     let count = 0;
     for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];

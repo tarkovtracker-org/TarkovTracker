@@ -1,12 +1,13 @@
 import { storeToRefs } from 'pinia';
 import { useDashboardFocusAnalytics } from '@/composables/useDashboardFocusAnalytics';
+import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { getQueryString } from '@/utils/routeHelpers';
+import { isTaskListPath, TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
 import type { Task } from '@/types/tarkov';
 export type UseTaskDeepLinkOptions = {
-  searchQuery: Ref<string>;
   filteredTasks: Ref<Task[]>;
   leafletMapRef: Ref<{
     activateObjectivePopup: (id: string) => boolean;
@@ -25,12 +26,12 @@ export interface UseTaskDeepLinkReturn {
 }
 type TaskStatus = 'available' | 'locked' | 'completed' | 'failed';
 export function useTaskDeepLink({
-  searchQuery,
   filteredTasks,
   leafletMapRef,
 }: UseTaskDeepLinkOptions): UseTaskDeepLinkReturn {
   const route = useRoute();
   const router = useRouter();
+  const { setSearchQuery } = useRouteSearchQuery();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const progressStore = useProgressStore();
@@ -183,15 +184,25 @@ export function useTaskDeepLink({
     highlightTask(focusedTaskElement);
     return true;
   };
+  // Only the list shows every task; the maps and graph routes hand plain task links to it.
+  const handOffToListRoute = async (objectiveIdToHighlight: string | undefined) => {
+    if (objectiveIdToHighlight || isTaskListPath(route.path)) return false;
+    await router.replace({ path: TASK_ROUTE_PATHS.list, query: { ...route.query } });
+    return true;
+  };
   const handleTaskQueryParam = async () => {
     const taskId = getQueryString(route.query.task);
     const objectiveIdToHighlight = getQueryString(route.query.highlightObjective);
     if (!taskId) return;
     const taskInMetadata = tasks.value.find((t) => t.id === taskId);
     if (!taskInMetadata) return;
-    if (searchQuery.value) {
-      searchQuery.value = '';
-    }
+    // Settle the cleared search before any hand-off reads the query, or it would restore it.
+    const startPath = router.currentRoute.value.path;
+    // Queued behind any pending search write, so that write cannot restore `q` afterwards.
+    await setSearchQuery('');
+    // The user may have left while the queue drained; never pull them back to the list.
+    if (router.currentRoute.value.path !== startPath) return;
+    if (await handOffToListRoute(objectiveIdToHighlight)) return;
     if (!objectiveIdToHighlight) {
       const isKappaRequired = taskInMetadata.kappaRequired === true;
       const isLightkeeperRequired = taskInMetadata.lightkeeperRequired === true;

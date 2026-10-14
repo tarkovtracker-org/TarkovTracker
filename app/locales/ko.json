@@ -92,7 +92,6 @@
     "user_avatar_alt": "사용자 아바타",
     "supporter_badge_aria": "후원 구독 관리({tier})",
     "help_community_aria": "도움말 및 커뮤니티",
-    "community_section": "커뮤니티",
     "keyboard_shortcuts": "키보드 단축키",
     "report_problem": "문제 보고",
     "login_aria": "계정 로그인",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "읽지 않은 활동 있음",
     "mark_read": "읽음 표시",
-    "clear": "지우기",
     "empty": "아직 기록된 활동이 없습니다.",
     "badge_api": "API 동기화",
     "api_synced": "API 진행도 동기화됨",
@@ -158,11 +156,7 @@
       "uncompleted": "미완료 임무: {name}",
       "failed": "실패한 임무: {name}",
       "reset_failed": "실패한 임무 리셋: {name}",
-      "available": "잠금 해제된 임무: {name}",
-      "undo_completed": "임무 완료 취소됨: {name}",
-      "undo_uncompleted": "임무 미완료 취소됨: {name}",
-      "undo_reset_failed": "실패한 임무 리셋 취소됨: {name}",
-      "undo_failed": "임무 실패 취소됨: {name}"
+      "available": "잠금 해제된 임무: {name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "상인 정렬",
           "direction_aria_label": "정렬 방향 전환"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "TarkovTracker 후원",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "후원자 배지",
       "perk_discord": "Discord 후원자 역할(계정 연결 후 서버에 참가)",
       "perk_tier_role": "Discord {tier} 등급 역할",
-      "perk_early_access": "새 기능 얼리 액세스",
       "perk_priority_support": "우선 지원",
       "perk_feature_voting": "기능 투표 우선권",
       "one_time_title": "일회성 후원",
@@ -873,11 +874,6 @@
       "savings_note": "월간 결제 대비 {amount} 절약",
       "kofi_deprecation_title": "Ko-fi(대체 옵션)",
       "kofi_deprecation_detail": "위 구독 및 일회성 후원금은 이제 Stripe를 통해 처리되어 수수료가 낮아지고 후원이 더 직접적으로 전달됩니다. Ko-fi는 일회성 팁의 대체 수단으로만 계속 사용할 수 있습니다.",
-      "alt_payments_title": "추가 결제 수단 출시 예정",
-      "alt_payments_coming_soon": "모든 사람이 자신에게 맞는 방식으로 후원할 수 있도록 추가 결제 옵션을 준비하고 있습니다.",
-      "alt_payment_crypto": "암호화폐",
-      "alt_payment_gift_cards": "기프트 카드",
-      "alt_payments_more": "외 더 보기",
       "checkout_error_title": "결제 실패",
       "checkout_error_generic": "결제를 시작할 수 없습니다. 잠시 후 다시 시도하세요.",
       "manage_subscription_cta": "구독 관리",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "언어",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "계정, 게임 진행도 및 애플리케이션 환경설정을 관리하세요.",
     "tabs": {
       "progression": "진행도",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "프레스티지 사용 불가",
-      "persistent_mode_unsupported": "지속적인 PvE 모드에서는 프레스티지를 사용할 수 없습니다.",
       "seasonal_mode_unsupported": "Seasonal PvP에서는 프레스티지를 사용할 수 없습니다.",
       "current_level": "현재 프레스티지 레벨",
       "set_current": "현재 프레스티지 설정",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "찾을 수 없나요? BSG 런처 -> 게임 설정 -> Logs를 열고 해당 경로를 복사하세요.",
       "avoid_session_folder_label": "예시 세션 폴더:",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "계정",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "로그 버전 포함",
       "version_filter_hint": "최신 메이저 버전이 기본 선택됩니다. 복원할 캐릭터와 리플레이스의 로그만 포함하세요.",
       "version_filter_tooltip": "버전은 계정 변경, 리플레이스 또는 프레스티지 초기화를 식별하지 않습니다. 가져오기 전에 적절한 세션 폴더를 선택하세요. Seasonal 이벤트는 활성 시즌에 속해야 합니다.",

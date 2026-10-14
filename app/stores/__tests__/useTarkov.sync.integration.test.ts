@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -71,7 +72,6 @@ const {
     level: 1,
     pmcFaction: 'USEC',
     displayName: null,
-    xpOffset: 0,
     taskObjectives: {},
     taskCompletions: {},
     hideoutParts: {},
@@ -187,7 +187,13 @@ const {
         queued && queued.length > 0
           ? { ...modeProgressResult, data: [], error: queued.shift() ?? null }
           : modeProgressResult;
-      return Promise.resolve(value).then(onfulfilled, onrejected);
+      return Promise.resolve({
+        ...value,
+        data: value.data?.map((row) => ({
+          ...row,
+          updated_at: row.updated_at ?? row.progress_updated_at ?? undefined,
+        })),
+      }).then(onfulfilled, onrejected);
     },
   };
   modeProgressQuery.in.mockImplementation(() => modeProgressQuery);
@@ -220,7 +226,12 @@ const {
       },
     };
   });
-  const select = vi.fn(() => ({ eq }));
+  const select = vi.fn(() => ({
+    eq,
+    abortSignal() {
+      return this;
+    },
+  }));
   const rpc = vi.fn(async (_name?: string, _args?: SyncRpcArgs): Promise<RpcResult> => ({
     error: null,
   }));
@@ -244,6 +255,9 @@ const {
     if (table === 'user_game_mode_progress') {
       return {
         select: vi.fn(() => ({
+          abortSignal() {
+            return this;
+          },
           eq: vi.fn((_column: unknown, value: unknown) => {
             userIdFilters.push(String(value));
             return modeProgressQuery;
@@ -375,7 +389,6 @@ const progressWithTaskState = (taskId: string, complete: boolean): UserProgressD
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {
     [taskId]: {
@@ -397,7 +410,6 @@ const progressWithLevel = (level: number): UserProgressData => ({
   level,
   pmcFaction: 'USEC',
   displayName: null,
-  xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
   hideoutParts: {},
@@ -608,6 +620,100 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('blocks active progress writes after the current owner activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockRejectedValueOnce(new Error('IndexedDB activation unavailable'));
+    try {
+      await expect(switchSession('user-1', null, 'logout')).rejects.toThrow(
+        'IndexedDB activation unavailable'
+      );
+      const before = localStorage.getItem(STORAGE_KEYS.progress);
+      const next = JSON.stringify({
+        _userId: null,
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 42 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(false);
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(before);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
+  it('keeps a replacement owner writable after a superseded activation fails', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const pending = Promise.withResolvers<undefined>();
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementationOnce(() => pending.promise);
+    try {
+      const stale = switchSession('user-1', 'user-2');
+      const failed = expect(stale).rejects.toThrow('former activation failed');
+      await vi.waitFor(() => expect(activate).toHaveBeenCalledOnce());
+      await switchSession('user-2', 'user-3');
+      pending.reject(new Error('former activation failed'));
+      await failed;
+      const next = JSON.stringify({
+        _userId: 'user-3',
+        _timestamp: Date.now(),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: 43 },
+        },
+      });
+      await expect(persistActiveProgressValue(next)).resolves.toBe(true);
+      expect(readPersistedEnvelope()._userId).toBe('user-3');
+      expect(readPersistedEnvelope().data?.pvp?.level).toBe(43);
+    } finally {
+      activate.mockRestore();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
+  it('keeps a same-owner peer writable after a local session reset', async () => {
+    const { IDBFactory } = await import('fake-indexeddb');
+    const { openActiveProgressRepository } = await import('@/stores/tarkov/progressRepository');
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const db = await openActiveProgressRepository(new IDBFactory(), 'same-owner-reset');
+    const peerToken = await db.activateOwner('user-1');
+    await db.read(peerToken, null);
+    const activate = vi
+      .spyOn(authority, 'initializeProgressAuthority')
+      .mockImplementation(async (owner, renew, canContinue) => {
+        await db.activateOwner(owner, renew, canContinue);
+      });
+    try {
+      await resetTarkovStoreForSessionTransition('user-1', 'same-owner reset');
+      await expect(
+        db.mutate(peerToken, () => ({ raw: 'peer-save', result: true }))
+      ).resolves.toMatchObject({ result: true });
+    } finally {
+      activate.mockRestore();
+      db.close();
+    }
+  });
+  it('holds cloud startup when the authoritative repository is unavailable', async () => {
+    const authority = await import('@/stores/tarkov/progressAuthority');
+    const ready = vi.spyOn(authority, 'isProgressAuthorityReady').mockReturnValue(false);
+    single.mockClear();
+    rpc.mockClear();
+    channel.subscribe.mockClear();
+    try {
+      await expect(initializeTarkovSync()).rejects.toThrow('Progress authority is unavailable');
+      expect(single).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
+      expect(channel.subscribe).not.toHaveBeenCalled();
+      ready.mockReturnValue(true);
+      await initializeTarkovSync();
+      expect(channel.subscribe).toHaveBeenCalled();
+    } finally {
+      ready.mockRestore();
+    }
+  });
   it.each(
     GAME_MODE_VALUES.flatMap((mode) => [null, 3, 9].map((pendingLevel) => ({ mode, pendingLevel })))
   )(
@@ -626,6 +732,7 @@ describe('useTarkov sync integration', () => {
       createApp({}).use(pinia);
       setActivePinia(pinia);
       await initializeTarkovSync();
+      await flushPromises();
       const store = useTarkovStore();
       const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
         typeof actual.useSupabaseSync
@@ -700,6 +807,7 @@ describe('useTarkov sync integration', () => {
         },
       ];
       await initializeTarkovSync();
+      await flushPromises();
       expect(useTarkovStore()[mode]).toMatchObject({ level: 1, progressEpoch: 1 });
     }
   );
@@ -722,6 +830,7 @@ describe('useTarkov sync integration', () => {
       );
       single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
       await initializeTarkovSync();
+      await flushPromises();
       const store = useTarkovStore();
       rpc.mockResolvedValue({
         data: { tarkov_uid: 1001, metadata_write_id: '100', tarkov_uid_conflict: false },
@@ -752,6 +861,7 @@ describe('useTarkov sync integration', () => {
           error: null,
         });
         await initializeTarkovSync();
+        await flushPromises();
       }
       getRealtimeCallback()?.({
         new: {
@@ -783,6 +893,7 @@ describe('useTarkov sync integration', () => {
       );
       single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
       await initializeTarkovSync();
+      await flushPromises();
       const store = useTarkovStore();
       const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
         typeof actual.useSupabaseSync
@@ -855,6 +966,7 @@ describe('useTarkov sync integration', () => {
   it('keeps a queued UID visible through delayed metadata from the completed relink', async () => {
     single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
     await initializeTarkovSync();
+    await flushPromises();
     const store = useTarkovStore();
     store.setTarkovUid(1001);
     const firstClient = {
@@ -1231,7 +1343,28 @@ describe('useTarkov sync integration', () => {
     modeProgressResult.errorSequence = [];
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
     syncInitialState.mockReset().mockResolvedValue({});
-    rpc.mockResolvedValue({ error: null });
+    // Successful uploads must be observable by the first-join REST reconciliation.
+    rpc.mockImplementation(async (name, args) => {
+      if (name === 'sync_user_game_mode_progress' && args?.p_modes) {
+        const rows = [...(modeProgressResult.data ?? [])];
+        for (const [mode, progress] of Object.entries(args.p_modes)) {
+          const season = getGameModeSeasonNumber(mode as 'pvp' | 'pve' | 'seasonal');
+          const index = rows.findIndex(
+            (row) => row.game_mode === mode && row.season_number === season
+          );
+          const row = {
+            game_mode: mode,
+            season_number: season,
+            progress_data: progress,
+            progress_updated_at: new Date(Date.now()).toISOString(),
+          };
+          if (index < 0) rows.push(row);
+          else rows[index] = row;
+        }
+        modeProgressResult.data = rows;
+      }
+      return { error: null };
+    });
     update.mockResolvedValue({ error: null });
     channel.on.mockImplementation((_: string, config: Record<string, unknown>, callback) => {
       const typedCallback = callback as (payload: { new: unknown; old: unknown }) => void;
@@ -1348,6 +1481,7 @@ describe('useTarkov sync integration', () => {
     expect(listSupersededProgressCopies('user-1')).toEqual([]);
   });
   afterEach(async () => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     resetTarkovSync('test teardown');
     await nextTick();
@@ -1542,7 +1676,6 @@ describe('useTarkov sync integration', () => {
             seasonal: {
               ...seasonal('local-task', base + 10_000),
               displayName: 'old name',
-              xpOffset: 100,
               skillOffsets: { Endurance: 4 },
               traders: { prapor: { level: 4, reputation: 0.8 } },
               skills: { Endurance: 30 },
@@ -1587,7 +1720,6 @@ describe('useTarkov sync integration', () => {
       expect(selected.taskCompletions).toEqual(tasks);
       expect(selected).toMatchObject({
         displayName: null,
-        xpOffset: 0,
         traders: { prapor: { level: 4, reputation: 0.8 } },
         skills: { Endurance: 30 },
       });
@@ -1628,7 +1760,6 @@ describe('useTarkov sync integration', () => {
           progress_data: {
             ...progressWithLevel(2),
             displayName: 'old name',
-            xpOffset: 100,
             skillOffsets: { Endurance: 4 },
             taskCompletions: { remoteTask: { complete: true, timestamp: base + 30_000 } },
             taskObjectives: { objective: { count: 5, timestamp: base + 10_000 } },
@@ -1637,7 +1768,7 @@ describe('useTarkov sync integration', () => {
       ];
       await initializeTarkovSync();
       const selected = useTarkovStore()[mode];
-      expect(selected).toMatchObject({ displayName: null, xpOffset: 0 });
+      expect(selected).toMatchObject({ displayName: null, skillOffsets: {} });
       expect(selected.skillOffsets).toEqual({});
       expect(selected.taskObjectives.objective?.count).toBe(0);
       expect(Object.keys(selected.taskCompletions).sort()).toEqual(['localTask', 'remoteTask']);
@@ -1791,9 +1922,10 @@ describe('useTarkov sync integration', () => {
       },
     ];
     await initializeTarkovSync();
+    await flushPromises();
     expect(useTarkovStore().pvp.level).toBe(42);
     expect(useTarkovStore().gameEdition).toBe(3);
-    expect(single).toHaveBeenCalledOnce();
+    expect(single).toHaveBeenCalledTimes(2);
   });
   it('persists remote freshness through the real Pinia persistence plugin', async () => {
     const base = Date.parse('2026-09-06T12:00:00Z');
@@ -1829,6 +1961,7 @@ describe('useTarkov sync integration', () => {
       },
     ];
     await initializeTarkovSync();
+    await flushPromises();
     await nextTick();
     await flushActiveProgressWrites();
     const read = () => JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
@@ -1899,6 +2032,7 @@ describe('useTarkov sync integration', () => {
         { game_mode: 'pve', season_number: 0, progress_data: progressWithLevel(1) },
       ];
       await initializeTarkovSync();
+      await flushPromises();
       expect(useTarkovStore().pvp.level).toBe(7);
     }
   );
@@ -1951,6 +2085,115 @@ describe('useTarkov sync integration', () => {
     expect(useTarkovStore().pvp.hideoutParts.part?.count).toBe(0);
     expect(useTarkovStore().pve.level).toBe(25);
     expect(useTarkovStore().seasonal.level).toBe(55);
+  });
+  it('keeps REST saving and retry reconciliation available when the initial Realtime join times out', async () => {
+    const { liveUpdatesDegraded } = await import('@/stores/tarkov/progressLiveStatus');
+    channel.subscribe.mockImplementationOnce((callback) => {
+      callback?.('TIMED_OUT');
+      return channel;
+    });
+    await expect(initializeTarkovSync()).resolves.toBeUndefined();
+    expect(liveUpdatesDegraded.value).toBe(true);
+    expect(cleanupSync).not.toHaveBeenCalled();
+    expect(showLoadFailed).not.toHaveBeenCalled();
+    const store = useTarkovStore();
+    const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as {
+      transform: (state: UserState) => Record<string, unknown>;
+      sync: (payload: Record<string, unknown>) => Promise<unknown>;
+      reconcileBeforeRetry: () => Promise<void>;
+    };
+    await expect(options.reconcileBeforeRetry()).resolves.toBeUndefined();
+    store.$patch((state) => {
+      state.pvp.level = 17;
+    });
+    await options.sync(options.transform(store.$state));
+    expect(rpc).toHaveBeenCalledWith(
+      'sync_user_game_mode_progress',
+      expect.objectContaining({
+        p_modes: expect.objectContaining({ pvp: expect.objectContaining({ level: 17 }) }),
+      })
+    );
+    expect(cleanupSync).not.toHaveBeenCalled();
+    resetTarkovSync('test logout');
+    expect(liveUpdatesDegraded.value).toBe(false);
+  });
+  it('preserves pending edits through outage polling and reconciles the first eventual join', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const actual = await vi.importActual<typeof import('@/composables/supabase/useSupabaseSync')>(
+      '@/composables/supabase/useSupabaseSync'
+    );
+    const { liveUpdatesDegraded } = await import('@/stores/tarkov/progressLiveStatus');
+    useSupabaseSyncMock.mockImplementation(
+      (options) =>
+        actual.useSupabaseSync(
+          options as Parameters<typeof actual.useSupabaseSync>[0]
+        ) as unknown as ReturnType<typeof useSupabaseSyncMock>
+    );
+    let status: ((value: string) => void) | undefined;
+    channel.subscribe.mockImplementationOnce((callback) => {
+      status = callback;
+      callback?.('TIMED_OUT');
+      return channel;
+    });
+    try {
+      await initializeTarkovSync();
+      const store = useTarkovStore();
+      const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
+        typeof actual.useSupabaseSync
+      >;
+      controller.pause();
+      store.$patch((state) => {
+        state.pvp.level = 17;
+      });
+      modeProgressResult.data = [
+        {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: progressWithLevel(9),
+          progress_updated_at: new Date(Date.now()).toISOString(),
+        },
+        {
+          game_mode: 'pve',
+          season_number: 0,
+          progress_data: progressWithLevel(25),
+          progress_updated_at: new Date(Date.now()).toISOString(),
+        },
+      ];
+      const read = Promise.withResolvers<{
+        data: ReturnType<typeof createRemoteRow>;
+        error: null;
+      }>();
+      single.mockReturnValueOnce(read.promise);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(single).toHaveBeenCalledTimes(2);
+      store.$patch((state) => {
+        state.pvp.displayName = 'Edited during refresh';
+      });
+      read.resolve({ data: createRemoteRow(), error: null });
+      await flushPromises();
+      expect(store.pvp).toMatchObject({ level: 17, displayName: 'Edited during refresh' });
+      expect(store.pve.level).toBe(25);
+      expect(liveUpdatesDegraded.value).toBe(true);
+      controller.resume();
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(rpc).toHaveBeenCalledWith(
+        'sync_user_game_mode_progress',
+        expect.objectContaining({
+          p_modes: expect.objectContaining({
+            pvp: expect.objectContaining({ level: 17, displayName: 'Edited during refresh' }),
+          }),
+        })
+      );
+      status?.('SUBSCRIBED');
+      await flushPromises();
+      expect(liveUpdatesDegraded.value).toBe(false);
+      expect(store.pvp.level).toBe(17);
+      expect(channel.subscribe).toHaveBeenCalledOnce();
+    } finally {
+      resetTarkovSync('test cleanup');
+      vi.useRealTimers();
+    }
   });
   it('stops initialization after normalized reads exhaust their retries', async () => {
     modeProgressResult.error = { message: 'normalized unavailable' };
@@ -2066,6 +2309,83 @@ describe('useTarkov sync integration', () => {
     recordLocalSave(true);
     resetCloudSaveStatus();
   });
+  it('retains failed first handoff intent through the join snapshot and saves its retry', async () => {
+    const actual = await vi.importActual<typeof import('@/composables/supabase/useSupabaseSync')>(
+      '@/composables/supabase/useSupabaseSync'
+    );
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const { markCloudSyncUnavailable, recordLocalSave } =
+      await import('@/stores/tarkov/progressSaveStatus');
+    modeProgressResult.error = { message: 'normalized unavailable' };
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    resetTarkovSync('initial sync failed');
+    markCloudSyncUnavailable(async () => false);
+    recordLocalSave(false, 'quota');
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.gameEdition = 5;
+      state.pvp.displayName = 'Unsaved handoff';
+    });
+    preserveUnsavedSessionProgress('user-1');
+    modeProgressResult.error = null;
+    single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
+    useSupabaseSyncMock.mockImplementation(
+      (options) =>
+        actual.useSupabaseSync(
+          options as Parameters<typeof actual.useSupabaseSync>[0]
+        ) as unknown as ReturnType<typeof useSupabaseSyncMock>
+    );
+    const firstSave = Promise.withResolvers<{ error: { message: string } }>();
+    rpc.mockReturnValueOnce(firstSave.promise);
+    try {
+      await initializeTarkovSync();
+      await flushPromises();
+      expect(rpc).toHaveBeenCalledOnce();
+      const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
+        typeof actual.useSupabaseSync
+      >;
+      single.mockResolvedValue({
+        data: createRemoteRow({ game_edition: 2, current_game_mode: 'pve', tarkov_uid: 7 }),
+        error: null,
+      });
+      modeProgressResult.data = [
+        modeRow('pvp', { ...progressWithLevel(9), displayName: 'Cloud name', pmcFaction: 'BEAR' }),
+        modeRow('pve', progressWithLevel(25)),
+      ];
+      firstSave.resolve({ error: { message: 'handoff write failed' } });
+      await flushPromises();
+      const { reconcileRemoteSnapshot } = await import('@/stores/tarkov/realtimeListener');
+      await reconcileRemoteSnapshot();
+      expect(store.gameEdition).toBe(5);
+      expect(store.pvp.displayName).toBe('Unsaved handoff');
+      expect(store.pvp).toMatchObject({ level: 9, pmcFaction: 'BEAR' });
+      expect(store.pve.level).toBe(25);
+      expect(store.currentGameMode).toBe('pve');
+      expect(store.tarkovUid).toBe(7);
+      expect(controller.hasPendingChanges?.()).toBe(true);
+      await vi.waitFor(() => expect(controller.isPaused.value).toBe(false), { timeout: 2000 });
+      await expect(controller.retryNow()).resolves.toBe(true);
+      expect(rpc).toHaveBeenLastCalledWith(
+        'sync_user_game_mode_progress',
+        expect.objectContaining({
+          p_game_edition: 5,
+          p_current_game_mode: 'pve',
+          p_tarkov_uid: 7,
+          p_modes: expect.objectContaining({
+            pvp: expect.objectContaining({
+              displayName: 'Unsaved handoff',
+              level: 9,
+              pmcFaction: 'BEAR',
+            }),
+          }),
+        })
+      );
+      expect(controller.hasPendingChanges?.()).toBe(false);
+    } finally {
+      firstSave.resolve({ error: { message: 'handoff regression cleanup' } });
+      resetTarkovSync('handoff regression cleanup');
+    }
+  });
   it('lets newer remote progress win for modes the memory-only edits did not touch', async () => {
     const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
     const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
@@ -2142,7 +2462,6 @@ describe('useTarkov sync integration', () => {
           ...baseline.pve,
           displayName: 'Other tab',
           pmcFaction: 'BEAR' as const,
-          xpOffset: 1234,
           skillOffsets: { endurance: 3 },
         },
       };
@@ -2192,7 +2511,6 @@ describe('useTarkov sync integration', () => {
         ...progressWithLevel(9),
         displayName: 'Other tab during read',
         pmcFaction: 'BEAR' as const,
-        xpOffset: 1234,
         skillOffsets: { endurance: 3 },
       },
     };
@@ -2533,14 +2851,9 @@ describe('useTarkov sync integration', () => {
     );
     resetTarkovSync('user switched', { preservePersistedStateForUserId: 'user-2' });
     store.$reset();
-    localStorage.setItem(
-      STORAGE_KEYS.progress,
-      JSON.stringify({
-        _timestamp: base + 15_000,
-        _userId: 'user-2',
-        data: structuredClone(defaultState),
-      })
-    );
+    // A memory reset no longer creates an authoritative placeholder. Legacy-tab
+    // placeholder writes are isolated and recovered by the native authority tests.
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.pvp.level).toBe(9);
     single.mockResolvedValue({
       data: createRemoteRow({ updated_at: new Date(base + 1_000).toISOString() }),
       error: null,
@@ -3937,7 +4250,7 @@ describe('useTarkov sync integration', () => {
         error: null,
       });
       await initializeTarkovSync();
-      expect(single).toHaveBeenCalledOnce();
+      expect(single).toHaveBeenCalledTimes(2);
       expect(select.mock.calls.flat().join(',')).not.toMatch(/pvp_data|pve_data/);
       expect(useTarkovStore().pvp.taskCompletions['poisoned-legacy-task']).toBeUndefined();
       expect(useTarkovStore().pve.level).toBe(1);
@@ -5245,7 +5558,7 @@ describe('useTarkov sync integration', () => {
                   ...progressWithLevel(25),
                   displayName: 'owner-B',
                   pmcFaction: 'BEAR',
-                  xpOffset: 42,
+                  skillOffsets: { Endurance: 42 },
                 },
               },
             })
@@ -5286,7 +5599,7 @@ describe('useTarkov sync integration', () => {
         expect(store.pvp.level).toBe(source === 'empty' ? 1 : 25);
         expect(store.pvp.displayName).toBe(hasRecovery ? 'owner-B' : null);
         expect(store.pvp.pmcFaction).toBe(hasRecovery ? 'BEAR' : 'USEC');
-        expect(store.pvp.xpOffset).toBe(hasRecovery ? 42 : 0);
+        expect(store.pvp.skillOffsets.Endurance).toBe(hasRecovery ? 42 : undefined);
       }
     );
     it.each([
@@ -5453,4 +5766,8 @@ describe('useTarkov sync integration', () => {
       }
     );
   });
+});
+vi.mock('@/stores/tarkov/progressAuthority', async () => {
+  const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');
+  return createProgressPolicyAuthority();
 });

@@ -48,6 +48,40 @@ const questRouteObjectives = [
   },
 ];
 describe('storylineObjectives', () => {
+  it('preserves valid optional parents through array projection and cached record normalization', () => {
+    const parent = { ...objectives[2]!, sourceQuestId: 'quest-a' };
+    const child = {
+      ...objectives[3]!,
+      sourceQuestId: 'quest-a',
+      parentObjectiveId: parent.id,
+    };
+    const normalized = normalizeStoryObjectives([child, parent]);
+    expect(normalized[child.id]?.parentObjectiveId).toBe(parent.id);
+    expect(normalizeStoryObjectives(normalized)[child.id]?.parentObjectiveId).toBe(parent.id);
+    expect(getAutoCompletableObjectiveIds([child, parent])).toEqual([parent.id, child.id]);
+    expect(child.parentObjectiveId).toBe(parent.id);
+  });
+  it.each([
+    { label: 'missing parent', parent: {}, child: { parentObjectiveId: 'missing' } },
+    { label: 'optional parent', parent: { type: 'optional' }, child: {} },
+    { label: 'another source quest', parent: { sourceQuestId: 'quest-b' }, child: {} },
+    {
+      label: 'unknown source quest',
+      parent: { sourceQuestId: undefined },
+      child: { sourceQuestId: undefined },
+    },
+    { label: 'blank source quest', parent: { sourceQuestId: ' ' }, child: { sourceQuestId: ' ' } },
+    { label: 'self reference', parent: {}, child: { parentObjectiveId: 'obj-4' } },
+    { label: 'main child', parent: {}, child: { type: 'main' } },
+    { label: 'non-string parent', parent: {}, child: { parentObjectiveId: 42 } },
+  ])('drops a link with $label without losing either objective', ({ parent, child }) => {
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[2]!, sourceQuestId: 'quest-a', ...parent },
+      { ...objectives[3]!, sourceQuestId: 'quest-a', parentObjectiveId: 'obj-3', ...child },
+    ] as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(Object.keys(normalized)).toEqual(['obj-3', 'obj-4']);
+    expect(normalized['obj-4']).not.toHaveProperty('parentObjectiveId');
+  });
   it('returns only non-route-choice objective ids', () => {
     expect(getAutoCompletableObjectiveIds(objectives)).toEqual(['obj-3', 'obj-4']);
   });
@@ -67,6 +101,55 @@ describe('storylineObjectives', () => {
       sourceQuestId: 'quest-a',
     });
   });
+  it('preserves explicit unlock records when hydrating a cached chapter', () => {
+    const unlocks = [
+      { type: 'trader' as const, id: 'peacekeeper', name: 'Peacekeeper', note: 'Complete Woods' },
+    ];
+    const normalized = normalizeStoryObjectives([{ ...objectives[0]!, unlocks }]);
+    expect(normalized['obj-1']?.unlocks).toEqual(unlocks);
+    expect(normalized['obj-1']?.unlocks).not.toBe(unlocks);
+  });
+  it('ignores malformed cached unlocks instead of fabricating their placement', () => {
+    const unlocks = [null, { type: 'invented', name: 'Shoreline' }, { type: 'trader', name: '' }];
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[0]!, unlocks },
+    ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(normalized['obj-1']?.unlocks).toEqual([]);
+  });
+  it.each([
+    { type: 'trader', name: ' ' },
+    { type: 'trader', name: 'Peacekeeper', id: '' },
+    { type: 'trader', name: 'Peacekeeper', id: ' ' },
+    { type: 'trader', name: 'Peacekeeper', id: 7 },
+    { type: 'trader', name: 'Peacekeeper', note: '' },
+    { type: 'trader', name: 'Peacekeeper', note: ' ' },
+    { type: 'trader', name: 'Peacekeeper', note: 7 },
+    { type: ['trader'], name: 'Peacekeeper' },
+  ])('rejects invalid cached unlock text and types: %j', (unlock) => {
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[0]!, unlocks: [unlock] },
+    ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(normalized['obj-1']?.unlocks).toEqual([]);
+  });
+  it.each([
+    Object.assign([], { type: 'trader', name: 'Peacekeeper' }),
+    Object.assign(Object.create({ inherited: true }), { type: 'trader', name: 'Peacekeeper' }),
+  ])('rejects non-plain cached unlock objects: %j', (unlock) => {
+    const normalized = normalizeStoryObjectives([
+      { ...objectives[0]!, unlocks: [unlock] },
+    ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+    expect(normalized['obj-1']?.unlocks).toEqual([]);
+  });
+  it.each(['achievement', 'barter', 'map', 'quest', 'trader', 'other'])(
+    'preserves the supported %s unlock type',
+    (type) => {
+      const unlock = { type, name: 'Unlock' };
+      const normalized = normalizeStoryObjectives([
+        { ...objectives[0]!, unlocks: [unlock] },
+      ] as unknown as Parameters<typeof normalizeStoryObjectives>[0]);
+      expect(normalized['obj-1']?.unlocks).toEqual([unlock]);
+    }
+  );
   it('excludes objectives on mutually exclusive quests from bulk completion', () => {
     expect(getAutoCompletableObjectiveIds(questRouteObjectives, [['quest-a', 'quest-b']])).toEqual([
       'obj-c1',

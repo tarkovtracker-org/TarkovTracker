@@ -59,6 +59,10 @@ import {
   type PrestigeRunRecord,
   type UserPrestigeRunRow,
 } from '@/stores/tarkov/prestige';
+import {
+  initializeProgressAuthority,
+  isProgressAuthorityReady,
+} from '@/stores/tarkov/progressAuthority';
 import { getNextProgressEpoch, hasProgress } from '@/stores/tarkov/progressMerge';
 import {
   countStoryIdChanges,
@@ -99,6 +103,12 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
+import {
+  effectiveStoryProgress,
+  isAutomaticStoryObjective,
+  isEffectiveStoryObjectiveComplete,
+  storyCatalogForMode,
+} from '@/utils/storylineCompletion';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
@@ -231,9 +241,46 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
 // ============================================================================
 const tarkovGetters = {
   ...getters,
+  getEffectiveStoryProgress: (state: UserState) => () =>
+    effectiveStoryProgress(state[state.currentGameMode]?.storyChapters, currentStoryCatalog(state)),
+  isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
+    isEffectiveStoryObjectiveComplete(
+      catalogStoryObjective(state, chapterId, objectiveId) ?? {},
+      getters.isStoryObjectiveComplete(state)(chapterId, objectiveId)
+    ),
 } satisfies _GettersTree<UserState>;
+/** Metadata store hydration normalizes objectives to ID-keyed records. */
+const currentStoryCatalog = (state: UserState) => {
+  const metadata = useMetadataStore();
+  return storyCatalogForMode(
+    metadata.storyChapters ?? [],
+    metadata.storyChaptersGameMode,
+    state.currentGameMode
+  );
+};
+const catalogStoryObjective = (state: UserState, chapterId: string, objectiveId: string) =>
+  currentStoryCatalog(state).find((chapter) => chapter.id === chapterId)?.objectives?.[objectiveId];
+const automaticStoryObjective = (
+  state: UserState,
+  chapterId: string,
+  objectiveId: string
+): boolean => {
+  return isAutomaticStoryObjective(catalogStoryObjective(state, chapterId, objectiveId));
+};
 const tarkovActions = {
   ...(actions as UserActions),
+  setStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.setStoryObjectiveComplete.call(this, chapterId, objectiveId);
+  },
+  setStoryObjectiveUncomplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.setStoryObjectiveUncomplete.call(this, chapterId, objectiveId);
+  },
+  toggleStoryObjectiveComplete(this: TarkovStoreInstance, chapterId: string, objectiveId: string) {
+    if (automaticStoryObjective(this, chapterId, objectiveId)) return;
+    actions.toggleStoryObjectiveComplete.call(this, chapterId, objectiveId);
+  },
   setHideoutModuleUncomplete(this: TarkovStoreInstance, hideoutId: string) {
     actions.setHideoutModuleUncomplete.call(this, hideoutId);
     const removedModules = enforceHideoutPrereqs(this);
@@ -317,7 +364,8 @@ const tarkovActions = {
   },
   /** Ensure every completed task has all its objectives complete. Returns changes made. */
   repairCompletedTaskObjectives(this: TarkovStoreInstance) {
-    return repairCompletedProgress(this, useMetadataStore().tasks ?? []);
+    const metadata = useMetadataStore();
+    return repairCompletedProgress(this, metadata.tasks ?? [], metadata.storyChapters ?? []);
   },
   async resetOnlineProfile(this: TarkovStoreInstance) {
     const { $supabase } = useNuxtApp();
@@ -683,6 +731,17 @@ const startProgressHandoff = (writes: ReturnType<typeof getPendingProgressWrites
   );
 const isCurrentSessionTransition = (revision: number, userId: string | null): boolean =>
   revision === sessionTransitionRevision && userId === getCurrentSupabaseUserId();
+const activateSessionProgressAuthority = async (revision: number, userId: string | null) => {
+  try {
+    await initializeProgressAuthority(userId, false, () =>
+      isCurrentSessionTransition(revision, userId)
+    );
+  } catch (error) {
+    // A failed former session must not block the replacement owner's writes.
+    if (isCurrentSessionTransition(revision, userId)) setActiveProgressWritesBlocked(true);
+    throw error;
+  }
+};
 const isMatchingGuestProgress = (
   guest: PersistedProgressSnapshot | null,
   state: UserState
@@ -732,6 +791,8 @@ export async function resetTarkovStoreForSessionTransition(
     if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
       return;
   }
+  await activateSessionProgressAuthority(revision, currentUserId);
+  if (!isCurrentSessionTransition(revision, currentUserId)) return;
   const restored = await restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId);
   if (revision !== sessionTransitionRevision || currentUserId !== getCurrentSupabaseUserId())
     return;
@@ -747,6 +808,9 @@ export async function resetTarkovStoreForSessionTransition(
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
+  if (!isProgressAuthorityReady()) {
+    throw new DOMException('Progress authority is unavailable', 'InvalidStateError');
+  }
   if (progressSync.isActiveFor(userId)) {
     logger.debug('[TarkovStore] Supabase sync already initialized, skipping');
     return false;
@@ -876,12 +940,16 @@ const retireRecoveryCopyOnFirstSync = (userId: string, retirementPending: boolea
 };
 type ProgressSyncStart = {
   hadRemoteData: boolean;
+  initialAcknowledgedState?: UserState;
   /** Memory-only or recovered changes the startup load did not upload. */
   hasUnsavedHandoff: boolean;
   onSynced: () => void;
 };
 const shouldStartSyncNow = (store: TarkovStore, start: ProgressSyncStart): boolean =>
   start.hadRemoteData || hasProgress(store.$state) || start.hasUnsavedHandoff;
+/** A deferred controller adopts its current state; only retained startup intent needs a seed. */
+const initialHandoffAcknowledgement = (start: ProgressSyncStart): UserState | undefined =>
+  start.hasUnsavedHandoff ? start.initialAcknowledgedState : undefined;
 const startProgressSync = (
   store: TarkovStore,
   userId: string,
@@ -890,7 +958,14 @@ const startProgressSync = (
 ): void => {
   const { $supabase } = useNuxtApp();
   const { hadRemoteData, onSynced } = start;
-  const options = { store, client: $supabase.client, userId, hadRemoteData, onSynced };
+  const options = {
+    store,
+    client: $supabase.client,
+    userId,
+    hadRemoteData,
+    onSynced,
+    initialAcknowledgedState: initialHandoffAcknowledgement(start),
+  };
   if (!shouldStartSyncNow(store, start)) {
     progressSync.startWhenProgressExists(options, isStartupCurrent);
     return;
@@ -945,12 +1020,13 @@ export async function initializeTarkovSync() {
   }
   const syncStart = {
     hadRemoteData: loadResult.hadRemoteData,
+    initialAcknowledgedState: loadResult.initialAcknowledgedState,
     hasUnsavedHandoff: hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
     onSynced: retireRecoveryCopyOnFirstSync(userId, startupCloudState.retirementPending),
   };
   startProgressSync(tarkovStore, userId, syncStart, isStartupCurrent);
-  // MULTI-DEVICE CONFLICT RESOLUTION: awaited so initialization does not report success before
-  // Realtime acknowledges the channel; failed or stalled joins reject to the app init boundary.
+  // Register the REST reconciliation reader and start live updates. A join outage
+  // falls back to polling without resetting the successfully loaded save controller.
   if (!isStartupCurrent()) return;
   await setupRealtimeListener(tarkovStore);
 }

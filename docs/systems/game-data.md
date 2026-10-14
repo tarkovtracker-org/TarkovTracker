@@ -99,6 +99,24 @@ flowchart LR
   respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
+### Cached startup catalogs
+
+A complete critical browser cache supplies the first paint without waiting for a catalog request.
+Startup then checks editions, storyline chapters and Seasonal perks in the background once per
+active mode/language scope, using the ordinary endpoint without `cacheBust`. The existing
+server overlay TTL still applies. Successful checks update the browser catalog; failures retain
+last-good data and remain retryable on a later startup. Queued work and responses from a replaced
+startup, changed scope or aborted caller cannot replace the active catalog.
+Later hydration in the same scope preserves a successfully checked live catalog even if its
+storage write is pending or failed. Retiring a live catalog on a scope change retires its freshness
+marker too, so returning through browser storage rechecks the catalog. Adopting another cached
+catalog makes that scope retryable.
+Unforced same-scope fetches reuse proven live data instead of a potentially older stored copy;
+forced fetches and explicit revalidation still request live data.
+
+The edition cache keeps its 24-hour storage TTL. Other critical caches retain their own TTLs and
+purge-marker behavior; catalog revalidation does not clear browser storage or reset progress.
+
 ### Data layers and contracts
 
 Game data passes through four layers; each consumer should state which one it reads.
@@ -119,7 +137,7 @@ Game data passes through four layers; each consumer should state which one it re
 
 Tarkov.dev game data is not TarkovTracker's public API. The `/api/tarkov/*` routes proxy game data
 for the app; the public progress API on `api.tarkovtracker.org` is a separate contract defined by
-`workers/api-gateway/src/openapi.ts` and described in [API](../api.md).
+[TarkovTracker-API/src/openapi.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/openapi.ts) and described in [API](../api.md).
 
 ### Prestige, editions, fleet verification, and cache bundle scope
 

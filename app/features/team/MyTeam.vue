@@ -19,6 +19,9 @@
       </div>
       <div v-else-if="!localUserTeam" class="py-4 text-center">
         <p class="text-surface-300">{{ $t('page.team.card.myteam.no_team') }}</p>
+        <p class="text-surface-400 mt-3 text-sm" data-testid="team-expiry-policy">
+          {{ $t('page.team.expiry.policy') }}
+        </p>
         <UButton
           :disabled="loading.createTeam"
           :loading="loading.createTeam"
@@ -31,6 +34,7 @@
         </UButton>
       </div>
       <div v-else class="space-y-4">
+        <TeamExpiryWarning :team-id="localUserTeam" />
         <div>
           <label for="team-invite-url" class="text-surface-200 text-sm font-medium">
             {{ $t('page.team.invite.link_label') }}
@@ -84,6 +88,7 @@
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import TeamCard from '@/features/team/TeamCard.vue';
+  import TeamExpiryWarning from '@/features/team/TeamExpiryWarning.vue';
   import { useTeamInviteCopyFeedback } from '@/features/team/useTeamInviteCopyFeedback';
   import { useTeamInviteLink } from '@/features/team/useTeamInviteLink';
   import {

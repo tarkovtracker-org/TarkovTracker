@@ -15,7 +15,7 @@
 <script setup lang="ts">
   import { useTheme } from '@/composables/useTheme';
   import { progressBarFillStyle } from '@/features/dashboard/traderPercentageStyle';
-  import type { ProgressBarColor } from '@/features/dashboard/progressCard';
+  type ProgressBarColor = 'primary' | 'success' | 'gradient';
   const { isLightTheme } = useTheme();
   const props = withDefaults(
     defineProps<{
@@ -25,19 +25,14 @@
       ariaLabel?: string;
     }>(),
     {
-      color: 'neutral',
+      color: 'primary',
       size: 'md',
       ariaLabel: undefined,
     }
   );
   const fillColors: Record<ProgressBarColor, string> = {
     primary: 'bg-primary-500',
-    neutral: 'bg-surface-400',
-    info: 'bg-info-500',
     success: 'bg-success-500',
-    kappa: 'bg-kappa-500',
-    lightkeeper: 'bg-lightkeeper-500',
-    locked: 'bg-surface-600/40',
     gradient: '',
   };
   const sizeClass = computed(() => (props.size === 'sm' ? 'h-1' : 'h-2.5'));

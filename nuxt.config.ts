@@ -1,5 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
@@ -32,6 +33,11 @@ import { THEME_BOOT_SCRIPT } from './app/utils/theme';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
+const nuxtRequire = createRequire(createRequire(import.meta.url).resolve('nuxt/package.json'));
+const nitroPagesAdapter = resolve(
+  nuxtRequire.resolve('nitropack/package.json'),
+  '../dist/presets/cloudflare/runtime/cloudflare-pages'
+);
 const testsDir = resolve(__dirname, 'tests');
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 const appVersion = packageJson.version ?? 'dev';
@@ -366,6 +372,7 @@ export default defineNuxtConfig({
   },
   css: ['~/assets/css/tailwind.css'],
   alias: {
+    'nitropack/presets/cloudflare/runtime/cloudflare-pages': nitroPagesAdapter,
     '@': appDir,
     '#tests': testsDir,
     '~': appDir,
@@ -444,10 +451,22 @@ export default defineNuxtConfig({
         const wrapper = wrappers[page.path];
         if (wrapper) page.file = resolve(appDir, 'features/seo-pages', `${wrapper}.vue`);
       }
+      // Task views are routes of the same tracker module (app/utils/taskRouteView.ts).
+      for (const view of ['traders', 'maps', 'graph']) {
+        pages.push({
+          name: `tasks-${view}`,
+          path: `/tasks/${view}`,
+          file: resolve(appDir, 'features/seo-pages', 'tasks.vue'),
+        });
+      }
     },
     'nitro:init': (nitro) => {
       if (!String(nitro.options.preset || '').includes('cloudflare')) {
         return;
+      }
+      // Change only the resolved Pages entry; prerender/dev must keep their own adapters.
+      if (nitro.options.preset === 'cloudflare-pages') {
+        nitro.options.entry = resolve(appDir, 'server/pages-entry.ts');
       }
       nitro.hooks.hook('compiled', () => {
         writeFileSync(

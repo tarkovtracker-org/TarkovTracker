@@ -92,7 +92,6 @@
     "user_avatar_alt": "用户头像",
     "supporter_badge_aria": "管理您的支持者订阅（{tier}）",
     "help_community_aria": "帮助与社区",
-    "community_section": "社区",
     "keyboard_shortcuts": "键盘快捷键",
     "report_problem": "报告问题",
     "login_aria": "登入你的账户",
@@ -148,7 +147,6 @@
   "activity_log": {
     "unread_indicator": "你有未读的活动记录",
     "mark_read": "标记为已读",
-    "clear": "清除",
     "empty": "暂无活动记录。",
     "badge_api": "API 同步",
     "api_synced": "API 进度已同步",
@@ -158,11 +156,7 @@
       "uncompleted": "未完成的任务：{name}",
       "failed": "失败的任务：{name}",
       "reset_failed": "已重置的失败任务：{name}",
-      "available": "已解锁任务：{name}",
-      "undo_completed": "撤销完成的任务：{name}",
-      "undo_uncompleted": "撤销未完成的任务：{name}",
-      "undo_reset_failed": "撤销重置失败的任务：{name}",
-      "undo_failed": "撤销失败的任务：{name}"
+      "available": "已解锁任务：{name}"
     }
   },
   "promoted_stream": {
@@ -741,6 +735,14 @@
           "aria_label": "排序商人",
           "direction_aria_label": "切换排序方向"
         }
+      },
+      "support_banner": {
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "支持 TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
@@ -839,7 +841,6 @@
       "perk_badge": "支持者徽章",
       "perk_discord": "Discord 中的支持者身份（关联账户并加入我们的服务器）",
       "perk_tier_role": "Discord 中的 {tier} 档位身份",
-      "perk_early_access": "抢先体验新功能",
       "perk_priority_support": "优先支持",
       "perk_feature_voting": "功能投票优先权",
       "one_time_title": "一次性支持",
@@ -873,11 +874,6 @@
       "savings_note": "相比按月订阅可节省 {amount}",
       "kofi_deprecation_title": "Ko-fi（备用选项）",
       "kofi_deprecation_detail": "上方订阅和一次性支持现已通过 Stripe 支付，这意味着手续费更低，更多支持将直接到达我们。Ko-fi 仍作为一次性打赏的备用方式保留。",
-      "alt_payments_title": "即将推出更多支付方式",
-      "alt_payments_coming_soon": "我们正在添加更多支付选项，让您可以选择最适合的方式提供支持。",
-      "alt_payment_crypto": "加密货币",
-      "alt_payment_gift_cards": "礼品卡",
-      "alt_payments_more": "及更多",
       "checkout_error_title": "结账失败",
       "checkout_error_generic": "无法开始结账。请稍后重试。",
       "manage_subscription_cta": "管理订阅",
@@ -1919,6 +1915,9 @@
   },
   "settings": {
     "locale": "语言",
+    "locale_loading": "Loading language and game data…",
+    "locale_failed": "Language could not be loaded. Please try again.",
+    "locale_cooldown": "Wait {seconds}s before loading another language. Cached languages are available now.",
     "page_description": "管理您的帐户、游戏进度和应用程序首选项。",
     "tabs": {
       "progression": "进度",
@@ -2168,7 +2167,6 @@
     },
     "prestige": {
       "persistent_mode_unsupported_title": "当前无法声望",
-      "persistent_mode_unsupported": "Prestige在持久性PvE模式下不可用。",
       "seasonal_mode_unsupported": "转生在赛季PvP中不可用。",
       "current_level": "当前声望等级",
       "set_current": "设置当前声望",
@@ -2301,6 +2299,12 @@
       "find_in_launcher_hint": "找不到吗？打开 BSG Launcher -> Game Settings -> Logs 并复制该路径。",
       "avoid_session_folder_label": "不要选择如下会话文件夹：",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "账户",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "包含日志版本",
       "version_filter_hint": "默认选中最新主版本。可调整以包含更早的赛季重置版本。",
       "version_filter_tooltip": "日志按会话版本分组。默认选择最新主版本，以避免混入旧赛季重置数据。",

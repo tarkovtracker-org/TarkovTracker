@@ -90,7 +90,7 @@ Ranking causes and improvements must be measured separately from these rendering
 │   │   ├── kappa/           # Kappa completion tracker
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
-│   │   ├── omnibar/         # Global search/command omnibar
+│   │   ├── omnibar/         # Inline app-bar search and jump results
 │   │   ├── profile/         # Profile and shared progress views
 │   │   ├── resources/       # Resource guides
 │   │   ├── settings/        # User settings
@@ -502,8 +502,8 @@ pnpm run test
 # Watch mode
 pnpm run test:watch
 
-# API Gateway tests
-pnpm run test:api-gateway
+# Versioned API parity (fetches/builds the pinned external source)
+pnpm run verify:api-parity
 ```
 
 **Test Organization:**
@@ -615,7 +615,7 @@ or `on` before starting the dev server or building the app to enable timing logs
 `app/utils/perf.ts` through the shared client logger. Leave it unset or set it to `false` for normal
 builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
-**Server-side (Nuxt private runtime config):**
+**Server-side (Nuxt private runtime config and direct process environment):**
 
 | Variable                                        | Description                                                     | Required   |
 | ----------------------------------------------- | --------------------------------------------------------------- | ---------- |
@@ -626,6 +626,7 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors                         | No         |
 | `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                              | No         |
 | `NUXT_GITHUB_TOKEN`                             | GitHub API token                                                | No         |
+| `OVERLAY_TOKEN`                                 | Read-only Contents token scoped to `tarkov-data-overlay`        | Yes        |
 | `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header                          | No         |
 | `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                            | No         |
 | `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                                        | No         |
@@ -653,6 +654,11 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds                 | No         |
 | `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports                | No²        |
 
+`OVERLAY_TOKEN` is required for private overlay fetches in production, previews, precompute, and
+local/operator checks such as `pnpm run verify:overlay`. Server and precompute consumers read it
+directly from the process environment; see
+[overlay authentication](systems/overlay-and-precompute.md#invariants).
+
 **Build-time / platform:**
 
 | Variable             | Description                            |
@@ -662,6 +668,23 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `GA_MEASUREMENT_ID`  | Google Analytics measurement ID        |
 | `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
 | `VITE_PERF_DEBUG`    | Client performance timing logs         |
+
+**Analytics privacy:** When analytics integrations are enabled and the Clarity project ID
+is valid, Microsoft Clarity skips documents on `/oauth`, `/oauth/*`, and `/auth/callback`
+(including encoded or case-varied paths). It also skips URLs with credential query or
+hash parameters, including Discord linking callbacks on `/settings`, and documents
+whose same-origin referrer contains one of these sensitive URLs. Malformed URLs also
+skip recording and do not install the router guard, allowing Nuxt's forced initial
+route replacement to finish without reloading the document. On recorded documents,
+the router guard starts a native full page navigation and cancels the
+SPA navigation. If only the fragment changes on the current path and query, it appends
+the existing `_tt_retry` cache-busting parameter to force a new document. This keeps
+the sensitive destination out of the current recorder's
+`pushState`/`replaceState` hooks. The destination still appears in normal browser
+navigation history; its new document skips Clarity. Consent denial alone does not
+prevent URL/referrer collection. Ordinary routes retain SPA navigation and the existing
+analytics consent flow. Skipped documents remain unrecorded until a full page load
+with a benign URL and referrer.
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
@@ -675,7 +698,7 @@ Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE
 Edge-only tier roles for supporter sync (role sync skips the tier role when one is unset). See
 `supabase/functions/.env.example`.
 
-**Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
+**Cloudflare Workers** (TarkovTracker-API, set via `wrangler secret put` in that checkout):
 
 | Variable                    | Description                                                    | Required   |
 | --------------------------- | -------------------------------------------------------------- | ---------- |

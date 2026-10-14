@@ -1,5 +1,4 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
-import { useXpCalculation } from '@/composables/useXpCalculation';
 import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -24,7 +23,8 @@ export type ImportErrorCode =
   | 'verification_failed'
   | 'fetch_failed'
   | 'tarkov_uid_conflict'
-  | 'save_failed';
+  | 'save_failed'
+  | 'level_thresholds_unavailable';
 export interface UseTarkovDevImportReturn {
   isImporting: Ref<boolean>;
   importState: Ref<ImportState>;
@@ -102,7 +102,6 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   const metadataStore = useMetadataStore();
   const runtimeConfig = useRuntimeConfig();
   const { setTotalSkillLevel } = useSkillCalculation();
-  const { setTotalXP } = useXpCalculation();
   const importState = ref<ImportState>('idle');
   const isImporting = ref(false);
   const previewData = ref<TarkovDevImportResult | null>(null);
@@ -269,7 +268,6 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     tarkovStore.setPMCFaction(data.pmcFaction);
     tarkovStore.setDisplayName(data.displayName);
     tarkovStore.setPrestigeLevel(data.prestigeLevel);
-    setTotalXP(data.totalXP);
     tarkovStore.setLevel(deriveLevel(data.totalXP));
     for (const [skillId, level] of Object.entries(data.skills)) {
       setTotalSkillLevel(skillId, level);
@@ -303,6 +301,30 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     recordUrlImportCooldown(data.tarkovUid);
     importState.value = 'success';
   }
+  async function fetchLevelThresholds(): Promise<void> {
+    try {
+      await metadataStore.fetchBootstrapData();
+    } catch (error) {
+      logger.error('[TarkovDevImport] Failed to load player level thresholds:', error);
+    }
+  }
+  async function runPreparedImport(
+    data: TarkovDevImportResult,
+    isCurrent: () => boolean,
+    editionOverride?: number | null
+  ): Promise<void> {
+    if (metadataStore.playerLevels.length === 0) await fetchLevelThresholds();
+    if (!isCurrent()) return;
+    if (metadataStore.playerLevels.length === 0) {
+      setCodedError(
+        'Player level thresholds are unavailable',
+        'level_thresholds_unavailable',
+        null
+      );
+      return;
+    }
+    await runImport(data, isCurrent, editionOverride);
+  }
   async function restoreGameMode(mode: GameMode): Promise<void> {
     try {
       await tarkovStore.switchGameMode(mode);
@@ -318,10 +340,12 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     editionOverride?: number | null
   ): Promise<void> {
     const originalMode = tarkovStore.getCurrentGameMode();
-    if (targetMode === originalMode) return runImport(data, isCurrent, editionOverride);
+    const isTargetCurrent = () => isCurrent() && tarkovStore.getCurrentGameMode() === targetMode;
+    if (targetMode === originalMode)
+      return runPreparedImport(data, isTargetCurrent, editionOverride);
     try {
       await tarkovStore.switchGameMode(targetMode);
-      await runImport(data, isCurrent, editionOverride);
+      await runPreparedImport(data, isTargetCurrent, editionOverride);
     } finally {
       if (ownsSession()) await restoreGameMode(originalMode);
     }

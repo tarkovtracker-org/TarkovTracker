@@ -1,5 +1,10 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { GAME_MODES } from '@/utils/constants';
+import {
+  isEffectiveStoryObjectiveComplete,
+  storyCatalogForMode,
+} from '@/utils/storylineCompletion';
 import {
   normalizeStoryObjectives,
   orderedStoryObjectives,
@@ -11,6 +16,7 @@ import type {
   StoryChapter,
   StoryChapterEnding,
   StoryObjective,
+  StoryObjectiveUnlock,
   StoryRewards,
 } from '@/types/tarkov';
 export interface StorylineLinkEntry {
@@ -57,6 +63,7 @@ export interface StorylineObjectiveUnlockView {
   estimated: boolean;
   id: string;
   label: string;
+  note?: string;
   type: 'map' | 'reward' | 'trader';
 }
 export interface StorylineRouteChoiceGroup {
@@ -64,7 +71,7 @@ export interface StorylineRouteChoiceGroup {
   id: string;
   objectives: StorylineObjectiveProgress[];
 }
-export interface StorylineObjectiveProgress extends StoryObjective {
+export interface StorylineObjectiveProgress extends Omit<StoryObjective, 'unlocks'> {
   complete: boolean;
   hasEstimatedUnlocks: boolean;
   unlocks: StorylineObjectiveUnlockView[];
@@ -169,19 +176,6 @@ const normalizeChapterRequirements = (
     })
     .filter((requirement): requirement is StorylineRequirementView => Boolean(requirement));
 };
-const normalizeSearchText = (value: string): string => {
-  return value
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-};
-const matchesUnlockText = (objectiveText: string, unlockLabel: string): boolean => {
-  const normalizedUnlock = normalizeSearchText(unlockLabel);
-  if (!normalizedUnlock) {
-    return false;
-  }
-  return objectiveText.includes(normalizedUnlock);
-};
 const parseChapterRewards = (
   chapter: StorylineChapterView
 ): Array<Omit<StorylineObjectiveUnlockView, 'estimated'>> => {
@@ -200,15 +194,42 @@ const parseChapterRewards = (
     type: 'reward',
   }));
 };
-const assignChapterUnlocks = (
+const unlockKey = (unlock: Pick<StorylineObjectiveUnlockView, 'type' | 'id'>): string =>
+  `${unlock.type}:${unlock.id}`;
+const chapterUnlockId = (chapter: StorylineChapterView, unlock: StoryObjectiveUnlock) => {
+  const references: Partial<Record<StoryObjectiveUnlock['type'], StorylineLinkEntry[]>> = {
+    map: chapter.mapUnlocks,
+    trader: chapter.traderUnlocks,
+  };
+  return references[unlock.type]?.find(
+    (reference) =>
+      typeof reference.name === 'string' && reference.name.trim() === unlock.name.trim()
+  )?.id;
+};
+const objectiveUnlockId = (
   chapter: StorylineChapterView,
-  matchObjectives: StorylineObjectiveProgress[],
-  distributionObjectives: StorylineObjectiveProgress[]
-): {
-  chapterUnlocks: StorylineObjectiveUnlockView[];
-  objectiveUnlockMap: Map<string, StorylineObjectiveUnlockView[]>;
-} => {
-  const chapterUnlockItems: Array<Omit<StorylineObjectiveUnlockView, 'estimated'>> = [
+  objectiveId: string,
+  unlock: StoryObjectiveUnlock,
+  index: number
+): string => unlock.id ?? chapterUnlockId(chapter, unlock) ?? `${objectiveId}-unlock-${index + 1}`;
+const objectiveUnlockView = (
+  chapter: StorylineChapterView,
+  objectiveId: string,
+  unlock: StoryObjectiveUnlock,
+  index: number
+): StorylineObjectiveUnlockView => ({
+  estimated: false,
+  id: objectiveUnlockId(chapter, objectiveId, unlock, index),
+  label: unlock.name,
+  note: unlock.note,
+  type: unlock.type === 'map' || unlock.type === 'trader' ? unlock.type : 'reward',
+});
+const remainingChapterUnlocks = (
+  chapter: StorylineChapterView,
+  objectives: StorylineObjectiveProgress[]
+): StorylineObjectiveUnlockView[] => {
+  const placedKeys = new Set(objectives.flatMap((objective) => objective.unlocks.map(unlockKey)));
+  const chapterUnlocks: Array<Omit<StorylineObjectiveUnlockView, 'estimated'>> = [
     ...chapter.mapUnlocks.map((map) => ({ id: map.id, label: map.name, type: 'map' as const })),
     ...chapter.traderUnlocks.map((trader) => ({
       id: trader.id,
@@ -217,69 +238,9 @@ const assignChapterUnlocks = (
     })),
     ...parseChapterRewards(chapter),
   ];
-  const objectiveUnlockMap = new Map<string, StorylineObjectiveUnlockView[]>(
-    matchObjectives.map((objective) => [objective.id, []])
-  );
-  if (!chapterUnlockItems.length) {
-    return {
-      chapterUnlocks: [],
-      objectiveUnlockMap,
-    };
-  }
-  if (!matchObjectives.length) {
-    return {
-      chapterUnlocks: chapterUnlockItems.map((unlock) => ({ ...unlock, estimated: false })),
-      objectiveUnlockMap,
-    };
-  }
-  const objectiveTextById = new Map(
-    matchObjectives.map((objective) => [
-      objective.id,
-      normalizeSearchText(`${objective.description} ${objective.notes ?? ''}`),
-    ])
-  );
-  const unassignedUnlockItems: Array<Omit<StorylineObjectiveUnlockView, 'estimated'>> = [];
-  for (const unlockItem of chapterUnlockItems) {
-    const matchedObjective = matchObjectives.find((objective) =>
-      matchesUnlockText(objectiveTextById.get(objective.id) ?? '', unlockItem.label)
-    );
-    if (!matchedObjective) {
-      unassignedUnlockItems.push(unlockItem);
-      continue;
-    }
-    objectiveUnlockMap.set(matchedObjective.id, [
-      ...(objectiveUnlockMap.get(matchedObjective.id) ?? []),
-      {
-        ...unlockItem,
-        estimated: false,
-      },
-    ]);
-  }
-  if (unassignedUnlockItems.length) {
-    const fallbackObjectives =
-      distributionObjectives.length > 0 ? distributionObjectives : matchObjectives;
-    unassignedUnlockItems.forEach((unlockItem, index) => {
-      const targetIndex = Math.min(
-        fallbackObjectives.length - 1,
-        Math.floor((index * fallbackObjectives.length) / unassignedUnlockItems.length)
-      );
-      const objectiveId = fallbackObjectives[targetIndex]?.id;
-      if (!objectiveId) {
-        return;
-      }
-      objectiveUnlockMap.set(objectiveId, [
-        ...(objectiveUnlockMap.get(objectiveId) ?? []),
-        {
-          ...unlockItem,
-          estimated: true,
-        },
-      ]);
-    });
-  }
-  return {
-    chapterUnlocks: [],
-    objectiveUnlockMap,
-  };
+  return chapterUnlocks
+    .filter((unlock) => !placedKeys.has(unlockKey(unlock)))
+    .map((unlock) => ({ ...unlock, estimated: false }));
 };
 const buildRouteChoiceGroups = (
   objectives: StorylineObjectiveProgress[]
@@ -565,7 +526,14 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
   const isObjectiveComplete = options.isObjectiveComplete ?? tarkovStore.isStoryObjectiveComplete;
   const completedObjectiveIds = options.completedObjectiveIds ?? (() => []);
   const chapters = computed<StorylineChapterView[]>(() => {
-    return (options.chapters?.() ?? metadataStore.storyChapters ?? []).map((chapter) => {
+    const catalog =
+      options.chapters?.() ??
+      storyCatalogForMode(
+        metadataStore.storyChapters ?? [],
+        metadataStore.storyChaptersGameMode,
+        tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP
+      );
+    return catalog.map((chapter) => {
       const objectiveMap = normalizeStoryObjectives(chapter.objectives);
       return {
         id: chapter.id,
@@ -597,7 +565,10 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
     return chapters.value.map((chapter) => {
       const objectiveProgress = chapter.objectives.map((objective) => ({
         ...objective,
-        complete: isObjectiveComplete(chapter.id, objective.id),
+        complete: isEffectiveStoryObjectiveComplete(
+          objective,
+          isObjectiveComplete(chapter.id, objective.id)
+        ),
       }));
       const objectiveCompleteMap = new Map(
         objectiveProgress.map((objective) => [objective.id, objective.complete])
@@ -633,28 +604,16 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         return {
           ...objective,
           hasEstimatedUnlocks: false,
-          unlocks: [],
+          unlocks: (objective.unlocks ?? []).map((unlock, index) =>
+            objectiveUnlockView(chapter, objective.id, unlock, index)
+          ),
           routeAlternatives,
           routeBlockingAlternatives,
           routeState,
         };
       });
-      const unlockDistributionObjectives = baseObjectives.filter(
-        (objective) => objective.type === 'main'
-      );
-      const { chapterUnlocks, objectiveUnlockMap } = assignChapterUnlocks(
-        chapter,
-        baseObjectives,
-        unlockDistributionObjectives.length > 0 ? unlockDistributionObjectives : baseObjectives
-      );
-      const objectives: StorylineObjectiveProgress[] = baseObjectives.map((objective) => {
-        const unlocks = objectiveUnlockMap.get(objective.id) ?? [];
-        return {
-          ...objective,
-          hasEstimatedUnlocks: unlocks.some((unlock) => unlock.estimated),
-          unlocks,
-        };
-      });
+      const objectives = baseObjectives;
+      const chapterUnlocks = remainingChapterUnlocks(chapter, objectives);
       const mainObjectives = objectives.filter((objective) => objective.type === 'main');
       const optionalObjectives = objectives.filter((objective) => objective.type === 'optional');
       const { linearObjectives: mainLinearObjectives, routeChoiceGroups: mainRouteChoices } =

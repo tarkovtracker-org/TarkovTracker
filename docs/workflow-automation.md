@@ -368,10 +368,15 @@ GitHub release.
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** A weekly schedule (Tuesdays 15:00 UTC) and manual `workflow_dispatch` on `main`
-(Actions → Release → Run workflow) when a notable change should ship as a release sooner. CI
-completion no longer starts a release. Other refs and events cannot publish, and there is no manual
-bypass of the CI gate. semantic-release still decides whether the accumulated conventional commits
+**Triggers:** A daily eligibility check at 15:00 UTC and manual `workflow_dispatch` on `main`
+(Actions → Release → Run workflow) when a notable change should ship as a release sooner.
+Scheduled publication requires seven full days since the newest stable GitHub release, including
+manual releases. Drafts and prereleases do not reset this interval. The gate checks publication
+history before setup and again before publishing, failing closed if history cannot be read. Checks
+within the interval skip setup and building; overdue attempts retry daily so an unfinished CI run,
+a changed main, or a failed release does not lose the next week. A manual dispatch may release
+sooner and resets the scheduled interval. CI completion no longer starts a release. Other refs and
+events cannot publish, and there is no manual bypass of the CI gate. semantic-release still decides whether the accumulated conventional commits
 warrant a version; weeks with only internal or non-releasing commits publish nothing.
 
 The release candidate is the run's trigger commit (`github.sha`, the head of `main` when the run
@@ -381,8 +386,9 @@ attempt's start time so a rerun of an older run record counts as newest, and req
 completed successfully. A later failed or in-progress attempt therefore blocks publication instead
 of an older success being reused. It then re-reads `refs/heads/main`, both before dependency setup and again
 immediately before publishing. If CI for the head is still running, or main advanced after the run
-started, the run skips; dispatch Release again once main CI passes. Release never substitutes a
-newer, unvalidated checkout.
+started, the run skips; the next daily check automatically retries an overdue release with its own
+fresh trigger commit once main CI passes. Maintainers can also dispatch Release sooner. Release
+never substitutes a newer, unvalidated checkout.
 The gate and its recovery helper initially load from the trusted default-branch SHA and are copied
 to `RUNNER_TEMP` so checks use the same source even after checkout replacement. Only after validation does a
 second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
@@ -917,7 +923,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 
 **Features:**
 
-- Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
+- Weekly dependency update batches for the frontend pnpm workspace (API updates are owned by TarkovTracker-API)
 - Monthly grouped GitHub Actions updates for manual review
 - Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
   behind a minor/patch-only rule
@@ -1013,7 +1019,8 @@ duplicated here:
 ```bash
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
 pnpm run build
-pnpm --filter api-gateway exec wrangler deploy
+# Public API deploys are separately authorized and run only in the API checkout:
+# pnpm run deploy (TarkovTracker-API repository)
 ```
 
 > **Note:** All local deployment commands assume you are in the project root directory.
@@ -1111,7 +1118,7 @@ pnpm run lint:fix
 
 - Verify Cloudflare Worker Git deployment status or deploy with `wrangler`
 - Check worker-specific secrets and bindings
-- Validate `wrangler.toml` and test locally with `pnpm --filter api-gateway run dev`
+- Validate the API repository's `wrangler.toml` and run `pnpm run dev` in the TarkovTracker-API checkout; this repository's Wrangler config belongs to Pages.
 
 ## Best Practices
 

@@ -9,7 +9,7 @@ mode = "smart"
 
 # Atomic, globally-consistent rate limiter shared with the api-gateway Worker.
 # The ApiGatewayRateLimiter Durable Object class is owned and deployed by
-# workers/api-gateway; Pages binds to it by script_name (Pages cannot define a
+# TarkovTracker-API; Pages binds to api-gateway by script_name (Pages cannot define a
 # DO class itself). When this binding is absent the rate limiter degrades to a
 # best-effort Cache API + in-memory path. durable_objects is a non-inheritable
 # key; it is deliberately not repeated under [env.preview] so anonymous previews
@@ -25,8 +25,8 @@ script_name = "api-gateway"
 # by the Nitro request handlers via edgeCache's `precomputed` option. When this
 # binding is absent the handlers fall back to the per-colo Cache API path, so a
 # misconfigured deploy degrades instead of breaking.
-# kv_namespaces is non-inheritable; it is deliberately not repeated under
-# [env.preview] so previews cannot read or depend on the production namespace.
+# kv_namespaces is non-inheritable; [env.preview] binds an isolated namespace
+# so previews cannot read or depend on the production namespace.
 # The same ID must be set as the TARKOV_DATA_KV_NAMESPACE_ID repository
 # variable so the Actions precompute writes where Pages reads.
 [[kv_namespaces]]
@@ -70,11 +70,20 @@ STRIPE_PRICE_CHAD_YEARLY = "price_1Ta2npLaRBke56G2I0UqI1HD"
 # sets the controlled preview branch alias explicitly, and the application derives per-deployment
 # host trust from it. Supabase, analytics, Turnstile, Stripe prices, and log forwarding are
 # deliberately empty so previews never carry production identifiers; the application's offline
-# Supabase fallback activates on `pages.dev` hostnames. Production KV and Durable Object bindings
-# are intentionally absent: the precomputed-payload readers and the rate limiter degrade to their
-# Cache API paths, so previews still serve public game data through /api/tarkov/*. Preview
-# environment secrets (service-role, Stripe, Turnstile, log sinks) are managed in the Pages
+# Supabase fallback activates on `pages.dev` hostnames. Preview KV contains only public game-data
+# snapshots and is separate from production; it requires an explicit preview seed/refresh.
+# The production Durable Object binding is absent, so the rate limiter uses its Cache API path.
+# This binding applies to all preview branches. Preview environment secrets
+# (service-role, Stripe, Turnstile, log sinks) are managed in the Pages
 # dashboard and must remain unset so previews stay isolated.
+# KV bindings permit get/put/delete: approved preview runtime code can replace or
+# delete another preview's catalogs. This shared store is deliberately expendable.
+# Seed only merged public game catalogs, never raw overlays, credentials, or user
+# progress. Maintainers revalidate the seeded release before import verification.
+[[env.preview.kv_namespaces]]
+binding = "TARKOV_DATA"
+id = "8b1f5caca19c4d379b601e4bd0f815e6"
+
 [env.preview.vars]
 NODE_ENV = "production"
 APP_URL = ""

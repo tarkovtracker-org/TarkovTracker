@@ -52,19 +52,18 @@
         />
       </div>
       <div class="bg-black">
-        <iframe
-          v-if="playerUrl"
-          :src="playerUrl"
+        <TwitchStreamPlayer
+          :key="channel"
+          :channel="channel"
           :title="t('promoted_stream.player_title', { streamer: displayName })"
           class="h-[360px] w-full min-w-[400px] border-0"
-          allow="autoplay; encrypted-media; fullscreen"
-          height="360"
-          width="640"
-        ></iframe>
+          @ready="handlePlayerReady"
+          @offline="handlePlayerOffline"
+        />
       </div>
     </aside>
     <UButton
-      v-else-if="isLive && dismissed"
+      v-else-if="enabled && dismissed"
       icon="i-mdi-twitch"
       color="primary"
       variant="solid"
@@ -76,11 +75,14 @@
   </ClientOnly>
 </template>
 <script setup lang="ts">
+  import TwitchStreamPlayer from '@/components/TwitchStreamPlayer.vue';
   import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { logger } from '@/utils/logger';
   const DISMISS_KEY = 'tt-twitch-dismissed';
   const CONFIG_REFRESH_INTERVAL_MS = 300_000;
   const POLL_INTERVAL_MS = 60_000;
+  const LIVE_REFRESH_INTERVAL_MS = 300_000;
+  const MAX_RETRY_INTERVAL_MS = 1_800_000;
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const fallback = runtimeConfig.public.promotedTwitch as {
@@ -94,10 +96,8 @@
   const displayName = ref(fallback.displayName?.trim() || channel.value);
   const enabled = ref(fallback.enabled === true);
   const isVisible = ref(false);
-  const isLive = ref(false);
   const dismissed = ref(false);
   const isExpanded = ref(true);
-  const playerUrl = ref('');
   let configTimer: ReturnType<typeof setInterval> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let liveInFlight: {
@@ -110,24 +110,18 @@
   let hasResolvedConfig = false;
   let isMounted = false;
   let liveGeneration = 0;
+  let nextConfigCheckAt = 0;
+  let nextLiveCheckAt = 0;
+  let liveRetryDelay = LIVE_REFRESH_INTERVAL_MS;
+  let playerManaged = false;
   const { config: sharedConfig } = usePromotedTwitch();
   const canRunVisibleWork = (): boolean => isMounted && !document.hidden;
-  const buildPlayerUrl = (): string => {
-    const params = new URLSearchParams({
-      channel: channel.value,
-      parent: window.location.hostname,
-      autoplay: 'true',
-      muted: 'true',
-    });
-    return `https://player.twitch.tv/?${params.toString()}`;
-  };
   const toggleExpanded = (): void => {
     isExpanded.value = !isExpanded.value;
   };
   const hidePlayer = (): void => {
-    isLive.value = false;
+    playerManaged = false;
     isVisible.value = false;
-    playerUrl.value = '';
   };
   const clearDismissal = (): void => {
     dismissed.value = false;
@@ -139,6 +133,8 @@
   };
   const dismiss = (): void => {
     dismissed.value = true;
+    playerManaged = false;
+    stopPolling();
     isVisible.value = false;
     try {
       sessionStorage.setItem(DISMISS_KEY, '1');
@@ -146,16 +142,29 @@
   };
   const undismiss = (): void => {
     clearDismissal();
-    if (isLive.value) {
-      playerUrl.value = buildPlayerUrl();
-      isVisible.value = true;
-    }
+    nextLiveCheckAt = 0;
+    void checkLive();
+    startPolling();
+  };
+  const handlePlayerReady = (): void => {
+    if (!isVisible.value) return;
+    // The SDK now owns status; invalidate any poll dispatched before READY.
+    liveGeneration += 1;
+    playerManaged = true;
+    stopPolling();
+  };
+  const handlePlayerOffline = (): void => {
+    hidePlayer();
+    nextLiveCheckAt = Date.now() + LIVE_REFRESH_INTERVAL_MS;
+    startPolling();
   };
   const adoptChannel = (next: string): void => {
     liveGeneration += 1;
+    nextLiveCheckAt = 0;
     hidePlayer();
     if (hasResolvedConfig) clearDismissal();
     channel.value = next;
+    startPolling();
   };
   const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
   const applyConfigChannel = (value: string): boolean => {
@@ -185,9 +194,14 @@
     }
   };
   const refreshConfig = (): Promise<void> => {
+    if (configInFlight) return configInFlight;
+    if (Date.now() < nextConfigCheckAt) return Promise.resolve();
+    nextConfigCheckAt = Date.now() + CONFIG_REFRESH_INTERVAL_MS;
     configInFlight ??= (async () => {
       try {
-        applyLocalConfig(await $fetch<TwitchConfigResponse>('/api/twitch/config'));
+        applyLocalConfig(
+          await $fetch<TwitchConfigResponse>('/api/twitch/config', { retry: 0, timeout: 10_000 })
+        );
       } catch (error) {
         logger.warn('[PromotedTwitchEmbed] Failed to refresh promoted stream config', error);
       }
@@ -198,11 +212,11 @@
   };
   const updatePlayerVisibility = (live: boolean): void => {
     if (!live) {
+      playerManaged = false;
       isVisible.value = false;
       return;
     }
     if (!isVisible.value) {
-      playerUrl.value = buildPlayerUrl();
       isVisible.value = true;
     }
   };
@@ -214,16 +228,17 @@
     live: boolean
   ): void => {
     if (!isCurrentLiveRequest(requestedChannel, requestedGeneration)) return;
-    isLive.value = live;
     if (dismissed.value) return;
     updatePlayerVisibility(live);
   };
   const discardLiveResult = (requestedChannel: string, requestedGeneration: number): void => {
     if (requestedChannel !== channel.value || requestedGeneration !== liveGeneration) return;
-    isLive.value = false;
     isVisible.value = false;
   };
+  const shouldCheckLive = (): boolean =>
+    enabled.value && !dismissed.value && canRunVisibleWork() && !playerManaged;
   const checkLive = (): Promise<void> => {
+    if (!shouldCheckLive()) return Promise.resolve();
     const requestedChannel = channel.value;
     const requestedGeneration = liveGeneration;
     if (
@@ -232,13 +247,24 @@
     ) {
       return liveInFlight.promise;
     }
+    if (Date.now() < nextLiveCheckAt) return Promise.resolve();
+    nextLiveCheckAt = Date.now() + LIVE_REFRESH_INTERVAL_MS;
     const request = (async () => {
       try {
         const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
           query: { channel: requestedChannel },
+          retry: 0,
+          timeout: 10_000,
         });
+        if (isCurrentLiveRequest(requestedChannel, requestedGeneration)) {
+          liveRetryDelay = LIVE_REFRESH_INTERVAL_MS;
+        }
         applyLiveResult(requestedChannel, requestedGeneration, data.isLive);
       } catch (error) {
+        if (isCurrentLiveRequest(requestedChannel, requestedGeneration)) {
+          liveRetryDelay = Math.min(liveRetryDelay * 2, MAX_RETRY_INTERVAL_MS);
+          nextLiveCheckAt = Date.now() + liveRetryDelay;
+        }
         logger.warn('[PromotedTwitchEmbed] Failed to check promoted stream status', {
           action: 'check_promoted_twitch_live',
           channel: requestedChannel,
@@ -285,13 +311,14 @@
   };
   const startPolling = (): void => {
     stopPolling();
-    if (!enabled.value || !canRunVisibleWork()) return;
+    if (!shouldCheckLive()) return;
     pollTimer = setInterval(() => {
       void checkLive();
     }, POLL_INTERVAL_MS);
   };
   watch(enabled, (next) => {
     liveGeneration += 1;
+    nextLiveCheckAt = 0;
     if (!next) {
       stopPolling();
       hidePlayer();

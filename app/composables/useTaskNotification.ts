@@ -43,6 +43,14 @@ export function useTaskNotification(): TaskNotificationReturn {
     }
     taskStatusUpdated.value = false;
   };
+  watch(
+    () => actionHistoryStore.undoStack,
+    () => {
+      showUndoButton.value = false;
+      closeNotification();
+    },
+    { flush: 'sync' }
+  );
   const entryTitleKeys: Record<TaskActionPayload['action'], string> = {
     complete: 'activity_log.entry.completed',
     uncomplete: 'activity_log.entry.uncompleted',

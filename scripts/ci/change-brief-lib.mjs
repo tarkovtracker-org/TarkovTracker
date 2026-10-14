@@ -4,8 +4,6 @@ import { classifyPaths } from './validation-plan.mjs';
 const codePattern = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testPattern =
   /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
-const gatewayTestPattern =
-  /^workers\/api-gateway\/(?:src\/(?:.*\/)?__tests__\/.*|scripts\/[^/]+)\.test\.ts$/;
 // Literal references outside import edges, including executable config and file-reading tests.
 const pathReferenceSpecs = [
   '.github/',
@@ -34,17 +32,14 @@ const pathReferenceSpecs = [
 ];
 // Markdown that can own behavior. `.cubic/` and the changelog are not sources (root AGENTS.md).
 const docSpecs = ['*.md', ':!.cubic/', ':!CHANGELOG.md', ':!app/locales/'];
-const codeSearchSpecs = ['app', 'workers/api-gateway', 'tests', 'scripts'];
+const codeSearchSpecs = ['app', 'workers/contract-tests', 'tests', 'scripts'];
 const maxListed = 12;
 const maxBroaderTests = 25;
 const maxReferenceSeeds = 60;
 const alwaysOutsideGraph =
   'Never in any graph: runtime string lookups (i18n keys, Supabase RPC/table names, KV keys, upstream field names).';
 export const isCodePath = (path) => codePattern.test(path);
-export const isTestPath = (path) =>
-  path.startsWith('workers/api-gateway/')
-    ? gatewayTestPattern.test(path)
-    : isCodePath(path) && testPattern.test(path);
+export const isTestPath = (path) => isCodePath(path) && testPattern.test(path);
 const isSourcePath = (path) => !isTestPath(path);
 const stripExtension = (path) => path.replace(/\.[^./]+$/, '');
 const stem = (path) => stripExtension(path.split('/').pop());
@@ -121,10 +116,7 @@ export function scopedInstructions(paths, instructionFiles) {
     .map(({ instruction }) => instruction);
   return unique(['AGENTS.md', ...scoped, ...semantic]);
 }
-const scopedRunners = [
-  ['workers/contract-tests/', 'parity'],
-  ['workers/api-gateway/', 'gateway'],
-];
+const scopedRunners = [['workers/contract-tests/', 'parity']];
 const runnerFor = (path) => {
   const scoped = scopedRunners.find(([prefix]) => path.startsWith(prefix));
   if (scoped) return scoped[1];
@@ -133,7 +125,6 @@ const runnerFor = (path) => {
     ? 'node'
     : 'vitest';
 };
-const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
 const DENO_TEST_FLAGS = ['--config', 'supabase/functions/deno.json', '--frozen'];
 // Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
 const testOperands = (files) => files.map((file) => `./${file}`);
@@ -145,17 +136,6 @@ const runnerCommands = {
   vitest: (files) => ({
     executable: 'pnpm',
     args: ['exec', 'vitest', 'run', ...testOperands(files)],
-  }),
-  gateway: (files) => ({
-    executable: 'pnpm',
-    args: [
-      'exec',
-      'vitest',
-      'run',
-      '--config',
-      'workers/api-gateway/vitest.config.ts',
-      ...testOperands(gatewayRelative(files)),
-    ],
   }),
   node: (files) => ({ executable: 'node', args: ['--test', '--', ...testOperands(files)] }),
   deno: (files) => ({
@@ -184,9 +164,9 @@ const validationRules = [
 ];
 const scopedRules = [
   {
-    applies: (paths) => touchesPrefix(paths, 'workers/api-gateway/'),
+    applies: (paths) => touchesPrefix(paths, 'workers/contract-tests/'),
     check:
-      'workers/api-gateway/AGENTS.md checks: pnpm --filter api-gateway run types:check; pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run; focused tests: pnpm run test:api-gateway',
+      'workers/contract-tests/AGENTS.md checks: pnpm run check:progress-contracts; pnpm run verify:api-parity',
   },
   {
     applies: (paths) => paths.some((path) => path.endsWith('.sql')),

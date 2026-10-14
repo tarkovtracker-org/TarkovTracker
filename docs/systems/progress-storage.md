@@ -120,6 +120,28 @@ Teams, save status and recovery, and progress imports build on this storage; see
 [teams](./teams.md), [progress sync and recovery](./progress-sync.md), and
 [imports](./imports.md).
 
+### Game profiles
+
+An account's existing progress rows are its default profile; nothing about them changes. A second
+EFT account is a non-default profile stored in its own tables, so a reader that does not know about
+profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its data.
+
+- `user_game_profiles`: one row per profile (`is_default`, `label`, `eft_account_id`,
+  `game_edition`). The default row is created lazily, when the account binds an EFT account id or
+  adds a profile. `eft_account_id` is unique per account, not globally.
+- `user_profile_mode_progress`: per-mode progress of a non-default profile, same shape and checks as
+  `user_game_mode_progress`, keyed `(profile_id, game_mode, season_number)`. Both tables are
+  deny-all; clients use `list_game_profiles`, `add_game_profile`, `update_game_profile`,
+  `delete_game_profile`, `get_game_profile_progress`, and `sync_game_profile_progress`.
+- Cap: 2 profiles per account (default plus one), enforced in `add_game_profile`. Errors: `PT400`
+  invalid label or EFT account id, `PT403` locked, `PT404` unknown profile, `PT409` duplicate or default-profile misuse, `PT422` cap reached.
+- Access: `private.game_profiles_unlocked` is true for an active, non-disqualified supporter (same
+  rule as `supporterStatus.ts`, using effective prepaid entitlements when that rollout is present) or when `app_settings.game_profiles_access` is `"all"`; a missing
+  setting means supporters only. Binding the default profile is never gated. A lapsed account keeps
+  its extra profile read-only and can still delete it.
+- Preferences and other non-progress settings stay account-global. API tokens and teams still address
+  the default profile only; profile-bound tokens and team membership are later changes.
+
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
@@ -138,16 +160,24 @@ Teams, save status and recovery, and progress imports build on this storage; see
   legacy-only `update_task_completion`, while retaining account clocks for accepted cached clients
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
+- `supabase/migrations/20261012094933_reconcile_game_profile_entitlements.sql` — game profile tables, supporter gate,
+  and profile RPCs
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
-- `app/utils/constants.ts`, `workers/api-gateway/src/utils/gameMode.ts` — runtime active-season
+- `app/utils/constants.ts`, [TarkovTracker-API/src/utils/gameMode.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/utils/gameMode.ts) — runtime active-season
   constants and upstream mode mapping
 
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Game profiles remain capped at default plus one extra, with account-owned IDs and RPC-only access.
+  Default progress is never gated or mixed with extra-profile rows. Lapsed accounts retain read and
+  delete access to extras; writes use effective, non-disqualified supporter access unless the setting
+  opens access to all. Preferences, team readers, shares and existing API tokens stay account-global
+  or default-profile scoped. Current Seasonal writes require a matching season stamp and preserve
+  all historical profile seasons. A NULL edition in extra-profile sync preserves its saved edition.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
   requires aligned application/gateway consumers and a verified database rollout first. The
@@ -174,7 +204,7 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
-- Both season resolvers (Nitro and the Worker's `workers/api-gateway/src/utils/gameMode.ts`) accept
+- Both season resolvers (Nitro and the Worker's [TarkovTracker-API/src/utils/gameMode.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/utils/gameMode.ts)) accept
   the RPC's `SMALLINT` only as a JSON number that is a positive integer
   (`@tarkovtracker/progress-contracts/seasonNumber`); strings, booleans, arrays, objects, null, zero, negatives and
   fractions are rejected without coercion and fail closed.
@@ -332,3 +362,55 @@ timeout. They perform no row rewrites or policy changes. After approved deployme
 effective privileges and the `postgres` defaults; close #663 only after rollout evidence and the
 explicitly linked reserved-role follow-up are recorded. An application rollback cannot restore
 revoked grants: any rollback requires a separately reviewed forward migration, never a bulk GRANT ALL.
+
+## Browser progress authority
+
+The active browser envelope is stored in IndexedDB through `progressRepository.ts` and
+`progressAuthority.ts`. Pinia hydration awaits its read; local edits apply their captured field
+changes to the latest committed envelope. Cloud hydration retains its original source clocks.
+Durable revisions are announced even when the original caller is canceled after commit. Cache adoption checks the live owner, session generation and a newer revision, so a delayed receipt cannot overwrite a newer account or recovery observation.
+Saved and memory adoption follow transaction completion, and account generations fence stale
+callbacks while same-owner tabs share their generation. Failed account intent survives retry.
+
+Existing localStorage progress keys remain available to older clients. Their observed later edits are
+retained as recovery copies for preview and export in Settings. While copies exist or capture
+overflowed, a dismissible app-wide notice (`app/shell/OlderTabRecoveryNotice.vue`) links to
+Settings → Backup & Restore; dismissal lasts for the tab and returns for new copies. Edits overwritten before observation cannot be recovered. Capture has a count/size cap and reports overflow without evicting retained copies; export includes the latest uncaptured owned edit and reads committed data without writes. Explicit export-and-clear removes
+only owned copies included in that archive; explicit device removal checks committed active data
+inside the native transaction. Unknown ownership remains quarantined and reports incomplete removal.
+See the [browser authority checkpoint](../decision-browser-progress.md#1092-runtime-integration-contract)
+for compatibility limits and native acceptance evidence; #1086 retains its compatibility hold.
+
+Failed older-tab captures retain exact observed snapshots in the current tab, bounded by the same
+20 copies and 5 Mi UTF-16 character limits as persistent recovery. They remain exportable until captured or
+confirmed as exported; account switches retain them under their raw owner, so returning to that
+account restores access without exposing them to another account. The retention limits apply across
+all owners in the tab. Explicit device removal also clears that owner's retained snapshots.
+Unrelated saves and unobserved read errors do not clear their warning.
+Only committed IndexedDB copies survive closing the tab. Bytes overwritten upstream while unable
+to persist or beyond the retention limit cannot be reconstructed; cleanup persists truncation
+warnings when it can commit.
+
+## Manual player levels
+
+Player levels use each mode's saved `level`, including Seasonal history and prestige archives.
+Completing or reversing tasks does not change the level. Users edit it in the drawer or in
+Settings → Progression; both editors share `usePlayerLevelEditor`, which rejects blank, fractional,
+and out-of-range input (metadata bounds, or the default 1–79 while metadata is absent) instead of
+clamping it, and resets an unsaved draft when the active mode or saved level changes. A Tarkov.dev profile import converts the imported XP with player-level metadata once and saves
+that level. Imports load missing thresholds before writing progress and fail without changing
+progress if thresholds remain unavailable.
+
+The automatic-level preference, XP offset, calculation plugin, and Experience & Level settings
+are retired. Hydration and backup imports discard legacy fields while retaining saved levels.
+The forward migration drops `user_preferences.use_automatic_level_calculation` and removes
+`xpOffset` from the SQL progress sanitizer; it does not rewrite existing progress rows.
+
+Cached clients that still send `xpOffset` cannot change an existing level within the same reset
+epoch. Their other progress writes remain supported until refresh; a newer reset epoch still
+permits an intentional reset. API level writes discard any inherited offset marker before the
+normal merge, so API updates continue to set levels. The existing missing-column retry in
+preference sync allows cached clients to save other preferences after the column is dropped.
+
+Existing production JSON offsets were removed by completed one-off maintenance; see the
+[runbook](../runbook.md#retired-automatic-level-cleanup). Keep historical migrations immutable.

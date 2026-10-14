@@ -6,7 +6,7 @@ const PAGE_HELP_PATHS: Record<PageHelpKey, string[]> = {
   dashboard: ['/'],
   hideout: ['/hideout'],
   needed_items: ['/needed-items', '/neededitems'],
-  tasks: ['/tasks'],
+  tasks: ['/tasks', '/tasks/traders', '/tasks/maps', '/tasks/graph'],
 };
 export function usePageHelpState(pageKey: PageHelpKey): {
   isOpen: globalThis.Ref<boolean>;

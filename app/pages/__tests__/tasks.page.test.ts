@@ -1,4 +1,4 @@
-import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
@@ -46,6 +46,9 @@ type MapObjectiveMark = {
   users?: string[];
 };
 const TASK_SEARCH_DEBOUNCE_MS = 180;
+const TASK_REFRESH_DEBOUNCE_MS = 50;
+// Nuxt's navigation-repaint hook holds each route change for up to 100ms.
+const ROUTE_NAVIGATION_MS = 100;
 const preferencesStoreMock = {
   getTaskPrimaryView: 'all',
   getTaskSecondaryView: 'available',
@@ -192,7 +195,6 @@ vi.mock('@/stores/useTarkov', () => ({
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
     },
     pve: {
       apiUpdateHistory: [],
@@ -208,7 +210,6 @@ vi.mock('@/stores/useTarkov', () => ({
       taskCompletions: {},
       taskObjectives: {},
       traders: {},
-      xpOffset: 0,
     },
     isTaskObjectiveComplete: (objectiveId: string) => selfCompletedObjectiveIds.has(objectiveId),
     isTaskComplete: (taskId: string) => selfCompletedTaskIds.has(taskId),
@@ -221,6 +222,19 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (_key: string, fallback?: string) => fallback ?? _key,
   }),
 }));
+// Each task view has its own route; keep the mocked route on the view the test picks.
+const TASK_VIEW_PATHS: Record<string, string> = { maps: '/tasks/maps', graph: '/tasks/graph' };
+mockNuxtImport('useRoute', (original) => () => {
+  const route = original();
+  return {
+    get query() {
+      return route.query;
+    },
+    get path() {
+      return TASK_VIEW_PATHS[preferencesStoreMock.getTaskPrimaryView] ?? '/tasks';
+    },
+  };
+});
 vi.mock('vue-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => ({ query: {} }),
@@ -297,9 +311,10 @@ const defaultGlobalStubs = {
     template: '<div data-testid="task-card" :data-accent="accentVariant">{{ task.id }}</div>',
   },
   TaskFilterBar: {
-    emits: ['update:searchQuery'],
+    props: ['activeStatusView', 'searchStatusCounts'],
+    emits: ['pin-status'],
     template:
-      '<div data-testid="task-filter"><input data-testid="task-search" @input="$emit(\'update:searchQuery\', $event.target.value)" /></div>',
+      '<div data-testid="task-filter" :data-active-status="activeStatusView"><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
   },
   TaskEmptyState: true,
   TaskLoadingState: true,
@@ -333,6 +348,9 @@ describe('tasks page', () => {
     const raw = wrapper.find('[data-testid="leaflet-map"]').attributes('data-marks') ?? '[]';
     return JSON.parse(raw) as MapObjectiveMark[];
   };
+  // The app-bar search writes `?q=`, which the page reads.
+  const setSearch = (q: string) =>
+    wrapper.vm.$router.replace({ query: { ...wrapper.vm.$route.query, q: q || undefined } });
   const flushTransition = async () => {
     await nextTick();
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -387,7 +405,8 @@ describe('tasks page', () => {
     TasksPage = module.default;
     await mountPage();
   });
-  afterEach(() => {
+  afterEach(async () => {
+    await setSearch('');
     wrapper?.unmount();
   });
   it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
@@ -537,6 +556,57 @@ describe('tasks page', () => {
       secondaryView: 'all',
     });
     expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
+  });
+  it('searches every status while a query is active and restores the tab on clear', async () => {
+    const latestSecondaryView = () => updateVisibleTasksMock.mock.calls.at(-1)?.[0].secondaryView;
+    const filterBar = () => wrapper.find('[data-testid="task-filter"]');
+    const scopeHint = () => wrapper.find('[data-testid="task-search-scope-hint"]');
+    expect(latestSecondaryView()).toBe('available');
+    vi.useFakeTimers();
+    try {
+      void setSearch('saving the mole');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
+      expect(latestSecondaryView()).toBe('all');
+      expect(filterBar().attributes('data-active-status')).toBe('all');
+      expect(scopeHint().exists()).toBe(true);
+      expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
+      await scopeHint().find('button').trigger('click');
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('available');
+      expect(filterBar().attributes('data-active-status')).toBe('available');
+      expect(scopeHint().exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('narrows only the current search to a picked tab and returns to the saved tab on clear', async () => {
+    const latestSecondaryView = () => updateVisibleTasksMock.mock.calls.at(-1)?.[0].secondaryView;
+    const scopeHint = () => wrapper.find('[data-testid="task-search-scope-hint"]');
+    vi.useFakeTimers();
+    try {
+      void setSearch('mole');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
+      expect(latestSecondaryView()).toBe('all');
+      await wrapper.find('[data-testid="pin-status"]').trigger('click');
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('locked');
+      expect(scopeHint().exists()).toBe(true);
+      void setSearch('mol');
+      await vi.advanceTimersByTimeAsync(
+        ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS + TASK_REFRESH_DEBOUNCE_MS
+      );
+      expect(latestSecondaryView()).toBe('locked');
+      await scopeHint().find('button').trigger('click');
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(latestSecondaryView()).toBe('available');
+      expect(preferencesStoreMock.getTaskSecondaryView).toBe('available');
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('keeps initial task slice when tasks arrive after mount', async () => {
     visibleTasksRef.value = [];
@@ -870,8 +940,8 @@ describe('tasks page', () => {
     expect(wrapper.find(mapVisibilitySelector).exists()).toBe(true);
     vi.useFakeTimers();
     try {
-      await wrapper.find('[data-testid="task-search"]').setValue('no-match-query');
-      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS);
+      void setSearch('no-match-query');
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_SEARCH_DEBOUNCE_MS);
       await nextTick();
       expect(wrapper.find(mapVisibilitySelector).exists()).toBe(false);
     } finally {
@@ -1024,6 +1094,28 @@ describe('tasks page', () => {
       }),
     ]);
   });
+  it.each([
+    { status: 'locked', expected: ['obj-1'] },
+    { status: 'all', expected: ['obj-1'] },
+    { status: 'available', expected: [] },
+  ])(
+    'draws locked task markers for the $status filter: $expected',
+    async ({ status, expected }) => {
+      const task = createDefaultTask({
+        id: 'task-map-objective',
+        name: 'Map Objective Task',
+        objectives: [createMapObjective()],
+      });
+      visibleTasksRef.value = [task];
+      preferencesStoreMock.getTaskPrimaryView = 'maps';
+      preferencesStoreMock.getTaskMapView = 'map-1';
+      preferencesStoreMock.getTaskSecondaryView = status;
+      metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+      progressStoreMock.unlockedTasks = { [task.id]: { self: false } };
+      await mountPage();
+      expect(getLeafletMarks().map((mark) => mark.id)).toEqual(expected);
+    }
+  );
   it('keeps self marker ownership when objective is active for self and teammate', async () => {
     const task = createDefaultTask({
       id: 'task-map-objective',

@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "Switch to dark theme"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "Progress save status: {status}",
     "cloud_pending_label": "Saving progress to the cloud",
     "cloud_retrying_label": "Cloud save retrying",
@@ -124,6 +126,12 @@
     "export_button": "Export progress",
     "export_hint": "Export downloads your current progress as a backup file, even when saving has failed."
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "Sign out with unsaved changes?",
     "risk": "Your latest progress changes are not saved in this browser or to the cloud. If you sign out now, they will be lost.",
@@ -133,13 +141,8 @@
     "retry_succeeded": "Your changes were saved to the cloud. You can sign out safely."
   },
   "omnibar": {
-    "title": "Search",
-    "description": "Search tasks, needed items, and hideout stations",
-    "trigger_label": "Search tasks, items, traders…",
-    "open_aria": "Open global search",
     "aria_label": "Global search",
     "placeholder": "Search tasks, needed items, hideout...",
-    "hint_min_chars": "Type at least 2 characters to search...",
     "no_results": "No results found for \"{query}\".",
     "group_tasks": "Tasks / Quests",
     "group_hideout": "Hideout Stations"
@@ -697,27 +700,10 @@
         }
       },
       "progress": {
-        "title": "Progress Breakdown",
-        "items": "Task Items",
         "hideout_items": "Hideout Items",
         "filtered_status_active": "Filtered by task settings",
-        "filtered_status_inactive": "Using all task types",
-        "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks)."
-      },
-      "progress_card": {
-        "view_details": "View details for {label}",
-        "progress_label": "{label} progress"
-      },
-      "milestones": {
-        "title": "Milestones",
-        "halfway": "Halfway There",
-        "veteran": "Almost Done",
-        "kappa": {
-          "subtitle": "Container Earned"
-        },
-        "lightkeeper": {
-          "subtitle": "Trader Unlocked"
-        }
+        "filtered_warning_tooltip": "Task and Kappa counts follow your task filter settings (Kappa, Lightkeeper, and non-special tasks). Hideout items are not filtered.",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "Trader Progress",
@@ -729,12 +715,12 @@
         "set_loyalty_level": "Set loyalty level {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav Karma",
-        "unlock_required": "Unlock required:",
-        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
         "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
@@ -763,7 +749,10 @@
     "storyline": {
       "subtitle": "Track your progress through Tarkov story chapters.",
       "chapters_complete": "chapters complete",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "Work in Progress",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "WIP",
       "wip_description": "This feature is still being built out. Content and functionality will be expanded and refined over time as we continue organizing the data. Thanks for your patience!",
       "no_data": "No storyline chapter data available.",
@@ -778,6 +767,7 @@
       "quest_route_evidence_pending": "No steps captured yet",
       "quest_route_conflict": "More than one route reads as finished; only one is possible in game.",
       "quest_route_progress": "{completed}/{total} steps",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "1 saved objective mark no longer matches the current story data and needs re-checking.",
       "stale_progress_other": "{count} saved objective marks no longer match the current story data and need re-checking.",
       "route_choice": "Route choice",
@@ -786,16 +776,16 @@
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
       "route_choose_one": "Choose one",
-      "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
       "route_switch_hint": "To switch routes, uncheck the selected route first.",
-      "route_unlocks_here": "Unlocks here",
       "route_unlocks_chapter": "Chapter unlocks",
       "route_unlocks_estimated": "Estimated timing",
       "route_unlock_map": "Map: {name}",
       "route_unlock_trader": "Trader: {name}",
-      "route_unlock_reward": "Reward: {name}"
+      "route_unlock_reward": "Reward: {name}",
+      "timeline_objective": "Objective",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
@@ -854,7 +844,7 @@
       "one_time_give_cta": "Give {total}",
       "one_time_login_cta": "Log in to contribute",
       "one_time_net_note": "{net} reaches us after fees",
-      "one_time_perks_heading": "Includes supporter perks for 30 days per $4, up to one year",
+      "one_time_perks_heading": "Includes supporter perks for 30 days per $4, up to one year per payment. Days pause during subscription or grace access and resume after access ends.",
       "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
       "perk_api_rate_limit": "Higher daily API read and write quotas",
       "perk_subscription_retention": "Exempt from routine inactivity cleanup while a qualifying subscription is active",
@@ -924,9 +914,9 @@
       "user_views": {
         "yourself": "Yourself"
       },
-      "search": {
-        "placeholder": "Search...",
-        "aria_label": "Search tasks"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team"
       },
       "sort": {
         "none": "Default order",
@@ -992,6 +982,13 @@
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
       "no_tasks_found_description": "Adjust your filters or level requirements to see available tasks.",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
@@ -1149,6 +1146,7 @@
         "story_route": "Meet the required task statuses for {tasks}, or progress one of these story chapters: {chapters}.",
         "failed_branch": "Blocked by failed task: {task}.",
         "faction": "Available to {faction} characters.",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
         "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
@@ -1213,7 +1211,6 @@
     },
     "needed_items": {
       "loading": "Loading task and hideout data",
-      "search_placeholder": "Search items, tasks, or hideout stations...",
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
@@ -1302,6 +1299,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "Invite teammates, choose which team progress you see, and track together.",
       "invite": {
         "title": "Invite link",
@@ -1790,14 +1792,12 @@
     "profile": "Profile",
     "section_navigation": "Navigation",
     "account_menu": "Account menu",
-    "mode_auto": "Auto",
-    "auto_level_enabled": "Automatic level calculation is enabled",
-    "level_display_auto": "Level {level} (automatic calculation enabled)",
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
-    "xp_progress": "XP progress",
-    "xp_settings_link": "View XP and level settings"
+    "level_input": "Current level, {min} to {max}",
+    "pin_subpages": "Keep {name} pages open",
+    "unpin_subpages": "Collapse {name} pages"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2068,7 +2068,29 @@
       "prestige_history_duration": "Run Duration",
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
-      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}"
+      "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} Prestige Complete",
@@ -2234,6 +2256,20 @@
       "active_mode": "Active",
       "game_edition_hint": "Select the game edition you own so tracking matches your available content."
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "Skills Management",
       "explanation": "Quest rewards are auto-calculated. Enter your total skill level to adjust the offset.",
@@ -2270,19 +2306,6 @@
       "warn_system_omnibar": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+T, Ctrl+W, Alt+Tab).",
       "warn_system_undo": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+W, Ctrl+T, Alt+Tab)."
     },
-    "experience": {
-      "title": "Experience & Level",
-      "auto_level_title": "Automatic Level Calculation",
-      "auto_level_description": "When enabled, your level will be automatically calculated based on total XP. When disabled, you can manually set your level independently of XP calculations.",
-      "current_level": "Current Level",
-      "set_total_xp": "Set Total XP",
-      "manual_hint": "Enter your actual total XP to adjust the offset automatically.",
-      "xp_amount": "{amount} XP",
-      "xp_to_next": "{amount} to next",
-      "reset_offset": "Reset XP Offset",
-      "xp_progress_aria": "Experience progress toward next level",
-      "xp_progress_value": "{percent}% toward the next level"
-    },
     "danger_zone": {
       "confirm_instruction": "Type {word} to confirm resetting all data:",
       "confirm_word": "DELETE"
@@ -2299,9 +2322,15 @@
       "find_in_launcher_hint": "Can't find it? Open the BSG Launcher -> Game Settings -> Logs and copy that path.",
       "avoid_session_folder_label": "Example session folder:",
       "session_folder_example_path": "C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037",
+      "account_filter_label": "Account",
+      "account_filter_tooltip": "Logs are grouped by the EFT account recorded at login. When only one account is identified, sessions without a recorded account are included with it and may belong to another account, so check your selected sessions. Each import writes into this tracker's progress.",
+      "account_label": "Account …{suffix}",
+      "account_unidentified": "Sessions without a recorded account",
+      "multiple_accounts_title": "Logs from multiple accounts detected",
+      "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Include Log Versions",
       "version_filter_hint": "Latest major version is selected by default. Include only logs from the character and wipe you want to restore.",
-      "version_filter_tooltip": "Versions do not identify account changes, wipes, or prestige resets. Select the appropriate session folders before importing. Seasonal events must fall within the active season.",
+      "version_filter_tooltip": "Versions do not identify wipes or prestige resets. Select the appropriate session folders before importing. Seasonal events must fall within the active season.",
       "version_unknown": "Unknown Version",
       "source_file": "Source File",
       "selected_files": "Selected files",
@@ -2311,7 +2340,7 @@
       "entries_scanned": "Archive Entries Scanned",
       "entries_scanned_tooltip": "Total selected files or archive entries scanned while looking for EFT logs.",
       "chat_messages": "Chat Messages",
-      "chat_messages_tooltip": "Chat notification payloads read from included notification logs.",
+      "chat_messages_tooltip": "Chat notification payloads read from included notification logs, across all accounts in those logs.",
       "completion_events": "Quest Completion Events",
       "completion_events_tooltip": "Unique quest completion events after deduping repeated log lines.",
       "started_events": "Quest Start Events",
@@ -2398,6 +2427,7 @@
         "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "This Tarkov profile is already linked to another TarkovTracker account, so it was not linked here. The imported progress was saved. Unlink it from the other account, then import again.",
         "save_failed": "The profile was imported on this device, but it could not be saved to your account yet. Check your connection; the import stays on this device until it syncs."
       }
@@ -2556,6 +2586,18 @@
       "tasks": {
         "title": "Tarkov Quest Tracker · TarkovTracker.org",
         "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal."
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "Tarkov Hideout Tracker · TarkovTracker.org",
