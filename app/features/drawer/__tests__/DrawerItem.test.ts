@@ -71,16 +71,4 @@ describe('DrawerItem', () => {
     const wrapper = mountSettingsDrawerItem();
     expect(wrapper.text()).toContain('common.settings');
   });
-  it('indents a nested sub-item only while the drawer is expanded', () => {
-    const topLevel = mountSettingsDrawerItem().get('a').classes();
-    const nested = mountSettingsDrawerItem({ nested: true }).get('a').classes();
-    const nestedCollapsed = mountSettingsDrawerItem({ nested: true, isCollapsed: true })
-      .get('a')
-      .classes();
-    expect(topLevel).toContain('min-h-10');
-    expect(topLevel).not.toContain('pl-8');
-    expect(nested).toEqual(expect.arrayContaining(['min-h-8', 'pl-8']));
-    expect(nestedCollapsed).toContain('min-h-8');
-    expect(nestedCollapsed).not.toContain('pl-8');
-  });
 });

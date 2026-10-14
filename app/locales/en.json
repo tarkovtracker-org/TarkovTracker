@@ -894,6 +894,7 @@
     },
     "tasks": {
       "primary_views": {
+        "aria_label": "Task views",
         "graph": "Graph"
       },
       "graph": {
@@ -1799,9 +1800,7 @@
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
-    "level_input": "Current level, {min} to {max}",
-    "pin_subpages": "Keep {name} pages open",
-    "unpin_subpages": "Collapse {name} pages"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"

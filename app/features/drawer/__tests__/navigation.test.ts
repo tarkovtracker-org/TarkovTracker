@@ -29,12 +29,16 @@ describe('isNavigationRouteActive', () => {
     }
   );
   it('uses exact match for ordinary routes', () => {
-    expect(isNavigationRouteActive('/tasks', '/tasks')).toBe(true);
-    expect(isNavigationRouteActive('/tasks', '/tasks/extra')).toBe(false);
+    expect(isNavigationRouteActive('/hideout', '/hideout')).toBe(true);
+    expect(isNavigationRouteActive('/hideout', '/hideout/extra')).toBe(false);
   });
-  it('marks only the task view sub-item active on its route', () => {
-    expect(isNavigationRouteActive('/tasks', '/tasks/maps')).toBe(false);
-    expect(isNavigationRouteActive('/tasks/maps', '/tasks/maps')).toBe(true);
-    expect(isNavigationRouteActive('/tasks/graph', '/tasks/maps')).toBe(false);
+  it.each(['/tasks', '/tasks/traders', '/tasks/maps', '/tasks/graph'])(
+    'keeps Tasks active on the %s view',
+    (path) => {
+      expect(isNavigationRouteActive('/tasks', path)).toBe(true);
+    }
+  );
+  it.each(['/tasksevil', '/task', '/storyline'])('does not mark Tasks active on %s', (path) => {
+    expect(isNavigationRouteActive('/tasks', path)).toBe(false);
   });
 });
