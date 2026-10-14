@@ -3,10 +3,77 @@
 import datetime as dt
 import hashlib
 import json
+import os
 import pathlib
 import subprocess
 import sys
 import time
+
+LOCAL_DOCKER_HOST = "unix:///var/run/docker.sock"
+DOCKER_PREFIX = ["docker", "--host", LOCAL_DOCKER_HOST]
+
+
+def local_docker_environment():
+    """Fail closed before any exec; pin all later commands to the local Linux socket."""
+    if os.environ.get("DOCKER_HOST", LOCAL_DOCKER_HOST) != LOCAL_DOCKER_HOST:
+        raise RuntimeError("Rehearsal requires the local Docker Unix socket; remote DOCKER_HOST denied")
+    env = {key: value for key, value in os.environ.items()
+           if key not in {"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"}}
+    context = os.environ.get("DOCKER_CONTEXT") or docker_context_value(["show"], env)
+    endpoint = docker_context_value(["inspect", context, "--format", "{{json .Endpoints.docker.Host}}"], env)
+    if json.loads(endpoint) != LOCAL_DOCKER_HOST:
+        raise RuntimeError("Rehearsal requires a local Docker context; remote endpoint denied")
+    return env
+
+
+def docker_context_value(args, env):
+    result = subprocess.run(["docker", "context"] + args, env=env, check=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.stdout.decode().strip()
+
+
+def test_local_docker_guard():
+    """Mock context discovery: no daemon connection, container exec or fixture writes."""
+    from unittest.mock import patch
+
+    def discovery(endpoint):
+        def run(args, **kwargs):
+            assert args[:2] == ["docker", "context"], "Guard ran a container command"
+            if args[2] == "inspect":
+                assert args[3] == (os.environ.get("DOCKER_CONTEXT") or "selected")
+            assert not any(key in kwargs["env"] for key in
+                           ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"))
+            output = "selected" if args[2] == "show" else json.dumps(endpoint)
+            return subprocess.CompletedProcess(args, 0, output.encode(), b"")
+        return run
+
+    cases = [
+        ({"DOCKER_HOST": "ssh://production"}, LOCAL_DOCKER_HOST, False),
+        ({"DOCKER_HOST": "tcp://production:2376"}, LOCAL_DOCKER_HOST, False),
+        ({"DOCKER_HOST": "tcp://localhost:2375"}, LOCAL_DOCKER_HOST, False),
+        ({"DOCKER_CONTEXT": "production"}, "ssh://production", False),
+        ({"DOCKER_HOST": LOCAL_DOCKER_HOST, "DOCKER_CONTEXT": "production"}, "tcp://production:2376", False),
+        ({}, "ssh://selected-production-context", False),
+        ({"DOCKER_CONTEXT": "local", "DOCKER_TLS_VERIFY": "1", "DOCKER_CERT_PATH": "/unused"}, LOCAL_DOCKER_HOST, True),
+        ({"DOCKER_HOST": LOCAL_DOCKER_HOST}, LOCAL_DOCKER_HOST, True),
+    ]
+    for environment, endpoint, allowed in cases:
+        with patch.dict(os.environ, environment, clear=True), patch("subprocess.run", side_effect=discovery(endpoint)):
+            try:
+                local_docker_environment()
+                accepted = True
+            except RuntimeError:
+                accepted = False
+            assert accepted == allowed, f"Docker endpoint guard mismatch: {environment}, {endpoint}"
+    assert DOCKER_PREFIX == ["docker", "--host", LOCAL_DOCKER_HOST]
+    print(f"Docker endpoint guard: {len(cases)} mock cases passed; no container commands executed")
+
+
+if sys.argv[1:] == ["--self-test-docker-guard"]:
+    test_local_docker_guard()
+    sys.exit(0)
+
+DOCKER_ENV = local_docker_environment()
 
 CONTAINER = "supabase_db_TarkovTracker1086"
 ROOT = pathlib.Path(sys.argv[1]).resolve()
@@ -20,8 +87,8 @@ CANDIDATE = (ROOT / "supabase/migrations/20261014094925_drop_legacy_progress_col
 checks = []
 
 def command(args, data=None, expected=0):
-    result = subprocess.run(["docker", "exec", "-i", CONTAINER] + args,
-                            input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(DOCKER_PREFIX + ["exec", "-i", CONTAINER] + args,
+                            input=data, env=DOCKER_ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if expected is not None and result.returncode != expected:
         raise RuntimeError(result.stderr.decode(errors="replace")[-6000:])
     return result
@@ -161,8 +228,8 @@ check("failed cleanup transaction preserves every retained field", fingerprints(
 check("failed cleanup transaction preserves legacy bytes", fingerprints(LAB, legacy=True) == legacy_before)
 sql(LAB, "DROP VIEW public.cleanup_unknown_dependency;")
 # Real conflicting access-share transaction; the bounded candidate must abort and roll back.
-holder = subprocess.Popen(["docker", "exec", "-i", CONTAINER, "psql", "-X", "-q", "-U", "postgres",
-                          "-d", LAB], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+holder = subprocess.Popen(DOCKER_PREFIX + ["exec", "-i", CONTAINER, "psql", "-X", "-q", "-U", "postgres",
+                          "-d", LAB], env=DOCKER_ENV, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 holder.stdin.write(b"BEGIN; LOCK TABLE public.user_progress IN ACCESS SHARE MODE;\n")
 holder.stdin.flush()
 try:

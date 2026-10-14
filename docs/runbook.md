@@ -783,16 +783,18 @@ account row and its seven metadata fields, normalized mode rows, all Seasonal hi
 prestige archives, preferences, team data and account-retention records. Legacy-shaped API and
 prestige RPC arguments are mode/payload contracts and remain unchanged.
 
-Before an explicitly approved merge, verify a fresh recovery point for the target values and
-a contained restore receipt, exact pending SQL/history, immutable independent review and CI.
+Before an explicitly approved merge, a fresh production table-only backup and its verified
+isolated restore receipt are mandatory gates, alongside exact pending SQL/history, immutable
+independent review and CI. The synthetic local rehearsal below is supplementary evidence and
+cannot satisfy the production backup/restore gate. Keep deletion held until all gates pass.
 The migration uses one transaction, a one-second lock timeout, a twenty-second statement
 timeout and explicit dependency removal followed by `DROP COLUMN RESTRICT`. An unexpected
 dependency or active reader aborts the complete transaction. It performs no data rewrite,
 row deletion, privilege change or physical reclamation. Supabase's normal integration deploys
 migrations and all Edge Functions; do not use an out-of-band production push.
 
-Prefer a scoped logical recovery rehearsal where an approved operator connection is available:
-a consistent custom-format PostgreSQL 17 dump selecting only `public.user_progress`, followed
+For the mandatory production recovery gate, use an approved operator connection to take a fresh,
+consistent custom-format PostgreSQL 17 dump selecting only `public.user_progress`, followed
 by a local restore of only pre-data and data into an isolated destination with no network,
 app/Auth access or scheduled extensions. Exclude post-data triggers, FKs, grants and publication
 from this extraction destination; compare count and full-row aggregate fingerprints, including
@@ -804,8 +806,11 @@ observer is not a raw-data export route. Synthetic rehearsal is not production r
 
 A provider physical clone copies jobs that begin immediately and cannot be paused before restore
 ([Supabase clone documentation](https://supabase.com/docs/guides/platform/clone-project)).
-The seven live schedules perform local deletions/retention/team changes even without external
-calls; a physical clone needs separately approved resource cost and safe scheduler containment.
+The migrations install eight schedules: Stripe-event, API-usage and mutation-rate-limit retention;
+account-deletion-attempt retention; inactive-account cleanup; account-activity snapshots;
+account-deletion retries; and owner-only team cleanup. Recheck the current `cron.job` inventory
+before containment; a physical clone needs separately approved resource cost and safe scheduler
+containment even without external calls.
 Do not assume an after-restore pause proves the copied data was untouched.
 
 Before commit, transaction rollback restores the old schema/data automatically. After commit,
@@ -829,11 +834,14 @@ Before any production field-only correction, verify the current trigger definiti
 complete bodies of both trigger functions against the separately reviewed correction. A guard
 on trigger names and enabled states alone cannot detect changed function behavior.
 
-Run the rehearsal with Python 3, Docker, the existing isolated
+Run the supplementary synthetic rehearsal with Python 3, Docker, the existing isolated
 `supabase_db_TarkovTracker1086` PostgreSQL 17 container (empty Auth source), checkout path and
 the synthetic pre-cleanup custom archive whose SHA-256 is pinned in the script. It refuses
 other archive bytes and uses only new secondary local databases. No production host, URL or
-credential is accepted. Archives and aggregate receipts stay outside Git.
+credential is accepted. Before any container command, it rejects a non-local `DOCKER_HOST` or
+selected Docker context endpoint, then pins commands to `unix:///var/run/docker.sock` with Docker
+host/context/TLS environment overrides removed. Use a local Linux context pointing to that socket.
+Archives and aggregate receipts stay outside Git.
 
 The pinned synthetic baseline is retained with the owner's local task artifacts at
 `../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump` relative to this
@@ -847,6 +855,7 @@ generated archive. The existing local PostgreSQL 17 container must also be avail
 From this checkout in the local Linux shell:
 
 ```bash
+python3 scripts/checks/legacy-progress-cleanup-rehearsal.py --self-test-docker-guard
 sha256sum ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
 python3 scripts/checks/legacy-progress-cleanup-rehearsal.py "$PWD" \
   ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
