@@ -158,7 +158,7 @@
       class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
     >
       <div
-        class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+        class="bg-surface-900 flex w-max min-w-full gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
       >
         <UButton
           v-for="mapOption in mapOptions"
@@ -192,7 +192,7 @@
       class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
     >
       <div
-        class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+        class="bg-surface-900 flex w-max min-w-full gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
       >
         <UButton
           v-for="trader in traders"

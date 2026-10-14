@@ -3,65 +3,57 @@
     <div class="px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
         <slot name="header" />
-        <div class="flex flex-col gap-4">
-          <div class="flex justify-center">
-            <div
-              class="bg-surface-900 border-surface-700/50 w-full max-w-4xl rounded-lg border px-4 py-3 shadow-sm"
-              data-testid="hideout-view-switcher"
-              data-help-target="hideout-view-switcher"
-            >
-              <div class="grid w-full gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-                <div class="hidden lg:block"></div>
-                <div
-                  data-help-target="hideout-status-filters"
-                  class="flex flex-wrap justify-center gap-2"
+        <div
+          class="bg-surface-900 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4"
+          data-testid="hideout-view-switcher"
+          data-help-target="hideout-view-switcher"
+        >
+          <div
+            data-help-target="hideout-status-filters"
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-none"
+          >
+            <template v-for="(view, index) in primaryViews" :key="view.view">
+              <UButton
+                :icon="`i-${view.icon}`"
+                :variant="'ghost'"
+                :color="'neutral'"
+                size="md"
+                :data-help-target="`hideout-filter-${view.view}`"
+                :aria-pressed="displayPrimaryView === view.view"
+                class="shrink-0"
+                :class="{
+                  'border-surface-200 rounded-none border-b-2': displayPrimaryView === view.view,
+                }"
+                @click="selectPrimaryView(view.view)"
+              >
+                <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
+                <span
+                  :class="[
+                    'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+                    view.badgeColor,
+                  ]"
                 >
-                  <template v-for="(view, index) in primaryViews" :key="view.view">
-                    <UButton
-                      :icon="`i-${view.icon}`"
-                      :variant="'ghost'"
-                      :color="'neutral'"
-                      size="md"
-                      :data-help-target="`hideout-filter-${view.view}`"
-                      :aria-pressed="displayPrimaryView === view.view"
-                      class="shrink-0"
-                      :class="{
-                        'border-surface-200 rounded-none border-b-2':
-                          displayPrimaryView === view.view,
-                      }"
-                      @click="selectPrimaryView(view.view)"
-                    >
-                      <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
-                      <span
-                        :class="[
-                          'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-                          view.badgeColor,
-                        ]"
-                      >
-                        {{ view.count }}
-                      </span>
-                    </UButton>
-                    <span
-                      v-if="index === 0"
-                      aria-hidden="true"
-                      class="bg-surface-700/60 h-6 w-px self-center"
-                    ></span>
-                  </template>
-                </div>
-                <div
-                  data-testid="hideout-filter-actions"
-                  data-help-target="hideout-filter-actions"
-                  class="flex items-center justify-center gap-2 lg:justify-end"
-                >
-                  <SettingsButton
-                    page-key="hideout"
-                    data-testid="hideout-settings-button"
-                    data-help-target="hideout-settings-button"
-                    :label="t('page.hideout.settings.title')"
-                  />
-                </div>
-              </div>
-            </div>
+                  {{ view.count }}
+                </span>
+              </UButton>
+              <span
+                v-if="index === 0"
+                aria-hidden="true"
+                class="bg-surface-700/60 h-6 w-px self-center"
+              ></span>
+            </template>
+          </div>
+          <div
+            data-testid="hideout-filter-actions"
+            data-help-target="hideout-filter-actions"
+            class="ml-auto flex items-center gap-2"
+          >
+            <SettingsButton
+              page-key="hideout"
+              data-testid="hideout-settings-button"
+              data-help-target="hideout-settings-button"
+              :label="t('page.hideout.settings.title')"
+            />
           </div>
         </div>
         <UModal

@@ -1,6 +1,6 @@
 <template>
   <div class="mb-6 space-y-3">
-    <!-- Primary Filter: ALL / TASKS / HIDEOUT (Centered) -->
+    <!-- Primary Filter: ALL / TASKS / HIDEOUT -->
     <UTabs
       v-model="activeFilter"
       :items="filterTabItems"
@@ -10,7 +10,7 @@
       class="bg-surface-900 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4 sm:py-3"
       :ui="{
         root: 'w-full',
-        list: 'flex flex-wrap items-center justify-center gap-1 border-b-0 p-0 sm:gap-2',
+        list: 'flex flex-wrap items-center justify-start gap-1 border-b-0 p-0 sm:gap-2',
         indicator: 'hidden',
         leadingIcon: 'h-4 w-4 sm:h-5 sm:w-5',
         trigger:
