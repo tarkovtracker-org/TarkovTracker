@@ -231,7 +231,10 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
   const step = workflowStep(jobBlock(ci, 'fallow'), 'Resolve Fallow base');
   // The step reads event data through `env:` rather than inline template expansion.
   assert.match(step, /EVENT_NAME: \$\{\{ github.event_name \}\}/);
-  assert.match(step, /PR_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(
+    step,
+    /PR_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \|\| github.event.merge_group.base_sha \}\}/
+  );
   assert.match(step, /PUSH_BEFORE_SHA: \$\{\{ github.event.before \}\}/);
   const script = step.slice(step.indexOf('run: |\n') + 'run: |\n'.length);
   assert.doesNotMatch(script, /\$\{\{/);

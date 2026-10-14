@@ -108,6 +108,7 @@ export function resolveBuildProfile({ eventName, refName, pullRequest }) {
     const previewBranch = previewBranchName({ pullRequest: Number(pullRequest) });
     return { profile: 'preview', previewBranch, appUrl: previewAppUrl(previewBranch) };
   }
+  if (eventName === 'merge_group') return dispatchProfile(refName);
   if (eventName === 'workflow_dispatch') return dispatchProfile(refName);
   return { profile: 'production' };
 }

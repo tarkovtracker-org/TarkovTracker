@@ -4,6 +4,7 @@ import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { readPreviewRequest } from './request-authorization.mjs';
+import { QueueValidationError, queueRevision, requireQueueCi } from './merge-queue.mjs';
 import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
 import {
   ciResultCheck,
@@ -128,6 +129,7 @@ async function resolveCandidate({ github, context, inputs }) {
 /* Live state                                                                                  */
 /* ------------------------------------------------------------------------------------------ */
 async function findCandidatePull(github, context, candidate) {
+  if (candidate.runEvent === 'merge_group') return null;
   return candidate.pullRequest
     ? await getPull(github, context.repo, candidate.pullRequest)
     : await findPullForHead(github, context.repo, candidate);
@@ -214,7 +216,7 @@ function checkRunState(run, candidate) {
   if (run.conclusion !== 'success') throw failure(`CI concluded ${run.conclusion}.`);
 }
 async function ciEvidence(github, context, candidate) {
-  if (candidate.runEvent === 'pull_request')
+  if (['pull_request', 'merge_group'].includes(candidate.runEvent))
     return ciResultCheck(github, context.repo, candidate.headSha);
   return latestStatus(github, context.repo, candidate.headSha, 'CI Result');
 }
@@ -341,9 +343,9 @@ function expectedManifest(context, candidate, pull, run) {
     repository: repoName(context),
     pullRequest: candidate.runEvent === 'pull_request' ? pullRequestNumber(pull) : null,
     headSha: candidate.headSha,
-    baseSha: claimSha(candidate, pull),
+    baseSha: candidate.queueBaseSha ?? claimSha(candidate, pull),
     checkedOutSha: claimCheckedOutSha(candidate, pull),
-    treeSha: runTreeSha(run),
+    treeSha: candidate.queueTreeSha ?? runTreeSha(run),
     runId: run.id,
     runAttempt: run.run_attempt,
     previewBranch,
@@ -490,6 +492,10 @@ async function previousSuccess(github, context, headSha, digest) {
   }
   return null;
 }
+function decisionBaseSha(candidate, pull) {
+  if (candidate?.queueBaseSha) return candidate.queueBaseSha;
+  return optional(pull?.base, 'sha');
+}
 function decisionIdentity({ candidate, pull }) {
   return {
     pullRequest: pullRequestNumber(pull),
@@ -497,7 +503,7 @@ function decisionIdentity({ candidate, pull }) {
     headBranch: optional(candidate, 'headBranch'),
     headRepo: optional(candidate, 'headRepo'),
     mergeSha: optional(pull, 'merge_commit_sha'),
-    baseSha: pull?.base?.sha ?? null,
+    baseSha: decisionBaseSha(candidate, pull),
   };
 }
 function decisionRun({ candidate, run }) {
@@ -509,8 +515,13 @@ function decisionRun({ candidate, run }) {
 }
 /** Rebuild the phase-1 candidate for phase-2 re-verification; runEvent picks the claim shape. */
 function decisionRunEvent(candidate, pull) {
-  const dispatch = !candidate || candidate.runEvent !== 'pull_request' || !pull;
-  return dispatch ? 'workflow_dispatch' : 'pull_request';
+  if (candidate?.runEvent === 'merge_group') return 'merge_group';
+  const pr = [
+    Boolean(candidate),
+    optional(candidate, 'runEvent') === 'pull_request',
+    Boolean(pull),
+  ].every(Boolean);
+  return pr ? 'pull_request' : 'workflow_dispatch';
 }
 function decisionBase({ candidate, pull, run, fork }) {
   return {
@@ -533,6 +544,12 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   assertSelectedAttempt(state.run, inputs);
   checkRunState(state.run, state.candidate);
   await checkCiResult(github, context, state.candidate);
+  if (state.candidate.runEvent === 'merge_group') {
+    return evaluateQueue({ github, context, state, workspace });
+  }
+  return evaluatePull({ github, context, inputs, workspace }, state);
+}
+async function evaluatePull({ github, context, inputs, workspace }, state) {
   await requireDispatchMergeProof(github, context, state.candidate, state.pull, state.run);
   if (!(await requiresPreview(github, context, state.pull)))
     return { ...decisionBase(state), ...notApplicable() };
@@ -550,6 +567,22 @@ async function evaluate({ github, context, inputs, workspace }, state) {
     state.previewRequest
   );
   await authorizeReadiness(github, context, inputs, state);
+  return deployDecision({ github, context, state, workspace });
+}
+async function queueProof(proof) {
+  try {
+    return await proof();
+  } catch (error) {
+    if (error instanceof QueueValidationError) throw failure(error.message);
+    throw error;
+  }
+}
+async function evaluateQueue({ github, context, state, workspace }) {
+  const revision = await queueProof(() => queueRevision(github, context, state.candidate));
+  state.candidate.queueBaseSha = revision.baseSha;
+  state.candidate.queueTreeSha = revision.treeSha;
+  await queueProof(() => requireQueueCi(github, context, state.run));
+  state.previewAuthorization = 'queue';
   return deployDecision({ github, context, state, workspace });
 }
 function requestBinding(inputs) {
@@ -800,7 +833,7 @@ function hasMergeIntent(context, state) {
 function hasPreviewIntent(context, state) {
   // Dependabot's dedicated workflow is the sole automatic request owner.
   if (optional(optional(state.pull, 'user'), 'id') === 49699333) return false;
-  if (state.previewAuthorization === 'readiness') return true;
+  if (['readiness', 'queue'].includes(state.previewAuthorization)) return true;
   if (!state.previewRequest) return hasMergeIntent(context, state);
   return [
     state.previewRequest.enabled,
@@ -945,8 +978,31 @@ async function freshnessErrors(github, context, decision) {
     ? await pullFreshnessErrors(github, context, decision)
     : [];
   const run = await getRun(github, context.repo, decision.runId);
+  const queueErrors = await queueFreshness(github, context, decision, run);
   const mismatch = await dispatchFreshnessMismatch(github, context, decision, run);
-  return [...pullErrors, ...runFreshnessErrors(run, decision), ...(mismatch ? [mismatch] : [])];
+  return [
+    ...pullErrors,
+    ...queueErrors,
+    ...runFreshnessErrors(run, decision),
+    ...(mismatch ? [mismatch] : []),
+  ];
+}
+async function checkQueueFreshness(github, context, decision, run) {
+  const candidate = candidateFromDecision(decision);
+  const revision = await queueRevision(github, context, candidate);
+  if (revision.baseSha !== decision.baseSha) return ['Queue base changed.'];
+  checkRunState(run, candidate);
+  await requireQueueCi(github, context, run);
+  return [];
+}
+async function queueFreshness(github, context, decision, run) {
+  if (decision.runEvent !== 'merge_group') return [];
+  try {
+    return await checkQueueFreshness(github, context, decision, run);
+  } catch (error) {
+    if (error instanceof QueueValidationError) return [error.message];
+    throw error;
+  }
 }
 async function dispatchFreshnessMismatch(github, context, decision, run) {
   if (!decision.pullRequest || decision.runEvent !== 'workflow_dispatch') return null;
@@ -962,6 +1018,7 @@ function candidateFromDecision(decision) {
     headRepo: decision.headRepo,
     baseBranch: PRODUCTION_BRANCH,
     pullRequest: decision.pullRequest,
+    queueBaseSha: decision.runEvent === 'merge_group' ? decision.baseSha : null,
   };
 }
 function assertDeployablePlan(decision) {
@@ -1030,6 +1087,10 @@ export async function verifyForDeploy({ github, context, core, decision, destina
     ? await getPull(github, context.repo, decision.pullRequest)
     : null;
   const run = await getRun(github, context.repo, decision.runId);
+  if (candidate.runEvent === 'merge_group') {
+    const revision = await queueRevision(github, context, candidate);
+    candidate.queueTreeSha = revision.treeSha;
+  }
   const { manifest } = await verifiedArtifact({
     github,
     context,

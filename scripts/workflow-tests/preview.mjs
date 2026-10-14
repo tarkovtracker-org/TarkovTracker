@@ -131,6 +131,150 @@ test('the Validate profile step passes production inputs through and clears them
   assert.equal(staging.buildEnv.SUPABASE_ANON_KEY, '');
   assert.throws(() => resolveProfileOutputs({ EVENT_NAME: 'pull_request', PR_NUMBER: '' }));
 });
+test('queue CI dispatches, deploys and reports only its live integration revision', async (t) => {
+  const branch = 'gh-readonly-queue/main/pr-42-example';
+  const previewBranch = previewBranchName({ branch });
+  const f = fakeGithub(t, {
+    run: { event: 'merge_group', head_branch: branch, pull_requests: [] },
+    commits: { [HEAD]: { tree: { sha: TREE }, parents: [{ sha: BASE }, { sha: MERGE }] } },
+    manifest: {
+      pullRequest: null,
+      headSha: HEAD,
+      baseSha: BASE,
+      checkedOutSha: HEAD,
+      previewBranch,
+      appUrl: previewAppUrl(previewBranch),
+    },
+  });
+  const core = fakeCore();
+  const args = { github: f.github, core, workspace: tempDir(t) };
+  const automatic = await planPreview({ ...args, context: workflowRunContext(f.state.run) });
+  assert.equal(automatic.action, 'request');
+  assert.equal(f.state.dispatches.length, 1);
+  assert.equal(f.state.dispatches[0].inputs.run_id, String(f.state.run.id));
+  const decision = await planPreview({
+    ...args,
+    workspace: tempDir(t),
+    context: workflowDispatchContext(),
+    inputs: f.state.dispatches[0].inputs,
+  });
+  assert.equal(decision.action, 'deploy');
+  assert.equal(decision.runEvent, 'merge_group');
+  assert.equal(decision.baseSha, BASE);
+  await verifyForDeploy({
+    ...args,
+    context: workflowDispatchContext(),
+    decision,
+    destination: tempDir(t),
+  });
+  assert.equal(
+    await publishResult({
+      ...args,
+      context: workflowDispatchContext(),
+      decision,
+      outcomes: { deploy: 'success', smoke: 'success' },
+    }),
+    'success'
+  );
+  assert.equal(f.state.statuses.at(-1).sha, HEAD);
+  f.state.queueSha = MERGE;
+  await assert.rejects(
+    verifyForDeploy({
+      ...args,
+      context: workflowDispatchContext(),
+      decision,
+      destination: tempDir(t),
+    }),
+    /Queue revision moved/
+  );
+});
+function queueFixture(t) {
+  const branch = 'gh-readonly-queue/main/pr-42-example';
+  const previewBranch = previewBranchName({ branch });
+  return fakeGithub(t, {
+    run: { event: 'merge_group', head_branch: branch, pull_requests: [] },
+    commits: { [HEAD]: { tree: { sha: TREE }, parents: [{ sha: BASE }] } },
+    manifest: {
+      pullRequest: null,
+      headSha: HEAD,
+      baseSha: BASE,
+      checkedOutSha: HEAD,
+      previewBranch,
+      appUrl: previewAppUrl(previewBranch),
+    },
+  });
+}
+test('obsolete queue candidates produce a failure decision without dispatching', async (t) => {
+  for (const status of [404, 422]) {
+    const f = queueFixture(t);
+    f.state.queueRefError = Object.assign(new Error('Not Found'), { status });
+    const decision = await planPreview({
+      github: f.github,
+      core: fakeCore(),
+      workspace: tempDir(t),
+      context: workflowRunContext(f.state.run),
+    });
+    assert.equal(decision.action, 'fail');
+    assert.equal(decision.state, 'failure');
+    assert.match(decision.description, /Queue ref is no longer available/);
+    assert.equal(f.state.dispatches.length, 0);
+    assert.equal(f.state.statuses.at(-1).state, 'failure');
+  }
+  const f = queueFixture(t);
+  f.state.mainSha = MERGE;
+  const decision = await planPreview({
+    github: f.github,
+    core: fakeCore(),
+    workspace: tempDir(t),
+    context: workflowRunContext(f.state.run),
+  });
+  assert.equal(decision.action, 'fail');
+  assert.match(decision.description, /Queue base is no longer current main/);
+});
+test('queue API outages remain errors rather than obsolete candidates', async (t) => {
+  const f = queueFixture(t);
+  f.state.queueRefError = Object.assign(new Error('Service unavailable'), { status: 503 });
+  await assert.rejects(
+    planPreview({
+      github: f.github,
+      core: fakeCore(),
+      workspace: tempDir(t),
+      context: workflowRunContext(f.state.run),
+    }),
+    /Service unavailable/
+  );
+});
+test('deleted or rebased queue entries cannot upload or publish success', async (t) => {
+  for (const change of ['deleted', 'rebased']) {
+    const f = queueFixture(t);
+    const args = { github: f.github, core: fakeCore(), context: workflowDispatchContext() };
+    const decision = await planPreview({
+      ...args,
+      workspace: tempDir(t),
+      inputs: { run_id: '900' },
+    });
+    assert.equal(decision.action, 'deploy');
+    if (change === 'deleted')
+      f.state.queueRefError = Object.assign(new Error('Not Found'), { status: 404 });
+    else f.state.mainSha = MERGE;
+    await assert.rejects(
+      verifyForDeploy({ ...args, decision, destination: tempDir(t) }),
+      /obsolete/
+    );
+    assert.equal(
+      await publishResult({
+        ...args,
+        decision,
+        outcomes: { deploy: 'success', smoke: 'success' },
+      }),
+      'obsolete'
+    );
+    assert.equal(
+      f.state.statuses.some((status) => status.state === 'success'),
+      false
+    );
+  }
+});
 /* ------------------------------------------------------------------------------------------ */
 /* Archive                                                                                     */
 /* ------------------------------------------------------------------------------------------ */
@@ -367,6 +511,10 @@ function fakeCommits(state) {
     ...state.commits,
   };
 }
+function queueRefResponse(state) {
+  if (state.queueRefError) throw state.queueRefError;
+  return { data: { object: { sha: state.queueSha ?? state.run.head_sha } } };
+}
 function repoEndpoints(state) {
   return {
     git: {
@@ -378,6 +526,9 @@ function repoEndpoints(state) {
         return { data: commit };
       },
       getRef: async ({ ref }) => {
+        if (ref === `heads/${state.run.head_branch}` && state.run.event === 'merge_group') {
+          return queueRefResponse(state);
+        }
         assert.equal(ref, 'heads/main');
         return { data: { object: { sha: state.mainSha } } };
       },

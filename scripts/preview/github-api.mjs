@@ -73,7 +73,8 @@ export async function findLatestPullRun(github, repo, headSha, matches = () => t
 }
 export function isCiRun(run) {
   return (
-    run?.path === CI_WORKFLOW_PATH && ['pull_request', 'workflow_dispatch'].includes(run.event)
+    run?.path === CI_WORKFLOW_PATH &&
+    ['pull_request', 'workflow_dispatch', 'merge_group'].includes(run.event)
   );
 }
 /** Latest `CI Result` job check run from GitHub Actions on the exact head. */
