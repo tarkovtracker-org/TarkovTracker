@@ -83,6 +83,16 @@ describe('weekly publication cadence', () => {
   });
 });
 describe('automatic release retries', () => {
+  it.each(['10/13/2026', '2026-10-13', '2026-10-13T20:00:00+00:00', '2026-02-30T20:00:00Z'])(
+    'rejects malformed stable publication timestamp %s',
+    async (timestamp) => {
+      const f = fixture();
+      f.releases.push(published(timestamp));
+      await expect(releaseEligibility(f)).rejects.toThrow(
+        'Invalid stable release publication date'
+      );
+    }
+  );
   it('retries an overdue release the following day after main advances during its build', async () => {
     const f = fixture();
     f.releases.push(published('2026-09-29T19:54:42Z'));

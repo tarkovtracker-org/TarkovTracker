@@ -5,11 +5,20 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 // Daily opportunities catch up missed releases; only one scheduled publication per seven days.
 const RELEASE_EVENTS = new Set(['schedule', 'workflow_dispatch']);
 const RELEASE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+function parsePublicationDate(value) {
+  const invalid = () => new Error('Invalid stable release publication date.');
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) throw invalid();
+  const timestamp = Date.parse(value);
+  if (
+    !Number.isFinite(timestamp) ||
+    new Date(timestamp).toISOString() !== value.replace('Z', '.000Z')
+  )
+    throw invalid();
+  return timestamp;
+}
 function publicationTime(release) {
   if (release.draft || release.prerelease) return 0;
-  const timestamp = Date.parse(release.published_at);
-  if (!Number.isFinite(timestamp)) throw new Error('Invalid stable release publication date.');
-  return timestamp;
+  return parsePublicationDate(release.published_at);
 }
 async function scheduledCooldown({ github, context, now }) {
   if (context.eventName !== 'schedule') return null;
