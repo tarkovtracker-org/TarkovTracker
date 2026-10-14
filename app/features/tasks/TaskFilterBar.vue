@@ -135,50 +135,24 @@
         class="ml-auto flex w-full min-w-0 items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-wrap"
       >
         <TaskTeamFilter />
-        <SelectMenuFixed
+        <TaskFiltersPopover />
+        <SortControl
           v-model="taskSortMode"
           :items="sortOptions"
-          value-key="value"
-          size="sm"
-          class="min-w-0 flex-1 sm:w-32 sm:flex-none 2xl:w-44"
-          :aria-label="t('page.tasks.sort.aria_label')"
-        >
-          <template #leading>
-            <UIcon :name="currentSortIcon" class="h-4 w-4" />
-          </template>
-          <template #item="{ item }">
-            <div class="flex items-center gap-2">
-              <UIcon :name="item.icon" class="h-4 w-4" />
-              <span>{{ item.label }}</span>
-            </div>
-          </template>
-        </SelectMenuFixed>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :icon="sortDirectionIcon"
-          :aria-label="sortDirectionLabel"
-          @click="toggleSortDirection"
+          :label="t('page.tasks.sort.aria_label')"
+          :leading-icon="currentSortIcon"
+          :direction="taskSortDirection"
+          select-class="min-w-0 flex-1 sm:w-32 sm:flex-none 2xl:w-44"
+          @toggle-direction="toggleSortDirection"
         />
-        <AppTooltip :text="t('page.tasks.settings.title')">
-          <UButton
-            variant="ghost"
-            color="neutral"
-            size="sm"
-            icon="i-mdi-cog"
-            :aria-label="t('page.tasks.settings.title')"
-            :aria-pressed="isDrawerOpen"
-            :class="
-              isDrawerOpen
-                ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
-                : 'text-surface-400'
-            "
-            @click="toggleDrawer"
-          />
-        </AppTooltip>
+        <SettingsButton
+          data-testid="task-settings-button"
+          page-key="tasks"
+          :label="t('page.tasks.settings.title')"
+        />
       </div>
     </div>
+    <ActiveFilterChips test-id-prefix="task-active-filters" :filters="activeFilters" />
     <div
       v-if="primaryView === 'maps' && maps.length > 0"
       class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
@@ -258,8 +232,12 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
+  import ActiveFilterChips from '@/components/ui/ActiveFilterChips.vue';
+  import SettingsButton from '@/components/ui/SettingsButton.vue';
+  import SortControl from '@/components/ui/SortControl.vue';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
+  import { useTaskContentFilters } from '@/features/tasks/composables/useTaskContentFilters';
+  import TaskFiltersPopover from '@/features/tasks/TaskFiltersPopover.vue';
   import TaskTeamFilter from '@/features/tasks/TaskTeamFilter.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -285,7 +263,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const metadataStore = useMetadataStore();
-  const { isOpen: isDrawerOpen, toggle: toggleDrawer } = usePageSettingsDrawer('tasks');
+  const { activeFilters } = useTaskContentFilters();
   const { calculateMapTaskTotals, calculateStatusCounts, calculateTraderCounts } =
     useTaskFiltering();
   const primaryView = computed(() => preferencesStore.getTaskPrimaryView);
@@ -407,14 +385,6 @@
     get: () => preferencesStore.getTaskSortDirection,
     set: (value: TaskSortDirection) => preferencesStore.setTaskSortDirection(value),
   });
-  const sortDirectionIcon = computed(() =>
-    taskSortDirection.value === 'asc' ? 'i-mdi-sort-ascending' : 'i-mdi-sort-descending'
-  );
-  const sortDirectionLabel = computed(() =>
-    taskSortDirection.value === 'asc'
-      ? t('page.tasks.sort.ascending')
-      : t('page.tasks.sort.descending')
-  );
   const toggleSortDirection = () => {
     taskSortDirection.value = taskSortDirection.value === 'asc' ? 'desc' : 'asc';
   };

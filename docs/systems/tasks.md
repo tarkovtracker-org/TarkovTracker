@@ -26,6 +26,29 @@ highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).
 
+## Filters and page settings
+
+Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/`:
+
+- **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): a toolbar button showing
+  the active count opens everything that changes _which_ items show. Reset clears every saved
+  filter, including ones idle in the current scope.
+- **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
+  current view, plus Clear all when there are several. A filter that cannot apply to the current
+  view (team-shared without teammates, map-only filters off Maps, Kappa only on the Hideout scope)
+  gets no chip and does not count.
+- **Settings** (`SettingsButton`, `SettingsDrawer`, `PreferenceSettingGroups`): how items _look or
+  behave_. Tasks and Hideout keep a drawer, docked beside the content on desktop and an overlay on
+  mobile (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
+  toolbar view controls.
+- **Sort** (`SortControl`): the sort select plus a direction button.
+
+Task types (`useTaskContentFilters`) are additive: a task shows when it belongs to any selected type.
+An empty saved selection already means every type, so the last selected type stays locked on. Card
+display, status tab visibility and behavior preferences live in `useTaskDisplaySettings`; the
+failed-task repair action shows under Behavior only while failed tasks exist. The Hideout drawer's
+switches are read-only while the help tour points at it.
+
 ## Canonical task progression
 
 ### Server-side start requirements

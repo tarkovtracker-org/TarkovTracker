@@ -1,113 +1,17 @@
 <template>
-  <aside
-    ref="drawerRef"
-    tabindex="-1"
-    :role="isOverlayMode ? 'dialog' : 'complementary'"
-    :aria-modal="isOverlayMode ? 'true' : undefined"
-    aria-labelledby="hideout-settings-drawer-title"
+  <SettingsDrawer
+    page-key="hideout"
+    :mode="mode"
+    :title="t('page.hideout.settings.title')"
     data-help-target="hideout-settings-panel"
-    class="overflow-y-auto backdrop-blur-sm"
-    :class="
-      isOverlayMode
-        ? 'bg-surface-900/96 fixed right-3 bottom-3 left-3 z-40 flex max-h-[72vh] flex-col rounded-[28px] border border-white/10 p-4 shadow-2xl sm:top-24 sm:right-4 sm:bottom-4 sm:left-auto sm:max-h-[calc(100vh-7rem)] sm:w-96'
-        : 'bg-surface-800/95 sticky top-6 max-h-[calc(100vh-3rem)] w-full rounded-lg border border-white/10 p-4 shadow-xl'
-    "
-    @keydown="handleKeydown"
   >
-    <div class="mb-3 flex items-center justify-between">
-      <h2
-        id="hideout-settings-drawer-title"
-        class="light:text-surface-50 text-sm font-semibold text-white"
-      >
-        {{ copy('page.hideout.settings.title', 'Hideout settings') }}
-      </h2>
-      <UButton
-        variant="ghost"
-        color="neutral"
-        icon="i-mdi-close"
-        size="xs"
-        :aria-label="t('common.close')"
-        @click="handleClose"
-      />
-    </div>
-    <div class="space-y-3">
-      <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
-        <div class="mb-2 flex items-center gap-2">
-          <UIcon name="i-mdi-tune-variant" class="text-info-400 h-4 w-4" />
-          <h3
-            class="light:text-surface-50 text-xs font-semibold tracking-wide text-white uppercase"
-          >
-            {{ copy('page.hideout.settings.page_options', 'Page options') }}
-          </h3>
-        </div>
-        <div class="space-y-1">
-          <label
-            class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-          >
-            <UCheckbox v-model="collapseCompleted" color="success" :disabled="isHelpTourActive" />
-            <span class="text-surface-200 text-sm">
-              {{ copy('page.hideout.collapse_completed', 'Collapse completed stations') }}
-            </span>
-          </label>
-          <label
-            class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-          >
-            <UCheckbox v-model="sortReadyFirst" color="info" :disabled="isHelpTourActive" />
-            <span class="text-surface-200 text-sm">
-              {{ copy('page.hideout.sort.ready_first', 'Sort ready to build first') }}
-            </span>
-          </label>
-        </div>
-      </section>
-      <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
-        <div class="mb-2 flex items-center gap-2">
-          <UIcon name="i-mdi-lock-outline" class="text-primary-400 h-4 w-4" />
-          <h3
-            class="light:text-surface-50 text-xs font-semibold tracking-wide text-white uppercase"
-          >
-            {{ copy('page.hideout.prereq_filters.title', 'Availability requirements') }}
-          </h3>
-        </div>
-        <p class="text-surface-500 mb-2 text-xs">
-          {{
-            copy(
-              'page.hideout.settings.requirements_help',
-              'These options decide how strict the hideout page is when it marks stations as available or locked.'
-            )
-          }}
-        </p>
-        <div class="space-y-1">
-          <label
-            class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-          >
-            <UCheckbox v-model="requireStationLevels" :disabled="isHelpTourActive" />
-            <span class="text-surface-200 text-sm">
-              {{ copy('page.hideout.prereq_filters.station_levels', 'Require station levels') }}
-            </span>
-          </label>
-          <label
-            class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-          >
-            <UCheckbox v-model="requireSkillLevels" :disabled="isHelpTourActive" />
-            <span class="text-surface-200 text-sm">
-              {{ copy('page.hideout.prereq_filters.skill_levels', 'Require skill levels') }}
-            </span>
-          </label>
-          <label
-            class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-          >
-            <UCheckbox v-model="requireTraderLoyalty" :disabled="isHelpTourActive" />
-            <span class="text-surface-200 text-sm">
-              {{ copy('page.hideout.prereq_filters.trader_loyalty', 'Require trader loyalty') }}
-            </span>
-          </label>
-        </div>
-      </section>
-    </div>
-  </aside>
+    <PreferenceSettingGroups :groups="groups" test-id-prefix="hideout-setting" />
+  </SettingsDrawer>
 </template>
 <script setup lang="ts">
-  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
+  import PreferenceSettingGroups from '@/components/ui/PreferenceSettingGroups.vue';
+  import SettingsDrawer from '@/components/ui/SettingsDrawer.vue';
+  import type { PreferenceSetting, PreferenceSettingGroup } from '@/types/filters';
   interface Props {
     collapseCompleted: boolean;
     isHelpTourActive?: boolean;
@@ -117,6 +21,7 @@
     requireTraderLoyalty: boolean;
     sortReadyFirst: boolean;
   }
+  type BooleanPropKey = Exclude<keyof Props, 'isHelpTourActive' | 'mode'>;
   const props = withDefaults(defineProps<Props>(), {
     isHelpTourActive: false,
     mode: 'overlay',
@@ -129,48 +34,57 @@
     'update:sortReadyFirst': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { close } = usePageSettingsDrawer('hideout');
-  const drawerRef = ref<HTMLElement | null>(null);
-  const isOverlayMode = computed(() => props.mode === 'overlay');
-  const { restoreTriggerFocus, trapFocus } = useOverlayFocusTrap({
-    containerRef: drawerRef,
-    isOverlayMode,
-  });
-  const copy = (key: string, fallback: string) => {
-    const value = t(key);
-    return value === key ? fallback : value;
+  const updaters: Record<BooleanPropKey, (value: boolean) => void> = {
+    collapseCompleted: (value) => emit('update:collapseCompleted', value),
+    requireSkillLevels: (value) => emit('update:requireSkillLevels', value),
+    requireStationLevels: (value) => emit('update:requireStationLevels', value),
+    requireTraderLoyalty: (value) => emit('update:requireTraderLoyalty', value),
+    sortReadyFirst: (value) => emit('update:sortReadyFirst', value),
   };
-  const collapseCompleted = computed({
-    get: () => props.collapseCompleted,
-    set: (value: boolean) => emit('update:collapseCompleted', value),
+  // The help tour opens this drawer to point at it, so switches stay read-only until it ends.
+  const toSetting = (
+    key: string,
+    prop: BooleanPropKey,
+    label: string,
+    description?: string
+  ): PreferenceSetting => ({
+    key,
+    label,
+    description,
+    disabled: props.isHelpTourActive,
+    get: () => props[prop],
+    set: updaters[prop],
   });
-  const sortReadyFirst = computed({
-    get: () => props.sortReadyFirst,
-    set: (value: boolean) => emit('update:sortReadyFirst', value),
-  });
-  const requireStationLevels = computed({
-    get: () => props.requireStationLevels,
-    set: (value: boolean) => emit('update:requireStationLevels', value),
-  });
-  const requireSkillLevels = computed({
-    get: () => props.requireSkillLevels,
-    set: (value: boolean) => emit('update:requireSkillLevels', value),
-  });
-  const requireTraderLoyalty = computed({
-    get: () => props.requireTraderLoyalty,
-    set: (value: boolean) => emit('update:requireTraderLoyalty', value),
-  });
-  const handleClose = () => {
-    close();
-    nextTick(() => {
-      restoreTriggerFocus();
-    });
-  };
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      handleClose();
-      return;
-    }
-    trapFocus(event);
-  };
+  const groups = computed<PreferenceSettingGroup[]>(() => [
+    {
+      key: 'page_options',
+      title: t('page.hideout.settings.page_options'),
+      settings: [
+        toSetting('collapse_completed', 'collapseCompleted', t('page.hideout.collapse_completed')),
+        toSetting('sort_ready_first', 'sortReadyFirst', t('page.hideout.sort.ready_first')),
+      ],
+    },
+    {
+      key: 'requirements',
+      title: t('page.hideout.prereq_filters.title'),
+      hint: t('page.hideout.settings.requirements_help'),
+      settings: [
+        toSetting(
+          'station_levels',
+          'requireStationLevels',
+          t('page.hideout.prereq_filters.station_levels')
+        ),
+        toSetting(
+          'skill_levels',
+          'requireSkillLevels',
+          t('page.hideout.prereq_filters.skill_levels')
+        ),
+        toSetting(
+          'trader_loyalty',
+          'requireTraderLoyalty',
+          t('page.hideout.prereq_filters.trader_loyalty')
+        ),
+      ],
+    },
+  ]);
 </script>

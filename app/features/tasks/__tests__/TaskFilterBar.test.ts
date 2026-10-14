@@ -373,7 +373,7 @@ describe('TaskFilterBar', () => {
       drawerOpen: true,
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const settingsButton = wrapper.find('button[data-icon="i-mdi-cog"]');
+    const settingsButton = wrapper.find('button[data-icon="i-mdi-tune-variant"]');
     expect(settingsButton.exists()).toBe(true);
     expect(settingsButton.attributes('aria-pressed')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');

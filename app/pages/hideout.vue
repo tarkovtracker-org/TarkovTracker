@@ -53,25 +53,12 @@
                   data-help-target="hideout-filter-actions"
                   class="flex items-center justify-center gap-2 lg:justify-end"
                 >
-                  <UButton
-                    icon="i-mdi-cog"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
+                  <SettingsButton
+                    page-key="hideout"
+                    data-testid="hideout-settings-button"
                     data-help-target="hideout-settings-button"
-                    :aria-label="t('common.settings')"
-                    :aria-pressed="isSettingsOpen"
-                    :class="
-                      isSettingsOpen
-                        ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
-                        : 'text-surface-400'
-                    "
-                    @click="toggleSettingsDrawer"
-                  >
-                    <span class="hidden sm:inline">
-                      {{ t('common.settings').toUpperCase() }}
-                    </span>
-                  </UButton>
+                    :label="t('page.hideout.settings.title')"
+                  />
                 </div>
               </div>
             </div>
@@ -180,7 +167,7 @@
       >
         <div
           v-if="isDesktopSettingsDrawerOpen"
-          class="pointer-events-none fixed top-20 right-4 z-30 w-80 xl:w-[22rem]"
+          class="pointer-events-none fixed top-20 right-4 z-30 w-80 xl:w-88"
         >
           <div class="pointer-events-auto">
             <HideoutSettingsDrawer
@@ -240,6 +227,7 @@
 <script setup lang="ts">
   import { useBreakpoints, useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
+  import SettingsButton from '@/components/ui/SettingsButton.vue';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
@@ -260,7 +248,7 @@
   const router = useRouter();
   const { t } = useI18n({ useScope: 'global' });
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('hideout');
-  const { isOpen: isSettingsOpen, toggle: toggleSettingsDrawer } = usePageSettingsDrawer('hideout');
+  const { isOpen: isSettingsOpen } = usePageSettingsDrawer('hideout');
   const dockedDrawerBreakpoints = useBreakpoints({ dockedHideoutDrawer: 1768 });
   const isWideEnoughForDockedDrawer = dockedDrawerBreakpoints.greaterOrEqual('dockedHideoutDrawer');
   const { getPageHelpContent } = usePageHelpContent();
