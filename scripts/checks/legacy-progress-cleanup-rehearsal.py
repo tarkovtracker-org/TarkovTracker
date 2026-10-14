@@ -163,11 +163,24 @@ sql(LAB, "DROP VIEW public.cleanup_unknown_dependency;")
 # Real conflicting access-share transaction; the bounded candidate must abort and roll back.
 holder = subprocess.Popen(["docker", "exec", "-i", CONTAINER, "psql", "-X", "-q", "-U", "postgres",
                           "-d", LAB], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-holder.stdin.write(b"BEGIN; SELECT count(*) FROM public.user_progress; SELECT pg_sleep(4); COMMIT;\n")
-holder.stdin.close()
-time.sleep(0.3)
-locked = guarded_candidate(LAB)
-holder.wait(timeout=10)
+holder.stdin.write(b"BEGIN; LOCK TABLE public.user_progress IN ACCESS SHARE MODE;\n")
+holder.stdin.flush()
+try:
+    deadline = time.monotonic() + 10
+    while scalar(LAB, "SELECT count(*) FROM pg_locks WHERE database=(SELECT oid FROM pg_database "
+                 "WHERE datname=current_database()) AND relation='public.user_progress'::regclass "
+                 "AND mode='AccessShareLock' AND granted AND pid<>pg_backend_pid();") == "0":
+        if holder.poll() is not None:
+            raise RuntimeError("lock holder exited before acquiring its lock")
+        if time.monotonic() >= deadline:
+            raise RuntimeError("lock holder never acquired its lock")
+        time.sleep(0.05)
+    locked = guarded_candidate(LAB)
+finally:
+    if holder.poll() is None:
+        holder.stdin.write(b"ROLLBACK;\n")
+        holder.stdin.close()
+    holder.wait(timeout=10)
 check("active account reader causes bounded lock timeout and atomic rollback",
       locked.returncode != 0 and "lock timeout" in locked.stderr.decode())
 check("lock timeout preserves account and normalized data", fingerprints(LAB) == before)
