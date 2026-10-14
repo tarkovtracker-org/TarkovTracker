@@ -150,7 +150,7 @@ async function subscriptionPair(label, holderSql, waiterSql) {
   assert.equal(first.code, 0, first.stderr);
   assert.equal(second.code, 0, second.stderr);
   const expiry = creditSnapshot();
-  const elapsed = expiry.observed_at - baseline.observed_at;
+  const elapsed = Math.max(0, expiry.observed_at - baseline.observed_at);
   const remainingChange = expiry.remaining - baseline.remaining - 30 * 86400;
   // Running credit spends real time while paused credit does not. Neither may
   // gain time or lose more than the actual duration of the observed transition.
