@@ -20,17 +20,21 @@ export type PersistedPreferencesStateWithLegacy = PersistedPreferencesState & {
   useAutomaticLevelCalculation?: unknown;
   neededItemsHideCollected?: boolean;
   onlyTasksWithSuggestedKeys?: boolean;
+  hideoutSortReadyFirst?: unknown;
+  hideoutCollapseCompleted?: unknown;
 };
+// Hideout ready-first ordering is always on and the collapse-completed switch was removed.
+const LEGACY_PREFERENCE_KEYS = [
+  'useAutomaticLevelCalculation',
+  'taskCardDensity',
+  'hideoutSortReadyFirst',
+  'hideoutCollapseCompleted',
+  'neededItemsHideCollected',
+  'onlyTasksWithSuggestedKeys',
+] as const;
 export const requiresLegacyPreferencesMigration = (
   persistedState: PersistedPreferencesStateWithLegacy
-): boolean => {
-  return (
-    'useAutomaticLevelCalculation' in persistedState ||
-    'taskCardDensity' in persistedState ||
-    'neededItemsHideCollected' in persistedState ||
-    'onlyTasksWithSuggestedKeys' in persistedState
-  );
-};
+): boolean => LEGACY_PREFERENCE_KEYS.some((key) => key in persistedState);
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object') {
     return false;
@@ -179,6 +183,8 @@ export const sanitizePersistedPreferencesState = (
   ) as PersistedPreferencesStateWithLegacy;
   delete sanitizedState.useAutomaticLevelCalculation;
   delete sanitizedState.taskCardDensity;
+  delete sanitizedState.hideoutSortReadyFirst;
+  delete sanitizedState.hideoutCollapseCompleted;
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
   if (
     typeof sanitizedState.neededItemsHideOwned !== 'boolean' &&

@@ -28,6 +28,19 @@ vi.mock('@/utils/userScopedStorage', async () => {
     getCurrentSupabaseUserId: () => currentUserId.value,
   };
 });
+describe('retired hideout preferences', () => {
+  it('discards saved sort and collapse values and preserves other hideout preferences', () => {
+    const store = usePreferencesStore();
+    store.replacePersistedState({
+      hideoutSortReadyFirst: true,
+      hideoutCollapseCompleted: true,
+      hideoutRequireSkillLevels: false,
+    } as Parameters<typeof store.replacePersistedState>[0]);
+    expect(store.$state).not.toHaveProperty('hideoutSortReadyFirst');
+    expect(store.$state).not.toHaveProperty('hideoutCollapseCompleted');
+    expect(store.getHideoutRequireSkillLevels).toBe(false);
+  });
+});
 describe('retired task card density', () => {
   it.each(['comfortable', 'compact'])(
     'discards legacy %s density and preserves other preferences',
@@ -290,6 +303,23 @@ describe('usePreferencesStore', () => {
       setActivePinia(newPinia);
       const store = usePreferencesStore();
       expect(store.neededItemsHideOwned).toBe(false);
+    });
+    it('persists removal of retired hideout preferences on hydration', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage(
+          { hideoutSortReadyFirst: true, hideoutCollapseCompleted: true, showNextQuests: false },
+          'user-1',
+          1234
+        )
+      );
+      currentUserId.value = 'user-1';
+      usePreferencesStore();
+      expect(JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}')).toEqual({
+        _timestamp: 1234,
+        _userId: 'user-1',
+        data: { showNextQuests: false },
+      });
     });
     it.each(['compact', 'comfortable'])(
       'persists removal of legacy %s density on hydration',
