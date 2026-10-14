@@ -37,7 +37,8 @@ Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/
 - **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
   current view. Clear all, shown when there are several, clears only those visible filters. A
   filter that cannot apply to the current view gets no chip and does not count: team-shared off the
-  whole team's Available tab, map-only filters off Maps, and Kappa only on the Hideout scope.
+  whole team's Available tab, map-only filters off Maps, and the Kappa-only filter on the Hideout
+  scope, where it is disabled.
 - **Settings** (`SettingsButton`, `SettingsDrawer`, `PreferenceSettingGroups`): how items _look or
   behave_. Tasks and Hideout keep a drawer, docked beside the content on wide screens and an overlay
   otherwise (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
