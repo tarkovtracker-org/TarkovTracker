@@ -1,7 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { reactive } from 'vue';
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 const toastAdd = vi.fn();
+const context = reactive({ currentGameMode: 'pvp' });
+vi.mock('@/stores/useTarkov', () => ({ useTarkovStore: () => context }));
 vi.mock('@/composables/useSafeToast', () => ({
   useSafeToast: () => ({ add: toastAdd }),
 }));
@@ -9,6 +12,7 @@ describe('useActionHistoryStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     toastAdd.mockClear();
+    context.currentGameMode = 'pvp';
   });
   it('pushes actions with a timestamp', () => {
     const store = useActionHistoryStore();
@@ -63,4 +67,25 @@ describe('useActionHistoryStore', () => {
     store.clearHistory();
     expect(store.undoStack).toHaveLength(0);
   });
+  it.each(['resolve', 'reject'])(
+    'ignores a late undo %s after a context change',
+    async (outcome) => {
+      let resolve!: () => void;
+      let reject!: (error: Error) => void;
+      const pending = new Promise<void>((ok, fail) => {
+        resolve = ok;
+        reject = fail;
+      });
+      const store = useActionHistoryStore();
+      store.pushAction({ id: 'old', description: 'Old', undo: () => pending });
+      const undo = store.undoLastAction();
+      context.currentGameMode = 'pve';
+      store.pushAction({ id: 'new', description: 'New', undo: vi.fn() });
+      if (outcome === 'resolve') resolve();
+      else reject(new Error('late failure'));
+      await undo;
+      expect(store.undoStack.map((entry) => entry.id)).toEqual(['new']);
+      expect(toastAdd).not.toHaveBeenCalled();
+    }
+  );
 });

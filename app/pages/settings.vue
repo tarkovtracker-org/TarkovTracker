@@ -69,6 +69,7 @@
               :aria-label="$t('settings.tabs.progression')"
             >
               <DisplayNameCard />
+              <PlayerLevelCard />
               <SkillsCard />
               <ResetProgressCard />
             </section>
@@ -179,6 +180,7 @@
   import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
+  import PlayerLevelCard from '@/features/settings/PlayerLevelCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';

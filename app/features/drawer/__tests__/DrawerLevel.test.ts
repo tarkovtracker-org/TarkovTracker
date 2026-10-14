@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import DrawerLevel from '@/features/drawer/DrawerLevel.vue';
 const { setLevel } = vi.hoisted(() => ({ setLevel: vi.fn() }));
 vi.mock('@/stores/useTarkov', () => ({
-  useTarkovStore: () => ({ playerLevel: () => 37, setLevel }),
+  useTarkovStore: () => ({ getCurrentGameMode: () => 'pvp', playerLevel: () => 37, setLevel }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({

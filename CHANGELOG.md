@@ -1,3 +1,21 @@
+# [1.87.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.86.0...v1.87.0) (2026-10-13)
+
+
+### Bug Fixes
+
+* bound client log uploads before Pages buffering ([#1212](https://github.com/tarkovtracker-org/TarkovTracker/issues/1212)) ([927b20b](https://github.com/tarkovtracker-org/TarkovTracker/commit/927b20bda02eae54918546e97589342f797f23d7))
+* **recovery:** bound device archive entry count ([#1203](https://github.com/tarkovtracker-org/TarkovTracker/issues/1203)) ([4a10e05](https://github.com/tarkovtracker-org/TarkovTracker/commit/4a10e0599144df823f4c640bacb7fb377bbd6fad))
+* **maps:** draw locked task markers under the Locked and All filters ([#1211](https://github.com/tarkovtracker-org/TarkovTracker/issues/1211)) ([9bf9790](https://github.com/tarkovtracker-org/TarkovTracker/commit/9bf9790186bfc95beb829e2c05759a3930877034))
+* invalidate task undo across account and mode changes ([#1208](https://github.com/tarkovtracker-org/TarkovTracker/issues/1208)) ([f09db5a](https://github.com/tarkovtracker-org/TarkovTracker/commit/f09db5adaa0b45324eacadd495a993e629fe1089))
+* **tasks:** lock tasks of traders unlocked by a task reward ([#1214](https://github.com/tarkovtracker-org/TarkovTracker/issues/1214)) ([8beb521](https://github.com/tarkovtracker-org/TarkovTracker/commit/8beb5213ccdb43da5a228ce8c1643161e07ed58c))
+* **debug:** omit query and fragment values from exports ([#1204](https://github.com/tarkovtracker-org/TarkovTracker/issues/1204)) ([a1b6c89](https://github.com/tarkovtracker-org/TarkovTracker/commit/a1b6c8975daae6c1f8e18791f3047f83ba5d5cd4))
+* **analytics:** sanitize OAuth URLs and tracker defaults ([#1205](https://github.com/tarkovtracker-org/TarkovTracker/issues/1205)) ([97f9fd6](https://github.com/tarkovtracker-org/TarkovTracker/commit/97f9fd6357e358eef3b48b4a2a11cd602b085b53))
+
+
+### Features
+
+* **settings:** add a validated Current Level editor ([#1210](https://github.com/tarkovtracker-org/TarkovTracker/issues/1210)) ([2fad08b](https://github.com/tarkovtracker-org/TarkovTracker/commit/2fad08b63c4bd979dec21f144305cc218cbfc4e8))
+
 # [1.86.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.85.0...v1.86.0) (2026-10-13)
 
 
