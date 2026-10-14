@@ -604,3 +604,16 @@ test('rollout coexistence preserves Crowdin freshness while accepting a reviewed
     /must include current main/
   );
 });
+test('Crowdin requests admission before inspecting mergeability blocked on the missing admission gate', (t) => {
+  const f = fixture(t);
+  const queue = {
+    RULES: JSON.stringify(queueRules()),
+    BLOCKED_UNTIL_ADMISSION: 'true',
+    MERGE_OUTCOME: 'OPEN',
+  };
+  passed(f.run('prepare', queue));
+  passed(f.run('merge', queue));
+  assert.ok(f.events().some((event) => event.type === 'admission-success'));
+  assert.ok(f.events().some((event) => event.type === 'merge'));
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+});

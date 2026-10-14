@@ -340,7 +340,17 @@ async function evaluateQueuedScope(github, context, core, scope, source) {
   });
   core.setOutput('queue_sha', queued.statusSha);
 }
+function sensitiveCommand(body) {
+  return typeof body === 'string' && body.trimStart().startsWith('/approve-sensitive ');
+}
+export function relevantComment(payload) {
+  return [payload.comment?.body, payload.changes?.body?.from].some(sensitiveCommand);
+}
 export async function runReviewAdmission({ github, context, core }) {
+  if (context.eventName === 'issue_comment' && !relevantComment(context.payload)) {
+    core.notice('Unrelated issue comment does not affect review admission.');
+    return;
+  }
   const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
   await requireSignal(github, context);

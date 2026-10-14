@@ -4,18 +4,36 @@ import { pathToFileURL } from 'node:url';
 const queuedFiles = new Map([
   ['.github/workflows/preview.yml', 'pages-preview-lifecycle'],
   ['.github/workflows/preview-retention.yml', 'pages-preview-lifecycle'],
-  ['.github/workflows/review-admission.yml', 'review-admission-publication'],
   ['.github/workflows/release-promotion-queue.yml', 'release-promotion-queue'],
 ]);
 /** Validate the documented queue extension before the older native parser sees the workflow. */
 export function normalizeQueueWorkflow(source, filename) {
+  if (filename === '.github/workflows/review-admission.yml')
+    return normalizeAdmissionWorkflow(source, filename);
   const group = queuedFiles.get(filename);
   if (!group) return source;
   const concurrency = `concurrency:\n  group: ${group}\n  queue: max\n  cancel-in-progress: false\n`;
-  const block = source.match(/^concurrency:\n(?:[ \t]+[^\n]*\n)*/m)?.[0];
+  const block = matchingBlock(source, /^concurrency:\n(?:[ \t]+[^\n]*\n)*/m);
   if (block !== concurrency) throw new Error(`Invalid preview lifecycle concurrency: ${filename}`);
   // Preserve line numbers. Every other key/expression/shell check remains native actionlint input.
   return source.replace(concurrency, concurrency.replace('  queue: max', ''));
+}
+function normalizeAdmissionWorkflow(source, filename) {
+  const expected =
+    '    concurrency:\n      group: review-admission-publication\n      queue: max\n      cancel-in-progress: false\n';
+  const jobs = matchingBlock(source, /^jobs:\n(?:[ \t]+[^\n]*\n|[ \t]*\n)*/m);
+  const job = matchingBlock(jobs, /^ {2}admission:\n(?:[ \t]{4,}[^\n]*\n|[ \t]*\n)*/m);
+  const block = matchingBlock(job, /^ {4}concurrency:\n(?:[ \t]{6,}[^\n]*\n)*/m);
+  if (block !== expected) throw new Error(`Invalid admission job concurrency: ${filename}`);
+  requireSingleConcurrency(source, filename);
+  return source.replace(expected, expected.replace('      queue: max', ''));
+}
+function matchingBlock(source, pattern) {
+  return source.match(pattern)?.[0] ?? '';
+}
+function requireSingleConcurrency(source, filename) {
+  const occurrences = source.match(/^[ \t]*concurrency:/gm) ?? [];
+  if (occurrences.length !== 1) throw new Error(`Ambiguous admission job concurrency: ${filename}`);
 }
 /** Run unchanged native checks, extending only the strictly validated serialization blocks. */
 function lintWorkflow(binary, filename) {

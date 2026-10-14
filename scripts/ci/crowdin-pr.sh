@@ -156,11 +156,12 @@ merge() {
   check_revision "$pr"
   # Preview Result targets the validated head; GitHub may regenerate the test merge at merge time.
   wait_for_preview_result "$HEAD_SHA"
-  wait_for_mergeability
   require_main_ci_policy
   if [[ "$MAIN_MERGE_MODE" != strict ]]; then
     wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
   fi
+  wait_for_mergeability
+  require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.
   gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
     --match-head-commit "$HEAD_SHA" --squash \

@@ -18,8 +18,13 @@ const { AdmissionPending, admissionDecision, classifyRisk } =
 const { createReviewPublisher, publisherConfig, requireReceiptIssuer } =
   await import('../ci/review-admission-issuer.mjs');
 const { safeLockfileChange } = await import('../ci/review-admission-lock.mjs');
-const { evaluateAdmission, publishReviewAdmission, publishReviewScope, runReviewAdmission } =
-  await import('../ci/review-admission.mjs');
+const {
+  evaluateAdmission,
+  publishReviewAdmission,
+  publishReviewScope,
+  runReviewAdmission,
+  relevantComment,
+} = await import('../ci/review-admission.mjs');
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const queued = 'c'.repeat(40);
@@ -882,7 +887,11 @@ function queuedControlFixture() {
     queueAllowed: true,
   };
   f.context.eventName = 'issue_comment';
-  f.context.payload = { action: 'deleted', issue: { number: 1, pull_request: {} } };
+  f.context.payload = {
+    action: 'deleted',
+    issue: { number: 1, pull_request: {} },
+    comment: { body: `/approve-sensitive ${head}` },
+  };
   f.github.rest.git = { ...q.github.rest.git, listMatchingRefs: 'refs' };
   f.github.rest.repos.compareCommits = q.github.rest.repos.compareCommits;
   f.f.refs = [{ ref: q.group.head_ref, object: { sha: queued } }];
@@ -1472,4 +1481,161 @@ test('queue issuer and generic App identity guards detect removed isolation', as
     () => assert.throws(() => configMutant.publisherConfig(generic)),
     assert.AssertionError
   );
+});
+function commentPayload(change = {}) {
+  return {
+    action: 'created',
+    issue: { number: 1, pull_request: {} },
+    comment: { body: '' },
+    changes: { body: { from: '' } },
+    ...change,
+  };
+}
+function admissionJobAllowsComment(source, payload) {
+  assert.ok(
+    !/^concurrency:/m.test(source),
+    'Unrelated comments must be filtered before joining a queue.'
+  );
+  assert.match(
+    source,
+    /^ {4}concurrency:\n {6}group: review-admission-publication\n {6}queue: max\n {6}cancel-in-progress: false$/m
+  );
+  const expression = source.match(/ {4}if: >-\n([\s\S]*?) {4}concurrency:/)[1].trim();
+  const evaluate = new Function(
+    'github',
+    'startsWith',
+    'contains',
+    'fromJSON',
+    `return (${expression});`
+  );
+  return Boolean(
+    evaluate(
+      { event_name: 'issue_comment', event: payload },
+      (value, prefix) => typeof value === 'string' && value.startsWith(prefix),
+      (values, value) => values.includes(value),
+      JSON.parse
+    )
+  );
+}
+test('only sensitive approval comments and their edits/deletions enter serialized admission', async () => {
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  for (const payload of [
+    commentPayload(),
+    commentPayload({ comment: { body: 'Thanks for the fix' } }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: 'New unrelated comment' },
+      changes: { body: { from: 'Old unrelated comment' } },
+    }),
+  ]) {
+    assert.equal(relevantComment(payload), false);
+    assert.equal(admissionJobAllowsComment(source, payload), false);
+    const f = queuedControlFixture();
+    f.context.payload = payload;
+    await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+    assert.equal(f.statuses.length, 1); // Seeded queue status is untouched by an unrelated comment.
+  }
+  for (const payload of [
+    commentPayload({ comment: { body: `/approve-sensitive ${head}`, author_association: 'NONE' } }),
+    commentPayload({ action: 'deleted', comment: { body: `/approve-sensitive ${head}` } }),
+    ...[' ', '\t'].flatMap((prefix) => [
+      commentPayload({ comment: { body: `${prefix}/approve-sensitive ${head}` } }),
+      commentPayload({
+        action: 'deleted',
+        comment: { body: `${prefix}/approve-sensitive ${head}` },
+      }),
+      commentPayload({
+        action: 'edited',
+        comment: { body: 'Withdrawn' },
+        changes: { body: { from: `${prefix}/approve-sensitive ${head}` } },
+      }),
+    ]),
+    commentPayload({
+      action: 'edited',
+      comment: { body: 'Approval withdrawn' },
+      changes: { body: { from: `/approve-sensitive ${head}` } },
+    }),
+  ]) {
+    assert.equal(relevantComment(payload), true);
+    assert.equal(admissionJobAllowsComment(source, payload), true);
+    const f = queuedControlFixture();
+    f.context.payload = payload;
+    f.f.files[0].filename = 'supabase/migrations/important.sql';
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+  }
+});
+test('comment filter regression controls detect old-body revocation loss and workflow-level contention', async () => {
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    '[payload.comment?.body, payload.changes?.body?.from]',
+    '[payload.comment?.body]'
+  );
+  const payload = commentPayload({
+    action: 'edited',
+    comment: { body: 'Withdrawn' },
+    changes: { body: { from: `/approve-sensitive ${head}` } },
+  });
+  assert.equal(relevantComment(payload), true);
+  assert.throws(() => assert.equal(mutant.relevantComment(payload), true), assert.AssertionError);
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const jobBlock = source.match(/^ {4}concurrency:\n(?: {6}[^\n]*\n)*/m)[0];
+  const global = jobBlock
+    .split('\n')
+    .map((line) => line.slice(4))
+    .join('\n');
+  const globalMutant = global + source.replace(jobBlock, '');
+  assert.throws(
+    () => admissionJobAllowsComment(globalMutant, commentPayload()),
+    assert.AssertionError
+  );
+  const unfiltered = source.replace(
+    " &&\n      (contains(github.event.comment.body, '/approve-sensitive ') || contains(github.event.changes.body.from, '/approve-sensitive '))",
+    ''
+  );
+  assert.equal(admissionJobAllowsComment(source, commentPayload()), false);
+  assert.equal(admissionJobAllowsComment(unfiltered, commentPayload()), true);
+  const currentOnly = source.replace(
+    " || contains(github.event.changes.body.from, '/approve-sensitive ')",
+    ''
+  );
+  assert.equal(admissionJobAllowsComment(source, payload), true);
+  assert.equal(admissionJobAllowsComment(currentOnly, payload), false);
+});
+test('whitespace approval revocation guards detect restoring raw startsWith filters', async () => {
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    "body.trimStart().startsWith('/approve-sensitive ')",
+    "body.startsWith('/approve-sensitive ')"
+  );
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const rawWorkflow = source
+    .replaceAll(
+      "contains(github.event.comment.body, '/approve-sensitive ')",
+      "startsWith(github.event.comment.body, '/approve-sensitive ')"
+    )
+    .replaceAll(
+      "contains(github.event.changes.body.from, '/approve-sensitive ')",
+      "startsWith(github.event.changes.body.from, '/approve-sensitive ')"
+    );
+  for (const prefix of [' ', '\t']) {
+    for (const payload of [
+      commentPayload({
+        action: 'deleted',
+        comment: { body: `${prefix}/approve-sensitive ${head}` },
+      }),
+      commentPayload({
+        action: 'edited',
+        comment: { body: 'Withdrawn' },
+        changes: { body: { from: `${prefix}/approve-sensitive ${head}` } },
+      }),
+    ]) {
+      assert.equal(relevantComment(payload), true);
+      assert.equal(admissionJobAllowsComment(source, payload), true);
+      assert.equal(mutant.relevantComment(payload), false);
+      assert.equal(admissionJobAllowsComment(rawWorkflow, payload), false);
+    }
+  }
 });

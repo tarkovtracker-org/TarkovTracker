@@ -270,7 +270,7 @@ export function queueOperations(repo) {
     ).trim();
   const submit = (number, head, mode) => {
     const args = ['pr', 'merge', String(number), '--repo', repository, '--match-head-commit', head];
-    if (mode === 'strict') args.push('--squash');
+    if (['strict', 'strict-queue'].includes(mode)) args.push('--squash');
     execFileSync('gh', args, { env, stdio: 'inherit' });
   };
   const dispatchMain = () =>
@@ -282,7 +282,10 @@ export function queueOperations(repo) {
 }
 async function submitCandidate(github, repo, pr, sourceSha, operations) {
   const mode = operations.policy();
-  requireCondition(['strict', 'queue'].includes(mode), 'Unsupported main merge policy.');
+  requireCondition(
+    ['strict', 'strict-queue', 'queue'].includes(mode),
+    'Unsupported main merge policy.'
+  );
   const { data: live } = await github.rest.pulls.get({ ...repo, pull_number: pr.number });
   if (!liveIdentity(live, pr, repo)) return skip('Release PR is no longer open and ready.');
   if (await alreadyQueued(github, repo, live)) return skip('Release PR is already queued.');

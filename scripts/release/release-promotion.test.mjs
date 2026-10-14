@@ -181,6 +181,28 @@ function fixture() {
     notes,
   };
 }
+function sameVersionHistory() {
+  const f = fixture();
+  f.prs.unshift({
+    ...structuredClone(f.pr),
+    number: 900,
+    merge_commit_sha: 'd'.repeat(40),
+    head: { ...structuredClone(f.pr.head), sha: 'e'.repeat(40), ref: 'wip/release-1.2.3-122-1' },
+  });
+  return f;
+}
+function publishedHistory() {
+  const f = sameVersionHistory();
+  f.sha = 'f'.repeat(40); // Ordinary main commit after rollback, fresh merge and publication.
+  f.assets[`${f.sha}/package.json`] = f.assets[`${mergedSha}/package.json`];
+  f.github.rest.git.getRef.mockResolvedValue({
+    data: { object: { type: 'commit', sha: mergedSha } },
+  });
+  f.github.rest.repos.getReleaseByTag.mockResolvedValue({
+    data: { draft: false, prerelease: false },
+  });
+  return f;
+}
 describe('asynchronous release promotion', () => {
   it('publishes only actual merged SHA after authenticating source run, assets, CI and preview', async () => {
     const f = fixture();
@@ -287,14 +309,7 @@ describe('asynchronous release promotion', () => {
     await expect(queuedRelease(f)).rejects.toThrow('provenance changed');
   });
   it('finalizes the exact fresh same-version merge after stale merge, rollback and reprepare history', async () => {
-    const f = fixture();
-    const stale = {
-      ...structuredClone(f.pr),
-      number: 900,
-      merge_commit_sha: 'd'.repeat(40),
-      head: { ...structuredClone(f.pr.head), sha: 'e'.repeat(40), ref: 'wip/release-1.2.3-122-1' },
-    };
-    f.prs.unshift(stale); // Immutable old history remains after the reviewed rollback/reprepare.
+    const f = sameVersionHistory(); // Immutable history survives reviewed rollback/reprepare.
     expect((await queuedRelease(f)).recovery).toMatchObject({ sha: mergedSha, version: '1.2.3' });
     expect(f.github.rest.actions.getWorkflowRunAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ run_id: 123 })
@@ -302,6 +317,78 @@ describe('asynchronous release promotion', () => {
     expect(f.github.rest.actions.getWorkflowRunAttempt).not.toHaveBeenCalledWith(
       expect.objectContaining({ run_id: 122 })
     );
+  });
+  it('permits later ordinary main after the unique tagged fresh same-version promotion was published', async () => {
+    const f = publishedHistory();
+    expect(await queuedRelease(f)).toBeNull();
+    expect(f.github.rest.git.getRef).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: 'tags/v1.2.3' })
+    );
+    expect(f.github.rest.repos.getReleaseByTag).toHaveBeenCalledWith(
+      expect.objectContaining({ tag: 'v1.2.3' })
+    );
+    expect(f.github.rest.actions.getWorkflowRunAttempt).not.toHaveBeenCalled();
+  });
+  it.each([
+    [
+      'wrong tag target',
+      (f) => {
+        f.github.rest.git.getRef.mockResolvedValue({
+          data: { object: { type: 'commit', sha: source } },
+        });
+      },
+    ],
+    [
+      'noncommit tag',
+      (f) => {
+        f.github.rest.git.getRef.mockResolvedValue({
+          data: { object: { type: 'tag', sha: mergedSha } },
+        });
+      },
+    ],
+    [
+      'missing tag',
+      (f) => {
+        f.github.rest.git.getRef.mockRejectedValue(
+          Object.assign(new Error('missing'), { status: 404 })
+        );
+      },
+    ],
+    [
+      'missing publication',
+      (f) => {
+        f.github.rest.repos.getReleaseByTag.mockRejectedValue(
+          Object.assign(new Error('missing'), { status: 404 })
+        );
+      },
+    ],
+    [
+      'draft publication',
+      (f) => {
+        f.github.rest.repos.getReleaseByTag.mockResolvedValue({
+          data: { draft: true, prerelease: false },
+        });
+      },
+    ],
+    [
+      'prerelease publication',
+      (f) => {
+        f.github.rest.repos.getReleaseByTag.mockResolvedValue({
+          data: { draft: false, prerelease: true },
+        });
+      },
+    ],
+    [
+      'ambiguous tagged provenance',
+      (f) => {
+        f.prs[0].merge_commit_sha = mergedSha;
+      },
+    ],
+  ])('holds multiple historical same-version merges with %s', async (_, change) => {
+    const f = publishedHistory();
+    change(f);
+    await expect(queuedRelease(f)).rejects.toThrow();
+    expect(f.github.rest.actions.getWorkflowRunAttempt).not.toHaveBeenCalled();
   });
   it('ignores authored PR body source/commit spoofing', async () => {
     const f = fixture();

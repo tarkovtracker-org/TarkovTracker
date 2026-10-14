@@ -58,6 +58,10 @@ uses a `pull_request` rule with `required_review_thread_resolution: true` and ze
 approvals, so a newly reopened thread blocks the server-side merge even when no workflow event
 was emitted. Low-risk bot admission does not create a human approving review.
 
+The controller serializes relevant events at job scope, after its event filter. Ordinary issue
+comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
+including withdrawal of a command with leading whitespace.
+
 Small ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Sensitive and unclassified changes require an exact-head approving review
 from an independent write collaborator, or a write collaborator's single-line command:

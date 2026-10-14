@@ -220,6 +220,13 @@ it('dispatches main CI only after an actual confirmed merge, never after queue s
   expect((await queueReleasePromotion(f)).state).toBe('MERGED');
   expect(f.operations.dispatchMain).toHaveBeenCalledTimes(1);
 });
+it('submits strict-queue promotion with exact-head gates and leaves confirmed OPEN queue entries pending', async () => {
+  const f = fixture();
+  f.operations.policy.mockReturnValue('strict-queue');
+  expect((await queueReleasePromotion(f)).state).toBe('QUEUED');
+  expect(f.operations.submit).toHaveBeenCalledExactlyOnceWith(901, head, 'strict-queue');
+  expect(f.operations.dispatchMain).not.toHaveBeenCalled();
+});
 it('does not claim QUEUED when submission is accepted without a confirmed queue entry', async () => {
   const f = fixture();
   f.operations.submit.mockImplementation(() => {});
@@ -252,6 +259,18 @@ it('CLI operations use trusted policy and exact-head normal merge without bypass
       .some((arg) => ['--admin', '--auto'].includes(arg))
   ).toBe(false);
 });
+it.each(['strict', 'strict-queue'])(
+  'CLI %s submits an explicit head-pinned squash without bypass',
+  (mode) => {
+    const operations = queueOperations({ owner: 'owner', repo: 'repo' });
+    operations.submit(901, head, mode);
+    expect(execFileSync).toHaveBeenCalledTimes(1);
+    expect(execFileSync.mock.calls[0].slice(0, 2)).toEqual([
+      'gh',
+      ['pr', 'merge', '901', '--repo', 'owner/repo', '--match-head-commit', head, '--squash'],
+    ]);
+  }
+);
 it('consumes the PR-head receipt alongside its queue-head receipt without re-enqueueing the group', async () => {
   const f = fixture();
   const groupHead = 'c'.repeat(40);

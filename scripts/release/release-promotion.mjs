@@ -147,11 +147,19 @@ async function pendingPromotion(github, repo, prs, sha) {
     requireCondition(current.length === 1, 'Ambiguous current version promotion provenance.');
     return current[0];
   }
+  if (await publishedHistoricalPromotion(github, repo, pending, manifest.version)) return null;
   requireCondition(
     pending.length === 1,
     'Main advanced beyond multiple unpublished snapshots; reviewed recovery is required.'
   );
   return pending[0];
+}
+async function publishedHistoricalPromotion(github, repo, pending, version) {
+  const tag = await existingTag(github, repo, version);
+  if (!tag) return false;
+  const tagged = pending.filter((pr) => pr.merge_commit_sha === tag.object.sha);
+  if (!isDeepStrictEqual([tag.object.type, tagged.length], ['commit', 1])) return false;
+  return stablePublication(github, repo, version);
 }
 async function alreadyPublished(github, repo, pr, version) {
   const tag = await existingTag(github, repo, version);

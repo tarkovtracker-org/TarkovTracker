@@ -378,3 +378,14 @@ test('Dependabot rollout coexistence retains freshness and admission while repor
       .some((event) => event.type === 'admission' || event.type === 'merge')
   );
 });
+test('automation shell keeps fixture commands ahead of host startup tooling', (t) => {
+  const f = fixture(t);
+  const result = f.shell(
+    'node /fixture/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$HEAD_SHA" 777',
+    { SHLVL: '0' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '777'));
+  const harness = read('scripts/workflow-tests/helpers/automation-fixture.mjs');
+  assert.match(harness, /\['--noprofile', '--norc', '-c', script\]/);
+});

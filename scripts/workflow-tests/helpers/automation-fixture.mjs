@@ -33,6 +33,7 @@ if (args[0].endsWith('/review-admission-cli.mjs')) {
   fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission', sha: args[2], runId: args[3] }) + '\n');
   if (process.env.ADMISSION_FAIL === 'true') { console.error('Review Admission denied'); process.exit(1); }
   if (process.env.ADMISSION_PENDING === 'true') { console.error('Review Admission pending'); process.exit(2); }
+  fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission-success', invocation: process.env.INVOCATION_ID }) + '\n');
   process.exit(0);
 }
 try { execFileSync(process.env.REAL_NODE, args, { stdio: 'inherit' }); }
@@ -185,7 +186,9 @@ if (args[1] === 'view') {
   const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
   const merge = events.findLast((event) => event.type === 'merge' && event.invocation === p.INVOCATION_ID);
   const pr = states[Math.min(index, states.length - 1)];
-  console.log(JSON.stringify(merge ? { ...pr, state: merge.state } : pr));
+  const admitted = events.some((event) => event.type === 'admission-success' && event.invocation === p.INVOCATION_ID);
+  const observed = p.BLOCKED_UNTIL_ADMISSION === 'true' && !admitted ? { ...pr, mergeStateStatus: 'BLOCKED' } : pr;
+  console.log(JSON.stringify(merge ? { ...observed, state: merge.state } : observed));
   process.exit(0);
 }
 if (args[1] === 'merge') {
@@ -290,7 +293,8 @@ process.exit(result.status ?? 1);
         timeout: 90000,
       }),
     shell: (script, overrides) =>
-      spawnSync('/bin/bash', ['-c', script], {
+      // Suppress remote/noninteractive startup files that can replace the mocked PATH.
+      spawnSync('/bin/bash', ['--noprofile', '--norc', '-c', script], {
         cwd: repo,
         env: { ...env, ...overrides, INVOCATION_ID: String(++invocation) },
         encoding: 'utf8',
