@@ -73,6 +73,9 @@ if sys.argv[1:] == ["--self-test-docker-guard"]:
     test_local_docker_guard()
     sys.exit(0)
 
+if len(sys.argv) != 3:
+    sys.exit("Usage: legacy-progress-cleanup-rehearsal.py CHECKOUT SYNTHETIC_ARCHIVE | --self-test-docker-guard")
+
 DOCKER_ENV = local_docker_environment()
 
 CONTAINER = "supabase_db_TarkovTracker1086"
