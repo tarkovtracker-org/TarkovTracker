@@ -17,6 +17,10 @@ function releaseFixture(t) {
   writeFileSync(join(f.repo, 'CHANGELOG.md'), '# 1.2.3\n');
   return f;
 }
+test('automatic releases get a daily catch-up opportunity instead of losing a whole week', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assert.match(workflowEvent(release, 'schedule'), /cron: '0 15 \* \* \*'/);
+});
 test('release validates a staging commit before promoting that identical SHA without PAT bypass', (t) => {
   const f = releaseFixture(t);
   const result = f.release();

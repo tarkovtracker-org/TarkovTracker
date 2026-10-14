@@ -2,8 +2,26 @@ import { findReleaseRecovery } from './release-recovery.mjs';
 const CI_PATH = '.github/workflows/ci.yml';
 const MAIN_REF = 'refs/heads/main';
 const FULL_SHA = /^[0-9a-f]{40}$/;
-// Releases are batched: only the weekly schedule or an explicit maintainer dispatch publishes.
+// Daily opportunities catch up missed releases; only one scheduled publication per seven days.
 const RELEASE_EVENTS = new Set(['schedule', 'workflow_dispatch']);
+const RELEASE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+function publicationTime(release) {
+  if (release.draft || release.prerelease) return 0;
+  const timestamp = Date.parse(release.published_at);
+  if (!Number.isFinite(timestamp)) throw new Error('Invalid stable release publication date.');
+  return timestamp;
+}
+async function scheduledCooldown({ github, context, now }) {
+  if (context.eventName !== 'schedule') return null;
+  const releases = await github.paginate(github.rest.repos.listReleases, {
+    ...context.repo,
+    per_page: 100,
+  });
+  const latest = Math.max(0, ...releases.map(publicationTime));
+  if (!latest || now >= latest + RELEASE_INTERVAL_MS) return null;
+  const due = new Date(latest + RELEASE_INTERVAL_MS).toISOString();
+  return `Weekly release is not due until ${due}; recent stable publication includes manual releases.`;
+}
 function mainCiRun(run) {
   return ['push', 'workflow_dispatch'].includes(run?.event) && run.head_branch === 'main';
 }
@@ -56,13 +74,24 @@ function ciProblem(run) {
   if (explicitlySkipsAutomation(run)) return 'The commit skips automation.';
   return null;
 }
+async function publicationProblem(evidence) {
+  const cooldown = await scheduledCooldown(evidence);
+  if (cooldown) return cooldown;
+  const problem = ciProblem(await latestCiRun(evidence));
+  return problem ? `${problem} Publication is not authorized.` : null;
+}
 // Re-read CI and main each time: a CI rerun or a newer merge can supersede the candidate.
-export async function releaseEligibility({ github, context, allowRecovery = false }) {
+export async function releaseEligibility({
+  github,
+  context,
+  allowRecovery = false,
+  now = Date.now(),
+}) {
   const skip = (reason) => ({ release: false, reason });
   const sha = candidateSha(context);
   if (!sha) return skip('Only scheduled or dispatched release runs on main may publish.');
-  const problem = ciProblem(await latestCiRun({ github, context, sha }));
-  if (problem) return skip(`${problem} Publication is not authorized.`);
+  const problem = await publicationProblem({ github, context, sha, now });
+  if (problem) return skip(problem);
   const { data: main } = await github.rest.git.getRef({ ...context.repo, ref: 'heads/main' });
   if (main.object.sha !== sha) {
     return staleMain({ github, context, baseSha: sha, sha: main.object.sha }, allowRecovery);
