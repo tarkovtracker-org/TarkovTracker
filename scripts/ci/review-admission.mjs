@@ -10,6 +10,7 @@ import {
   reviewThreads,
   trustedActors,
 } from './review-admission-api.mjs';
+import { readAdmissionArchive } from './review-admission-binding.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
@@ -199,9 +200,6 @@ function directNumber(payload) {
     Number(payload.inputs?.pull_request),
   ].find(Boolean);
 }
-function sourceHead(payload) {
-  return payload.check_suite?.head_sha ?? payload.workflow_run?.head_sha;
-}
 function queueRun(payload) {
   const run = payload.workflow_run;
   if (run?.event !== 'merge_group') return null;
@@ -216,14 +214,89 @@ async function targets(github, context) {
   if (queued) return queueTarget(github, context.repo, queued);
   const direct = directNumber(context.payload);
   if (direct) return [{ number: direct }];
-  const head = sourceHead(context.payload);
-  if (!head) return [];
+  if (context.eventName !== 'workflow_run') return [];
+  return signalTargets(github, context);
+}
+async function signalTargets(github, context) {
+  const run = await validatedSignalRun(github, context);
+  if (run.event === 'check_suite') return suiteTargets(github, context.repo, run);
+  return linkedPullTarget(run.pull_requests, context.repo);
+}
+function linkedPullTarget(pulls, repo) {
+  requireEvidence(
+    Array.isArray(pulls) && pulls.length === 1,
+    'Signal PR identity is missing or ambiguous.'
+  );
+  const pr = pulls[0];
+  const repositoryUrl = `https://api.github.com/repos/${repo.owner}/${repo.repo}`;
+  requireEvidence(
+    [
+      Number.isSafeInteger(pr.number),
+      pr.number > 0,
+      pr.url === `${repositoryUrl}/pulls/${pr.number}`,
+      pr.base?.ref === 'main',
+      pr.base?.repo?.url === repositoryUrl,
+    ].every(Boolean),
+    'Signal PR repository identity mismatch.'
+  );
+  return [{ number: pr.number }];
+}
+async function signalLocator(github, repo, run) {
+  const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
+    ...repo,
+    run_id: run.id,
+  });
+  const matches = artifacts.filter(
+    (item) => item.name === `review-admission-signal-${run.run_attempt}`
+  );
+  requireEvidence(matches.length === 1, 'Signal locator is missing or ambiguous.');
+  const artifact = matches[0];
+  requireEvidence(
+    !artifact.expired && artifact.size_in_bytes <= 100000,
+    'Signal locator expired or oversized.'
+  );
+  const { data } = await github.rest.actions.downloadArtifact({
+    ...repo,
+    artifact_id: artifact.id,
+    archive_format: 'zip',
+  });
+  // Candidate artifacts are only locators. Authority comes from the suite API
+  // and the fresh PR/review/queue checks, never from fields in this document.
+  const locator = await readAdmissionArchive(Buffer.from(data), 'signal');
+  requireEvidence(
+    Number.isSafeInteger(locator.suiteId) && locator.suiteId > 0,
+    'Invalid provider suite locator.'
+  );
+  return locator;
+}
+async function suiteTargets(github, repo, run) {
+  requireEvidence(run.head_branch === 'main', 'Provider suite signal must run on main.');
+  const locator = await signalLocator(github, repo, run);
+  const { data: suite } = await github.rest.checks.getSuite({
+    ...repo,
+    check_suite_id: locator.suiteId,
+  });
+  requireProviderSuite(suite, repo, locator.suiteId);
+  if (suite.pull_requests?.length) return linkedPullTarget(suite.pull_requests, repo);
   const pulls = await allPages(github, github.rest.pulls.list, {
-    ...context.repo,
+    ...repo,
     state: 'open',
     base: 'main',
   });
-  return pulls.filter((pr) => pr.head.sha === head).map((pr) => ({ number: pr.number }));
+  const matches = pulls.filter((pr) => pr.head.sha === suite.head_sha);
+  return linkedPullTarget(matches, repo);
+}
+function requireProviderSuite(suite, repo, id) {
+  requireEvidence(
+    [
+      suite.id === id,
+      suite.url === `https://api.github.com/repos/${repo.owner}/${repo.repo}/check-suites/${id}`,
+      [347564, 1082092].includes(suite.app?.id),
+      suite.status === 'completed',
+      SHA.test(suite.head_sha),
+    ].every(Boolean),
+    'Signal provider suite identity mismatch.'
+  );
 }
 async function queueTarget(github, repo, queued) {
   const match = /^refs\/heads\/gh-readonly-queue\/main\/pr-(\d+)-[a-f0-9]+$/.exec(queued.head_ref);
@@ -259,6 +332,7 @@ async function validatedSignalRun(github, context) {
       run.id === event.id,
       run.run_attempt === event.run_attempt,
       run.head_sha === event.head_sha,
+      run.event === event.event,
       run.status === 'completed',
       run.conclusion === 'success',
     ].every(Boolean),

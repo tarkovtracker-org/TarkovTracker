@@ -845,8 +845,15 @@ test('publisher cannot turn failed/missing evidence upload into success', async 
     assert.ok(!f.statuses.some((status) => status.state === 'success'));
   });
 });
-function signalFixture() {
-  const f = publishingFixture();
+function signalPull() {
+  return {
+    number: 1,
+    url: 'https://api.github.com/repos/example/repo/pulls/1',
+    head: { sha: head },
+    base: { ref: 'main', repo: { url: 'https://api.github.com/repos/example/repo' } },
+  };
+}
+function signalFixture(f = publishingFixture()) {
   const run = {
     id: 2,
     run_attempt: 1,
@@ -854,6 +861,7 @@ function signalFixture() {
     status: 'completed',
     conclusion: 'success',
     event: 'pull_request_review',
+    pull_requests: [signalPull()],
     path: '.github/workflows/review-admission-signal.yml',
     repository: { full_name: 'example/repo' },
   };
@@ -875,11 +883,203 @@ function signalFixture() {
   ];
   return { ...f, run };
 }
+test('review signals bind service-owned PR identity independently of signal commit SHA', async () => {
+  for (const event of ['pull_request_review', 'pull_request_review_comment']) {
+    for (const change of [
+      (f) => {
+        f.f.reviews = [];
+      },
+      (f) => {
+        f.f.reviews.push(human('CHANGES_REQUESTED'));
+      },
+      (f) => {
+        f.f.threads = [{ isResolved: false, isOutdated: false }];
+      },
+    ]) {
+      const f = signalFixture(queuedControlFixture());
+      f.run.event = event;
+      f.run.head_sha = 'd'.repeat(40); // A delayed signal can refer to a previous head or a synthetic merge commit.
+      f.context.payload.workflow_run = { ...f.run };
+      f.f.jobs[0].head_sha = f.run.head_sha;
+      change(f);
+      await assert.rejects(
+        runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+      );
+      assert.equal(f.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+      assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+    }
+  }
+});
+test('service-linked review and native queue signals still prepare both current receipts', async () => {
+  for (const event of ['pull_request_review', 'merge_group']) {
+    const f = signalFixture(queuedControlFixture());
+    f.run.event = event;
+    f.run.head_sha = event === 'merge_group' ? queued : 'd'.repeat(40);
+    f.run.head_branch = 'gh-readonly-queue/main/pr-1-abcdef';
+    f.context.payload.workflow_run = { ...f.run };
+    f.f.jobs[0].head_sha = f.run.head_sha;
+    const outputs = {};
+    f.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    await withReceiptDirectory(async () => {
+      await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+      assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+    });
+  }
+});
+test('review signal rejects missing, ambiguous or foreign PR links without guessing from run SHA', async () => {
+  for (const pulls of [
+    [],
+    undefined,
+    [signalPull(), signalPull()],
+    [{ ...signalPull(), url: 'https://api.github.com/repos/fork/repo/pulls/1' }],
+    [
+      {
+        ...signalPull(),
+        base: { ref: 'main', repo: { url: 'https://api.github.com/repos/fork/repo' } },
+      },
+    ],
+    [{ ...signalPull(), base: { ...signalPull().base, ref: 'develop' } }],
+  ]) {
+    const f = signalFixture();
+    f.run.pull_requests = pulls;
+    await assert.rejects(runReviewAdmission({ github: f.github, context: f.context, core: {} }));
+    assert.equal(f.statuses.length, 0);
+  }
+});
+function suiteSignalFixture() {
+  const f = signalFixture(queuedControlFixture());
+  f.run.event = 'check_suite';
+  f.run.head_branch = 'main';
+  f.run.head_sha = base; // This event runs in the default-branch context.
+  f.run.pull_requests = [];
+  f.context.payload.workflow_run = { ...f.run };
+  f.f.jobs[0].head_sha = base;
+  f.f.artifacts = [
+    { id: 42, name: 'review-admission-signal-1', size_in_bytes: 500, expired: false },
+  ];
+  f.suite = {
+    id: 55,
+    url: 'https://api.github.com/repos/example/repo/check-suites/55',
+    app: { id: 347564 },
+    status: 'completed',
+    head_sha: head,
+    pull_requests: [signalPull()],
+  };
+  f.github.rest.actions.listWorkflowRunArtifacts = 'artifacts';
+  f.github.rest.actions.downloadArtifact = async () => ({
+    data: archive({ suiteId: 55 }, 'signal.json'),
+  });
+  f.github.rest.checks.getSuite = async () => ({ data: f.suite });
+  return f;
+}
+test('provider signal authenticates locator via suite API and revokes current head and active queue', async () => {
+  for (const mapping of ['linked', 'head']) {
+    const f = suiteSignalFixture();
+    if (mapping === 'head') {
+      f.suite.pull_requests = [];
+      f.github.rest.pulls.list = 'pulls';
+      f.f.pulls = [signalPull()];
+    }
+    f.f.reviews.push(human('CHANGES_REQUESTED'));
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.equal(f.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+    assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+  }
+});
+test('untrusted suite locator cannot supply approval, provider identity or ambiguous PR mapping', async () => {
+  for (const change of [
+    { id: 56 },
+    { app: { id: 15368 } },
+    { status: 'in_progress' },
+    { url: 'https://api.github.com/repos/fork/repo/check-suites/55' },
+    { pull_requests: [signalPull(), signalPull()] },
+  ]) {
+    const f = suiteSignalFixture();
+    Object.assign(f.suite, change);
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.equal(f.statuses.length, 1); // Only the seeded old status; nothing was published.
+  }
+  for (const artifacts of [
+    [],
+    [{ id: 42, name: 'review-admission-signal-2', size_in_bytes: 500 }],
+    [{ id: 42, name: 'review-admission-signal-1', size_in_bytes: 500, expired: true }],
+  ]) {
+    const f = suiteSignalFixture();
+    f.f.artifacts = artifacts;
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.equal(f.statuses.length, 1);
+  }
+});
+test('suite signal fails closed for wrong source branch, ambiguous head lookup or API errors', async () => {
+  const branch = suiteSignalFixture();
+  branch.run.head_branch = 'feature';
+  await assert.rejects(
+    runReviewAdmission({ github: branch.github, context: branch.context, core: branch.core })
+  );
+  assert.equal(branch.statuses.length, 1);
+  const ambiguous = suiteSignalFixture();
+  ambiguous.suite.pull_requests = [];
+  ambiguous.github.rest.pulls.list = 'pulls';
+  ambiguous.f.pulls = [signalPull(), signalPull()];
+  await assert.rejects(
+    runReviewAdmission({
+      github: ambiguous.github,
+      context: ambiguous.context,
+      core: ambiguous.core,
+    })
+  );
+  assert.equal(ambiguous.statuses.length, 1);
+  const broken = suiteSignalFixture();
+  broken.github.rest.checks.getSuite = async () => {
+    throw new Error('provider API unavailable');
+  };
+  await assert.rejects(
+    runReviewAdmission({ github: broken.github, context: broken.context, core: broken.core })
+  );
+  assert.equal(broken.statuses.length, 1);
+});
+test('signal regression controls detect synthetic-SHA targeting and provider identity bypass', async () => {
+  const old = await importMutationSource(
+    'review-admission.mjs',
+    'return linkedPullTarget(run.pull_requests, context.repo);',
+    'return run.pull_requests.filter(pr => pr.head.sha === run.head_sha).map(pr => ({ number: pr.number }));'
+  );
+  const f = signalFixture(queuedControlFixture());
+  f.run.head_sha = 'd'.repeat(40);
+  f.context.payload.workflow_run = { ...f.run };
+  f.f.jobs[0].head_sha = f.run.head_sha;
+  f.f.reviews = [];
+  await assert.rejects(
+    old.runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+  );
+  assert.equal(f.statuses.at(-1).state, 'success'); // Mutant leaves the queue's seeded green untouched.
+  const forged = await importMutationSource(
+    'review-admission.mjs',
+    '[347564, 1082092].includes(suite.app?.id)',
+    'true'
+  );
+  const wrong = suiteSignalFixture();
+  wrong.suite.app.id = 15368;
+  wrong.f.reviews = [];
+  await assert.rejects(
+    forged.runReviewAdmission({ github: wrong.github, context: wrong.context, core: wrong.core })
+  );
+  assert.equal(wrong.statuses.at(-1).state, 'failure'); // Removing identity guard enters publication scope.
+});
 test('controller rejects wrong signal workflow/repository/event/attempt or unsuccessful signal jobs', async () => {
   for (const change of [
     { path: '.github/workflows/ci.yml' },
     { repository: { full_name: 'fork/repo' } },
     { event: 'workflow_run' },
+    { event: 'check_suite' },
     { run_attempt: 2 },
     { head_sha: base },
     { conclusion: 'failure' },
@@ -1176,6 +1376,11 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.ok(!signal.includes('checkout'));
   assert.ok(!signal.includes('environment:'));
   assert.ok(!signal.includes('workflow_run:'));
+  assert.match(signal, /name: review-admission-signal-\$\{\{ github.run_attempt \}\}/);
+  assert.match(signal, /path: signal.json/);
+  assert.match(signal, /SUITE_ID: \$\{\{ github.event.check_suite.id \}\}/);
+  assert.match(signal, /if-no-files-found: error/);
+  assert.ok(!signal.includes('secrets.'));
 });
 const appIds = { appId: 987654, botId: 987655, installationId: 987656, queueAllowed: true };
 const appEnv = {
@@ -1670,9 +1875,24 @@ test('Cubic admission receipt cannot be reused for a second PR on the same head'
   f.receipt.number = 1;
   assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run, 2), /PR number/);
 });
+function assertPermissionMap(job, expected) {
+  const lines = permissionsBlock(job, '    ')
+    .trim()
+    .split('\n')
+    .map((line) => line.trim())
+    .sort();
+  assert.deepEqual(lines, expected.map((line) => line.trim()).sort());
+}
 function assertAdmissionSecurity(workflow) {
   const job = jobBlock(workflow, 'admission');
-  assert.match(permissionsBlock(job, '    '), /^ {6}statuses: write$/m);
+  assertPermissionMap(job, [
+    'actions: read',
+    'checks: read',
+    'contents: read',
+    'issues: read',
+    'pull-requests: read',
+    'statuses: write',
+  ]);
   for (const name of [
     'Evaluate current immutable review evidence',
     'Publish verified admission after evidence upload',
@@ -1686,10 +1906,34 @@ function assertAdmissionSecurity(workflow) {
   }
   const filter = jobBlock(workflow, 'filter');
   assert.doesNotMatch(filter, /statuses: write|secrets\.|environment:|concurrency:/);
-  assert.match(permissionsBlock(filter, '    '), /^ {6}actions: read$/m);
+  assertPermissionMap(filter, ['actions: read', 'contents: read']);
   assert.match(filter, /ref: main/);
   assert.match(filter, /filterAdmission\(\{ github, context \}\)/);
 }
+function assertOldAdmissionMapGuard(name, changed) {
+  if (name !== 'admission') return;
+  // The former admission guard only required the status-write line.
+  assert.match(permissionsBlock(changed, '    '), /^ {6}statuses: write$/m);
+}
+test('Cubic admission permission maps reject added or broadened token scopes in either trusted job', () => {
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  for (const name of ['filter', 'admission']) {
+    const job = jobBlock(source, name);
+    for (const [before, after] of [
+      ['      contents: read', '      contents: write'],
+      ['      actions: read', '      actions: write'],
+      ['      contents: read', '      contents: read\n      deployments: write'],
+    ]) {
+      const changed = job.replace(before, after);
+      assert.notEqual(changed, job);
+      assertOldAdmissionMapGuard(name, changed);
+      assert.throws(
+        () => assertAdmissionSecurity(source.replace(job, changed)),
+        assert.AssertionError
+      );
+    }
+  }
+});
 test('Cubic security assertions reject unrelated-job substitutes for admission permissions or key steps', () => {
   const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
   assertAdmissionSecurity(source);

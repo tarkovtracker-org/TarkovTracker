@@ -452,7 +452,7 @@ function assertRetentionBoundary(workflow) {
   assert.match(apply, /getCollaboratorPermissionLevel/);
   assert.match(
     workflowEvent(workflow, 'workflow_dispatch'),
-    /apply:\n(?: +[^\n]*\n)* +default: false/
+    /^ {6}apply:\n(?: {8}[^\n]*\n)* {8}default: false$/m
   );
 }
 test('retention workflow remains main-only, credential isolated, and disabled until approval', () => {

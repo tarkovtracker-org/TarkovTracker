@@ -77,6 +77,14 @@ Queue admission re-proves the member PR, live queue ref, current-main parent and
 `ALLGREEN` configuration. Read-only signal workflows cannot publish approval. Consumers authenticate
 the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
 
+Review and review-comment wakeups resolve the service-owned PR link from the authenticated
+signal attempt, then reread its current head and queue. A provider-suite signal supplies only a
+bounded locator: the controller fetches the known completed provider suite from this repository
+and resolves exactly one PR before evaluating live evidence. Missing or ambiguous mappings hold
+admission; an explicit trusted-main dispatch can recover once review evidence is complete. The
+controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
+and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).
+
 Crowdin validates its immutable translation diff without updating a behind branch when queue
 policy is active. While strict freshness and the verified queue coexist during rollout, their
 validation remains strict but admission and pending queue reporting already work. Crowdin and
