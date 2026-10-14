@@ -19,6 +19,12 @@
         :is-collapsed="props.isCollapsed"
         :badge="t('page.storyline.wip_badge')"
       ></DrawerItem>
+      <DrawerItem
+        icon="i-heroicons-sparkles"
+        locale-key="navigation_drawer.season_planner"
+        to="/season-planner"
+        :is-collapsed="props.isCollapsed"
+      ></DrawerItem>
       <DrawerItemGroup
         icon="i-heroicons-clipboard-document-list"
         locale-key="common.tasks"
