@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 // Native Node test execution has no Nuxt @/ alias resolution.
 import { gitExecutable } from '../../ci/validation-tools.mjs';
+// Missing-status cases poll the stubbed gh hundreds of times; loaded CI runners need the headroom.
+const GATE_SPAWN_TIMEOUT_MS = 60_000;
 const gate = resolve('scripts/ci/crowdin-pr.sh');
 const releaseGate = resolve('scripts/release/release-commit.sh');
 const read = (path) => readFileSync(path, 'utf8');
@@ -290,7 +292,7 @@ process.exit(result.status ?? 1);
         cwd: repo,
         env: { ...env, ...overrides, INVOCATION_ID: String(++invocation) },
         encoding: 'utf8',
-        timeout: 90000,
+        timeout: GATE_SPAWN_TIMEOUT_MS,
       }),
     shell: (script, overrides) =>
       // Suppress remote/noninteractive startup files that can replace the mocked PATH.
@@ -298,14 +300,14 @@ process.exit(result.status ?? 1);
         cwd: repo,
         env: { ...env, ...overrides, INVOCATION_ID: String(++invocation) },
         encoding: 'utf8',
-        timeout: 90000,
+        timeout: GATE_SPAWN_TIMEOUT_MS,
       }),
     release: (overrides) =>
       spawnSync('/bin/bash', [releaseGate], {
         cwd: repo,
         env: { ...env, ...overrides },
         encoding: 'utf8',
-        timeout: 90000,
+        timeout: GATE_SPAWN_TIMEOUT_MS,
       }),
     events: () => read(env.EVENTS).trim().split('\n').filter(Boolean).map(JSON.parse),
     pushes: () => read(env.PUSHES).trim().split('\n').filter(Boolean).map(JSON.parse),
