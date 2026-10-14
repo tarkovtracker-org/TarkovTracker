@@ -33,7 +33,8 @@ Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/
 - **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): on Tasks and Needed Items, a
   toolbar button showing the active count opens everything that changes _which_ items show. Its
   Reset clears every saved filter, including ones idle in the current view. Hideout has no Filters
-  menu; its options live in the Settings drawer.
+  menu: its station status tabs stay in the toolbar, and its display and prerequisite switches live
+  in the Settings drawer.
 - **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
   current view. Clear all, shown when there are several, clears only those visible filters. A
   filter that cannot apply to the current view gets no chip and does not count: team-shared off the

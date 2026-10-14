@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref } from 'vue';
 import TaskFiltersPopover from '@/features/tasks/TaskFiltersPopover.vue';
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -39,6 +39,10 @@ const mountPopover = () =>
     },
   });
 describe('TaskFiltersPopover', () => {
+  beforeEach(() => {
+    hasSavedFilters.value = false;
+    resetAll.mockClear();
+  });
   it('resets saved filters even when none is active in the current view', async () => {
     const wrapper = mountPopover();
     const reset = () => wrapper.get('[data-testid="task-filters-reset"]');
