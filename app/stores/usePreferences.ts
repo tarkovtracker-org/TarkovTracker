@@ -118,8 +118,6 @@ export interface PreferencesState {
   hideNonKappaTasks: boolean;
   hideCompletedMapObjectives: boolean;
   hideoutPrimaryView?: string | null;
-  hideoutCollapseCompleted: boolean;
-  hideoutSortReadyFirst: boolean;
   hideoutRequireStationLevels: boolean;
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
@@ -208,8 +206,6 @@ export const preferencesDefaultState: PreferencesState = {
   hideNonKappaTasks: false,
   hideCompletedMapObjectives: false,
   hideoutPrimaryView: null,
-  hideoutCollapseCompleted: false,
-  hideoutSortReadyFirst: false,
   hideoutRequireStationLevels: true,
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
@@ -534,9 +530,6 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getHideoutPrimaryView: (state) => {
       return state.hideoutPrimaryView ?? 'available';
-    },
-    getHideoutSortReadyFirst: (state) => {
-      return state.hideoutSortReadyFirst ?? false;
     },
     getHideoutRequireStationLevels: (state) => {
       return state.hideoutRequireStationLevels ?? true;
@@ -1047,8 +1040,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapShowPinnedObjectives',
       'mapShowTeamObjectives',
       'dashboardNoticeDismissed',
-      'hideoutCollapseCompleted',
-      'hideoutSortReadyFirst',
       'hideoutRequireStationLevels',
       'hideoutRequireSkillLevels',
       'hideoutRequireTraderLoyalty',

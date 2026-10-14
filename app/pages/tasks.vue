@@ -349,7 +349,7 @@
       leave-from-class="translate-x-0 opacity-100"
       leave-to-class="translate-x-4 opacity-0"
     >
-      <div v-if="isDesktopSideRailOpen" class="hidden w-[26rem] shrink-0 px-4 py-6 lg:block">
+      <div v-if="isDesktopSideRailOpen" class="hidden w-104 shrink-0 px-4 py-6 lg:block">
         <PageHelpPanel v-if="isDesktopHelpPanelOpen" page-key="tasks" mode="docked" />
         <TaskSettingsDrawer v-else-if="isDesktopSettingsDrawerOpen" mode="docked" />
       </div>
