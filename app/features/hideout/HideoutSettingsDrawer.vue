@@ -19,7 +19,6 @@
     requireSkillLevels: boolean;
     requireStationLevels: boolean;
     requireTraderLoyalty: boolean;
-    sortReadyFirst: boolean;
   }
   type BooleanPropKey = Exclude<keyof Props, 'isHelpTourActive' | 'mode'>;
   const props = withDefaults(defineProps<Props>(), {
@@ -31,7 +30,6 @@
     'update:requireSkillLevels': [value: boolean];
     'update:requireStationLevels': [value: boolean];
     'update:requireTraderLoyalty': [value: boolean];
-    'update:sortReadyFirst': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const updaters: Record<BooleanPropKey, (value: boolean) => void> = {
@@ -39,7 +37,6 @@
     requireSkillLevels: (value) => emit('update:requireSkillLevels', value),
     requireStationLevels: (value) => emit('update:requireStationLevels', value),
     requireTraderLoyalty: (value) => emit('update:requireTraderLoyalty', value),
-    sortReadyFirst: (value) => emit('update:sortReadyFirst', value),
   };
   // The help tour opens this drawer to point at it, so switches stay read-only until it ends.
   const toSetting = (
@@ -61,7 +58,6 @@
       title: t('page.hideout.settings.page_options'),
       settings: [
         toSetting('collapse_completed', 'collapseCompleted', t('page.hideout.collapse_completed')),
-        toSetting('sort_ready_first', 'sortReadyFirst', t('page.hideout.sort.ready_first')),
       ],
     },
     {

@@ -173,13 +173,11 @@
             <HideoutSettingsDrawer
               mode="docked"
               :collapse-completed="preferencesStore.hideoutCollapseCompleted"
-              :sort-ready-first="preferencesStore.hideoutSortReadyFirst"
               :require-station-levels="preferencesStore.hideoutRequireStationLevels"
               :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
               :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
               :is-help-tour-active="isHideoutHelpTourActive"
               @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
-              @update:sort-ready-first="preferencesStore.hideoutSortReadyFirst = $event"
               @update:require-station-levels="handlePrereqToggle('station', $event)"
               @update:require-skill-levels="handlePrereqToggle('skill', $event)"
               @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"
@@ -209,13 +207,11 @@
           v-if="isOverlaySettingsDrawerOpen"
           mode="overlay"
           :collapse-completed="preferencesStore.hideoutCollapseCompleted"
-          :sort-ready-first="preferencesStore.hideoutSortReadyFirst"
           :require-station-levels="preferencesStore.hideoutRequireStationLevels"
           :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
           :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
           :is-help-tour-active="isHideoutHelpTourActive"
           @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
-          @update:sort-ready-first="preferencesStore.hideoutSortReadyFirst = $event"
           @update:require-station-levels="handlePrereqToggle('station', $event)"
           @update:require-skill-levels="handlePrereqToggle('skill', $event)"
           @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"
@@ -237,7 +233,6 @@
   import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import type { HideoutStation } from '@/types/tarkov';
   const HideoutHelpDemoCard = defineAsyncComponent(
@@ -255,9 +250,8 @@
   const metadataStore = useMetadataStore();
   const { hideoutStations } = storeToRefs(metadataStore);
   const preferencesStore = usePreferencesStore();
-  const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
-  const { arePrereqsMet, getStationStatus } = useHideoutStationStatus();
+  const { getStationStatus } = useHideoutStationStatus();
   const highlightedStationId = ref<string | null>(null);
   const highlightedModuleId = ref<string | null>(null);
   const helpContent = computed(() => getPageHelpContent('hideout'));
@@ -451,7 +445,7 @@
     },
     setPreference: setPrereqPreference,
   });
-  const { activePrimaryView, isStoreLoading, visibleStations, stationCounts } =
+  const { activePrimaryView, isStoreLoading, visibleStations, stationCounts, stationsForView } =
     useHideoutFiltering();
   useHideoutRouteSync();
   const isDesktopSettingsDrawerOpen = computed(
@@ -466,40 +460,11 @@
   const displayPrimaryView = computed<HideoutPrimaryView>(() => {
     return hideoutHelpPrimaryView.value ?? activePrimaryView.value;
   });
-  const sortReadyFirst = computed(() => preferencesStore.hideoutSortReadyFirst);
   const stationList = computed(() => (hideoutStations.value ?? []) as HideoutStation[]);
-  const isStationReadyToBuild = (station: HideoutStation): boolean => {
-    const currentLevel = progressStore.hideoutLevels?.[station.id]?.self ?? 0;
-    const nextLevel = [...station.levels]
-      .sort((leftLevel, rightLevel) => leftLevel.level - rightLevel.level)
-      .find((level) => level.level === currentLevel + 1);
-    if (!nextLevel) return false;
-    return arePrereqsMet(nextLevel);
-  };
-  const sortStationsByReadiness = (stations: HideoutStation[]) => {
-    if (!sortReadyFirst.value) return stations;
-    return stations
-      .map((station, index) => ({
-        index,
-        ready: isStationReadyToBuild(station),
-        station,
-      }))
-      .sort((leftEntry, rightEntry) => {
-        if (leftEntry.ready === rightEntry.ready) return leftEntry.index - rightEntry.index;
-        return leftEntry.ready ? -1 : 1;
-      })
-      .map((entry) => entry.station);
-  };
-  const filterStationsByView = (stations: HideoutStation[], view: HideoutPrimaryView) => {
-    if (view === 'all') return sortStationsByReadiness(stations);
-    return sortStationsByReadiness(
-      stations.filter((station) => getStationStatus(station) === view)
-    );
-  };
   const displayVisibleStations = computed(() => {
     if (isStoreLoading.value) return [];
     if (!isHideoutHelpTourActive.value) return visibleStations.value;
-    return filterStationsByView(stationList.value, displayPrimaryView.value);
+    return stationsForView(stationList.value, displayPrimaryView.value);
   });
   const selectPrimaryView = (view: HideoutPrimaryView) => {
     if (isHideoutHelpTourActive.value) {
@@ -719,7 +684,7 @@
     if (activePrimaryView.value !== status) {
       activePrimaryView.value = status;
     }
-    const targetStations = filterStationsByView(stationList.value, status);
+    const targetStations = stationsForView(stationList.value, status);
     const stationIndex = targetStations.findIndex(
       (targetStation) => targetStation.id === stationId
     );

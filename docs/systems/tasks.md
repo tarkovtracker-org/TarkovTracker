@@ -52,7 +52,9 @@ Task types (`useTaskContentFilters`) are additive: a task shows when it belongs 
 An empty saved selection already means every type, so the last selected type stays locked on. Card
 display, status tab visibility and behavior preferences live in `useTaskDisplaySettings`; the
 failed-task repair action shows under Behavior only while failed tasks exist. The Hideout drawer's
-switches are read-only while the help tour points at it.
+switches are read-only while the help tour points at it. Hideout always lists stations whose next
+level can be built first, keeping upstream order within each group, so it has no sort setting; the
+legacy `hideout_sort_ready_first` column is no longer read or written.
 
 ## Canonical task progression
 

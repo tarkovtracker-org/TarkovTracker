@@ -16,6 +16,7 @@ export type UseHideoutFilteringReturn = {
   isStoreLoading: ComputedRef<boolean>;
   visibleStations: ComputedRef<HideoutStation[]>;
   stationCounts: ComputedRef<HideoutStationCounts>;
+  stationsForView: (stations: HideoutStation[], view: HideoutPrimaryView) => HideoutStation[];
 };
 export function useHideoutFiltering(): UseHideoutFilteringReturn {
   const metadataStore = useMetadataStore();
@@ -27,7 +28,6 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     get: () => preferencesStore.getHideoutPrimaryView as HideoutPrimaryView,
     set: (value: HideoutPrimaryView) => preferencesStore.setHideoutPrimaryView(value),
   });
-  const sortReadyFirst = computed(() => preferencesStore.getHideoutSortReadyFirst);
   const isStationReadyToBuild = (station: HideoutStation): boolean => {
     const currentLevel = progressStore.hideoutLevels?.[station.id]?.self ?? 0;
     const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
@@ -35,9 +35,9 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     if (!nextLevel) return false;
     return arePrereqsMet(nextLevel);
   };
-  const sortStationsByReadiness = (stations: HideoutStation[]): HideoutStation[] => {
-    if (!sortReadyFirst.value) return stations;
-    return stations
+  // Stations whose next level can be built now come first; the rest keep their upstream order.
+  const sortStationsByReadiness = (stations: HideoutStation[]): HideoutStation[] =>
+    stations
       .map((station, index) => ({
         station,
         index,
@@ -48,7 +48,6 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
         return a.ready ? -1 : 1;
       })
       .map((entry) => entry.station);
-  };
   const stationCounts = computed(() => {
     if (!hideoutStations.value || hideoutStations.value.length === 0) {
       return { available: 0, maxed: 0, locked: 0, all: 0 };
@@ -70,31 +69,22 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     if (Object.keys(progressStore.visibleTeamStores).length === 0) return true;
     return false;
   });
-  const filterAndSortStations = (
+  const stationsForView = (
     stations: HideoutStation[],
-    status?: 'available' | 'maxed' | 'locked'
-  ): HideoutStation[] => {
-    const filtered = status ? stations.filter((s) => getStationStatus(s) === status) : stations;
-    return sortStationsByReadiness(filtered);
-  };
+    view: HideoutPrimaryView
+  ): HideoutStation[] =>
+    sortStationsByReadiness(
+      view === 'all' ? stations : stations.filter((s) => getStationStatus(s) === view)
+    );
   const visibleStations = computed(() => {
     if (isStoreLoading.value) return [];
-    const hideoutStationList = hideoutStations.value as HideoutStation[];
-    if (activePrimaryView.value === 'available') {
-      return filterAndSortStations(hideoutStationList, 'available');
-    }
-    if (activePrimaryView.value === 'maxed') {
-      return filterAndSortStations(hideoutStationList, 'maxed');
-    }
-    if (activePrimaryView.value === 'locked') {
-      return filterAndSortStations(hideoutStationList, 'locked');
-    }
-    return filterAndSortStations(hideoutStationList);
+    return stationsForView(hideoutStations.value as HideoutStation[], activePrimaryView.value);
   });
   return {
     activePrimaryView,
     isStoreLoading,
     visibleStations,
     stationCounts,
+    stationsForView,
   };
 }

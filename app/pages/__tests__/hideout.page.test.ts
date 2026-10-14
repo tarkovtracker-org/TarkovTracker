@@ -115,7 +115,6 @@ vi.mock('pinia', async () => {
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     hideoutCollapseCompleted: false,
-    hideoutSortReadyFirst: false,
     hideoutRequireStationLevels: false,
     hideoutRequireSkillLevels: false,
     hideoutRequireTraderLoyalty: false,

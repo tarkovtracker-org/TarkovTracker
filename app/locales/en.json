@@ -1198,9 +1198,6 @@
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
       "collapse_completed": "Collapse completed stations",
-      "sort": {
-        "ready_first": "Sort ready to build first"
-      },
       "prereq_filters": {
         "title": "Availability requirements",
         "station_levels": "Require station levels",

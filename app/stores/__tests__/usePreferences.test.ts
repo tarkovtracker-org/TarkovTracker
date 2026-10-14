@@ -132,7 +132,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.hideoutPrimaryView).toBeNull();
       expect(store.hideoutCollapseCompleted).toBe(false);
-      expect(store.hideoutSortReadyFirst).toBe(false);
       expect(store.hideoutRequireStationLevels).toBe(true);
       expect(store.hideoutRequireSkillLevels).toBe(true);
       expect(store.hideoutRequireTraderLoyalty).toBe(true);
@@ -885,12 +884,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.hideoutPrimaryView = 'all';
       expect(store.getHideoutPrimaryView).toBe('all');
-    });
-    it('should return hideoutSortReadyFirst state', () => {
-      const store = usePreferencesStore();
-      expect(store.getHideoutSortReadyFirst).toBe(false);
-      store.hideoutSortReadyFirst = true;
-      expect(store.getHideoutSortReadyFirst).toBe(true);
     });
     it('should return hideoutRequireStationLevels state with default true', () => {
       const store = usePreferencesStore();
