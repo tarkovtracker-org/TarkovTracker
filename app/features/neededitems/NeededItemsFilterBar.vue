@@ -51,6 +51,7 @@
           :hide-non-fir-special-equipment="hideNonFirSpecialEquipment"
           :kappa-only="kappaOnly"
           :active-count="activeFilters.length"
+          :can-reset="hasSavedFilters"
           :is-kappa-disabled="isKappaDisabled"
           @update:fir-filter="emit('update:firFilter', $event)"
           @update:hide-owned="emit('update:hideOwned', $event)"
@@ -225,12 +226,11 @@
       }))
   );
   // Reset clears every saved filter, including Kappa only while it is idle on the Hideout tab.
+  const hasSavedFilters = computed(
+    () => activeFilters.value.length > 0 || (props.kappaOnly && isKappaDisabled.value)
+  );
   const clearAllFilters = () => {
-    emit('update:firFilter', 'all');
-    emit('update:hideOwned', false);
-    emit('update:hideTeamItems', false);
-    emit('update:hideNonFirSpecialEquipment', false);
-    emit('update:kappaOnly', false);
+    filterChipDescriptors.forEach((descriptor) => descriptor.clear());
   };
   const sortOptions = computed(() => [
     {

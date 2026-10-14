@@ -375,13 +375,13 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const settingsButton = wrapper.find('button[data-icon="i-mdi-tune-variant"]');
     expect(settingsButton.exists()).toBe(true);
-    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.attributes('aria-expanded')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');
     expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
     // Exercise the drawer toggle so the mocked toggle() and the off state are covered
     // (and so the shared drawer state is left closed for later tests in this file).
     await settingsButton.trigger('click');
-    expect(settingsButton.attributes('aria-pressed')).toBe('false');
+    expect(settingsButton.attributes('aria-expanded')).toBe('false');
   });
   it('renders neutral badge class when available count is zero', async () => {
     const { TaskFilterBar } = await setup({

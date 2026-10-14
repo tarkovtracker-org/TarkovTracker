@@ -222,6 +222,18 @@ describe('NeededItemsFilterBar', () => {
     expect(wrapper.emitted('update:hideNonFirSpecialEquipment')).toEqual([[false]]);
     expect(wrapper.emitted('update:kappaOnly')).toEqual([[false]]);
   });
+  it('keeps Reset available while Kappa only sits idle on the Hideout scope', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...createDefaultProps(), modelValue: 'hideout' as const },
+      global: createDefaultGlobal(),
+    });
+    const reset = () => wrapper.get('[data-testid="needed-items-filters-reset"]');
+    expect(reset().attributes('disabled')).toBeDefined();
+    await wrapper.setProps({ kappaOnly: true });
+    expect(wrapper.find('[data-testid="needed-items-filters-count"]').exists()).toBe(false);
+    expect(reset().attributes('disabled')).toBeUndefined();
+  });
   it('hides the chip row when no filter is active', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {

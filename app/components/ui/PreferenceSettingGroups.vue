@@ -12,7 +12,7 @@
       >
         {{ group.title }}
       </h3>
-      <p v-if="group.hint" class="text-surface-500 mb-1 px-2 text-xs">{{ group.hint }}</p>
+      <p v-if="group.hint" class="text-surface-400 mb-1 px-2 text-xs">{{ group.hint }}</p>
       <div class="space-y-0.5">
         <PreferenceSwitch
           v-for="setting in group.settings"

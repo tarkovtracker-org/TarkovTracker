@@ -15,6 +15,8 @@ const createStore = () =>
     getHideGlobalTasks: false,
     getHideCompletedMapObjectives: false,
     getTaskPrimaryView: 'all',
+    getTaskUserView: 'self',
+    getTaskSecondaryView: 'available',
     setShowNonSpecialTasks(value: boolean) {
       this.getShowNonSpecialTasks = value;
     },
@@ -83,9 +85,11 @@ describe('useTaskContentFilters', () => {
     store.getHideCompletedMapObjectives = true;
     const filters = useTaskContentFilters();
     expect(chipKeys(filters)).toEqual([]);
-    teamStore.teammates = ['mate'];
+    store.getTaskUserView = 'all';
     store.getTaskPrimaryView = 'maps';
     expect(chipKeys(filters)).toEqual(['team_shared', 'global_hidden', 'map_complete_hidden']);
+    store.getTaskSecondaryView = 'completed';
+    expect(chipKeys(filters)).toEqual(['global_hidden', 'map_complete_hidden']);
   });
   it('clears every active filter at once', () => {
     store.getTaskPrimaryView = 'maps';
@@ -101,5 +105,37 @@ describe('useTaskContentFilters', () => {
     expect(store.getOnlyTasksWithRequiredKeys).toBe(false);
     expect(store.getHideGlobalTasks).toBe(false);
     expect(store.getHideCompletedMapObjectives).toBe(false);
+  });
+  it('lets Reset clear saved filters that sit idle in the current view', () => {
+    const filters = useTaskContentFilters();
+    expect(filters.hasSavedFilters.value).toBe(false);
+    store.getShowNonSpecialTasks = false;
+    store.getTaskSharedByAllOnly = true;
+    store.getHideGlobalTasks = true;
+    store.getHideCompletedMapObjectives = true;
+    expect(filters.activeCount.value).toBe(1);
+    filters.clearAll();
+    expect(store.getTaskSharedByAllOnly).toBe(true);
+    expect(filters.hasSavedFilters.value).toBe(true);
+    store.getOnlyTasksWithRequiredKeys = true;
+    store.getShowNonSpecialTasks = false;
+    filters.resetAll();
+    expect(filters.hasSavedFilters.value).toBe(false);
+    expect(store.getShowNonSpecialTasks).toBe(true);
+    expect(store.getOnlyTasksWithRequiredKeys).toBe(false);
+    expect(store.getTaskSharedByAllOnly).toBe(false);
+    expect(store.getHideGlobalTasks).toBe(false);
+    expect(store.getHideCompletedMapObjectives).toBe(false);
+  });
+  it.each([
+    ['getShowNonSpecialTasks', false],
+    ['getOnlyTasksWithRequiredKeys', true],
+    ['getTaskSharedByAllOnly', true],
+    ['getHideGlobalTasks', true],
+    ['getHideCompletedMapObjectives', true],
+  ] as const)('reports %s as a saved filter', (key, value) => {
+    const filters = useTaskContentFilters();
+    (store as Record<string, unknown>)[key] = value;
+    expect(filters.hasSavedFilters.value).toBe(true);
   });
 });

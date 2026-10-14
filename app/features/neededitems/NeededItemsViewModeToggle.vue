@@ -7,7 +7,7 @@
       :color="option.isActive ? 'primary' : 'neutral'"
       :variant="option.isActive ? 'soft' : 'ghost'"
       size="sm"
-      :disabled="option.isActive"
+      :aria-pressed="option.isActive"
       :title="option.label"
       :aria-label="option.label"
       @click="option.select"

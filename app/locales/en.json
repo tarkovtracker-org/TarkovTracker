@@ -381,7 +381,9 @@
     "active_label": "Filtered by",
     "remove_filter": "Remove filter: {name}",
     "clear_all": "Clear all",
-    "clear_filters": "Clear filters"
+    "clear_filters": "Clear filters",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "Help",
@@ -964,8 +966,6 @@
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
-        "ascending": "Ascending",
-        "descending": "Descending",
         "aria_label": "Sort tasks",
         "progression": "Progression"
       },
@@ -1250,7 +1250,7 @@
         "title": "Filter items",
         "found_in_raid": {
           "title": "Found in raid",
-          "hint": "Count only items that need to be found in raid, or only the ones that don't.",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
           "non_fir": "Non-FIR"
         },
         "hide": {

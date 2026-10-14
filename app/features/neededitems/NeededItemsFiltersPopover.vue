@@ -3,6 +3,7 @@
     test-id-prefix="needed-items-filters"
     :title="t('page.needed_items.filters.title')"
     :active-count="activeCount"
+    :can-reset="canReset"
     align="start"
     @reset="emit('reset')"
   >
@@ -25,7 +26,7 @@
           :class="
             firFilter === option.value
               ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
-              : 'text-surface-300 hover:text-white'
+              : 'text-surface-300 light:hover:text-surface-50 hover:text-white'
           "
           @click="firFilter = option.value"
         >
@@ -75,6 +76,8 @@
   import type { NeededItemsFirFilter } from '@/features/neededitems/neededitems-constants';
   defineProps<{
     activeCount: number;
+    /** True while any saved filter is set, including Kappa idle on the Hideout tab. */
+    canReset: boolean;
     /** Kappa only narrows task needs, so it has nothing to do on the Hideout tab. */
     isKappaDisabled: boolean;
   }>();

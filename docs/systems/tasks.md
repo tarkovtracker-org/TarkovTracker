@@ -30,17 +30,20 @@ params kept (`app/middleware/tasks-legacy-view.global.ts`).
 
 Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/`:
 
-- **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): a toolbar button showing
-  the active count opens everything that changes _which_ items show. Reset clears every saved
-  filter, including ones idle in the current scope.
+- **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): on Tasks and Needed Items, a
+  toolbar button showing the active count opens everything that changes _which_ items show. Its
+  Reset clears every saved filter, including ones idle in the current view. Hideout has no Filters
+  menu; its options live in the Settings drawer.
 - **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
-  current view, plus Clear all when there are several. A filter that cannot apply to the current
-  view (team-shared without teammates, map-only filters off Maps, Kappa only on the Hideout scope)
-  gets no chip and does not count.
+  current view. Clear all, shown when there are several, clears only those visible filters. A
+  filter that cannot apply to the current view gets no chip and does not count: team-shared off the
+  whole team's Available tab, map-only filters off Maps, and Kappa only on the Hideout scope.
 - **Settings** (`SettingsButton`, `SettingsDrawer`, `PreferenceSettingGroups`): how items _look or
-  behave_. Tasks and Hideout keep a drawer, docked beside the content on desktop and an overlay on
-  mobile (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
+  behave_. Tasks and Hideout keep a drawer, docked beside the content on wide screens and an overlay
+  otherwise (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
   toolbar view controls.
+- Navigation stays outside both menus: task status tabs and the team view selector on Tasks, and
+  the All, Tasks and Hideout scope tabs on Needed Items.
 - **Sort** (`SortControl`): the sort select plus a direction button.
 
 Task types (`useTaskContentFilters`) are additive: a task shows when it belongs to any selected type.

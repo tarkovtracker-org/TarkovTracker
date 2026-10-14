@@ -23,7 +23,7 @@
     size="sm"
     :icon="direction === 'asc' ? 'i-mdi-sort-ascending' : 'i-mdi-sort-descending'"
     :aria-label="
-      direction === 'asc' ? t('page.tasks.sort.ascending') : t('page.tasks.sort.descending')
+      direction === 'asc' ? t('filter_menu.sort_ascending') : t('filter_menu.sort_descending')
     "
     @click="emit('toggle-direction')"
   />

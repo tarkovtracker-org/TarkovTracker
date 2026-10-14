@@ -11,7 +11,7 @@
         : 'text-surface-200 border-white/10'
     "
     :aria-label="label"
-    :aria-pressed="isOpen"
+    :aria-expanded="isOpen"
     @click="toggle"
   >
     <span class="hidden text-xs leading-none uppercase sm:inline">

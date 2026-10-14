@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import TaskSettingsDrawer from '@/features/tasks/TaskSettingsDrawer.vue';
@@ -7,9 +7,15 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 const failedTasksCount = ref(0);
-const repairFailedTasks = vi.fn();
+const repaired = vi.fn();
+// Keeps the composable's contract: repair only runs once the drawer's confirm dialog says yes.
 vi.mock('@/composables/useTaskRepair', () => ({
-  useTaskRepair: () => ({ failedTasksCount, repairFailedTasks }),
+  useTaskRepair: ({ requestRepairConfirm }: { requestRepairConfirm: () => Promise<boolean> }) => ({
+    failedTasksCount,
+    repairFailedTasks: async () => {
+      if (await requestRepairConfirm()) repaired();
+    },
+  }),
 }));
 vi.mock('@/features/tasks/composables/useTaskDisplaySettings', () => ({
   useTaskDisplaySettings: () => ({
@@ -29,14 +35,18 @@ const mountDrawer = () =>
           template: '<button @click="$emit(\'click\')"><slot /></button>',
         },
         UIcon: true,
-        UModal: true,
+        UModal: {
+          props: ['open'],
+          emits: ['close'],
+          template: '<div v-if="open" data-testid="repair-confirm"><slot name="content" /></div>',
+        },
       },
     },
   });
 describe('TaskSettingsDrawer', () => {
   beforeEach(() => {
     failedTasksCount.value = 0;
-    repairFailedTasks.mockClear();
+    repaired.mockClear();
   });
   it('points filter seekers to the Filters menu', () => {
     expect(mountDrawer().find('[data-testid="task-settings-filters-note"]').exists()).toBe(true);
@@ -48,7 +58,20 @@ describe('TaskSettingsDrawer', () => {
     await wrapper.vm.$nextTick();
     const repair = wrapper.get('[data-testid="task-setting-group-behavior"]');
     await repair.get('[data-testid="task-settings-repair"] button').trigger('click');
-    expect(repairFailedTasks).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-testid="repair-confirm"]').exists()).toBe(true);
     expect(wrapper.findAll('[data-testid="task-settings-repair"]')).toHaveLength(1);
+  });
+  it.each([
+    ['repairs after confirming', 1, 1],
+    ['leaves tasks alone after cancelling', 0, 0],
+  ])('%s', async (_name, buttonIndex, expectedRepairs) => {
+    failedTasksCount.value = 2;
+    const wrapper = mountDrawer();
+    await wrapper.get('[data-testid="task-settings-repair"] button').trigger('click');
+    const buttons = wrapper.get('[data-testid="repair-confirm"]').findAll('button');
+    await buttons[buttonIndex]!.trigger('click');
+    await flushPromises();
+    expect(repaired).toHaveBeenCalledTimes(expectedRepairs);
+    expect(wrapper.find('[data-testid="repair-confirm"]').exists()).toBe(false);
   });
 });

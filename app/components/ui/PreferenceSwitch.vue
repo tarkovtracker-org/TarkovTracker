@@ -9,7 +9,7 @@
       <span
         v-if="description"
         :id="descriptionId"
-        class="text-surface-500 block text-xs leading-snug"
+        class="text-surface-400 block text-xs leading-snug"
       >
         {{ description }}
       </span>

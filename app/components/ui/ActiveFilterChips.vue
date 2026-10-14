@@ -6,7 +6,9 @@
     role="group"
     :aria-label="t('filter_menu.active_label')"
   >
-    <span class="text-surface-400 mr-0.5 text-xs">{{ t('filter_menu.active_label') }}</span>
+    <span class="text-surface-400 mr-0.5 text-xs" aria-hidden="true">
+      {{ t('filter_menu.active_label') }}
+    </span>
     <button
       v-for="filter in filters"
       :key="filter.key"

@@ -3,7 +3,8 @@
     test-id-prefix="task-filters"
     :title="t('page.tasks.filters.title')"
     :active-count="activeCount"
-    @reset="clearAll"
+    :can-reset="hasSavedFilters"
+    @reset="resetAll"
   >
     <FilterSection
       :title="t('page.tasks.filters.types.title')"
@@ -39,7 +40,7 @@
         :description="t('page.tasks.filters.narrow.required_keys_hint')"
       />
       <PreferenceSwitch
-        v-if="hasTeammates"
+        v-if="hasTeammates || sharedByAllOnly"
         v-model="sharedByAllOnly"
         test-id="task-filter-team-shared"
         :label="t('page.tasks.filters.narrow.team_shared')"
@@ -71,13 +72,14 @@
   const { t } = useI18n({ useScope: 'global' });
   const {
     activeCount,
-    clearAll,
+    hasSavedFilters,
     hasTeammates,
     hideCompletedMapObjectives,
     isMapsView,
     isTypeLocked,
     isTypeSelected,
     onlyTasksWithRequiredKeys,
+    resetAll,
     sharedByAllOnly,
     showGlobalTasks,
     toggleType,

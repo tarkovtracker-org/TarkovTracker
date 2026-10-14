@@ -93,10 +93,10 @@ describe('SortControl', () => {
     });
     const button = wrapper.get('button');
     expect(button.attributes('data-icon')).toBe('i-mdi-sort-ascending');
-    expect(button.attributes('aria-label')).toBe('page.tasks.sort.ascending');
+    expect(button.attributes('aria-label')).toBe('filter_menu.sort_ascending');
     await wrapper.setProps({ direction: 'desc' });
     expect(button.attributes('data-icon')).toBe('i-mdi-sort-descending');
-    expect(button.attributes('aria-label')).toBe('page.tasks.sort.descending');
+    expect(button.attributes('aria-label')).toBe('filter_menu.sort_descending');
     await button.trigger('click');
     expect(wrapper.emitted('toggle-direction')).toHaveLength(1);
   });

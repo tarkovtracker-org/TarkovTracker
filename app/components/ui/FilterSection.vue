@@ -3,7 +3,7 @@
     <h3 :id="headingId" class="text-surface-400 mb-1 text-xs font-semibold tracking-wide uppercase">
       {{ title }}
     </h3>
-    <p v-if="hint" class="text-surface-500 mb-2 text-xs">{{ hint }}</p>
+    <p v-if="hint" class="text-surface-400 mb-2 text-xs">{{ hint }}</p>
     <slot />
   </section>
 </template>

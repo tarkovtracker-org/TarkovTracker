@@ -20,7 +20,7 @@
       <span
         v-if="activeCount > 0"
         :data-testid="`${testIdPrefix}-count`"
-        class="bg-primary-500 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+        class="bg-primary-500 text-surface-950 light:text-surface-50 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
       >
         {{ activeCount }}
       </span>
@@ -38,7 +38,7 @@
             color="neutral"
             size="xs"
             icon="i-mdi-filter-remove-outline"
-            :disabled="activeCount === 0"
+            :disabled="!isResetEnabled"
             @click="emit('reset')"
           >
             {{ t('common.reset') }}
@@ -58,11 +58,14 @@
       testIdPrefix: string;
       /** Which button edge the panel lines up with; match the side the button sits on. */
       align?: 'start' | 'end';
+      /** Reset can clear saved filters idle in this view; defaults to having an active filter. */
+      canReset?: boolean;
     }>(),
-    { align: 'end' }
+    { align: 'end', canReset: undefined }
   );
   const emit = defineEmits<{ reset: [] }>();
   const { t } = useI18n({ useScope: 'global' });
+  const isResetEnabled = computed(() => props.canReset ?? props.activeCount > 0);
   const buttonAriaLabel = computed(() =>
     props.activeCount > 0
       ? t('filter_menu.button_active', { count: props.activeCount })

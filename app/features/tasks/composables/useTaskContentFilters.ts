@@ -1,5 +1,6 @@
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTeamStore } from '@/stores/useTeamStore';
+import { isAllUsersView } from '@/types/taskFilter';
 import type { ActiveFilter } from '@/types/filters';
 const TASK_TYPE_KEYS = ['regular', 'kappa', 'lightkeeper'] as const;
 export type TaskTypeKey = (typeof TASK_TYPE_KEYS)[number];
@@ -27,6 +28,12 @@ export function useTaskContentFilters() {
   const teamStore = useTeamStore();
   const hasTeammates = computed(() => (teamStore.teammates?.length ?? 0) > 0);
   const isMapsView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
+  // Mirrors useTaskFiltering: the team-shared filter only narrows the whole team's Available tab.
+  const isTeamSharedApplicable = computed(
+    () =>
+      isAllUsersView(preferencesStore.getTaskUserView) &&
+      preferencesStore.getTaskSecondaryView === 'available'
+  );
   const selectedTypes = computed<TaskTypeKey[]>(() => {
     const state = readTypeState(preferencesStore);
     const selected = TASK_TYPE_KEYS.filter((type) => state[type]);
@@ -72,7 +79,7 @@ export function useTaskContentFilters() {
     ...toggleFilter('required_keys', onlyTasksWithRequiredKeys.value, () => {
       onlyTasksWithRequiredKeys.value = false;
     }),
-    ...toggleFilter('team_shared', hasTeammates.value && sharedByAllOnly.value, () => {
+    ...toggleFilter('team_shared', isTeamSharedApplicable.value && sharedByAllOnly.value, () => {
       sharedByAllOnly.value = false;
     }),
     ...toggleFilter('global_hidden', isMapsView.value && !showGlobalTasks.value, () => {
@@ -90,6 +97,23 @@ export function useTaskContentFilters() {
   const clearAll = () => {
     activeFilters.value.forEach((filter) => filter.clear());
   };
+  // Saved filters include ones idle in the current view (map filters off Maps, team-shared off the
+  // whole team's Available tab), so Reset can clear what the chips do not show.
+  const savedFilterStates = computed(() => [
+    selectedTypes.value.length < TASK_TYPE_KEYS.length,
+    onlyTasksWithRequiredKeys.value,
+    sharedByAllOnly.value,
+    !showGlobalTasks.value,
+    hideCompletedMapObjectives.value,
+  ]);
+  const hasSavedFilters = computed(() => savedFilterStates.value.some(Boolean));
+  const resetAll = () => {
+    resetTypes();
+    onlyTasksWithRequiredKeys.value = false;
+    sharedByAllOnly.value = false;
+    showGlobalTasks.value = true;
+    hideCompletedMapObjectives.value = false;
+  };
   return {
     hasTeammates,
     isMapsView,
@@ -103,5 +127,7 @@ export function useTaskContentFilters() {
     activeFilters,
     activeCount,
     clearAll,
+    hasSavedFilters,
+    resetAll,
   };
 }
