@@ -10,7 +10,7 @@
         >
           <div
             data-help-target="hideout-status-filters"
-            class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-none"
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
           >
             <template v-for="(view, index) in primaryViews" :key="view.view">
               <UButton
@@ -39,7 +39,7 @@
               <span
                 v-if="index === 0"
                 aria-hidden="true"
-                class="bg-surface-700/60 h-6 w-px self-center"
+                class="bg-surface-700/60 hidden h-6 w-px self-center sm:block"
               ></span>
             </template>
           </div>
