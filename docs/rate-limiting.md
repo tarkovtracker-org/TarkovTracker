@@ -289,6 +289,13 @@ flowchart TB
 | `/api/tarkov-dev/profile`      | `tarkov-dev-profile-verification-rate:*` + `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP (verification) or 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
 | `/api/logs/client`             | `client-logs-rate:ip:...`                                                                                   | 10 / min / IP                                                | fixed in route                                                                                 |
 
+Client log bodies are limited to 128 KiB of actual streamed bytes before Nitro's Pages adapter
+buffers them and again at the route boundary. The 10/minute quota counts requests admitted to the
+route; oversized uploads dropped before Nitro do not consume that quota. The depth guard checks
+only the first 20 arguments forwarded to the logger, allowing at most eight container levels below
+the argument list. Oversized, malformed, or deeper forwarded arguments receive a quiet 204 without
+reaching the logger; ordinary nested diagnostics retain the existing 20-argument cap.
+
 Implementation: `app/server/utils/sharedEdgeStore.ts`
 
 Important:

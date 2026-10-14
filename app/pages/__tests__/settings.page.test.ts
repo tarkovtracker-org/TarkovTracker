@@ -123,6 +123,7 @@ const defaultGlobalStubs = {
   GeneralPreferencesCard: { template: '<div data-testid="general-preferences-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
+  PlayerLevelCard: { template: '<div data-testid="player-level-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
   ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
   ResetProgressCard: { template: '<div data-testid="reset-progress-card" />' },
@@ -248,6 +249,7 @@ describe('settings page', () => {
       global: globalConfig,
     });
     expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
+    expect(wrapper.find('#progression [data-testid="player-level-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
   });

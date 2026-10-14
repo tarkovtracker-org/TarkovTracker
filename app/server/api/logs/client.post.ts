@@ -1,5 +1,7 @@
-import { defineEventHandler, readBody, setResponseHeader, setResponseStatus } from 'h3';
+import { defineEventHandler, setResponseHeader, setResponseStatus, type H3Event } from 'h3';
 import { useRuntimeConfig } from '#imports';
+import { hasSafeClientLogDepth, readClientLogBytes } from '@/server/utils/clientLogBody';
+import { clientLogRequestStream } from '@/server/utils/clientLogRequestStream';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -42,6 +44,13 @@ const sanitizeArgs = (value: unknown): unknown[] => {
   }
   return value.slice(0, 20);
 };
+const readClientLogBody = async (event: H3Event) => {
+  const stream = clientLogRequestStream(event);
+  if (!stream) return null;
+  const bytes = await readClientLogBytes(stream);
+  if (!bytes) return null;
+  return JSON.parse(new TextDecoder().decode(bytes)) as ClientLogBody | null;
+};
 const consumeRateLimit = async (handle: SharedCacheHandle, key: string): Promise<boolean> => {
   return consumeSharedRateLimit(
     handle,
@@ -69,13 +78,17 @@ export default defineEventHandler(async (event) => {
     setResponseStatus(event, 204);
     return null;
   }
-  const body = (await readBody(event).catch(() => null)) as ClientLogBody | null;
+  const body = await readClientLogBody(event).catch(() => null);
   if (!body || typeof body !== 'object') {
     setResponseStatus(event, 204);
     return null;
   }
   const level = toClientLogLevel(body.level);
   const args = sanitizeArgs(body.args);
+  if (!hasSafeClientLogDepth(args)) {
+    setResponseStatus(event, 204);
+    return null;
+  }
   const href = toSafeString(body.href, 1024);
   const timestamp = toSafeString(body.timestamp, 64) ?? new Date().toISOString();
   const payload = {

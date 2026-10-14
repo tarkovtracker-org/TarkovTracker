@@ -357,3 +357,31 @@ describe('storyline trader task availability', () => {
     ).toBe(true);
   });
 });
+describe('reward-based trader unlocks', () => {
+  // Mirrors json.tarkov.dev: Mechanic's Introduction lists Jaeger in finishRewards.traderUnlock.
+  const jaeger = { id: '5c0647fdd443bc2504c2d371', name: 'Jaeger', normalizedName: 'jaeger' };
+  const introduction: Task = {
+    id: '5d2495a886f77425cd51e403',
+    trader: { id: 'mechanic', name: 'Mechanic', normalizedName: 'mechanic' },
+    finishRewards: { traderUnlock: [jaeger.id] as unknown as { id: string; name: string } },
+  };
+  const acquaintance: Task = { id: '5d24b81486f77439c92d6ba8', trader: jaeger };
+  it('locks the unlocked trader’s ungated tasks until the reward task is complete', () => {
+    expect(evaluate(acquaintance, data(), [introduction]).blockers).toEqual([
+      { type: 'trader_unlock', taskId: introduction.id, trader: { id: jaeger.id, name: 'Jaeger' } },
+    ]);
+  });
+  it('opens the trader once the reward task is complete', () => {
+    const progress = data({ completions: { [introduction.id]: true } });
+    expect(evaluate(acquaintance, progress, [introduction]).available).toBe(true);
+  });
+  it('accepts the legacy single-object reward shape', () => {
+    const legacy = { ...introduction, finishRewards: { traderUnlock: jaeger } };
+    expect(evaluate(acquaintance, data(), [legacy]).available).toBe(false);
+  });
+  it('does not block the reward task itself or other traders', () => {
+    expect(evaluate(introduction, data(), [acquaintance]).available).toBe(true);
+    const other: Task = { id: 'other', trader: { id: 'prapor', name: 'Prapor' } };
+    expect(evaluate(other, data(), [introduction]).available).toBe(true);
+  });
+});
