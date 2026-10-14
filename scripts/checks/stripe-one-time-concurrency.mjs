@@ -119,12 +119,20 @@ function verifyCutover() {
     'PASS cutover accepts an empty timed-payment history and rejects a legacy fulfilled payment'
   );
 }
-async function subscriptionPair(label, holderSql, waiterSql) {
-  const started = performance.now();
-  const baseline = Number(
-    query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
+function creditSnapshot() {
+  const snapshot = JSON.parse(
+    query(`SELECT jsonb_build_object(
+      'remaining', extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now())),
+      'observed_at', extract(epoch FROM now()))
     FROM public.supporters WHERE user_id='${user}'`)
   );
+  assert.notEqual(snapshot, null, 'Credit snapshot must exist');
+  assert.ok(Number.isFinite(snapshot.remaining), 'Credit balance must be finite');
+  assert.ok(Number.isFinite(snapshot.observed_at), 'Credit observation time must be finite');
+  return snapshot;
+}
+async function subscriptionPair(label, holderSql, waiterSql) {
+  const baseline = creditSnapshot();
   const holder =
     connection(`BEGIN; SET application_name='${application}'; SET LOCAL ROLE service_role;
     ${holderSql}; SELECT pg_sleep(3); COMMIT;`);
@@ -141,17 +149,22 @@ async function subscriptionPair(label, holderSql, waiterSql) {
   const [first, second] = await Promise.all([holder, other]);
   assert.equal(first.code, 0, first.stderr);
   assert.equal(second.code, 0, second.stderr);
-  const expiry = Number(
-    query(`SELECT extract(epoch FROM coalesce(one_time_remaining, one_time_expires_at - now()))
-    FROM public.supporters WHERE user_id='${user}'`)
-  );
-  const elapsed = (performance.now() - started) / 1000;
-  const remainingChange = expiry - baseline - 30 * 86400;
+  const expiry = creditSnapshot();
+  const elapsed = expiry.observed_at - baseline.observed_at;
+  const remainingChange = expiry.remaining - baseline.remaining - 30 * 86400;
   // Running credit spends real time while paused credit does not. Neither may
   // gain time or lose more than the actual duration of the observed transition.
+  // Measure both balance and elapsed time with the database wall clock: the host's
+  // monotonic timer can diverge from it when the environment clock adjusts.
   assert.ok(
     remainingChange <= 1 && remainingChange >= -elapsed - 1,
-    'Subscription transition preserves every committed paid period'
+    `Subscription transition preserves every committed paid period: ${JSON.stringify({
+      label,
+      baseline,
+      expiry,
+      remainingChange,
+      elapsed,
+    })}`
   );
   console.log(`PASS ${label}: actual row-lock wait; independent credit retains the payment`);
 }
