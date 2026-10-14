@@ -5,6 +5,7 @@ const SETTINGS_ROUTE_PATHS = new Set([
   '/prestige',
   '/preferences',
 ]);
+const SECTION_ROUTE_PATHS = new Set(['/resources', '/tasks']);
 export const isNavigationRouteActive = (
   targetPath: string | null | undefined,
   routePath: string
@@ -15,8 +16,9 @@ export const isNavigationRouteActive = (
   if (targetPath === '/settings') {
     return SETTINGS_ROUTE_PATHS.has(routePath);
   }
-  if (targetPath === '/resources') {
-    return routePath === '/resources' || routePath.startsWith('/resources/');
+  // Section entries stay highlighted on their sub-pages, such as the task views.
+  if (SECTION_ROUTE_PATHS.has(targetPath)) {
+    return routePath === targetPath || routePath.startsWith(`${targetPath}/`);
   }
   return routePath === targetPath;
 };
