@@ -349,12 +349,10 @@
   const props = withDefaults(
     defineProps<{
       station: HideoutStation;
-      collapsed?: boolean;
       highlighted?: boolean;
       highlightModuleId?: string | null;
     }>(),
     {
-      collapsed: false,
       highlighted: false,
       highlightModuleId: null,
     }
@@ -367,18 +365,8 @@
     useHideoutStationStatus();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
-  const isContentVisible = ref(!props.collapsed);
+  const isContentVisible = ref(true);
   const highlightDismissed = ref(false);
-  watch(
-    () => props.collapsed,
-    (newValue) => {
-      if (highlightActive.value) {
-        isContentVisible.value = true;
-        return;
-      }
-      isContentVisible.value = !newValue;
-    }
-  );
   watch(
     () => [props.highlighted, props.highlightModuleId],
     ([highlighted, highlightModuleId]) => {

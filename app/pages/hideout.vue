@@ -135,10 +135,6 @@
             >
               <HideoutCard
                 :station="hStation"
-                :collapsed="
-                  getStationStatus(hStation) === 'maxed' &&
-                  preferencesStore.hideoutCollapseCompleted
-                "
                 :highlighted="highlightedStationId === hStation.id"
                 :highlight-module-id="
                   highlightedStationId === hStation.id ? highlightedModuleId : undefined
@@ -172,12 +168,10 @@
           <div class="pointer-events-auto">
             <HideoutSettingsDrawer
               mode="docked"
-              :collapse-completed="preferencesStore.hideoutCollapseCompleted"
               :require-station-levels="preferencesStore.hideoutRequireStationLevels"
               :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
               :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
               :is-help-tour-active="isHideoutHelpTourActive"
-              @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
               @update:require-station-levels="handlePrereqToggle('station', $event)"
               @update:require-skill-levels="handlePrereqToggle('skill', $event)"
               @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"
@@ -206,12 +200,10 @@
         <HideoutSettingsDrawer
           v-if="isOverlaySettingsDrawerOpen"
           mode="overlay"
-          :collapse-completed="preferencesStore.hideoutCollapseCompleted"
           :require-station-levels="preferencesStore.hideoutRequireStationLevels"
           :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
           :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
           :is-help-tour-active="isHideoutHelpTourActive"
-          @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
           @update:require-station-levels="handlePrereqToggle('station', $event)"
           @update:require-skill-levels="handlePrereqToggle('skill', $event)"
           @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"

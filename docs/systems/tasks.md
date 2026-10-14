@@ -54,7 +54,10 @@ display, status tab visibility and behavior preferences live in `useTaskDisplayS
 failed-task repair action shows under Behavior only while failed tasks exist. The Hideout drawer's
 switches are read-only while the help tour points at it. Hideout always lists stations whose next
 level has its station, skill and trader prerequisites met first (item requirements do not count),
-keeping upstream order within each group, so it has no sort setting; the legacy `hideout_sort_ready_first` column is no longer read or written.
+keeping upstream order within each group, so it has no sort setting. Maxed cards already show only
+"Max station level reached", so there is no page-wide collapse setting either; each card keeps its
+own collapse toggle. The drawer holds only the availability requirements. The legacy
+`hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
 
 ## Canonical task progression
 

@@ -1197,7 +1197,6 @@
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
-      "collapse_completed": "Collapse completed stations",
       "prereq_filters": {
         "title": "Availability requirements",
         "station_levels": "Require station levels",
@@ -1233,7 +1232,6 @@
       },
       "settings": {
         "title": "Hideout settings",
-        "page_options": "Page options",
         "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },

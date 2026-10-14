@@ -118,7 +118,6 @@ export interface PreferencesState {
   hideNonKappaTasks: boolean;
   hideCompletedMapObjectives: boolean;
   hideoutPrimaryView?: string | null;
-  hideoutCollapseCompleted: boolean;
   hideoutRequireStationLevels: boolean;
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
@@ -207,7 +206,6 @@ export const preferencesDefaultState: PreferencesState = {
   hideNonKappaTasks: false,
   hideCompletedMapObjectives: false,
   hideoutPrimaryView: null,
-  hideoutCollapseCompleted: false,
   hideoutRequireStationLevels: true,
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
@@ -1042,7 +1040,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapShowPinnedObjectives',
       'mapShowTeamObjectives',
       'dashboardNoticeDismissed',
-      'hideoutCollapseCompleted',
       'hideoutRequireStationLevels',
       'hideoutRequireSkillLevels',
       'hideoutRequireTraderLoyalty',

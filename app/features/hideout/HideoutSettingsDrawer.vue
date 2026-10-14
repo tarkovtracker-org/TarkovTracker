@@ -13,7 +13,6 @@
   import SettingsDrawer from '@/components/ui/SettingsDrawer.vue';
   import type { PreferenceSetting, PreferenceSettingGroup } from '@/types/filters';
   interface Props {
-    collapseCompleted: boolean;
     isHelpTourActive?: boolean;
     mode?: 'overlay' | 'docked';
     requireSkillLevels: boolean;
@@ -26,14 +25,12 @@
     mode: 'overlay',
   });
   const emit = defineEmits<{
-    'update:collapseCompleted': [value: boolean];
     'update:requireSkillLevels': [value: boolean];
     'update:requireStationLevels': [value: boolean];
     'update:requireTraderLoyalty': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const updaters: Record<BooleanPropKey, (value: boolean) => void> = {
-    collapseCompleted: (value) => emit('update:collapseCompleted', value),
     requireSkillLevels: (value) => emit('update:requireSkillLevels', value),
     requireStationLevels: (value) => emit('update:requireStationLevels', value),
     requireTraderLoyalty: (value) => emit('update:requireTraderLoyalty', value),
@@ -53,13 +50,6 @@
     set: updaters[prop],
   });
   const groups = computed<PreferenceSettingGroup[]>(() => [
-    {
-      key: 'page_options',
-      title: t('page.hideout.settings.page_options'),
-      settings: [
-        toSetting('collapse_completed', 'collapseCompleted', t('page.hideout.collapse_completed')),
-      ],
-    },
     {
       key: 'requirements',
       title: t('page.hideout.prereq_filters.title'),

@@ -131,7 +131,6 @@ describe('usePreferencesStore', () => {
     it('should initialize hideout defaults correctly', () => {
       const store = usePreferencesStore();
       expect(store.hideoutPrimaryView).toBeNull();
-      expect(store.hideoutCollapseCompleted).toBe(false);
       expect(store.hideoutRequireStationLevels).toBe(true);
       expect(store.hideoutRequireSkillLevels).toBe(true);
       expect(store.hideoutRequireTraderLoyalty).toBe(true);
