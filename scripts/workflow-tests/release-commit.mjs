@@ -54,6 +54,15 @@ test('release stages a version-only reviewed PR without pushing main or waiting 
   const result = f.release();
   assert.equal(result.status, 0, result.stderr);
   const sha = git(f.repo, 'rev-parse', 'HEAD');
+  assert.ok(
+    f
+      .calls()
+      .some((args) =>
+        args.includes(
+          `repos/example/repo/commits/${sha}/check-runs?check_name=CI%20Result&filter=latest&per_page=100`
+        )
+      )
+  );
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   const events = f.events();
   const previewIndex = events.findIndex((event) => event.type === 'preview-result');
@@ -136,6 +145,10 @@ test('a version commit without a successful preview is never promoted', (t) => {
 test('failed PR creation retains recoverable staging assets and leaves main unchanged', (t) => {
   const f = releaseFixture(t);
   assert.notEqual(f.release({ CREATE_PR_FAIL: 'true' }).status, 0);
+  assert.equal(
+    git(f.repo, '--git-dir', f.remote, 'rev-parse', 'refs/heads/wip/release-1.2.3-123-1'),
+    git(f.repo, 'rev-parse', 'HEAD')
+  );
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   assert.equal(f.pushes().length, 1);
 });

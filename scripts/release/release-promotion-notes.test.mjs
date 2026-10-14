@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { recordPreparedVersion, clearPreparedVersion } from './release-note-state.mjs';
 import { captureGitHubNotes } from './release-promotion-notes.mjs';
@@ -113,7 +113,7 @@ function archive(receipt, filename = 'release-promotion.json') {
     'python3',
     [
       '-c',
-      'import io,json,sys,zipfile; data=json.load(sys.stdin); buffer=io.BytesIO(); archive=zipfile.ZipFile(buffer,"w"); archive.writestr(data["filename"],json.dumps(data["receipt"])); archive.close(); sys.stdout.buffer.write(buffer.getvalue())',
+      'import io,json,sys,zipfile; data=json.load(sys.stdin); buffer=io.BytesIO(); archive=zipfile.ZipFile(buffer,"w",compression=zipfile.ZIP_DEFLATED); archive.writestr(data["filename"],json.dumps(data["receipt"])); archive.close(); sys.stdout.buffer.write(buffer.getvalue())',
     ],
     { input: JSON.stringify({ receipt, filename }) }
   );
@@ -124,7 +124,64 @@ it('owned publication archive is bounded JSON only; renamed entries, malformed a
   await expect(readPromotionArchive(archive(receipt, 'evil.mjs'))).rejects.toThrow('Unexpected');
   await expect(readPromotionArchive(Buffer.alloc(1024 * 1024 + 1))).rejects.toThrow('oversized');
   await expect(readPromotionArchive(Buffer.from('not a zip'))).rejects.toThrow();
+  const bomb = archive({ githubNotes: 'x'.repeat(1024 * 1024 + 1) });
+  expect(bomb.byteLength).toBeLessThan(8192);
+  await expect(readPromotionArchive(bomb)).rejects.toThrow(/ENOBUFS|maxBuffer/);
 });
+function boundedUnzip(mode, expectedCode) {
+  const directory = mkdtempSync(join(tmpdir(), 'release-unzip-bound-'));
+  const executable = join(directory, 'unzip');
+  writeFileSync(
+    executable,
+    `#!/usr/bin/env python3
+import os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+mode = ${JSON.stringify(mode)}
+if mode == 'receipt' and sys.argv[1] == '-Z1':
+  sys.stdout.write('release-promotion.json\\n')
+else:
+  if mode != 'timeout': os.write(1, b'x' * (2 * 1024 * 1024))
+  while True: time.sleep(1)
+`
+  );
+  chmodSync(executable, 0o755);
+  const harness = `import { readPromotionArchive } from ${JSON.stringify(new URL('./release-promotion-receipt.mjs', import.meta.url).href)};
+try { await readPromotionArchive(Buffer.from('fixture archive')); process.exitCode = 2; }
+catch (error) { if (error.code === ${JSON.stringify(expectedCode)}) console.log('bounded'); else process.exitCode = 3; }`;
+  try {
+    // GNU timeout kills this fixture's whole process group if a guard regresses. An ignored TERM
+    // must never leave either the main Vitest worker blocked or an orphan fixture unzip alive.
+    return execFileSync(
+      'timeout',
+      ['--signal=KILL', '12s', process.execPath, '--input-type=module', '-e', harness],
+      {
+        env: {
+          PATH: `${directory}:${dirname(process.execPath)}:/usr/bin:/bin`,
+          HOME: directory,
+          TMPDIR: directory,
+        },
+        encoding: 'utf8',
+        maxBuffer: 8192,
+        timeout: 14000,
+        killSignal: 'SIGKILL',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+it.each([
+  ['listing', 'ENOBUFS'],
+  ['receipt', 'ENOBUFS'],
+  ['timeout', 'ETIMEDOUT'],
+])(
+  'bounds receipt unzip %s even when SIGTERM is ignored',
+  (mode, code) => {
+    expect(boundedUnzip(mode, code)).toBe('bounded\n');
+  },
+  20000
+);
 function finalizationClient(f, receipt, merged) {
   const repo = { owner: 'owner', repo: 'repo' };
   const pr = {
@@ -240,6 +297,8 @@ function finalizationClient(f, receipt, merged) {
     actions: {
       getWorkflowRunAttempt: vi.fn(async () => ({
         data: {
+          id: 123,
+          run_attempt: 1,
           path: '.github/workflows/release.yml',
           event: 'workflow_dispatch',
           head_branch: 'main',

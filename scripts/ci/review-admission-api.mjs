@@ -237,7 +237,9 @@ function requireTrustedRun(run, repo) {
   if (run.event !== 'workflow_dispatch') return;
   requireEvidence(run.head_branch === 'main', 'Admission dispatch did not use trusted main.');
 }
-export function validateAdmissionReceipt(receipt, repo, head, run) {
+export function validateAdmissionReceipt(receipt, repo, head, run, number) {
+  requireEvidence(Number.isSafeInteger(number) && number > 0, 'Expected a positive PR number.');
+  requireEvidence(receipt.number === number, 'Admission receipt PR number mismatch.');
   requireReceiptIssuer(receipt);
   requireEvidence(receipt.schema === 1, 'Missing admission receipt.');
   requireEvidence(

@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { previewBranchName, PAGES_DOMAIN } from '../preview/profile.mjs';
-import { pendingPreviews, retentionPages } from '../preview/retention-api.mjs';
+import { liveQueueAliases, pendingPreviews, retentionPages } from '../preview/retention-api.mjs';
 import { retainQueuePreviews, requireRetentionLifecycle } from '../preview/retention.mjs';
+import { jobBlock, workflowStep, workflowEvent } from './helpers/workflow-blocks.mjs';
 const repo = { owner: 'example', repo: 'repo' };
 const sha = 'a'.repeat(40);
 const branch = 'gh-readonly-queue/main/pr-123-example';
@@ -437,16 +438,75 @@ test('Pages transport or envelope failures cannot report successful deletion', a
   });
   await assert.rejects(pages.remove('00000000-0000-0000-0000-000000000001'));
 });
+function assertRetentionBoundary(workflow) {
+  const retention = jobBlock(workflow, 'retention');
+  const checkout = workflowStep(retention, 'Checkout trusted retention tooling');
+  const apply = workflowStep(retention, 'Plan or apply bounded retention');
+  assert.match(retention, /^ {4}if: github.ref == 'refs\/heads\/main'$/m);
+  assert.match(retention, /^ {4}environment: preview$/m);
+  assert.match(checkout, /ref: \$\{\{ github.event.repository.default_branch \}\}/);
+  assert.doesNotMatch(checkout, /persist-credentials: true/);
+  assert.match(apply, /CLOUDFLARE_PAGES_API_TOKEN: \$\{\{ secrets.CLOUDFLARE_PAGES_API_TOKEN \}\}/);
+  assert.match(apply, /RETENTION_ENABLED: \$\{\{ vars.PREVIEW_QUEUE_RETENTION_ENABLED \}\}/);
+  assert.match(apply, /process.env.RETENTION_ENABLED === 'true'/);
+  assert.match(apply, /getCollaboratorPermissionLevel/);
+  assert.match(
+    workflowEvent(workflow, 'workflow_dispatch'),
+    /apply:\n(?: +[^\n]*\n)* +default: false/
+  );
+}
 test('retention workflow remains main-only, credential isolated, and disabled until approval', () => {
   const workflow = readFileSync('.github/workflows/preview-retention.yml', 'utf8');
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main'/);
-  assert.match(workflow, /ref: \$\{\{ github.event.repository.default_branch \}\}/);
-  assert.match(workflow, /environment: preview/);
-  assert.match(workflow, /RETENTION_ENABLED: \$\{\{ vars.PREVIEW_QUEUE_RETENTION_ENABLED \}\}/);
-  assert.match(workflow, /process.env.RETENTION_ENABLED === 'true'/);
-  assert.match(workflow, /default: false/);
-  assert.match(workflow, /getCollaboratorPermissionLevel/);
-  assert.doesNotMatch(workflow, /pull_request|merge_group|persist-credentials: true/);
+  assertRetentionBoundary(workflow);
+  const decoy =
+    "  unrelated:\n    if: github.ref == 'refs/heads/main'\n    environment: preview\n    steps:\n      - name: Decoy\n        env:\n          CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}\n          RETENTION_ENABLED: ${{ vars.PREVIEW_QUEUE_RETENTION_ENABLED }}\n";
+  for (const changed of [
+    workflow.replace("    if: github.ref == 'refs/heads/main'\n", ''),
+    workflow.replace('    environment: preview\n', ''),
+    workflow.replace(
+      'CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}',
+      'CLOUDFLARE_PAGES_API_TOKEN: missing'
+    ),
+    workflow.replace(
+      'RETENTION_ENABLED: ${{ vars.PREVIEW_QUEUE_RETENTION_ENABLED }}',
+      'RETENTION_ENABLED: missing'
+    ),
+  ])
+    assert.throws(() => assertRetentionBoundary(changed + decoy), assert.AssertionError);
+});
+test('manual retention accepts maintain role despite legacy write permission and rejects ordinary write', async () => {
+  const workflow = readFileSync('.github/workflows/preview-retention.yml', 'utf8');
+  const step = workflowStep(jobBlock(workflow, 'retention'), 'Plan or apply bounded retention');
+  const guard = step.slice(step.indexOf('const requested ='), step.indexOf('const pages ='));
+  const run = new (Object.getPrototypeOf(async function () {}).constructor)(
+    'context',
+    'process',
+    'github',
+    guard + 'return apply;'
+  );
+  const context = {
+    eventName: 'workflow_dispatch',
+    actor: 'maintainer',
+    repo: { owner: 'owner', repo: 'repo' },
+  };
+  const process = { env: { APPLY_INPUT: 'true', RETENTION_ENABLED: 'true' } };
+  const github = (data) => ({
+    rest: { repos: { getCollaboratorPermissionLevel: async () => ({ data }) } },
+  });
+  assert.equal(
+    await run(context, process, github({ permission: 'write', role_name: 'maintain' })),
+    true
+  );
+  assert.equal(
+    await run(context, process, github({ permission: 'admin', role_name: 'admin' })),
+    true
+  );
+  for (const data of [
+    { permission: 'write', role_name: 'write' },
+    { permission: 'write' },
+    { permission: 'read', role_name: 'triage' },
+  ])
+    await assert.rejects(run(context, process, github(data)), /current maintainer/);
 });
 function ordinaryWaiting(f) {
   const source = {
@@ -555,5 +615,16 @@ test('retention mutations expose forged source classification and unknown pendin
   assert.equal(
     (await pendingBypass.retainQueuePreviews({ ...unknown.options, apply: true })).deleted.length,
     1
+  );
+});
+test('matching references include every queue alias beyond thirty without assumed REST pagination', async () => {
+  const refs = Array.from({ length: 35 }, (_, index) => ({
+    ref: `refs/heads/gh-readonly-queue/main/pr-${index}-candidate`,
+    object: { sha: 'a'.repeat(40) },
+  }));
+  const github = { rest: { git: { listMatchingRefs: async () => ({ data: refs, headers: {} }) } } };
+  assert.equal(
+    (await liveQueueAliases(github, { owner: 'owner', repo: 'repo' }, previewBranchName)).length,
+    35
   );
 });

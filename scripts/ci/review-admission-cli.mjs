@@ -48,14 +48,17 @@ function pageItems(page) {
   return page.artifacts;
 }
 async function main() {
-  const [name, head, expectedRunId] = process.argv.slice(2);
+  const [name, head, expectedNumber, expectedRunId] = process.argv.slice(2);
   requireEvidence(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(name ?? ''), 'Expected OWNER/REPO.');
   requireEvidence(SHA.test(head ?? ''), 'Expected exact 40-character head SHA.');
+  requireEvidence(/^[1-9]\d*$/.test(expectedNumber ?? ''), 'Expected a positive PR number.');
+  const number = Number(expectedNumber);
   const [owner, repo] = name.split('/');
   const receipt = await requireReviewAdmission({
     github: adapter(),
     repo: { owner, repo },
     head,
+    number,
     expectedRunId,
   });
   process.stdout.write(`${JSON.stringify(receipt)}\n`);

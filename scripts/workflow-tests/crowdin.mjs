@@ -63,7 +63,7 @@ test('queue admission validates the PR diff without rewriting a behind translati
   assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
   assert.deepEqual(
     f.events().filter((event) => event.type === 'admission'),
-    [{ type: 'admission', sha: f.head, runId: '777' }]
+    [{ type: 'admission', sha: f.head, number: '857', runId: '777' }]
   );
   assert.equal(f.calls().filter((args) => args[0] === 'pr' && args[1] === 'merge').length, 1);
 });

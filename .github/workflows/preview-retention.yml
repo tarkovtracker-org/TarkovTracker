@@ -52,7 +52,7 @@ jobs:
             if (process.env.APPLY_INPUT === 'true' && !apply) throw new Error('Retention activation has not been approved.');
             if (apply && context.eventName === 'workflow_dispatch') {
               const { data } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: context.actor });
-              if (!['maintain', 'admin'].includes(data.permission)) throw new Error('Retention apply requires a current maintainer.');
+              if (!['maintain', 'admin'].includes(data.role_name)) throw new Error('Retention apply requires a current maintainer.');
             }
             const pages = retentionPages({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_PAGES_API_TOKEN });
             const report = await retainQueuePreviews({ github, repo: context.repo, pages, workspace: process.env.GITHUB_WORKSPACE, apply });

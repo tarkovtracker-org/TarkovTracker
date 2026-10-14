@@ -16,17 +16,17 @@ export async function readPromotionArchive(bytes) {
   }
 }
 function parseReceipt(archive) {
-  const entries = execFileSync('unzip', ['-Z1', archive], {
-    encoding: 'utf8',
-    maxBuffer: 8192,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
+  const entries = unzip(['-Z1', archive], 8192).trim();
   if (entries !== 'release-promotion.json')
     throw new Error('Unexpected promotion receipt contents.');
-  const json = execFileSync('unzip', ['-p', archive, entries], {
+  return JSON.parse(unzip(['-p', archive, entries], RECEIPT_LIMIT));
+}
+function unzip(args, maxBuffer) {
+  return execFileSync('unzip', args, {
     encoding: 'utf8',
-    maxBuffer: RECEIPT_LIMIT,
+    maxBuffer,
+    killSignal: 'SIGKILL',
+    timeout: 10000,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  return JSON.parse(json);
 }

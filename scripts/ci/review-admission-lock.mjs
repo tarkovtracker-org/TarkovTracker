@@ -1,9 +1,8 @@
 // A comparison of a strict textual subset, not a general YAML loader. Unknown changed shapes hold.
 import { safeVersion } from './review-admission-version.mjs';
 const SENSITIVE =
-  /(?:supabase|stripe|auth|session|jose|jwt|oauth|passport|credential|progress-contracts)/i;
-const VERSION =
-  /(?<![a-zA-Z0-9_.-])(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?![a-zA-Z0-9_.-])/g;
+  /(?:supabase|stripe|auth|session|jose|jwt|jsonwebtoken|oauth|passport|credential|progress-contracts)/i;
+const VERSION = /(^|@)((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(?=[()]|$)/g;
 const PACKAGE =
   /^((?:@[a-z0-9_.-]+\/)?[a-z0-9_.-]+)@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(.*)$/;
 function sections(text) {
@@ -55,12 +54,12 @@ function packageName(key) {
   return parsed[1];
 }
 function normaliseVersions(text) {
-  return text.replace(VERSION, '#VERSION#');
+  return text.replace(VERSION, '$1#VERSION#');
 }
 function versionShape(before, after) {
   if (normaliseVersions(before) !== normaliseVersions(after)) return false;
-  const old = [...before.matchAll(VERSION)].map((match) => match[0]);
-  const next = [...after.matchAll(VERSION)].map((match) => match[0]);
+  const old = [...before.matchAll(VERSION)].map((match) => match[2]);
+  const next = [...after.matchAll(VERSION)].map((match) => match[2]);
   if (!old.length) return false;
   return old.every((version, index) => safeVersion(version, next[index]));
 }
@@ -69,8 +68,12 @@ function integrityMetadata(body) {
   if (matches?.length !== 1) throw new Error('Unclassified package integrity');
   return body.replace(matches[0], '    resolution: {integrity: #INTEGRITY#}');
 }
+function ordinaryPackagePair(before, after) {
+  const name = packageName(before);
+  return name === packageName(after) && !SENSITIVE.test(name);
+}
 function safePackagePair(before, after) {
-  if (SENSITIVE.test(packageName(before[0]))) return false;
+  if (!ordinaryPackagePair(before[0], after[0])) return false;
   if (!versionShape(before[0], after[0])) return false;
   if (before[0] === after[0]) return false; // An immutable version may not change its resolution.
   return integrityMetadata(before[1]) === integrityMetadata(after[1]);
@@ -120,17 +123,25 @@ function contextualLine(stack, line) {
   if (header) stack.push({ indent, name: header[1] });
   return { line, context: stack.map((entry) => entry.name).join('/') };
 }
-function ordinaryScalar(line) {
-  const scalar = /^ +[^:]+: (.+)$/.exec(line);
-  if (!scalar) return false;
-  return /^['"]?[a-zA-Z0-9@_./()-]+['"]?$/.test(scalar[1]);
+function resolvedScalar(line) {
+  const scalar = /^ +([^:]+): (.+)$/.exec(line);
+  if (!scalar) return null;
+  if (!/^\d+\.\d+\.\d+(?:\(|$)/.test(scalar[2])) return null;
+  if (!/^[a-zA-Z0-9@_./()-]+$/.test(scalar[2])) return null;
+  return { name: scalar[1], version: scalar[2] };
+}
+function safeScalarPair(before, after) {
+  const old = resolvedScalar(before);
+  const next = resolvedScalar(after);
+  if (![old, next].every(Boolean)) return false;
+  return old.name === next.name && versionShape(old.version, next.version);
 }
 function safeLine(before, after) {
+  if (before.context !== after.context) return false;
   if (before.line === after.line) return true;
   if (SENSITIVE.test(`${before.context} ${before.line} ${after.context} ${after.line}`))
     return false;
-  if (![ordinaryScalar(before.line), ordinaryScalar(after.line)].every(Boolean)) return false;
-  return versionShape(before.line, after.line);
+  return safeScalarPair(before.line, after.line);
 }
 function sameResolvedEdges(before, after) {
   const old = contextualLines(before);
@@ -139,7 +150,7 @@ function sameResolvedEdges(before, after) {
   return old.every((line, index) => safeLine(line, next[index]));
 }
 function safeSnapshotPair(before, after) {
-  if (SENSITIVE.test(packageName(before[0]))) return false;
+  if (!ordinaryPackagePair(before[0], after[0])) return false;
   if (!versionShape(before[0], after[0])) return false;
   return sameResolvedEdges(before[1], after[1]);
 }

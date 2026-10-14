@@ -76,14 +76,18 @@ test('admission extension rejects workflow/global, foreign-job, duplicate or mal
 test('preview extension accepts only the exact queue-profile conditional group', () => {
   const filename = '.github/workflows/preview.yml';
   const current = readFileSync(filename, 'utf8');
-  assert.equal(normalizeQueueWorkflow(current, filename), current.replace('  queue: max', ''));
+  assert.equal(
+    normalizeQueueWorkflow(current, filename),
+    current.replace("  queue: ${{ inputs.queue && 'max' || 'single' }}", '')
+  );
   for (const changed of [
     current.replace("inputs.queue && 'pages-preview-lifecycle'", "inputs.queue && 'other'"),
     current.replace(
       "inputs.queue && 'pages-preview-lifecycle'",
       "true && 'pages-preview-lifecycle'"
     ),
-    current.replace('queue: max', 'queue: single'),
+    current.replace("queue: ${{ inputs.queue && 'max' || 'single' }}", 'queue: single'),
+    current.replace('cancel-in-progress: ${{ !inputs.queue }}', 'cancel-in-progress: false'),
   ])
     assert.throws(() => normalizeQueueWorkflow(changed, filename));
 });

@@ -10,17 +10,35 @@ vi.mock('./release-promotion.mjs', () => ({ queuedRelease: vi.fn(), rollbackProm
 const sha = 'a'.repeat(40);
 const reply = (data, httpStatus = 200) =>
   `HTTP/2.0 ${httpStatus} OK\ncontent-type: application/json\n\n${JSON.stringify(data)}`;
-let branch, dirty, main, conclusion;
+let branch, dirty, main, conclusion, prefix;
+function readOnlyCommand([tool, args]) {
+  if (tool === 'git')
+    return [
+      ['branch', '--show-current'],
+      ['status', '--porcelain'],
+      ['rev-parse', 'HEAD'],
+      ['rev-parse', '--show-prefix'],
+    ].some((allowed) => JSON.stringify(args) === JSON.stringify(allowed));
+  return [
+    tool === 'gh',
+    args.length === 3,
+    args[0] === 'api',
+    args[1] === '--include',
+    args[2]?.startsWith('repos/owner/repo'),
+  ].every(Boolean);
+}
 beforeEach(() => {
   vi.resetAllMocks();
   branch = 'fix/release-recovery';
   dirty = '';
   main = sha;
   conclusion = 'success';
+  prefix = '';
   const gitResults = new Map([
     ['branch --show-current', () => branch],
     ['status --porcelain', () => dirty],
     ['rev-parse HEAD', () => sha],
+    ['rev-parse --show-prefix', () => prefix],
   ]);
   const responses = new Map([
     ['repos/owner/repo/git/ref/heads/main', () => ({ object: { sha: main } })],
@@ -44,6 +62,7 @@ beforeEach(() => {
     ['repos/owner/repo', () => ({ id: 456 })],
   ]);
   execFileSync.mockImplementation((tool, args) => {
+    if (!readOnlyCommand([tool, args])) throw new Error('Unexpected write command');
     if (tool === 'git') return gitResults.get(args.join(' '))();
     const endpoint = args.at(-1);
     if (!responses.has(endpoint)) throw new Error('Unexpected command');
@@ -60,12 +79,20 @@ it('creates only two local generated asset edits after current-main identity and
     ['package.json', '{"version":"1.2.2"}\n'],
     ['CHANGELOG.md', 'old notes'],
   ]);
-  expect(
-    execFileSync.mock.calls.every(
-      ([tool, args]) =>
-        tool === 'git' || (tool === 'gh' && args[0] === 'api' && !args.includes('--method'))
-    )
-  ).toBe(true);
+  expect(execFileSync.mock.calls.map((call) => call.slice(0, 2)).every(readOnlyCommand)).toBe(true);
+});
+it.each([
+  ['git', ['push', 'origin', 'HEAD:main']],
+  ['gh', ['api', '-X', 'POST', 'repos/owner/repo/pulls']],
+  ['gh', ['api', '--method', 'POST', 'repos/owner/repo/pulls']],
+])('read-only command allowlist rejects %s write arguments', (tool, args) => {
+  expect(readOnlyCommand([tool, args])).toBe(false);
+});
+it('rejects nested working directories before GitHub reads or writing generated assets', async () => {
+  prefix = 'scripts/release/';
+  await expect(prepareRollback('owner/repo', '901')).rejects.toThrow('repository root');
+  expect(writeFileSync).not.toHaveBeenCalled();
+  expect(execFileSync.mock.calls.some(([tool]) => tool === 'gh')).toBe(false);
 });
 it.each(['owner/repo;touch unwanted', '../repo', 'owner'])(
   'rejects malformed repository %s',

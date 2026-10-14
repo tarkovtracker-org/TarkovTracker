@@ -65,6 +65,13 @@ function latestReviews(reviews) {
 }
 function keepLatestReview(latest, review) {
   if (!['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(review.state)) return;
+  if (!review.user?.id) return keepAnonymousRequest(latest, review);
+  keepLatestUserReview(latest, review);
+}
+function keepAnonymousRequest(latest, review) {
+  if (review.state === 'CHANGES_REQUESTED') latest.set(review, review);
+}
+function keepLatestUserReview(latest, review) {
   const old = latest.get(review.user.id);
   if (!old || review.id > old.id) latest.set(review.user.id, review);
 }
@@ -109,6 +116,7 @@ function verifiedProvider(reviews, checks, head) {
   );
 }
 function approvedHuman(review, head, authorId, trusted) {
+  if (!review.user) return false;
   return [
     review.state === 'APPROVED',
     review.commit_id === head,
@@ -118,6 +126,7 @@ function approvedHuman(review, head, authorId, trusted) {
   ].every(Boolean);
 }
 function explicitComment(comment, head, trusted) {
+  if (!comment.user) return false;
   return [
     comment.user.type === 'User',
     trusted.has(comment.user.login),

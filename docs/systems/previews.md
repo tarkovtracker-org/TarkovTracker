@@ -252,7 +252,9 @@ requires a current maintainer. No production, normal PR, unknown or pre-lock dep
 Native queue Preview workflows and retention share `pages-preview-lifecycle` with
 `queue: max` and `cancel-in-progress: false` through upload, smoke and authoritative result
 publication. Ordinary PR, fork and release previews use `preview-ci-<CI run id>` instead, so an
-unapproved fork cannot occupy the queue lifecycle lock. The trusted requester sets the boolean
+unapproved fork cannot occupy the queue lifecycle lock. Ordinary previews keep `single` pending
+capacity and cancel an earlier request for the same CI run; native queue previews keep `max`
+capacity without cancellation. The trusted requester sets the boolean
 `queue` input from authenticated CI metadata; planning rejects either profile mismatch before
 entering an environment approval wait, and upload verifies it again against the live CI event.
 The existing `preview` and `preview-fork` environments, branch policies, reviewers and secrets

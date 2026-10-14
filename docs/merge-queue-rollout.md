@@ -42,8 +42,9 @@ the queue until all of the following are established:
    enqueue only after reviews are complete and findings resolved, including independent review
    for the risk classes in `AGENTS.md`. Never use `--admin`.
 7. With explicit rollout authorization, activate the queue template and remove strict freshness
-   only once equivalent queue integration checks are enforced. Keep both required contexts,
-   GitHub Actions provider pins, `ALLGREEN`, no bypass actors, and deletion/non-fast-forward rules.
+   only once equivalent queue integration checks are enforced. Keep the two Actions-pinned CI/preview
+   contexts and the App-pinned admission context, `ALLGREEN`, no bypass actors, and
+   deletion/non-fast-forward rules.
 
 ## Integrated automation and review admission
 

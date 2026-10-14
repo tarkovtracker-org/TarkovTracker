@@ -34,6 +34,8 @@ function parseArchive(archive, head) {
     encoding: 'utf8',
     maxBuffer: 8192,
     stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 10000,
+    killSignal: 'SIGKILL',
   }).trim();
   requireEvidence(
     entries === `${head}.json`,
@@ -43,6 +45,8 @@ function parseArchive(archive, head) {
     encoding: 'utf8',
     maxBuffer: 100000,
     stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 10000,
+    killSignal: 'SIGKILL',
   });
   return JSON.parse(json);
 }
@@ -57,7 +61,8 @@ async function trustedSource(github, repo, receipt) {
     'Admission policy source is not on trusted main history.'
   );
 }
-export async function requireReviewAdmission({ github, repo, head, expectedRunId }) {
+export async function requireReviewAdmission({ github, repo, head, number, expectedRunId }) {
+  requireEvidence(Number.isSafeInteger(number) && number > 0, 'Expected a positive PR number.');
   const run = await admissionRun(github, repo, head, expectedRunId);
   const artifact = await admissionArtifact(github, repo, run, head);
   const { data } = await github.rest.actions.downloadArtifact({
@@ -66,7 +71,7 @@ export async function requireReviewAdmission({ github, repo, head, expectedRunId
     archive_format: 'zip',
   });
   const receipt = await readAdmissionArchive(Buffer.from(data), head);
-  validateAdmissionReceipt(receipt, repo, head, run);
+  validateAdmissionReceipt(receipt, repo, head, run, number);
   await trustedSource(github, repo, receipt);
   return receipt;
 }

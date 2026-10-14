@@ -27,6 +27,7 @@ function fixture() {
   };
   const main = { object: { sha } };
   const runs = [run];
+  const wakeup = structuredClone(run);
   const releases = [];
   const github = {
     paginate: vi.fn(async (endpoint) => (endpoint === github.rest.pulls.list ? [] : releases)),
@@ -34,13 +35,13 @@ function fixture() {
       repos: { listReleases: vi.fn() },
       pulls: { list: vi.fn() },
       actions: {
-        getWorkflowRun: vi.fn(async () => ({ data: run })),
+        getWorkflowRun: vi.fn(async () => ({ data: wakeup })),
         listWorkflowRuns: vi.fn(async () => ({ data: { workflow_runs: runs } })),
       },
       git: { getRef: vi.fn().mockResolvedValue({ data: main }) },
     },
   };
-  return { run, runs, main, context, github, releases, now };
+  return { run, wakeup, runs, main, context, github, releases, now };
 }
 function published(published_at, changes = {}) {
   return { draft: false, prerelease: false, published_at, ...changes };
@@ -294,16 +295,28 @@ describe('main CI finalization wakeups', () => {
     }
   });
   it.each([
-    ['fork CI', (f) => (f.run.head_repository.id = 999)],
-    ['wrong workflow', (f) => (f.run.path = '.github/workflows/evil.yml')],
-    ['branch CI', (f) => (f.run.head_branch = 'feature')],
-    ['untrusted event', (f) => (f.run.event = 'pull_request')],
-    ['failed run', (f) => (f.run.conclusion = 'failure')],
-    ['superseded attempt', (f) => (f.run.run_attempt = 2)],
-    ['changed CI SHA', (f) => (f.run.head_sha = 'b'.repeat(40))],
+    ['fork CI', (f) => (f.wakeup.head_repository.id = 999)],
+    ['wrong workflow', (f) => (f.wakeup.path = '.github/workflows/evil.yml')],
+    ['branch CI', (f) => (f.wakeup.head_branch = 'feature')],
+    ['untrusted event', (f) => (f.wakeup.event = 'pull_request')],
+    ['failed run', (f) => (f.wakeup.conclusion = 'failure')],
+    ['superseded attempt', (f) => (f.wakeup.run_attempt = 2)],
+    ['changed CI SHA', (f) => (f.wakeup.head_sha = 'b'.repeat(40))],
   ])('rejects %s without enabling preparation', async (_label, mutate) => {
     const f = finalization();
     mutate(f);
-    expect((await releaseEligibility(f)).release).toBe(false);
+    const queued = vi.spyOn(promotion, 'queuedRelease').mockResolvedValue({
+      release: false,
+      recovery: { sha, version: '1.2.3', notes: 'verified' },
+    });
+    try {
+      const result = await releaseEligibility(f);
+      expect(result).toMatchObject({ release: false });
+      expect(result.recovery).toBeUndefined();
+      expect(queued).not.toHaveBeenCalled();
+      expect(f.run).toMatchObject({ conclusion: 'success', head_sha: sha, head_branch: 'main' });
+    } finally {
+      queued.mockRestore();
+    }
   });
 });

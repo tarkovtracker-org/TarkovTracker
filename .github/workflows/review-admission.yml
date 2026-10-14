@@ -17,13 +17,37 @@ on:
         type: string
 permissions: {}
 jobs:
+  filter:
+    name: Filter admission event
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout trusted event filter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Filter current and withdrawn approval commands
+        id: filter
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { filterAdmission } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            core.setOutput('relevant', String(await filterAdmission({ github, context })));
   admission:
     name: Review admission controller
+    needs: filter
     if: >-
+      needs.filter.outputs.relevant == 'true' && (
       (github.event_name == 'pull_request_target' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) ||
-      (github.event_name == 'workflow_run' && contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group", "check_suite"]'), github.event.workflow_run.event) && github.event.workflow_run.repository.full_name == github.repository) ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
-      (contains(github.event.comment.body, '/approve-sensitive ') || contains(github.event.changes.body.from, '/approve-sensitive ')))
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group", "check_suite"]'), github.event.workflow_run.event) && github.event.workflow_run.repository.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request))
     concurrency:
       group: review-admission-publication
       queue: max

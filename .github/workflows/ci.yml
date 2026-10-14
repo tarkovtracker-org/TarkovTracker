@@ -139,7 +139,7 @@ jobs:
             "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz" \
             "$ZIZMOR_SHA256"
           # Validate GitHub's newer queue:max extension, then retain all native parser/security checks.
-          node scripts/ci/actionlint-queue.mjs "$RUNNER_TEMP/actionlint"
+          env -u GH_TOKEN node scripts/ci/actionlint-queue.mjs "$RUNNER_TEMP/actionlint"
           "$RUNNER_TEMP/zizmor" --no-progress --min-severity low .github/
   typecheck:
     needs: changes

@@ -48,7 +48,7 @@ wait_for_review_admission() {
     -f "inputs[pull_request]=$number" -F return_run_details=true --jq ".workflow_run_id")"
   [[ "$admission_run" =~ ^[1-9][0-9]*$ ]] || { echo "Admission dispatch returned no authenticated run ID" >&2; return 1; }
   for ((attempt = 1; attempt <= 120; attempt++)); do
-    if node "$(dirname "${BASH_SOURCE[0]}")/review-admission-cli.mjs" "$GITHUB_REPOSITORY" "$sha" "$admission_run"; then
+    if node "$(dirname "${BASH_SOURCE[0]}")/review-admission-cli.mjs" "$GITHUB_REPOSITORY" "$sha" "$number" "$admission_run"; then
       return 0
     else
       admission_exit=$?

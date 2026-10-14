@@ -83,9 +83,14 @@ function requireCleanTopic() {
   if (execute('git', ['status', '--porcelain']))
     throw new Error('Recovery requires a clean checkout.');
 }
+function requireRepositoryRoot() {
+  if (execute('git', ['rev-parse', '--show-prefix']))
+    throw new Error('Run recovery from the repository root.');
+}
 /** Run on a clean topic at fresh main: produce only a local, reviewable generated-assets diff. */
 export async function prepareRollback(repository, prNumber) {
   requireArguments(repository, prNumber);
+  requireRepositoryRoot();
   requireCleanTopic();
   const sha = execute('git', ['rev-parse', 'HEAD']);
   const github = readClient(repository);

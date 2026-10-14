@@ -25,12 +25,24 @@ async function content(github, repo, sha, path) {
   return Buffer.from(data.content, 'base64').toString('utf8');
 }
 /** Bind the branch receipt to a real attempt of trusted main release code. */
-async function sourceRun(github, repo, branch, head) {
+async function preparationRun(github, repo, branch) {
+  const runId = Number(branch[2]);
+  const attempt = Number(branch[3]);
+  requireCondition(
+    [Number.isSafeInteger(runId), runId > 0, Number.isSafeInteger(attempt), attempt > 0].every(
+      Boolean
+    ),
+    'Invalid preparation run/attempt.'
+  );
   const { data: run } = await github.rest.actions.getWorkflowRunAttempt({
     ...repo,
-    run_id: Number(branch[2]),
-    attempt_number: Number(branch[3]),
+    run_id: runId,
+    attempt_number: attempt,
   });
+  requireCondition(
+    isDeepStrictEqual([run.id, run.run_attempt], [runId, attempt]),
+    'Preparation run/attempt identity changed.'
+  );
   const identity = [run.path, run.head_branch, run.head_repository?.full_name];
   requireCondition(
     isDeepStrictEqual(identity, [
@@ -44,11 +56,15 @@ async function sourceRun(github, repo, branch, head) {
     ['schedule', 'workflow_dispatch'].includes(run.event),
     'Untrusted release trigger.'
   );
+  requireCondition(FULL_SHA.test(run.head_sha), 'Invalid release source SHA.');
+  return run;
+}
+async function sourceRun(github, repo, branch, head) {
+  const run = await preparationRun(github, repo, branch);
   requireCondition(
     isDeepStrictEqual([run.status, run.conclusion], ['completed', 'success']),
     'Preparation did not succeed.'
   );
-  requireCondition(FULL_SHA.test(run.head_sha), 'Invalid release source SHA.');
   const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
     ...repo,
     run_id: Number(branch[2]),
@@ -65,6 +81,9 @@ async function sourceRun(github, repo, branch, head) {
 /** Source lineage plus content prove the exact version-only candidate, independent of PR text. */
 export async function candidateEvidence(github, repo, pr, branch) {
   const baseSha = await sourceRun(github, repo, branch, pr.head.sha);
+  return candidateAssets(github, repo, pr, branch, baseSha);
+}
+async function candidateAssets(github, repo, pr, branch, baseSha) {
   const { data: candidate } = await github.rest.repos.getCommit({ ...repo, ref: pr.head.sha });
   requireCondition(
     isDeepStrictEqual(
@@ -159,7 +178,15 @@ async function publishedHistoricalPromotion(github, repo, pending, version) {
   if (!tag) return false;
   const tagged = pending.filter((pr) => pr.merge_commit_sha === tag.object.sha);
   if (!isDeepStrictEqual([tag.object.type, tagged.length], ['commit', 1])) return false;
+  const newest = newestPromotions(pending);
+  if (!isDeepStrictEqual(newest, tagged)) return false;
   return stablePublication(github, repo, version);
+}
+function newestPromotions(promotions) {
+  const times = promotions.map((pr) => Date.parse(pr.merged_at));
+  requireCondition(times.every(Number.isFinite), 'Unknown historical promotion merge time.');
+  const latest = Math.max(...times);
+  return promotions.filter((_pr, index) => times[index] === latest);
 }
 async function alreadyPublished(github, repo, pr, version) {
   const tag = await existingTag(github, repo, version);
@@ -176,7 +203,7 @@ async function publishablePromotion(github, repo, prs, sha, requireValidation) {
   const branch = promotionBranch(pr, repo);
   if (await alreadyPublished(github, repo, pr, branch[1])) return null;
   const evidence = await candidateEvidence(github, repo, pr, branch);
-  await reviewAdmission(github, repo, pr.head.sha);
+  await reviewAdmission(github, repo, pr.head.sha, pr.number);
   const recovery = await mergedEvidence(github, repo, pr, evidence, sha, requireValidation);
   recovery.notes = await promotionGitHubNotes(github, repo, pr, branch, evidence);
   return {
@@ -248,11 +275,11 @@ export async function rollbackPromotion({ github, context, prNumber, sha }) {
     source: evidence.baseSha,
   };
 }
-async function reviewAdmission(github, repo, head) {
+async function reviewAdmission(github, repo, head, number) {
   const { requireReviewAdmission } = await import(
     new URL('../ci/review-admission-binding.mjs', import.meta.url)
   );
-  await requireReviewAdmission({ github, repo, head });
+  await requireReviewAdmission({ github, repo, head, number });
 }
 async function promotionGitHubNotes(github, repo, pr, branch, evidence) {
   const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
@@ -299,11 +326,9 @@ const QUEUED_RELEASE_QUERY = `query($owner:String!,$repo:String!,$number:Int!) {
   repository(owner:$owner,name:$repo) { pullRequest(number:$number) { headRefOid mergeQueueEntry { id } } }
 }`;
 async function openPromotion(github, context, pr, sha) {
-  const { data: candidate } = await github.rest.repos.getCommit({
-    ...context.repo,
-    ref: pr.head.sha,
-  });
-  if (candidate.parents[0]?.sha === sha)
+  const recovered = await recoverFailedPromotion(github, context, pr, sha);
+  if (recovered !== undefined) return recovered;
+  if (await currentSource(github, context.repo, pr, sha))
     return pendingPromotionResult(
       pr,
       'awaits reviewed merge; do not recreate or update its immutable head.'
@@ -315,9 +340,37 @@ async function openPromotion(github, context, pr, sha) {
     );
   return regenerateStalePromotion(github, context, pr, sha);
 }
+async function currentSource(github, repo, pr, sha) {
+  const { data: candidate } = await github.rest.repos.getCommit({ ...repo, ref: pr.head.sha });
+  return candidate.parents[0]?.sha === sha;
+}
+async function recoverFailedPromotion(github, context, pr, sha) {
+  if (!['schedule', 'workflow_dispatch'].includes(context.eventName)) return undefined;
+  const evidence = await failedPreparationEvidence(github, context.repo, pr, sha);
+  if (!evidence) return undefined;
+  return replaceOpenPromotion(github, context, pr, sha, evidence);
+}
 async function staleEvidence(github, repo, pr, sha) {
   const branch = promotionBranch(pr, repo);
   const evidence = await candidateEvidence(github, repo, pr, branch);
+  return replaceableEvidence(github, repo, evidence, sha, ['ahead']);
+}
+/** Failed attempts authorize reversible closure only; publication keeps sourceRun's success/receipt gates. */
+async function failedPreparationEvidence(github, repo, pr, sha) {
+  const branch = promotionBranch(pr, repo);
+  const run = await preparationRun(github, repo, branch);
+  if (
+    ![run.status === 'completed', ['failure', 'cancelled'].includes(run.conclusion)].every(Boolean)
+  )
+    return null;
+  const evidence = await candidateAssets(github, repo, pr, branch, run.head_sha);
+  await replaceableEvidence(github, repo, evidence, sha, ['ahead', 'identical']);
+  return {
+    ...evidence,
+    retryReason: 'its trusted preparation failed before durable publication evidence was completed',
+  };
+}
+async function replaceableEvidence(github, repo, evidence, sha, allowedHistory) {
   requireCondition(
     !(await existingTag(github, repo, evidence.version)),
     'Tagged promotion cannot be replaced.'
@@ -331,7 +384,10 @@ async function staleEvidence(github, repo, pr, sha) {
     base: evidence.baseSha,
     head: sha,
   });
-  requireCondition(comparison.status === 'ahead', 'Stale source is not a proven main ancestor.');
+  requireCondition(
+    allowedHistory.includes(comparison.status),
+    'Stale source is not a proven main ancestor.'
+  );
   return evidence;
 }
 async function unqueuedPromotion(github, repo, pr) {
@@ -339,16 +395,26 @@ async function unqueuedPromotion(github, repo, pr) {
     .repository?.pullRequest;
   requireCondition(Boolean(queried), 'Stale promotion queue metadata is missing.');
   requireCondition(queried.headRefOid === pr.head.sha, 'Stale promotion head changed.');
-  return !queried.mergeQueueEntry;
+  requireCondition(Object.hasOwn(queried, 'mergeQueueEntry'), 'Promotion queue state is missing.');
+  return queried.mergeQueueEntry === null;
 }
 function unchangedOpenPromotion(current, original, repo) {
   requireCondition(Boolean(promotionBranch(current, repo)), 'Promotion owner/branch changed.');
   requireCondition(current.head.sha === original.head.sha, 'Edited promotion must remain held.');
-  return current.state === 'open' && !current.draft;
+  return [
+    current.state === 'open',
+    current.draft === false,
+    current.merged !== true,
+    !current.merged_at,
+  ].every(Boolean);
 }
 async function regenerateStalePromotion(github, context, pr, sha) {
   const repo = context.repo;
   const evidence = await staleEvidence(github, repo, pr, sha);
+  return replaceOpenPromotion(github, context, pr, sha, evidence);
+}
+async function replaceOpenPromotion(github, context, pr, sha, evidence) {
+  const repo = context.repo;
   if (!(await unqueuedPromotion(github, repo, pr)))
     return pendingPromotionResult(pr, 'is still queued; regeneration waits for removal.');
   const { data: current } = await github.rest.pulls.get({ ...repo, pull_number: pr.number });
@@ -366,7 +432,7 @@ async function closeStalePromotion(github, repo, pr, sha, evidence) {
   await github.rest.issues.createComment({
     ...repo,
     issue_number: pr.number,
-    body: `Closed unchanged generated version snapshot ${pr.head.sha} because source ${evidence.baseSha} was superseded by validated main ${sha}. Branch history is retained; no version tag/publication or production data changed. This ordinary Release run will prepare a fresh version PR. Edited or queued snapshots are held instead.`,
+    body: `Closed unchanged generated version snapshot ${pr.head.sha} because ${evidence.retryReason ?? `source ${evidence.baseSha} was superseded by validated main ${sha}`}. Branch history is retained; no version tag/publication or production data changed. This ordinary Release run will prepare a fresh version PR. Edited or queued snapshots are held instead.`,
   });
   return null;
 }

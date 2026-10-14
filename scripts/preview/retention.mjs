@@ -139,8 +139,10 @@ function scopedLifecycleTextMatches(text) {
   const group =
     "  group: ${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}\n";
   return [
-    workflowLifecycleBlock(text) ===
+    [
       `concurrency:\n${group}  queue: max\n  cancel-in-progress: false\n`,
+      `concurrency:\n${group}  queue: \${{ inputs.queue && 'max' || 'single' }}\n  cancel-in-progress: \${{ !inputs.queue }}\n`,
+    ].includes(workflowLifecycleBlock(text)),
     / {6}queue:\n {8}description:[^\n]*\n {8}required: false\n {8}type: boolean\n {8}default: false\n/.test(
       text
     ),

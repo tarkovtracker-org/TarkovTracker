@@ -52,6 +52,14 @@ proven main ancestor. It retains branch history and records a handoff. Concurren
 are reopened and held. CI callbacks never close snapshots or prepare replacements; edited, tagged
 or uncertain evidence stays held for operator investigation.
 
+If notes generation or receipt upload fails after opening the candidate PR, the next ordinary
+validated schedule/dispatch can close and replace that orphan. This requires its exact trusted
+main preparation attempt to have completed with failure/cancellation, an unchanged generated-only
+candidate with successful CI/preview, a source equal to or ancestral to current validated main,
+and no queue entry, tag or publication. Branch history and the handoff remain; a concurrent head
+edit reopens and holds the PR. Running attempts stay held. Failed/missing receipts never authorize
+enqueue or publication, and CI completion callbacks never perform this recovery.
+
 If the stale version PR already merged, prepare a reviewed rollback of its unpublished generated
 assets first. On a clean, dedicated topic branch from freshly fetched main, run:
 
@@ -59,9 +67,9 @@ assets first. On a clean, dedicated topic branch from freshly fetched main, run:
 node scripts/release/release-promotion-recovery.mjs tarkovtracker-org/TarkovTracker <version-PR>
 ```
 
-This read-only GitHub observer writes only local `package.json` and `CHANGELOG.md`; it cannot
-commit, push, merge, mutate production, or publish. It authenticates the preparation/source and
-requires no existing release tag, the promotion in main's ancestry, unchanged promoted version
+Run this read-only GitHub observer from the repository root. It writes only local `package.json`
+and `CHANGELOG.md`; it cannot commit, push, merge, mutate production, or publish. It authenticates
+the preparation/source and requires no existing release tag, the promotion in main's ancestry, unchanged promoted version
 and unchanged generated changelog. It restores only the previous version field/history while
 preserving newer manifest fields. Any inconsistent evidence requires operator investigation.
 Validate and review that rollback diff, merge its PR through normal admission, then dispatch

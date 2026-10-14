@@ -239,7 +239,7 @@ async function preparationReady(github, repo, branch) {
 async function approvedAdmission(github, repo, pr) {
   const { requireReviewAdmission } = await binding();
   try {
-    await requireReviewAdmission({ github, repo, head: pr.head.sha });
+    await requireReviewAdmission({ github, repo, head: pr.head.sha, number: pr.number });
     return true;
   } catch (error) {
     const { AdmissionPending } = await import(

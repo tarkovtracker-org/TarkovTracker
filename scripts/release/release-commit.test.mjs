@@ -28,6 +28,8 @@ describe('release commit preparation', () => {
       }
     );
     expect(execFileSync).toHaveBeenCalledTimes(2);
+    expect(execFileSync.mock.calls[1].slice(0, 2)).toEqual(['git', ['rev-parse', 'HEAD']]);
+    expect(execFileSync.mock.calls[1][2]).toEqual({ cwd: '/repo', encoding: 'utf8' });
     expect(recordPreparedVersion).toHaveBeenCalledExactlyOnceWith(context, 'a'.repeat(40));
   });
   it('refuses publication from another branch before invoking Git', () => {

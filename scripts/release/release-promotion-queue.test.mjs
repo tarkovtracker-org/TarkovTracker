@@ -134,6 +134,7 @@ it.each(['admission', 'release'])(
       github: f.github,
       repo: f.context.repo,
       head,
+      number: f.pr.number,
     });
     expect(f.operations.dispatchMain).not.toHaveBeenCalled();
     expect((await queueReleasePromotion(f)).state).toBe('SKIPPED');

@@ -346,6 +346,19 @@ function sensitiveCommand(body) {
 export function relevantComment(payload) {
   return [payload.comment?.body, payload.changes?.body?.from].some(sensitiveCommand);
 }
+function relevantPrComment(payload) {
+  return Boolean(payload.issue?.pull_request) && relevantComment(payload);
+}
+async function successfulSignal(github, context) {
+  if (context.payload.workflow_run.conclusion !== 'success') return false;
+  await requireSignal(github, context);
+  return true;
+}
+export async function filterAdmission({ github, context }) {
+  if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
+  if (context.eventName === 'workflow_run') return successfulSignal(github, context);
+  return true;
+}
 export async function runReviewAdmission({ github, context, core }) {
   if (context.eventName === 'issue_comment' && !relevantComment(context.payload)) {
     core.notice('Unrelated issue comment does not affect review admission.');

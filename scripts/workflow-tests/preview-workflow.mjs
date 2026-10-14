@@ -121,7 +121,7 @@ test('preview controller runs trusted code only and isolates credentials per job
     assert.match(trustedWorkflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
   assert.match(
     workflow,
-    /group: \$\{\{ inputs.queue && 'pages-preview-lifecycle' \|\| format\('preview-ci-\{0\}', inputs.run_id\) \}\}\n {2}queue: max\n {2}cancel-in-progress: false/
+    /group: \$\{\{ inputs.queue && 'pages-preview-lifecycle' \|\| format\('preview-ci-\{0\}', inputs.run_id\) \}\}\n {2}queue: \$\{\{ inputs.queue && 'max' \|\| 'single' \}\}\n {2}cancel-in-progress: \$\{\{ !inputs.queue \}\}/
   );
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
   assert.match(
@@ -277,6 +277,18 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
       /timeout-minutes: 90/
     );
 });
+function concurrencyValue(workflow, field, inputs) {
+  const value = workflow.match(new RegExp(`^ {2}${field}: (.+)$`, 'm'))[1];
+  if (value.startsWith('${{'))
+    return new Function('inputs', `return (${value.slice(3, -2)});`)(inputs);
+  return field === 'cancel-in-progress' ? JSON.parse(value) : value;
+}
+function previewScheduling(workflow, queue) {
+  return [
+    concurrencyValue(workflow, 'queue', { queue }),
+    concurrencyValue(workflow, 'cancel-in-progress', { queue }),
+  ];
+}
 test('unapproved ordinary forks use a separate full-workflow group; queue upload and reporting stay locked', () => {
   const workflow = read('.github/workflows/preview.yml');
   const group = workflow.match(/^ {2}group: \$\{\{ (.*) \}\}$/m)[1];
@@ -284,6 +296,16 @@ test('unapproved ordinary forks use a separate full-workflow group; queue upload
   const format = (pattern, id) => pattern.replace('{0}', id);
   assert.equal(evaluate({ queue: false, run_id: '123' }, format), 'preview-ci-123');
   assert.equal(evaluate({ queue: true, run_id: '123' }, format), 'pages-preview-lifecycle');
+  assert.deepEqual(previewScheduling(workflow, true), ['max', false]);
+  assert.deepEqual(previewScheduling(workflow, false), ['single', true]);
+  const blocking = workflow
+    .replace("queue: ${{ inputs.queue && 'max' || 'single' }}", 'queue: max')
+    .replace('cancel-in-progress: ${{ !inputs.queue }}', 'cancel-in-progress: false');
+  assert.throws(
+    () => assert.deepEqual(previewScheduling(blocking, false), ['single', true]),
+    assert.AssertionError
+  );
+  assert.deepEqual(previewScheduling(blocking, true), ['max', false]);
   assert.equal((workflow.match(/QUEUE_INPUT: \$\{\{ inputs.queue \}\}/g) ?? []).length, 2);
   assert.match(
     workflow,

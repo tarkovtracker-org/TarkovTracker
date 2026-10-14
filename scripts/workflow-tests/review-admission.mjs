@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fixture as automationFixture } from './helpers/automation-fixture.mjs';
+import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const { admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
   await import('../ci/review-admission-api.mjs');
 const { readAdmissionArchive, requireReviewAdmission } =
@@ -24,6 +26,7 @@ const {
   publishReviewScope,
   runReviewAdmission,
   relevantComment,
+  filterAdmission,
 } = await import('../ci/review-admission.mjs');
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
@@ -536,6 +539,7 @@ function bindingFixture() {
   };
   const receipt = {
     schema: 1,
+    number: 1,
     repository: 'example/repo',
     headSha: head,
     statusSha: head,
@@ -557,7 +561,7 @@ function bindingFixture() {
 test('binding rejects spoofed status, untrusted workflow event and stale head/attempt receipts', async () => {
   const f = bindingFixture();
   await admissionRun(f.github, repo, head);
-  validateAdmissionReceipt(f.receipt, repo, head, f.run);
+  validateAdmissionReceipt(f.receipt, repo, head, f.run, 1);
   for (const change of [
     { state: 'failure' },
     { creator: { id: 1, type: 'Bot' } },
@@ -588,7 +592,9 @@ test('binding rejects spoofed status, untrusted workflow event and stale head/at
     { repository: 'fork/repo' },
     { review: { commit: base } },
   ])
-    assert.throws(() => validateAdmissionReceipt({ ...f.receipt, ...change }, repo, head, f.run));
+    assert.throws(() =>
+      validateAdmissionReceipt({ ...f.receipt, ...change }, repo, head, f.run, 1)
+    );
 });
 function archive(receipt, filename = `${head}.json`) {
   return execFileSync(
@@ -683,13 +689,24 @@ test('binding consumes exact JSON artifact and rejects missing/untrusted/ambiguo
     downloadArtifact: async () => ({ data: zip }),
   });
   f.github.rest.repos.compareCommits = async () => ({ data: { status: 'ahead' } });
-  assert.equal((await requireReviewAdmission({ github: f.github, repo, head })).approved, true);
+  assert.equal(
+    (await requireReviewAdmission({ github: f.github, repo, head, number: 1 })).approved,
+    true
+  );
+  await assert.rejects(
+    requireReviewAdmission({ github: f.github, repo, head, number: 2 }),
+    /PR number/
+  );
+  await assert.rejects(
+    requireReviewAdmission({ github: f.github, repo, head }),
+    /positive PR number/
+  );
   f.github.rest.repos.compareCommits = async () => ({ data: { status: 'diverged' } });
-  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head }));
+  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head, number: 1 }));
   await assert.rejects(readAdmissionArchive(archive(f.receipt, 'wrong.json'), head));
   await assert.rejects(readAdmissionArchive(Buffer.from('not a zip'), head));
   f.github.paginate = async (endpoint) => (endpoint === 'statuses' ? [f.status] : []);
-  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head }));
+  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head, number: 1 }));
 });
 function publishingFixture() {
   const f = fixture();
@@ -1102,9 +1119,9 @@ test('original queue and binding assertions reject reintroduced identity/attempt
     'true'
   );
   const wrong = { ...f.receipt, runAttempt: 2 };
-  assert.throws(() => validateAdmissionReceipt(wrong, repo, head, f.run));
+  assert.throws(() => validateAdmissionReceipt(wrong, repo, head, f.run, 1));
   assert.throws(
-    () => assert.throws(() => attemptMutant.validateAdmissionReceipt(wrong, repo, head, f.run)),
+    () => assert.throws(() => attemptMutant.validateAdmissionReceipt(wrong, repo, head, f.run, 1)),
     assert.AssertionError
   );
 });
@@ -1126,22 +1143,23 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.ok(!workflow.includes('  pull_request_review:'));
   assert.ok(!workflow.includes('  check_suite:'));
   assert.match(workflow, /workflows: \[Review Admission Signal\]/);
-  assert.match(workflow, /ref: main/);
-  assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /statuses: write/);
-  assert.match(workflow, /if-no-files-found: error/);
+  const job = jobBlock(workflow, 'admission');
+  assertAdmissionSecurity(workflow);
+  assert.match(job, /ref: main/);
+  assert.match(job, /persist-credentials: false/);
+  assert.match(job, /if-no-files-found: error/);
   assert.ok(!workflow.includes('pnpm install'));
-  assert.match(workflow, /environment: review-admission/);
+  assert.match(job, /environment: review-admission/);
   assert.equal(
     (
-      workflow.match(
+      job.match(
         /REVIEW_ADMISSION_PRIVATE_KEY: \$\{\{ secrets.REVIEW_ADMISSION_PRIVATE_KEY \}\}/g
       ) ?? []
     ).length,
     2
   );
   assert.equal(
-    (workflow.match(/createReviewPublisher\(\{ github, context, core \}\)/g) ?? []).length,
+    (job.match(/createReviewPublisher\(\{ github, context, core \}\)/g) ?? []).length,
     2
   );
   assert.match(workflow, /review-admission-\$\{\{ steps.evaluate.outputs.admission_sha/);
@@ -1395,9 +1413,9 @@ test('configured binding rejects generic Actions forgery and mismatched issuer r
     await assert.rejects(admissionRun(f.github, repo, head), /configured publisher/);
     f.status.creator.id = appIds.botId;
     await admissionRun(f.github, repo, head);
-    assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run));
+    assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run, 1));
     f.receipt.issuer = appIds;
-    validateAdmissionReceipt(f.receipt, repo, head, f.run);
+    validateAdmissionReceipt(f.receipt, repo, head, f.run, 1);
     assert.throws(() => requireReceiptIssuer({ issuer: { ...appIds, installationId: 1 } }));
     process.env.REVIEW_ADMISSION_BOT_ID = '';
     f.github.paginate = async () => [];
@@ -1491,7 +1509,7 @@ function commentPayload(change = {}) {
     ...change,
   };
 }
-function admissionJobAllowsComment(source, payload) {
+function admissionJobAllowsComment(source, payload, policy = relevantComment) {
   assert.ok(
     !/^concurrency:/m.test(source),
     'Unrelated comments must be filtered before joining a queue.'
@@ -1500,9 +1518,11 @@ function admissionJobAllowsComment(source, payload) {
     source,
     /^ {4}concurrency:\n {6}group: review-admission-publication\n {6}queue: max\n {6}cancel-in-progress: false$/m
   );
-  const expression = source.match(/ {4}if: >-\n([\s\S]*?) {4}concurrency:/)[1].trim();
+  const job = jobBlock(source, 'admission');
+  const expression = job.match(/ {4}if: >-\n([\s\S]*?) {4}concurrency:/)[1].trim();
   const evaluate = new Function(
     'github',
+    'needs',
     'startsWith',
     'contains',
     'fromJSON',
@@ -1511,6 +1531,7 @@ function admissionJobAllowsComment(source, payload) {
   return Boolean(
     evaluate(
       { event_name: 'issue_comment', event: payload },
+      { filter: { outputs: { relevant: String(policy(payload)) } } },
       (value, prefix) => typeof value === 'string' && value.startsWith(prefix),
       (values, value) => values.includes(value),
       JSON.parse
@@ -1522,6 +1543,7 @@ test('only sensitive approval comments and their edits/deletions enter serialize
   for (const payload of [
     commentPayload(),
     commentPayload({ comment: { body: 'Thanks for the fix' } }),
+    commentPayload({ comment: { body: `Example: /approve-sensitive ${head}` } }),
     commentPayload({
       action: 'edited',
       comment: { body: 'New unrelated comment' },
@@ -1591,18 +1613,11 @@ test('comment filter regression controls detect old-body revocation loss and wor
     () => admissionJobAllowsComment(globalMutant, commentPayload()),
     assert.AssertionError
   );
-  const unfiltered = source.replace(
-    " &&\n      (contains(github.event.comment.body, '/approve-sensitive ') || contains(github.event.changes.body.from, '/approve-sensitive '))",
-    ''
-  );
+  const unfiltered = source.replace("needs.filter.outputs.relevant == 'true' && (", '(');
   assert.equal(admissionJobAllowsComment(source, commentPayload()), false);
   assert.equal(admissionJobAllowsComment(unfiltered, commentPayload()), true);
-  const currentOnly = source.replace(
-    " || contains(github.event.changes.body.from, '/approve-sensitive ')",
-    ''
-  );
   assert.equal(admissionJobAllowsComment(source, payload), true);
-  assert.equal(admissionJobAllowsComment(currentOnly, payload), false);
+  assert.equal(admissionJobAllowsComment(source, payload, mutant.relevantComment), false);
 });
 test('whitespace approval revocation guards detect restoring raw startsWith filters', async () => {
   const mutant = await importMutationSource(
@@ -1611,15 +1626,6 @@ test('whitespace approval revocation guards detect restoring raw startsWith filt
     "body.startsWith('/approve-sensitive ')"
   );
   const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
-  const rawWorkflow = source
-    .replaceAll(
-      "contains(github.event.comment.body, '/approve-sensitive ')",
-      "startsWith(github.event.comment.body, '/approve-sensitive ')"
-    )
-    .replaceAll(
-      "contains(github.event.changes.body.from, '/approve-sensitive ')",
-      "startsWith(github.event.changes.body.from, '/approve-sensitive ')"
-    );
   for (const prefix of [' ', '\t']) {
     for (const payload of [
       commentPayload({
@@ -1635,7 +1641,248 @@ test('whitespace approval revocation guards detect restoring raw startsWith filt
       assert.equal(relevantComment(payload), true);
       assert.equal(admissionJobAllowsComment(source, payload), true);
       assert.equal(mutant.relevantComment(payload), false);
-      assert.equal(admissionJobAllowsComment(rawWorkflow, payload), false);
+      assert.equal(admissionJobAllowsComment(source, payload, mutant.relevantComment), false);
     }
+  }
+});
+test('Cubic dependency regressions hold changed package identities, JWT transitives and 0.x breaking minors', async () => {
+  const named = simpleLock('2.0.0', '@scope/1.0.0');
+  assert.equal(safeLockfileChange(named, named.replaceAll('@scope/1.0.0', '@scope/1.0.1')), false);
+  assert.equal(
+    safeLockfileChange(simpleLock('1.0.0', 'jsonwebtoken'), simpleLock('1.0.1', 'jsonwebtoken')),
+    false
+  );
+  const { safeVersion } = await import('../ci/review-admission-version.mjs');
+  assert.equal(safeVersion('0.2.0', '0.3.0'), false);
+  assert.equal(safeVersion('0.2.0', '0.2.1'), true);
+});
+test('Cubic deleted review authors do not crash admission or erase requested changes', () => {
+  const f = fixture();
+  f.reviews.unshift({ id: 1, user: null, state: 'APPROVED', commit_id: head });
+  assert.equal(admissionDecision(f).approved, true);
+  f.reviews.unshift({ id: 2, user: null, state: 'CHANGES_REQUESTED', commit_id: head });
+  assert.throws(() => admissionDecision(f), /Changes requested remain/);
+  f.reviews.push({ id: 30, user: null, state: 'APPROVED', commit_id: head });
+  assert.throws(() => admissionDecision(f), /Changes requested remain/);
+});
+test('Cubic admission receipt cannot be reused for a second PR on the same head', () => {
+  const f = bindingFixture();
+  f.receipt.number = 1;
+  assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run, 2), /PR number/);
+});
+function assertAdmissionSecurity(workflow) {
+  const job = jobBlock(workflow, 'admission');
+  assert.match(permissionsBlock(job, '    '), /^ {6}statuses: write$/m);
+  for (const name of [
+    'Evaluate current immutable review evidence',
+    'Publish verified admission after evidence upload',
+  ]) {
+    const step = workflowStep(job, name);
+    assert.match(
+      step,
+      /REVIEW_ADMISSION_PRIVATE_KEY: \$\{\{ secrets.REVIEW_ADMISSION_PRIVATE_KEY \}\}/
+    );
+    assert.match(step, /createReviewPublisher\(\{ github, context, core \}\)/);
+  }
+  const filter = jobBlock(workflow, 'filter');
+  assert.doesNotMatch(filter, /statuses: write|secrets\.|environment:|concurrency:/);
+  assert.match(permissionsBlock(filter, '    '), /^ {6}actions: read$/m);
+  assert.match(filter, /ref: main/);
+  assert.match(filter, /filterAdmission\(\{ github, context \}\)/);
+}
+test('Cubic security assertions reject unrelated-job substitutes for admission permissions or key steps', () => {
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  assertAdmissionSecurity(source);
+  const unrelated =
+    '\n  unrelated:\n    permissions:\n      statuses: write\n    steps:\n      - name: unrelated\n        env:\n          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}\n';
+  assert.throws(() =>
+    assertAdmissionSecurity(source.replace('      statuses: write\n', '') + unrelated)
+  );
+  assert.throws(() =>
+    assertAdmissionSecurity(
+      source.replace(
+        '          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}\n',
+        ''
+      ) + unrelated
+    )
+  );
+});
+test('Cubic event filtering skips unsuccessful signals and uses the exact comment predicate before serialization', async () => {
+  for (const conclusion of ['failure', 'cancelled', 'skipped', null]) {
+    const f = signalFixture();
+    f.context.payload.workflow_run.conclusion = conclusion;
+    assert.equal(await filterAdmission({ github: f.github, context: f.context }), false);
+  }
+  const skipped = signalFixture();
+  skipped.f.jobs[0].conclusion = 'skipped';
+  await assert.rejects(filterAdmission({ github: skipped.github, context: skipped.context }));
+  for (const body of [
+    `Example: /approve-sensitive ${head}`,
+    `/approve-sensitive ${head}`,
+    `\t/approve-sensitive ${head}`,
+  ]) {
+    const payload = commentPayload({ comment: { body } });
+    assert.equal(
+      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      relevantComment(payload)
+    );
+  }
+});
+test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
+  const peer = simpleLock()
+    .replace('version: 1.0.0', 'version: 1.0.0(@scope/1.0.0@2.0.0)')
+    .replace('ordinary@1.0.0: {}', 'ordinary@1.0.0(@scope/1.0.0@2.0.0): {}');
+  const renamed = peer.replaceAll('@scope/1.0.0', '@scope/1.0.1');
+  assert.equal(safeLockfileChange(peer, renamed), false);
+  const names = await importMutationSource(
+    'review-admission-lock.mjs',
+    "return text.replace(VERSION, '$1#VERSION#');",
+    "return text.replace(/\\d+\\.\\d+\\.\\d+/g, '#VERSION#');"
+  );
+  assert.equal(names.safeLockfileChange(peer, renamed), true);
+  const jwt = await importMutationSource('review-admission-lock.mjs', '|jsonwebtoken', '');
+  assert.equal(
+    jwt.safeLockfileChange(
+      simpleLock('1.0.0', 'jsonwebtoken'),
+      simpleLock('1.0.1', 'jsonwebtoken')
+    ),
+    true
+  );
+  const zero = await importMutationSource(
+    'review-admission-version.mjs',
+    'before[0] !== 0 || before[1] === after[1]',
+    'true'
+  );
+  assert.equal(zero.safeVersion('0.2.0', '0.3.0'), true);
+  const receipt = await importMutationSource(
+    'review-admission-api.mjs',
+    'receipt.number === number',
+    'true'
+  );
+  const f = bindingFixture();
+  assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run, 2));
+  receipt.validateAdmissionReceipt(f.receipt, repo, head, f.run, 2);
+  const anonymous = await importMutationSource(
+    'review-admission-policy.mjs',
+    "if (review.state === 'CHANGES_REQUESTED') latest.set(review, review);",
+    ''
+  );
+  const evidence = fixture();
+  evidence.reviews.push({ user: null, state: 'CHANGES_REQUESTED' });
+  assert.throws(() => admissionDecision(evidence), /Changes requested/);
+  assert.equal(anonymous.admissionDecision(evidence).approved, true);
+});
+test('Cubic prefilter mutations cannot silently admit quoted commands or failed signals', async () => {
+  const comments = await importMutationSource(
+    'review-admission.mjs',
+    'return relevantPrComment(context.payload);',
+    'return true;'
+  );
+  const context = {
+    eventName: 'issue_comment',
+    payload: commentPayload({ comment: { body: `Example: /approve-sensitive ${head}` } }),
+  };
+  assert.equal(await filterAdmission({ context }), false);
+  assert.equal(await comments.filterAdmission({ context }), true);
+  const signals = await importMutationSource(
+    'review-admission.mjs',
+    "if (context.payload.workflow_run.conclusion !== 'success') return false;",
+    ''
+  );
+  const f = signalFixture();
+  f.context.payload.workflow_run.conclusion = 'failure';
+  assert.equal(await filterAdmission({ github: f.github, context: f.context }), false);
+  assert.equal(await signals.filterAdmission({ github: f.github, context: f.context }), true);
+});
+test('shared automation helper sends the captured PR number and dispatch run into the CLI', (t) => {
+  const f = automationFixture(t);
+  const script = new URL('../ci/github-ci-gate.sh', import.meta.url).pathname;
+  const result = f.shell(`source '${script}'; wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"`);
+  assert.equal(result.status, 0, result.stderr);
+  const event = f.events().find((item) => item.type === 'admission');
+  assert.equal(event.number, f.env.PR_NUMBER);
+  assert.equal(event.runId, '777');
+});
+function boundedAdmissionUnzip(source, mode, expectedCode) {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-unzip-bound-'));
+  writeFileSync(
+    join(directory, 'unzip'),
+    `#!/usr/bin/env python3
+import os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+mode = ${JSON.stringify(mode)}
+if mode.startswith('extraction') and sys.argv[1] == '-Z1':
+  print(${JSON.stringify(`${head}.json`)}, flush=True)
+else:
+  if not mode.endswith('quiet'): os.write(1, b'x' * (2 * 1024 * 1024))
+  while True: time.sleep(1)
+`,
+    { mode: 0o755 }
+  );
+  const rewritten = source.replace(
+    /from '(\.\/[^']+)'/g,
+    (_, path) => `from '${new URL(`../ci/${path.slice(2)}`, import.meta.url).href}'`
+  );
+  const url = `data:text/javascript;base64,${Buffer.from(rewritten).toString('base64')}`;
+  const harness = `import { readAdmissionArchive } from ${JSON.stringify(url)};
+try { await readAdmissionArchive(Buffer.from('fixture archive'), ${JSON.stringify(head)}); process.exitCode = 2; }
+catch (error) { if (error.code === ${JSON.stringify(expectedCode)}) console.log('bounded'); else process.exitCode = 3; }`;
+  const allowed = ['PATH', 'HOME', 'USER', 'SHELL', 'TZ', 'LANG', 'LC_ALL'];
+  const env = Object.fromEntries(
+    allowed
+      .filter((name) => process.env[name] !== undefined)
+      .map((name) => [name, process.env[name]])
+  );
+  env.PATH = `${directory}:${dirname(process.execPath)}:/usr/bin:/bin`;
+  env.TMPDIR = directory;
+  try {
+    // GNU timeout terminates this owned process group, including the TERM-ignoring fixture.
+    const output = execFileSync(
+      'timeout',
+      ['--signal=KILL', '2s', process.execPath, '--input-type=module', '-e', harness],
+      {
+        env,
+        encoding: 'utf8',
+        maxBuffer: 8192,
+        timeout: 4000,
+        killSignal: 'SIGKILL',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    return { output, signal: null };
+  } catch (error) {
+    return { output: error.stdout?.toString() ?? '', signal: error.signal };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+test('admission unzip listing and extraction have hard deadlines and forced termination', () => {
+  const source = readFileSync('scripts/ci/review-admission-binding.mjs', 'utf8');
+  const calls = source.split("execFileSync('unzip',").slice(1);
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    const fields = call.split('\n  })')[0];
+    assert.equal(
+      fields.includes('timeout: 10000'),
+      true,
+      'Each unzip call needs the ten-second bound.'
+    );
+    assert.equal(
+      fields.includes("killSignal: 'SIGKILL'"),
+      true,
+      'Each unzip call must force termination.'
+    );
+  }
+  for (const mode of ['listing', 'extraction']) {
+    assert.equal(boundedAdmissionUnzip(source, mode, 'ENOBUFS').output, 'bounded\n');
+    const term = source.replaceAll("killSignal: 'SIGKILL'", "killSignal: 'SIGTERM'");
+    assert.equal(boundedAdmissionUnzip(term, mode, 'ENOBUFS').signal, 'SIGKILL');
+  }
+  // Scale only the in-memory fixture deadline; the exact production value is checked above.
+  const fast = source.replaceAll('timeout: 10000', 'timeout: 100');
+  for (const mode of ['listing-quiet', 'extraction-quiet']) {
+    assert.equal(boundedAdmissionUnzip(fast, mode, 'ETIMEDOUT').output, 'bounded\n');
+    const unlimited = fast.replaceAll('timeout: 100', 'timeout: 0');
+    assert.equal(boundedAdmissionUnzip(unlimited, mode, 'ETIMEDOUT').signal, 'SIGKILL');
   }
 });

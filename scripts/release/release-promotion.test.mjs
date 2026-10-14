@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { ReleasePrepared } from './release-commit.mjs';
-import { queuedRelease, rollbackPromotion } from './release-promotion.mjs';
+import {
+  candidateEvidence,
+  promotionBranch,
+  queuedRelease,
+  rollbackPromotion,
+} from './release-promotion.mjs';
 import { runRelease } from './release-run.mjs';
 vi.mock('./release-promotion-receipt.mjs', () => ({
   readPromotionArchive: vi.fn(async (bytes) => JSON.parse(String(bytes))),
@@ -28,6 +33,8 @@ function fixture() {
     head: { ref: 'wip/release-1.2.3-123-1', sha: candidateSha, repo: { full_name: 'owner/repo' } },
   };
   const run = {
+    id: 123,
+    run_attempt: 1,
     path: '.github/workflows/release.yml',
     event: 'schedule',
     head_branch: 'main',
@@ -186,6 +193,7 @@ function sameVersionHistory() {
   f.prs.unshift({
     ...structuredClone(f.pr),
     number: 900,
+    merged_at: '2026-10-14T09:00:00Z',
     merge_commit_sha: 'd'.repeat(40),
     head: { ...structuredClone(f.pr.head), sha: 'e'.repeat(40), ref: 'wip/release-1.2.3-122-1' },
   });
@@ -216,11 +224,13 @@ describe('asynchronous release promotion', () => {
   });
   it('keeps an open immutable version PR pending instead of duplicating or waiting on it', async () => {
     const f = fixture();
+    f.sha = source;
+    f.context.eventName = 'schedule';
     f.pr.state = 'open';
     f.pr.merged_at = null;
     expect(await queuedRelease(f)).toMatchObject({
       release: false,
-      reason: expect.stringContaining('#901'),
+      reason: expect.stringContaining('awaits reviewed merge'),
     });
     expect(f.github.rest.repos.getCommit).toHaveBeenCalled();
   });
@@ -328,6 +338,13 @@ describe('asynchronous release promotion', () => {
       expect.objectContaining({ tag: 'v1.2.3' })
     );
     expect(f.github.rest.actions.getWorkflowRunAttempt).not.toHaveBeenCalled();
+  });
+  it('holds a newer untagged same-version merge even when an older matching merge was published', async () => {
+    const f = publishedHistory();
+    f.github.rest.git.getRef.mockResolvedValue({
+      data: { object: { type: 'commit', sha: f.prs[0].merge_commit_sha } },
+    });
+    await expect(queuedRelease(f)).rejects.toThrow('multiple unpublished');
   });
   it.each([
     [
@@ -497,6 +514,181 @@ function staleOpenFixture() {
   f.github.rest.issues = { createComment: vi.fn(async () => ({ data: {} })) };
   return f;
 }
+function failedOpenFixture() {
+  const f = staleOpenFixture();
+  f.sha = source;
+  f.run.conclusion = 'failure';
+  f.github.rest.git.getRef.mockImplementation(async ({ ref }) => {
+    if (ref === 'heads/main') return { data: { object: { sha: source } } };
+    throw Object.assign(new Error('missing'), { status: 404 });
+  });
+  f.github.rest.repos.compareCommits.mockResolvedValue({ data: { status: 'identical' } });
+  const artifacts = f.pages.get(f.github.rest.actions.listWorkflowRunArtifacts);
+  f.pages.set(f.github.rest.actions.listWorkflowRunArtifacts, (params) =>
+    params.run_id === 123 ? [] : artifacts(params)
+  );
+  return f;
+}
+describe('failed ordinary preparation retry', () => {
+  it.each([
+    ['notes generation', source, 'identical'],
+    ['receipt artifact upload', mergedSha, 'ahead'],
+  ])(
+    'replaces an unchanged orphan after failed %s without accepting its missing receipt',
+    async (_stage, currentMain, history) => {
+      const f = failedOpenFixture();
+      f.sha = currentMain;
+      const ref = f.github.rest.git.getRef.getMockImplementation();
+      f.github.rest.git.getRef.mockImplementation((params) =>
+        params.ref === 'heads/main' ? { data: { object: { sha: currentMain } } } : ref(params)
+      );
+      f.github.rest.repos.compareCommits.mockResolvedValue({ data: { status: history } });
+      await expect(
+        candidateEvidence(f.github, f.context.repo, f.pr, promotionBranch(f.pr, f.context.repo))
+      ).rejects.toThrow('Preparation did not succeed');
+      expect(await queuedRelease(f)).toBeNull();
+      expect(f.github.rest.pulls.update).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ pull_number: 901, state: 'closed' })
+      );
+      expect(f.github.rest.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({ body: expect.stringContaining('trusted preparation failed') })
+      );
+      expect(f.github.rest.actions.downloadArtifact).not.toHaveBeenCalled();
+    }
+  );
+  it('allows cancelled preparation to regenerate on ordinary dispatch, never CI completion', async () => {
+    const f = failedOpenFixture();
+    f.run.conclusion = 'cancelled';
+    f.context.eventName = 'workflow_run';
+    expect((await queuedRelease(f)).release).toBe(false);
+    expect(f.github.rest.pulls.update).not.toHaveBeenCalled();
+    f.context.eventName = 'workflow_dispatch';
+    expect(await queuedRelease(f)).toBeNull();
+  });
+  it('holds in-progress source attempts and already queued or advanced-main candidates', async () => {
+    const running = failedOpenFixture();
+    running.run.status = 'in_progress';
+    running.run.conclusion = null;
+    expect((await queuedRelease(running)).release).toBe(false);
+    expect(running.github.rest.pulls.update).not.toHaveBeenCalled();
+    const queued = failedOpenFixture();
+    queued.github.graphql.mockResolvedValue({
+      repository: { pullRequest: { headRefOid: candidateSha, mergeQueueEntry: { id: 'queued' } } },
+    });
+    expect((await queuedRelease(queued)).reason).toContain('still queued');
+    expect(queued.github.rest.pulls.update).not.toHaveBeenCalled();
+    const advanced = failedOpenFixture();
+    const ref = advanced.github.rest.git.getRef.getMockImplementation();
+    advanced.github.rest.git.getRef.mockImplementation((params) =>
+      params.ref === 'heads/main' ? { data: { object: { sha: mergedSha } } } : ref(params)
+    );
+    expect((await queuedRelease(advanced)).reason).toContain('fresh validated main');
+    expect(advanced.github.rest.pulls.update).not.toHaveBeenCalled();
+  });
+  it.each([
+    [
+      'forged workflow',
+      (f) => {
+        f.run.path = '.github/workflows/evil.yml';
+      },
+    ],
+    [
+      'fork source',
+      (f) => {
+        f.run.head_repository.full_name = 'fork/repo';
+      },
+    ],
+    [
+      'mismatched run',
+      (f) => {
+        f.run.id = 124;
+      },
+    ],
+    [
+      'mismatched attempt',
+      (f) => {
+        f.run.run_attempt = 2;
+      },
+    ],
+    [
+      'changed source parent',
+      (f) => {
+        f.candidate.parents = [{ sha: mergedSha }];
+      },
+    ],
+    [
+      'application asset',
+      (f) => {
+        f.candidate.files.push({ status: 'modified', filename: 'app/evil.mjs' });
+      },
+    ],
+    [
+      'edited live head',
+      (f) => {
+        f.github.rest.pulls.get.mockResolvedValue({
+          data: { ...f.pr, head: { ...f.pr.head, sha: mergedSha } },
+        });
+      },
+    ],
+    [
+      'missing queue state',
+      (f) => {
+        f.github.graphql.mockResolvedValue({
+          repository: { pullRequest: { headRefOid: candidateSha } },
+        });
+      },
+    ],
+    [
+      'tagged version',
+      (f) => {
+        const read = f.github.rest.git.getRef.getMockImplementation();
+        f.github.rest.git.getRef.mockImplementation((params) =>
+          params.ref === 'tags/v1.2.3' ? { data: { object: { sha: candidateSha } } } : read(params)
+        );
+      },
+    ],
+    [
+      'published version',
+      (f) => {
+        f.github.rest.repos.getReleaseByTag.mockResolvedValue({
+          data: { draft: false, prerelease: false },
+        });
+      },
+    ],
+    [
+      'unknown ancestry',
+      (f) => {
+        f.github.rest.repos.compareCommits.mockResolvedValue({ data: { status: 'diverged' } });
+      },
+    ],
+    [
+      'failed candidate CI',
+      (f) => {
+        f.pages.set(f.github.rest.checks.listForRef, () => [
+          {
+            app: { id: 15368 },
+            head_sha: candidateSha,
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ]);
+      },
+    ],
+  ])('refuses orphan replacement with %s', async (_, change) => {
+    const f = failedOpenFixture();
+    change(f);
+    await expect(queuedRelease(f)).rejects.toThrow();
+    expect(f.github.rest.pulls.update).not.toHaveBeenCalled();
+  });
+  it('holds a live PR already merged instead of trying to close it', async () => {
+    const f = failedOpenFixture();
+    f.github.rest.pulls.get.mockResolvedValue({
+      data: { ...f.pr, merged: true, merged_at: '2026-10-14T11:00:00Z' },
+    });
+    expect((await queuedRelease(f)).reason).toContain('no longer open');
+    expect(f.github.rest.pulls.update).not.toHaveBeenCalled();
+  });
+});
 describe('safe ordinary stale-source retry', () => {
   it('closes only a proven unchanged unqueued unpublished generated snapshot and allows fresh preparation', async () => {
     const f = staleOpenFixture();

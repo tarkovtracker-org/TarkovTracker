@@ -32,7 +32,7 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0].endsWith('/review-admission-cli.mjs')) {
-  fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission', sha: args[2], runId: args[3] }) + '\n');
+  fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission', sha: args[2], number: args[3], runId: args[4] }) + '\n');
   if (process.env.ADMISSION_FAIL === 'true') { console.error('Review Admission denied'); process.exit(1); }
   if (process.env.ADMISSION_PENDING === 'true') { console.error('Review Admission pending'); process.exit(2); }
   fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission-success', invocation: process.env.INVOCATION_ID }) + '\n');

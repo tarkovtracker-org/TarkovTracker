@@ -34,8 +34,8 @@ on:
 # previews use a per-CI-run group so fork approval waits cannot block queue deployment or cleanup.
 concurrency:
   group: ${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}
-  queue: max
-  cancel-in-progress: false
+  queue: ${{ inputs.queue && 'max' || 'single' }}
+  cancel-in-progress: ${{ !inputs.queue }}
 permissions:
   contents: read
 env:

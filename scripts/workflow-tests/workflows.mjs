@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -381,11 +381,37 @@ test('Dependabot rollout coexistence retains freshness and admission while repor
 test('automation shell keeps fixture commands ahead of host startup tooling', (t) => {
   const f = fixture(t);
   const result = f.shell(
-    'node /fixture/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$HEAD_SHA" 777',
+    'node /fixture/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$HEAD_SHA" "$PR_NUMBER" 777',
     { SHLVL: '0' }
   );
   assert.equal(result.status, 0, result.stderr);
   assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '777'));
   const harness = read('scripts/workflow-tests/helpers/automation-fixture.mjs');
   assert.match(harness, /\['--noprofile', '--norc', '-c', script\]/);
+});
+test('repository-controlled workflow normalization receives no online-audit token', (t) => {
+  const workflow = read('.github/workflows/ci.yml');
+  const step = workflowStep(jobBlock(workflow, 'lint-format'), 'Lint GitHub Actions workflows');
+  assert.match(step, /GH_TOKEN: \$\{\{ github.token \}\}/);
+  assert.match(step, /"\$RUNNER_TEMP\/zizmor" --no-progress/);
+  const command = step
+    .match(/^ +(?:env -u GH_TOKEN )?node scripts\/ci\/actionlint-queue\.mjs[^\n]*$/m)[0]
+    .trim();
+  const dir = mkdtempSync(join(tmpdir(), 'workflow-token-scope-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(
+    join(dir, 'node'),
+    '#!/bin/sh\n[ -z "${GH_TOKEN+x}" ] || exit 9\nprintf "token-absent\\n"\n',
+    { mode: 0o755 }
+  );
+  const env = {
+    PATH: `${dir}:${process.env.PATH}`,
+    GH_TOKEN: 'synthetic-audit-token',
+    RUNNER_TEMP: dir,
+  };
+  const run = (script) =>
+    spawnSync('/bin/bash', ['--noprofile', '--norc', '-c', script], { env, encoding: 'utf8' });
+  assert.equal(run(command).status, 0);
+  assert.equal(run(command).stdout.trim(), 'token-absent');
+  assert.equal(run(command.replace('env -u GH_TOKEN ', '')).status, 9);
 });
