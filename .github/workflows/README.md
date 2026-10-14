@@ -122,8 +122,10 @@ direct validation before auto-merging safe translation updates.
 
 ### Release (`release.yml`)
 
-**Trigger:** Weekly schedule (Tuesdays 15:00 UTC) and manual dispatch on `main`. Deploys do not
-wait for it; every merge still deploys on its own.
+**Trigger:** Daily eligibility check (15:00 UTC) and manual dispatch on `main`. Scheduled publication
+is due seven full days after the latest stable release, including manual releases; overdue attempts
+retry daily. Checks within the interval skip setup and building. Deploys do not wait for it; every
+merge still deploys on its own.
 **Jobs:** `Release` (find the newest main CI run for the trigger commit and require success, check
 current main, install through the shared `setup-project` action, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects other refs and events, failed
@@ -185,8 +187,8 @@ deployable paths; preview-required changes stay pending until an explicit valida
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
-`Release` runs weekly or on manual dispatch, not on CI completion; it publishes only when the
-newest main CI run for its commit succeeded.
+`Release` checks daily for a weekly publication or runs on manual dispatch, not on CI completion;
+it publishes only when the newest main CI run for its commit succeeded.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets

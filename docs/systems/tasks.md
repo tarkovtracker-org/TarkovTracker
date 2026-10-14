@@ -207,6 +207,10 @@ disabled loyalty gating do not bypass an explicit gate. Catalogs must match each
 shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
 a compatibility fallback when no clear objective placement exists. Story trader blockers name the
 objective and cannot be cleared through Mark available; complete the storyline objective first.
+Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
+`finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
+opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
+locked on the dashboard also locks its tasks.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
@@ -281,7 +285,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
    team membership. The composable returns both map marks and an objective-visibility map, each
    entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
-   that objective themselves.
+   that objective themselves. Under the Locked and All status filters, `tasks.vue` passes
+   `shouldShowLockedObjectives`, so objectives of locked (not failed) tasks with no other owner
+   draw as self markers; a teammate who needs the objective still owns it.
 2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
 3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
    aggregates bring-mode equipment and alternative key groups independently for each group. It

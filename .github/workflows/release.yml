@@ -2,7 +2,9 @@ name: Release
 on:
   # Batched releases: every merge still deploys on its own, independently of this workflow.
   schedule:
-    - cron: '0 15 * * 2' # Tuesdays 15:00 UTC
+    # Check daily so stale-main, unfinished-CI and failed attempts can catch up automatically.
+    # The gate permits publication only seven days after the latest stable release.
+    - cron: '0 15 * * *' # Daily 15:00 UTC; weekly publication cadence
   workflow_dispatch:
 permissions:
   contents: read
