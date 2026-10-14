@@ -9,6 +9,7 @@ import type { Task } from '@/types/tarkov';
 const sessionUser = reactive({ id: 'owner-a', loggedIn: true });
 mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: sessionUser } }));
 const createTarkovStore = (options: {
+  isTaskActive?: (taskId: string) => boolean;
   isTaskComplete?: (taskId: string) => boolean;
   progressData?: Partial<UserProgressData>;
   objectiveCounts?: Record<string, number>;
@@ -30,6 +31,8 @@ const createTarkovStore = (options: {
     getObjectiveCount: vi.fn((objectiveId: string) => objectiveCounts.get(objectiveId) ?? 0),
     playerLevel: vi.fn(() => options.playerLevel ?? 1),
     setLevel: vi.fn(),
+    isTaskActive: vi.fn((taskId: string) => options.isTaskActive?.(taskId) ?? false),
+    setTaskActive: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => options.isTaskComplete?.(taskId) ?? false),
     getCurrentProgressData: vi.fn(() => options.progressData ?? {}),
     // Manual activity-log entries live in the synced progress blob (issue #445).
@@ -70,6 +73,57 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it('records and reverses accepting a task', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+    stop();
+  });
+  it('releases the story objectives an undone acceptance recorded', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+      recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk' }],
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setStoryObjectiveUncomplete).toHaveBeenCalledWith('tour', 'talk');
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)('restores acceptance when undoing %s', async (action) => {
+    const task: Task = { id: 'accepted', name: 'Accepted task' };
+    const { notification, tarkovStore, stop } = await setup([task], {
+      isTaskActive: () => true,
+    });
+    notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+    tarkovStore.isTaskActive.mockReturnValue(false);
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)(
+    'keeps a neutral task neutral when undoing %s',
+    async (action) => {
+      const task: Task = { id: 'neutral', name: 'Neutral task' };
+      const { notification, tarkovStore, stop } = await setup([task]);
+      notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+      await notification.undoLastAction();
+      expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+      expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+      stop();
+    }
+  );
   it('closes an empty-history status notification on a mode change', async () => {
     const { notification, tarkovStore, stop } = await setup([]);
     notification.onTaskAction({
@@ -142,7 +196,7 @@ describe('useTaskNotification', () => {
     await retainedUndo();
     expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
   });
-  it.each(['complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
+  it.each(['active', 'complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
     'keeps manual %s and its undo out of activity history',
     async (action) => {
       const { notification, tarkovStore, stop } = await setup([]);

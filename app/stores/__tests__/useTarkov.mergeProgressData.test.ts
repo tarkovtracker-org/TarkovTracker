@@ -138,6 +138,71 @@ describe('mergeProgressData story chapters', () => {
     });
   });
 });
+describe('mergeProgressData task active state', () => {
+  it('round-trips explicit active and preserves legacy unknown', () => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      active: { active: true, complete: false, failed: false, timestamp: 2000 },
+      legacy: { complete: false, failed: false, timestamp: 2000 },
+    };
+    const merged = mergeProgressData(local, createProgressData({}));
+    expect(merged.taskCompletions.active).toMatchObject({ active: true });
+    expect(merged.taskCompletions.legacy).not.toHaveProperty('active');
+  });
+  it.each([true, false])('retains known acceptance %s for an equal-time legacy save', (active) => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      task: { active, complete: false, failed: false, timestamp: 1000 },
+    };
+    const remote = createProgressData({});
+    remote.taskCompletions = {
+      task: { complete: false, failed: false, timestamp: 1000 },
+    };
+    expect(mergeProgressData(local, remote).taskCompletions.task?.active).toBe(active);
+  });
+  it('lets a newer explicit neutral state clear active', () => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      task: { active: true, complete: false, failed: false, timestamp: 1000 },
+    };
+    const remote = createProgressData({});
+    remote.taskCompletions = {
+      task: { active: false, complete: false, failed: false, timestamp: 2000 },
+    };
+    expect(mergeProgressData(local, remote).taskCompletions.task).toMatchObject({
+      active: false,
+      complete: false,
+      failed: false,
+      timestamp: 2000,
+    });
+  });
+  it.each([
+    ['completed', { complete: true, failed: false, timestamp: 2000 }],
+    ['failed', { complete: true, failed: true, timestamp: 2000 }],
+  ])('clears older active for a newer legacy %s state', (_state, completion) => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      task: { active: true, complete: false, failed: false, timestamp: 1000 },
+    };
+    const remote = createProgressData({});
+    remote.taskCompletions = { task: completion };
+    expect(mergeProgressData(local, remote).taskCompletions.task).toMatchObject({
+      active: false,
+      ...completion,
+    });
+  });
+  it('keeps a newer ambiguous legacy incomplete state unknown', () => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      task: { active: true, complete: false, failed: false, timestamp: 1000 },
+    };
+    const remote = createProgressData({});
+    remote.taskCompletions = {
+      task: { complete: false, failed: false, timestamp: 2000 },
+    };
+    expect(mergeProgressData(local, remote).taskCompletions.task).not.toHaveProperty('active');
+  });
+});
 describe('hasProgress metadata state', () => {
   it('treats prestige and reset epochs as progress', () => {
     const empty = createProgressData({});

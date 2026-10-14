@@ -77,6 +77,7 @@ type ModeProgressRow = {
 type SanitizedTaskCompletion = {
   complete?: boolean;
   failed?: boolean;
+  active?: boolean;
   manual?: boolean;
   timestamp?: number;
 };
@@ -394,6 +395,7 @@ const applyDerivedTaskFailures = (
       ...(targetCompletion ?? {}),
       complete: true,
       failed: true,
+      active: false,
     };
     if (nextCompletion.timestamp === undefined && triggerTimestamp !== undefined) {
       nextCompletion.timestamp = triggerTimestamp;

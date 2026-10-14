@@ -25,7 +25,7 @@ import type { Task, TaskRequirement } from '@/types/tarkov';
 export type TaskActionPayload = {
   taskId: string;
   taskName: string;
-  action: 'available' | 'complete' | 'uncomplete' | 'reset_failed' | 'fail';
+  action: 'active' | 'available' | 'complete' | 'uncomplete' | 'reset_failed' | 'fail';
   analyticsParams?: Record<string, boolean | number | string>;
   undoKey?: string;
   statusKey?: string;
@@ -35,6 +35,7 @@ export type TaskActionPayload = {
 };
 export type UseTaskActionsReturn = {
   markTaskComplete: (isUndo?: boolean) => void;
+  markTaskActive: () => void;
   markTaskUncomplete: (isUndo?: boolean) => void;
   markTaskAvailable: () => void;
   /** Whether Mark available would make the task available rather than leave it locked. */
@@ -315,6 +316,20 @@ export function useTaskActions(
       statusKey: 'page.tasks.questcard.status_available',
     });
   };
+  const markTaskActive = () => {
+    const currentTask = task();
+    const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
+    tarkovStore.setTaskActive(currentTask.id);
+    const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
+    emitAction({
+      taskId: currentTask.id,
+      taskName,
+      action: 'active',
+      analyticsParams: analyticsParams(currentTask),
+      statusKey: 'page.tasks.questcard.status_active',
+      recordedStoryObjectives,
+    });
+  };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
@@ -349,6 +364,7 @@ export function useTaskActions(
   };
   return {
     markTaskComplete,
+    markTaskActive,
     markTaskUncomplete,
     markTaskAvailable,
     canMarkTaskAvailable: () => canMarkTaskAvailable(task()),
