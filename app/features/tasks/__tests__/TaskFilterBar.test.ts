@@ -282,6 +282,27 @@ describe('TaskFilterBar', () => {
     expect(wrapper.emitted('pin-status')).toEqual([['locked']]);
     expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
   });
+  it('keeps Active clickable during search and highlights the shown status', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup({
+      preferencesStore: { getTaskSecondaryView: 'active' },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'all' });
+    const activeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Active'))!;
+    expect(activeButton.attributes('disabled')).toBeUndefined();
+    expect(activeButton.attributes('aria-pressed')).toBe('false');
+    expect(activeButton.classes()).not.toContain('border-primary-500/45');
+    await activeButton.trigger('click');
+    expect(wrapper.emitted('pin-status')).toEqual([['active']]);
+    expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
+    const pinnedWrapper = mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'active' });
+    const pinnedButton = pinnedWrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Active'))!;
+    expect(pinnedButton.attributes('aria-pressed')).toBe('true');
+    expect(pinnedButton.classes()).toContain('border-primary-500/45');
+  });
   it('saves a status picked with no search active', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, false, { activeStatusView: 'available' });

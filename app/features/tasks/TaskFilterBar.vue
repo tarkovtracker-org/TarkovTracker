@@ -72,9 +72,9 @@
           color="neutral"
           size="sm"
           class="leading-none"
-          :disabled="secondaryView === 'active'"
-          :aria-pressed="secondaryView === 'active'"
-          :class="getStatusButtonClass('active', secondaryView === 'active')"
+          :disabled="isStatusApplied('active')"
+          :aria-pressed="selectedStatusView === 'active'"
+          :class="getStatusButtonClass('active', selectedStatusView === 'active')"
           @click="setSecondaryView('active')"
         >
           <UIcon name="i-mdi-progress-check" class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block" />
