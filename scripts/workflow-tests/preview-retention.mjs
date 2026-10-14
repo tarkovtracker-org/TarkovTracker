@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { previewBranchName, PAGES_DOMAIN } from '../preview/profile.mjs';
 import { pendingPreviews, retentionPages } from '../preview/retention-api.mjs';
 import { retainQueuePreviews, requireRetentionLifecycle } from '../preview/retention.mjs';
@@ -446,4 +447,113 @@ test('retention workflow remains main-only, credential isolated, and disabled un
   assert.match(workflow, /default: false/);
   assert.match(workflow, /getCollaboratorPermissionLevel/);
   assert.doesNotMatch(workflow, /pull_request|merge_group|persist-credentials: true/);
+});
+function ordinaryWaiting(f) {
+  const source = {
+    ...f.state.run,
+    id: 30,
+    event: 'pull_request',
+    head_branch: 'fork-feature',
+    conclusion: 'success',
+    head_repository: { full_name: 'fork/repo' },
+  };
+  f.state.active = [
+    { ...f.state.controller, id: 20, status: 'waiting', display_title: 'Preview CI 30 request 0' },
+  ];
+  const get = f.options.github.rest.actions.getWorkflowRun;
+  f.options.github.rest.actions.getWorkflowRun = async (params) =>
+    params.run_id === 30 ? { data: source } : get(params);
+  return source;
+}
+test('authenticated ordinary fork approval waits do not block queue retention; unknown pending evidence does', async (t) => {
+  const f = fixture(t);
+  ordinaryWaiting(f);
+  assert.equal((await retainQueuePreviews({ ...f.options, apply: true })).deleted.length, 1);
+  for (const change of [
+    (f, source) => {
+      source.event = 'merge_group';
+      source.head_branch = branch;
+    },
+    (f, source) => {
+      source.path = '.github/workflows/forged.yml';
+    },
+    (f, source) => {
+      source.repository = { full_name: 'foreign/repo' };
+    },
+    (f) => {
+      f.state.active[0].head_repository = { full_name: 'fork/repo' };
+    },
+    (f) => {
+      f.state.active[0].head_branch = 'candidate';
+    },
+    (f) => {
+      f.state.active[0].display_title = 'unclassified';
+    },
+  ]) {
+    const f = fixture(t);
+    change(f, ordinaryWaiting(f));
+    assert.deepEqual((await retainQueuePreviews({ ...f.options, apply: true })).deleted, []);
+  }
+  const missing = fixture(t);
+  ordinaryWaiting(missing);
+  const get = missing.options.github.rest.actions.getWorkflowRun;
+  missing.options.github.rest.actions.getWorkflowRun = async (params) => {
+    if (params.run_id === 30) throw new Error('API unavailable');
+    return get(params);
+  };
+  await assert.rejects(retainQueuePreviews({ ...missing.options, apply: true }));
+  assert.deepEqual(missing.state.removed, []);
+});
+test('current conditional lock requires both authenticated profile bindings; historical global locks remain supported', async (t) => {
+  const f = fixture(t);
+  const current = readFileSync('.github/workflows/preview.yml', 'utf8');
+  f.state.historicalWorkflow = current;
+  writeFileSync(join(f.options.workspace, '.github/workflows/preview.yml'), current);
+  requireRetentionLifecycle(f.options.workspace);
+  assert.equal((await retainQueuePreviews(f.options)).eligible.length, 1);
+  for (const changed of [
+    current.replace("inputs.queue && 'pages-preview-lifecycle'", "inputs.queue && 'wrong'"),
+    current.replace('queue: process.env.QUEUE_INPUT,', 'queue: false,'),
+    current.replace('QUEUE_INPUT: ${{ inputs.queue }}', 'QUEUE_INPUT: false'),
+    current.replace('type: boolean', 'type: string'),
+  ]) {
+    f.state.historicalWorkflow = changed;
+    assert.deepEqual((await retainQueuePreviews({ ...f.options, apply: true })).deleted, []);
+  }
+});
+async function retentionMutation(before, after) {
+  const filename = join(process.cwd(), 'scripts/preview/retention.mjs');
+  const source = readFileSync(filename, 'utf8');
+  assert.ok(source.includes(before));
+  const changed = source
+    .replace(before, after)
+    .replace(
+      /from ['"](\.[^'"]+)['"]/g,
+      (_, specifier) => `from '${new URL(specifier, pathToFileURL(filename)).href}'`
+    );
+  return import(`data:text/javascript;base64,${Buffer.from(changed).toString('base64')}`);
+}
+test('retention mutations expose forged source classification and unknown pending evidence bypasses', async (t) => {
+  const f = fixture(t);
+  ordinaryWaiting(f).path = '.github/workflows/forged.yml';
+  assert.deepEqual((await retainQueuePreviews({ ...f.options, apply: true })).deleted, []);
+  const sourceBypass = await retentionMutation(
+    'source.id === id && ordinarySource(source, repository)',
+    'source.id === id'
+  );
+  assert.equal(
+    (await sourceBypass.retainQueuePreviews({ ...f.options, apply: true })).deleted.length,
+    1
+  );
+  const unknown = fixture(t);
+  unknown.state.active = [{ id: 20 }];
+  assert.deepEqual((await retainQueuePreviews({ ...unknown.options, apply: true })).deleted, []);
+  const pendingBypass = await retentionMutation(
+    'if (!(await ordinaryPending(options, run, repository))) return true;',
+    'if (false) return true;'
+  );
+  assert.equal(
+    (await pendingBypass.retainQueuePreviews({ ...unknown.options, apply: true })).deleted.length,
+    1
+  );
 });

@@ -13,6 +13,11 @@ on:
         description: Successful CI run id for the exact PR revision to preview.
         required: true
         type: string
+      queue:
+        description: Native merge queue CI profile; verified against the source run before deployment.
+        required: false
+        type: boolean
+        default: false
       request_comment_id:
         description: Command authorizing this automatic request; omit for a manual preview.
         required: false
@@ -25,10 +30,10 @@ on:
         description: Exact CI attempt selected by the trusted requester.
         required: false
         type: string
-# Deployment, smoke/result jobs and retention share one lifecycle lock. Stale revisions still
-# fail their identity checks; queue:max preserves pending requests for other PRs.
+# Native queue deployment, smoke/result jobs and retention share one lifecycle lock. Ordinary
+# previews use a per-CI-run group so fork approval waits cannot block queue deployment or cleanup.
 concurrency:
-  group: pages-preview-lifecycle
+  group: ${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}
   queue: max
   cancel-in-progress: false
 permissions:
@@ -65,6 +70,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RUN_ID_INPUT: ${{ inputs.run_id }}
+          QUEUE_INPUT: ${{ inputs.queue }}
           REQUEST_COMMENT_ID_INPUT: ${{ inputs.request_comment_id }}
           AUTHORIZATION_INPUT: ${{ inputs.authorization }}
           CI_ATTEMPT_INPUT: ${{ inputs.ci_attempt }}
@@ -75,7 +81,7 @@ jobs:
               github,
               context,
               core,
-              inputs: { run_id: process.env.RUN_ID_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
+              inputs: { run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
               workspace: process.env.RUNNER_TEMP,
             });
             core.setOutput('decision', JSON.stringify(decision));
@@ -133,6 +139,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DECISION: ${{ needs.plan.outputs.decision }}
+          QUEUE_INPUT: ${{ inputs.queue }}
         with:
           script: |
             const { verifyForDeploy } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
@@ -142,6 +149,7 @@ jobs:
               context,
               core,
               decision,
+              queue: process.env.QUEUE_INPUT,
               destination: `${process.env.RUNNER_TEMP}/preview-dist`,
             });
             core.setOutput('head_sha', manifest.headSha);

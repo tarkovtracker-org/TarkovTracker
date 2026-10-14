@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { normalizeQueueWorkflow } from '../ci/actionlint-queue.mjs';
-const path = '.github/workflows/preview.yml';
+const path = '.github/workflows/preview-retention.yml';
 const block =
   'concurrency:\n  group: pages-preview-lifecycle\n  queue: max\n  cancel-in-progress: false\n';
 test('only the validated queue extension is blanked and line numbers remain unchanged', () => {
@@ -72,4 +72,18 @@ test('admission extension rejects workflow/global, foreign-job, duplicate or mal
     admissionSource.replace('      queue: max\n', '      queue: max\n      unknown: true\n'),
   ])
     assert.throws(() => normalizeQueueWorkflow(source, admissionPath));
+});
+test('preview extension accepts only the exact queue-profile conditional group', () => {
+  const filename = '.github/workflows/preview.yml';
+  const current = readFileSync(filename, 'utf8');
+  assert.equal(normalizeQueueWorkflow(current, filename), current.replace('  queue: max', ''));
+  for (const changed of [
+    current.replace("inputs.queue && 'pages-preview-lifecycle'", "inputs.queue && 'other'"),
+    current.replace(
+      "inputs.queue && 'pages-preview-lifecycle'",
+      "true && 'pages-preview-lifecycle'"
+    ),
+    current.replace('queue: max', 'queue: single'),
+  ])
+    assert.throws(() => normalizeQueueWorkflow(changed, filename));
 });

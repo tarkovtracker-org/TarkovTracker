@@ -121,7 +121,7 @@ test('preview controller runs trusted code only and isolates credentials per job
     assert.match(trustedWorkflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
   assert.match(
     workflow,
-    /group: pages-preview-lifecycle\n {2}queue: max\n {2}cancel-in-progress: false/
+    /group: \$\{\{ inputs.queue && 'pages-preview-lifecycle' \|\| format\('preview-ci-\{0\}', inputs.run_id\) \}\}\n {2}queue: max\n {2}cancel-in-progress: false/
   );
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
   assert.match(
@@ -276,4 +276,21 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
       jobBlock(read(`.github/workflows/${name}.yml`), name === 'crowdin' ? 'sync' : 'release'),
       /timeout-minutes: 90/
     );
+});
+test('unapproved ordinary forks use a separate full-workflow group; queue upload and reporting stay locked', () => {
+  const workflow = read('.github/workflows/preview.yml');
+  const group = workflow.match(/^ {2}group: \$\{\{ (.*) \}\}$/m)[1];
+  const evaluate = new Function('inputs', 'format', `return (${group});`);
+  const format = (pattern, id) => pattern.replace('{0}', id);
+  assert.equal(evaluate({ queue: false, run_id: '123' }, format), 'preview-ci-123');
+  assert.equal(evaluate({ queue: true, run_id: '123' }, format), 'pages-preview-lifecycle');
+  assert.equal((workflow.match(/QUEUE_INPUT: \$\{\{ inputs.queue \}\}/g) ?? []).length, 2);
+  assert.match(
+    workflow,
+    /inputs: \{ run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT/
+  );
+  assert.match(workflow, /queue: process.env.QUEUE_INPUT,\n +destination:/);
+  assert.match(jobBlock(workflow, 'deploy'), /name: \$\{\{ needs.plan.outputs.environment \}\}/);
+  assert.match(workflow, /^concurrency:/m);
+  assert.doesNotMatch(workflow, /^ {4}concurrency:/m);
 });

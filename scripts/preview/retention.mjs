@@ -126,16 +126,37 @@ async function provenance(options, record, cache) {
   if (!binding) return null;
   return authenticatedRuns(options, record, binding, cache);
 }
-function lifecycleTextMatches(text) {
-  return /concurrency:\s*\n {2}group: pages-preview-lifecycle\n {2}queue: max\n {2}cancel-in-progress: false(?:\n|$)/.test(
-    text
+function workflowLifecycleBlock(text) {
+  return text.match(/^concurrency:\n(?: {2}[^\n]*\n)*/m)?.[0] ?? '';
+}
+function historicalLifecycleTextMatches(text) {
+  return (
+    workflowLifecycleBlock(text) ===
+    'concurrency:\n  group: pages-preview-lifecycle\n  queue: max\n  cancel-in-progress: false\n'
   );
+}
+function scopedLifecycleTextMatches(text) {
+  const group =
+    "  group: ${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}\n";
+  return [
+    workflowLifecycleBlock(text) ===
+      `concurrency:\n${group}  queue: max\n  cancel-in-progress: false\n`,
+    / {6}queue:\n {8}description:[^\n]*\n {8}required: false\n {8}type: boolean\n {8}default: false\n/.test(
+      text
+    ),
+    (text.match(/QUEUE_INPUT: \$\{\{ inputs.queue \}\}/g) ?? []).length === 2,
+    text.includes('run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT'),
+    /queue: process.env.QUEUE_INPUT,\n +destination:/.test(text),
+  ].every(Boolean);
+}
+function lifecycleTextMatches(text) {
+  return historicalLifecycleTextMatches(text) || scopedLifecycleTextMatches(text);
 }
 function requireLifecycleText(text) {
   if (!lifecycleTextMatches(text))
     throw new Error('Pages retention requires shared lifecycle concurrency.');
 }
-/** Serialize complete Preview workflows (including historical failed-job reruns), not just uploads. */
+/** Queue Preview workflows and historical failed-job reruns remain serialized through reporting. */
 export function requireRetentionLifecycle(workspace) {
   for (const file of ['preview.yml', 'preview-retention.yml'])
     requireLifecycleText(readFileSync(`${workspace}/.github/workflows/${file}`, 'utf8'));
@@ -147,9 +168,57 @@ async function unneeded({ github, repo }, selected) {
     liveQueueAliases(github, repo, previewBranchName),
   ]);
   const alias = deploymentIdentity(selected.deployment, selected.run).previewBranch;
-  if ([!absent, pending.length > 0, aliases.includes(alias)].some(Boolean)) return false;
+  if ([!absent, aliases.includes(alias)].some(Boolean)) return false;
+  if (await protectivePending({ github, repo }, pending)) return false;
   const status = await previewStatus(github, repo, selected.run.head_sha);
   return terminalStatus(status);
+}
+function ordinaryPendingController(run, repository) {
+  return [
+    run.path === '.github/workflows/preview.yml',
+    run.event === 'workflow_dispatch',
+    run.head_branch === PRODUCTION_BRANCH,
+    run.repository?.full_name === repository,
+    run.head_repository?.full_name === repository,
+    /^[0-9a-f]{40}$/.test(String(run.head_sha)),
+  ].every(Boolean);
+}
+function ordinarySource(run, repository) {
+  return [
+    run.path === '.github/workflows/ci.yml',
+    ['pull_request', 'workflow_dispatch'].includes(run.event),
+    run.repository?.full_name === repository,
+    ordinaryHeadRepository(run, repository),
+    run.status === 'completed',
+    run.conclusion === 'success',
+    /^[0-9a-f]{40}$/.test(String(run.head_sha)),
+    typeof run.head_branch === 'string' && !run.head_branch.startsWith(PREFIX),
+  ].every(Boolean);
+}
+async function protectivePending(options, runs) {
+  const repository = `${options.repo.owner}/${options.repo.repo}`;
+  if (runs.length > SCAN_BUDGET) return true;
+  for (const run of runs) {
+    if (!(await ordinaryPending(options, run, repository))) return true;
+  }
+  return false;
+}
+function ordinaryHeadRepository(run, repository) {
+  if (run.event === 'workflow_dispatch') return run.head_repository?.full_name === repository;
+  return /^[^/]+\/[^/]+$/.test(String(run.head_repository?.full_name));
+}
+function pendingSourceId(run) {
+  const match = /^Preview CI ([1-9][0-9]*) request [0-9]+$/.exec(run.display_title);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) ? id : null;
+}
+async function ordinaryPending(options, run, repository) {
+  if (!ordinaryPendingController(run, repository)) return false;
+  const id = pendingSourceId(run);
+  if (!id) return false;
+  const source = await retentionRun(options.github, options.repo, id);
+  return source.id === id && ordinarySource(source, repository);
 }
 function terminalStatus(status) {
   return [TERMINAL.has(status?.state), status?.creator?.login === 'github-actions[bot]'].every(

@@ -184,6 +184,9 @@ export default withNuxt(
     // The route registry and native Node workflow tests run without Nuxt's @ alias resolver.
     files: [
       'app/utils/routeSeo.ts',
+      'scripts/preview/controller.mjs',
+      'scripts/workflow-tests/preview.mjs',
+      'scripts/workflow-tests/preview-request.mjs',
       'scripts/workflow-tests/review-admission.mjs',
       'scripts/workflow-tests/actionlint-queue.mjs',
       'scripts/workflow-tests/merge-queue-policy.mjs',

@@ -2,7 +2,10 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const queuedFiles = new Map([
-  ['.github/workflows/preview.yml', 'pages-preview-lifecycle'],
+  [
+    '.github/workflows/preview.yml',
+    "${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}",
+  ],
   ['.github/workflows/preview-retention.yml', 'pages-preview-lifecycle'],
   ['.github/workflows/release-promotion-queue.yml', 'release-promotion-queue'],
 ]);

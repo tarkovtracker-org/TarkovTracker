@@ -95,8 +95,9 @@ are owned by
 
 Queue-only Pages retention is dry-run by default. Its independent activation switch and protected
 deployment lifecycle are described in [previews](systems/previews.md#queue-preview-retention).
-The preview pipeline serializes with retention using `queue: max`, so unrelated pending previews
-are not replaced by a newer pending request. The queue remains one build/merge at a time, with a
+Native queue previews serialize with retention using `queue: max`. Ordinary and fork previews
+keep their own per-CI-run lock, so fork approval waits do not block the shared queue lifecycle.
+The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
 60-minute response bound; integration is still full CI plus an anonymous deployed preview.
 
 ## Admission publisher provisioning

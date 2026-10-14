@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { extractZip, listZipEntries, zipEntryErrors } from '../preview/archive.mjs';
+import { resolveProfileOutputs } from '../preview/build-profile.mjs';
 import {
   ENVIRONMENTS,
   planPreview,
@@ -15,7 +16,6 @@ import {
   verifyForDeploy,
   verifyManifest,
 } from '../preview/controller.mjs';
-import { resolveProfileOutputs } from '../preview/build-profile.mjs';
 import { deploymentRecordErrors, parseWranglerOutput } from '../preview/deployment.mjs';
 import { buildManifest, digestDirectory, manifestShapeErrors } from '../preview/manifest.mjs';
 import {
@@ -30,10 +30,10 @@ import {
   resolveBuildProfile,
 } from '../preview/profile.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
+import { countApiCalls } from './helpers/api-count.mjs';
+import { buildZip } from './helpers/zip.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
-import { buildZip } from './helpers/zip.mjs';
-import { countApiCalls } from './helpers/api-count.mjs';
 const sha = (letter) => letter.repeat(40);
 const HEAD = sha('a');
 const BASE = sha('b');
@@ -164,6 +164,7 @@ test('queue CI dispatches, deploys and reports only its live integration revisio
   await verifyForDeploy({
     ...args,
     context: workflowDispatchContext(),
+    queue: true,
     decision,
     destination: tempDir(t),
   });
@@ -171,6 +172,7 @@ test('queue CI dispatches, deploys and reports only its live integration revisio
     await publishResult({
       ...args,
       context: workflowDispatchContext(),
+      queue: true,
       decision,
       outcomes: { deploy: 'success', smoke: 'success' },
     }),
@@ -182,6 +184,7 @@ test('queue CI dispatches, deploys and reports only its live integration revisio
     verifyForDeploy({
       ...args,
       context: workflowDispatchContext(),
+      queue: true,
       decision,
       destination: tempDir(t),
     }),
@@ -247,11 +250,16 @@ test('queue API outages remain errors rather than obsolete candidates', async (t
 test('deleted or rebased queue entries cannot upload or publish success', async (t) => {
   for (const change of ['deleted', 'rebased']) {
     const f = queueFixture(t);
-    const args = { github: f.github, core: fakeCore(), context: workflowDispatchContext() };
+    const args = {
+      github: f.github,
+      core: fakeCore(),
+      context: workflowDispatchContext(),
+      queue: true,
+    };
     const decision = await planPreview({
       ...args,
       workspace: tempDir(t),
-      inputs: { run_id: '900' },
+      inputs: { run_id: '900', queue: 'true' },
     });
     assert.equal(decision.action, 'deploy');
     if (change === 'deleted')
@@ -754,7 +762,12 @@ test('ready and reopen reuse passed CI; readiness provenance survives the dispat
     const requested = await plan(t, pullTargetContext(pullFixture(), action));
     assert.equal(requested.decision.action, 'request');
     const inputs = requested.state.dispatches[0].inputs;
-    assert.deepEqual(inputs, { run_id: '900', authorization: 'readiness', ci_attempt: '1' });
+    assert.deepEqual(inputs, {
+      run_id: '900',
+      queue: 'false',
+      authorization: 'readiness',
+      ci_attempt: '1',
+    });
     const deployed = await plan(t, workflowDispatchContext(), { inputs });
     assert.equal(deployed.decision.previewAuthorization, 'readiness');
     assert.equal(deployed.decision.action, 'deploy');
@@ -977,7 +990,7 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: '900', authorization: 'readiness', ci_attempt: '1' },
+      inputs: { run_id: '900', queue: 'false', authorization: 'readiness', ci_attempt: '1' },
     },
   ]);
   // The pending status is published before the dispatch so the dispatched run supersedes it.
@@ -2131,6 +2144,7 @@ test('hourly reconciliation re-evaluates a head left pending on an unready test 
   assert.match(fake.state.statuses[0].description, /Preview enabled: requested/);
   assert.deepEqual(fake.state.dispatches[0].inputs, {
     run_id: '900',
+    queue: 'false',
     authorization: 'readiness',
     ci_attempt: '1',
   });
@@ -2326,4 +2340,70 @@ test('readiness polling is bounded and production hosts are recognised', async (
     'not a url',
   ])
     assert.equal(isForbiddenRequest(url), false, url);
+});
+async function previewMutation(file, before, after) {
+  const filename = join(process.cwd(), 'scripts/preview', file);
+  const source = readFileSync(filename, 'utf8');
+  assert.ok(source.includes(before), before);
+  const changed = source
+    .replace(before, after)
+    .replace(
+      /from ['"](\.[^'"]+)['"]/g,
+      (_, specifier) => `from '${new URL(specifier, pathToFileURL(filename)).href}'`
+    );
+  return import(`data:text/javascript;base64,${Buffer.from(changed).toString('base64')}`);
+}
+test('queue profile is authenticated before environment selection and repeated before upload', async (t) => {
+  for (const [kind, queue] of [
+    ['queue', 'false'],
+    ['ordinary', 'true'],
+  ]) {
+    const f = kind === 'queue' ? queueFixture(t) : fakeGithub(t);
+    const args = {
+      github: f.github,
+      context: workflowDispatchContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+      inputs: { run_id: '900', queue },
+    };
+    const decision = await planPreview(args);
+    assert.equal(decision.action, 'fail');
+    assert.match(decision.description, /queue profile/);
+    assert.equal(decision.environment, undefined);
+    assert.equal(f.state.dispatches.length, 0);
+    const correct = await planPreview({
+      ...args,
+      inputs: { ...args.inputs, queue: String(kind === 'queue') },
+    });
+    assert.equal(correct.action, 'deploy');
+    await assert.rejects(
+      verifyForDeploy({ ...args, decision: correct, queue, destination: tempDir(t) }),
+      /queue profile/
+    );
+  }
+  const f = queueFixture(t);
+  const args = {
+    github: f.github,
+    context: workflowDispatchContext(),
+    core: fakeCore(),
+    workspace: tempDir(t),
+    inputs: { run_id: '900', queue: 'false' },
+  };
+  const planner = await previewMutation(
+    'controller.mjs',
+    'requireQueueScope(inputs?.queue, run.event);',
+    ''
+  );
+  assert.equal((await planner.planPreview(args)).action, 'deploy');
+  const decision = await planPreview({
+    ...args,
+    workspace: tempDir(t),
+    inputs: { run_id: '900', queue: 'true' },
+  });
+  const uploader = await previewMutation(
+    'controller.mjs',
+    'requireQueueScope(queue, run.event);',
+    ''
+  );
+  await uploader.verifyForDeploy({ ...args, decision, queue: 'false', destination: tempDir(t) });
 });
