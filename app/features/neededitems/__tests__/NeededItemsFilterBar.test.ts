@@ -165,23 +165,82 @@ describe('NeededItemsFilterBar', () => {
     expect(wrapper.emitted('update:sortBy')).toEqual([['count']]);
     expect(wrapper.emitted('update:sortDirection')).toEqual([['desc']]);
   });
-  it('toggles settings drawer button and applies light-theme active classes', async () => {
+  it('lists active filters as chips and hides the idle Kappa chip on the Hideout scope', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: {
+        ...createDefaultProps(),
+        modelValue: 'hideout' as const,
+        firFilter: 'non-fir' as const,
+        hideOwned: true,
+        kappaOnly: true,
+      },
+      global: createDefaultGlobal(),
+    });
+    const chips = wrapper.get('[data-testid="needed-items-active-filters"]');
+    expect(chips.get('[data-testid="needed-items-active-filters-fir"]').text()).toBe(
+      'page.needed_items.filters.chips.non_fir'
+    );
+    expect(chips.find('[data-testid="needed-items-active-filters-hide_owned"]').exists()).toBe(
+      true
+    );
+    expect(chips.find('[data-testid="needed-items-active-filters-kappa_only"]').exists()).toBe(
+      false
+    );
+    expect(wrapper.get('[data-testid="needed-items-filters-count"]').text()).toBe('2');
+    await wrapper.setProps({ modelValue: 'tasks' });
+    expect(chips.find('[data-testid="needed-items-active-filters-kappa_only"]').exists()).toBe(
+      true
+    );
+    expect(wrapper.get('[data-testid="needed-items-filters-count"]').text()).toBe('3');
+  });
+  it('clears one filter from its chip without touching the others', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...createDefaultProps(), firFilter: 'fir' as const, hideTeamItems: true },
+      global: createDefaultGlobal(),
+    });
+    await wrapper.get('[data-testid="needed-items-active-filters-fir"]').trigger('click');
+    expect(wrapper.emitted('update:firFilter')).toEqual([['all']]);
+    expect(wrapper.emitted('update:hideTeamItems')).toBeUndefined();
+  });
+  it('resets every saved filter from the popover, including Kappa only on the Hideout scope', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: {
+        ...createDefaultProps(),
+        modelValue: 'hideout' as const,
+        hideOwned: true,
+        kappaOnly: true,
+      },
+      global: createDefaultGlobal(),
+    });
+    await wrapper.get('[data-testid="needed-items-filters-reset"]').trigger('click');
+    expect(wrapper.emitted('update:firFilter')).toEqual([['all']]);
+    expect(wrapper.emitted('update:hideOwned')).toEqual([[false]]);
+    expect(wrapper.emitted('update:hideTeamItems')).toEqual([[false]]);
+    expect(wrapper.emitted('update:hideNonFirSpecialEquipment')).toEqual([[false]]);
+    expect(wrapper.emitted('update:kappaOnly')).toEqual([[false]]);
+  });
+  it('keeps Reset available while Kappa only sits idle on the Hideout scope', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...createDefaultProps(), modelValue: 'hideout' as const },
+      global: createDefaultGlobal(),
+    });
+    const reset = () => wrapper.get('[data-testid="needed-items-filters-reset"]');
+    expect(reset().attributes('disabled')).toBeDefined();
+    await wrapper.setProps({ kappaOnly: true });
+    expect(wrapper.find('[data-testid="needed-items-filters-count"]').exists()).toBe(false);
+    expect(reset().attributes('disabled')).toBeUndefined();
+  });
+  it('hides the chip row when no filter is active', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    const settingsButton = wrapper.find('button[data-icon="i-mdi-cog"]');
-    expect(settingsButton.attributes('aria-pressed')).toBe('false');
-    expect(settingsButton.classes()).toContain('text-surface-400');
-    await settingsButton.trigger('click');
-    expect(settingsButton.attributes('aria-pressed')).toBe('true');
-    expect(settingsButton.classes()).toContain('light:text-surface-50');
-    expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
-    // The drawer lives in shared Nuxt state, so leaving it open would leak into any
-    // later test that mounts the bar and expects the default-closed state.
-    await settingsButton.trigger('click');
-    expect(settingsButton.attributes('aria-pressed')).toBe('false');
-    expect(settingsButton.classes()).toContain('text-surface-400');
+    expect(wrapper.find('[data-testid="needed-items-active-filters"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="needed-items-filters-count"]').exists()).toBe(false);
   });
 });

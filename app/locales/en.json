@@ -375,6 +375,16 @@
     "validation_error": "Validation Error",
     "got_it": "Got it"
   },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "Clear filters",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
+  },
   "page_help": {
     "button": "Help",
     "launcher": {
@@ -470,14 +480,14 @@
         },
         "filters": {
           "title": "Trim the list",
-          "description": "Status filters let you focus on what is available now, locked, completed, or failed without leaving the page.",
+          "description": "Status tabs focus on what is available, locked, completed, or failed. The Filters button narrows tasks by type, keys, team, or map.",
           "bullet_one": "Search works across task names and helps when the list feels too large.",
-          "bullet_two": "If a count looks lower than expected, one of the status or teammate filters is usually hiding results."
+          "bullet_two": "Active filters show as chips under the toolbar; select one to remove it, or use Clear all."
         },
         "settings": {
           "title": "Adjust behavior",
-          "description": "The cog opens display and filtering preferences that change how the task list behaves across sessions.",
-          "bullet_one": "Use settings when you want different default filters, team visibility, or map behavior.",
+          "description": "The Settings button opens display preferences: what task cards show, which status tabs appear, and how sorting and fail actions behave.",
+          "bullet_one": "Use Filters to change which tasks appear, and Settings to change how they look.",
           "bullet_two": "If the page feels off, settings are the first place to check before assuming data is missing."
         }
       },
@@ -488,7 +498,7 @@
     "needed_items": {
       "title": "Needed items guide",
       "summary": "Use needed items to combine task and hideout materials, then narrow the list to the exact items you still care about.",
-      "hint": "Get a quick explanation of the tabs, view modes, and the filters behind the cog.",
+      "hint": "Get a quick explanation of the tabs, view modes, and the Filters button.",
       "sections": {
         "scopes": {
           "title": "Choose a scope",
@@ -504,8 +514,8 @@
         },
         "filters": {
           "title": "Refine the list",
-          "description": "The settings drawer controls owned-item visibility, FIR rules, team needs, and other high-impact filters.",
-          "bullet_one": "If an item disappears unexpectedly, a drawer filter is usually the reason.",
+          "description": "The Filters button controls owned-item visibility, FIR rules, team needs, and Kappa-only items. Active filters show as chips under the toolbar.",
+          "bullet_one": "If an item disappears unexpectedly, check the filter chips; remove one to bring those items back.",
           "bullet_two": "Sorting by priority is best when you want the highest-impact items first."
         }
       }
@@ -917,7 +927,36 @@
       },
       "filters": {
         "team_aria_label": "Show progress for {name}",
-        "whole_team": "Whole team"
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "Regular",
+          "kappa": "Kappa",
+          "lightkeeper": "Lightkeeper"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "Default order",
@@ -927,53 +966,39 @@
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
-        "ascending": "Ascending",
-        "descending": "Descending",
         "aria_label": "Sort tasks",
         "progression": "Progression"
       },
       "settings": {
         "title": "Task Settings",
-        "tabs": {
-          "filters": "Task Filters",
-          "filter_bar": "Filter Bar",
-          "advanced": "Advanced"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "Rewards",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "Control which tasks appear.",
-          "regular_tasks": "Regular Tasks",
-          "kappa_required": "Kappa Required",
-          "lightkeeper_required": "Lightkeeper Required",
-          "team_shared_only": "Team Shared Only",
-          "has_required_keys": "Only Tasks with Keys",
-          "show_global_tasks": "Show Global Tasks on Map",
-          "impact_respects_filters": "Impact Respects Task Filters",
-          "hide_completed_map_objectives": "Hide Map-Complete Tasks"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "Tune how task cards look.",
-          "required_labels": "\"Required\" Labels",
-          "experience_rewards": "Experience Rewards",
-          "next_tasks": "Next Tasks",
-          "previous_tasks": "Previous Tasks",
-          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks"
-        },
-        "filter_bar": {
-          "hint": "Toggle task status filters on or off to control which tasks are visible.",
-          "all_filter": "Show All Tasks",
-          "all_filter_hint": "Display every task regardless of status.",
-          "available_filter": "Show Available",
-          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
-          "locked_filter": "Show Locked",
-          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
-          "completed_filter": "Show Completed",
-          "completed_filter_hint": "Tasks you've already finished.",
-          "failed_filter": "Show Failed",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "Manual Fail Actions",
-          "failed_tasks_label": "Failed tasks",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "Repair failed tasks",
           "repair_failed_confirm": "Repair failed tasks by clearing failed flags that are not supported by current fail conditions?",
           "repair_failed_done": "Cleared failed status for {count} tasks.",
@@ -1172,10 +1197,6 @@
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
-      "collapse_completed": "Collapse completed stations",
-      "sort": {
-        "ready_first": "Sort ready to build first"
-      },
       "prereq_filters": {
         "title": "Availability requirements",
         "station_levels": "Require station levels",
@@ -1208,22 +1229,48 @@
           "mark_incomplete": "Mark Incomplete",
           "set_custom_amount": "Set Custom Amount:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
       "loading": "Loading task and hideout data",
       "items": "items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
       "filters": {
-        "label": "Filters",
-        "non_fir": "NON-FIR",
-        "hide_owned": "HIDE OWNED",
-        "hide_non_fir_special_equipment_title": "Hide non-FIR special equipment (e.g., MS2000 Markers, Wi-Fi Cameras)",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Show only items required for Kappa tasks",
-        "kappa_only_disabled_tooltip": "Kappa filter applies to tasks only.",
-        "hide_team_needs": "HIDE TEAM NEEDS"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "Non-FIR"
+        },
+        "hide": {
+          "title": "Hide",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "Tasks",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "Sort",
@@ -1236,10 +1283,7 @@
         "grid": "Grid view",
         "combined": "Combined view"
       },
-      "teammates_needed": "Teammates need this",
-      "settings": {
-        "title": "Needed Items Settings"
-      }
+      "teammates_needed": "Teammates need this"
     },
     "settings": {
       "card": {

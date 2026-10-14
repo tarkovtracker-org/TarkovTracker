@@ -5,6 +5,7 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import type { HideoutStation } from '@/types/tarkov';
 export type HideoutPrimaryView = 'available' | 'maxed' | 'locked' | 'all';
+const STATION_STATUS_VIEWS: readonly HideoutPrimaryView[] = ['available', 'maxed', 'locked'];
 export type HideoutStationCounts = {
   available: number;
   maxed: number;
@@ -16,6 +17,7 @@ export type UseHideoutFilteringReturn = {
   isStoreLoading: ComputedRef<boolean>;
   visibleStations: ComputedRef<HideoutStation[]>;
   stationCounts: ComputedRef<HideoutStationCounts>;
+  stationsForView: (stations: HideoutStation[], view: HideoutPrimaryView) => HideoutStation[];
 };
 export function useHideoutFiltering(): UseHideoutFilteringReturn {
   const metadataStore = useMetadataStore();
@@ -27,7 +29,6 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     get: () => preferencesStore.getHideoutPrimaryView as HideoutPrimaryView,
     set: (value: HideoutPrimaryView) => preferencesStore.setHideoutPrimaryView(value),
   });
-  const sortReadyFirst = computed(() => preferencesStore.getHideoutSortReadyFirst);
   const isStationReadyToBuild = (station: HideoutStation): boolean => {
     const currentLevel = progressStore.hideoutLevels?.[station.id]?.self ?? 0;
     const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
@@ -35,9 +36,10 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     if (!nextLevel) return false;
     return arePrereqsMet(nextLevel);
   };
-  const sortStationsByReadiness = (stations: HideoutStation[]): HideoutStation[] => {
-    if (!sortReadyFirst.value) return stations;
-    return stations
+  // Stations whose next level has its station, skill and trader prerequisites met come first; the
+  // rest keep their upstream order. Item requirements do not affect the order.
+  const sortStationsByReadiness = (stations: HideoutStation[]): HideoutStation[] =>
+    stations
       .map((station, index) => ({
         station,
         index,
@@ -48,7 +50,6 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
         return a.ready ? -1 : 1;
       })
       .map((entry) => entry.station);
-  };
   const stationCounts = computed(() => {
     if (!hideoutStations.value || hideoutStations.value.length === 0) {
       return { available: 0, maxed: 0, locked: 0, all: 0 };
@@ -70,31 +71,25 @@ export function useHideoutFiltering(): UseHideoutFilteringReturn {
     if (Object.keys(progressStore.visibleTeamStores).length === 0) return true;
     return false;
   });
-  const filterAndSortStations = (
+  const stationsForView = (
     stations: HideoutStation[],
-    status?: 'available' | 'maxed' | 'locked'
-  ): HideoutStation[] => {
-    const filtered = status ? stations.filter((s) => getStationStatus(s) === status) : stations;
-    return sortStationsByReadiness(filtered);
-  };
+    view: HideoutPrimaryView
+  ): HideoutStation[] =>
+    // A stored view that is not a station status (stale or synced from elsewhere) shows every station.
+    sortStationsByReadiness(
+      STATION_STATUS_VIEWS.includes(view)
+        ? stations.filter((s) => getStationStatus(s) === view)
+        : stations
+    );
   const visibleStations = computed(() => {
     if (isStoreLoading.value) return [];
-    const hideoutStationList = hideoutStations.value as HideoutStation[];
-    if (activePrimaryView.value === 'available') {
-      return filterAndSortStations(hideoutStationList, 'available');
-    }
-    if (activePrimaryView.value === 'maxed') {
-      return filterAndSortStations(hideoutStationList, 'maxed');
-    }
-    if (activePrimaryView.value === 'locked') {
-      return filterAndSortStations(hideoutStationList, 'locked');
-    }
-    return filterAndSortStations(hideoutStationList);
+    return stationsForView(hideoutStations.value as HideoutStation[], activePrimaryView.value);
   });
   return {
     activePrimaryView,
     isStoreLoading,
     visibleStations,
     stationCounts,
+    stationsForView,
   };
 }

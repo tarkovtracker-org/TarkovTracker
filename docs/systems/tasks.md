@@ -26,6 +26,39 @@ highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).
 
+## Filters and page settings
+
+Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/`:
+
+- **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): on Tasks and Needed Items, a
+  toolbar button showing the active count opens everything that changes _which_ items show. Its
+  Reset clears every saved filter, including ones idle in the current view. Hideout has no Filters
+  menu: its station status tabs stay in the toolbar, and its display and prerequisite switches live
+  in the Settings drawer.
+- **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
+  current view. Clear all, shown when there are several, clears only those visible filters. A
+  filter that cannot apply to the current view gets no chip and does not count: team-shared off the
+  whole team's Available tab, map-only filters off Maps, and the Kappa-only filter on the Hideout
+  scope, where it is disabled.
+- **Settings** (`SettingsButton`, `SettingsDrawer`, `PreferenceSettingGroups`): how items _look or
+  behave_. Tasks and Hideout keep a drawer, docked beside the content on wide screens and an overlay
+  otherwise (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
+  toolbar view controls.
+- Navigation stays outside both menus: task status tabs and the team view selector on Tasks, and
+  the All, Tasks and Hideout scope tabs on Needed Items.
+- **Sort** (`SortControl`): the sort select plus a direction button.
+
+Task types (`useTaskContentFilters`) are additive: a task shows when it belongs to any selected type.
+An empty saved selection already means every type, so the last selected type stays locked on. Card
+display, status tab visibility and behavior preferences live in `useTaskDisplaySettings`; the
+failed-task repair action shows under Behavior only while failed tasks exist. The Hideout drawer's
+switches are read-only while the help tour points at it. Hideout always lists stations whose next
+level has its station, skill and trader prerequisites met first (item requirements do not count),
+keeping upstream order within each group, so it has no sort setting. Maxed cards already show only
+"Max station level reached", so there is no page-wide collapse setting either; each card keeps its
+own collapse toggle. The drawer holds only the availability requirements. The legacy
+`hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
+
 ## Canonical task progression
 
 ### Server-side start requirements

@@ -114,8 +114,6 @@ vi.mock('pinia', async () => {
 });
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
-    hideoutCollapseCompleted: false,
-    hideoutSortReadyFirst: false,
     hideoutRequireStationLevels: false,
     hideoutRequireSkillLevels: false,
     hideoutRequireTraderLoyalty: false,
@@ -221,7 +219,9 @@ describe('hideout page', () => {
     expect(wrapper.get('[data-testid="hideout-view-switcher"]').text()).toContain(
       'COMMON.AVAILABLE'
     );
-    expect(wrapper.get('[data-testid="hideout-filter-actions"]').text()).toContain('SETTINGS');
+    expect(wrapper.get('[data-testid="hideout-filter-actions"]').text()).toContain(
+      'common.settings'
+    );
   });
   it('renders the settings drawer as a docked side rail on desktop', async () => {
     breakpointState.value = true;
@@ -280,13 +280,13 @@ describe('hideout page', () => {
     });
     const settingsButton = wrapper.find('[data-help-target="hideout-settings-button"]');
     expect(settingsButton.exists()).toBe(true);
-    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.attributes('aria-expanded')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');
     expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
     hideoutSettingsDrawerState.value = false;
     await nextTick();
-    expect(settingsButton.attributes('aria-pressed')).toBe('false');
-    expect(settingsButton.classes()).toContain('text-surface-400');
+    expect(settingsButton.attributes('aria-expanded')).toBe('false');
+    expect(settingsButton.classes()).toContain('text-surface-200');
     expect(settingsButton.classes()).not.toContain('light:text-surface-50');
     expect(settingsButton.classes()).not.toContain('light:bg-surface-700/70');
     wrapper.unmount();
