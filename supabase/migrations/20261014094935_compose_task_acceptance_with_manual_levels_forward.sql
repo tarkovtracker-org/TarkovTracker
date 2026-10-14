@@ -91,7 +91,7 @@ BEGIN
     ELSIF new_timestamp <= old_timestamp
       AND old_entry->'complete' IS DISTINCT FROM 'true'::jsonb
       AND old_entry->'failed' IS DISTINCT FROM 'true'::jsonb THEN
-      task_entry := task_entry || jsonb_build_object('active', old_entry->'active');
+      task_entry := jsonb_set(task_entry, '{active}', old_entry->'active');
     END IF;
     tasks := jsonb_set(tasks, ARRAY[task_id], task_entry);
   END LOOP;
