@@ -116,12 +116,17 @@ export function useTaskNotification(): TaskNotificationReturn {
   type UndoContext = {
     event: TaskActionPayload;
     task: Task | undefined;
-    wasActive: boolean;
+    previousAcceptance: boolean | undefined;
     releaseStoryObjectives: () => void;
   };
-  const restoreTaskAcceptance = ({ event, wasActive }: UndoContext) => {
-    if (wasActive) tarkovStore.setTaskActive(event.taskId);
+  const restoreTaskAcceptance = ({ event, previousAcceptance }: UndoContext) => {
+    if (previousAcceptance === undefined) tarkovStore.setTaskAcceptanceUnknown(event.taskId);
+    else if (previousAcceptance) tarkovStore.setTaskActive(event.taskId);
     else tarkovStore.setTaskUncompleted(event.taskId);
+  };
+  const previousAcceptance = (taskId: string): boolean | undefined => {
+    const active = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]?.active;
+    return typeof active === 'boolean' ? active : undefined;
   };
   const showUndoStatus = ({ event }: UndoContext, statusKey: string) => {
     updateTaskStatus(statusKey, event.taskName);
@@ -133,7 +138,7 @@ export function useTaskNotification(): TaskNotificationReturn {
   const undoHandlers: Partial<Record<TaskActionPayload['action'], (context: UndoContext) => void>> =
     {
       active: (context) => {
-        tarkovStore.setTaskUncompleted(context.event.taskId);
+        restoreTaskAcceptance(context);
         context.releaseStoryObjectives();
         showUndoStatus(context, 'page.tasks.questcard.undo_active');
       },
@@ -187,7 +192,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     if (!handler) return;
     const context: UndoContext = {
       event,
-      wasActive: tarkovStore.isTaskActive(event.taskId),
+      previousAcceptance: previousAcceptance(event.taskId),
       task: tasks.value.find((task) => task.id === event.taskId),
       releaseStoryObjectives: () =>
         releaseRecordedStoryObjectives({

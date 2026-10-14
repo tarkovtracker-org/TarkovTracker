@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { reactive, watch } from 'vue';
 import {
   actions,
   getters,
@@ -7,6 +8,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
@@ -78,6 +80,69 @@ describe('progressState getters task completion compatibility', () => {
   });
 });
 describe('progressState task lifecycle', () => {
+  it.each([
+    { previous: 5000, confirmation: undefined, expected: 5001 },
+    { previous: 9000, confirmation: 8000, expected: 9001 },
+    { previous: 5000, confirmation: 10000, expected: 10001 },
+    {
+      previous: 5000,
+      confirmation: MAX_CONFIRMATION_TIMESTAMP,
+      expected: MAX_CONFIRMATION_TIMESTAMP,
+    },
+  ])(
+    'restores unknown acceptance atomically after clocks $previous/$confirmation',
+    ({ previous, confirmation, expected }) => {
+      const state = reactive(
+        createStateWithTaskCompletion({
+          active: true,
+          complete: false,
+          failed: false,
+          timestamp: previous,
+        })
+      );
+      if (confirmation !== undefined)
+        state.pvp.taskAvailability = {
+          'task-1': { timestamp: confirmation, requirements: 'gate' },
+        };
+      const observed: Array<{ active: boolean | undefined; timestamp: number | undefined }> = [];
+      const stop = watch(
+        () => state.pvp.taskCompletions['task-1'],
+        (row) => observed.push({ active: row?.active, timestamp: row?.timestamp }),
+        { flush: 'sync' }
+      );
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        actions.setTaskAcceptanceUnknown.call(state, 'task-1');
+        expect(state.pvp.taskCompletions['task-1']).not.toHaveProperty('active');
+        expect(observed).toEqual([{ active: undefined, timestamp: expected }]);
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it('rejects unknown restoration at a saturated status clock without mutating it', () => {
+    const state = reactive(
+      createStateWithTaskCompletion({
+        active: true,
+        complete: false,
+        failed: false,
+        timestamp: MAX_CONFIRMATION_TIMESTAMP,
+      })
+    );
+    const original = state.pvp.taskCompletions['task-1'];
+    const observed = vi.fn();
+    const stop = watch(() => state.pvp.taskCompletions['task-1'], observed, { flush: 'sync' });
+    try {
+      expect(() => actions.setTaskAcceptanceUnknown.call(state, 'task-1')).toThrow(
+        'Task acceptance clock cannot advance'
+      );
+      expect(state.pvp.taskCompletions['task-1']).toBe(original);
+      expect(observed).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
+  });
   it('writes canonical active, completed, failed, and neutral states', () => {
     const state = createBaseState();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);

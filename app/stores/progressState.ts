@@ -385,6 +385,18 @@ export const actions = {
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
   },
+  setTaskAcceptanceUnknown(this: UserState, taskId: string) {
+    const data = getCurrentData(this);
+    const previous = data.taskCompletions[taskId];
+    const previousTimestamp = previous?.timestamp ?? 0;
+    const timestamp = nextClock(previousTimestamp, data.taskAvailability?.[taskId]?.timestamp ?? 0);
+    // A newer unknown write must beat the server's equal-time acceptance carry.
+    if (timestamp <= previousTimestamp) throw new Error('Task acceptance clock cannot advance');
+    const restored = { ...previous, ...createCompletion(false, false, false, false), timestamp };
+    delete restored.active;
+    // Replace atomically so sync observers never see an intermediate active: false.
+    data.taskCompletions[taskId] = restored;
+  },
   setTaskUncompleted(this: UserState, taskId: string) {
     setTaskStatus(this, taskId, createCompletion(false, false, false, false));
   },

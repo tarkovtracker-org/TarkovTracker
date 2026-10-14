@@ -319,7 +319,6 @@ export function useTaskActions(
   const markTaskActive = () => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
-    tarkovStore.setTaskActive(currentTask.id);
     const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
     emitAction({
       taskId: currentTask.id,
@@ -329,6 +328,7 @@ export function useTaskActions(
       statusKey: 'page.tasks.questcard.status_active',
       recordedStoryObjectives,
     });
+    tarkovStore.setTaskActive(currentTask.id);
   };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();

@@ -141,6 +141,15 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('registers acceptance undo before changing the task state', async () => {
+    const task: Task = { id: 'accept-order', name: 'Accept order' };
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    onAction.mockImplementation(() => {
+      expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+    });
+    actions.markTaskActive();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+  });
   it('accepts an available task as explicitly active', async () => {
     const task: Task = { id: 'task-active', name: 'Task Active' };
     const { actions, onAction, tarkovStore } = await setup(task, [task], {});
