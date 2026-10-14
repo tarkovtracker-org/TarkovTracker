@@ -1,0 +1,94 @@
+name: Review Admission
+# Only trusted events publish. Candidate review/queue events use the separate read-only signal.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: [Review Admission Signal]
+    types: [completed]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number to recheck
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: review-admission-publication
+  queue: max
+  cancel-in-progress: false
+jobs:
+  admission:
+    name: Review admission controller
+    if: >-
+      (github.event_name == 'pull_request_target' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) ||
+      (github.event_name == 'workflow_run' && contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group", "check_suite"]'), github.event.workflow_run.event) && github.event.workflow_run.repository.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: review-admission
+    env:
+      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted admission policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Evaluate current immutable review evidence
+        id: evaluate
+        env:
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { runReviewAdmission } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core });
+            await runReviewAdmission({ github: publisher, context, core });
+      - name: Upload exact-head admission receipt
+        if: success() && steps.evaluate.outputs.admission_sha != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: review-admission-${{ steps.evaluate.outputs.admission_sha }}
+          path: review-admission-evidence/${{ steps.evaluate.outputs.admission_sha }}.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+      - name: Upload current queue admission receipt
+        if: success() && steps.evaluate.outputs.queue_sha != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: review-admission-${{ steps.evaluate.outputs.queue_sha }}
+          path: review-admission-evidence/${{ steps.evaluate.outputs.queue_sha }}.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+      - name: Publish verified admission after evidence upload
+        if: success() && steps.evaluate.outputs.admission_sha != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ADMISSION_SHA: ${{ steps.evaluate.outputs.admission_sha }}
+          QUEUE_SHA: ${{ steps.evaluate.outputs.queue_sha }}
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+        with:
+          script: |
+            const { publishReviewScope } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core });
+            await publishReviewScope({ github: publisher, context, head: process.env.ADMISSION_SHA, queued: process.env.QUEUE_SHA });

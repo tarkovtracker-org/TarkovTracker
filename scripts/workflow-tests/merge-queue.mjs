@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-import { queueRevision, requireQueueCi } from '../preview/merge-queue.mjs';
 import { resolveProfileOutputs } from '../preview/build-profile.mjs';
+import { queueRevision, requireQueueCi } from '../preview/merge-queue.mjs';
+import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const tree = 'c'.repeat(40);
@@ -111,7 +111,7 @@ test('queue builds use anonymous preview settings, not production identifiers', 
 });
 test('queue workflow runs full validation and retains existing merge protections during rollout', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  assert.match(ci, /merge_group:\n    types: \[checks_requested\]/);
+  assert.match(ci, /merge_group:\n {4}types: \[checks_requested\]/);
   const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
   assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
   assert.match(classify, /BASE_SHA:.*github.event.merge_group.base_sha/);
@@ -124,9 +124,12 @@ test('queue workflow runs full validation and retains existing merge protections
   assert.deepEqual(staged.bypass_actors, []);
   assert.equal(staged.rules[1].parameters.grouping_strategy, 'ALLGREEN');
   assert.equal(staged.rules[1].parameters.max_entries_to_build, 1);
-  assert.deepEqual(
-    staged.rules[0].parameters.required_status_checks,
-    JSON.parse(readFileSync('.github/main-ci-ruleset.json', 'utf8')).rules[0].parameters
-      .required_status_checks
-  );
+  assert.equal(staged.rules[2].type, 'pull_request');
+  assert.equal(staged.rules[2].parameters.required_review_thread_resolution, true);
+  assert.equal(staged.rules[2].parameters.required_approving_review_count, 0);
+  assert.deepEqual(staged.rules[0].parameters.required_status_checks, [
+    ...JSON.parse(readFileSync('.github/main-ci-ruleset.json', 'utf8')).rules[0].parameters
+      .required_status_checks,
+    { context: 'Review Admission', integration_id: 0 },
+  ]);
 });

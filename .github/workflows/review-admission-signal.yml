@@ -1,0 +1,23 @@
+name: Review Admission Signal
+# Candidate event definitions have no write permissions and never publish admission.
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  merge_group:
+    types: [checks_requested]
+  check_suite:
+    types: [completed]
+permissions: {}
+jobs:
+  signal:
+    name: Admission signal
+    if: >-
+      contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group"]'), github.event_name) ||
+      (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id))
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Notify trusted admission controller
+        run: 'true'

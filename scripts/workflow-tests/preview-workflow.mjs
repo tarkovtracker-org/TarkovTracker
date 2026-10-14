@@ -119,7 +119,10 @@ test('preview controller runs trusted code only and isolates credentials per job
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /request_comment_id:/);
   for (const trustedWorkflow of [workflow, stateWorkflow])
     assert.match(trustedWorkflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(
+    workflow,
+    /group: pages-preview-lifecycle\n {2}queue: max\n {2}cancel-in-progress: false/
+  );
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
   assert.match(
     jobBlock(workflow, 'result'),

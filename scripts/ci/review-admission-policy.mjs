@@ -1,0 +1,178 @@
+// This policy is loaded from trusted main, never from a candidate checkout.
+export const CONTEXT = 'Review Admission';
+export const SHA = /^[0-9a-f]{40}$/;
+const PROVIDERS = Object.freeze([
+  {
+    name: 'CodeRabbit',
+    botId: 136622811,
+    appId: 347564,
+    summary: /\*\*Actionable comments posted: \d+\*\*/,
+  },
+  {
+    name: 'Cubic',
+    botId: 191113872,
+    appId: 1082092,
+    summary: /<!-- cubic:review-summary:start -->[\s\S]+<!-- cubic:review-summary:end -->/,
+  },
+]);
+class AdmissionDenied extends Error {}
+export class AdmissionPending extends Error {}
+export function requireEvidence(condition, message) {
+  if (!condition) throw new AdmissionDenied(message);
+}
+const SENSITIVE_PATH =
+  /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|SECURITY)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
+const LOW_RISK_PATH =
+  /^(?:docs\/|app\/locales\/|app\/(?:components|pages|features|layouts|assets)\/|(?:app|scripts)\/.*(?:\.test\.[cm]?[jt]s|\.spec\.[cm]?[jt]s)$|scripts\/workflow-tests\/)/;
+const SENSITIVE_PATCH =
+  /(?:supabase|stripe|service.role|secret|credential|authorization|authentication|permission|access.check|session|process\.env|runtimeConfig|localStorage|indexedDB|persist|defineEventHandler|fetch\(|\$fetch\(|https?:\/\/)/i;
+function ordinaryFile(file) {
+  if (SENSITIVE_PATH.test(file.filename)) return false;
+  if (!LOW_RISK_PATH.test(file.filename)) return false;
+  return ordinaryPatch(file);
+}
+function ordinaryPatch(file) {
+  if (!file.patch) return false;
+  if (/^(docs\/|app\/locales\/)/.test(file.filename)) return true;
+  return !SENSITIVE_PATCH.test(file.patch);
+}
+export function classifyRisk(files, metadataSafe = false) {
+  requireEvidence(Array.isArray(files), 'Changed files must be a list.');
+  requireEvidence(files.length > 0, 'Complete changed files are required.');
+  if (metadataSafe && files.every(safeMetadataFile))
+    return { sensitive: false, paths: files.map((file) => file.filename) };
+  const names = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
+  const sensitive = files.some((file) => !ordinaryFile(file));
+  const renamedSensitive = names.some((name) => SENSITIVE_PATH.test(name));
+  const large = largeRuntimeDiff(files);
+  return { sensitive: [sensitive, renamedSensitive, large].some(Boolean), paths: names };
+}
+function safeMetadataFile(file) {
+  return [
+    file.status === 'modified',
+    !file.previous_filename,
+    ['package.json', 'pnpm-lock.yaml', 'CHANGELOG.md'].includes(file.filename),
+  ].every(Boolean);
+}
+function largeRuntimeDiff(files) {
+  if (files.every((file) => /^(docs\/|app\/locales\/)/.test(file.filename))) return false;
+  return files.reduce((sum, file) => sum + file.changes, 0) > 200;
+}
+function latestReviews(reviews) {
+  const latest = new Map();
+  for (const review of reviews) keepLatestReview(latest, review);
+  return [...latest.values()];
+}
+function keepLatestReview(latest, review) {
+  if (!['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(review.state)) return;
+  const old = latest.get(review.user.id);
+  if (!old || review.id > old.id) latest.set(review.user.id, review);
+}
+function providerReview(review, provider, head) {
+  return [
+    review.user?.id === provider.botId,
+    review.user?.type === 'Bot',
+    review.commit_id === head,
+    ['APPROVED', 'COMMENTED'].includes(review.state),
+    Boolean(review.submitted_at),
+    provider.summary.test(review.body ?? ''),
+  ].every(Boolean);
+}
+function providerChecks(checks, provider, head) {
+  const own = checks.filter((check) => check.app?.id === provider.appId);
+  return own.every((check) =>
+    [
+      check.head_sha === head,
+      check.status === 'completed',
+      ['success', 'neutral'].includes(check.conclusion),
+    ].every(Boolean)
+  );
+}
+function zeroOutsideFindings(review, provider) {
+  if (provider.name === 'Cubic')
+    return /\*\*(?:0 issues found|All reported issues were addressed)/.test(review.body ?? '');
+  // Findings outside the diff have no resolvable GitHub thread; require a clean re-review.
+  return /Actionable comments posted: 0\*\*/.test(review.body ?? '');
+}
+function completedProvider(reviews, checks, head, provider) {
+  const review = reviews.findLast((item) => providerReview(item, provider, head));
+  if (!review) return null;
+  if (
+    ![providerChecks(checks, provider, head), zeroOutsideFindings(review, provider)].every(Boolean)
+  )
+    return null;
+  return { provider: provider.name, reviewId: review.id, commit: head };
+}
+function verifiedProvider(reviews, checks, head) {
+  return PROVIDERS.map((provider) => completedProvider(reviews, checks, head, provider)).find(
+    Boolean
+  );
+}
+function approvedHuman(review, head, authorId, trusted) {
+  return [
+    review.state === 'APPROVED',
+    review.commit_id === head,
+    review.user.type === 'User',
+    review.user.id !== authorId,
+    trusted.has(review.user.login),
+  ].every(Boolean);
+}
+function explicitComment(comment, head, trusted) {
+  return [
+    comment.user.type === 'User',
+    trusted.has(comment.user.login),
+    comment.body.trim() === `/approve-sensitive ${head}`,
+    !comment.body.includes('\n'),
+  ].every(Boolean);
+}
+function requireReady(pr) {
+  requireEvidence(SHA.test(pr.head.sha), 'PR head must be immutable.');
+  requireEvidence(pr.state === 'open' && !pr.draft, 'PR must be open and ready.');
+}
+function requireFindingsResolved(threads, reviews) {
+  requireEvidence(
+    !threads.some((thread) => !thread.isResolved && !thread.isOutdated),
+    'Unresolved review findings remain.'
+  );
+  requireEvidence(
+    !reviews.some((review) => review.state === 'CHANGES_REQUESTED'),
+    'Changes requested remain.'
+  );
+}
+function requireSensitiveApproval(sensitive, human, approval) {
+  if (!sensitive) return;
+  requireEvidence(
+    Boolean(human || approval),
+    'Sensitive or unclassified change needs exact-head collaborator approval.'
+  );
+}
+function approvalId(human, approval) {
+  if (human) return human.id;
+  return approval?.id ?? null;
+}
+function reviewedHead(input, latest) {
+  const { pr, checks, trusted, reviews } = input;
+  const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
+  const provider = verifiedProvider(reviews, checks, pr.head.sha);
+  requireEvidence(
+    Boolean(provider || human),
+    'Completed exact-head independent review is required.'
+  );
+  return { human, provider };
+}
+export function admissionDecision(input) {
+  const { pr, files, threads, comments, trusted, reviews } = input;
+  requireReady(pr);
+  const latest = latestReviews(reviews);
+  requireFindingsResolved(threads, latest);
+  const { human, provider } = reviewedHead(input, latest);
+  const risk = classifyRisk(files, [input.dependencySafe, input.releaseSafe].some(Boolean));
+  const approval = comments.findLast((comment) => explicitComment(comment, pr.head.sha, trusted));
+  requireSensitiveApproval(risk.sensitive, human, approval);
+  return {
+    approved: true,
+    risk: risk.sensitive ? 'sensitive' : 'low',
+    review: provider ?? { provider: 'human', reviewId: human.id, commit: pr.head.sha },
+    sensitiveApprovalId: approvalId(human, approval),
+  };
+}

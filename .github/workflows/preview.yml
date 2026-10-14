@@ -25,11 +25,12 @@ on:
         description: Exact CI attempt selected by the trusted requester.
         required: false
         type: string
-# Repeated requests for the same CI run replace an older attempt. Late results are also rejected
-# by revision checks.
+# Deployment, smoke/result jobs and retention share one lifecycle lock. Stale revisions still
+# fail their identity checks; queue:max preserves pending requests for other PRs.
 concurrency:
-  group: preview-${{ inputs.run_id }}
-  cancel-in-progress: true
+  group: pages-preview-lifecycle
+  queue: max
+  cancel-in-progress: false
 permissions:
   contents: read
 env:
@@ -144,6 +145,7 @@ jobs:
               destination: `${process.env.RUNNER_TEMP}/preview-dist`,
             });
             core.setOutput('head_sha', manifest.headSha);
+            core.setOutput('source_ci_run_id', decision.runId);
             core.setOutput('digest', manifest.digest);
             core.setOutput('preview_branch', manifest.previewBranch);
       - name: Upload verified output to the Pages preview environment
@@ -154,6 +156,7 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
           PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
           HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+          SOURCE_CI_RUN_ID: ${{ steps.verify.outputs.source_ci_run_id }}
         run: |
           set -euo pipefail
           case "$PREVIEW_BRANCH" in
@@ -168,7 +171,7 @@ jobs:
             --project-name tarkovtracker \
             --branch "$PREVIEW_BRANCH" \
             --commit-hash "$HEAD_SHA" \
-            --commit-message "Actions preview for $HEAD_SHA" \
+            --commit-message "Actions preview for $HEAD_SHA CI $SOURCE_CI_RUN_ID controller $GITHUB_RUN_ID" \
             --commit-dirty=true
       - name: Verify deployment record
         id: verify-deployment

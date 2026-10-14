@@ -242,6 +242,41 @@ documented compatibility window, the window
 applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
 the accepting aggregator version ships in the same change that activates the job.
 
+### Queue preview retention
+
+`.github/workflows/preview-retention.yml` uses trusted main and the protected `preview`
+environment. It runs hourly in dry-run mode until the separately approved environment variable
+`PREVIEW_QUEUE_RETENTION_ENABLED=true` enables bounded cleanup. Manual `apply=true` additionally
+requires a current maintainer. No production, normal PR, unknown or pre-lock deployment is eligible.
+
+The complete Preview workflow and retention share `pages-preview-lifecycle` with
+`queue: max` and `cancel-in-progress: false`. Upload, smoke and authoritative result publication
+cannot overlap cleanup; pending requests are retained up to GitHub's queue bound. The uploader
+records the exact source CI and controller run IDs in immutable Pages deployment metadata.
+Cleanup authenticates those runs and the controller's historical workflow lock, not a branch
+prefix alone. Older deployments without that evidence stay retained.
+
+Deletion requires a preview record at least 48 hours old, a completed same-repository queue CI
+run, exact recomputed SHA/alias identity, an absent original ref, no re-formed live alias, no
+pending Preview jobs, and a terminal bot-created Preview Result. It rechecks the live project,
+deployment identity, refs and pending jobs immediately before each deletion. Canonical production
+and latest project deployments are always protected. API errors, unknown or incomplete protection
+evidence fail closed; lifecycle validation is mandatory before applying.
+
+Pages discovery uses supported 25-record pages and rotates through at most 40 history pages per
+hour plus a metadata request. The window is explicitly partial; absence from it never authorizes
+deletion. Fifty-candidate batches rotate across traversal cycles, and each run permits at most
+10 deletions. Complete bounded GitHub protection evidence remains mandatory. This handles large
+historical projects without repeatedly scanning only new records or silently truncating evidence.
+Dry-run reports include the discovery window, candidates, retained reasons and deletion budget.
+
+GitHub supports `queue: max` before the pinned actionlint parser recognizes it.
+`scripts/ci/actionlint-queue.mjs` strictly validates only the known serialization blocks before
+blanking that field for native lint input. It retains line numbers and every other native
+schema, expression and shell check; unsupported values or changed lock/cancellation settings fail.
+
+Live activation/canary and rollback remain gated by [merge queue rollout](../merge-queue-rollout.md).
+
 ### Opt-in finalization shadow
 
 `.github/workflows/finalization-shadow.yml` is a non-authoritative rehearsal of a late build.

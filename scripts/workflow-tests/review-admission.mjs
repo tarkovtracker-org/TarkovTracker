@@ -1,0 +1,1475 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { generateKeyPairSync, verify } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+const { admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
+  await import('../ci/review-admission-api.mjs');
+const { readAdmissionArchive, requireReviewAdmission } =
+  await import('../ci/review-admission-binding.mjs');
+const { safeDependencyManifests, dependencyEligibility } =
+  await import('../ci/review-admission-dependencies.mjs');
+const { releaseAssetsEligibility, safeReleaseManifest, requireReleaseSource } =
+  await import('../ci/review-admission-release.mjs');
+const { AdmissionPending, admissionDecision, classifyRisk } =
+  await import('../ci/review-admission-policy.mjs');
+const { createReviewPublisher, publisherConfig, requireReceiptIssuer } =
+  await import('../ci/review-admission-issuer.mjs');
+const { safeLockfileChange } = await import('../ci/review-admission-lock.mjs');
+const { evaluateAdmission, publishReviewAdmission, publishReviewScope, runReviewAdmission } =
+  await import('../ci/review-admission.mjs');
+const head = 'a'.repeat(40);
+const base = 'b'.repeat(40);
+const queued = 'c'.repeat(40);
+const repo = { owner: 'example', repo: 'repo' };
+function fixture() {
+  return {
+    pr: {
+      number: 1,
+      changed_files: 1,
+      state: 'open',
+      draft: false,
+      user: { id: 3 },
+      head: { sha: head, ref: 'fix', repo: { full_name: 'example/repo' } },
+      base: { sha: base, ref: 'main', repo: { full_name: 'example/repo' } },
+    },
+    files: [{ filename: 'app/components/TaskButton.vue', changes: 2, patch: '-old\n+new' }],
+    reviews: [
+      {
+        id: 10,
+        user: { id: 191113872, type: 'Bot' },
+        commit_id: head,
+        state: 'COMMENTED',
+        submitted_at: '2026-10-14T00:00:00Z',
+        body: '<!-- cubic:review-summary:start -->**0 issues found**<!-- cubic:review-summary:end -->',
+      },
+    ],
+    threads: [],
+    comments: [],
+    checks: [],
+    trusted: new Set(['maintainer']),
+  };
+}
+function human(state = 'APPROVED', change = {}) {
+  return {
+    id: 20,
+    state,
+    commit_id: head,
+    user: { id: 7, login: 'maintainer', type: 'User' },
+    ...change,
+  };
+}
+test('only completed authenticated exact-head provider review admits ordinary fixes', () => {
+  assert.equal(admissionDecision(fixture()).risk, 'low');
+  for (const change of [
+    { commit_id: base },
+    { body: '' },
+    { body: '<!-- cubic:review-summary:start -->Review skipped<!-- cubic:review-summary:end -->' },
+    { state: 'PENDING' },
+    { submitted_at: null },
+    { user: { id: 55, type: 'Bot' } },
+  ]) {
+    const f = fixture();
+    f.reviews = [{ ...f.reviews[0], ...change }];
+    assert.throws(() => admissionDecision(f));
+  }
+  const f = fixture();
+  f.reviews = [];
+  f.checks = [{ status: 'completed', conclusion: 'success' }];
+  assert.throws(() => admissionDecision(f));
+});
+test('provider check app identity and exact-head completion cannot be substituted', () => {
+  for (const change of [
+    { head_sha: base },
+    { status: 'in_progress' },
+    { conclusion: 'failure' },
+    { conclusion: 'skipped' },
+  ]) {
+    const f = fixture();
+    f.checks = [
+      {
+        app: { id: 1082092 },
+        head_sha: head,
+        status: 'completed',
+        conclusion: 'success',
+        ...change,
+      },
+    ];
+    assert.throws(() => admissionDecision(f));
+  }
+});
+test('CodeRabbit empty inline replies and unresolved outside findings are not completion', () => {
+  const f = fixture();
+  f.reviews[0].user.id = 136622811;
+  f.reviews[0].body = '**Actionable comments posted: 1**';
+  assert.throws(() => admissionDecision(f));
+  f.reviews[0].body = '**Actionable comments posted: 0**';
+  assert.equal(admissionDecision(f).review.provider, 'CodeRabbit');
+});
+test('unresolved current threads and outstanding changes requested always block', () => {
+  const f = fixture();
+  f.threads = [{ isResolved: false, isOutdated: false }];
+  assert.throws(() => admissionDecision(f));
+  f.threads[0].isOutdated = true;
+  assert.equal(admissionDecision(f).approved, true);
+  f.reviews.push(human('CHANGES_REQUESTED', { commit_id: base }));
+  assert.throws(() => admissionDecision(f));
+  f.reviews.push(human('DISMISSED', { id: 21 }));
+  assert.equal(admissionDecision(f).approved, true);
+});
+test('approval on another revision or by author/non-collaborator cannot admit', () => {
+  for (const change of [
+    { commit_id: base },
+    { user: { id: 3, login: 'maintainer', type: 'User' } },
+    { user: { id: 99, login: 'stranger', type: 'User' } },
+  ]) {
+    const f = fixture();
+    f.reviews = [human('APPROVED', change)];
+    assert.throws(() => admissionDecision(f));
+  }
+});
+test('sensitive paths require human head-bound approval plus independent review', () => {
+  for (const filename of [
+    'supabase/migrations/new.sql',
+    'app/plugins/supabase.client.ts',
+    'app/stores/progressState.ts',
+    'app/pages/account.vue',
+    '.github/workflows/ci.yml',
+    'scripts/ops/prod-db.mjs',
+    'nuxt.config.ts',
+    'workers/contract-tests/client.ts',
+    'unknown/file.js',
+  ]) {
+    const f = fixture();
+    f.files[0].filename = filename;
+    assert.throws(() => admissionDecision(f), filename);
+    f.reviews.push(human());
+    assert.equal(admissionDecision(f).risk, 'sensitive', filename);
+  }
+});
+test('renamed paths, large patches and hidden credential operations remain sensitive', () => {
+  for (const change of [
+    { previous_filename: 'app/pages/account.vue' },
+    { changes: 201 },
+    { patch: '+localStorage.setItem()' },
+    { patch: '+fetch(url)' },
+  ]) {
+    const f = fixture();
+    Object.assign(f.files[0], change);
+    assert.throws(() => admissionDecision(f));
+  }
+});
+test('explicit sensitive command authenticates permission and immutable SHA', () => {
+  const f = fixture();
+  f.files[0].filename = 'supabase/migrations/new.sql';
+  const command = {
+    id: 22,
+    body: `/approve-sensitive ${head}`,
+    user: { id: 7, login: 'maintainer', type: 'User' },
+  };
+  f.comments = [command];
+  assert.equal(admissionDecision(f).sensitiveApprovalId, 22);
+  for (const change of [
+    { body: `/approve-sensitive ${base}` },
+    { user: { type: 'Bot', login: 'maintainer' } },
+    { body: `/approve-sensitive ${head}\n` },
+    { user: { type: 'User', login: 'stranger' } },
+  ]) {
+    f.comments = [{ ...command, ...change }];
+    assert.throws(() => admissionDecision(f));
+  }
+  f.comments = [command];
+  f.reviews = [];
+  assert.throws(() => admissionDecision(f));
+});
+test('draft/closed/no-files candidates fail closed', () => {
+  for (const change of [{ draft: true }, { state: 'closed' }, { head: { sha: 'short' } }]) {
+    const f = fixture();
+    Object.assign(f.pr, change);
+    assert.throws(() => admissionDecision(f));
+  }
+  assert.throws(() => classifyRisk([]));
+});
+test('dependencies permit exact patch/minor only without new packages/scripts or auth clients', () => {
+  const before = {
+    scripts: { test: 'test' },
+    dependencies: { vue: '3.5.1', '@supabase/supabase-js': '2.0.0' },
+    devDependencies: { vitest: '4.0.0' },
+  };
+  const after = structuredClone(before);
+  after.dependencies.vue = '3.6.0';
+  assert.equal(safeDependencyManifests(before, after), true);
+  for (const version of [
+    '4.0.0',
+    '^3.6.0',
+    'https://bad',
+    '3.5.0',
+    '3.6.0-beta',
+    '03.6.0',
+    '3.999999999999999999999.0',
+  ]) {
+    const changed = structuredClone(before);
+    changed.dependencies.vue = version;
+    assert.equal(safeDependencyManifests(before, changed), false, version);
+  }
+  for (const change of [
+    { dependencies: { ...after.dependencies, new: '1.0.0' } },
+    { dependencies: { ...after.dependencies, '@supabase/supabase-js': '2.0.1' } },
+    { scripts: { postinstall: 'exec' } },
+  ])
+    assert.equal(safeDependencyManifests(before, { ...after, ...change }), false);
+});
+function manifestsGithub(before, after) {
+  return {
+    rest: {
+      repos: {
+        getContent: async ({ ref }) => ({
+          data: {
+            type: 'file',
+            encoding: 'base64',
+            size: 200,
+            content: Buffer.from(JSON.stringify(ref === base ? before : after)).toString('base64'),
+          },
+        }),
+      },
+    },
+  };
+}
+function releaseFixture() {
+  const f = fixture();
+  f.pr.user = { id: 41898282, type: 'Bot' };
+  f.pr.head.ref = 'wip/release-1.2.4-123-1';
+  f.files = ['package.json', 'CHANGELOG.md'].map((filename) => ({
+    filename,
+    status: 'modified',
+    changes: 2,
+    patch: 'version notes',
+  }));
+  const before = {
+    version: '1.2.3',
+    private: true,
+    scripts: { build: 'build' },
+    dependencies: { vue: '3.5.1' },
+  };
+  const after = { ...before, version: '1.2.4' };
+  return { f, before, after };
+}
+test('generated own-version release assets admit only canonical bot branch and version-only manifest', async () => {
+  const { f, before, after } = releaseFixture();
+  assert.throws(() => admissionDecision(f)); // Before the narrow metadata proof this is held.
+  f.releaseSafe = await releaseAssetsEligibility(manifestsGithub(before, after), f.pr, f.files);
+  assert.equal(admissionDecision(f).risk, 'low');
+  for (const change of [
+    { dependencies: { vue: '4.0.0' } },
+    { scripts: { postinstall: 'exec' } },
+    { private: false },
+    { version: '1.2.5' },
+  ]) {
+    f.releaseSafe = await releaseAssetsEligibility(
+      manifestsGithub(before, { ...after, ...change }),
+      f.pr,
+      f.files
+    );
+    assert.throws(() => admissionDecision(f));
+  }
+  assert.equal(safeReleaseManifest(before, { ...before, version: '2.0.0' }, '2.0.0'), true);
+  for (const version of ['^1.2.4', '1.2.4-beta', '999999999999999999999.2.4', '01.2.4', '1.2.2'])
+    assert.equal(safeReleaseManifest(before, { ...before, version }, version), false);
+});
+test('release/dependency paths cannot rename sensitive files or add/delete assets into an exception', async () => {
+  const { f, before, after } = releaseFixture();
+  for (const change of [
+    { status: 'renamed', previous_filename: 'supabase/migrations/danger.sql' },
+    { status: 'removed' },
+    { status: 'added' },
+    { previous_filename: 'app/plugins/auth.ts' },
+  ]) {
+    const files = [{ ...f.files[0], ...change }, f.files[1]];
+    assert.equal(
+      await releaseAssetsEligibility(manifestsGithub(before, after), f.pr, files),
+      false
+    );
+    assert.equal(classifyRisk(files, true).sensitive, true);
+    const pr = {
+      ...f.pr,
+      user: { id: 49699333 },
+      head: { ...f.pr.head, ref: 'dependabot/npm_and_yarn/testing-tooling-hash' },
+    };
+    assert.equal(
+      await dependencyEligibility(manifestsGithub(before, after), pr, files.slice(0, 1)),
+      false
+    );
+  }
+});
+test('ordinary metadata, non-bot author, foreign branch and extra executable paths remain held', async () => {
+  const { f, before, after } = releaseFixture();
+  for (const change of [
+    { user: { id: 7, type: 'User' } },
+    { head: { ...f.pr.head, ref: 'fix/release-1.2.4' } },
+    { head: { ...f.pr.head, repo: { full_name: 'fork/repo' } } },
+    { head: { ...f.pr.head, ref: 'wip/release-1.2.4-0-1' } },
+  ])
+    assert.equal(
+      await releaseAssetsEligibility(
+        manifestsGithub(before, after),
+        { ...f.pr, ...change },
+        f.files
+      ),
+      false
+    );
+  assert.equal(
+    await releaseAssetsEligibility(manifestsGithub(before, after), f.pr, [
+      ...f.files,
+      { filename: 'app/plugins/auth.ts', status: 'modified' },
+    ]),
+    false
+  );
+});
+function simpleLock(version = '1.0.0', name = 'ordinary') {
+  return `lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n\nimporters:\n  .:\n    dependencies:\n      ${name}:\n        specifier: ${version}\n        version: ${version}\n\npackages:\n  ${name}@${version}:\n    resolution: {integrity: sha512-AAAA}\n    engines: {node: '>=18'}\n\nsnapshots:\n  ${name}@${version}: {}\n`;
+}
+test('native lock proof admits known ordinary patches and refuses auth, major, edges and controls', () => {
+  const before = simpleLock();
+  const after = simpleLock('1.0.1');
+  assert.equal(safeLockfileChange(before, after), true);
+  for (const next of [
+    simpleLock('2.0.0'),
+    simpleLock('1.0.1', 'jose'),
+    after.replace('autoInstallPeers: true', 'autoInstallPeers: false'),
+    after.replace('sha512-AAAA', 'sha512-AAAA, tarball: https://bad'),
+    after.replace("node: '>=18'", "node: '>=20'"),
+    after.replace('ordinary@1.0.1: {}', 'ordinary@1.0.1: {}\n  ordinary@1.0.1: {}'),
+  ])
+    assert.equal(safeLockfileChange(before, next), false);
+  assert.equal(safeLockfileChange(simpleLock('1.0.0', 'jose'), simpleLock('1.0.1', 'jose')), false);
+  const edges = before.replace(
+    'ordinary@1.0.0: {}',
+    'ordinary@1.0.0:\n    dependencies:\n      leaf: 1.0.0'
+  );
+  assert.equal(safeLockfileChange(edges, edges.replace('leaf: 1.0.0', 'leaf: 2.0.0')), false);
+  assert.equal(safeLockfileChange(edges, edges.replace('leaf: 1.0.0', 'jose: 1.0.1')), false);
+  assert.equal(
+    safeLockfileChange(edges, edges.replace('leaf: 1.0.0', 'leaf: https://registry/pkg/1.0.1')),
+    false
+  );
+  assert.equal(safeLockfileChange(before, 'unclassified lock output'), false);
+});
+test('known ordinary resolution changes work within the complete current PNPM lock including empty snapshots', () => {
+  const before = readFileSync('pnpm-lock.yaml', 'utf8');
+  const after = before
+    .replaceAll('ansi-regex@6.3.0', 'ansi-regex@6.3.1')
+    .replaceAll('ansi-regex: 6.3.0', 'ansi-regex: 6.3.1');
+  assert.notEqual(before, after);
+  assert.equal(safeLockfileChange(before, after), true);
+});
+test('genuine Supabase CLI jose transitive patch remains sensitive with an unchanged manifest', async () => {
+  const after = readFileSync('pnpm-lock.yaml', 'utf8');
+  assert.ok(after.includes('jose@6.2.12'));
+  const before = after
+    .replaceAll('jose@6.2.12', 'jose@6.2.11')
+    .replace(/jose: 6\.2\.12/g, 'jose: 6.2.11')
+    .replace(
+      'sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==',
+      'sha512-A5NPn7g8EAzGU3IzRs+Yiq8K5n3ypYS75M5+KKiVHdUexfpWK1kP4ZMq7QnTGDoMj6TJ1dtcEJjW60yZDXS4hg=='
+    );
+  assert.equal(safeLockfileChange(before, after), false);
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+  const pr = {
+    ...fixture().pr,
+    user: { id: 49699333, type: 'Bot' },
+    head: { ...fixture().pr.head, ref: 'dependabot/npm_and_yarn/remaining-npm-hash' },
+  };
+  const files = [
+    { filename: 'pnpm-lock.yaml', status: 'modified', changes: 8, patch: 'auth patch' },
+  ];
+  const github = {
+    rest: {
+      repos: {
+        getContent: async ({ path, ref }) =>
+          assetData(
+            path === 'package.json' ? JSON.stringify(manifest) : ref === base ? before : after
+          ),
+      },
+    },
+  };
+  assert.equal(await dependencyEligibility(github, pr, files), false);
+  assert.equal(
+    await dependencyEligibility(github, pr, [
+      ...files,
+      { filename: 'pnpm-workspace.yaml', status: 'modified' },
+    ]),
+    false
+  );
+});
+function assetData(text) {
+  return {
+    data: {
+      type: 'file',
+      encoding: 'base64',
+      size: Buffer.byteLength(text),
+      content: Buffer.from(text).toString('base64'),
+    },
+  };
+}
+test('generated version assets cannot join a queue based on newer main; ordinary behind heads remain eligible', async () => {
+  const { f } = releaseFixture();
+  const github = {
+    rest: { git: { getCommit: async () => ({ data: { parents: [{ sha: base }] } }) } },
+  };
+  await requireReleaseSource(github, repo, f.pr, { base_sha: base }, f.files);
+  await assert.rejects(requireReleaseSource(github, repo, f.pr, { base_sha: queued }, f.files));
+  await requireReleaseSource(github, repo, fixture().pr, { base_sha: queued }, fixture().files);
+});
+test('thread pagination is complete and refuses stalled/missing page data', async () => {
+  const pages = [
+    {
+      nodes: Array.from({ length: 100 }, () => ({ isResolved: true })),
+      pageInfo: { hasNextPage: true, endCursor: 'next' },
+    },
+    { nodes: [{ isResolved: false }], pageInfo: { hasNextPage: false } },
+  ];
+  const github = {
+    graphql: async (query, args) => {
+      assert.match(query, /reviewThreads/);
+      return { repository: { pullRequest: { reviewThreads: pages[args.cursor ? 1 : 0] } } };
+    },
+  };
+  assert.equal((await reviewThreads(github, repo, 1)).length, 101);
+  github.graphql = async () => ({
+    repository: { pullRequest: { reviewThreads: { nodes: [], pageInfo: { hasNextPage: true } } } },
+  });
+  await assert.rejects(reviewThreads(github, repo, 1));
+  github.graphql = async () => ({});
+  await assert.rejects(reviewThreads(github, repo, 1));
+});
+function queueFixture() {
+  const pr = fixture().pr;
+  const group = {
+    head_ref: 'refs/heads/gh-readonly-queue/main/pr-1-abcdef',
+    head_sha: queued,
+    base_ref: 'refs/heads/main',
+    base_sha: base,
+  };
+  const state = {
+    ref: queued,
+    main: base,
+    parent: base,
+    status: 'ahead',
+    entry: {
+      position: 1,
+      baseCommit: { oid: base },
+      headCommit: { oid: queued },
+      pullRequest: { number: 1, headRefOid: head },
+      mergeQueue: {
+        configuration: {
+          maximumEntriesToBuild: 1,
+          maximumEntriesToMerge: 1,
+          mergingStrategy: 'ALLGREEN',
+        },
+      },
+    },
+  };
+  const github = {
+    rest: {
+      git: {
+        getRef: async ({ ref }) => ({
+          data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
+        }),
+        getCommit: async () => ({ data: { parents: [{ sha: state.parent }] } }),
+      },
+      repos: { compareCommits: async () => ({ data: { status: state.status } }) },
+    },
+    graphql: async () => ({
+      repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } },
+    }),
+  };
+  return { github, pr, group, state };
+}
+test('queue admission proves live ref, main parent, PR ancestry and exact queued entry', async () => {
+  const f = queueFixture();
+  await queueIdentity(f.github, repo, f.group, f.pr);
+  for (const change of [
+    { ref: head },
+    { main: head },
+    { parent: head },
+    { status: 'diverged' },
+    { entry: null },
+    { entry: { ...f.state.entry, headCommit: { oid: head } } },
+    { entry: { ...f.state.entry, position: 2 } },
+  ]) {
+    const changed = queueFixture();
+    Object.assign(changed.state, change);
+    await assert.rejects(queueIdentity(changed.github, repo, changed.group, changed.pr));
+  }
+  for (const change of [
+    { head_ref: 'refs/heads/main' },
+    { base_ref: 'refs/heads/other' },
+    { head_ref: 'refs/heads/gh-readonly-queue/main/pr-2-abcdef' },
+  ])
+    await assert.rejects(queueIdentity(f.github, repo, { ...f.group, ...change }, f.pr));
+  f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+  await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+});
+function bindingFixture() {
+  const run = {
+    id: 9,
+    run_attempt: 1,
+    repository: { full_name: 'example/repo' },
+    head_branch: 'main',
+    event: 'workflow_run',
+    path: '.github/workflows/review-admission.yml',
+    status: 'completed',
+    conclusion: 'success',
+  };
+  const status = {
+    context: 'Review Admission',
+    state: 'success',
+    creator: { id: 41898282, type: 'Bot' },
+    target_url: 'https://github.com/example/repo/actions/runs/9',
+  };
+  const receipt = {
+    schema: 1,
+    repository: 'example/repo',
+    headSha: head,
+    statusSha: head,
+    approved: true,
+    runId: 9,
+    runAttempt: 1,
+    workflowSourceSha: base,
+    review: { commit: head },
+  };
+  const github = {
+    paginate: async () => [status],
+    rest: {
+      repos: { listCommitStatusesForRef: 'statuses' },
+      actions: { getWorkflowRun: async () => ({ data: run }) },
+    },
+  };
+  return { github, run, status, receipt };
+}
+test('binding rejects spoofed status, untrusted workflow event and stale head/attempt receipts', async () => {
+  const f = bindingFixture();
+  await admissionRun(f.github, repo, head);
+  validateAdmissionReceipt(f.receipt, repo, head, f.run);
+  for (const change of [
+    { state: 'failure' },
+    { creator: { id: 1, type: 'Bot' } },
+    { target_url: 'https://github.com/fork/repo/actions/runs/9' },
+  ]) {
+    const changed = bindingFixture();
+    Object.assign(changed.status, change);
+    await assert.rejects(admissionRun(changed.github, repo, head));
+  }
+  for (const change of [
+    { path: '.github/workflows/other.yml' },
+    { event: 'merge_group' },
+    { event: 'check_suite' },
+    { event: 'workflow_dispatch', head_branch: 'candidate' },
+    { repository: { full_name: 'fork/repo' } },
+    { conclusion: 'failure' },
+    { status: 'in_progress' },
+  ]) {
+    const changed = bindingFixture();
+    Object.assign(changed.run, change);
+    await assert.rejects(admissionRun(changed.github, repo, head));
+  }
+  for (const change of [
+    { approved: false },
+    { headSha: base },
+    { statusSha: base },
+    { runAttempt: 2 },
+    { repository: 'fork/repo' },
+    { review: { commit: base } },
+  ])
+    assert.throws(() => validateAdmissionReceipt({ ...f.receipt, ...change }, repo, head, f.run));
+});
+function archive(receipt, filename = `${head}.json`) {
+  return execFileSync(
+    'python3',
+    [
+      '-c',
+      'import io,json,sys,zipfile; data=json.load(sys.stdin); buffer=io.BytesIO(); archive=zipfile.ZipFile(buffer,"w"); archive.writestr(data["filename"],json.dumps(data["receipt"])); archive.close(); sys.stdout.buffer.write(buffer.getvalue())',
+    ],
+    { input: JSON.stringify({ receipt, filename }) }
+  );
+}
+test('only authenticated pending/missing status or incomplete trusted publisher is retryable', async () => {
+  const absent = bindingFixture();
+  absent.github.paginate = async () => [];
+  await assert.rejects(admissionRun(absent.github, repo, head), AdmissionPending);
+  for (const change of [
+    { status: { state: 'pending' } },
+    { run: { status: 'queued' } },
+    { run: { status: 'in_progress' } },
+  ]) {
+    const f = bindingFixture();
+    Object.assign(f.status, change.status);
+    Object.assign(f.run, change.run);
+    await assert.rejects(admissionRun(f.github, repo, head), AdmissionPending);
+  }
+  for (const change of [
+    { status: { state: 'failure' } },
+    { status: { state: 'error' } },
+    { status: { state: 'pending', creator: { id: 1, type: 'Bot' } } },
+    { run: { status: 'in_progress', path: 'wrong' } },
+    { run: { status: 'completed', conclusion: 'failure' } },
+    { run: { status: 'unexpected' } },
+  ]) {
+    const f = bindingFixture();
+    Object.assign(f.status, change.status);
+    Object.assign(f.run, change.run);
+    await assert.rejects(
+      admissionRun(f.github, repo, head),
+      (error) => !(error instanceof AdmissionPending)
+    );
+  }
+  const f = bindingFixture();
+  f.github.paginate = async () => {
+    throw new Error('API failure');
+  };
+  await assert.rejects(
+    admissionRun(f.github, repo, head),
+    (error) => !(error instanceof AdmissionPending)
+  );
+});
+test('expected dispatch blocks stale green/failure and authenticates the exact completed publisher', async () => {
+  for (const state of ['success', 'failure']) {
+    const f = bindingFixture();
+    f.status.state = state;
+    const expected = { ...f.run, id: 11, event: 'workflow_dispatch', status: 'in_progress' };
+    f.github.rest.actions.getWorkflowRun = async ({ run_id }) => ({
+      data: run_id === 11 ? expected : f.run,
+    });
+    await assert.rejects(admissionRun(f.github, repo, head, 11), AdmissionPending);
+    expected.status = 'completed';
+    expected.conclusion = 'success';
+    await assert.rejects(
+      admissionRun(f.github, repo, head, 11),
+      (error) => !(error instanceof AdmissionPending)
+    );
+    f.status.state = 'success';
+    f.status.target_url = 'https://github.com/example/repo/actions/runs/11';
+    assert.equal((await admissionRun(f.github, repo, head, 11)).id, 11);
+    expected.head_branch = 'candidate';
+    await assert.rejects(
+      admissionRun(f.github, repo, head, 11),
+      (error) => !(error instanceof AdmissionPending)
+    );
+  }
+});
+test('binding consumes exact JSON artifact and rejects missing/untrusted/ambiguous provenance', async () => {
+  const f = bindingFixture();
+  const zip = archive(f.receipt);
+  f.github.paginate = async (endpoint) =>
+    endpoint === 'statuses'
+      ? [f.status]
+      : [
+          {
+            id: 2,
+            name: `review-admission-${head}`,
+            expired: false,
+            size_in_bytes: zip.byteLength,
+          },
+        ];
+  Object.assign(f.github.rest.actions, {
+    listWorkflowRunArtifacts: 'artifacts',
+    downloadArtifact: async () => ({ data: zip }),
+  });
+  f.github.rest.repos.compareCommits = async () => ({ data: { status: 'ahead' } });
+  assert.equal((await requireReviewAdmission({ github: f.github, repo, head })).approved, true);
+  f.github.rest.repos.compareCommits = async () => ({ data: { status: 'diverged' } });
+  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head }));
+  await assert.rejects(readAdmissionArchive(archive(f.receipt, 'wrong.json'), head));
+  await assert.rejects(readAdmissionArchive(Buffer.from('not a zip'), head));
+  f.github.paginate = async (endpoint) => (endpoint === 'statuses' ? [f.status] : []);
+  await assert.rejects(requireReviewAdmission({ github: f.github, repo, head }));
+});
+function publishingFixture() {
+  const f = fixture();
+  const statuses = [];
+  const github = {
+    reviewAdmissionIssuer: {
+      appId: 15368,
+      botId: 41898282,
+      installationId: null,
+      queueAllowed: false,
+    },
+    paginate: async (endpoint) => f[endpoint],
+    graphql: async () => ({
+      repository: {
+        pullRequest: { reviewThreads: { nodes: f.threads, pageInfo: { hasNextPage: false } } },
+      },
+    }),
+    rest: {
+      pulls: { get: async () => ({ data: f.pr }), listFiles: 'files', listReviews: 'reviews' },
+      issues: { listComments: 'comments' },
+      checks: { listForRef: 'checks' },
+      repos: {
+        getCollaboratorPermissionLevel: async () => ({ data: { permission: 'write' } }),
+        createCommitStatus: async (data) => {
+          statuses.push(data);
+        },
+      },
+    },
+  };
+  return { f, github, statuses, context: { repo, runId: 9, serverUrl: 'https://github.com' } };
+}
+function breakPublication(f, mode) {
+  if (mode === 'files') f.f.pr.changed_files = 2;
+  if (mode === 'api')
+    f.github.paginate = async () => {
+      throw new Error('tool failure');
+    };
+  if (mode === 'head') {
+    let count = 0;
+    f.github.rest.pulls.get = async () => ({
+      data: ++count === 1 ? f.f.pr : { ...f.f.pr, head: { sha: base } },
+    });
+  }
+}
+test('publication fails closed on truncation, API errors and live head changes', async () => {
+  for (const mode of ['files', 'api', 'head']) {
+    const f = publishingFixture();
+    breakPublication(f, mode);
+    await assert.rejects(
+      evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base })
+    );
+    assert.equal(f.statuses.at(-1).state, 'failure');
+    assert.ok(!f.statuses.some((status) => status.state === 'success'));
+  }
+});
+async function withReceiptDirectory(check) {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-publication-'));
+  const previous = process.cwd();
+  const attempt = process.env.GITHUB_RUN_ATTEMPT;
+  const gitDirectory = process.env.GIT_DIR;
+  const fixtureGit = execFileSync('git', ['rev-parse', '--absolute-git-dir'], {
+    encoding: 'utf8',
+  }).trim();
+  process.chdir(directory);
+  process.env.GITHUB_RUN_ATTEMPT = '1';
+  process.env.GIT_DIR = fixtureGit;
+  try {
+    await check();
+  } finally {
+    process.chdir(previous);
+    restoreAttempt(attempt);
+    if (gitDirectory === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = gitDirectory;
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+function restoreAttempt(attempt) {
+  if (attempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT;
+  else process.env.GITHUB_RUN_ATTEMPT = attempt;
+}
+test('successful publication records exact receipt while final refreshed findings revoke admission', async () => {
+  await withReceiptDirectory(async () => {
+    const f = publishingFixture();
+    const receipt = await evaluateAdmission({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      source: base,
+    });
+    assert.equal(f.statuses.at(-1).state, 'pending');
+    f.context.payload = { pull_request: { number: 1 } };
+    f.f.artifacts = [{ name: `review-admission-${head}`, expired: false }];
+    f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+    await publishReviewAdmission({ github: f.github, context: f.context, sha: head });
+    assert.equal(f.statuses.at(-1).state, 'success');
+    assert.equal(receipt.headSha, head);
+    assert.equal(receipt.runAttempt, 1);
+    assert.deepEqual(
+      JSON.parse(readFileSync(`review-admission-evidence/${head}.json`, 'utf8')),
+      receipt
+    );
+    const changed = publishingFixture();
+    let count = 0;
+    changed.github.graphql = async () => ({
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: ++count === 1 ? [] : [{ isResolved: false, isOutdated: false }],
+            pageInfo: { hasNextPage: false },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      evaluateAdmission({
+        github: changed.github,
+        context: changed.context,
+        number: 1,
+        source: base,
+      })
+    );
+    assert.equal(changed.statuses.at(-1).state, 'failure');
+  });
+});
+test('publisher cannot turn failed/missing evidence upload into success', async () => {
+  await withReceiptDirectory(async () => {
+    const f = publishingFixture();
+    await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
+    f.context.payload = { pull_request: { number: 1 } };
+    f.f.artifacts = [];
+    f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+    await assert.rejects(
+      publishReviewAdmission({ github: f.github, context: f.context, sha: head })
+    );
+    assert.equal(f.statuses.at(-1).state, 'failure');
+    assert.ok(!f.statuses.some((status) => status.state === 'success'));
+  });
+});
+function signalFixture() {
+  const f = publishingFixture();
+  const run = {
+    id: 2,
+    run_attempt: 1,
+    head_sha: head,
+    status: 'completed',
+    conclusion: 'success',
+    event: 'pull_request_review',
+    path: '.github/workflows/review-admission-signal.yml',
+    repository: { full_name: 'example/repo' },
+  };
+  f.context.eventName = 'workflow_run';
+  f.context.payload = { workflow_run: { ...run } };
+  f.github.rest.actions = {
+    getWorkflowRunAttempt: async () => ({ data: run }),
+    listJobsForWorkflowRunAttempt: 'jobs',
+  };
+  f.f.jobs = [
+    {
+      name: 'Admission signal',
+      head_sha: head,
+      run_id: 2,
+      run_attempt: 1,
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ];
+  return { ...f, run };
+}
+test('controller rejects wrong signal workflow/repository/event/attempt or unsuccessful signal jobs', async () => {
+  for (const change of [
+    { path: '.github/workflows/ci.yml' },
+    { repository: { full_name: 'fork/repo' } },
+    { event: 'workflow_run' },
+    { run_attempt: 2 },
+    { head_sha: base },
+    { conclusion: 'failure' },
+  ]) {
+    const f = signalFixture();
+    Object.assign(f.run, change);
+    await assert.rejects(runReviewAdmission({ github: f.github, context: f.context, core: {} }));
+    assert.equal(f.statuses.length, 0);
+  }
+  const f = signalFixture();
+  f.f.jobs[0].conclusion = 'skipped';
+  await assert.rejects(runReviewAdmission({ github: f.github, context: f.context, core: {} }));
+  assert.equal(f.statuses.length, 0);
+});
+function queuedControlFixture() {
+  const f = publishingFixture();
+  const q = queueFixture();
+  f.github.reviewAdmissionIssuer = {
+    appId: 987654,
+    botId: 987655,
+    installationId: 987656,
+    queueAllowed: true,
+  };
+  f.context.eventName = 'issue_comment';
+  f.context.payload = { action: 'deleted', issue: { number: 1, pull_request: {} } };
+  f.github.rest.git = { ...q.github.rest.git, listMatchingRefs: 'refs' };
+  f.github.rest.repos.compareCommits = q.github.rest.repos.compareCommits;
+  f.f.refs = [{ ref: q.group.head_ref, object: { sha: queued } }];
+  f.github.graphql = async (query) =>
+    query.includes('mergeQueueEntry')
+      ? q.github.graphql()
+      : {
+          repository: {
+            pullRequest: {
+              reviewThreads: { nodes: f.f.threads, pageInfo: { hasNextPage: false } },
+            },
+          },
+        };
+  f.statuses.push({ sha: queued, state: 'success' });
+  return { ...f, q, core: { setOutput: () => {}, notice: () => {} } };
+}
+test('revoked sensitive approval and changes requested invalidate an already-green queue group', async () => {
+  for (const mode of ['approval', 'review']) {
+    const f = queuedControlFixture();
+    if (mode === 'approval') f.f.files[0].filename = 'supabase/migrations/important.sql';
+    else f.f.reviews.push(human('CHANGES_REQUESTED'));
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.equal(f.statuses.filter((status) => status.sha === head).at(-1).state, 'failure');
+    assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'failure');
+  }
+});
+test('healthy PR evidence prepares and publishes separate authenticated head and queue receipts', async () => {
+  await withReceiptDirectory(async () => {
+    const f = queuedControlFixture();
+    const outputs = {};
+    f.core.setOutput = (key, value) => {
+      outputs[key] = value;
+    };
+    await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+    assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+    assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'pending');
+    f.f.artifacts = [head, queued].map((sha) => ({
+      name: `review-admission-${sha}`,
+      expired: false,
+    }));
+    f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+    await publishReviewScope({ github: f.github, context: f.context, head, queued });
+    assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'success');
+    assert.equal(
+      JSON.parse(readFileSync(`review-admission-evidence/${queued}.json`, 'utf8')).headSha,
+      head
+    );
+  });
+});
+test('regression assertions detect reintroduced head-only revocation and manifest-only dependency bypasses', async () => {
+  const scopeMutant = await importMutationSource(
+    'review-admission.mjs',
+    'const shas = [...new Set([pr.head.sha, ...refs.map((ref) => ref.object.sha)])];',
+    'const shas = [pr.head.sha];'
+  );
+  const f = queuedControlFixture();
+  f.f.files[0].filename = 'supabase/migrations/important.sql';
+  await assert.rejects(
+    scopeMutant.runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+  );
+  assert.throws(
+    () =>
+      assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'failure'),
+    assert.AssertionError
+  );
+  const dependencyMutant = await importMutationSource(
+    'review-admission-dependencies.mjs',
+    'return safeLockfileChange(oldLock, newLock);',
+    'return true;'
+  );
+  const pr = {
+    ...fixture().pr,
+    user: { id: 49699333, type: 'Bot' },
+    head: { ...fixture().pr.head, ref: 'dependabot/npm_and_yarn/remaining-npm-hash' },
+  };
+  const manifest = { dependencies: { ordinary: '1.0.0' } };
+  const github = {
+    rest: {
+      repos: {
+        getContent: async ({ path, ref }) =>
+          assetData(
+            path === 'package.json'
+              ? JSON.stringify(manifest)
+              : simpleLock(ref === base ? '6.2.11' : '6.2.12', 'jose')
+          ),
+      },
+    },
+  };
+  const files = [{ filename: 'pnpm-lock.yaml', status: 'modified' }];
+  assert.equal(await dependencyEligibility(github, pr, files), false);
+  assert.equal(await dependencyMutant.dependencyEligibility(github, pr, files), true);
+});
+test('original admission assertions reject reintroduced review, thread and sensitive bypasses', async () => {
+  const original = readFileSync('scripts/ci/review-admission-policy.mjs', 'utf8');
+  const mutations = [
+    {
+      before: 'review.commit_id === head',
+      after: 'true',
+      change: (f) => {
+        f.reviews[0].commit_id = base;
+      },
+    },
+    {
+      before: 'review.user?.id === provider.botId',
+      after: 'true',
+      change: (f) => {
+        f.reviews[0].user.id = 55;
+      },
+    },
+    {
+      before: '!threads.some((thread) => !thread.isResolved && !thread.isOutdated)',
+      after: 'true',
+      change: (f) => {
+        f.threads = [{ isResolved: false, isOutdated: false }];
+      },
+    },
+    {
+      before: 'if (!sensitive) return;',
+      after: 'return;',
+      change: (f) => {
+        f.files[0].filename = 'supabase/migrations/new.sql';
+      },
+    },
+    {
+      before: "return /Actionable comments posted: 0\\*\\*/.test(review.body ?? '');",
+      after: 'return true;',
+      change: (f) => {
+        f.reviews[0].user.id = 136622811;
+        f.reviews[0].body = '**Actionable comments posted: 1**';
+      },
+    },
+  ];
+  for (const mutation of mutations) await admissionMutation(original, mutation);
+});
+async function admissionMutation(original, mutation) {
+  assert.ok(original.includes(mutation.before), mutation.before);
+  const source = original.replace(mutation.before, mutation.after);
+  const mutant = await import(
+    `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  );
+  const f = fixture();
+  mutation.change(f);
+  assert.throws(() => admissionDecision(f));
+  assert.throws(() => assert.throws(() => mutant.admissionDecision(f)), assert.AssertionError);
+}
+function importMutationSource(filename, before, after) {
+  const original = readFileSync(`scripts/ci/${filename}`, 'utf8');
+  assert.ok(original.includes(before), before);
+  const source = original
+    .replace(before, after)
+    .replace(
+      /from '(\.\/[^']+)'/g,
+      (match, path) => `from '${new URL(`../ci/${path.slice(2)}`, import.meta.url).href}'`
+    );
+  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+}
+test('original queue and binding assertions reject reintroduced identity/attempt bypasses', async () => {
+  const mutations = [
+    {
+      before: 'live.object.sha === group.head_sha',
+      change: (f) => {
+        f.state.ref = head;
+      },
+    },
+    {
+      before: 'main.object.sha === group.base_sha',
+      change: (f) => {
+        f.state.main = head;
+      },
+    },
+    {
+      before: 'entry.headCommit.oid === sha',
+      change: (f) => {
+        f.state.entry.headCommit.oid = head;
+      },
+    },
+    {
+      before: 'entry.pullRequest.headRefOid === pr.head.sha',
+      change: (f) => {
+        f.state.entry.pullRequest.headRefOid = base;
+      },
+    },
+    {
+      before: 'config.maximumEntriesToBuild === 1',
+      change: (f) => {
+        f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+      },
+    },
+  ];
+  for (const mutation of mutations) await queueMutation(mutation);
+  const f = bindingFixture();
+  f.status.creator.id = 1;
+  const appMutant = await importMutationSource(
+    'review-admission-api.mjs',
+    'status.creator.id === expectedBot',
+    'true'
+  );
+  await assert.rejects(admissionRun(f.github, repo, head));
+  await assert.rejects(
+    async () => assert.rejects(appMutant.admissionRun(f.github, repo, head)),
+    assert.AssertionError
+  );
+  const attemptMutant = await importMutationSource(
+    'review-admission-api.mjs',
+    'receipt.runAttempt === run.run_attempt',
+    'true'
+  );
+  const wrong = { ...f.receipt, runAttempt: 2 };
+  assert.throws(() => validateAdmissionReceipt(wrong, repo, head, f.run));
+  assert.throws(
+    () => assert.throws(() => attemptMutant.validateAdmissionReceipt(wrong, repo, head, f.run)),
+    assert.AssertionError
+  );
+});
+async function queueMutation(mutation) {
+  const f = queueFixture();
+  mutation.change(f);
+  const mutant = await importMutationSource('review-admission-api.mjs', mutation.before, 'true');
+  await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  await assert.rejects(
+    async () => assert.rejects(mutant.queueIdentity(f.github, repo, f.group, f.pr)),
+    assert.AssertionError
+  );
+}
+test('trusted workflow isolates candidate signals, status writes and artifact evidence', () => {
+  const workflow = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  assert.match(workflow, /permissions: \{\}/);
+  assert.match(workflow, /workflow_run:/);
+  assert.ok(!workflow.includes('  merge_group:'));
+  assert.ok(!workflow.includes('  pull_request_review:'));
+  assert.ok(!workflow.includes('  check_suite:'));
+  assert.match(workflow, /workflows: \[Review Admission Signal\]/);
+  assert.match(workflow, /ref: main/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /statuses: write/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.ok(!workflow.includes('pnpm install'));
+  assert.match(workflow, /environment: review-admission/);
+  assert.equal(
+    (
+      workflow.match(
+        /REVIEW_ADMISSION_PRIVATE_KEY: \$\{\{ secrets.REVIEW_ADMISSION_PRIVATE_KEY \}\}/g
+      ) ?? []
+    ).length,
+    2
+  );
+  assert.equal(
+    (workflow.match(/createReviewPublisher\(\{ github, context, core \}\)/g) ?? []).length,
+    2
+  );
+  assert.match(workflow, /review-admission-\$\{\{ steps.evaluate.outputs.admission_sha/);
+  assert.ok(
+    workflow.indexOf('Upload exact-head admission receipt') <
+      workflow.indexOf('Publish verified admission after evidence upload')
+  );
+  assert.match(workflow, /overwrite: true/);
+  const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');
+  assert.match(signal, /name: Review Admission Signal/);
+  assert.match(signal, /merge_group:/);
+  assert.match(signal, /permissions: \{\}/);
+  assert.ok(!signal.includes('statuses: write'));
+  assert.ok(!signal.includes('checkout'));
+  assert.ok(!signal.includes('environment:'));
+  assert.ok(!signal.includes('workflow_run:'));
+});
+const appIds = { appId: 987654, botId: 987655, installationId: 987656, queueAllowed: true };
+const appEnv = {
+  REVIEW_ADMISSION_APP_ID: '987654',
+  REVIEW_ADMISSION_BOT_ID: '987655',
+  REVIEW_ADMISSION_INSTALLATION_ID: '987656',
+};
+const signingKeys = generateKeyPairSync('rsa', { modulusLength: 2048 });
+function issuerFixture() {
+  const env = {
+    ...appEnv,
+    REVIEW_ADMISSION_PRIVATE_KEY: signingKeys.privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  };
+  const installation = {
+    id: appIds.installationId,
+    app_id: appIds.appId,
+    account: { login: repo.owner },
+    repository_selection: 'selected',
+    suspended_at: null,
+  };
+  const repository = { id: 5, full_name: 'example/repo' };
+  const responses = {
+    '/app': {
+      id: appIds.appId,
+      slug: 'isolated-admission',
+      permissions: { statuses: 'write', metadata: 'read' },
+    },
+    '/users/isolated-admission%5Bbot%5D': { id: appIds.botId, type: 'Bot' },
+    '/app/installations/987656': structuredClone(installation),
+    '/repos/example/repo/installation': structuredClone(installation),
+    '/app/installations/987656/access_tokens': {
+      token: 'synthetic-private-installation-token',
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+      permissions: { statuses: 'write', metadata: 'read' },
+      repository_selection: 'selected',
+      repositories: [repository],
+    },
+    [`/repos/example/repo/statuses/${head}`]: { id: 1 },
+  };
+  const calls = [];
+  const masked = [];
+  const args = {
+    github: {
+      graphql: async () => 'retained',
+      paginate: async () => 'retained',
+      rest: {
+        repos: {
+          get: async () => ({ data: repository }),
+          createCommitStatus: async () =>
+            assert.fail('Generic Actions cannot publish configured App status.'),
+        },
+      },
+    },
+    context: { repo, ref: 'refs/heads/main', eventName: 'workflow_dispatch' },
+    core: { setSecret: (value) => masked.push(value) },
+    env,
+    fetchImpl: async (url, options) => {
+      assert.equal(new URL(url).origin, 'https://api.github.com');
+      assert.equal(options.redirect, 'error');
+      calls.push({ path: new URL(url).pathname, options });
+      assert.ok(Object.hasOwn(responses, new URL(url).pathname));
+      return { ok: true, json: async () => responses[new URL(url).pathname] };
+    },
+  };
+  return { args, calls, masked, responses, repository };
+}
+test('dedicated App publisher validates identity, mints scoped token and only replaces status writer', async () => {
+  const f = issuerFixture();
+  const github = await createReviewPublisher(f.args);
+  assert.deepEqual(github.reviewAdmissionIssuer, appIds);
+  assert.equal(github.graphql, f.args.github.graphql);
+  assert.equal(github.paginate, f.args.github.paginate);
+  assert.equal(github.rest.repos.get, f.args.github.rest.repos.get);
+  const tokenCall = f.calls.find((call) => call.path.endsWith('/access_tokens'));
+  assert.deepEqual(JSON.parse(tokenCall.options.body), {
+    repository_ids: [5],
+    permissions: { statuses: 'write' },
+  });
+  const signedJwt = f.calls[0].options.headers.Authorization.slice(7);
+  const parts = signedJwt.split('.');
+  const claims = JSON.parse(Buffer.from(parts[1], 'base64url'));
+  assert.equal(claims.iss, '987654');
+  assert.ok(claims.exp - claims.iat <= 600);
+  assert.equal(
+    verify(
+      'RSA-SHA256',
+      Buffer.from(parts.slice(0, 2).join('.')),
+      signingKeys.publicKey,
+      Buffer.from(parts[2], 'base64url')
+    ),
+    true
+  );
+  await github.rest.repos.createCommitStatus({
+    ...repo,
+    sha: head,
+    context: 'Review Admission',
+    state: 'success',
+  });
+  assert.equal(
+    f.calls.at(-1).options.headers.Authorization,
+    'Bearer synthetic-private-installation-token'
+  );
+  assert.ok(f.masked.includes(f.args.env.REVIEW_ADMISSION_PRIVATE_KEY));
+  assert.ok(f.masked.includes(signedJwt));
+  assert.ok(f.masked.includes('synthetic-private-installation-token'));
+  for (const params of [
+    { ...repo, sha: head, context: 'Other' },
+    { ...repo, sha: 'bad', context: 'Review Admission' },
+    { ...repo, repo: 'foreign', sha: head, context: 'Review Admission' },
+  ])
+    await assert.rejects(github.rest.repos.createCommitStatus(params));
+});
+test('App publisher rejects wrong identities, installation, repository and excessive token scopes', async () => {
+  for (const change of [
+    (f) => {
+      f.responses['/app'].id = 1;
+    },
+    (f) => {
+      f.responses['/app'].permissions.actions = 'write';
+    },
+    (f) => {
+      f.responses['/users/isolated-admission%5Bbot%5D'].id = 1;
+    },
+    (f) => {
+      f.responses['/app/installations/987656'].id = 1;
+    },
+    (f) => {
+      f.responses['/repos/example/repo/installation'].app_id = 1;
+    },
+    (f) => {
+      f.responses['/repos/example/repo/installation'].account.login = 'foreign';
+    },
+    (f) => {
+      f.responses['/repos/example/repo/installation'].repository_selection = 'all';
+    },
+    (f) => {
+      f.responses['/repos/example/repo/installation'].suspended_at = '2026-10-14';
+    },
+    (f) => {
+      f.repository.full_name = 'foreign/repo';
+    },
+    (f) => {
+      f.responses['/app/installations/987656/access_tokens'].repositories = [
+        { id: 6, full_name: 'foreign/repo' },
+      ];
+    },
+    (f) => {
+      f.responses['/app/installations/987656/access_tokens'].permissions.contents = 'write';
+    },
+    (f) => {
+      f.responses['/app/installations/987656/access_tokens'].expires_at = 'bad';
+    },
+  ]) {
+    const f = issuerFixture();
+    change(f);
+    await assert.rejects(createReviewPublisher(f.args));
+  }
+});
+test('partial App setup, missing key, generic issuer and untrusted execution fail closed', async () => {
+  assert.equal(publisherConfig({}), null);
+  for (const env of [
+    { REVIEW_ADMISSION_APP_ID: '987654' },
+    { ...appEnv, REVIEW_ADMISSION_APP_ID: '15368' },
+    { ...appEnv, REVIEW_ADMISSION_BOT_ID: '41898282' },
+    { ...appEnv, REVIEW_ADMISSION_BOT_ID: '0' },
+  ])
+    assert.throws(() => publisherConfig(env));
+  for (const change of [
+    (f) => {
+      delete f.args.env.REVIEW_ADMISSION_PRIVATE_KEY;
+    },
+    (f) => {
+      f.args.context.ref = 'refs/heads/candidate';
+    },
+    (f) => {
+      f.args.context.eventName = 'merge_group';
+    },
+  ]) {
+    const f = issuerFixture();
+    change(f);
+    await assert.rejects(createReviewPublisher(f.args));
+    assert.equal(f.calls.length, 0);
+  }
+  const f = issuerFixture();
+  f.args.fetchImpl = async () => ({
+    ok: true,
+    json: async () => {
+      throw new Error(f.args.env.REVIEW_ADMISSION_PRIVATE_KEY);
+    },
+  });
+  await assert.rejects(createReviewPublisher(f.args), {
+    message: 'Review publisher API response is invalid.',
+  });
+});
+test('legacy staging publishes head evidence but cannot admit queued commits', async () => {
+  await withReceiptDirectory(async () => {
+    const f = queuedControlFixture();
+    f.github = await createReviewPublisher({ github: f.github, context: f.context, env: {} });
+    assert.equal(f.github.reviewAdmissionIssuer.queueAllowed, false);
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core }),
+      /dedicated protected App publisher/
+    );
+    assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+    const ordinary = publishingFixture();
+    ordinary.github = await createReviewPublisher({
+      github: ordinary.github,
+      context: ordinary.context,
+      env: {},
+    });
+    const receipt = await evaluateAdmission({
+      github: ordinary.github,
+      context: ordinary.context,
+      number: 1,
+      source: base,
+    });
+    assert.equal(receipt.issuer.queueAllowed, false);
+  });
+});
+async function withAppEnv(check) {
+  const previous = Object.fromEntries(Object.keys(appEnv).map((name) => [name, process.env[name]]));
+  Object.assign(process.env, appEnv);
+  try {
+    await check();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+test('configured binding rejects generic Actions forgery and mismatched issuer receipt', async () => {
+  await withAppEnv(async () => {
+    const f = bindingFixture();
+    await assert.rejects(admissionRun(f.github, repo, head), /configured publisher/);
+    f.status.creator.id = appIds.botId;
+    await admissionRun(f.github, repo, head);
+    assert.throws(() => validateAdmissionReceipt(f.receipt, repo, head, f.run));
+    f.receipt.issuer = appIds;
+    validateAdmissionReceipt(f.receipt, repo, head, f.run);
+    assert.throws(() => requireReceiptIssuer({ issuer: { ...appIds, installationId: 1 } }));
+    process.env.REVIEW_ADMISSION_BOT_ID = '';
+    f.github.paginate = async () => [];
+    await assert.rejects(
+      admissionRun(f.github, repo, head),
+      (error) => !(error instanceof AdmissionPending)
+    );
+  });
+});
+test('App guard regressions are detected when app, bot, token scope or receipt binding is removed', async () => {
+  for (const [before, change] of [
+    [
+      'app.id === config.appId',
+      (f) => {
+        f.responses['/app'].id = 1;
+      },
+    ],
+    [
+      "bot.id === config.botId && bot.type === 'Bot'",
+      (f) => {
+        f.responses['/users/isolated-admission%5Bbot%5D'].id = 1;
+      },
+    ],
+    [
+      'data.id === config.installationId && data.app_id === config.appId',
+      (f) => {
+        f.responses['/app/installations/987656'].app_id = 1;
+      },
+    ],
+    [
+      'token.repositories[0].id === repository.id &&\n      token.repositories[0].full_name === repository.full_name',
+      (f) => {
+        f.responses['/app/installations/987656/access_tokens'].repositories = [
+          { id: 6, full_name: 'foreign/repo' },
+        ];
+      },
+    ],
+  ]) {
+    const f = issuerFixture();
+    change(f);
+    await assert.rejects(createReviewPublisher(f.args));
+    const mutant = await importMutationSource('review-admission-issuer.mjs', before, 'true');
+    await assert.rejects(
+      async () => assert.rejects(mutant.createReviewPublisher(f.args)),
+      assert.AssertionError
+    );
+  }
+  const receiptMutant = await importMutationSource(
+    'review-admission-issuer.mjs',
+    'actual.installationId === expected.installationId',
+    'true'
+  );
+  const wrong = { issuer: { ...appIds, installationId: 1 } };
+  assert.throws(() => requireReceiptIssuer(wrong, appEnv));
+  assert.throws(
+    () => assert.throws(() => receiptMutant.requireReceiptIssuer(wrong, appEnv)),
+    assert.AssertionError
+  );
+});
+test('queue issuer and generic App identity guards detect removed isolation', async () => {
+  const mutant = await importMutationSource(
+    'review-admission-issuer.mjs',
+    'github.reviewAdmissionIssuer?.queueAllowed === true',
+    'true'
+  );
+  const legacy = { reviewAdmissionIssuer: { queueAllowed: false } };
+  const { requireQueueIssuer } = await import('../ci/review-admission-issuer.mjs');
+  assert.throws(() => requireQueueIssuer(legacy));
+  assert.throws(
+    () => assert.throws(() => mutant.requireQueueIssuer(legacy)),
+    assert.AssertionError
+  );
+  const configMutant = await importMutationSource(
+    'review-admission-issuer.mjs',
+    'ids[0] !== LEGACY.appId && ids[1] !== LEGACY.botId',
+    'true'
+  );
+  const generic = { ...appEnv, REVIEW_ADMISSION_APP_ID: '15368' };
+  assert.throws(() => publisherConfig(generic));
+  assert.throws(
+    () => assert.throws(() => configMutant.publisherConfig(generic)),
+    assert.AssertionError
+  );
+});

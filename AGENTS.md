@@ -81,6 +81,11 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   (`gh pr update-branch <PR>`) and CI and applicable previews rerun on the new head. Request
   `@coderabbitai review` for substantial diff changes, hand-resolved conflicts, or unresolved
   integration risks (incremental reviews are off). Do not pause other merges for freshness.
+- After the gated merge-queue rollout is activated, queue integration replaces strict freshness:
+  do not update a behind branch merely to enqueue it. Review Admission verifies the immutable PR
+  head and resolved findings; sensitive changes need exact-head collaborator approval. Report
+  `QUEUED` after submission and let Actions own integration/merge. Activation, canary and rollback:
+  `docs/merge-queue-rollout.md`.
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
   (omit `--request` to check status), only when CodeRabbit is rate-limited or for the final review
   of a change that needs independent review (below). Never post raw `@codex review`, repost, or

@@ -6,16 +6,26 @@ on:
     # The gate permits publication only seven days after the latest stable release.
     - cron: '0 15 * * *' # Daily 15:00 UTC; weekly publication cadence
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 permissions:
   contents: read
+env:
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   release:
     name: Release
-    # Only the schedule or an explicit dispatch on main may release; the gate then requires
-    # successful main CI for that exact commit.
+    # Only schedule/dispatch may prepare a new version. Trusted main CI completion wakes
+    # pending finalization; the gate authenticates its source and exact successful main SHA.
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     concurrency:
       group: release-main
       cancel-in-progress: false
@@ -27,6 +37,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      statuses: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,25 +51,43 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { copyFile } = require('node:fs/promises');
-            const gatePath = `${process.env.RUNNER_TEMP}/release-gate.mjs`;
-            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-gate.mjs`, gatePath);
-            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-recovery.mjs`, `${process.env.RUNNER_TEMP}/release-recovery.mjs`);
+            const { cp, mkdir } = require('node:fs/promises');
+            const releasePath = `${process.env.RUNNER_TEMP}/release`;
+            await mkdir(releasePath, { recursive: true });
+            await cp(`${process.env.GITHUB_WORKSPACE}/scripts/release`, releasePath, { recursive: true });
+            await mkdir(`${process.env.RUNNER_TEMP}/ci`, { recursive: true });
+            for (const name of ['review-admission-binding.mjs', 'review-admission-api.mjs', 'review-admission-policy.mjs', 'review-admission-issuer.mjs']) {
+              await cp(`${process.env.GITHUB_WORKSPACE}/scripts/ci/${name}`, `${process.env.RUNNER_TEMP}/ci/${name}`);
+            }
+            const gatePath = `${releasePath}/release-gate.mjs`;
             const { releaseEligibility } = await import(pathToFileURL(gatePath));
             const result = await releaseEligibility({ github, context, allowRecovery: Number(process.env.GITHUB_RUN_ATTEMPT) > 1 });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
-            core.setOutput('sha', result.sha || '');
+            core.setOutput('sha', result.sha || result.recovery?.sha || '');
             core.setOutput('recovery', String(Boolean(result.recovery)));
+      - name: Validate merged release preview
+        if: steps.eligible.outputs.recovery == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ steps.eligible.outputs.sha }}
+        run: |
+          export GH_TOKEN="$GITHUB_TOKEN"
+          source scripts/ci/github-ci-gate.sh
+          require_main_revision "$RELEASE_SHA"
+          require_main_ci_policy
+          dispatch_ci main
+          request_preview_after_dispatched_ci "$RELEASE_SHA"
+          wait_for_preview_result "$RELEASE_SHA"
       - name: Recover interrupted version publication
         if: steps.eligible.outputs.recovery == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-gate.mjs`));
-            const { publishRecoveredRelease } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-recovery.mjs`));
-            const result = await releaseEligibility({ github, context, allowRecovery: true });
+            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release/release-gate.mjs`));
+            const { publishRecoveredRelease } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release/release-recovery.mjs`));
+            const result = await releaseEligibility({ github, context, allowRecovery: true, validatePromotion: true });
             if (!result.recovery) throw new Error('Release recovery evidence changed.');
             await publishRecoveredRelease({ github, context, recovery: result.recovery });
             core.info(`Recovered publication of v${result.recovery.version} at ${result.recovery.sha}.`);
@@ -90,12 +119,21 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-gate.mjs`));
+            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release/release-gate.mjs`));
             const result = await releaseEligibility({ github, context });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
       - name: Semantic Release
+        id: prepare
         if: steps.publish.outputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec semantic-release
+        run: node scripts/release/release-run.mjs
+      - name: Record prepared promotion provenance
+        if: steps.prepare.outputs.sha != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-promotion-${{ steps.prepare.outputs.sha }}
+          path: ${{ runner.temp }}/release-promotion.json
+          if-no-files-found: error
+          retention-days: 30

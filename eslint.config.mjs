@@ -181,8 +181,17 @@ export default withNuxt(
     },
   },
   {
-    // The route registry is also loaded by Nuxt's Node config before @ aliases exist.
-    files: ['app/utils/routeSeo.ts'],
+    // The route registry and native Node workflow tests run without Nuxt's @ alias resolver.
+    files: [
+      'app/utils/routeSeo.ts',
+      'scripts/workflow-tests/review-admission.mjs',
+      'scripts/workflow-tests/actionlint-queue.mjs',
+      'scripts/workflow-tests/merge-queue-policy.mjs',
+      'scripts/workflow-tests/merge-queue.mjs',
+      'scripts/workflow-tests/preview-retention.mjs',
+      'scripts/workflow-tests/workflows.mjs',
+      'scripts/workflow-tests/helpers/automation-fixture.mjs',
+    ],
     rules: { 'import-x/no-relative-parent-imports': 'off' },
   }
 );
