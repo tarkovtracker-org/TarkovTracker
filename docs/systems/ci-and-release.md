@@ -73,7 +73,9 @@ CodeQL) is selected on every CI run. See
 
 ### Invariants
 
-- Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Pushes, dispatches and merge-group candidates retain full validation; only pull requests receive reduced selection.
+- Queue integration support and activation prerequisites are specified in
+  [merge queue rollout](../merge-queue-rollout.md). The production queue is not yet active.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
 - Nested `AGENTS.md`/`CLAUDE.md` instruction files count as documentation, except under `public/`,
   where they would ship as site assets. `format:check` covers them at every depth.
