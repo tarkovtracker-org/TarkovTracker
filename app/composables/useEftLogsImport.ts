@@ -516,7 +516,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     preview: EftLogsImportPreviewData,
     targetMode: GameMode
   ): boolean {
-    if (hasInvalidEftLogCutoff(selection.value)) {
+    if (hasInvalidEftLogCutoff(selection.value, targetMode)) {
       importError.value = t('settings.log_import.errors.invalid_date');
       return false;
     }

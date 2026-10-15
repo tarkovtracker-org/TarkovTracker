@@ -26,8 +26,14 @@ export function isInvalidEftLogCutoff(time: number | undefined): boolean {
   if (time === undefined) return false;
   return !Number.isFinite(time) || time < 0 || time > 8.64e15;
 }
-export function hasInvalidEftLogCutoff(selection: EftLogImportSelection): boolean {
-  return Object.values(selection.since).some(isInvalidEftLogCutoff);
+/** Only selected sources and the unidentified destination can apply a cutoff. */
+export function hasInvalidEftLogCutoff(
+  selection: EftLogImportSelection,
+  targetMode: GameMode
+): boolean {
+  return selection.modes.some((mode) =>
+    isInvalidEftLogCutoff(selection.since[mode === 'unknown' ? targetMode : mode])
+  );
 }
 /** Applies the destination's reset cutoff to original event time, never its replay delivery time. */
 function isWithinImportHistory(

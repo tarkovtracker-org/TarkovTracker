@@ -391,6 +391,29 @@ describe('DataManagementCard', () => {
     expect(eftLogsFns.confirmImport).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('does not let a hidden invalid cutoff disable an otherwise valid mode selection', () => {
+    const events = [
+      {
+        mode: 'pve' as const,
+        status: 'completed' as const,
+        questId: '61604635c725987e815b1a46',
+        eventKey: 'pve',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = {
+      ...createEftLogImportSelection(events),
+      modes: ['pve'],
+      since: { pvp: NaN },
+    };
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(
+      findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
+    ).toBeUndefined();
+    wrapper.unmount();
+  });
   it('locks every data-selection control while progress is being applied', async () => {
     const events = [
       {

@@ -1756,7 +1756,9 @@
   const eftLogsHasOutsideSeasonEvents = computed(() =>
     hasOutsideSeasonEvents(eftLogsSelectedEvents.value, eftLogsTargetMode.value)
   );
-  const eftLogsInvalidDate = computed(() => hasInvalidEftLogCutoff(eftLogsSelection.value));
+  const eftLogsInvalidDate = computed(() =>
+    hasInvalidEftLogCutoff(eftLogsSelection.value, eftLogsTargetMode.value)
+  );
   /** Shows selection errors immediately while preserving application errors. */
   function eftLogsSelectionError(): string | null {
     if (eftLogsInvalidDate.value) return t('settings.log_import.errors.invalid_date');

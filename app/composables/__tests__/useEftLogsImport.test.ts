@@ -160,7 +160,7 @@ describe('useEftLogsImport', () => {
         'log_pve/output.log'
       ),
     ]);
-    importer.setSelection({ ...importer.selection.value, modes: [] });
+    importer.setSelection({ ...importer.selection.value, modes: [], since: { pvp: NaN } });
     await importer.confirmImport('pvp');
     expect(importer.importState.value).toBe('preview');
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createEftLogImportSelection, selectEftImportEvents } from '@/utils/eftLogImportSelection';
+import {
+  createEftLogImportSelection,
+  hasInvalidEftLogCutoff,
+  selectEftImportEvents,
+} from '@/utils/eftLogImportSelection';
 import type { EftQuestImportEvent } from '@/utils/eftLogQuestParser';
 const questId = '61604635c725987e815b1a46';
 const event = (
@@ -20,6 +24,18 @@ describe('EFT import selection', () => {
       createEftLogImportSelection([event('pve', 'completed'), event('unknown', 'started')]).modes
     ).not.toContain('unknown');
     expect(createEftLogImportSelection([event('unknown', 'completed')]).modes).toContain('unknown');
+  });
+  it('validates cutoffs only for selected sources and the unidentified destination', () => {
+    const selection = {
+      ...createEftLogImportSelection(),
+      modes: ['pve'] as const,
+      since: { pvp: NaN },
+    };
+    expect(hasInvalidEftLogCutoff(selection, 'pvp')).toBe(false);
+    const unidentified = { ...selection, modes: ['unknown'] as const };
+    expect(hasInvalidEftLogCutoff(unidentified, 'pve')).toBe(false);
+    expect(hasInvalidEftLogCutoff(unidentified, 'pvp')).toBe(true);
+    expect(hasInvalidEftLogCutoff({ ...selection, modes: ['pvp'] }, 'pve')).toBe(true);
   });
   it('imports only the selected source mode without routing excluded unknown events', () => {
     const events = ['pvp', 'pve', 'seasonal', 'unknown'].map((mode) =>
