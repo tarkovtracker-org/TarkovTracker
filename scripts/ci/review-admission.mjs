@@ -17,6 +17,7 @@ import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
 import { releaseAssetsEligibility, requireReleaseSource } from './review-admission-release.mjs';
+const QUEUE_SUITE_BRANCH = /^gh-readonly-queue\/main\/pr-\d+-[a-f0-9]+$/;
 async function evidence(github, repo, pr) {
   const files = await allPages(github, github.rest.pulls.listFiles, {
     ...repo,
@@ -296,6 +297,7 @@ async function suiteTargets(github, repo, run) {
     check_suite_id: locator.suiteId,
   });
   requireProviderSuite(suite, repo, locator.suiteId);
+  if (queueCommitSuite(suite)) return null;
   if (suite.pull_requests?.length) return linkedPullTarget(suite.pull_requests, repo);
   const pulls = await allPages(github, github.rest.pulls.list, {
     ...repo,
@@ -304,6 +306,12 @@ async function suiteTargets(github, repo, run) {
   });
   const matches = pulls.filter((pr) => pr.head.sha === suite.head_sha);
   return linkedPullTarget(matches, repo);
+}
+// Providers also check GitHub's temporary queue commits. Those suites are not review evidence
+// (admission binds the member PR head) and the group's own merge_group signal already drives
+// queue admission, so an authenticated provider suite on a queue ref selects no target.
+function queueCommitSuite(suite) {
+  return QUEUE_SUITE_BRANCH.test(suite.head_branch ?? '') && !suite.pull_requests?.length;
 }
 function requireProviderSuite(suite, repo, id) {
   requireEvidence(
@@ -465,6 +473,12 @@ export async function runReviewAdmission({ github, context, core }) {
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
   await requireSignal(github, context);
   const selected = await targets(github, context);
+  if (selected === null) {
+    core.notice(
+      'Provider suite on a merge-queue commit is not review evidence; no status changed.'
+    );
+    return;
+  }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
   await evaluateScope(github, context, core, selected[0], source);
 }
