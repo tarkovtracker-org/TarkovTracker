@@ -196,8 +196,8 @@
         key: 'locked',
         label: t('common.locked', 'Locked'),
         icon: 'i-mdi-lock-outline',
-        chipClass: 'bg-warning-700/25',
-        iconClass: 'text-warning-300',
+        chipClass: 'bg-locked-700/25',
+        iconClass: 'text-locked-300',
         tasks: locked,
       },
       {
@@ -219,7 +219,7 @@
   const taskStatusColor = (taskId: string): string => {
     if (props.isTaskFailed(taskId)) return 'text-error-400';
     if (props.isTaskSuccessful(taskId)) return 'text-success-400';
-    if (props.isTaskLocked(taskId)) return 'text-warning-400';
+    if (props.isTaskLocked(taskId)) return 'text-locked-400';
     return 'text-primary-400';
   };
   const objectiveIcon = (objectiveId: string): string => {

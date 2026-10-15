@@ -14,6 +14,7 @@ import { isCurrencyItemId } from '@/utils/constants';
 import { fuzzyMatch } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
 import { perfNow, roundPerfMs } from '@/utils/perf';
+import { ALL_TAB_ICON } from '@/utils/statusTones';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import type {
   NeededItemsFirFilter,
@@ -27,6 +28,7 @@ import type {
   NeededItemTaskObjective,
   TarkovItem,
 } from '@/types/tarkov';
+import type { StatusTabItem } from '@/utils/statusTones';
 const DEFAULT_FULL_LOAD_TIMEOUT_MS = 5000;
 const DEFAULT_FULL_LOAD_MIN_TIME_MS = 16;
 const DEFAULT_FULL_LOAD_DELAY_MS = 1500;
@@ -47,12 +49,7 @@ export interface UseNeededItemsOptions {
   search?: Ref<string>;
   t?: (key: string) => string;
 }
-export interface FilterTab {
-  label: string;
-  value: NeededItemsFilterType;
-  icon: string;
-  count: number;
-}
+export type FilterTab = StatusTabItem<NeededItemsFilterType>;
 export interface UseNeededItemsReturn {
   activeFilter: WritableComputedRef<NeededItemsFilterType>;
   firFilter: WritableComputedRef<NeededItemsFirFilter>;
@@ -371,26 +368,30 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       {
         label: translate('common.all'),
         value: 'all' as NeededItemsFilterType,
-        icon: 'i-mdi-clipboard-list',
+        icon: ALL_TAB_ICON,
         count: counts.incomplete,
+        tone: 'neutral',
       },
       {
         label: translate('common.tasks'),
         value: 'tasks' as NeededItemsFilterType,
         icon: 'i-mdi-checkbox-marked-circle-outline',
         count: counts.tasks,
+        tone: 'info',
       },
       {
         label: translate('common.hideout'),
         value: 'hideout' as NeededItemsFilterType,
         icon: 'i-mdi-home',
         count: counts.hideout,
+        tone: 'info',
       },
       {
         label: translate('common.completed'),
         value: 'completed' as NeededItemsFilterType,
         icon: 'i-mdi-check-all',
         count: counts.completed,
+        tone: 'success',
       },
     ];
   });

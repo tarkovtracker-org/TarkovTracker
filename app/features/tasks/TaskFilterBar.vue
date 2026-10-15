@@ -1,139 +1,13 @@
 <template>
   <div class="mb-6 space-y-3">
-    <div
-      class="bg-surface-900 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4"
+    <StatusTabBar
+      :tabs="statusTabs"
+      :model-value="selectedStatusView"
+      :group-label="t('page.tasks.status_tabs_label')"
+      :inert-when-selected="!isSearchActive"
+      @update:model-value="setSecondaryView"
     >
-      <div
-        class="flex max-w-full min-w-0 flex-1 scrollbar-none items-center gap-1 overflow-x-auto [-webkit-overflow-scrolling:touch] sm:flex-none"
-      >
-        <UButton
-          v-if="showAllStatusButton"
-          variant="ghost"
-          color="neutral"
-          size="sm"
-          class="leading-none"
-          :disabled="isStatusApplied('all')"
-          :aria-pressed="selectedStatusView === 'all'"
-          :class="getStatusButtonClass('all', selectedStatusView === 'all')"
-          @click="setSecondaryView('all')"
-        >
-          <UIcon
-            name="i-mdi-format-list-bulleted"
-            class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block"
-          />
-          <span class="text-xs leading-none uppercase 2xl:text-sm">
-            {{ t('common.all', 'All') }}
-          </span>
-          <span
-            class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-            :class="
-              displayStatusCounts.all > 0
-                ? 'bg-surface-500'
-                : 'bg-surface-600 light:text-surface-50'
-            "
-          >
-            {{ displayStatusCounts.all }}
-          </span>
-        </UButton>
-        <span
-          v-if="showStatusAllDivider"
-          aria-hidden="true"
-          class="bg-surface-700/60 h-6 w-px self-center"
-        ></span>
-        <UButton
-          v-if="!isGraphView && preferencesStore.getShowAvailableFilter"
-          variant="ghost"
-          color="neutral"
-          size="sm"
-          class="leading-none"
-          :disabled="isStatusApplied('available')"
-          :aria-pressed="selectedStatusView === 'available'"
-          :class="getStatusButtonClass('available', selectedStatusView === 'available')"
-          @click="setSecondaryView('available')"
-        >
-          <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block" />
-          <span class="text-xs leading-none uppercase 2xl:text-sm">
-            {{ t('common.available') }}
-          </span>
-          <span
-            class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-            :class="
-              displayStatusCounts.available > 0
-                ? 'bg-info-500'
-                : 'bg-surface-600 light:text-surface-50'
-            "
-          >
-            {{ displayStatusCounts.available }}
-          </span>
-        </UButton>
-        <UButton
-          v-if="!isGraphView && preferencesStore.getShowLockedFilter"
-          variant="ghost"
-          color="neutral"
-          size="sm"
-          class="leading-none"
-          :disabled="isStatusApplied('locked')"
-          :aria-pressed="selectedStatusView === 'locked'"
-          :class="getStatusButtonClass('locked', selectedStatusView === 'locked')"
-          @click="setSecondaryView('locked')"
-        >
-          <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block" />
-          <span class="text-xs leading-none uppercase 2xl:text-sm">
-            {{ t('common.locked') }}
-          </span>
-          <span
-            class="light:text-surface-50 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-            :class="displayStatusCounts.locked > 0 ? 'bg-surface-600' : 'bg-surface-700'"
-          >
-            {{ displayStatusCounts.locked }}
-          </span>
-        </UButton>
-        <UButton
-          v-if="showCompletedFilterButton"
-          variant="ghost"
-          color="neutral"
-          size="sm"
-          class="leading-none"
-          :disabled="isStatusApplied('completed')"
-          :aria-pressed="selectedStatusView === 'completed'"
-          :class="getStatusButtonClass('completed', selectedStatusView === 'completed')"
-          @click="setSecondaryView('completed')"
-        >
-          <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block" />
-          <span class="text-xs leading-none uppercase 2xl:text-sm">
-            {{ t('common.completed') }}
-          </span>
-          <span
-            class="bg-success-500 light:bg-success-100 light:text-surface-50 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-          >
-            {{ displayStatusCounts.completed }}
-          </span>
-        </UButton>
-        <UButton
-          v-if="showFailedFilterButton"
-          variant="ghost"
-          color="neutral"
-          size="sm"
-          class="leading-none"
-          :disabled="isStatusApplied('failed')"
-          :aria-pressed="selectedStatusView === 'failed'"
-          :class="getStatusButtonClass('failed', selectedStatusView === 'failed')"
-          @click="setSecondaryView('failed')"
-        >
-          <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 2xl:mr-1 2xl:block" />
-          <span class="text-xs leading-none uppercase 2xl:text-sm">
-            {{ t('common.failed') }}
-          </span>
-          <span
-            class="bg-error-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-          >
-            {{ displayStatusCounts.failed }}
-          </span>
-        </UButton>
-      </div>
-      <div
-        class="ml-auto flex w-full min-w-0 items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-wrap"
-      >
+      <template #actions>
         <TaskTeamFilter />
         <TaskFiltersPopover />
         <SortControl
@@ -142,7 +16,7 @@
           :label="t('page.tasks.sort.aria_label')"
           :leading-icon="currentSortIcon"
           :direction="taskSortDirection"
-          select-class="min-w-0 flex-1 sm:w-32 sm:flex-none 2xl:w-44"
+          select-class="min-w-0 flex-1 sm:w-40 sm:flex-none 2xl:w-44"
           @toggle-direction="toggleSortDirection"
         />
         <SettingsButton
@@ -150,8 +24,8 @@
           page-key="tasks"
           :label="t('page.tasks.settings.title')"
         />
-      </div>
-    </div>
+      </template>
+    </StatusTabBar>
     <ActiveFilterChips test-id-prefix="task-active-filters" :filters="activeFilters" />
     <div
       v-if="primaryView === 'maps' && maps.length > 0"
@@ -171,7 +45,7 @@
           :aria-pressed="preferencesStore.getTaskMapView === mapOption.value"
           :class="[
             'gap-1.5',
-            ...getSegmentButtonClass(preferencesStore.getTaskMapView === mapOption.value),
+            ...getTabClass('neutral', preferencesStore.getTaskMapView === mapOption.value),
           ]"
           @click="onMapSelect(mapOption)"
         >
@@ -179,10 +53,10 @@
           <span
             :class="[
               'light:text-surface-50 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
-              (mapOption.count ?? 0) > 0 ? 'bg-pve-500' : 'bg-surface-600',
+              mapOption.count > 0 ? 'bg-pve-500' : 'bg-surface-600',
             ]"
           >
-            {{ mapOption.count ?? 0 }}
+            {{ mapOption.count }}
           </span>
         </UButton>
       </div>
@@ -205,7 +79,7 @@
           :aria-pressed="preferencesStore.getTaskTraderView === trader.id"
           :class="[
             'gap-2',
-            ...getSegmentButtonClass(preferencesStore.getTaskTraderView === trader.id),
+            ...getTabClass('neutral', preferencesStore.getTaskTraderView === trader.id),
           ]"
           @click="onTraderSelect(trader.id)"
         >
@@ -235,6 +109,7 @@
   import ActiveFilterChips from '@/components/ui/ActiveFilterChips.vue';
   import SettingsButton from '@/components/ui/SettingsButton.vue';
   import SortControl from '@/components/ui/SortControl.vue';
+  import StatusTabBar from '@/components/ui/StatusTabBar.vue';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskContentFilters } from '@/features/tasks/composables/useTaskContentFilters';
   import TaskFiltersPopover from '@/features/tasks/TaskFiltersPopover.vue';
@@ -242,6 +117,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { TASK_SORT_MODES } from '@/types/taskSort';
+  import { ALL_TAB_ICON, getTabClass } from '@/utils/statusTones';
   import {
     getTaskSecondaryViewForPrimaryView,
     normalizeSecondaryView,
@@ -250,6 +126,7 @@
   import type { TaskStatusCounts } from '@/features/tasks/composables/useTaskFilters';
   import type { TaskSecondaryView } from '@/types/taskFilter';
   import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
+  import type { StatusTabItem, StatusTone } from '@/utils/statusTones';
   const props = defineProps<{
     /** A search is typed, so status tabs narrow it instead of saving a preference. */
     isSearchActive?: boolean;
@@ -273,9 +150,6 @@
     getTaskSecondaryViewForPrimaryView(primaryView.value, preferencesStore.getTaskSecondaryView)
   );
   const selectedStatusView = computed(() => props.activeStatusView ?? secondaryView.value);
-  // While searching every tab stays clickable so it can pin the search; otherwise the shown tab is inert.
-  const isStatusApplied = (view: TaskSecondaryView) =>
-    !props.isSearchActive && selectedStatusView.value === view;
   const traderCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
     return calculateTraderCounts(userView, selectedStatusView.value);
@@ -290,71 +164,58 @@
       preferencesStore.setTaskTraderView(traderId);
     }
   };
-  const showStatusAllDivider = computed(() => {
-    return (
-      showAllStatusButton.value &&
-      !isGraphView.value &&
-      (preferencesStore.getShowAvailableFilter ||
-        preferencesStore.getShowLockedFilter ||
-        preferencesStore.getShowCompletedFilter ||
-        preferencesStore.getShowFailedFilter)
-    );
-  });
   const showAllStatusButton = computed(
     () => isGraphView.value || preferencesStore.getShowAllFilter
   );
-  const showCompletedFilterButton = computed(() => {
-    return !isGraphView.value && preferencesStore.getShowCompletedFilter;
-  });
-  const showFailedFilterButton = computed(() => {
-    return !isGraphView.value && preferencesStore.getShowFailedFilter;
-  });
-  type StatusToggleView = 'all' | 'available' | 'locked' | 'completed' | 'failed';
-  const statusViewVisibility = computed<Record<StatusToggleView, boolean>>(() => ({
+  const statusViewVisibility = computed<Record<TaskSecondaryView, boolean>>(() => ({
     all: showAllStatusButton.value,
     available: !isGraphView.value && preferencesStore.getShowAvailableFilter,
     locked: !isGraphView.value && preferencesStore.getShowLockedFilter,
-    completed: showCompletedFilterButton.value,
-    failed: showFailedFilterButton.value,
+    completed: !isGraphView.value && preferencesStore.getShowCompletedFilter,
+    failed: !isGraphView.value && preferencesStore.getShowFailedFilter,
   }));
   const visibleStatusViews = computed<TaskSecondaryView[]>(() => {
     return (['all', 'available', 'locked', 'completed', 'failed'] as const).filter(
       (view) => statusViewVisibility.value[view]
     );
   });
-  const toggleButtonBaseClass =
-    'border border-transparent font-medium transition-colors duration-150 disabled:cursor-default disabled:opacity-100';
-  const secondaryToggleInactiveClass =
-    'text-surface-400 hover:border-white/10 hover:bg-white/5 hover:text-white light:hover:text-surface-50';
-  const selectedToggleClass =
-    'border-primary-500/45 bg-primary-500/12 text-white ring-1 ring-primary-500/25 light:text-primary-700';
-  const neutralSelectedToggleClass =
-    'border-white/15 bg-white/10 text-white ring-1 ring-white/10 light:border-surface-600 light:bg-surface-700/60 light:text-surface-50 light:ring-surface-600/40';
-  const statusToggleSelectedClasses: Record<StatusToggleView, string> = {
-    all: selectedToggleClass,
-    available:
-      'border-info-500/45 bg-info-500/12 text-white ring-1 ring-info-500/25 light:text-info-700',
-    locked: neutralSelectedToggleClass,
-    completed:
-      'border-success-500/45 bg-success-500/12 text-white ring-1 ring-success-500/25 light:text-success-700',
-    failed:
-      'border-error-500/45 bg-error-500/12 text-white ring-1 ring-error-500/25 light:text-error-700',
-  };
-  const getStatusButtonClass = (view: StatusToggleView, isActive: boolean): string[] => {
-    return [
-      toggleButtonBaseClass,
-      isActive ? statusToggleSelectedClasses[view] : secondaryToggleInactiveClass,
-    ];
-  };
-  const getSegmentButtonClass = (isActive: boolean): string[] => {
-    return [toggleButtonBaseClass, isActive ? selectedToggleClass : secondaryToggleInactiveClass];
-  };
   // Calculate task counts for badges
   const statusCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
     return calculateStatusCounts(userView);
   });
   const displayStatusCounts = computed(() => props.searchStatusCounts ?? statusCounts.value);
+  const STATUS_TABS: Array<{
+    value: TaskSecondaryView;
+    labelKey: string;
+    icon: string;
+    tone: StatusTone;
+  }> = [
+    { value: 'all', labelKey: 'common.all', icon: ALL_TAB_ICON, tone: 'neutral' },
+    {
+      value: 'available',
+      labelKey: 'common.available',
+      icon: 'i-mdi-clipboard-text',
+      tone: 'info',
+    },
+    { value: 'locked', labelKey: 'common.locked', icon: 'i-mdi-lock', tone: 'locked' },
+    {
+      value: 'completed',
+      labelKey: 'common.completed',
+      icon: 'i-mdi-check-circle',
+      tone: 'success',
+    },
+    { value: 'failed', labelKey: 'common.failed', icon: 'i-mdi-close-circle', tone: 'error' },
+  ];
+  const statusTabs = computed<StatusTabItem<TaskSecondaryView>[]>(() =>
+    STATUS_TABS.filter((tab) => statusViewVisibility.value[tab.value]).map((tab) => ({
+      value: tab.value,
+      label: t(tab.labelKey),
+      icon: tab.icon,
+      tone: tab.tone,
+      count: displayStatusCounts.value[tab.value],
+    }))
+  );
   type SortOption = {
     value: TaskSortMode;
     label: string;
@@ -421,7 +282,8 @@
     if (firstMap?.id) preferencesStore.setTaskMapView(firstMap.id);
   };
   // Secondary view (available / locked / completed)
-  // A tab picked during a search only narrows that search; the saved tab is left alone.
+  // A tab picked during a search only narrows that search; the saved tab is left alone. While
+  // searching every tab stays clickable so it can pin the search; otherwise the shown tab is inert.
   const setSecondaryView = (view: string) => {
     const normalizedView = getTaskSecondaryViewForPrimaryView(primaryView.value, view);
     emit('pin-status', normalizedView);

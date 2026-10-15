@@ -27,6 +27,7 @@ const FOREGROUND_FAMILIES = [
   'error',
   'info',
   'kappa',
+  'locked',
   'lightkeeper',
   'pvp',
   'pve',
@@ -65,5 +66,50 @@ describe('light theme accent foreground remap', () => {
     expect(remap('accent', 200)).toBe(remap('primary', 200));
     expect(remap('accent', 300)).toBe(remap('primary', 300));
     expect(remap('accent', 400)).toBe(remap('primary', 400));
+  });
+});
+const LADDER_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
+const oklchBlock = /@supports \(color: oklch\(0 0 0\)\)\s*\{\s*:root\s*\{([^}]+)\}/.exec(
+  withoutComments
+)?.[1];
+const hslToken = (name: string) => {
+  const match = new RegExp(`--color-${name}:\\s*hsl\\((\\d+) (\\d+)% (\\d+)%\\)`).exec(
+    withoutComments
+  );
+  return match ? match.slice(1, 4).map(Number) : undefined;
+};
+const hslToRgb = ([h, s, l]: number[]) => {
+  const sat = s! / 100;
+  const light = l! / 100;
+  const a = sat * Math.min(light, 1 - light);
+  const channel = (n: number) => {
+    const k = (n + h! / 30) % 12;
+    return light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [channel(0), channel(8), channel(4)];
+};
+const luminance = (rgb: number[]) => {
+  const [r, g, b] = rgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+};
+const contrast = (a: number[], b: number[]) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+};
+describe('locked status color', () => {
+  it.each(LADDER_STEPS)('declares locked-%s in the hsl base and the oklch override', (step) => {
+    expect(hslToken(`locked-${step}`), `hsl locked-${step}`).toBeDefined();
+    expect(oklchBlock, 'oklch :root block').toBeDefined();
+    expect(oklchBlock).toMatch(new RegExp(`--color-locked-${step}:\\s*oklch\\(`));
+  });
+  it('keeps white badge numerals at AA on the locked badge step', () => {
+    // STATUS_TONE_CLASSES.locked.badge renders white numerals on bg-locked-600.
+    expect(contrast(hslToRgb(hslToken('locked-600')!), [1, 1, 1])).toBeGreaterThanOrEqual(4.5);
+  });
+  it('keeps selected locked tab text at AA on the light shell', () => {
+    const lightShell = /--color-surface-900:\s*hsl\((\d+) (\d+)% (\d+)%\)/.exec(lightBlock);
+    expect(lightShell).not.toBeNull();
+    const shellRgb = hslToRgb(lightShell!.slice(1, 4).map(Number));
+    expect(contrast(hslToRgb(hslToken('locked-700')!), shellRgb)).toBeGreaterThanOrEqual(4.5);
   });
 });

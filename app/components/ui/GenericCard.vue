@@ -130,6 +130,7 @@
     info: 'bg-gradient-to-br from-info-800 via-info-700 to-info-600',
     kappa: 'bg-gradient-to-br from-kappa-800 via-kappa-700 to-kappa-600',
     lightkeeper: 'bg-gradient-to-br from-lightkeeper-800 via-lightkeeper-700 to-lightkeeper-600',
+    locked: 'bg-gradient-to-br from-locked-800 via-locked-700 to-locked-600',
     primary: 'bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600',
     pve: 'bg-gradient-to-br from-pve-800 via-pve-700 to-pve-600',
     pvp: 'bg-gradient-to-br from-pvp-800 via-pvp-700 to-pvp-600',

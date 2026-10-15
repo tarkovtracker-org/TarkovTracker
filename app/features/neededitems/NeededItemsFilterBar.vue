@@ -1,49 +1,14 @@
 <template>
   <div class="mb-6 space-y-3">
-    <!-- Primary Filter: ALL / TASKS / HIDEOUT -->
-    <UTabs
+    <StatusTabBar
       v-model="activeFilter"
-      :items="filterTabItems"
-      :content="false"
-      color="neutral"
-      variant="link"
-      class="bg-surface-900 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4 sm:py-3"
-      :ui="{
-        root: 'w-full',
-        list: 'flex flex-wrap items-center justify-start gap-1 border-b-0 p-0 sm:gap-2',
-        indicator: 'hidden',
-        leadingIcon: 'h-4 w-4 sm:h-5 sm:w-5',
-        trigger:
-          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white light:data-[state=active]:text-surface-50 rounded-none border-b-2 border-transparent px-2 sm:px-3',
-      }"
+      :tabs="visibleFilterTabs"
+      :group-label="$t('page.needed_items.filter_tabs_label')"
     >
-      <template #default="{ item }">
-        <div class="flex items-center">
-          <span class="sr-only text-[clamp(0.625rem,2vw,0.875rem)] uppercase sm:not-sr-only">
-            {{ item.label }}
-          </span>
-          <span
-            :class="[
-              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-              item.badgeClass,
-            ]"
-          >
-            {{ item.count }}
-          </span>
-        </div>
-      </template>
-    </UTabs>
-    <!-- Unified Filter Bar: Filters + Views -->
-    <div
-      class="bg-surface-900 flex flex-col gap-3 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:px-4 sm:py-3"
-    >
-      <!-- Right side controls -->
-      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-        <!-- Item count badge -->
+      <template #actions>
         <UBadge color="neutral" variant="soft" size="md" class="shrink-0 px-3 py-1.5 text-sm">
           {{ countLabel }}
         </UBadge>
-        <div class="hidden h-6 w-px bg-white/10 sm:block" />
         <NeededItemsFiltersPopover
           :fir-filter="firFilter"
           :hide-owned="hideOwned"
@@ -66,11 +31,10 @@
           :label="$t('page.needed_items.sort.label')"
           leading-icon="i-mdi-sort"
           :direction="sortDirection"
-          select-class="w-28 sm:w-40"
+          select-class="w-32 sm:w-40"
           @toggle-direction="toggleSortDirection"
         />
-        <!-- Divider (hidden on mobile) -->
-        <div class="hidden h-6 w-px bg-white/10 sm:block" />
+        <div aria-hidden="true" class="hidden h-6 w-px bg-white/10 sm:block" />
         <NeededItemsViewModeToggle
           :view-mode="viewMode"
           :group-by-item="groupByItem"
@@ -79,20 +43,22 @@
           @update:group-by-item="emit('update:groupByItem', $event)"
           @update:card-style="emit('update:cardStyle', $event)"
         />
-      </div>
-    </div>
+      </template>
+    </StatusTabBar>
     <ActiveFilterChips test-id-prefix="needed-items-active-filters" :filters="activeFilters" />
   </div>
 </template>
 <script setup lang="ts">
   import ActiveFilterChips from '@/components/ui/ActiveFilterChips.vue';
   import SortControl from '@/components/ui/SortControl.vue';
+  import StatusTabBar from '@/components/ui/StatusTabBar.vue';
   import {
     normalizeNeededItemsFilterType,
     normalizeNeededItemsSortBy,
   } from '@/features/neededitems/neededItemsFilterNormalization';
   import NeededItemsFiltersPopover from '@/features/neededitems/NeededItemsFiltersPopover.vue';
   import NeededItemsViewModeToggle from '@/features/neededitems/NeededItemsViewModeToggle.vue';
+  import type { FilterTab } from '@/composables/useNeededItems';
   import type { ActiveFilter } from '@/types/filters';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';
@@ -100,12 +66,6 @@
   type SortBy = 'priority' | 'name' | 'category' | 'count';
   type SortDirection = 'asc' | 'desc';
   type CardStyle = 'compact' | 'expanded';
-  interface FilterTab {
-    label: string;
-    value: FilterType;
-    icon: string;
-    count: number;
-  }
   const props = defineProps<{
     modelValue: FilterType;
     viewMode: ViewMode;
@@ -142,32 +102,10 @@
       emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
-  // Light theme picks whichever numeral clears AA on each badge: white stays on
-  // info-500 and surface-500, while the pale surface-600 badge and the saturated
-  // success-500 badge (where white is only ~3.9:1 but ink is ~4.2:1) switch to ink.
-  const getTabBadgeColor = (tab: FilterTab): string => {
-    switch (tab.value) {
-      case 'completed':
-        return 'bg-success-500 light:text-surface-50';
-      case 'tasks':
-      case 'hideout':
-        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600 light:text-surface-50';
-      case 'all':
-      default:
-        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600 light:text-surface-50';
-    }
-  };
-  const filterTabItems = computed(() => {
-    return props.filterTabs
-      .filter((tab) => {
-        if (tab.value === 'completed' && tab.count <= 0) return false;
-        return true;
-      })
-      .map((tab) => ({
-        ...tab,
-        badgeClass: getTabBadgeColor(tab),
-      }));
-  });
+  // Completed only gets a tab once something is done.
+  const visibleFilterTabs = computed(() =>
+    props.filterTabs.filter((tab) => tab.value !== 'completed' || tab.count > 0)
+  );
   const countLabel = computed(() =>
     props.groupByItem && props.ungroupedCount !== props.totalCount
       ? t('page.needed_items.unique_items_count', {
