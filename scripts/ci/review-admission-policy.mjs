@@ -97,7 +97,9 @@ function providerChecks(checks, provider, head) {
 }
 function zeroOutsideFindings(review, provider) {
   if (provider.name === 'Cubic')
-    return /\*\*(?:0 issues found|All reported issues were addressed)/.test(review.body ?? '');
+    return /\*\*(?:No issues found|0 issues found|All reported issues were addressed)/.test(
+      review.body ?? ''
+    );
   // Findings outside the diff have no resolvable GitHub thread; require a clean re-review.
   return /Actionable comments posted: 0\*\*/.test(review.body ?? '');
 }

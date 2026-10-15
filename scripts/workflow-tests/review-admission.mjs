@@ -69,6 +69,36 @@ function human(state = 'APPROVED', change = {}) {
     ...change,
   };
 }
+// Summary emitted by Cubic on PR #1230's exact head (review 5527226774).
+const cubicCleanSummary = `<!-- cubic:review-summary:start -->
+<!-- cubic:review-summary:confidence-score:5/5 -->
+**No issues found** across 1 file
+
+Confidence score: **5/5**
+- Automated review surfaced no issues in the provided summaries.
+- No files require special attention.
+<!-- cubic:review-summary:end -->`;
+test('live Cubic clean summary admits the reviewed head while preserving admission guards', () => {
+  const f = fixture();
+  f.reviews[0].body = cubicCleanSummary;
+  f.checks = [{ app: { id: 1082092 }, head_sha: head, status: 'completed', conclusion: 'success' }];
+  assert.equal(admissionDecision(f).review.provider, 'Cubic');
+  for (const change of [
+    { commit_id: base },
+    { user: { id: 55, type: 'Bot' } },
+    { state: 'PENDING' },
+    { submitted_at: null },
+    { body: cubicCleanSummary.replace('**No issues found**', '**1 issue found**') },
+    { body: cubicCleanSummary.replace('**No issues found**', 'Review skipped') },
+  ]) {
+    assert.throws(() => admissionDecision({ ...f, reviews: [{ ...f.reviews[0], ...change }] }));
+  }
+  f.threads = [{ isResolved: false, isOutdated: false }];
+  assert.throws(() => admissionDecision(f), /Unresolved review findings/);
+  f.threads = [];
+  f.files[0].filename = '.github/workflows/ci.yml';
+  assert.throws(() => admissionDecision(f), /exact-head collaborator approval/);
+});
 test('only completed authenticated exact-head provider review admits ordinary fixes', () => {
   assert.equal(admissionDecision(fixture()).risk, 'low');
   for (const change of [
