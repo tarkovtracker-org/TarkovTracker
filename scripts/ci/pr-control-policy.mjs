@@ -119,6 +119,7 @@ export function renderControlPanel({
     `**Last result:** ${result}`,
     '',
     `PR state: **${state}**. CI, preview, findings, and sensitive-change approval still apply.`,
+    'Stop pauses automatic PR previews. Existing deployments remain available; manual and required queue previews use their own authorization.',
     panelGuidance(terminal),
     `<!-- revision:${revision} -->`,
   ].join('\n');
