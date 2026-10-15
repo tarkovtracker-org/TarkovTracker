@@ -1,6 +1,16 @@
 name: Queue metadata read probe
 on:
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Owned canary PR number
+        type: number
+        default: 1240
+        required: true
+      wait_for_entry:
+        description: Wait up to 60 seconds for an entry before the field probe
+        type: boolean
+        default: false
 permissions: {}
 jobs:
   probe:
@@ -13,30 +23,66 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
+            const number = Number(context.payload.inputs.pr_number);
+            if (!Number.isSafeInteger(number) || number <= 0) throw new Error('Expected a positive PR number.');
             const observations = [];
-            const queries = [
-              ['pr-entry', 'query { repository(owner:"tarkovtracker-org",name:"TarkovTracker") { pullRequest(number:1240) { headRefOid mergeQueueEntry { position baseCommit { oid } headCommit { oid } pullRequest { number headRefOid } } } } }'],
-              ['queue-id', 'query { repository(owner:"tarkovtracker-org",name:"TarkovTracker") { mergeQueue(branch:"main") { id } } }'],
-              ['queue-config', 'query { repository(owner:"tarkovtracker-org",name:"TarkovTracker") { mergeQueue(branch:"main") { configuration { maximumEntriesToBuild maximumEntriesToMerge mergeMethod mergingStrategy } } } }'],
-              ['original-query', 'query { repository(owner:"tarkovtracker-org",name:"TarkovTracker") { pullRequest(number:1240) { headRefOid mergeQueueEntry { position baseCommit { oid } headCommit { oid } pullRequest { number headRefOid } mergeQueue { configuration { maximumEntriesToBuild maximumEntriesToMerge mergeMethod mergingStrategy } } } } } }'],
-            ];
-            for (const [name, query] of queries) {
+            const repo = (body) => `query { repository(owner:"tarkovtracker-org",name:"TarkovTracker") { ${body} } }`;
+            const pr = (body) => repo(`pullRequest(number:${number}) { ${body} }`);
+            const safeErrors = (error) => (error.errors || []).map(({type,path}) => ({
+              type: typeof type === 'string' ? type.replace(/[^A-Z_]/g, '') : 'UNKNOWN',
+              path: Array.isArray(path) ? path.filter((part) => Number.isSafeInteger(part) || (typeof part === 'string' && /^[a-zA-Z_][a-zA-Z0-9_]{0,79}$/.test(part))) : [],
+            }));
+            const read = async (name, query) => {
               try {
-                observations.push({name, data: await github.graphql(query)});
+                const data = await github.graphql(query);
+                observations.push({name,data});
+                return {data};
               } catch (error) {
-                observations.push({name, errors: (error.errors || []).map(({type,path,message}) => ({type,path,message}))});
+                const errors = safeErrors(error);
+                observations.push({name,errors});
+                return {errors};
               }
+            };
+            await read('root-queue-id', repo('mergeQueue(branch:"main") { id }'));
+            for (const field of ['maximumEntriesToBuild','maximumEntriesToMerge','mergeMethod','mergingStrategy']) {
+              await read(`root-config-${field}`, repo(`mergeQueue(branch:"main") { configuration { ${field} } }`));
             }
-            for (const [name, route] of [
-              ['effective-rules', 'GET /repos/{owner}/{repo}/rules/branches/{branch}'],
-              ['disabled-rule', 'GET /repos/{owner}/{repo}/rulesets/{ruleset_id}'],
-            ]) {
-              try {
-                const {status,data} = await github.request(route, {...context.repo, branch:'main', ruleset_id:25157234});
-                const rules = Array.isArray(data) ? data : data.rules;
-                observations.push({name,status,rules:rules.map(({type,parameters,ruleset_id}) => ({type,parameters,ruleset_id}))});
-              } catch (error) {
-                observations.push({name,status:error.status,message:error.message});
+            if (context.payload.inputs.wait_for_entry === 'true') {
+              const deadline = Date.now() + 60000;
+              let polls = 0;
+              while (Date.now() < deadline) {
+                polls += 1;
+                try {
+                  const data = await github.graphql(pr('headRefOid mergeQueueEntry { id }'));
+                  if (data.repository?.pullRequest?.mergeQueueEntry) {
+                    observations.push({name:'entry-observed',polls,data});
+                    break;
+                  }
+                } catch (error) {
+                  observations.push({name:'entry-wait-error',polls,errors:safeErrors(error)});
+                  break;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 2000));
               }
+              observations.push({name:'entry-wait-complete',polls});
+            }
+            for (const [name,selection] of [
+              ['entry-id','id'],
+              ['entry-position','position'],
+              ['entry-base','baseCommit { oid }'],
+              ['entry-head','headCommit { oid }'],
+              ['entry-member','pullRequest { number headRefOid }'],
+              ['entry-queue-id','mergeQueue { id }'],
+              ['entry-queue-config','mergeQueue { configuration { maximumEntriesToBuild maximumEntriesToMerge mergeMethod mergingStrategy } }'],
+              ['reduced-membership','position baseCommit { oid } headCommit { oid } pullRequest { number headRefOid }'],
+              ['original-combined','position baseCommit { oid } headCommit { oid } pullRequest { number headRefOid } mergeQueue { configuration { maximumEntriesToBuild maximumEntriesToMerge mergeMethod mergingStrategy } }'],
+            ]) {
+              await read(name, pr(`headRefOid mergeQueueEntry { ${selection} }`));
+            }
+            try {
+              const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo,branch:'main',per_page:100});
+              observations.push({name:'effective-rules',status:200,rules:rules.filter(({type}) => type === 'merge_queue').map(({type,parameters,ruleset_id,ruleset_source,ruleset_source_type}) => ({type,parameters,ruleset_id,ruleset_source,ruleset_source_type}))});
+            } catch (error) {
+              observations.push({name:'effective-rules',status:error.status || 'UNKNOWN'});
             }
             for (const observation of observations) core.info(JSON.stringify(observation));
