@@ -11,7 +11,9 @@ const payload = {
   data: { items: [{ id: 'item', name: 'Équipement' }] },
   dataOverlay: { status: 'fresh', version: '1.2', generated: '2026-09-25', sha256: 'abc123' },
 };
-function harness(options: { cache?: boolean; precomputed?: boolean; response?: boolean } = {}) {
+function harness(
+  options: { cache?: boolean; precomputed?: boolean; response?: boolean; waitUntil?: boolean } = {}
+) {
   const entries = new Map<string, Response>();
   const cache = {
     match: vi.fn(async (request: Request) => entries.get(request.url)?.clone()),
@@ -27,7 +29,10 @@ function harness(options: { cache?: boolean; precomputed?: boolean; response?: b
   app.use(
     eventHandler((event) => {
       event.context.cloudflare = {
-        context: { waitUntil: (task: Promise<unknown>) => background.push(task) },
+        context:
+          options.waitUntil === false
+            ? {}
+            : { waitUntil: (task: Promise<unknown>) => background.push(task) },
       };
       const query = getQuery(event);
       const key = `items-${query.lang ?? 'en'}-${query.gameMode ?? 'regular'}`;
@@ -54,6 +59,28 @@ describe('edgeCache final response mode through H3', () => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
+  it.each([true, false])(
+    'serializes a cold response once with waitUntil=%s and preserves both bodies',
+    async (waitUntil) => {
+      const h = harness({ waitUntil });
+      const toJSON = vi.fn(() => payload);
+      const fresh = { ...payload, toJSON };
+      h.fetcher.mockResolvedValue(fresh);
+      const response = await h.request();
+      expect(response.headers.get('x-cache-status')).toBe('MISS');
+      expect(response.headers.get('x-overlay-sha256')).toBe('abc123');
+      expect(await response.text()).toBe(JSON.stringify(payload));
+      await Promise.all(h.background);
+      const stored = [...h.entries.values()][0]!;
+      expect(await stored.text()).toBe(JSON.stringify(payload));
+      expect(stored.headers.get('x-cache-response-version')).toBe('1');
+      expect(stored.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=120');
+      expect(response.headers.has('x-cache-response-version')).toBe(false);
+      expect(response.headers.has('x-cache-stored-at')).toBe(false);
+      expect(h.cache.put).toHaveBeenCalledOnce();
+      expect(toJSON).toHaveBeenCalledOnce();
+    }
+  );
   it('preserves JSON and public headers on MISS and HIT while storing overlay metadata', async () => {
     const h = harness();
     const miss = await h.request();
