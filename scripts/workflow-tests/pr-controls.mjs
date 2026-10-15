@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { readFileSync, rmSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { jobBlock, permissionsBlock } from './helpers/workflow-blocks.mjs';
@@ -1229,4 +1229,47 @@ test('a cross-source timestamp tie favors Stop and same-source ties follow serve
     assert.equal(selectPreviewAuthorization([right, left]).grant, null);
   }
   assert.ok(comparePreviewIntents(record('control', 11, true), record('control', 10, false)) < 0);
+});
+test('confirmed receipt loss fails native head/group admission before panel or artifact preparation can fail', async () => {
+  for (const failure of ['panel-read', 'artifact-storage']) {
+    const f = fixture();
+    f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+    f.stateAvailable = false;
+    f.context.eventName = 'pull_request_target';
+    const queueSha = 'd'.repeat(40);
+    f.github.rest.git.listMatchingRefs = async () => ({
+      data: [
+        {
+          ref: 'refs/heads/gh-readonly-queue/main/pr-1-aabb',
+          object: { sha: queueSha },
+        },
+      ],
+    });
+    const blocker = join(EVIDENCE_DIRECTORY, 'blocked-recovery-artifact');
+    writeFileSync(blocker, 'fixture');
+    if (failure === 'panel-read')
+      f.github.rest.issues.getComment = async () => {
+        throw new Error('Injected panel read failure');
+      };
+    await assert.rejects(
+      prepareControls({
+        github: f.github,
+        context: f.context,
+        core: f.core,
+        number: 1,
+        evidenceDirectory: blocker,
+      })
+    );
+    assert.deepEqual(
+      f.pointers.map(({ context, state, sha }) => [context, state, sha]),
+      [
+        ['Review Admission', 'failure', head],
+        ['Review Admission', 'failure', queueSha],
+      ]
+    );
+    assert.equal(f.pointer.id, 90); // No replacement journal pointer was uploaded or published.
+    assert.equal(f.outputs.changed, undefined);
+    assert.equal(f.comments.length, 0);
+    await assert.rejects(currentAdminAttestation(f.github, repo, 1, head), /missing/);
+  }
 });

@@ -154,7 +154,9 @@ receipt upload. Only one exact unchecked-to-checked transition is accepted; any 
 copied comment ID, stale body/revision/head, old queued operation, or workflow rerun is rejected.
 Bot edits do not trigger another operation. New commits and lost admin access invalidate the
 attestation; a revoke clears it and fails PR/queue admission statuses synchronously. Missing or
-expired newest state fails closed, without falling back to an older approval.
+expired newest state fails closed, without falling back to an older approval. When recovery
+confirms receipt loss, the App fails native PR/queue admission before panel reads or artifact
+preparation/upload, so a later storage or presentation failure cannot leave stale green admission.
 
 Agents use structured dispatch and receipts, without reading or posting conversation commands:
 

@@ -329,6 +329,7 @@ export async function prepareControls({
   requireEvidence(context.ref === 'refs/heads/main', 'Controls require trusted main.');
   const snapshot = await controlSnapshot(github, context, number);
   if (unrelatedComment(context, snapshot.previous)) return;
+  await invalidateRecoveredState(github, context, snapshot);
   if (!journalAvailable(snapshot.previous, context, core))
     return repairExhaustedPanel(github, context.repo, snapshot.previous);
   await savePreparedState(await prepareState(github, context, snapshot), core, evidenceDirectory);
@@ -545,4 +546,9 @@ async function repairExhaustedPanel(github, repo, previous) {
     `${CONTROL_MARKER}\n### TarkovTracker · PR controls\nControls are disabled for this PR. Use provider/human review, /preview, /preview stop, or the existing manual preview workflow.`;
   if (comment.body === body) return;
   await github.rest.issues.updateComment({ ...repo, comment_id: previous.commentId, body });
+}
+async function invalidateRecoveredState(github, context, snapshot) {
+  if (!snapshot.previous?.recovered) return;
+  // A native queue only sees statuses: receipt loss must fail it before any panel/upload work.
+  await invalidateRevokedGrant(github, context, snapshot.pull);
 }
