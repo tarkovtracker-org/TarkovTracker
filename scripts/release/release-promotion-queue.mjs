@@ -43,7 +43,7 @@ function requireRunIdentity(run, repo, event) {
     [ADMISSION_PATH, RELEASE_PATH].includes(run.path),
     'Unknown release enqueue source workflow.'
   );
-  requireCondition(FULL_SHA.test(run.head_sha), 'Missing immutable controller source.');
+  requireCondition(FULL_SHA.test(run.head_sha), 'Missing immutable source run revision.');
 }
 function requireMainSource(run, repo) {
   const identity = [run.head_branch, run.head_repository?.full_name];
@@ -75,20 +75,28 @@ async function sourceWakeup(github, context) {
   const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: event.id });
   requireRunIdentity(run, repo, event);
   if (!requireSourceEvent(run, repo)) return null;
-  if (run.run_attempt > event.run_attempt) return null;
+  if (!completedAttempt(run, event)) return null;
+  if (run.path === RELEASE_PATH) await requirePolicySource(github, repo, run.head_sha);
+  return run;
+}
+function completedAttempt(run, event) {
+  if (run.run_attempt > event.run_attempt) return false;
   requireCondition(run.run_attempt === event.run_attempt, 'Source attempt identity changed.');
-  if (run.status !== 'completed') return null;
+  if (run.status !== 'completed') return false;
   requireCondition(run.conclusion === 'success', 'Source workflow did not succeed.');
+  return true;
+}
+async function requirePolicySource(github, repo, sha) {
+  requireCondition(FULL_SHA.test(sha), 'Missing immutable controller policy source.');
   const { data: comparison } = await github.rest.repos.compareCommits({
     ...repo,
-    base: run.head_sha,
+    base: sha,
     head: 'main',
   });
   requireCondition(
     ['ahead', 'identical'].includes(comparison.status),
     'Controller source is outside trusted main history.'
   );
-  return run;
 }
 async function sourceArtifacts(github, repo, run) {
   const prefix = run.path === ADMISSION_PATH ? 'review-admission-' : 'release-promotion-';
@@ -154,6 +162,9 @@ async function admissionCandidate(github, repo, run, source) {
     run,
     source.head
   );
+  // Admission event metadata may identify the candidate; the run-owned receipt records
+  // the actual trusted checkout. Prove that source before considering even skipped PRs.
+  await requirePolicySource(github, repo, receipt.workflowSourceSha);
   if (receipt.statusSha !== receipt.headSha) return null; // Integration receipts cannot enqueue a PR again.
   requireCondition(
     Number.isSafeInteger(receipt.number) && receipt.number > 0,
