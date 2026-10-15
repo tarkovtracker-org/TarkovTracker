@@ -21,7 +21,7 @@ function parseArchive(archive, head) {
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 10000,
     killSignal: 'SIGKILL',
-  }).trim();
+  }).replace(/\r?\n$/, '');
   requireEvidence(
     entries === `${head}.json`,
     'Admission artifact must contain exactly the expected receipt.'

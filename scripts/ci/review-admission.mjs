@@ -416,6 +416,7 @@ function requireEventGroup(eventGroup, current) {
 }
 async function evaluateScope(github, context, core, target, source) {
   const scope = await reviewScope(github, context, target);
+  await writeAdmissionTarget(context, core, scope.number);
   try {
     const head = await evaluateAdmission({ github, context, number: scope.number, source });
     core.setOutput('admission_sha', head.statusSha);
@@ -474,4 +475,15 @@ export async function publishReviewScope({ github, context, head, queued }) {
     await scopeStatuses(github, context, shas, 'failure', error.message);
     throw error;
   }
+}
+async function writeAdmissionTarget(context, core, number) {
+  const locator = {
+    repository: `${context.repo.owner}/${context.repo.repo}`,
+    number,
+    runId: Number(context.runId),
+    runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+  };
+  await mkdir('review-admission-evidence', { recursive: true });
+  await writeFile('review-admission-evidence/target.json', `${JSON.stringify(locator)}\n`);
+  core.setOutput('pull_request', String(number));
 }

@@ -15,8 +15,33 @@ function json(endpoint) {
 function repository(params) {
   return `repos/${params.owner}/${params.repo}`;
 }
+function collaboratorPermission(params) {
+  try {
+    return json(`${repository(params)}/collaborators/${params.username}/permission`);
+  } catch (error) {
+    const match = /\(HTTP (403|404)\)/.exec(String(error.stderr));
+    if (match)
+      throw Object.assign(new Error('Collaborator permission is unavailable.'), {
+        status: Number(match[1]),
+      });
+    throw new Error('Collaborator permission read failed.');
+  }
+}
 function adapter() {
   return {
+    graphql: async (query, variables) => {
+      const response = JSON.parse(
+        execFileSync('gh', ['api', 'graphql', '--input', '-'], {
+          input: JSON.stringify({ query, variables }),
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 2000000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      );
+      requireEvidence(!response.errors, 'Control state query failed.');
+      return response.data;
+    },
     paginate: async (endpoint, params) => {
       const pages = JSON.parse(
         request(endpoint(params), ['--paginate', '--slurp']).toString('utf8')
@@ -25,8 +50,7 @@ function adapter() {
     },
     rest: {
       repos: {
-        getCollaboratorPermissionLevel: async (params) =>
-          json(`${repository(params)}/collaborators/${params.username}/permission`),
+        getCollaboratorPermissionLevel: async (params) => collaboratorPermission(params),
         listCommitStatusesForRef: (params) =>
           `${repository(params)}/commits/${params.ref}/statuses?per_page=100`,
         compareCommits: async (params) =>

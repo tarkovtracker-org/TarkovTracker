@@ -2,13 +2,17 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { requestPreviewForHead } from '../preview/comment-request.mjs';
 import { allPages, queuedRefs, requirePrIdentity } from './review-admission-api.mjs';
+import { controlRefreshTargets } from './pr-control-targets.mjs';
 import { controlPanelEvidence } from './pr-control-panel.mjs';
 import {
   CONTROL_MARKER,
   CONTROL_ANCHOR,
+  CONTROL_WRITE_LIMIT,
+  REVOCATION_DESCRIPTION,
   controlContext,
   controlEdit,
   renderControlPanel,
@@ -38,33 +42,6 @@ function controlCommentEvent(context) {
     payload.changes?.body?.from?.startsWith(CONTROL_MARKER),
   ].every(Boolean);
 }
-async function refreshTargets(github, context) {
-  const { data: run } = await github.rest.actions.getWorkflowRunAttempt({
-    ...context.repo,
-    run_id: context.payload.workflow_run.id,
-    attempt_number: context.payload.workflow_run.run_attempt,
-  });
-  requireEvidence(
-    run.repository?.full_name === `${context.repo.owner}/${context.repo.repo}`,
-    'Refresh source repository mismatch.'
-  );
-  requireEvidence(
-    [
-      '.github/workflows/ci.yml',
-      '.github/workflows/preview.yml',
-      '.github/workflows/review-admission.yml',
-    ].includes(run.path),
-    'Refresh source workflow mismatch.'
-  );
-  requireEvidence(run.status === 'completed', 'Refresh source is not completed.');
-  const pulls = await allPages(github, github.rest.pulls.list, {
-    ...context.repo,
-    state: 'open',
-    base: 'main',
-  });
-  requireEvidence(pulls.length <= 100, 'Too many PRs for one bounded panel refresh.');
-  return pulls.map((pr) => pr.number);
-}
 function commentTargets(context) {
   return controlCommentEvent(context) ? [context.payload.issue.number] : [];
 }
@@ -81,7 +58,7 @@ function directTargets(context) {
 }
 export async function controlTargets({ github, context }) {
   if (context.ref !== 'refs/heads/main') return [];
-  if (context.eventName === 'workflow_run') return refreshTargets(github, context);
+  if (context.eventName === 'workflow_run') return controlRefreshTargets(github, context);
   if (context.eventName === 'issue_comment') return commentTargets(context);
   return directTargets(context);
 }
@@ -185,7 +162,7 @@ async function applyIntent(github, context, state, request, pull, run) {
     };
   if (request.operation === 'revoke-review') state.grant = null;
   if (request.operation === 'preview')
-    return (await requestPreviewForHead(github, context.repo, pull)).message;
+    return `Preview request received. [Dispatch result](${runUrl(context)}).`;
   return `${request.operation} accepted from @${request.actor.login}. [Request receipt](${runUrl(context)}).`;
 }
 async function processIntent(github, context, state, previous, comment, pull, run) {
@@ -218,6 +195,8 @@ const EMPTY_STATE = Object.freeze({
   lastIntentRunNumber: 0,
   result: 'Ready for a request.',
   pointerId: null,
+  runNumber: 0,
+  counter: 0,
   presentation: null,
   headSha: null,
   body: null,
@@ -236,6 +215,8 @@ function nextState(context, pull, previous, comment, grant, run, source) {
     issuer: null,
     workflowSourceSha: source,
     runId: run.id,
+    runNumber: run.run_number,
+    counter: previous.counter + 1,
     runAttempt: 1,
     result: previous.result,
     request: null,
@@ -270,6 +251,7 @@ function currentPresentation(state, pull, evidence) {
     grant: state.grant,
     result: state.result,
     state: pull.draft ? 'draft' : pull.state,
+    terminal: state.counter >= CONTROL_WRITE_LIMIT,
   };
 }
 function meaningfulChange(previous, state, comment) {
@@ -281,18 +263,34 @@ function meaningfulChange(previous, state, comment) {
   ].some(Boolean);
 }
 function refreshHeadMessage(state, previous) {
-  if (previous?.headSha !== state.headSha)
+  previous = previous ?? EMPTY_STATE;
+  if (previous.recovered) return;
+  if (previous.headSha !== state.headSha)
     state.result = 'Current commit refreshed; admin attestations apply to one exact commit.';
+}
+function synchronizeGrant(grant, context, run) {
+  if (!grant) return null;
+  const invalidated = [
+    context.eventName === 'pull_request_target',
+    context.payload.action === 'synchronize',
+    run.run_number > grant.runNumber,
+  ].every(Boolean);
+  return invalidated ? null : grant;
 }
 async function prepareState(github, context, snapshot) {
   const { pull, previous, run } = snapshot;
   const comment = await panelComment(github, context.repo, previous, pull.number);
-  const grant = await validPreviousGrant(github, context.repo, previous, pull);
+  const grant = synchronizeGrant(
+    await validPreviousGrant(github, context.repo, previous, pull),
+    context,
+    run
+  );
   const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const state = nextState(context, pull, previous, comment, grant, run, source);
   state.issuer = github.reviewAdmissionIssuer;
   refreshHeadMessage(state, previous);
   await processIntent(github, context, state, previous, comment, pull, run);
+  enforceJournalBudget(state);
   state.presentation = currentPresentation(
     state,
     pull,
@@ -303,18 +301,25 @@ async function prepareState(github, context, snapshot) {
   state.previousPointerId = (previous ?? EMPTY_STATE).pointerId;
   return state;
 }
-async function savePreparedState(state, core) {
+async function savePreparedState(state, core, evidenceDirectory) {
   if (!state) return;
-  await mkdir('pr-control-evidence', { recursive: true });
-  await writeFile('pr-control-evidence/state.json', `${JSON.stringify(state, null, 2)}\n`);
+  await mkdir(evidenceDirectory, { recursive: true });
+  await writeFile(join(evidenceDirectory, 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   core.setOutput('changed', 'true');
 }
-export async function prepareControls({ github, context, core, number }) {
+export async function prepareControls({
+  github,
+  context,
+  core,
+  number,
+  evidenceDirectory = 'pr-control-evidence',
+}) {
   requireQueueIssuer(github);
   requireEvidence(context.ref === 'refs/heads/main', 'Controls require trusted main.');
   const snapshot = await controlSnapshot(github, context, number);
   if (unrelatedComment(context, snapshot.previous)) return;
-  await savePreparedState(await prepareState(github, context, snapshot), core);
+  if (!journalAvailable(snapshot.previous, context, core)) return;
+  await savePreparedState(await prepareState(github, context, snapshot), core, evidenceDirectory);
 }
 async function revalidateRequest(github, context, state, previous, pull) {
   if (!state.request) return;
@@ -329,17 +334,20 @@ async function revalidateRequest(github, context, state, previous, pull) {
     'Control request changed during receipt upload.'
   );
 }
-export async function publishControls({ github, context, number, artifactId }) {
-  const state = JSON.parse(await readFile('pr-control-evidence/state.json', 'utf8'));
+export async function publishControls({
+  github,
+  context,
+  number,
+  artifactId,
+  evidenceDirectory = 'pr-control-evidence',
+}) {
+  const state = JSON.parse(await readFile(join(evidenceDirectory, 'state.json'), 'utf8'));
   requireEvidence(
     [state.number === number, state.runId === Number(context.runId)].every(Boolean),
     'Control publication identity mismatch.'
   );
   const previous = await currentControlState(github, context.repo, number, { recover: true });
-  requireEvidence(
-    (previous ?? EMPTY_STATE).pointerId === state.previousPointerId,
-    'A newer control receipt superseded this run.'
-  );
+  requirePublicationRevision(previous, state);
   const { data: pull } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
   requireEvidence(
     pull.head.sha === state.headSha,
@@ -356,7 +364,7 @@ export async function publishControls({ github, context, number, artifactId }) {
     sha: CONTROL_ANCHOR,
     state: 'success',
     context: controlContext(number),
-    description: `Control panel ${state.commentId}`,
+    description: `Control panel ${state.commentId} revision ${state.counter}`,
     target_url: `${runUrl(context)}#artifacts/${artifactId}`,
   });
   await github.rest.issues.updateComment({
@@ -364,12 +372,31 @@ export async function publishControls({ github, context, number, artifactId }) {
     comment_id: state.commentId,
     body: state.body,
   });
+  await recheckAfterInvalidation(github, context, previous, state, number);
   requireEvidence(state.operationResult?.status !== 'rejected', state.result);
-  await requestAdmission(github, context, state, number);
+  await executeAcceptedRequest(github, context, state, number, pull);
 }
-async function requestAdmission(github, context, state, number) {
+async function executeAcceptedRequest(github, context, state, number, pull) {
   if (!state.request) return;
-  if (state.request.operation === 'preview') return;
+  if (state.request.operation === 'preview') {
+    const current = await requireCurrentRequestActor(github, context, state, pull);
+    return requestPreviewForHead(github, context.repo, current);
+  }
+  await github.rest.actions.createWorkflowDispatch({
+    ...context.repo,
+    workflow_id: 'review-admission.yml',
+    ref: 'main',
+    inputs: { pull_request: String(number) },
+  });
+}
+function needsGrantInvalidation(previous, state) {
+  previous = previous ?? EMPTY_STATE;
+  if (previous.recovered) return true;
+  return [Boolean(previous.grant), !state.grant, previous.headSha === state.headSha].every(Boolean);
+}
+async function recheckAfterInvalidation(github, context, previous, state, number) {
+  if (!needsGrantInvalidation(previous, state)) return;
+  if (hasAdmissionRequest(state)) return;
   await github.rest.actions.createWorkflowDispatch({
     ...context.repo,
     workflow_id: 'review-admission.yml',
@@ -378,9 +405,7 @@ async function requestAdmission(github, context, state, number) {
   });
 }
 async function invalidateChangedGrant(github, context, previous, state, pull) {
-  if (!previous?.grant) return;
-  if (state.grant) return;
-  await invalidateRevokedGrant(github, context, pull);
+  if (needsGrantInvalidation(previous, state)) await invalidateRevokedGrant(github, context, pull);
 }
 async function invalidateRevokedGrant(github, context, pull) {
   const refs = await queuedRefs(github, context.repo, pull.number);
@@ -391,7 +416,52 @@ async function invalidateRevokedGrant(github, context, pull) {
       sha,
       context: 'Review Admission',
       state: 'failure',
-      description: 'Admin review attestation revoked; fresh admission is required.',
+      description: REVOCATION_DESCRIPTION,
       target_url: runUrl(context),
     });
+}
+function enforceJournalBudget(state) {
+  if (state.counter < CONTROL_WRITE_LIMIT) return;
+  state.grant = null;
+  state.request = null;
+  state.operationResult = {
+    status: 'rejected',
+    reason: 'Control journal write budget reached.',
+    runId: state.runId,
+    expectedHead: state.headSha,
+  };
+  state.result =
+    'Control journal reached its 900-update limit. Admin attestations are disabled for this PR; use existing review and preview workflows.';
+}
+async function requireCurrentRequestActor(github, context, state, pull) {
+  const { data: current } = await github.rest.pulls.get({
+    ...context.repo,
+    pull_number: pull.number,
+  });
+  requireEvidence(current.head.sha === state.headSha, 'PR head changed before preview dispatch.');
+  const permission = await controlRole(github, context.repo, state.request.actor);
+  requireControlActor(state.request.actor, permission, 'preview');
+  return current;
+}
+function requirePublicationRevision(previous, state) {
+  previous = previous ?? EMPTY_STATE;
+  requireEvidence(
+    previous.pointerId === state.previousPointerId,
+    'A newer control receipt superseded this run.'
+  );
+  requireEvidence(
+    state.runNumber > previous.runNumber,
+    'A newer control run already committed state; this receipt cannot replace it.'
+  );
+}
+function hasAdmissionRequest(state) {
+  return ['approve-review', 'revoke-review', 'recheck'].includes(state.request?.operation);
+}
+function journalAvailable(previous, context, core) {
+  if ((previous ?? EMPTY_STATE).counter < CONTROL_WRITE_LIMIT) return true;
+  const message =
+    'Control journal is exhausted for this PR; use existing review/preview workflows.';
+  requireEvidence(!isIntent(context), message);
+  core.notice(message);
+  return false;
 }

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { jobBlock, permissionsBlock } from './helpers/workflow-blocks.mjs';
+import { readAdmissionArchive } from '../ci/review-admission-archive.mjs';
 import { after, test } from 'node:test';
 import { requireReviewAdmission } from '../ci/review-admission-binding.mjs';
 import { admissionDecision } from '../ci/review-admission-policy.mjs';
@@ -17,6 +21,7 @@ import {
 } from '../ci/pr-control-policy.mjs';
 import { controlTargets, prepareControls, publishControls } from '../ci/pr-controls.mjs';
 import { requestPreviewForHead } from '../preview/comment-request.mjs';
+const EVIDENCE_DIRECTORY = mkdtempSync(join(tmpdir(), 'tt-pr-controls-test-'));
 const repo = { owner: 'example', repo: 'repo' };
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
@@ -36,7 +41,7 @@ after(() => {
     if (originalEnv[i] === undefined) delete process.env[name];
     else process.env[name] = originalEnv[i];
   });
-  rmSync('pr-control-evidence', { recursive: true, force: true });
+  rmSync(EVIDENCE_DIRECTORY, { recursive: true, force: true });
 });
 function zip(receipt, filename = 'state.json') {
   return execFileSync(
@@ -92,6 +97,8 @@ function fixture(operation = 'approve-review') {
     commentId: 55,
     lastIntentRunNumber: 5,
     runId: 700,
+    runNumber: 6,
+    counter: 1,
     runAttempt: 1,
     workflowSourceSha: base,
     grant: null,
@@ -104,7 +111,7 @@ function fixture(operation = 'approve-review') {
     context: controlContext(1),
     creator: { id: issuer.botId },
     state: 'success',
-    description: 'Control panel 55',
+    description: 'Control panel 55 revision 1',
     target_url: 'https://github.com/example/repo/actions/runs/700#artifacts/77',
   };
   const comment = {
@@ -148,8 +155,10 @@ function fixture(operation = 'approve-review') {
       getCollaboratorPermissionLevel: () => reply({ role_name: f.role, user: f.editor }),
       createCommitStatus: (params) => {
         f.pointers.push(params);
-        f.pointer = { ...params, id: 91, creator: { id: issuer.botId } };
-        return reply(f.pointer);
+        const status = { ...params, id: 90 + f.pointers.length, creator: { id: issuer.botId } };
+        if (params.context === controlContext(1)) f.pointer = status;
+        else f.statuses.unshift(status);
+        return reply(status);
       },
     },
     pulls: {
@@ -172,7 +181,7 @@ function fixture(operation = 'approve-review') {
       getWorkflowRun: ({ run_id }) =>
         reply(
           Number(run_id) === f.previous.runId
-            ? { ...run, id: f.previous.runId, run_number: f.previous.lastIntentRunNumber + 1 }
+            ? { ...run, id: f.previous.runId, run_number: f.previous.runNumber }
             : f.run
         ),
       getWorkflowRunAttempt: ({ run_id, attempt_number }) => {
@@ -182,7 +191,7 @@ function fixture(operation = 'approve-review') {
             ? {
                 ...run,
                 id: f.previous.runId,
-                run_number: f.previous.lastIntentRunNumber + 1,
+                run_number: f.previous.runNumber,
                 run_attempt: 1,
               }
             : f.run
@@ -209,14 +218,33 @@ function fixture(operation = 'approve-review') {
       const { data } = await endpoint(params);
       return data.artifacts ?? data;
     },
-    graphql: async () => ({
-      node: {
-        fullDatabaseId: '55',
-        body: f.comment.body,
-        lastEditedAt: '2026-10-15T16:00:00Z',
-        editor: { databaseId: f.editor.id, login: f.editor.login },
-      },
-    }),
+    graphql: async (query) => {
+      if (query.includes('query ControlPointer'))
+        return {
+          repository: {
+            object: {
+              status: {
+                context: f.pointer
+                  ? {
+                      ...f.pointer,
+                      state: f.pointer.state.toUpperCase(),
+                      targetUrl: f.pointer.target_url,
+                      creator: { databaseId: f.pointer.creator.id },
+                    }
+                  : null,
+              },
+            },
+          },
+        };
+      return {
+        node: {
+          fullDatabaseId: '55',
+          body: f.comment.body,
+          lastEditedAt: '2026-10-15T16:00:00Z',
+          editor: { databaseId: f.editor.id, login: f.editor.login },
+        },
+      };
+    },
   };
   f.core = {
     setOutput: (key, value) => {
@@ -240,8 +268,14 @@ function fixture(operation = 'approve-review') {
   return f;
 }
 const prepare = (f) =>
-  prepareControls({ github: f.github, context: f.context, core: f.core, number: 1 });
-const prepared = () => JSON.parse(readFileSync('pr-control-evidence/state.json', 'utf8'));
+  prepareControls({
+    github: f.github,
+    context: f.context,
+    core: f.core,
+    number: 1,
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+  });
+const prepared = () => JSON.parse(readFileSync(join(EVIDENCE_DIRECTORY, 'state.json'), 'utf8'));
 function policyInput() {
   return {
     pr: { state: 'open', draft: false, user: actor, head: { sha: head } },
@@ -445,6 +479,7 @@ test('revocation clears the grant and older queued intent cannot resurrect it', 
   const revoked = prepared();
   assert.equal(revoked.grant, null);
   f.previous = { ...revoked, runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
   f.run.run_number = 9;
   f.context.payload.inputs.operation = 'approve-review';
   await prepare(f);
@@ -478,7 +513,13 @@ test('reruns are rejected before any state or comment mutation', async () => {
 test('publication rechecks actor and head, pins immutable artifact, and requests the existing admission gate', async () => {
   const f = fixture();
   await prepare(f);
-  await publishControls({ github: f.github, context: f.context, number: 1, artifactId: 88 });
+  await publishControls({
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+    github: f.github,
+    context: f.context,
+    number: 1,
+    artifactId: 88,
+  });
   assert.equal(f.pointers[0].sha, CONTROL_ANCHOR);
   assert.match(f.pointers[0].target_url, /800#artifacts\/88$/);
   assert.equal(f.comments[0].comment_id, 55);
@@ -498,7 +539,13 @@ test('head/role changes during upload prevent pointer and comment publication', 
     await prepare(f);
     change(f);
     await assert.rejects(
-      publishControls({ github: f.github, context: f.context, number: 1, artifactId: 88 })
+      publishControls({
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+      })
     );
     assert.equal(f.pointers.length, 0);
     assert.equal(f.comments.length, 0);
@@ -557,7 +604,13 @@ test('successful revocation fails head/queue admission before updating durable c
     data: [{ ref: 'refs/heads/gh-readonly-queue/main/pr-1-aabb', object: { sha: 'd'.repeat(40) } }],
   });
   await prepare(f);
-  await publishControls({ github: f.github, context: f.context, number: 1, artifactId: 88 });
+  await publishControls({
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+    github: f.github,
+    context: f.context,
+    number: 1,
+    artifactId: 88,
+  });
   assert.deepEqual(
     f.pointers.map((item) => [item.context, item.state, item.sha]),
     [
@@ -586,6 +639,7 @@ test('rendering unchanged passive state does not create another comment or recei
   f.context.eventName = 'pull_request_target';
   await prepare(f);
   f.previous = { ...prepared(), runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
   f.comment.body = f.previous.body;
   f.outputs = {};
   f.core.setOutput = (key, value) => {
@@ -595,11 +649,12 @@ test('rendering unchanged passive state does not create another comment or recei
   assert.equal(f.outputs.changed, undefined);
   assert.equal(f.comments.length, 0);
 });
-test('rerunning an old source cannot resurrect a grant after the latest revoke', async () => {
+test('a rerun cannot change the immutable first-attempt source receipt', async () => {
   const f = fixture();
-  f.previous.grant = null;
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
   f.github.rest.actions.getWorkflowRun = async () => ({ data: { ...f.run, run_attempt: 2 } });
-  assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
+  assert.equal((await currentAdminAttestation(f.github, repo, 1, head)).reviewId, 600);
+  assert.equal(f.pointers.length, 0);
 });
 test('privileged controls workflow is main-only, serialized, artifact-first, and never executes candidate code', () => {
   const source = readFileSync('.github/workflows/pr-controls.yml', 'utf8');
@@ -611,8 +666,17 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   );
   assert.equal((source.match(/ref: main/g) ?? []).length, 2);
   assert.equal((source.match(/persist-credentials: false/g) ?? []).length, 2);
-  assert.match(source, /actions: write/);
-  assert.match(source, /issues: write/);
+  const controls = jobBlock(source, 'controls');
+  const targets = jobBlock(source, 'targets');
+  assert.match(controls, /if: github.ref == 'refs\/heads\/main'/);
+  assert.equal(
+    permissionsBlock(controls, '    ').trim(),
+    'actions: write\n      checks: read\n      contents: read\n      issues: write\n      pull-requests: read\n      statuses: read'
+  );
+  assert.equal(
+    permissionsBlock(targets, '    ').trim(),
+    'actions: read\n      contents: read\n      pull-requests: read'
+  );
   assert.match(source, /pull-requests: read/);
   assert.match(source, /scope: 'controls'/);
   assert.ok(
@@ -683,7 +747,7 @@ test('enqueue consumer rejects an old green admission receipt after explicit rev
     (await requireReviewAdmission({ github: f.github, repo, head, number: 1 })).approved,
     true
   );
-  f.previous = { ...f.previous, grant: null, runId: 701, lastIntentRunNumber: 7 };
+  f.previous = { ...f.previous, grant: null, runId: 701, runNumber: 7, lastIntentRunNumber: 7 };
   f.pointer = {
     ...f.pointer,
     id: 91,
@@ -718,4 +782,298 @@ test('pull_request_target receipt trusts the protected main policy source, not R
     return { data: { status: 'ahead' } };
   };
   assert.equal((await currentControlState(f.github, repo, 1)).commentId, 55);
+});
+test('a push away and back to the reviewed SHA still invalidates the previous attestation', async () => {
+  const f = fixture();
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  f.context.eventName = 'pull_request_target';
+  f.context.payload.action = 'synchronize';
+  await prepare(f);
+  assert.equal(prepared().grant, null);
+});
+test('an older queued run keeps a rejection receipt but cannot overwrite newer durable state', async () => {
+  const f = fixture();
+  f.previous.runNumber = 11;
+  f.previous.lastIntentRunNumber = 11;
+  await prepare(f);
+  assert.equal(prepared().operationResult.status, 'rejected');
+  await assert.rejects(
+    publishControls({
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+    }),
+    /newer control run/
+  );
+  assert.equal(f.pointers.length, 0);
+  assert.equal(f.comments.length, 0);
+});
+test('confirmed missing state invalidates native admission before publishing the recovered empty grant', async () => {
+  const f = fixture();
+  f.stateAvailable = false;
+  f.context.eventName = 'pull_request_target';
+  await prepare(f);
+  assert.equal(prepared().grant, null);
+  await publishControls({
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+    github: f.github,
+    context: f.context,
+    number: 1,
+    artifactId: 88,
+  });
+  assert.equal(f.pointers[0].context, 'Review Admission');
+  assert.equal(f.pointers[0].state, 'failure');
+  assert.equal(f.pointers.at(-1).context, controlContext(1));
+});
+test('transient artifact API failures do not recover, clear a grant, or mutate the panel', async () => {
+  for (const endpoint of ['listWorkflowRunArtifacts', 'downloadArtifact']) {
+    const f = fixture();
+    f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+    f.github.rest.actions[endpoint] = async () => {
+      throw Object.assign(new Error('Transient API failure'), { status: 503 });
+    };
+    await assert.rejects(prepare(f), /Transient API failure/);
+    assert.equal(f.previous.grant.runId, 600);
+    assert.equal(f.pointers.length, 0);
+    assert.equal(f.outputs.changed, undefined);
+  }
+});
+test('archive validation rejects extra whitespace-named members', async () => {
+  const bytes = execFileSync('python3', [
+    '-c',
+    'import io,sys,zipfile; b=io.BytesIO(); z=zipfile.ZipFile(b,"w"); z.writestr("state.json","{}"); z.writestr(" ","extra"); z.close(); sys.stdout.buffer.write(b.getvalue())',
+  ]);
+  await assert.rejects(readAdmissionArchive(bytes, 'state'), /exactly the expected receipt/);
+});
+test('completed CI refreshes only its associated PR and main push refreshes none', async () => {
+  const f = fixture();
+  f.context.eventName = 'workflow_run';
+  f.context.payload = { workflow_run: { id: 800, run_attempt: 1 } };
+  Object.assign(f.run, {
+    path: '.github/workflows/ci.yml',
+    event: 'pull_request',
+    status: 'completed',
+    pull_requests: [{ number: 1 }],
+  });
+  f.github.rest.pulls.list = async () =>
+    assert.fail('A source run must not enumerate every open PR.');
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+  f.run.event = 'push';
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), []);
+});
+test('completed preview resolves its source CI and admission resolves only its bounded locator', async () => {
+  const f = fixture();
+  f.context.eventName = 'workflow_run';
+  f.context.payload = { workflow_run: { id: 800, run_attempt: 1 } };
+  Object.assign(f.run, {
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    status: 'completed',
+    display_title: 'Preview CI 40 request 55',
+  });
+  f.github.rest.actions.getWorkflowRun = async () => ({
+    data: {
+      id: 40,
+      path: '.github/workflows/ci.yml',
+      event: 'pull_request',
+      repository: { full_name: 'example/repo' },
+      pull_requests: [{ number: 1 }],
+    },
+  });
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+  f.run.path = '.github/workflows/review-admission.yml';
+  f.github.rest.actions.listWorkflowRunArtifacts = async () => ({
+    data: {
+      artifacts: [
+        { id: 51, name: 'review-admission-target-1', expired: false, size_in_bytes: 1000 },
+      ],
+    },
+  });
+  f.github.rest.actions.downloadArtifact = async () => ({
+    data: zip({ repository: 'example/repo', number: 1, runId: 800, runAttempt: 1 }, 'target.json'),
+  });
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+});
+test('a failed journal publication after revocation cannot revive the old grant on a fresh admission decision', async () => {
+  const f = fixture('revoke-review');
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  const original = f.github.rest.repos.createCommitStatus;
+  f.github.rest.repos.createCommitStatus = (params) => {
+    if (params.context === controlContext(1))
+      throw new Error('Injected journal publication failure');
+    return original(params);
+  };
+  await assert.rejects(
+    publishControls({
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+    }),
+    /Injected/
+  );
+  assert.equal(f.pointer.id, 90);
+  assert.equal(f.previous.grant.runId, 600);
+  f.statuses.unshift({
+    context: 'Review Admission',
+    state: 'pending',
+    creator: { id: issuer.botId },
+    target_url: 'https://github.com/example/repo/actions/runs/999',
+  });
+  const input = policyInput();
+  input.adminAttestation = await currentAdminAttestation(f.github, repo, 1, head);
+  assert.equal(input.adminAttestation, null);
+  assert.throws(() => admissionDecision(input), /independent review/);
+});
+test('journal lookup uses one named context and never scans every PR history', async () => {
+  const f = fixture();
+  f.github.rest.repos.listCommitStatusesForRef = async () =>
+    assert.fail('Journal reads must use the exact GraphQL context.');
+  assert.equal((await currentControlState(f.github, repo, 1)).counter, 1);
+});
+test('the reserved final journal revision disables attestations before GitHub status exhaustion', async () => {
+  const f = fixture();
+  f.previous.counter = 899;
+  f.pointer.description = 'Control panel 55 revision 899';
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  const state = prepared();
+  assert.equal(state.counter, 900);
+  assert.equal(state.grant, null);
+  assert.ok(!state.body.includes('- [ ]'));
+  assert.match(state.result, /900-update limit/);
+  await assert.rejects(
+    publishControls({
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+    }),
+    /900-update limit/
+  );
+  assert.equal(f.pointers[0].context, 'Review Admission');
+  assert.equal(f.pointers.at(-1).description, 'Control panel 55 revision 900');
+});
+test('head or actor changes after upload prevent preview dispatch, including after the state pointer step', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.head.sha = base;
+    },
+    (f) => {
+      f.role = 'read';
+    },
+  ]) {
+    const f = fixture('preview');
+    await prepare(f);
+    assert.equal(f.dispatches.length, 0);
+    const original = f.github.rest.issues.updateComment;
+    f.github.rest.issues.updateComment = (params) => {
+      const result = original(params);
+      change(f);
+      return result;
+    };
+    await assert.rejects(
+      publishControls({
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+      })
+    );
+    assert.equal(f.dispatches.length, 0);
+  }
+});
+test('one-shot preview reuses an active command-bound deployment instead of canceling it', async () => {
+  const f = fixture('preview');
+  const ci = {
+    id: 40,
+    run_attempt: 2,
+    path: '.github/workflows/ci.yml',
+    event: 'pull_request',
+    head_sha: head,
+    head_repository: { full_name: 'example/repo' },
+    head_branch: 'fix',
+    status: 'completed',
+    conclusion: 'success',
+    pull_requests: [{ number: 1, head: { sha: head }, base: { sha: base } }],
+    updated_at: '2026-10-15T15:00:00Z',
+  };
+  const active = {
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    display_title: 'Preview CI 40 request 123',
+    status: 'in_progress',
+    created_at: '2026-10-15T16:00:00Z',
+  };
+  f.github.rest.actions.listWorkflowRuns = async ({ workflow_id }) => ({
+    data: workflow_id === 'ci.yml' ? { workflow_runs: [ci] } : [active],
+  });
+  f.github.rest.checks.listForRef = async () => ({
+    data: [
+      {
+        id: 1,
+        app: { id: 15368 },
+        head_sha: head,
+        status: 'completed',
+        conclusion: 'success',
+        details_url: 'https://github.com/example/repo/actions/runs/40/job/77',
+      },
+    ],
+  });
+  assert.equal((await requestPreviewForHead(f.github, repo, f.pull)).ciRunId, 40);
+  assert.equal(f.dispatches.length, 0);
+});
+test('new-head refresh preserves independently valid admission instead of revoking another revision', async () => {
+  const f = fixture();
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  f.pull.head.sha = base;
+  f.context.eventName = 'pull_request_target';
+  await prepare(f);
+  await publishControls({
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+    github: f.github,
+    context: f.context,
+    number: 1,
+    artifactId: 88,
+  });
+  assert.ok(f.pointers.every((status) => status.context !== 'Review Admission'));
+});
+test('a newer rejected request also prevents an older accepted intent from committing state', async () => {
+  const f = fixture();
+  f.previous.runNumber = 11;
+  f.previous.lastIntentRunNumber = 5;
+  await prepare(f);
+  assert.equal(prepared().operationResult.status, 'accepted');
+  await assert.rejects(
+    publishControls({
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+    }),
+    /newer control run/
+  );
+  assert.equal(f.pointers.length, 0);
+  assert.equal(f.dispatches.length, 0);
+});
+test('the actual first-attempt endpoint rejects a mismatched rerun receipt while a grant exists', async () => {
+  const f = fixture();
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  const original = f.github.rest.actions.getWorkflowRunAttempt;
+  f.github.rest.actions.getWorkflowRunAttempt = async (params) => {
+    assert.equal(params.attempt_number, 1);
+    const { data } = await original(params);
+    return { data: { ...data, run_attempt: 2 } };
+  };
+  await assert.rejects(currentControlState(f.github, repo, 1), /first attempt/);
+  assert.equal(f.previous.grant.runId, 600);
+  assert.equal(f.pointers.length, 0);
 });

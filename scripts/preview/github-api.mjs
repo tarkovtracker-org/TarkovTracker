@@ -152,11 +152,12 @@ function matchesPreviewRequest(run, decision) {
   ].every(Boolean);
 }
 function matchesRequestBinding(run, decision) {
+  if (decision.reuseAnyRequestBinding) return matchesAnyPreviewBinding(run, decision.runId);
   const request = previewGrant(decision.previewRequest);
   const binding = request ? String(request.commentId) : '0';
   if (run.display_title === `Preview CI ${decision.runId} request ${binding}`) return true;
   // Legacy unbound dispatches can still be reused. A command-bound run needs explicit provenance.
-  return binding === '0' && run.display_title === `Preview CI ${decision.runId}`;
+  return matchesLegacyPreviewBinding(run, decision.runId, binding);
 }
 /** Active dispatches include queued runs and fork runs awaiting environment approval. */
 async function previewRequestInFlight(github, repo, decision) {
@@ -215,4 +216,14 @@ export async function publishStatus(github, repo, { sha, state, description, tar
     description: truncateDescription(description),
     target_url: targetUrl,
   });
+}
+function matchesAnyPreviewBinding(run, runId) {
+  const prefix = `Preview CI ${runId} request `;
+  const title = String(run.display_title);
+  if (title === `Preview CI ${runId}`) return true;
+  if (!title.startsWith(prefix)) return false;
+  return /^[0-9]+$/.test(title.slice(prefix.length));
+}
+function matchesLegacyPreviewBinding(run, runId, binding) {
+  return binding === '0' && run.display_title === `Preview CI ${runId}`;
 }

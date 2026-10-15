@@ -232,7 +232,11 @@ function requireStatusTarget(params, repo, scope) {
 }
 function controlStatusTarget(params) {
   if (params.context === CONTEXT) return params.state === 'failure';
-  return params.sha === CONTROL_ANCHOR && /^TarkovTracker Controls #[1-9]\d*$/.test(params.context);
+  return [
+    params.sha === CONTROL_ANCHOR,
+    params.state === 'success',
+    /^TarkovTracker Controls #[1-9]\d*$/.test(params.context),
+  ].every(Boolean);
 }
 function statusPublisher(fetchImpl, repo, token, scope) {
   return async (params) => {
@@ -273,6 +277,7 @@ export async function createReviewPublisher({
   scope = 'admission',
 }) {
   const config = publisherConfig(env);
+  requireControlsScope(scope, context, config);
   if (!config) return legacyPublisher(github, env);
   requireMainContext(context);
   if (scope === 'controls')
@@ -299,4 +304,13 @@ function legacyPublisher(github, env) {
     'Private publisher key exists without public App configuration.'
   );
   return wrappedGithub(github, LEGACY, github.rest.repos.createCommitStatus);
+}
+function requireControlsScope(scope, context, config) {
+  if (scope !== 'controls') return;
+  requireMainContext(context);
+  requireEvidence(Boolean(config), 'Controls publisher requires the dedicated App configuration.');
+  requireEvidence(
+    context.workflow === 'PR Controls',
+    'Controls publisher requires the dedicated workflow.'
+  );
 }

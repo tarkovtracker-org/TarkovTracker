@@ -1078,7 +1078,7 @@ test('service-linked review and native queue signals still prepare both current 
     };
     await withReceiptDirectory(async () => {
       await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-      assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+      assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
     });
   }
 });
@@ -1325,7 +1325,7 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
       outputs[key] = value;
     };
     await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-    assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+    assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
     assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'pending');
     f.f.artifacts = [head, queued].map((sha) => ({
       name: `review-admission-${sha}`,
@@ -2333,6 +2333,8 @@ test('controls publisher is confined to its fixed journal and admission failure;
     { ...repo, sha: head, context: 'Review Admission', state: 'success' },
     { ...repo, sha: head, context: controlContext(1), state: 'success' },
     { ...repo, sha: CONTROL_ANCHOR, context: 'Other', state: 'success' },
+    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'pending' },
+    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'failure' },
   ])
     await assert.rejects(github.rest.repos.createCommitStatus(params));
   const ordinary = await createReviewPublisher(issuerFixture().args);
@@ -2346,4 +2348,13 @@ test('controls publisher is confined to its fixed journal and admission failure;
   );
   f.args.context.workflow = 'Unrelated';
   await assert.rejects(createReviewPublisher(f.args), /dedicated workflow/);
+});
+test('controls scope cannot fall through to the unconfigured legacy writer', async () => {
+  const f = issuerFixture();
+  f.args.scope = 'controls';
+  f.args.context.workflow = 'PR Controls';
+  f.args.env = {};
+  await assert.rejects(createReviewPublisher(f.args), /dedicated App configuration/);
+  f.args.context.ref = 'refs/heads/candidate';
+  await assert.rejects(createReviewPublisher(f.args), /trusted main/);
 });

@@ -3,7 +3,7 @@ name: PR Controls
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   issue_comment:
     types: [edited]
   workflow_run:
@@ -47,6 +47,8 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Verify bounded archive prerequisite
+        run: command -v unzip >/dev/null
       - id: targets
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -56,7 +58,7 @@ jobs:
   controls:
     name: PR control panel
     needs: targets
-    if: needs.targets.outputs.numbers != '[]'
+    if: github.ref == 'refs/heads/main' && needs.targets.outputs.numbers != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -74,7 +76,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: read
-      statuses: write
+      statuses: read
     env:
       REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
       REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
@@ -88,6 +90,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      - name: Verify bounded archive prerequisite
+        run: command -v unzip >/dev/null
       - name: Validate operation and prepare meaningful panel changes
         id: prepare
         env:

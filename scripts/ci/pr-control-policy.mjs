@@ -2,6 +2,9 @@
 import { requireEvidence, SHA } from './review-admission-policy.mjs';
 export const CONTROL_MARKER = '<!-- tarkovtracker:pr-controls:v1 -->';
 export const CONTROL_ANCHOR = '44d4462c3db34b60e7cca69450405c922af15f56';
+export const CONTROL_WRITE_LIMIT = 900;
+export const REVOCATION_DESCRIPTION =
+  'Admin review attestation revoked; fresh admission is required.';
 export const CONTROL_WORKFLOW = '.github/workflows/pr-controls.yml';
 export const CONTROL_ACTIONS = Object.freeze({
   'approve-review': 'Attest that I reviewed this exact commit (repository admin)',
@@ -86,6 +89,7 @@ export function renderControlPanel({
   result,
   revision,
   state,
+  terminal = false,
 }) {
   const review = grant
     ? `Admin attestation by @${grant.actor.login}, for this commit only.`
@@ -106,7 +110,7 @@ export function renderControlPanel({
       statusLine(label, checks[label])
     ),
     '',
-    ...Object.values(CONTROL_ACTIONS).map((label) => `- [ ] ${label}`),
+    ...panelActions(terminal),
     '',
     `**Last result:** ${result}`,
     '',
@@ -114,4 +118,7 @@ export function renderControlPanel({
     'Checkboxes reset after processing. Agents use the structured PR Controls workflow.',
     `<!-- revision:${revision} -->`,
   ].join('\n');
+}
+function panelActions(terminal) {
+  return terminal ? [] : Object.values(CONTROL_ACTIONS).map((label) => `- [ ] ${label}`);
 }

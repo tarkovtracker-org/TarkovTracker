@@ -165,20 +165,24 @@ gh workflow run pr-controls.yml --ref main \
 
 Operations are `recheck`, `approve-review`, `revoke-review`, and `preview`. Fetch the dispatched
 run's immutable `pr-controls-<PR>` artifact and read `state.json`: `operationResult.status` is
-`accepted` or `rejected`, bound to `expectedHead`, actor, and run. A rejected operation fails the
+`accepted` or `rejected`. Accepted results bind the requested head, actor, and run; rejected results
+record the observed current head, run, and rejection reason, without attesting to the submitted actor/head.
+Acceptance records authorization and intent; successful execution still requires the control job
+and the actual admission/preview receipts. A rejected operation fails the
 run after retaining its receipt. Approval/revocation dispatches the existing admission workflow;
 its successful exact-head receipt remains required before enqueue. `preview` selects a successful
 matching current-head CI run/attempt and invokes the existing trusted preview workflow. It grants
 no permanent opt-in and does not bypass fork environment approval or artifact checks. There is no
 production deployment operation.
 
-The controls job explicitly requests Actions write (dispatch existing preview/admission workflows),
-Issues write (maintain its one comment), and read access to contents, checks, and PR metadata.
-These are additional job permissions relative to the read-only admission controller; the existing
-preview-request workflow already has those write capabilities. The dedicated App stays restricted
-to statuses write plus metadata read, with the same selected-repository installation, no webhook,
-and the existing main-only `review-admission` environment. The controls publisher may write its
-own state-pointer contexts and **failure only** to `Review Admission`; it cannot grant admission.
+The new controls job explicitly declares Actions write (dispatch existing workflows) and Issues
+write (maintain its comment), with Contents, Checks, Pull requests, and Statuses read. The existing
+admission job has Actions read and Issues read; the existing preview-request job has Actions
+write, Pull requests write, and Issues read. These are new grants on this specific controls job.
+The dedicated App retains statuses write and metadata read, the selected-repository installation,
+no webhook, and the main-only `review-admission` environment. Its controls publisher may write
+success only to its fixed journal context and failure only to `Review Admission`. It cannot
+grant native admission. Workflow/permission/policy activation requires an explicitly approved merge.
 
 Durable state uses an immutable Actions artifact plus an App-owned `TarkovTracker Controls #<PR>`
 status pointer on fixed trusted commit `44d4462c3db34b60e7cca69450405c922af15f56`. That anchor is a
@@ -300,3 +304,18 @@ the handoff and changed evidence, not the entire previous review. Provider cache
 billing are outside GitHub's control; no cache or token saving is guaranteed.
 
 GitHub queue guidance: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>.
+
+The journal reader selects one named GraphQL status context; it does not scan the shared anchor's
+history. Each PR has a 900-write budget, below GitHub's 1,000-status SHA/context limit. The final
+reserved revision clears admin approval, fails native admission, removes the action checkboxes,
+and disables further control writes for that PR. Existing provider/human review and manual preview
+workflows remain available. This explicit capacity limit avoids a journal rollover system.
+A controls-origin native revocation status is also a durable barrier: even if the journal-pointer
+write fails, later admission rechecks cannot revive a grant older than that revocation run.
+
+Receipt helpers run in Ubuntu/WSL and require Node and `unzip`; workflow tests also use Python 3.
+The bounded `unzip` reader was extracted from the existing admission binding without adding a
+package installation to credential-bearing jobs. Controls jobs explicitly check the prerequisite.
+
+The panel currently offers a one-shot preview request. Enable/Stop controls are not implemented;
+existing `/preview` and `/preview stop` commands retain their persistent authorization semantics.
