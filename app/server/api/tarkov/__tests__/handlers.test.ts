@@ -227,7 +227,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).not.toHaveBeenCalled();
     expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
   });
-  it('builds expected cache key for items-lite', async () => {
+  it('builds expected cache key and opts into response mode for items-lite', async () => {
     const { default: handler } = await import('@/server/api/tarkov/items-lite.get');
     await handler(event);
     expect(mockCreateTarkovJsonItemsFetcher).toHaveBeenCalledWith(
@@ -244,7 +244,7 @@ describe('Tarkov API handlers', () => {
       'items-lite-json-v2-en-regular',
       expect.any(Function),
       222,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('builds expected cache key for items', async () => {
