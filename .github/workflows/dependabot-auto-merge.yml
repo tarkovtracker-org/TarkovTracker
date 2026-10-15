@@ -149,10 +149,14 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: Wait for checks
+        id: checks
         if: steps.gate.outputs.eligible == 'true'
         shell: bash
         run: |
           set -euo pipefail
+          source scripts/ci/github-ci-gate.sh
+          require_main_ci_policy
+          echo "merge_mode=$MAIN_MERGE_MODE" >> "$GITHUB_OUTPUT"
           # Aggregates only: `CI Result` (GitHub Actions check run, covers validation and the
           # integrated security scans), Socket's PR alerts, and `Preview Result` (commit status
           # from the trusted preview controller). Individual job names are not a dependency.
@@ -171,15 +175,25 @@ jobs:
           while true; do
             # Preview Result is the authoritative gate; controller job checks may be cancelled by
             # a newer event on the same head and are not independent merge requirements.
+            check_filter='.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Refresh preview state" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
+            if [ "$MAIN_MERGE_MODE" != strict ]; then
+              check_filter+=' | map(select(.app.id != 15368 or (.name != "Filter admission event" and .name != "Review admission controller")))'
+            fi
             check_runs="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Refresh preview state" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
+                --jq "$check_filter"
             )"
+            # Queue admission is explicitly refreshed after these gates. Old controller checks
+            # and status failure/pending must not prevent recovery; strict mode is unchanged.
+            status_filter='.statuses | sort_by(.context, .id) | group_by(.context) | map(last) | map(select(.context != "Preview Result"))'
+            if [ "$MAIN_MERGE_MODE" != strict ]; then
+              status_filter+=' | map(select(.context != "Review Admission"))'
+            fi
             status_contexts="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
-                --jq '.statuses | sort_by(.context, .id) | group_by(.context) | map(last) | map(select(.context != "Preview Result"))'
+                --jq "$status_filter"
             )"
             current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
             if ! jq -e --arg sha "$HEAD_SHA" '.state == "open" and .draft == false and .base.ref == "main" and .head.sha == $sha' >/dev/null <<< "$current_pr"; then
@@ -290,11 +304,19 @@ jobs:
           done
       - name: Merge Dependabot PR
         if: steps.gate.outputs.eligible == 'true'
+        env:
+          CHECKED_MERGE_MODE: ${{ steps.checks.outputs.merge_mode }}
         shell: bash
         run: |
           set -euo pipefail
           source scripts/ci/github-ci-gate.sh
           require_main_ci_policy
+          admission_mode="$CHECKED_MERGE_MODE"
+          [ "$MAIN_MERGE_MODE" = "$admission_mode" ] || {
+            echo "::error::Main merge policy changed since Dependabot checks; retry."
+            exit 1
+          }
+          admission_complete=false
           # GitHub recomputes mergeability asynchronously, so the status can be
           # UNKNOWN for a short window right after checks settle. Poll until it
           # resolves instead of failing on the transient state.
@@ -315,6 +337,14 @@ jobs:
             if ! jq -e '.baseRefName == "main" and .state == "OPEN" and .isDraft == false and .isCrossRepository == false' >/dev/null <<< "$pr_state"; then
               echo "::error::Dependabot PR is no longer eligible for main."
               exit 1
+            fi
+            # Missing admission can itself produce BLOCKED. Refresh once, then re-read
+            # mergeability. During commissioning, a behind head still fails freshness first.
+            if [ "$admission_mode" != strict ] && [ "$admission_complete" = false ] && \
+              { [ "$merge_state" != BEHIND ] || [ "$admission_mode" = queue ]; }; then
+              wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
+              admission_complete=true
+              continue
             fi
             if [ "$merge_state" != "UNKNOWN" ]; then
               break
@@ -341,8 +371,11 @@ jobs:
               ;;
           esac
           require_main_ci_policy
+          [ "$MAIN_MERGE_MODE" = "$admission_mode" ] || {
+            echo "::error::Main merge policy changed during Dependabot validation; retry."
+            exit 1
+          }
           if [ "$MAIN_MERGE_MODE" != strict ]; then
-            wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
             gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
               --match-head-commit "$HEAD_SHA" --squash
           else
