@@ -1,3 +1,11 @@
+# [1.88.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.87.0...v1.88.0) (2026-10-15)
+
+
+### Features
+
+* **ui:** split task filters from settings and share them across pages ([#1222](https://github.com/tarkovtracker-org/TarkovTracker/issues/1222)) ([78088a6](https://github.com/tarkovtracker-org/TarkovTracker/commit/78088a6d948e1f62852b2bf0bd6d887d55a3c4f8))
+* **tasks:** switch task views from header tabs again ([#1220](https://github.com/tarkovtracker-org/TarkovTracker/issues/1220)) ([f7067d9](https://github.com/tarkovtracker-org/TarkovTracker/commit/f7067d9600f4b16786fac915e8664d92c4803ad2))
+
 # [1.87.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.86.0...v1.87.0) (2026-10-13)
 
 
