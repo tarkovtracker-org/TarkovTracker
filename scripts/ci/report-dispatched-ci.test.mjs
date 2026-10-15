@@ -36,6 +36,264 @@ function localesFixture() {
   };
   return f;
 }
+function queueFixture() {
+  const f = localesFixture();
+  f.admissionAppId = 987654;
+  const own = { ruleset_id: 43, ruleset_source_type: 'Repository', ruleset_source: 'example/repo' };
+  f.rules = [
+    {
+      ...own,
+      type: 'required_status_checks',
+      parameters: {
+        strict_required_status_checks_policy: false,
+        required_status_checks: [
+          { context: 'CI Result', integration_id: 15368 },
+          { context: 'Preview Result', integration_id: 15368 },
+          { context: 'Review Admission', integration_id: f.admissionAppId },
+        ],
+      },
+    },
+    {
+      ...own,
+      type: 'merge_queue',
+      parameters: {
+        grouping_strategy: 'ALLGREEN',
+        max_entries_to_build: 1,
+        max_entries_to_merge: 1,
+        min_entries_to_merge: 1,
+        merge_method: 'SQUASH',
+      },
+    },
+    { ...own, type: 'pull_request', parameters: { required_review_thread_resolution: true } },
+  ];
+  f.github.rest.repos.getBranchRules = vi.fn();
+  f.github.paginate = vi.fn().mockImplementation(async () => f.rules);
+  f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: 'e'.repeat(40) } } });
+  f.github.rest.git.getCommit
+    .mockResolvedValueOnce({ data: { tree: { sha: 'd'.repeat(40) } } })
+    .mockResolvedValueOnce({ data: { tree: { sha: 'e'.repeat(40) } } });
+  return f;
+}
+describe('verified Crowdin integration queue admission', () => {
+  it.each(['success', 'failure'])(
+    'reports only exact behind head %s without attesting a merge tree',
+    async (outcome) => {
+      const f = queueFixture();
+      await reportDispatchedCi({ ...f, outcome });
+      expect(f.github.paginate).toHaveBeenCalledExactlyOnceWith(
+        f.github.rest.repos.getBranchRules,
+        {
+          ...f.context.repo,
+          branch: 'main',
+          per_page: 100,
+        }
+      );
+      expect(f.github.rest.pulls.get).toHaveBeenCalledExactlyOnceWith({
+        ...f.context.repo,
+        pull_number: f.pull.number,
+      });
+      expect(f.github.rest.git.getRef).not.toHaveBeenCalled();
+      expect(f.github.rest.git.getCommit).not.toHaveBeenCalled();
+      expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ sha: f.context.sha, state: outcome })
+      );
+    }
+  );
+  it.each([
+    [
+      'foreign queue',
+      (f) => {
+        f.rules[1].ruleset_source = 'other/repo';
+      },
+    ],
+    [
+      'different ruleset',
+      (f) => {
+        f.rules[1].ruleset_id = 44;
+      },
+    ],
+    [
+      'missing admission',
+      (f) => {
+        f.rules[0].parameters.required_status_checks.pop();
+      },
+    ],
+    [
+      'Actions admission issuer',
+      (f) => {
+        f.admissionAppId = 15368;
+      },
+    ],
+    [
+      'unconfigured issuer',
+      (f) => {
+        f.admissionAppId = 0;
+      },
+    ],
+    [
+      'spoofed issuer',
+      (f) => {
+        f.rules[0].parameters.required_status_checks[2].integration_id = 1;
+      },
+    ],
+    [
+      'wrong CI issuer',
+      (f) => {
+        f.rules[0].parameters.required_status_checks[0].integration_id = 1;
+      },
+    ],
+    [
+      'wrong preview issuer',
+      (f) => {
+        f.rules[0].parameters.required_status_checks[1].integration_id = 1;
+      },
+    ],
+    [
+      'HEADGREEN',
+      (f) => {
+        f.rules[1].parameters.grouping_strategy = 'HEADGREEN';
+      },
+    ],
+    [
+      'multiple builds',
+      (f) => {
+        f.rules[1].parameters.max_entries_to_build = 2;
+      },
+    ],
+    [
+      'multiple merges',
+      (f) => {
+        f.rules[1].parameters.max_entries_to_merge = 2;
+      },
+    ],
+    [
+      'multiple minimum entries',
+      (f) => {
+        f.rules[1].parameters.min_entries_to_merge = 2;
+      },
+    ],
+    [
+      'wrong merge method',
+      (f) => {
+        f.rules[1].parameters.merge_method = 'MERGE';
+      },
+    ],
+    [
+      'unresolved threads',
+      (f) => {
+        f.rules[2].parameters.required_review_thread_resolution = false;
+      },
+    ],
+    [
+      'separate thread policy',
+      (f) => {
+        f.rules[2].ruleset_id = 44;
+      },
+    ],
+    [
+      'coexisting strict policy',
+      (f) => {
+        f.rules.push({
+          ...f.rules[0],
+          ruleset_id: 45,
+          parameters: { ...f.rules[0].parameters, strict_required_status_checks_policy: true },
+        });
+      },
+    ],
+  ])('retains strict exact-tree denial for %s', async (_, change) => {
+    const f = queueFixture();
+    change(f);
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('retains strict different-tree denial with a configured admission issuer', async () => {
+    const f = queueFixture();
+    f.rules[0].parameters.strict_required_status_checks_policy = true;
+    f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: f.pull.base.sha } } });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.git.getCommit).toHaveBeenCalledTimes(2);
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it.each([
+    [
+      'API error',
+      (f) => {
+        f.github.paginate.mockRejectedValue(new Error('rules unavailable'));
+      },
+    ],
+    [
+      'malformed response',
+      (f) => {
+        f.rules = {};
+      },
+    ],
+    [
+      'malformed rule',
+      (f) => {
+        f.rules = [null];
+      },
+    ],
+    [
+      'invalid app',
+      (f) => {
+        f.admissionAppId = 'unknown';
+      },
+    ],
+    [
+      'ambiguous PR',
+      (f) => {
+        f.github.rest.pulls.list.mockResolvedValue({ data: [f.pull, f.pull] });
+      },
+    ],
+    [
+      'draft PR',
+      (f) => {
+        f.github.rest.pulls.list.mockResolvedValue({ data: [{ ...f.pull, draft: true }] });
+      },
+    ],
+    [
+      'invalid PR number',
+      (f) => {
+        f.github.rest.pulls.list.mockResolvedValue({ data: [{ ...f.pull, number: null }] });
+      },
+    ],
+    [
+      'foreign PR',
+      (f) => {
+        f.github.rest.pulls.list.mockResolvedValue({
+          data: [{ ...f.pull, head: { ...f.pull.head, repo: { full_name: 'other/repo' } } }],
+        });
+      },
+    ],
+    [
+      'raced head',
+      (f) => {
+        f.github.rest.pulls.get.mockResolvedValue({
+          data: { ...f.pull, head: { ...f.pull.head, sha: 'e'.repeat(40) } },
+        });
+      },
+    ],
+    [
+      'closed PR',
+      (f) => {
+        f.github.rest.pulls.get.mockResolvedValue({ data: { ...f.pull, state: 'closed' } });
+      },
+    ],
+    [
+      'raced base',
+      (f) => {
+        f.github.rest.pulls.get.mockResolvedValue({
+          data: { ...f.pull, base: { ...f.pull.base, sha: 'e'.repeat(40) } },
+        });
+      },
+    ],
+  ])('fails closed before any status publication for %s', async (_, change) => {
+    const f = queueFixture();
+    change(f);
+    await expect(reportDispatchedCi(f)).rejects.toThrow();
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+});
 describe('dispatched CI commit status', () => {
   it('reports the real aggregate success on the exact validated SHA with a run link', async () => {
     const f = fixture();

@@ -2,10 +2,6 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
-import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
-import { readPreviewRequest } from './request-authorization.mjs';
-import { QueueValidationError, queueRevision, requireQueueCi } from './merge-queue.mjs';
-import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
 import {
   ciResultCheck,
   downloadArtifact,
@@ -21,6 +17,8 @@ import {
   publishStatus,
   requestPreviewDispatch,
 } from './github-api.mjs';
+import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
+import { QueueValidationError, queueRevision, requireQueueCi } from './merge-queue.mjs';
 import {
   MANIFEST_FILE,
   PREVIEW_PROFILE_VERSION,
@@ -28,6 +26,8 @@ import {
   previewAppUrl,
   previewBranchName,
 } from './profile.mjs';
+import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
+import { readPreviewRequest } from './request-authorization.mjs';
 // Trusted preview controller. Everything here loads from the default branch and treats candidate
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
@@ -110,12 +110,23 @@ function requestedRunId(inputs) {
   const runId = Number(inputs?.run_id);
   return Number.isInteger(runId) && runId > 0 ? runId : null;
 }
+function queueScope(value) {
+  if ([true, 'true'].includes(value)) return true;
+  if ([undefined, false, 'false', ''].includes(value)) return false;
+  throw failure('Preview queue profile input is invalid.');
+}
+function requireQueueScope(value, event) {
+  if (queueScope(value) !== (event === 'merge_group'))
+    throw failure('Preview queue profile does not match the authenticated CI event.');
+}
 async function candidateFromDispatch(github, context, inputs) {
   if (context.ref !== `refs/heads/${PRODUCTION_BRANCH}`)
     throw ignore('Manual reruns must dispatch from the default branch.');
   const runId = requestedRunId(inputs);
   if (!runId) throw failure('A numeric CI run id is required.');
-  return candidateFromRun(await getRun(github, context.repo, runId), context);
+  const run = await getRun(github, context.repo, runId);
+  requireQueueScope(inputs?.queue, run.event);
+  return candidateFromRun(run, context);
 }
 async function resolveCandidate({ github, context, inputs }) {
   if (context.eventName === 'workflow_run')
@@ -1079,7 +1090,7 @@ async function requireFreshDecision(github, context, decision) {
   if (errors.length) throw new Error(`Candidate is obsolete: ${errors.join('; ')}`);
 }
 /** Phase 2: immediately before upload, repeat freshness checks and re-verify the artifact. */
-export async function verifyForDeploy({ github, context, core, decision, destination }) {
+export async function verifyForDeploy({ github, context, core, decision, destination, queue }) {
   assertDeployablePlan(decision);
   await requireFreshDecision(github, context, decision);
   const candidate = candidateFromDecision(decision);
@@ -1087,6 +1098,7 @@ export async function verifyForDeploy({ github, context, core, decision, destina
     ? await getPull(github, context.repo, decision.pullRequest)
     : null;
   const run = await getRun(github, context.repo, decision.runId);
+  requireQueueScope(queue, run.event);
   if (candidate.runEvent === 'merge_group') {
     const revision = await queueRevision(github, context, candidate);
     candidate.queueTreeSha = revision.treeSha;

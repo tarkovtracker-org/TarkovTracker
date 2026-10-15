@@ -12,6 +12,10 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
+env:
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   auto-merge:
     name: Auto-merge safe Dependabot PR
@@ -138,6 +142,12 @@ jobs:
             exit 0
           fi
           echo "eligible=true" >> "$GITHUB_OUTPUT"
+      - name: Checkout trusted admission gate
+        if: steps.gate.outputs.eligible == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - name: Wait for checks
         if: steps.gate.outputs.eligible == 'true'
         shell: bash
@@ -283,6 +293,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          source scripts/ci/github-ci-gate.sh
+          require_main_ci_policy
           # GitHub recomputes mergeability asynchronously, so the status can be
           # UNKNOWN for a short window right after checks settle. Poll until it
           # resolves instead of failing on the transient state.
@@ -317,13 +329,34 @@ jobs:
           case "$merge_state" in
             CLEAN | UNSTABLE)
               ;;
+            BEHIND)
+              [ "$MAIN_MERGE_MODE" = queue ] || {
+                echo "::error::Behind PR requires strict freshness."
+                exit 1
+              }
+              ;;
             *)
               echo "::error::PR merge state is $merge_state, not mergeable."
               exit 1
               ;;
           esac
-          gh pr merge "$PR_NUMBER" \
-            --repo "$GITHUB_REPOSITORY" \
-            --match-head-commit "$HEAD_SHA" \
-            --squash \
-            --delete-branch
+          require_main_ci_policy
+          if [ "$MAIN_MERGE_MODE" != strict ]; then
+            wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
+            gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --match-head-commit "$HEAD_SHA" --squash
+          else
+            gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --match-head-commit "$HEAD_SHA" --squash --delete-branch
+          fi
+          result="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json state,headRefOid,baseRefName)"
+          if jq -e '.state == "MERGED" and .baseRefName == "main"' >/dev/null <<< "$result"; then
+            # Direct job-token merges suppress push CI; queued entries must not dispatch main early.
+            dispatch_ci main
+          elif [ "$MAIN_MERGE_MODE" != strict ] && jq -e --arg sha "$HEAD_SHA" \
+            '.state == "OPEN" and .headRefOid == $sha and .baseRefName == "main"' >/dev/null <<< "$result"; then
+            echo "::notice::Submitted reviewed Dependabot PR to the merge queue; Actions owns integration."
+          else
+            echo "::error::Dependabot merge request did not produce the expected merge or queue state."
+            exit 1
+          fi
