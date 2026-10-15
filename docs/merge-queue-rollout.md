@@ -96,7 +96,7 @@ Crowdin validates its immutable translation diff without updating a behind branc
 policy is active. While strict freshness and the verified queue coexist during rollout, their
 validation remains strict but admission and pending queue reporting already work. Crowdin and
 Dependabot explicitly request authenticated admission and submit a
-head-pinned native enqueue through `enqueuePullRequest(expectedHeadOid)`. This does not depend
+head-pinned native enqueue through `enqueuePullRequest` with `expectedHeadOid` in the mutation input. This does not depend
 on the repository auto-merge setting. They report queued entries without dispatching main CI early; direct
 job-token merges dispatch main CI only after the PR is actually merged. Existing dependency,
 translation, fork and credential controls remain enforced.
