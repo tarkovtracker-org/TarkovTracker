@@ -1,0 +1,39 @@
+name: Review Admission Signal
+# Candidate event definitions have no write permissions and never publish admission.
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  merge_group:
+    types: [checks_requested]
+  check_suite:
+    types: [completed]
+permissions: {}
+jobs:
+  signal:
+    name: Admission signal
+    if: >-
+      contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group"]'), github.event_name) ||
+      (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id))
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      # A locator is never review evidence: the trusted controller authenticates the
+      # provider suite through GitHub, then rereads the live PR and queue policy.
+      - name: Record provider suite locator
+        if: github.event_name == 'check_suite'
+        env:
+          SUITE_ID: ${{ github.event.check_suite.id }}
+        run: |
+          node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("signal.json", JSON.stringify({ suiteId: Number(process.env.SUITE_ID) }));'
+      - name: Upload provider suite locator
+        if: github.event_name == 'check_suite'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: review-admission-signal-${{ github.run_attempt }}
+          path: signal.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Notify trusted admission controller
+        run: 'true'
