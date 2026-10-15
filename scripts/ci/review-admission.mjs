@@ -11,6 +11,7 @@ import {
   trustedActors,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
+import { currentAdminAttestation } from './pr-control-state.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
@@ -42,7 +43,24 @@ async function evidence(github, repo, pr) {
   const trusted = await trustedActors(github, repo, reviews, comments);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
-  return { pr, files, reviews, comments, checks, threads, trusted, dependencySafe, releaseSafe };
+  const adminAttestation = await currentAdminAttestation(
+    github,
+    repo,
+    pr.number,
+    pr.head.sha
+  ).catch(() => null);
+  return {
+    pr,
+    files,
+    reviews,
+    comments,
+    checks,
+    threads,
+    trusted,
+    dependencySafe,
+    releaseSafe,
+    adminAttestation,
+  };
 }
 function receipt(context, pr, statusSha, decision, source, issuer) {
   return {

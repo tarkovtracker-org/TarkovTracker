@@ -192,3 +192,14 @@ export async function minimizePreviewCommand({ github, context, core }) {
     core.warning(`Could not collapse preview command: ${error.message}`);
   }
 }
+/** One-shot control/API request: reuse CI identity and artifact checks, without persistent opt-in. */
+export async function requestPreviewForHead(github, repo, pull) {
+  requireOpenPull(pull);
+  if (!pullReady(pull)) throw new Error('The PR must be ready with a current test merge.');
+  if (!(await hasDeployablePaths(github, repo, pull)))
+    return { message: 'This commit does not require a preview.' };
+  const result = await dispatchCurrentPreview(github, repo, pull, {}, undefined);
+  if (!result.ciRunId)
+    throw new Error('A successful current-head CI Result and matching CI run are required.');
+  return { message: `Preview requested from CI run ${result.ciRunId}.`, ciRunId: result.ciRunId };
+}

@@ -1,5 +1,6 @@
 // The dedicated issuer key belongs only in the protected main-only admission environment.
 import { createPrivateKey, sign } from 'node:crypto';
+import { CONTROL_ANCHOR } from './pr-control-policy.mjs';
 import { CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
 const IDS = [
   'REVIEW_ADMISSION_APP_ID',
@@ -218,20 +219,24 @@ async function restrictedToken(fetchImpl, config, repository, jwtToken, core) {
   tokenIdentity(token, repository);
   return token.token;
 }
-function requireStatusTarget(params, repo) {
+function requireStatusTarget(params, repo, scope) {
   requireEvidence(
     params.owner === repo.owner && params.repo === repo.repo,
     'App status target repository mismatch.'
   );
   requireEvidence(SHA.test(params.sha), 'App status target revision is invalid.');
   requireEvidence(
-    params.context === CONTEXT,
-    'App publisher only writes Review Admission context.'
+    scope === 'controls' ? controlStatusTarget(params) : params.context === CONTEXT,
+    'App publisher status context is outside its job scope.'
   );
 }
-function statusPublisher(fetchImpl, repo, token) {
+function controlStatusTarget(params) {
+  if (params.context === CONTEXT) return params.state === 'failure';
+  return params.sha === CONTROL_ANCHOR && /^TarkovTracker Controls #[1-9]\d*$/.test(params.context);
+}
+function statusPublisher(fetchImpl, repo, token, scope) {
   return async (params) => {
-    requireStatusTarget(params, repo);
+    requireStatusTarget(params, repo, scope);
     const { owner, repo: name, sha, ...body } = params;
     const data = await appApi(
       fetchImpl,
@@ -265,10 +270,16 @@ export async function createReviewPublisher({
   core,
   env = process.env,
   fetchImpl = fetch,
+  scope = 'admission',
 }) {
   const config = publisherConfig(env);
   if (!config) return legacyPublisher(github, env);
   requireMainContext(context);
+  if (scope === 'controls')
+    requireEvidence(
+      context.workflow === 'PR Controls',
+      'Controls publisher requires the dedicated workflow.'
+    );
   const pem = env.REVIEW_ADMISSION_PRIVATE_KEY;
   requireEvidence(
     typeof pem === 'string' && pem.length > 0,
@@ -280,7 +291,7 @@ export async function createReviewPublisher({
   await verifiedInstallation(fetchImpl, config, context.repo, token);
   const repository = await repositoryIdentity(github, context.repo);
   const access = await restrictedToken(fetchImpl, config, repository, token, core);
-  return wrappedGithub(github, config, statusPublisher(fetchImpl, context.repo, access));
+  return wrappedGithub(github, config, statusPublisher(fetchImpl, context.repo, access, scope));
 }
 function legacyPublisher(github, env) {
   requireEvidence(

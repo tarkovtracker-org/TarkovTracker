@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readAdmissionArchive } from './review-admission-archive.mjs';
+export { readAdmissionArchive } from './review-admission-archive.mjs';
 import { admissionRun, allPages, validateAdmissionReceipt } from './review-admission-api.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { currentAdminAttestation } from './pr-control-state.mjs';
 import { requireEvidence, SHA } from './review-admission-policy.mjs';
 async function admissionArtifact(github, repo, run, head) {
   const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
@@ -17,38 +17,6 @@ async function admissionArtifact(github, repo, run, head) {
     'Admission artifact expired or oversized.'
   );
   return artifact;
-}
-export async function readAdmissionArchive(bytes, head) {
-  requireEvidence(bytes.byteLength <= 100000, 'Admission ZIP is oversized.');
-  const directory = await mkdtemp(join(tmpdir(), 'review-admission-'));
-  try {
-    const archive = join(directory, 'receipt.zip');
-    await writeFile(archive, bytes);
-    return parseArchive(archive, head);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-}
-function parseArchive(archive, head) {
-  const entries = execFileSync('unzip', ['-Z1', archive], {
-    encoding: 'utf8',
-    maxBuffer: 8192,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 10000,
-    killSignal: 'SIGKILL',
-  }).trim();
-  requireEvidence(
-    entries === `${head}.json`,
-    'Admission artifact must contain exactly the expected receipt.'
-  );
-  const json = execFileSync('unzip', ['-p', archive, entries], {
-    encoding: 'utf8',
-    maxBuffer: 100000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 10000,
-    killSignal: 'SIGKILL',
-  });
-  return JSON.parse(json);
 }
 export async function requireTrustedPolicySource(github, repo, sha) {
   requireEvidence(SHA.test(sha), 'Missing immutable controller policy source.');
@@ -74,5 +42,12 @@ export async function requireReviewAdmission({ github, repo, head, number, expec
   const receipt = await readAdmissionArchive(Buffer.from(data), head);
   validateAdmissionReceipt(receipt, repo, head, run, number);
   await requireTrustedPolicySource(github, repo, receipt.workflowSourceSha);
+  if (receipt.review.provider === 'admin-attestation') {
+    const current = await currentAdminAttestation(github, repo, number, head);
+    requireEvidence(
+      isDeepStrictEqual(current, receipt.review),
+      'Admin attestation was revoked, expired, or lost admin access.'
+    );
+  }
   return receipt;
 }

@@ -1,0 +1,122 @@
+name: PR Controls
+# One bot-owned panel; all writes run trusted main code in the existing protected environment.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+  issue_comment:
+    types: [edited]
+  workflow_run:
+    workflows: [CI, Preview, Review Admission]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number
+        required: true
+        type: string
+      operation:
+        description: Structured review or preview operation
+        required: true
+        default: recheck
+        type: choice
+        options: [recheck, approve-review, revoke-review, preview]
+      expected_head:
+        description: Exact 40-character PR head SHA
+        required: true
+        type: string
+permissions: {}
+jobs:
+  targets:
+    name: Select control panels
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && github.event.sender.type == 'User' &&
+      startsWith(github.event.changes.body.from, '<!-- tarkovtracker:pr-controls:v1 -->')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      numbers: ${{ steps.targets.outputs.numbers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - id: targets
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { controlTargets } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
+            core.setOutput('numbers', JSON.stringify(await controlTargets({ github, context })));
+  controls:
+    name: PR control panel
+    needs: targets
+    if: needs.targets.outputs.numbers != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        number: ${{ fromJSON(needs.targets.outputs.numbers) }}
+    concurrency:
+      group: review-admission-publication
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: review-admission
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: read
+      statuses: write
+    env:
+      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
+      CONTROL_PR: ${{ matrix.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Validate operation and prepare meaningful panel changes
+        id: prepare
+        env:
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { prepareControls } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core, scope: 'controls' });
+            await prepareControls({ github: publisher, context, core, number: Number(process.env.CONTROL_PR) });
+      - name: Save immutable control receipt
+        id: receipt
+        if: steps.prepare.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-controls-${{ matrix.number }}
+          path: pr-control-evidence/state.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Commit App-pinned state and update the same panel
+        if: steps.prepare.outputs.changed == 'true'
+        env:
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+          CONTROL_ARTIFACT_ID: ${{ steps.receipt.outputs.artifact-id }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { publishControls } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core, scope: 'controls' });
+            await publishControls({ github: publisher, context, number: Number(process.env.CONTROL_PR), artifactId: Number(process.env.CONTROL_ARTIFACT_ID) });

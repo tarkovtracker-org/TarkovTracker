@@ -2281,7 +2281,7 @@ catch (error) { if (error.code === ${JSON.stringify(expectedCode)}) console.log(
   }
 }
 test('admission unzip listing and extraction have hard deadlines and forced termination', () => {
-  const source = readFileSync('scripts/ci/review-admission-binding.mjs', 'utf8');
+  const source = readFileSync('scripts/ci/review-admission-archive.mjs', 'utf8');
   const calls = source.split("execFileSync('unzip',").slice(1);
   assert.equal(calls.length, 2);
   for (const call of calls) {
@@ -2309,4 +2309,41 @@ test('admission unzip listing and extraction have hard deadlines and forced term
     const unlimited = fast.replaceAll('timeout: 100', 'timeout: 0');
     assert.equal(boundedAdmissionUnzip(unlimited, mode, 'ETIMEDOUT').signal, 'SIGKILL');
   }
+});
+test('controls publisher is confined to its fixed journal and admission failure; ordinary publisher cannot write control state', async () => {
+  const { CONTROL_ANCHOR, controlContext } = await import('../ci/pr-control-policy.mjs');
+  const f = issuerFixture();
+  f.args.scope = 'controls';
+  f.args.context.workflow = 'PR Controls';
+  f.responses[`/repos/example/repo/statuses/${CONTROL_ANCHOR}`] = { id: 2 };
+  const github = await createReviewPublisher(f.args);
+  await github.rest.repos.createCommitStatus({
+    ...repo,
+    sha: CONTROL_ANCHOR,
+    context: controlContext(1),
+    state: 'success',
+  });
+  await github.rest.repos.createCommitStatus({
+    ...repo,
+    sha: head,
+    context: 'Review Admission',
+    state: 'failure',
+  });
+  for (const params of [
+    { ...repo, sha: head, context: 'Review Admission', state: 'success' },
+    { ...repo, sha: head, context: controlContext(1), state: 'success' },
+    { ...repo, sha: CONTROL_ANCHOR, context: 'Other', state: 'success' },
+  ])
+    await assert.rejects(github.rest.repos.createCommitStatus(params));
+  const ordinary = await createReviewPublisher(issuerFixture().args);
+  await assert.rejects(
+    ordinary.rest.repos.createCommitStatus({
+      ...repo,
+      sha: CONTROL_ANCHOR,
+      context: controlContext(1),
+      state: 'success',
+    })
+  );
+  f.args.context.workflow = 'Unrelated';
+  await assert.rejects(createReviewPublisher(f.args), /dedicated workflow/);
 });

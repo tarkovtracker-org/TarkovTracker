@@ -185,10 +185,27 @@ function reviewedHead(input, latest) {
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
   const provider = verifiedProvider(reviews, checks, pr.head.sha);
   requireEvidence(
-    Boolean(provider || human),
+    Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
     'Completed exact-head independent review is required.'
   );
   return { human, provider };
+}
+function positiveReviewId(value) {
+  return [Number.isSafeInteger(value), value > 0].every(Boolean);
+}
+function adminReview(review, head) {
+  if (!review) return null;
+  return [
+    review.provider === 'admin-attestation',
+    review.commit === head,
+    positiveReviewId(review.actorId),
+    positiveReviewId(review.reviewId),
+  ].every(Boolean)
+    ? review
+    : null;
+}
+function humanReview(human, head) {
+  return human ? { provider: 'human', reviewId: human.id, commit: head } : null;
 }
 export function admissionDecision(input) {
   const { pr, files, threads, comments, trusted, reviews } = input;
@@ -202,7 +219,7 @@ export function admissionDecision(input) {
   return {
     approved: true,
     risk: risk.sensitive ? 'sensitive' : 'low',
-    review: provider ?? { provider: 'human', reviewId: human.id, commit: pr.head.sha },
+    review: provider ?? humanReview(human, pr.head.sha) ?? input.adminAttestation,
     sensitiveApprovalId: approvalId(human, approval),
   };
 }

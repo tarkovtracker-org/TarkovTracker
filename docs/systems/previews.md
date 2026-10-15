@@ -346,3 +346,12 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `scripts/ci/github-ci-gate.sh`, `scripts/release/release-recovery.mjs` — dual-gate waits for automation
 - `wrangler.toml` — isolated preview variables and game-data KV binding
 - `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests
+
+### PR control panel
+
+The single TarkovTracker PR control comment offers a one-shot preview request for the displayed
+exact commit. It reuses the successful current-head CI/run/attempt selection and the existing
+trusted preview controller; fork environment approval and artifact checks still apply. It does
+not change automatic preview opt-in or expose production deployment. Maintainers and admins
+can use the checkbox, or agents can dispatch the structured `PR Controls` workflow. Authorization,
+durable receipts, and rollout are documented in [merge queue controls](../merge-queue-rollout.md#review-and-preview-controls).

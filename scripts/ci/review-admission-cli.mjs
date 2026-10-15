@@ -25,12 +25,18 @@ function adapter() {
     },
     rest: {
       repos: {
+        getCollaboratorPermissionLevel: async (params) =>
+          json(`${repository(params)}/collaborators/${params.username}/permission`),
         listCommitStatusesForRef: (params) =>
           `${repository(params)}/commits/${params.ref}/statuses?per_page=100`,
         compareCommits: async (params) =>
           json(`${repository(params)}/compare/${params.base}...${params.head}`),
       },
       actions: {
+        getWorkflowRunAttempt: async (params) =>
+          json(
+            `${repository(params)}/actions/runs/${params.run_id}/attempts/${params.attempt_number}`
+          ),
         getWorkflowRun: async (params) =>
           json(`${repository(params)}/actions/runs/${params.run_id}`),
         listWorkflowRunArtifacts: (params) =>
