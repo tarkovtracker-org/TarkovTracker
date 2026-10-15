@@ -78,6 +78,39 @@ Confidence score: **5/5**
 - Automated review surfaced no issues in the provided summaries.
 - No files require special attention.
 <!-- cubic:review-summary:end -->`;
+test('Cubic admission requires one clean overall summary instead of quoted or conflicting results', () => {
+  const f = fixture();
+  for (const result of [
+    '**No issues found** across 1 file',
+    '**0 issues found**',
+    '**0 issues found across 1 file (changes from recent commits).**',
+    '**All reported issues were addressed** across 3 files',
+  ]) {
+    f.reviews[0].body = cubicCleanSummary.replace('**No issues found** across 1 file', result);
+    assert.equal(admissionDecision(f).approved, true, result);
+  }
+  for (const body of [
+    cubicCleanSummary.replace('**No issues found**', '**1 issue found**') + '\n**No issues found**',
+    cubicCleanSummary.replace('**No issues found**', '**1 issue found**') +
+      '\n' +
+      cubicCleanSummary,
+    cubicCleanSummary.replace(
+      '**No issues found** across 1 file',
+      '**No issues found** for file A\n**1 issue found** for file B'
+    ),
+    cubicCleanSummary.replace(
+      'No files require special attention.',
+      '1 issue found in another file.'
+    ),
+    cubicCleanSummary.replace(
+      '**No issues found**',
+      'Review skipped; previously **No issues found**'
+    ),
+  ]) {
+    f.reviews[0].body = body;
+    assert.throws(() => admissionDecision(f), /Completed exact-head independent review/, body);
+  }
+});
 test('live Cubic clean summary admits the reviewed head while preserving admission guards', () => {
   const f = fixture();
   f.reviews[0].body = cubicCleanSummary;

@@ -53,6 +53,8 @@ The staged integration implements the compatibility gates; it does not activate 
 controller verifies a completed exact-head CodeRabbit/Cubic review or an independent collaborator
 approval, complete review-thread evidence, and no outstanding changes requested. A bot comment or
 green provider check without completed review evidence is insufficient.
+Cubic completion requires one marked summary with a clean overall result, including its
+`No issues found` wording; quoted clean text and conflicting issue counts do not grant admission.
 
 Native resolved-thread enforcement remains required alongside Review Admission. The queue ruleset
 uses a `pull_request` rule with `required_review_thread_resolution: true` and zero required human
