@@ -90,6 +90,11 @@ test('Cubic admission requires one clean overall summary instead of quoted or co
     assert.equal(admissionDecision(f).approved, true, result);
   }
   for (const body of [
+    cubicCleanSummary + '\n**1 issue found**',
+    cubicCleanSummary + '\nReview skipped',
+    cubicCleanSummary + '\n> **No issues found**',
+    cubicCleanSummary.replace('No files require special attention.', 'Review skipped'),
+    cubicCleanSummary.replace('No files require special attention.', '> **No issues found**'),
     cubicCleanSummary.replace('**No issues found**', '**1 issue found**') + '\n**No issues found**',
     cubicCleanSummary.replace('**No issues found**', '**1 issue found**') +
       '\n' +

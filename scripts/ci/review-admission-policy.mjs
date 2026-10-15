@@ -108,7 +108,14 @@ function cleanCubicSummary(body) {
   const overall = summary.split('\n')[0].trim();
   const clean =
     /^\*\*(?:No issues found|0 issues found|All reported issues were addressed)(?:\*\*(?: across [1-9]\d* files?)?| across [1-9]\d* files?(?: \(changes from recent commits\))?\.?\*\*)$/;
-  return [clean.test(overall), !/\b[1-9]\d* issues? found\b/i.test(summary)].every(Boolean);
+  return [
+    clean.test(overall),
+    !/\b[1-9]\d* issues? found\b/i.test(body),
+    !/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*)?Review skipped\b/im.test(body),
+    !/^\s*(?:[-*]\s*)?>\s*\*\*(?:No issues found|0 issues found|All reported issues were addressed)\b/im.test(
+      body
+    ),
+  ].every(Boolean);
 }
 function zeroOutsideFindings(review, provider) {
   if (provider.name === 'Cubic') return cleanCubicSummary(review.body ?? '');
