@@ -332,6 +332,7 @@ it('strict-queue uses the same guarded native enqueue while freshness coexists',
   const operations = queueOperations({ owner: 'owner', repo: 'repo' });
   operations.submit(901, head, 'strict-queue');
   expect(execFileSync.mock.calls[0][0]).toBe(process.execPath);
+  expect(execFileSync.mock.calls[0][1][0]).toMatch(/\/ci\/enqueue-pr-cli\.mjs$/);
   expect(execFileSync.mock.calls[0][1].slice(1)).toEqual(['owner/repo', '901', head]);
 });
 it('consumes the PR-head receipt alongside its queue-head receipt without re-enqueueing the group', async () => {

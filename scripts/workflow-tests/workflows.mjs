@@ -490,7 +490,7 @@ test('Dependabot dispatches main CI only after actual merge and holds failed adm
   const denied = f.shell(dependabotMergeScript(), { ...queue, ADMISSION_FAIL: 'true' });
   assert.equal(denied.status, 1);
   assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
-  const merged = f.shell(dependabotMergeScript(), queue);
+  const merged = f.shell(dependabotMergeScript(), { ...queue, MERGE_OUTCOME: 'MERGED' });
   assert.equal(merged.status, 0, merged.stderr);
   assert.ok(f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
 });

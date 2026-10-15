@@ -608,6 +608,18 @@ test('rollout coexistence preserves Crowdin freshness while accepting a reviewed
     /must include current main/
   );
 });
+test('strict-queue accepts main advancing after enqueue while still rejecting a changed head', (t) => {
+  const f = fixture(t);
+  const rollout = { RULES: JSON.stringify(strictQueueRules()), AFTER_ENQUEUE_BASE: 'b'.repeat(40) };
+  passed(f.run('prepare', rollout));
+  passed(f.run('merge', rollout));
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+  const raced = fixture(t);
+  passed(raced.run('prepare', rollout));
+  rejected(raced.run('merge', { ...rollout, AFTER_ENQUEUE_HEAD: 'c'.repeat(40) }), /head changed/);
+  assert.equal(raced.events().filter((event) => event.type === 'enqueue').length, 1);
+});
 test('Crowdin requests admission before inspecting mergeability blocked on the missing admission gate', (t) => {
   const f = fixture(t);
   const queue = {
