@@ -346,11 +346,13 @@ test('Dependabot recovers stale admission before checking GitHub mergeability', 
       {
         ...dependabotChecks(state),
         RULES: JSON.stringify(activeQueueRules()),
+        CHECKED_MERGE_MODE: 'queue',
         BLOCKED_UNTIL_ADMISSION: 'true',
         MERGE_OUTCOME: 'OPEN',
       }
     );
     assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(f.output(), /merge_mode=queue/);
     assert.ok(f.events().some((event) => event.type === 'admission-success'));
     assert.ok(f.events().some((event) => event.type === 'merge'));
     assert.ok(!f.events().some((event) => event.type === 'dispatch'));
@@ -360,12 +362,31 @@ test('Dependabot never submits a candidate when refreshed admission fails', (t) 
   const f = fixture(t);
   const result = f.shell(dependabotMergeScript(), {
     RULES: JSON.stringify(activeQueueRules()),
+    CHECKED_MERGE_MODE: 'queue',
     BLOCKED_UNTIL_ADMISSION: 'true',
     ADMISSION_FAIL: 'true',
   });
   assert.equal(result.status, 1);
   assert.ok(f.events().some((event) => event.type === 'admission'));
   assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
+});
+test('Dependabot retries if policy mode changed since the checks step', (t) => {
+  const merge = workflowStep(autoMergeJob(), 'Merge Dependabot PR');
+  assert.match(merge, /CHECKED_MERGE_MODE: \$\{\{ steps\.checks\.outputs\.merge_mode \}\}/);
+  for (const checked of ['strict', 'strict-queue', '']) {
+    const f = fixture(t);
+    const result = f.shell(dependabotMergeScript(), {
+      RULES: JSON.stringify(activeQueueRules()),
+      CHECKED_MERGE_MODE: checked,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /Main merge policy changed since Dependabot checks/);
+    assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+  }
+  const f = fixture(t);
+  const rollback = f.shell(dependabotMergeScript(), { CHECKED_MERGE_MODE: 'queue' });
+  assert.equal(rollback.status, 1);
+  assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
 });
 test('Dependabot retains strict admission failures and unrelated queue status failures', (t) => {
   const strict = fixture(t);
@@ -425,6 +446,7 @@ test('Dependabot queue submission preserves behind head and never dispatches mai
   const f = fixture(t);
   const result = f.shell(dependabotMergeScript(), {
     MAIN_MERGE_MODE: 'queue',
+    CHECKED_MERGE_MODE: 'queue',
     RULES: JSON.stringify(activeQueueRules()),
     PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
     MERGE_OUTCOME: 'OPEN',
@@ -439,7 +461,11 @@ test('Dependabot queue submission preserves behind head and never dispatches mai
 });
 test('Dependabot dispatches main CI only after actual merge and holds failed admission', (t) => {
   const f = fixture(t);
-  const queue = { MAIN_MERGE_MODE: 'queue', RULES: JSON.stringify(activeQueueRules()) };
+  const queue = {
+    MAIN_MERGE_MODE: 'queue',
+    CHECKED_MERGE_MODE: 'queue',
+    RULES: JSON.stringify(activeQueueRules()),
+  };
   const denied = f.shell(dependabotMergeScript(), { ...queue, ADMISSION_FAIL: 'true' });
   assert.equal(denied.status, 1);
   assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
@@ -455,7 +481,11 @@ test('Dependabot rollout coexistence retains freshness and admission while repor
     ruleset_id: 42,
     parameters: { ...rules[0].parameters, strict_required_status_checks_policy: true },
   });
-  const rollout = { RULES: JSON.stringify(rules), MERGE_OUTCOME: 'OPEN' };
+  const rollout = {
+    RULES: JSON.stringify(rules),
+    CHECKED_MERGE_MODE: 'strict-queue',
+    MERGE_OUTCOME: 'OPEN',
+  };
   const queued = f.shell(dependabotMergeScript(), rollout);
   assert.equal(queued.status, 0, queued.stderr);
   assert.ok(f.events().some((event) => event.type === 'admission'));
