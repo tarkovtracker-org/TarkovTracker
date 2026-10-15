@@ -1,19 +1,65 @@
 #!/usr/bin/env bash
 # Shared by trusted Crowdin and release automation; callers enable errexit/pipefail.
-# Reject a missing, non-strict, or foreign-provider main validation rule.
+# Accept strict freshness or the equivalent reviewed, single-entry integration queue.
 # The rollout administrator verifies bypass actors; reading them requires ruleset write access.
-require_main_ci_policy() {
-  local rules rule_id
+MAIN_MERGE_MODE=''
+main_policy_mode() {
+  local rules mode admission_app
+  admission_app="${REVIEW_ADMISSION_APP_ID:-0}"
+  [[ "$admission_app" =~ ^[0-9]+$ ]] || { echo 'Invalid admission App ID.' >&2; return 1; }
   rules="$(gh api --paginate "repos/$GITHUB_REPOSITORY/rules/branches/main?per_page=100")"
-  rule_id="$(jq -rs --arg repo "$GITHUB_REPOSITORY" '
-    [ .[][] | select(.type == "required_status_checks"
-      and .ruleset_source_type == "Repository" and .ruleset_source == $repo
-      and .parameters.strict_required_status_checks_policy == true
-      and any(.parameters.required_status_checks[]; .context == "CI Result" and .integration_id == 15368)
-      and any(.parameters.required_status_checks[]; .context == "Preview Result" and .integration_id == 15368))
-      | .ruleset_id ][0] // empty' <<< "$rules")"
-  [[ "$rule_id" =~ ^[0-9]+$ ]] || { echo 'Missing strict main CI and Preview Result rule.' >&2; return 1; }
-
+  mode="$(jq -rs --arg repo "$GITHUB_REPOSITORY" --argjson admission_app "$admission_app" '
+    def own: .ruleset_source_type == "Repository" and .ruleset_source == $repo;
+    def pinned($context): any(.parameters.required_status_checks[]?;
+      .context == $context and .integration_id == 15368);
+    [ .[][] ] as $all |
+    [ $all[] | select(own and .type == "required_status_checks" and
+      pinned("CI Result") and pinned("Preview Result")) ] as $checks |
+    any($checks[]; .parameters.strict_required_status_checks_policy == true) as $strict |
+    any($checks[]; .parameters.strict_required_status_checks_policy == false and
+      ($admission_app > 0 and $admission_app != 15368) and
+      any(.parameters.required_status_checks[]?; .context == "Review Admission" and .integration_id == $admission_app) and
+      (.ruleset_id as $id | any($all[]; own and .ruleset_id == $id and
+        .type == "pull_request" and .parameters.required_review_thread_resolution == true)) and
+      (.ruleset_id as $id | any($all[]; own and .ruleset_id == $id and .type == "merge_queue" and
+        .parameters.grouping_strategy == "ALLGREEN" and
+        .parameters.max_entries_to_build == 1 and .parameters.max_entries_to_merge == 1 and
+        .parameters.min_entries_to_merge == 1 and .parameters.merge_method == "SQUASH"))) as $queue |
+    if $strict and $queue then "strict-queue"
+    elif $strict then "strict"
+    elif any($all[]; .type == "required_status_checks" and
+      .parameters.strict_required_status_checks_policy == true and
+      pinned("CI Result") and pinned("Preview Result")) then empty
+    elif $queue then "queue" else empty end' <<< "$rules")"
+  [[ "$mode" == strict || "$mode" == strict-queue || "$mode" == queue ]] || {
+    echo 'Missing strict main CI and Preview Result rule or equivalent reviewed merge queue.' >&2
+    return 1
+  }
+  printf '%s\n' "$mode"
+}
+require_main_ci_policy() {
+  MAIN_MERGE_MODE="$(main_policy_mode)"
+}
+# Job-token PR events can be suppressed. Recheck trusted admission explicitly, without bypasses.
+wait_for_review_admission() {
+  local number="$1" sha="$2" attempt admission_exit admission_run
+  admission_run="$(gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/review-admission.yml/dispatches" \
+    -H "X-GitHub-Api-Version: 2022-11-28" -f ref=main \
+    -f "inputs[pull_request]=$number" -F return_run_details=true --jq ".workflow_run_id")"
+  [[ "$admission_run" =~ ^[1-9][0-9]*$ ]] || { echo "Admission dispatch returned no authenticated run ID" >&2; return 1; }
+  for ((attempt = 1; attempt <= 120; attempt++)); do
+    if node "$(dirname "${BASH_SOURCE[0]}")/review-admission-cli.mjs" "$GITHUB_REPOSITORY" "$sha" "$number" "$admission_run"; then
+      return 0
+    else
+      admission_exit=$?
+    fi
+    case "$admission_exit" in
+      2) sleep 5 ;;
+      *) return "$admission_exit" ;;
+    esac
+  done
+  echo 'Timed out waiting for authenticated Review Admission.' >&2
+  return 1
 }
 # Observe the captured main revision before promoting an already validated commit.
 require_main_revision() {

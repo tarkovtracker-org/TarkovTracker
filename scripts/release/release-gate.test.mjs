@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { releaseEligibility } from './release-gate.mjs';
+import * as promotion from './release-promotion.mjs';
 const sha = 'a'.repeat(40);
 const now = Date.parse('2026-10-13T20:30:29Z');
 function fixture() {
@@ -26,18 +27,21 @@ function fixture() {
   };
   const main = { object: { sha } };
   const runs = [run];
+  const wakeup = structuredClone(run);
   const releases = [];
   const github = {
-    paginate: vi.fn(async () => releases),
+    paginate: vi.fn(async (endpoint) => (endpoint === github.rest.pulls.list ? [] : releases)),
     rest: {
       repos: { listReleases: vi.fn() },
+      pulls: { list: vi.fn() },
       actions: {
+        getWorkflowRun: vi.fn(async () => ({ data: wakeup })),
         listWorkflowRuns: vi.fn(async () => ({ data: { workflow_runs: runs } })),
       },
       git: { getRef: vi.fn().mockResolvedValue({ data: main }) },
     },
   };
-  return { run, runs, main, context, github, releases, now };
+  return { run, wakeup, runs, main, context, github, releases, now };
 }
 function published(published_at, changes = {}) {
   return { draft: false, prerelease: false, published_at, ...changes };
@@ -54,7 +58,10 @@ describe('weekly publication cadence', () => {
     f.context.eventName = 'workflow_dispatch';
     f.releases.push(published('2026-10-13T17:22:07Z'));
     expect((await releaseEligibility(f)).release).toBe(true);
-    expect(f.github.paginate).not.toHaveBeenCalled();
+    expect(f.github.paginate).not.toHaveBeenCalledWith(
+      f.github.rest.repos.listReleases,
+      expect.anything()
+    );
     f.run.conclusion = 'failure';
     expect((await releaseEligibility(f)).release).toBe(false);
   });
@@ -252,5 +259,64 @@ describe('release freshness and failures', () => {
     await expect(releaseEligibility(f)).rejects.toThrow('GitHub unavailable');
     f.github.rest.actions.listWorkflowRuns.mockRejectedValue(new Error('Actions unavailable'));
     await expect(releaseEligibility(f)).rejects.toThrow('Actions unavailable');
+  });
+});
+describe('main CI finalization wakeups', () => {
+  function finalization() {
+    const f = fixture();
+    f.context.eventName = 'workflow_run';
+    f.context.payload.workflow_run = {
+      id: f.run.id,
+      run_attempt: f.run.run_attempt,
+      head_sha: sha,
+    };
+    return f;
+  }
+  it('authenticates exact successful main CI but never prepares a new version outside cadence', async () => {
+    const f = finalization();
+    expect(await releaseEligibility(f)).toMatchObject({
+      release: false,
+      reason: expect.stringContaining('finalize only'),
+    });
+    expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledWith(
+      expect.objectContaining({ run_id: 123 })
+    );
+  });
+  it('immediately selects pending reviewed version finalization on its actual successful main CI SHA', async () => {
+    const f = finalization();
+    const recovery = { sha, version: '1.2.3', notes: 'verified publication notes' };
+    const queued = vi
+      .spyOn(promotion, 'queuedRelease')
+      .mockResolvedValueOnce({ release: false, recovery, reason: 'Verified version' });
+    try {
+      expect(await releaseEligibility(f)).toMatchObject({ release: false, recovery });
+    } finally {
+      queued.mockRestore();
+    }
+  });
+  it.each([
+    ['fork CI', (f) => (f.wakeup.head_repository.id = 999)],
+    ['wrong workflow', (f) => (f.wakeup.path = '.github/workflows/evil.yml')],
+    ['branch CI', (f) => (f.wakeup.head_branch = 'feature')],
+    ['untrusted event', (f) => (f.wakeup.event = 'pull_request')],
+    ['failed run', (f) => (f.wakeup.conclusion = 'failure')],
+    ['superseded attempt', (f) => (f.wakeup.run_attempt = 2)],
+    ['changed CI SHA', (f) => (f.wakeup.head_sha = 'b'.repeat(40))],
+  ])('rejects %s without enabling preparation', async (_label, mutate) => {
+    const f = finalization();
+    mutate(f);
+    const queued = vi.spyOn(promotion, 'queuedRelease').mockResolvedValue({
+      release: false,
+      recovery: { sha, version: '1.2.3', notes: 'verified' },
+    });
+    try {
+      const result = await releaseEligibility(f);
+      expect(result).toMatchObject({ release: false });
+      expect(result.recovery).toBeUndefined();
+      expect(queued).not.toHaveBeenCalled();
+      expect(f.run).toMatchObject({ conclusion: 'success', head_sha: sha, head_branch: 'main' });
+    } finally {
+      queued.mockRestore();
+    }
   });
 });

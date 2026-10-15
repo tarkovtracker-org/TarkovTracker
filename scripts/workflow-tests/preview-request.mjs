@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { countApiCalls } from './helpers/api-count.mjs';
+import { pathToFileURL } from 'node:url';
 import {
   PreviewRequestDenied,
   requestPreviewFromComment,
@@ -16,6 +15,7 @@ import {
   readPreviewRequest,
   rolloutEnabledAt,
 } from '../preview/request-authorization.mjs';
+import { countApiCalls } from './helpers/api-count.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 const REPO = { owner: 'example', repo: 'tracker' };
@@ -76,7 +76,7 @@ function fixture(options = {}) {
       },
       checks: { listForRef: 'checks' },
     },
-    paginate: async (endpoint, params) => {
+    paginate: async (endpoint) => {
       if (endpoint === 'files') return options.files ?? [{ filename: 'app/a.ts' }];
       if (endpoint === 'checks') return [check];
       throw new Error(`Unexpected endpoint ${endpoint}`);
@@ -122,7 +122,7 @@ test('maintainer command dispatches the current successful PR CI run without an 
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: String(RUN_ID), request_comment_id: '1', ci_attempt: '1' },
+      inputs: { run_id: String(RUN_ID), queue: 'false', request_comment_id: '1', ci_attempt: '1' },
     },
   ]);
 });

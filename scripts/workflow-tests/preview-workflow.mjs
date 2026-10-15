@@ -119,7 +119,10 @@ test('preview controller runs trusted code only and isolates credentials per job
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /request_comment_id:/);
   for (const trustedWorkflow of [workflow, stateWorkflow])
     assert.match(trustedWorkflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(
+    workflow,
+    /group: \$\{\{ inputs.queue && 'pages-preview-lifecycle' \|\| format\('preview-ci-\{0\}', inputs.run_id\) \}\}\n {2}queue: \$\{\{ inputs.queue && 'max' \|\| 'single' \}\}\n {2}cancel-in-progress: \$\{\{ !inputs.queue \}\}/
+  );
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
   assert.match(
     jobBlock(workflow, 'result'),
@@ -273,4 +276,43 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
       jobBlock(read(`.github/workflows/${name}.yml`), name === 'crowdin' ? 'sync' : 'release'),
       /timeout-minutes: 90/
     );
+});
+function concurrencyValue(workflow, field, inputs) {
+  const value = workflow.match(new RegExp(`^ {2}${field}: (.+)$`, 'm'))[1];
+  if (value.startsWith('${{'))
+    return new Function('inputs', `return (${value.slice(3, -2)});`)(inputs);
+  return field === 'cancel-in-progress' ? JSON.parse(value) : value;
+}
+function previewScheduling(workflow, queue) {
+  return [
+    concurrencyValue(workflow, 'queue', { queue }),
+    concurrencyValue(workflow, 'cancel-in-progress', { queue }),
+  ];
+}
+test('unapproved ordinary forks use a separate full-workflow group; queue upload and reporting stay locked', () => {
+  const workflow = read('.github/workflows/preview.yml');
+  const group = workflow.match(/^ {2}group: \$\{\{ (.*) \}\}$/m)[1];
+  const evaluate = new Function('inputs', 'format', `return (${group});`);
+  const format = (pattern, id) => pattern.replace('{0}', id);
+  assert.equal(evaluate({ queue: false, run_id: '123' }, format), 'preview-ci-123');
+  assert.equal(evaluate({ queue: true, run_id: '123' }, format), 'pages-preview-lifecycle');
+  assert.deepEqual(previewScheduling(workflow, true), ['max', false]);
+  assert.deepEqual(previewScheduling(workflow, false), ['single', true]);
+  const blocking = workflow
+    .replace("queue: ${{ inputs.queue && 'max' || 'single' }}", 'queue: max')
+    .replace('cancel-in-progress: ${{ !inputs.queue }}', 'cancel-in-progress: false');
+  assert.throws(
+    () => assert.deepEqual(previewScheduling(blocking, false), ['single', true]),
+    assert.AssertionError
+  );
+  assert.deepEqual(previewScheduling(blocking, true), ['max', false]);
+  assert.equal((workflow.match(/QUEUE_INPUT: \$\{\{ inputs.queue \}\}/g) ?? []).length, 2);
+  assert.match(
+    workflow,
+    /inputs: \{ run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT/
+  );
+  assert.match(workflow, /queue: process.env.QUEUE_INPUT,\n +destination:/);
+  assert.match(jobBlock(workflow, 'deploy'), /name: \$\{\{ needs.plan.outputs.environment \}\}/);
+  assert.match(workflow, /^concurrency:/m);
+  assert.doesNotMatch(workflow, /^ {4}concurrency:/m);
 });

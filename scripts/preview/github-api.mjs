@@ -189,12 +189,13 @@ export async function requestPreviewDispatch(github, repo, decision) {
       decision.runId,
       decision.previewRequest,
       decision.previewAuthorization,
-      decision.runAttempt
+      decision.runAttempt,
+      decision.runEvent
     ),
   });
 }
-function previewDispatchInputs(runId, request, authorization, attempt) {
-  const inputs = { run_id: String(runId) };
+function previewDispatchInputs(runId, request, authorization, attempt, event) {
+  const inputs = { run_id: String(runId), queue: String(event === 'merge_group') };
   const grant = previewGrant(request);
   if (grant) inputs.request_comment_id = String(grant.commentId);
   if (authorization === 'readiness') inputs.authorization = 'readiness';
