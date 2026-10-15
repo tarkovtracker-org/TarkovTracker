@@ -304,38 +304,37 @@ it('metadata read failure fails closed and never turns into an empty success', a
   await expect(queueReleasePromotion(f)).rejects.toThrow('API unavailable');
   expect(f.operations.submit).not.toHaveBeenCalled();
 });
-it('CLI operations use trusted policy and exact-head normal merge without bypass/autoapproval', () => {
+it('CLI operations use trusted policy and guarded native enqueue without auto-merge', () => {
   execFileSync.mockReturnValue('queue\n');
   const operations = queueOperations({ owner: 'owner', repo: 'repo' });
   expect(operations.policy()).toBe('queue');
   operations.submit(901, head, 'queue');
-  expect(execFileSync.mock.calls[1][1]).toEqual([
-    'pr',
-    'merge',
-    '901',
-    '--repo',
-    'owner/repo',
-    '--match-head-commit',
-    head,
-  ]);
+  expect(execFileSync.mock.calls[1][0]).toBe(process.execPath);
+  const [helper, ...args] = execFileSync.mock.calls[1][1];
+  expect(helper).toMatch(/\/ci\/enqueue-pr-cli\.mjs$/);
+  expect(args).toEqual(['owner/repo', '901', head]);
   expect(
     execFileSync.mock.calls
       .flatMap((call) => call[1])
       .some((arg) => ['--admin', '--auto'].includes(arg))
   ).toBe(false);
 });
-it.each(['strict', 'strict-queue'])(
-  'CLI %s submits an explicit head-pinned squash without bypass',
-  (mode) => {
-    const operations = queueOperations({ owner: 'owner', repo: 'repo' });
-    operations.submit(901, head, mode);
-    expect(execFileSync).toHaveBeenCalledTimes(1);
-    expect(execFileSync.mock.calls[0].slice(0, 2)).toEqual([
-      'gh',
-      ['pr', 'merge', '901', '--repo', 'owner/repo', '--match-head-commit', head, '--squash'],
-    ]);
-  }
-);
+it.each(['strict'])('CLI %s submits an explicit head-pinned squash without bypass', (mode) => {
+  const operations = queueOperations({ owner: 'owner', repo: 'repo' });
+  operations.submit(901, head, mode);
+  expect(execFileSync).toHaveBeenCalledTimes(1);
+  expect(execFileSync.mock.calls[0].slice(0, 2)).toEqual([
+    'gh',
+    ['pr', 'merge', '901', '--repo', 'owner/repo', '--match-head-commit', head, '--squash'],
+  ]);
+});
+it('strict-queue uses the same guarded native enqueue while freshness coexists', () => {
+  const operations = queueOperations({ owner: 'owner', repo: 'repo' });
+  operations.submit(901, head, 'strict-queue');
+  expect(execFileSync.mock.calls[0][0]).toBe(process.execPath);
+  expect(execFileSync.mock.calls[0][1][0]).toMatch(/\/ci\/enqueue-pr-cli\.mjs$/);
+  expect(execFileSync.mock.calls[0][1].slice(1)).toEqual(['owner/repo', '901', head]);
+});
 it('consumes the PR-head receipt alongside its queue-head receipt without re-enqueueing the group', async () => {
   const f = fixture();
   const groupHead = 'c'.repeat(40);
