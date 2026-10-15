@@ -179,6 +179,15 @@ graph TB
     Gateway --> CF
 ```
 
+## Settings navigation
+
+[`settings.vue`](../app/pages/settings.vue) keeps tab and nested hash targets below the fixed
+header using their scroll margins. It scrolls instantly and reasserts once on the next animation
+frame to settle competing native/router hash scrolling. The correction requires the same path,
+hash and connected target; it does not continuously pin the page after navigation. Route aliases,
+refresh and Back/Forward retain their existing targets. Geometry is checked by the settings
+navigation [browser smoke test](../scripts/preview/smoke/settings-navigation.smoke.mjs).
+
 ## State Management
 
 ### Three-Store Pattern + Facade

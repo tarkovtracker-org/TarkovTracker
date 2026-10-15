@@ -366,22 +366,18 @@
     return document.getElementById(targetId);
   };
   const scrollTarget = (element: Element, hash: string) => {
-    const isTab = element.getAttribute('role') === 'tab';
+    const path = route.path;
     const options: ScrollIntoViewOptions = {
-      // Settle horizontal tab movement before Nuxt's subsequent panel scroll.
-      behavior: isTab ? 'instant' : 'smooth',
+      // Avoid competing animated hash scrolls for both tabs and nested targets.
+      behavior: 'instant',
       block: 'start',
       inline: 'nearest',
     };
     element.scrollIntoView(options);
-    if (!isTab) {
-      return;
-    }
-    // An instant scroll issued while an earlier smooth panel scroll is still animating does not
-    // fully cancel it in Chromium: the stale animation applies one more frame and leaves the tab
-    // strip under the app bar. Re-assert the position once that frame has run.
+    // Chromium can apply one residual native/router hash-scroll frame after an instant scroll.
+    // Reassert once for this navigation; do not keep correcting later user scrolling.
     requestAnimationFrame(() => {
-      if (hash === route.hash && element.isConnected) {
+      if (path === route.path && hash === route.hash && element.isConnected) {
         element.scrollIntoView(options);
       }
     });

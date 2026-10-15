@@ -51,17 +51,20 @@ async function expectActiveTabVisible(page, name, focused = false) {
 }
 async function expectNestedTarget(page, hash, panel) {
   await expect(page.locator(panel)).toBeVisible();
-  await expect
-    .poll(() =>
-      page.locator(hash).evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return (
-          rect.top >= document.querySelector('header').getBoundingClientRect().bottom &&
-          rect.top < innerHeight
-        );
-      })
-    )
-    .toBe(true);
+  const isVisible = () =>
+    page.locator(hash).evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return (
+        rect.top >= document.querySelector('header').getBoundingClientRect().bottom &&
+        rect.top < innerHeight
+      );
+    });
+  await expect.poll(isVisible).toBe(true);
+  // A transient pass while native/router scrolling is still settling is insufficient.
+  await page.waitForTimeout(600);
+  expect(await isVisible(), 'nested target remains below the header after scrolling settles').toBe(
+    true
+  );
 }
 for (const viewport of [
   { width: 400, height: 609 },
