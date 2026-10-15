@@ -56,6 +56,7 @@ test('queue admission validates the PR diff without rewriting a behind translati
       ...queue,
       BASE_SHA: base,
       CURRENT_BASE: 'b'.repeat(40),
+      AUTO_MERGE_DISABLED: 'true',
       MERGE_OUTCOME: 'OPEN',
       PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
     })
@@ -65,7 +66,10 @@ test('queue admission validates the PR diff without rewriting a behind translati
     f.events().filter((event) => event.type === 'admission'),
     [{ type: 'admission', sha: f.head, number: '857', runId: '777' }]
   );
-  assert.equal(f.calls().filter((args) => args[0] === 'pr' && args[1] === 'merge').length, 1);
+  const enqueue = f.events().filter((event) => event.type === 'enqueue');
+  assert.equal(enqueue.length, 1);
+  assert.equal(enqueue[0].input.expectedHeadOid, f.head);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
 });
 test('queue policy rejects missing review/provider/group controls and unknown API responses', (t) => {
   for (const change of [

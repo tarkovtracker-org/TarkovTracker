@@ -116,6 +116,23 @@ if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
 }
 if (args[0] === 'api') {
   const waitEndpoint = args[1];
+  if (waitEndpoint === 'graphql') {
+    const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
+    const queued = { id: 'MQE_fixture', pullRequest: { number: Number(p.PR_NUMBER), headRefOid: p.ACTUAL_HEAD } };
+    if (payload.query.startsWith('query')) {
+      console.log(JSON.stringify({data:{repository:{pullRequest:{headRefOid:p.ACTUAL_HEAD,mergeQueueEntry:null}}}}));
+      process.exit(0);
+    }
+    const expected = {pullRequestId:'PR_fixture_' + p.PR_NUMBER,expectedHeadOid:p.ACTUAL_HEAD};
+    if (!payload.query.includes('enqueuePullRequest') || JSON.stringify(payload.variables.input) !== JSON.stringify(expected)) {
+      console.error('Unexpected or unguarded queue mutation'); process.exit(1);
+    }
+    if (p.MERGE_FAIL === 'true') { console.error('Server-side branch rules rejected enqueue'); process.exit(1); }
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'enqueue',input:payload.variables.input,invocation:p.INVOCATION_ID}) + '\n');
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'merge',state:p.MERGE_OUTCOME || 'MERGED',invocation:p.INVOCATION_ID}) + '\n');
+    console.log(JSON.stringify({data:{enqueuePullRequest:{mergeQueueEntry:queued}}}));
+    process.exit(0);
+  }
   if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
     const input = JSON.stringify({ check_runs: JSON.parse(p.WAIT_CHECK_RUNS || '[]') });
     console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
@@ -127,7 +144,7 @@ if (args[0] === 'api') {
     process.exit(0);
   }
   if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER) {
-    console.log(JSON.stringify({ state: 'open', draft: false, base: { ref: 'main' }, head: { sha: p.ACTUAL_HEAD } }));
+    console.log(JSON.stringify({ number:Number(p.PR_NUMBER), node_id:'PR_fixture_' + p.PR_NUMBER, state:'open', draft:false, base:{ref:'main',repo:{full_name:p.GITHUB_REPOSITORY}}, head:{sha:p.ACTUAL_HEAD,repo:{full_name:p.GITHUB_REPOSITORY}} }));
     process.exit(0);
   }
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
@@ -209,6 +226,7 @@ if (args[1] === 'view') {
   process.exit(0);
 }
 if (args[1] === 'merge') {
+  if (p.AUTO_MERGE_DISABLED === 'true') { console.error('Auto merge is not allowed for this repository (enablePullRequestAutoMerge)'); process.exit(1); }
   const supplied = args[args.indexOf('--match-head-commit') + 1];
   if (supplied !== p.ACTUAL_HEAD) { console.error('Head changed at merge'); process.exit(1); }
   if (p.ACTUAL_BASE && p.ACTUAL_BASE !== p.BASE_SHA && p.QUEUE_ENFORCED !== 'true') { console.error('Base advanced at merge'); process.exit(1); }

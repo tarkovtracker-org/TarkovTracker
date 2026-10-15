@@ -455,9 +455,30 @@ test('Dependabot queue submission preserves behind head and never dispatches mai
   assert.match(result.stdout, /Submitted reviewed Dependabot PR/);
   assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '777'));
   assert.ok(!f.events().some((event) => event.type === 'dispatch'));
-  const merge = f.calls().find((args) => args[0] === 'pr' && args[1] === 'merge');
-  assert.ok(merge.includes(f.head));
-  assert.ok(!merge.includes('--admin') && !merge.includes('--delete-branch'));
+  const enqueue = f.events().find((event) => event.type === 'enqueue');
+  assert.equal(enqueue.input.expectedHeadOid, f.head);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
+});
+test('Dependabot native enqueue works when repository auto-merge is disabled', (t) => {
+  const f = fixture(t);
+  const options = {
+    RULES: JSON.stringify(activeQueueRules()),
+    CHECKED_MERGE_MODE: 'queue',
+    AUTO_MERGE_DISABLED: 'true',
+    MERGE_OUTCOME: 'OPEN',
+    PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'UNSTABLE' }]),
+  };
+  const result = f.shell(dependabotMergeScript(), options);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  const cliMutant = dependabotMergeScript().replace(
+    'enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"',
+    'gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --match-head-commit "$HEAD_SHA" --squash'
+  );
+  assert.notEqual(cliMutant, dependabotMergeScript());
+  const denied = f.shell(cliMutant, options);
+  assert.equal(denied.status, 1);
+  assert.match(denied.stderr, /Auto merge is not allowed/);
 });
 test('Dependabot dispatches main CI only after actual merge and holds failed admission', (t) => {
   const f = fixture(t);

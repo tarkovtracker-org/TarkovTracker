@@ -272,8 +272,24 @@ export function queueOperations(repo) {
       { env, encoding: 'utf8' }
     ).trim();
   const submit = (number, head, mode) => {
-    const args = ['pr', 'merge', String(number), '--repo', repository, '--match-head-commit', head];
-    if (['strict', 'strict-queue'].includes(mode)) args.push('--squash');
+    if (mode !== 'strict') {
+      const helper = fileURLToPath(new URL('../ci/enqueue-pr-cli.mjs', import.meta.url));
+      execFileSync(process.execPath, [helper, repository, String(number), head], {
+        env,
+        stdio: 'inherit',
+      });
+      return;
+    }
+    const args = [
+      'pr',
+      'merge',
+      String(number),
+      '--repo',
+      repository,
+      '--match-head-commit',
+      head,
+      '--squash',
+    ];
     execFileSync('gh', args, { env, stdio: 'inherit' });
   };
   const dispatchMain = () =>

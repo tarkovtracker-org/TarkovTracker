@@ -163,10 +163,14 @@ merge() {
   wait_for_mergeability
   require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.
-  gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-    --match-head-commit "$HEAD_SHA" --squash \
-    --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)" \
-    --body "Automated translation updates from Crowdin."
+  if [[ "$MAIN_MERGE_MODE" != strict ]]; then
+    enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"
+  else
+    gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+      --match-head-commit "$HEAD_SHA" --squash \
+      --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)" \
+      --body "Automated translation updates from Crowdin."
+  fi
   pr="$(read_pr)"
   if [[ "$(jq -r '.state' <<< "$pr")" == OPEN ]]; then
     [[ "$MAIN_MERGE_MODE" != strict ]] || fail "Translation merge did not complete."
