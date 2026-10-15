@@ -92,7 +92,10 @@ Agents may record that command only after receiving the specific merge authority
 Queue admission re-proves the member PR, live queue ref, current-main parent and single-entry
 squash `ALLGREEN` configuration. A squash queue commit has current main as its only parent and is
 exactly one commit ahead of it; it does not contain the PR head as an ancestor, so GitHub's queue
-entry (exact PR head and exact queue commit) is the PR binding. Read-only signal workflows cannot publish approval. Consumers authenticate
+entry (exact PR head and exact queue commit) is the PR binding. Configuration is re-proved from
+the one repository-owned effective main queue rule through the public REST branch-rules endpoint;
+this removes GraphQL queue configuration reads without broadening job/App permissions.
+Missing, ambiguous, foreign or changed queue policy fails closed. Read-only signal workflows cannot publish approval. Consumers authenticate
 the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
 
 Review and review-comment wakeups resolve the service-owned PR link from the authenticated
@@ -107,7 +110,8 @@ Crowdin validates its immutable translation diff without updating a behind branc
 policy is active. While strict freshness and the verified queue coexist during rollout, their
 validation remains strict but admission and pending queue reporting already work. Crowdin and
 Dependabot explicitly request authenticated admission and submit a
-head-pinned normal merge. They report queued entries without dispatching main CI early; direct
+head-pinned native enqueue through `enqueuePullRequest` with `expectedHeadOid` in the mutation input. This does not depend
+on the repository auto-merge setting. They report queued entries without dispatching main CI early; direct
 job-token merges dispatch main CI only after the PR is actually merged. Existing dependency,
 translation, fork and credential controls remain enforced.
 

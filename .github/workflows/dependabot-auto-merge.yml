@@ -376,8 +376,7 @@ jobs:
             exit 1
           }
           if [ "$MAIN_MERGE_MODE" != strict ]; then
-            gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --match-head-commit "$HEAD_SHA" --squash
+            enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"
           else
             gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
               --match-head-commit "$HEAD_SHA" --squash --delete-branch

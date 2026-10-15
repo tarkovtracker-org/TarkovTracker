@@ -56,6 +56,7 @@ test('queue admission validates the PR diff without rewriting a behind translati
       ...queue,
       BASE_SHA: base,
       CURRENT_BASE: 'b'.repeat(40),
+      AUTO_MERGE_DISABLED: 'true',
       MERGE_OUTCOME: 'OPEN',
       PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
     })
@@ -65,7 +66,10 @@ test('queue admission validates the PR diff without rewriting a behind translati
     f.events().filter((event) => event.type === 'admission'),
     [{ type: 'admission', sha: f.head, number: '857', runId: '777' }]
   );
-  assert.equal(f.calls().filter((args) => args[0] === 'pr' && args[1] === 'merge').length, 1);
+  const enqueue = f.events().filter((event) => event.type === 'enqueue');
+  assert.equal(enqueue.length, 1);
+  assert.equal(enqueue[0].input.expectedHeadOid, f.head);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
 });
 test('queue policy rejects missing review/provider/group controls and unknown API responses', (t) => {
   for (const change of [
@@ -603,6 +607,18 @@ test('rollout coexistence preserves Crowdin freshness while accepting a reviewed
     behind.run('prepare', { ...rollout, CURRENT_BASE: git(behind.repo, 'rev-parse', 'HEAD') }),
     /must include current main/
   );
+});
+test('strict-queue accepts main advancing after enqueue while still rejecting a changed head', (t) => {
+  const f = fixture(t);
+  const rollout = { RULES: JSON.stringify(strictQueueRules()), AFTER_ENQUEUE_BASE: 'b'.repeat(40) };
+  passed(f.run('prepare', rollout));
+  passed(f.run('merge', rollout));
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+  const raced = fixture(t);
+  passed(raced.run('prepare', rollout));
+  rejected(raced.run('merge', { ...rollout, AFTER_ENQUEUE_HEAD: 'c'.repeat(40) }), /head changed/);
+  assert.equal(raced.events().filter((event) => event.type === 'enqueue').length, 1);
 });
 test('Crowdin requests admission before inspecting mergeability blocked on the missing admission gate', (t) => {
   const f = fixture(t);
