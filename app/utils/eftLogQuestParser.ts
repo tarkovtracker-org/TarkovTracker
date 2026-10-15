@@ -132,13 +132,22 @@ function* readLogRecords(text: string): Generator<LogRecord> {
 /** Decodes versioned and legacy pipe-delimited headers while preserving message delimiters. */
 function toLogRecord(text: string, match: RegExpExecArray, end: number): LogRecord {
   const fields = match[1]!.split('|');
-  const channelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
+  const headerChannelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
+  const channelIndex = mirroredChannelIndex(fields, headerChannelIndex);
   return {
     timestamp: extractLogLineTimestamp(match[0])!,
     channel: (fields[channelIndex] ?? '').toLowerCase(),
     message: fields.slice(channelIndex + 1).join('|'),
     body: text.slice(match.index + match[0].length, end).trim(),
   };
+}
+/** Unwraps only explicitly source-prefixed output mirrors, never generic output chatter. */
+function mirroredChannelIndex(fields: string[], index: number): number {
+  const sources = ['application', 'backend', 'notifications', 'push-notifications'];
+  return fields[index]?.toLowerCase() === 'output' &&
+    sources.includes(fields[index + 1]?.toLowerCase() ?? '')
+    ? index + 1
+    : index;
 }
 /** Parses log timestamps as UTC when no explicit offset is present; invalid values return null. */
 function eftLogTimestampMillis(timestamp: string | null): number | null {
@@ -552,8 +561,18 @@ function appendLogText(source: EftParsedLogFile, text: string, budget?: EftLogIm
   for (const record of readLogRecords(text)) {
     collectRecordModeSignals(record, source, budget);
   }
-  if (source.notifications)
-    appendNotificationResult(source.notifications, parseEftNotificationLogText(text, budget));
+  appendSourceNotifications(source, text, budget);
+}
+/** Keeps output context-only files out of notification/account counts until notification evidence appears. */
+function appendSourceNotifications(
+  source: EftParsedLogFile,
+  text: string,
+  budget?: EftLogImportBudget
+): void {
+  if (!isEftQuestEvidenceLogFileName(source.name)) return;
+  const result = parseEftNotificationLogText(text, budget);
+  if (source.notifications) appendNotificationResult(source.notifications, result);
+  else if (result.chatMessageCount + result.parseErrorCount > 0) source.notifications = result;
 }
 /** Parses complete records once and retains only evidence needed for later version/mode selection. */
 export function createEftLogFileParser(name: string, budget?: EftLogImportBudget) {
@@ -594,6 +613,10 @@ function matchesChannel(fileName: string, channel: string): boolean {
 export function isEftNotificationLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, '(?:push-notifications|notifications)');
 }
+/** Identifies dedicated notification files and output files that may contain explicit notification mirrors. */
+export function isEftQuestEvidenceLogFileName(fileName: string): boolean {
+  return matchesChannel(fileName, '(?:push-notifications|notifications|output)');
+}
 /** Identifies backend logs that can provide session mode evidence. */
 export function isEftBackendLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, 'backend');
@@ -610,7 +633,7 @@ function modeBuckets<T>(create: () => T): Record<EftQuestEventMode, T> {
   return { pvp: create(), pve: create(), seasonal: create(), unknown: create() };
 }
 /** Prefers original server time and otherwise uses the notification receipt timestamp. */
-function knownQuestEventTime(event: EftQuestEvent): number | null {
+export function knownQuestEventTime(event: EftQuestEvent): number | null {
   return event.occurredAt ?? eftLogTimestampMillis(event.timestamp);
 }
 /** Places events without usable timestamps before dated history during reconciliation. */

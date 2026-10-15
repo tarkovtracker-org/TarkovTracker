@@ -5,6 +5,11 @@ Evidence snapshots: 2026-08-09 and 2026-08-29. The `C` corpus was independently 
 notification markers, and Arena tokens all reproduced exactly. One ledger correction was applied
 (`World spawn confirmed` is not a `0.16.x` signal; see below).
 
+A full 2026-10-15 re-audit extends observed coverage to main `1.2.0.0.47965` and Arena
+`0.6.0.0.47752`: see the [latest evidence summary](./README.md#latest-re-audit-2026-10-15) and
+[dated signature/notification ledger](./audit_2026-10-15_signatures.json). The detailed `H`/`C`
+tables below remain historical; newer signature presence does not verify every field's semantics.
+
 ## 1. Overview
 
 This document inventories event types and data shapes directly observed in local Escape from Tarkov
@@ -917,22 +922,25 @@ context, and identifier-label values.
 
 ## 7. Gaps and evidence limits
 
-- The Arena log root did not exist. None of the known Arena channels (`application`, `backend`,
-  `arena_backlog`, `arena_preset_selection`, `arena_static_data`, `errors`, `lifecycle`,
-  `network_summary`, `notifications`, `pools`, `traces`, `traces_all`, `web_socket`,
-  `network-connection`, `network-messages`) was validated.
-- The known main-game channels `assetBundle` and `health-system` were not present.
-- No `0.16.x` main-game session was available; the evidence begins at `1.0.2.5.43579`.
-- Large files were intentionally sampled, with lifecycle/API target scans over all files. Therefore,
-  the reference is exhaustive for the 9,763 normalized extracted shapes, not a claim that every
-  non-targeted raw chatter line in every large file was read.
+- The Arena root was absent in `H`, but validated in `C` and the 2026-10-15 re-audit. `0.16.x`
+  main-game sessions and `assetBundle`/`health-system` channels were also validated in `C`;
+  their absence in the original snapshot is not a current gap.
+- `H` intentionally sampled large files, with lifecycle/API target scans over all files. Its 9,763
+  normalized extracted shapes are not a claim that every raw chatter line was read. Later full
+  audits scan all lines for their defined signatures, endpoints, and notification markers; that
+  does not establish semantic coverage of every possible event.
 - Multiline JSON and stack traces are physically unprefixed. Normalization preserves their fields but
   can lose exact object boundaries.
 - Backend response bodies are often introduced by `responseText:` and continued separately. A
   response timing line is not universal proof of application-level success.
 - Generic events inherit a session mode envelope. Only a direct gateway/WSS marker or explicit session
   mode proves the message's environment.
-- No explicit quest-accept route or unambiguous item-handover event was retained.
+- No explicit quest-accept route or unambiguous item-handover event was retained. Typed chat
+  notifications still establish started/failed/completed quest states (message types 10/11/12);
+  route absence does not mean there is no start evidence.
+- No verified self-prestige/reset event or authoritative self-XP snapshot was established.
+  `/client/prestige/list` is a catalogue request; `PrestigeLevel` in friend/group snapshots can
+  describe other players. The 296 inspected change-event arrays in the latest corpus were empty.
 - Insurance success, payment, expiry, return timer, and returned-item events were not retained.
 - No single unambiguous `PlayerReady` event was found; use the documented readiness cluster.
 - Direct structured survival/killed `GameStopped` records were retained only in early builds. Later

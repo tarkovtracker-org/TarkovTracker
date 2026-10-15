@@ -53,6 +53,45 @@ ${timestamp}|Info|push-notifications|Got notification | ChatMessageReceived
 const backendPayload = (host: string, path: string, timestamp = '2026-02-21 10:00:00.000') =>
   `${timestamp}|Info|backend|---> Request HTTPS, id [1]: URL: https://${host}${path}, crc: .`;
 describe('parseEftNotificationLogText', () => {
+  it.each(['notifications', 'push-notifications'])(
+    'recovers source-prefixed output mirrors for %s',
+    (channel) => {
+      const quest = '5ac2426c86f774138762edfe';
+      const original = completionPayload('mirror', `${quest} successMessageText`);
+      const mirrored = original.replace('|push-notifications|', `|output|${channel}|`);
+      const context = '2026-02-21 09:00:00.000|Info|output|application|Session mode: Pve\n';
+      const result = parseEftLogsForQuestImport(
+        [{ name: 'output_000.log', text: context + mirrored }],
+        [quest]
+      );
+      expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
+      const duplicates = parseEftLogsForQuestImport(
+        [
+          { name: 'output_000.log', text: context + mirrored },
+          { name: 'push-notifications_000.log', text: original },
+        ],
+        [quest]
+      );
+      expect(duplicates.dedupedCompletionEventCount).toBe(1);
+      expect(duplicates.events).toHaveLength(1);
+    }
+  );
+  it('rejects unprefixed output chatter and notification text on unrelated channels', () => {
+    const original = completionPayload('not-notification', '5ac2426c86f774138762edfe');
+    for (const channel of ['output', 'errors', 'backend']) {
+      expect(
+        parseEftNotificationLogText(original.replace('|push-notifications|', `|${channel}|`))
+          .completionEventCount
+      ).toBe(0);
+    }
+  });
+  it('does not treat prestige catalogue requests or another member snapshot as quest progress', () => {
+    const text =
+      backendPayload('gw-pvp-01.escapefromtarkov.com', '/client/prestige/list') +
+      '\n2026-02-21 10:00:00.000|Info|push-notifications|Got notification | GroupMatchRaidReady\n' +
+      JSON.stringify({ members: [{ Info: { Level: 50, PrestigeLevel: 3 } }] });
+    expect(parseEftLogsForQuestImport([{ name: 'output.log', text }], []).events).toEqual([]);
+  });
   it('extracts quest completion events from chat notifications', () => {
     const text =
       completionPayload('event-1', '5ac2426c86f774138762edfe successMessageText') +

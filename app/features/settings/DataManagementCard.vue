@@ -509,6 +509,13 @@
                 {{ $t('settings.log_import.version_filter_hint') }}
               </p>
             </div>
+            <EftLogImportControls
+              :model-value="eftLogsSelection"
+              :events="eftLogsPreview.events ?? []"
+              :target-mode="eftLogsTargetMode"
+              :disabled="eftLogsIsImporting"
+              @update:model-value="setEftLogsSelection"
+            />
             <div
               class="bg-surface-900/80 divide-surface-700 divide-y rounded-md border border-white/10"
             >
@@ -692,13 +699,26 @@
             <p v-else class="text-surface-400 text-xs">
               {{ $t('settings.log_import.auto_mode_hint') }}
             </p>
+            <p class="text-surface-200 text-sm" role="status">
+              {{
+                $t('settings.log_import.selection_summary', {
+                  count: eftLogsEffectiveEvents.length,
+                  modes: eftLogsSelectedModeLabel,
+                })
+              }}
+            </p>
             <div class="flex gap-2">
               <UButton
                 icon="i-mdi-check"
                 color="primary"
                 class="flex-1"
                 :loading="eftLogsIsImporting"
-                :disabled="eftLogsHasOutsideSeasonEvents"
+                :disabled="
+                  eftLogsIsImporting ||
+                  eftLogsHasOutsideSeasonEvents ||
+                  !eftLogsEffectiveEvents.length ||
+                  eftLogsInvalidDate
+                "
                 @click="handleEftLogsConfirm"
               >
                 {{ $t('common.confirm_import') }}
@@ -1129,6 +1149,7 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
+  import EftLogImportControls from '@/features/settings/EftLogImportControls.vue';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
   import {
     useDataManagementSession,
@@ -1142,15 +1163,16 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
     GAME_MODES,
+    GAME_MODE_VALUES,
     getGameModeLabel,
     sortSkillsByGameOrder,
     type GameMode,
   } from '@/utils/constants';
+  import { hasInvalidEftLogCutoff, selectEftImportEvents } from '@/utils/eftLogImportSelection';
   import {
     hasOutsideSeasonEvents,
     isCurrentSeasonLogEvent,
     isEligibleImportEvent,
-    latestEftQuestEvents,
     UNIDENTIFIED_LOG_ACCOUNT,
     type EftLogAccountSummary,
   } from '@/utils/eftLogQuestParser';
@@ -1366,6 +1388,8 @@
     parseFiles: parseEftLogsFiles,
     setIncludedVersions: setEftLogsIncludedVersions,
     setAccount: setEftLogsAccount,
+    selection: eftLogsSelection,
+    setSelection: setEftLogsSelection,
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
   } = dataManagementSession.eftLogs;
@@ -1716,22 +1740,40 @@
     return `${taskName} (${taskId})`;
   }
   /** Uses only eligible, in-season latest states for the selected destination's preview totals. */
+  const eftLogsSelectedEvents = computed(() =>
+    selectEftImportEvents(
+      eftLogsPreview.value?.events ?? [],
+      eftLogsSelection.value,
+      eftLogsTargetMode.value
+    )
+  );
   const eftLogsEffectiveEvents = computed(() =>
-    latestEftQuestEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+    eftLogsSelectedEvents.value
       .filter(isEligibleImportEvent)
       .filter((event) => event.mode !== GAME_MODES.SEASONAL || isCurrentSeasonLogEvent(event))
   );
   /** Applies the confirmation guard before enabling a Seasonal import. */
   const eftLogsHasOutsideSeasonEvents = computed(() =>
-    hasOutsideSeasonEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+    hasOutsideSeasonEvents(eftLogsSelectedEvents.value, eftLogsTargetMode.value)
   );
-  /** Shows invalid Seasonal selections immediately while preserving application errors. */
-  const eftLogsPreviewError = computed(
+  const eftLogsInvalidDate = computed(() => hasInvalidEftLogCutoff(eftLogsSelection.value));
+  /** Shows selection errors immediately while preserving application errors. */
+  function eftLogsSelectionError(): string | null {
+    if (eftLogsInvalidDate.value) return t('settings.log_import.errors.invalid_date');
+    if (eftLogsHasOutsideSeasonEvents.value)
+      return t('settings.log_import.errors.outside_active_season');
+    if (!eftLogsEffectiveEvents.value.length)
+      return t('settings.log_import.errors.empty_selection');
+    return null;
+  }
+  const eftLogsPreviewError = computed(() => eftLogsImportError.value ?? eftLogsSelectionError());
+  const eftLogsSelectedModeLabel = computed(
     () =>
-      eftLogsImportError.value ??
-      (eftLogsHasOutsideSeasonEvents.value
-        ? t('settings.log_import.errors.outside_active_season')
-        : null)
+      GAME_MODE_VALUES.filter((mode) =>
+        eftLogsEffectiveEvents.value.some((event) => event.mode === mode)
+      )
+        .map((mode) => t(getGameModeLabel(mode)))
+        .join(' + ') || t('settings.log_import.no_modes')
   );
   const eftLogsCompletedCount = computed(
     () => eftLogsEffectiveEvents.value.filter((event) => event.status === 'completed').length
@@ -1785,7 +1827,9 @@
   const eftLogsUnknownFailedTaskIds = computed(
     () => eftLogsPreview.value?.matchedFailedTaskIdsByMode?.unknown ?? []
   );
-  const eftLogsRequiresManualModeSelection = computed(() => eftLogsUnknownCount.value > 0);
+  const eftLogsRequiresManualModeSelection = computed(
+    () => eftLogsUnknownCount.value > 0 && eftLogsSelection.value.modes.includes('unknown')
+  );
   const eftLogsModeSummaryLabel = computed(() => {
     const labels = [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]
       .filter((mode) => eftLogsModeCount(mode) > 0)

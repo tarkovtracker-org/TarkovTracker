@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
 import { ACTIVE_SEASON } from '@/utils/constants';
+import {
+  createEftLogImportSelection,
+  type EftLogImportSelection,
+} from '@/utils/eftLogImportSelection';
 import { parseEftLogsForQuestImport } from '@/utils/eftLogQuestParser';
 const {
   backupFns,
@@ -87,8 +91,10 @@ const {
     reset: vi.fn(),
     setIncludedVersions: vi.fn(),
     setAccount: vi.fn(),
+    setSelection: vi.fn(),
   },
   eftLogsState: {
+    selection: {} as Ref<EftLogImportSelection>,
     isParsing: {} as Ref<boolean>,
     parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
@@ -176,6 +182,8 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseFiles: eftLogsFns.parseFiles,
     setIncludedVersions: eftLogsFns.setIncludedVersions,
     setAccount: eftLogsFns.setAccount,
+    selection: eftLogsState.selection,
+    setSelection: eftLogsFns.setSelection,
     confirmImport: eftLogsFns.confirmImport,
     reset: eftLogsFns.reset,
   }),
@@ -257,6 +265,10 @@ describe('DataManagementCard', () => {
     eftLogsFns.reset.mockReset();
     eftLogsFns.setIncludedVersions.mockReset();
     eftLogsFns.setAccount.mockReset();
+    eftLogsState.selection = ref(createEftLogImportSelection());
+    eftLogsFns.setSelection.mockReset().mockImplementation((selection: EftLogImportSelection) => {
+      eftLogsState.selection.value = selection;
+    });
     tarkovStoreState.setTarkovUid.mockClear();
     tarkovStoreState.setTarkovUid.mockImplementation((uid: number | null) => {
       tarkovStoreState.tarkovUid = uid;
@@ -329,7 +341,7 @@ describe('DataManagementCard', () => {
           },
           UCheckbox: {
             template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
+              '<input type="checkbox" :aria-label="label" :disabled="disabled" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
             props: ['disabled', 'label', 'modelValue'],
             emits: ['update:model-value'],
           },
@@ -343,6 +355,62 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('updates preview totals and confirmation when modes, states, and reset history are excluded', async () => {
+    const timestamp = new Date(Date.parse(ACTIVE_SEASON.startsOn) + 86400000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace('Z', '');
+    const events = (['pvp', 'pve', 'seasonal', 'unknown'] as const).map((mode) => ({
+      mode,
+      status: 'completed' as const,
+      questId: '61604635c725987e815b1a46',
+      eventKey: mode,
+      timestamp,
+    }));
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    const wrapper = createWrapper({ view: 'imports' });
+    const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
+    expect(vm.eftLogsCompletedCount).toBe(3);
+    const controls = wrapper.findComponent({ name: 'EftLogImportControls' });
+    await controls.find('input[aria-label="common.pvp (1)"]').setValue(false);
+    await controls.find('input[aria-label="common.seasonal_pvp (1)"]').setValue(false);
+    expect(vm.eftLogsCompletedCount).toBe(1);
+    expect(eftLogsState.selection.value.modes).not.toContain('unknown');
+    expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(false);
+    await controls.find('input[type="datetime-local"]').setValue('2099-01-01T00:00:00');
+    expect(vm.eftLogsCompletedCount).toBe(0);
+    const confirm = findButtonByText(wrapper, 'common.confirm_import')!;
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await controls.find('input[type="datetime-local"]').setValue('');
+    expect(vm.eftLogsCompletedCount).toBe(1);
+    await controls.find('input[aria-label="settings.log_import.states.completed"]').setValue(false);
+    expect(vm.eftLogsCompletedCount).toBe(0);
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(eftLogsFns.confirmImport).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('locks every data-selection control while progress is being applied', async () => {
+    const events = [
+      {
+        mode: 'pve' as const,
+        status: 'started' as const,
+        questId: '61604635c725987e815b1a46',
+        eventKey: 'start',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    eftLogsState.isImporting.value = true;
+    const wrapper = createWrapper({ view: 'imports' });
+    const inputs = wrapper.findComponent({ name: 'EftLogImportControls' }).findAll('input');
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.every((input) => input.attributes('disabled') !== undefined)).toBe(true);
+    wrapper.unmount();
+  });
   it('keeps a live region mounted and shows cancellable folder-read progress', async () => {
     const wrapper = createWrapper({ view: 'imports' });
     const liveRegion = wrapper.find('output');
