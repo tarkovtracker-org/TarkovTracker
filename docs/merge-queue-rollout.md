@@ -178,8 +178,8 @@ selects successful current-head CI and the matching artifact before dispatching 
 control does not bypass fork protections, artifact checks, or the final pre-upload revalidation.
 There is no production deployment operation.
 
-The new controls job explicitly declares Actions write (dispatch existing workflows) and Issues
-write (maintain its comment), with Contents, Checks, Pull requests, and Statuses read. The existing
+The controls job explicitly declares Actions write (dispatch existing workflows) and Pull requests
+write (maintain its PR comment), with Contents, Checks, Issues, and Statuses read. The existing
 admission job has Actions read and Issues read; the existing preview-request job has Actions
 write, Pull requests write, and Issues read. The controls job receives these grants explicitly.
 Preview Request and the Preview deployment job additionally need Statuses read to authenticate

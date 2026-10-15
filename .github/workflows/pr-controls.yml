@@ -74,8 +74,8 @@ jobs:
       actions: write
       checks: read
       contents: read
-      issues: write
-      pull-requests: read
+      issues: read
+      pull-requests: write
       statuses: read
     env:
       REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
