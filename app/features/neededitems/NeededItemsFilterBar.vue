@@ -102,10 +102,10 @@
       emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
-  // Completed only gets a tab once something is done.
-  const visibleFilterTabs = computed(() =>
-    props.filterTabs.filter((tab) => tab.value !== 'completed' || tab.count > 0)
-  );
+  // Completed only gets a tab once something is done, or while it is the picked filter.
+  const isTabShown = (tab: FilterTab) =>
+    tab.value !== 'completed' || tab.count > 0 || tab.value === props.modelValue;
+  const visibleFilterTabs = computed(() => props.filterTabs.filter(isTabShown));
   const countLabel = computed(() =>
     props.groupByItem && props.ungroupedCount !== props.totalCount
       ? t('page.needed_items.unique_items_count', {

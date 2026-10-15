@@ -185,6 +185,12 @@ describe('NeededItemsFilterBar', () => {
       filterTabs: [...defaults.filterTabs, { ...completedTab, count: 2 }],
     });
     expect(tabLabels()).toEqual(['All', 'Completed']);
+    // Un-completing the last item while Completed is picked keeps the active filter visible.
+    await wrapper.setProps({
+      modelValue: 'completed',
+      filterTabs: [...defaults.filterTabs, completedTab],
+    });
+    expect(tabLabels()).toEqual(['All', 'Completed']);
   });
   it('renders the filter icon only once per tab', async () => {
     const NeededItemsFilterBar = await setup();
