@@ -8,7 +8,8 @@ vi.mock('./release-promotion.mjs', async (original) => ({
   ...(await original()),
   candidateEvidence: vi.fn(async () => ({})),
 }));
-vi.mock('../ci/review-admission-binding.mjs', () => ({
+vi.mock('../ci/review-admission-binding.mjs', async (original) => ({
+  ...(await original()),
   requireReviewAdmission: vi.fn(),
   readAdmissionArchive: vi.fn(),
 }));
@@ -54,6 +55,7 @@ function fixture(kind = 'admission') {
     approved: true,
     runId: run.id,
     runAttempt: 1,
+    workflowSourceSha: source,
   };
   const artifact = {
     id: 99,
@@ -148,6 +150,68 @@ it('completed Release wakeup retries admission that raced the unfinished prepara
   expect(early.operations.submit).not.toHaveBeenCalled();
   const later = fixture('release');
   expect((await queueReleasePromotion(later)).state).toBe('QUEUED');
+});
+it.each(['release', 'ordinary'])(
+  'pull_request_target admission uses trusted policy ancestry for a %s PR, not candidate ancestry',
+  async (kind) => {
+    const f = fixture();
+    if (kind === 'ordinary') f.pr.head.ref = 'fix/app';
+    f.run.event = 'pull_request_target';
+    f.run.head_sha = head;
+    f.run.head_branch = f.pr.head.ref;
+    f.context.payload.workflow_run = structuredClone(f.run);
+    f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
+      data: { status: base === source ? 'identical' : 'diverged' },
+    }));
+    expect((await queueReleasePromotion(f)).state).toBe(kind === 'release' ? 'QUEUED' : 'SKIPPED');
+    expect(f.github.rest.repos.compareCommits).toHaveBeenCalledExactlyOnceWith({
+      ...f.context.repo,
+      base: source,
+      head: 'main',
+    });
+    expect(f.operations.submit).toHaveBeenCalledTimes(kind === 'release' ? 1 : 0);
+    expect(f.operations.dispatchMain).not.toHaveBeenCalled();
+  }
+);
+it.each([undefined, '', 'not-a-sha', 'c'.repeat(40)])(
+  'rejects missing, malformed, or untrusted admission policy source %s before reading the PR',
+  async (policySource) => {
+    const f = fixture();
+    f.receipt.workflowSourceSha = policySource;
+    f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
+      data: { status: base === source ? 'identical' : 'diverged' },
+    }));
+    await expect(queueReleasePromotion(f)).rejects.toThrow();
+    expect(f.github.rest.pulls.get).not.toHaveBeenCalled();
+    expect(f.operations.submit).not.toHaveBeenCalled();
+    expect(f.operations.dispatchMain).not.toHaveBeenCalled();
+  }
+);
+it.each(['ordinary', 'integration'])(
+  'untrusted policy provenance cannot hide behind a skipped %s receipt',
+  async (kind) => {
+    const f = fixture();
+    f.receipt.workflowSourceSha = 'c'.repeat(40);
+    if (kind === 'ordinary') f.pr.head.ref = 'fix/app';
+    if (kind === 'integration') f.receipt.headSha = 'd'.repeat(40);
+    f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
+      data: { status: base === source ? 'identical' : 'diverged' },
+    }));
+    await expect(queueReleasePromotion(f)).rejects.toThrow('not on trusted main history');
+    expect(f.github.rest.pulls.get).not.toHaveBeenCalled();
+    expect(f.operations.submit).not.toHaveBeenCalled();
+  }
+);
+it('release preparation still authenticates its main run SHA before reading any artifact', async () => {
+  const f = fixture('release');
+  f.run.head_sha = head;
+  f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
+    data: { status: base === source ? 'identical' : 'diverged' },
+  }));
+  await expect(queueReleasePromotion(f)).rejects.toThrow('not on trusted main history');
+  expect(f.github.rest.actions.downloadArtifact).not.toHaveBeenCalled();
+  expect(f.github.paginate).not.toHaveBeenCalled();
+  expect(f.operations.submit).not.toHaveBeenCalled();
 });
 it.each([
   ['unknown source path', (f) => (f.run.path = '.github/workflows/evil.yml')],
