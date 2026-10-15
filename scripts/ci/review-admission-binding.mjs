@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { admissionRun, allPages, validateAdmissionReceipt } from './review-admission-api.mjs';
-import { requireEvidence } from './review-admission-policy.mjs';
+import { requireEvidence, SHA } from './review-admission-policy.mjs';
 async function admissionArtifact(github, repo, run, head) {
   const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
     ...repo,
@@ -50,10 +50,11 @@ function parseArchive(archive, head) {
   });
   return JSON.parse(json);
 }
-async function trustedSource(github, repo, receipt) {
+export async function requireTrustedPolicySource(github, repo, sha) {
+  requireEvidence(SHA.test(sha), 'Missing immutable controller policy source.');
   const { data: comparison } = await github.rest.repos.compareCommits({
     ...repo,
-    base: receipt.workflowSourceSha,
+    base: sha,
     head: 'main',
   });
   requireEvidence(
@@ -72,6 +73,6 @@ export async function requireReviewAdmission({ github, repo, head, number, expec
   });
   const receipt = await readAdmissionArchive(Buffer.from(data), head);
   validateAdmissionReceipt(receipt, repo, head, run, number);
-  await trustedSource(github, repo, receipt);
+  await requireTrustedPolicySource(github, repo, receipt.workflowSourceSha);
   return receipt;
 }

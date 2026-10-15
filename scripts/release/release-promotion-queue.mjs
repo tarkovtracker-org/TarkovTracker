@@ -87,16 +87,8 @@ function completedAttempt(run, event) {
   return true;
 }
 async function requirePolicySource(github, repo, sha) {
-  requireCondition(FULL_SHA.test(sha), 'Missing immutable controller policy source.');
-  const { data: comparison } = await github.rest.repos.compareCommits({
-    ...repo,
-    base: sha,
-    head: 'main',
-  });
-  requireCondition(
-    ['ahead', 'identical'].includes(comparison.status),
-    'Controller source is outside trusted main history.'
-  );
+  const { requireTrustedPolicySource } = await binding();
+  await requireTrustedPolicySource(github, repo, sha);
 }
 async function sourceArtifacts(github, repo, run) {
   const prefix = run.path === ADMISSION_PATH ? 'review-admission-' : 'release-promotion-';

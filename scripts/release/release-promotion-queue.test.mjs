@@ -8,7 +8,8 @@ vi.mock('./release-promotion.mjs', async (original) => ({
   ...(await original()),
   candidateEvidence: vi.fn(async () => ({})),
 }));
-vi.mock('../ci/review-admission-binding.mjs', () => ({
+vi.mock('../ci/review-admission-binding.mjs', async (original) => ({
+  ...(await original()),
   requireReviewAdmission: vi.fn(),
   readAdmissionArchive: vi.fn(),
 }));
@@ -196,7 +197,7 @@ it.each(['ordinary', 'integration'])(
     f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
       data: { status: base === source ? 'identical' : 'diverged' },
     }));
-    await expect(queueReleasePromotion(f)).rejects.toThrow('outside trusted main history');
+    await expect(queueReleasePromotion(f)).rejects.toThrow('not on trusted main history');
     expect(f.github.rest.pulls.get).not.toHaveBeenCalled();
     expect(f.operations.submit).not.toHaveBeenCalled();
   }
@@ -207,7 +208,7 @@ it('release preparation still authenticates its main run SHA before reading any 
   f.github.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
     data: { status: base === source ? 'identical' : 'diverged' },
   }));
-  await expect(queueReleasePromotion(f)).rejects.toThrow('outside trusted main history');
+  await expect(queueReleasePromotion(f)).rejects.toThrow('not on trusted main history');
   expect(f.github.rest.actions.downloadArtifact).not.toHaveBeenCalled();
   expect(f.github.paginate).not.toHaveBeenCalled();
   expect(f.operations.submit).not.toHaveBeenCalled();
