@@ -996,6 +996,32 @@ test('service-linked review and native queue signals still prepare both current 
     });
   }
 });
+test('delayed obsolete queue signals cannot revoke a successful replacement or current head', async () => {
+  for (const replacement of [queued, null]) {
+    const f = signalFixture(queuedControlFixture());
+    f.run.event = 'merge_group';
+    f.run.head_sha = 'd'.repeat(40);
+    f.run.head_branch = 'gh-readonly-queue/main/pr-1-123abc';
+    f.context.payload.workflow_run = { ...f.run };
+    f.f.jobs[0].head_sha = f.run.head_sha;
+    f.statuses.push({ sha: head, state: 'success' });
+    if (replacement === null) {
+      f.f.refs = [];
+      f.q.state.entry = null;
+    }
+    const before = structuredClone(f.statuses);
+    const outputs = {};
+    f.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core }),
+      /Requested queue group is no longer current/
+    );
+    assert.deepEqual(f.statuses, before);
+    assert.deepEqual(outputs, {});
+  }
+});
 test('review signal rejects missing, ambiguous or foreign PR links without guessing from run SHA', async () => {
   for (const pulls of [
     [],

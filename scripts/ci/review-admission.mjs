@@ -370,6 +370,16 @@ async function reviewScope(github, context, target) {
   requirePrIdentity(pr, context.repo);
   const refs = await queuedRefs(github, context.repo, pr.number);
   const shas = [...new Set([pr.head.sha, ...refs.map((ref) => ref.object.sha)])];
+  let group;
+  try {
+    group = await activeQueueGroup(github, context.repo, pr, refs);
+  } catch (error) {
+    await scopeStatuses(github, context, shas, 'failure', error.message);
+    throw error;
+  }
+  // An old merge-group signal has no authority to invalidate its replacement.
+  // Discovery errors still revoke the known scope; a proven obsolete target does not.
+  requireEventGroup(target.group, group);
   await scopeStatuses(
     github,
     context,
@@ -377,14 +387,7 @@ async function reviewScope(github, context, target) {
     'pending',
     'Rechecking PR and queue review admission after evidence changes.'
   );
-  try {
-    const group = await activeQueueGroup(github, context.repo, pr, refs);
-    requireEventGroup(target.group, group);
-    return { number: pr.number, group, shas };
-  } catch (error) {
-    await scopeStatuses(github, context, shas, 'failure', error.message);
-    throw error;
-  }
+  return { number: pr.number, group, shas };
 }
 function requireEventGroup(eventGroup, current) {
   if (!eventGroup) return;

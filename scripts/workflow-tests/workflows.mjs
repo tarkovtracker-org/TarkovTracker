@@ -297,8 +297,8 @@ test('Deno resolves the functions config and fails on lockfile drift', () => {
     assert.doesNotMatch(read(file), /\bdeno test\b/, file);
   assert.match(read('.gitignore'), /^\/deno\.lock$/m);
 });
-function dependabotMergeScript() {
-  const step = workflowStep(autoMergeJob(), 'Merge Dependabot PR');
+function dependabotScript(name) {
+  const step = workflowStep(autoMergeJob(), name);
   return step
     .split('run: |\n')[1]
     .replaceAll(/^ {10}/gm, '')
@@ -307,6 +307,72 @@ function dependabotMergeScript() {
       `source '${resolve('scripts/ci/github-ci-gate.sh')}'`
     );
 }
+const dependabotMergeScript = () => dependabotScript('Merge Dependabot PR');
+function dependabotChecks(state) {
+  return {
+    WAIT_CHECK_RUNS: JSON.stringify([
+      { name: 'CI Result', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
+      { name: 'PR Meta', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
+      {
+        name: 'Socket Security: Pull Request Alerts',
+        app: { id: 156372 },
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ]),
+    WAIT_STATUSES: JSON.stringify([
+      { id: 1, context: 'Preview Result', state: 'success' },
+      ...(state === undefined ? [] : [{ id: 2, context: 'Review Admission', state }]),
+    ]),
+  };
+}
+test('Dependabot recovers stale admission before checking GitHub mergeability', (t) => {
+  for (const state of ['failure', 'pending', undefined]) {
+    const f = fixture(t);
+    const result = f.shell(
+      '(' + dependabotScript('Wait for checks') + ')\n(' + dependabotMergeScript() + ')',
+      {
+        ...dependabotChecks(state),
+        RULES: JSON.stringify(activeQueueRules()),
+        BLOCKED_UNTIL_ADMISSION: 'true',
+        MERGE_OUTCOME: 'OPEN',
+      }
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(f.events().some((event) => event.type === 'admission-success'));
+    assert.ok(f.events().some((event) => event.type === 'merge'));
+    assert.ok(!f.events().some((event) => event.type === 'dispatch'));
+  }
+});
+test('Dependabot never submits a candidate when refreshed admission fails', (t) => {
+  const f = fixture(t);
+  const result = f.shell(dependabotMergeScript(), {
+    RULES: JSON.stringify(activeQueueRules()),
+    BLOCKED_UNTIL_ADMISSION: 'true',
+    ADMISSION_FAIL: 'true',
+  });
+  assert.equal(result.status, 1);
+  assert.ok(f.events().some((event) => event.type === 'admission'));
+  assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
+});
+test('Dependabot retains strict admission failures and unrelated queue status failures', (t) => {
+  const strict = fixture(t);
+  const denied = strict.shell(dependabotScript('Wait for checks'), dependabotChecks('failure'));
+  assert.equal(denied.status, 1);
+  assert.match(denied.stdout, /Review Admission concluded failure/);
+  const queue = fixture(t);
+  const checks = dependabotChecks('failure');
+  const statuses = JSON.parse(checks.WAIT_STATUSES);
+  statuses.push({ id: 3, context: 'Other security gate', state: 'failure' });
+  const blocked = queue.shell(dependabotScript('Wait for checks'), {
+    ...checks,
+    RULES: JSON.stringify(activeQueueRules()),
+    WAIT_STATUSES: JSON.stringify(statuses),
+  });
+  assert.equal(blocked.status, 1);
+  assert.match(blocked.stdout, /Other security gate concluded failure/);
+  assert.ok(!queue.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+});
 function activeQueueRules() {
   return JSON.parse(read('.github/main-merge-queue-ruleset.json')).rules.map((rule) => ({
     ...rule,
