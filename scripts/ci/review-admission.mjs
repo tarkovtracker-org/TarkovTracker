@@ -9,6 +9,7 @@ import {
   requirePrIdentity,
   reviewThreads,
   trustedActors,
+  writeCollaborator,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
@@ -426,13 +427,35 @@ export function relevantComment(payload) {
 function relevantPrComment(payload) {
   return Boolean(payload.issue?.pull_request) && relevantComment(payload);
 }
+function commentUser(payload) {
+  const user = payload.comment?.user;
+  return user?.type === 'User' ? user.login : null;
+}
+// A failed permission lookup still rechecks: re-evaluation is safe, a missed withdrawal is not.
+async function liveWriter(github, repo, login) {
+  try {
+    return await writeCollaborator(github, repo, login);
+  } catch {
+    return true;
+  }
+}
+// Only a write collaborator's command can change the decision, so others never queue a recheck.
+async function writerComment(github, context) {
+  const login = commentUser(context.payload);
+  if (!login) return false;
+  return liveWriter(github, context.repo, login);
+}
+async function relevantWriterComment(github, context) {
+  if (!relevantPrComment(context.payload)) return false;
+  return writerComment(github, context);
+}
 async function successfulSignal(github, context) {
   if (context.payload.workflow_run.conclusion !== 'success') return false;
   await requireSignal(github, context);
   return true;
 }
 export async function filterAdmission({ github, context }) {
-  if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
+  if (context.eventName === 'issue_comment') return relevantWriterComment(github, context);
   if (context.eventName === 'workflow_run') return successfulSignal(github, context);
   return true;
 }

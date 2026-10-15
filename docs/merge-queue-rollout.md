@@ -63,7 +63,10 @@ was emitted. Low-risk bot admission does not create a human approving review.
 
 The controller serializes relevant events at job scope, after its event filter. Ordinary issue
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
-including withdrawal of a command with leading whitespace.
+including withdrawal of a command with leading whitespace. The filter admits a command event only
+when its author has live write permission; others' commands never count, so they cannot queue a
+recheck or flip a queued status to pending. `author_association` is not used, because it does not
+reliably reflect write access. A failed permission lookup still rechecks.
 
 Small ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Sensitive and unclassified changes require an exact-head approving review
