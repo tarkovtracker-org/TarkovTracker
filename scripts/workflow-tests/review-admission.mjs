@@ -533,6 +533,7 @@ function queueFixture() {
     main: base,
     parents: [base],
     comparison: { status: 'ahead', ahead_by: 1, behind_by: 0 },
+    commitRequests: [],
     entry: {
       position: 1,
       baseCommit: { oid: base },
@@ -555,7 +556,7 @@ function queueFixture() {
           data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
         }),
         getCommit: async ({ commit_sha }) => {
-          assert.equal(commit_sha, queued);
+          state.commitRequests.push(commit_sha);
           return { data: { parents: state.parents.map((sha) => ({ sha })) } };
         },
       },
@@ -575,6 +576,7 @@ function queueFixture() {
 test('queue admission proves live ref, single squash commit on main and exact queued entry', async () => {
   const f = queueFixture();
   await queueIdentity(f.github, repo, f.group, f.pr);
+  assert.deepEqual(f.state.commitRequests, [queued]);
   for (const change of [
     { ref: head },
     { main: head },
