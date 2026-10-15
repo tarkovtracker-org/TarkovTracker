@@ -652,7 +652,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   assert.match(controls, /if: github.ref == 'refs\/heads\/main'/);
   assert.equal(
     permissionsBlock(controls, '    ').trim(),
-    'actions: write\n      checks: read\n      contents: read\n      issues: write\n      pull-requests: read\n      statuses: read'
+    'actions: write\n      checks: read\n      contents: read\n      issues: read\n      pull-requests: write\n      statuses: read'
   );
   assert.equal(
     permissionsBlock(targets, '    ').trim(),
