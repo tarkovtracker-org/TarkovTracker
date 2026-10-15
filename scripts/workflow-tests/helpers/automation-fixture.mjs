@@ -115,6 +115,21 @@ if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
   process.exit(0);
 }
 if (args[0] === 'api') {
+  const waitEndpoint = args[1];
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
+    const input = JSON.stringify({ check_runs: JSON.parse(p.WAIT_CHECK_RUNS || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/status') {
+    const input = JSON.stringify({ statuses: JSON.parse(p.WAIT_STATUSES || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER) {
+    console.log(JSON.stringify({ state: 'open', draft: false, base: { ref: 'main' }, head: { sha: p.ACTUAL_HEAD } }));
+    process.exit(0);
+  }
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
     if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
       console.error('Head changed at branch update'); process.exit(1);
