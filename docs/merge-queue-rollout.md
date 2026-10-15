@@ -20,6 +20,20 @@ Initial queue configuration permits one build and one merge at a time. This boun
 load and makes the first-parent/current-main proof explicit; increasing concurrency requires a
 new proof for cumulative queue groups, not just changing the ruleset limit.
 
+## Provisioning checkpoint
+
+The organization-owned Review Admission App (`5328610`) has only commit-status write and
+metadata read access, installed on TarkovTracker alone. Its signing key is isolated in the
+`review-admission` environment, whose branch policy allows only `main`.
+
+[Run 38687620665](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38687620665)
+proved a non-main workflow was denied before credential provisioning.
+[Run 38726052506](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38726052506)
+produced the authenticated exact-head receipt used before the guarded merge of
+[#1237](https://github.com/tarkovtracker-org/TarkovTracker/pull/1237).
+These provisioning receipts complement the group-specific integration and removal/reformation
+proofs required below; they do not establish native queue behavior.
+
 ## Activation gate — not yet active
 
 `.github/main-merge-queue-ruleset.json` is a **disabled** rollout template. The existing strict
