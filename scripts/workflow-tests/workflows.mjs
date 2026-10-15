@@ -314,6 +314,18 @@ function dependabotChecks(state) {
       { name: 'CI Result', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
       { name: 'PR Meta', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
       {
+        name: 'Review admission controller',
+        app: { id: 15368 },
+        status: 'completed',
+        conclusion: 'failure',
+      },
+      {
+        name: 'Filter admission event',
+        app: { id: 15368 },
+        status: 'in_progress',
+        conclusion: null,
+      },
+      {
         name: 'Socket Security: Pull Request Alerts',
         app: { id: 156372 },
         status: 'completed',
@@ -330,7 +342,7 @@ test('Dependabot recovers stale admission before checking GitHub mergeability', 
   for (const state of ['failure', 'pending', undefined]) {
     const f = fixture(t);
     const result = f.shell(
-      '(' + dependabotScript('Wait for checks') + ')\n(' + dependabotMergeScript() + ')',
+      'set -e\n(' + dependabotScript('Wait for checks') + ')\n(' + dependabotMergeScript() + ')',
       {
         ...dependabotChecks(state),
         RULES: JSON.stringify(activeQueueRules()),
@@ -372,6 +384,24 @@ test('Dependabot retains strict admission failures and unrelated queue status fa
   assert.equal(blocked.status, 1);
   assert.match(blocked.stdout, /Other security gate concluded failure/);
   assert.ok(!queue.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+});
+test('Dependabot retains unrelated and foreign admission-named check failures', (t) => {
+  for (const check of [
+    { name: 'Other security check', app: { id: 15368 } },
+    { name: 'Review admission controller', app: { id: 44 } },
+  ]) {
+    const f = fixture(t);
+    const gates = dependabotChecks('failure');
+    const checks = JSON.parse(gates.WAIT_CHECK_RUNS);
+    checks.push({ ...check, status: 'completed', conclusion: 'failure' });
+    const result = f.shell(dependabotScript('Wait for checks'), {
+      ...gates,
+      RULES: JSON.stringify(activeQueueRules()),
+      WAIT_CHECK_RUNS: JSON.stringify(checks),
+    });
+    assert.equal(result.status, 1);
+    assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+  }
 });
 function activeQueueRules() {
   return JSON.parse(read('.github/main-merge-queue-ruleset.json')).rules.map((rule) => ({

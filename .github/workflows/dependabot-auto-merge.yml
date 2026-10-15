@@ -173,13 +173,17 @@ jobs:
           while true; do
             # Preview Result is the authoritative gate; controller job checks may be cancelled by
             # a newer event on the same head and are not independent merge requirements.
+            check_filter='.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Refresh preview state" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
+            if [ "$MAIN_MERGE_MODE" != strict ]; then
+              check_filter+=' | map(select(.app.id != 15368 or (.name != "Filter admission event" and .name != "Review admission controller")))'
+            fi
             check_runs="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Refresh preview state" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
+                --jq "$check_filter"
             )"
-            # Queue admission is explicitly refreshed after these gates. An old admission
-            # failure/pending must not prevent that recovery; strict-mode behavior is unchanged.
+            # Queue admission is explicitly refreshed after these gates. Old controller checks
+            # and status failure/pending must not prevent recovery; strict mode is unchanged.
             status_filter='.statuses | sort_by(.context, .id) | group_by(.context) | map(last) | map(select(.context != "Preview Result"))'
             if [ "$MAIN_MERGE_MODE" != strict ]; then
               status_filter+=' | map(select(.context != "Review Admission"))'

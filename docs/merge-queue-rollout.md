@@ -114,8 +114,8 @@ The dispatch profile is verified before approval and upload. The queue remains o
 ## Admission publisher provisioning
 
 Dependabot waits for CI, security and preview gates before explicitly refreshing its exact-head
-admission. In queue mode, an older admission failure or pending status cannot prevent that
-refresh. The authenticated receipt must succeed before GitHub mergeability is checked; other
+admission. In queue mode, older admission controller checks and a failure or pending status
+cannot prevent that refresh. The authenticated receipt must succeed before mergeability is checked; other
 failed checks/statuses still block. A policy-mode change during validation requires a retry.
 
 An obsolete merge-group signal is rejected before publishing to the current PR or replacement
