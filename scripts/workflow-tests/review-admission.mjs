@@ -554,7 +554,10 @@ function queueFixture() {
         getRef: async ({ ref }) => ({
           data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
         }),
-        getCommit: async () => ({ data: { parents: state.parents.map((sha) => ({ sha })) } }),
+        getCommit: async ({ commit_sha }) => {
+          assert.equal(commit_sha, queued);
+          return { data: { parents: state.parents.map((sha) => ({ sha })) } };
+        },
       },
       repos: {
         compareCommits: async ({ base: from, head: to }) => {
