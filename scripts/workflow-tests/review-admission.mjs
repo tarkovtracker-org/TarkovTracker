@@ -531,8 +531,8 @@ function queueFixture() {
   const state = {
     ref: queued,
     main: base,
-    parent: base,
-    status: 'ahead',
+    parents: [base],
+    comparison: { status: 'ahead', ahead_by: 1, behind_by: 0 },
     entry: {
       position: 1,
       baseCommit: { oid: base },
@@ -542,6 +542,7 @@ function queueFixture() {
         configuration: {
           maximumEntriesToBuild: 1,
           maximumEntriesToMerge: 1,
+          mergeMethod: 'SQUASH',
           mergingStrategy: 'ALLGREEN',
         },
       },
@@ -553,9 +554,14 @@ function queueFixture() {
         getRef: async ({ ref }) => ({
           data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
         }),
-        getCommit: async () => ({ data: { parents: [{ sha: state.parent }] } }),
+        getCommit: async () => ({ data: { parents: state.parents.map((sha) => ({ sha })) } }),
       },
-      repos: { compareCommits: async () => ({ data: { status: state.status } }) },
+      repos: {
+        compareCommits: async ({ base: from, head: to }) => {
+          assert.deepEqual([from, to], [base, queued]);
+          return { data: state.comparison };
+        },
+      },
     },
     graphql: async () => ({
       repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } },
@@ -563,14 +569,16 @@ function queueFixture() {
   };
   return { github, pr, group, state };
 }
-test('queue admission proves live ref, main parent, PR ancestry and exact queued entry', async () => {
+test('queue admission proves live ref, single squash commit on main and exact queued entry', async () => {
   const f = queueFixture();
   await queueIdentity(f.github, repo, f.group, f.pr);
   for (const change of [
     { ref: head },
     { main: head },
-    { parent: head },
-    { status: 'diverged' },
+    { parents: [head] },
+    { parents: [base, head] },
+    { comparison: { status: 'diverged', ahead_by: 1, behind_by: 1 } },
+    { comparison: { status: 'ahead', ahead_by: 2, behind_by: 0 } },
     { entry: null },
     { entry: { ...f.state.entry, headCommit: { oid: head } } },
     { entry: { ...f.state.entry, position: 2 } },
@@ -587,6 +595,9 @@ test('queue admission proves live ref, main parent, PR ancestry and exact queued
     await assert.rejects(queueIdentity(f.github, repo, { ...f.group, ...change }, f.pr));
   f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
   await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  const merge = queueFixture();
+  merge.state.entry.mergeQueue.configuration.mergeMethod = 'MERGE';
+  await assert.rejects(queueIdentity(merge.github, repo, merge.group, merge.pr), /squash/);
 });
 function bindingFixture() {
   const run = {
