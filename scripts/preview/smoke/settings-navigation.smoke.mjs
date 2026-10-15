@@ -51,20 +51,29 @@ async function expectActiveTabVisible(page, name, focused = false) {
 }
 async function expectNestedTarget(page, hash, panel) {
   await expect(page.locator(panel)).toBeVisible();
-  const isVisible = () =>
-    page.locator(hash).evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return (
-        rect.top >= document.querySelector('header').getBoundingClientRect().bottom &&
-        rect.top < innerHeight
-      );
-    });
-  await expect.poll(isVisible).toBe(true);
-  // A transient pass while native/router scrolling is still settling is insufficient.
-  await page.waitForTimeout(600);
-  expect(await isVisible(), 'nested target remains below the header after scrolling settles').toBe(
-    true
-  );
+  // Observe visibility and unchanged geometry across three animation frames. This is a bounded
+  // settling check, not a guarantee against future layout changes; metadata is exercised below.
+  await expect
+    .poll(() =>
+      page.locator(hash).evaluate(async (element) => {
+        const samples = [];
+        for (let frame = 0; frame < 3; frame++) {
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          const rect = element.getBoundingClientRect();
+          const headerBottom = document.querySelector('header').getBoundingClientRect().bottom;
+          samples.push({
+            visible: rect.top >= headerBottom && rect.top < innerHeight,
+            geometry: [scrollX, scrollY, rect.top, rect.bottom, headerBottom, innerHeight],
+          });
+        }
+        return samples.every(
+          (sample) =>
+            sample.visible &&
+            sample.geometry.every((value, index) => value === samples[0].geometry[index])
+        );
+      })
+    )
+    .toBe(true);
 }
 for (const viewport of [
   { width: 400, height: 609 },
