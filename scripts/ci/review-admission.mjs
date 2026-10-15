@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import {
   activeQueueGroup,
@@ -477,13 +478,15 @@ export async function publishReviewScope({ github, context, head, queued }) {
   }
 }
 async function writeAdmissionTarget(context, core, number) {
+  core.setOutput('pull_request', String(number));
+  if (!process.env.RUNNER_TEMP) return;
   const locator = {
     repository: `${context.repo.owner}/${context.repo.repo}`,
     number,
     runId: Number(context.runId),
     runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
   };
-  await mkdir('review-admission-evidence', { recursive: true });
-  await writeFile('review-admission-evidence/target.json', `${JSON.stringify(locator)}\n`);
-  core.setOutput('pull_request', String(number));
+  const directory = join(process.env.RUNNER_TEMP, 'review-admission-target');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'target.json'), `${JSON.stringify(locator)}\n`);
 }

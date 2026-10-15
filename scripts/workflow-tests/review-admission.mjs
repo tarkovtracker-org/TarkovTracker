@@ -2358,3 +2358,24 @@ test('controls scope cannot fall through to the unconfigured legacy writer', asy
   f.args.context.ref = 'refs/heads/candidate';
   await assert.rejects(createReviewPublisher(f.args), /trusted main/);
 });
+test('panel target locators use the owned runner temporary directory', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-target-fixture-'));
+  const previous = process.env.RUNNER_TEMP;
+  process.env.RUNNER_TEMP = directory;
+  try {
+    const f = queuedControlFixture();
+    await withReceiptDirectory(async () => {
+      await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+      const locator = JSON.parse(
+        readFileSync(join(directory, 'review-admission-target/target.json'), 'utf8')
+      );
+      assert.equal(locator.number, 1);
+      assert.equal(locator.repository, 'example/repo');
+      assert.equal(locator.runId, Number(f.context.runId));
+    });
+  } finally {
+    if (previous === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
