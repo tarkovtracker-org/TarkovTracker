@@ -220,3 +220,5 @@ the handoff and changed evidence, not the entire previous review. Provider cache
 billing are outside GitHub's control; no cache or token saving is guaranteed.
 
 GitHub queue guidance: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>.
+
+<!-- Owned unmerged canary: prove a reviewed behind head can enqueue without an update. -->
