@@ -40,6 +40,10 @@ main_policy_mode() {
 require_main_ci_policy() {
   MAIN_MERGE_MODE="$(main_policy_mode)"
 }
+# Native enqueue does not depend on repository auto-merge being enabled.
+enqueue_reviewed_pr() {
+  node "$(dirname "${BASH_SOURCE[0]}")/enqueue-pr-cli.mjs" "$GITHUB_REPOSITORY" "$1" "$2"
+}
 # Job-token PR events can be suppressed. Recheck trusted admission explicitly, without bypasses.
 wait_for_review_admission() {
   local number="$1" sha="$2" attempt admission_exit admission_run

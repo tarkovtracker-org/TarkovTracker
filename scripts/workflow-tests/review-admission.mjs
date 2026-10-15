@@ -32,6 +32,25 @@ const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const queued = 'c'.repeat(40);
 const repo = { owner: 'example', repo: 'repo' };
+const queueRulesRoute = 'GET /repos/{owner}/{repo}/rules/branches/{branch}';
+function queueRules() {
+  return [
+    {
+      type: 'merge_queue',
+      ruleset_id: 43,
+      ruleset_source_type: 'Repository',
+      ruleset_source: 'example/repo',
+      parameters: {
+        max_entries_to_build: 1,
+        max_entries_to_merge: 1,
+        min_entries_to_merge: 1,
+        grouping_strategy: 'ALLGREEN',
+        merge_method: 'SQUASH',
+        check_response_timeout_minutes: 60,
+      },
+    },
+  ];
+}
 function fixture() {
   return {
     pr: {
@@ -58,6 +77,7 @@ function fixture() {
     comments: [],
     checks: [],
     trusted: new Set(['maintainer']),
+    [queueRulesRoute]: queueRules(),
   };
 }
 function human(state = 'APPROVED', change = {}) {
@@ -531,20 +551,15 @@ function queueFixture() {
   const state = {
     ref: queued,
     main: base,
-    parent: base,
-    status: 'ahead',
+    parents: [base],
+    comparison: { status: 'ahead', ahead_by: 1, behind_by: 0 },
+    commitRequests: [],
+    rules: queueRules(),
     entry: {
       position: 1,
       baseCommit: { oid: base },
       headCommit: { oid: queued },
       pullRequest: { number: 1, headRefOid: head },
-      mergeQueue: {
-        configuration: {
-          maximumEntriesToBuild: 1,
-          maximumEntriesToMerge: 1,
-          mergingStrategy: 'ALLGREEN',
-        },
-      },
     },
   };
   const github = {
@@ -553,24 +568,41 @@ function queueFixture() {
         getRef: async ({ ref }) => ({
           data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
         }),
-        getCommit: async () => ({ data: { parents: [{ sha: state.parent }] } }),
+        getCommit: async ({ commit_sha }) => {
+          state.commitRequests.push(commit_sha);
+          return { data: { parents: state.parents.map((sha) => ({ sha })) } };
+        },
       },
-      repos: { compareCommits: async () => ({ data: { status: state.status } }) },
+      repos: {
+        compareCommits: async ({ base: from, head: to }) => {
+          assert.deepEqual([from, to], [base, queued]);
+          return { data: state.comparison };
+        },
+      },
     },
-    graphql: async () => ({
-      repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } },
-    }),
+    paginate: async (route, params) => {
+      assert.equal(route, queueRulesRoute);
+      assert.deepEqual(params, { ...repo, branch: 'main', per_page: 100 });
+      return state.rules;
+    },
+    graphql: async (query) => {
+      assert.doesNotMatch(query, /configuration|\bmergeQueue\s*\{/);
+      return { repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } } };
+    },
   };
   return { github, pr, group, state };
 }
-test('queue admission proves live ref, main parent, PR ancestry and exact queued entry', async () => {
+test('queue admission proves live ref, single squash commit on main and exact queued entry', async () => {
   const f = queueFixture();
   await queueIdentity(f.github, repo, f.group, f.pr);
+  assert.deepEqual(f.state.commitRequests, [queued]);
   for (const change of [
     { ref: head },
     { main: head },
-    { parent: head },
-    { status: 'diverged' },
+    { parents: [head] },
+    { parents: [base, head] },
+    { comparison: { status: 'diverged', ahead_by: 1, behind_by: 1 } },
+    { comparison: { status: 'ahead', ahead_by: 2, behind_by: 0 } },
     { entry: null },
     { entry: { ...f.state.entry, headCommit: { oid: head } } },
     { entry: { ...f.state.entry, position: 2 } },
@@ -585,8 +617,62 @@ test('queue admission proves live ref, main parent, PR ancestry and exact queued
     { head_ref: 'refs/heads/gh-readonly-queue/main/pr-2-abcdef' },
   ])
     await assert.rejects(queueIdentity(f.github, repo, { ...f.group, ...change }, f.pr));
-  f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+  f.state.rules[0].parameters.max_entries_to_build = 2;
   await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  const merge = queueFixture();
+  merge.state.rules[0].parameters.merge_method = 'MERGE';
+  await assert.rejects(queueIdentity(merge.github, repo, merge.group, merge.pr), /squash/);
+});
+test('queue configuration remains fail-closed through the public effective-rules read', async () => {
+  for (const change of [
+    (f) => {
+      f.state.rules = [];
+    },
+    (f) => {
+      f.state.rules.push(structuredClone(f.state.rules[0]));
+    },
+    (f) => {
+      f.state.rules[0].ruleset_source_type = 'Organization';
+    },
+    (f) => {
+      f.state.rules[0].ruleset_source = 'foreign/repo';
+    },
+    (f) => {
+      f.state.rules[0].parameters.max_entries_to_merge = 2;
+    },
+    (f) => {
+      f.state.rules[0].parameters.min_entries_to_merge = 2;
+    },
+    (f) => {
+      f.state.rules[0].parameters.grouping_strategy = 'HEADGREEN';
+    },
+    (f) => {
+      f.state.rules[0].parameters.check_response_timeout_minutes = 120;
+    },
+    (f) => {
+      f.github.paginate = async () => {
+        throw new Error('REST unavailable');
+      };
+    },
+  ]) {
+    const f = queueFixture();
+    change(f);
+    await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  }
+});
+test('queue metadata errors identify the denied field without exposing request credentials', async () => {
+  const f = queueFixture();
+  f.github.graphql = async () => {
+    const error = new Error('sensitive request diagnostic');
+    error.errors = [{ type: 'FORBIDDEN', path: ['repository', 'pullRequest', 'mergeQueueEntry'] }];
+    error.request = { headers: { authorization: 'not-a-real-token' } };
+    throw error;
+  };
+  await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr), (error) => {
+    assert.match(error.message, /repository\.pullRequest\.mergeQueueEntry/);
+    assert.doesNotMatch(error.message, /sensitive request|authorization|not-a-real-token/);
+    return true;
+  });
 });
 function bindingFixture() {
   const run = {
@@ -996,6 +1082,32 @@ test('service-linked review and native queue signals still prepare both current 
     });
   }
 });
+test('delayed obsolete queue signals cannot revoke a successful replacement or current head', async () => {
+  for (const replacement of [queued, null]) {
+    const f = signalFixture(queuedControlFixture());
+    f.run.event = 'merge_group';
+    f.run.head_sha = 'd'.repeat(40);
+    f.run.head_branch = 'gh-readonly-queue/main/pr-1-123abc';
+    f.context.payload.workflow_run = { ...f.run };
+    f.f.jobs[0].head_sha = f.run.head_sha;
+    f.statuses.push({ sha: head, state: 'success' });
+    if (replacement === null) {
+      f.f.refs = [];
+      f.q.state.entry = null;
+    }
+    const before = structuredClone(f.statuses);
+    const outputs = {};
+    f.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core }),
+      /Requested queue group is no longer current/
+    );
+    assert.deepEqual(f.statuses, before);
+    assert.deepEqual(outputs, {});
+  }
+});
 test('review signal rejects missing, ambiguous or foreign PR links without guessing from run SHA', async () => {
   for (const pulls of [
     [],
@@ -1182,7 +1294,7 @@ function queuedControlFixture() {
   f.f.refs = [{ ref: q.group.head_ref, object: { sha: queued } }];
   f.github.graphql = async (query) =>
     query.includes('mergeQueueEntry')
-      ? q.github.graphql()
+      ? q.github.graphql(query)
       : {
           repository: {
             pullRequest: {
@@ -1362,9 +1474,9 @@ test('original queue and binding assertions reject reintroduced identity/attempt
       },
     },
     {
-      before: 'config.maximumEntriesToBuild === 1',
+      before: 'await requireQueueConfiguration(github, repo)',
       change: (f) => {
-        f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+        f.state.rules[0].parameters.max_entries_to_build = 2;
       },
     },
   ];

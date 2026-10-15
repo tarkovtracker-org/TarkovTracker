@@ -20,6 +20,20 @@ Initial queue configuration permits one build and one merge at a time. This boun
 load and makes the first-parent/current-main proof explicit; increasing concurrency requires a
 new proof for cumulative queue groups, not just changing the ruleset limit.
 
+## Provisioning checkpoint
+
+The organization-owned Review Admission App (`5328610`) has only commit-status write and
+metadata read access, installed on TarkovTracker alone. Its signing key is isolated in the
+`review-admission` environment, whose branch policy allows only `main`.
+
+[Run 38687620665](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38687620665)
+proved a non-main workflow was denied before credential provisioning.
+[Run 38726052506](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38726052506)
+produced the authenticated exact-head receipt used before the guarded merge of
+[#1237](https://github.com/tarkovtracker-org/TarkovTracker/pull/1237).
+These provisioning receipts complement the group-specific integration and removal/reformation
+proofs required below; they do not establish native queue behavior.
+
 ## Activation gate — not yet active
 
 `.github/main-merge-queue-ruleset.json` is a **disabled** rollout template. The existing strict
@@ -76,7 +90,12 @@ from an independent write collaborator, or a write collaborator's single-line co
 Agents may record that command only after receiving the specific merge authority required by
 `AGENTS.md`; admission never supplies authorization itself. Changed heads invalidate approval.
 Queue admission re-proves the member PR, live queue ref, current-main parent and single-entry
-`ALLGREEN` configuration. Read-only signal workflows cannot publish approval. Consumers authenticate
+squash `ALLGREEN` configuration. A squash queue commit has current main as its only parent and is
+exactly one commit ahead of it; it does not contain the PR head as an ancestor, so GitHub's queue
+entry (exact PR head and exact queue commit) is the PR binding. Configuration is re-proved from
+the one repository-owned effective main queue rule through the public REST branch-rules endpoint;
+this removes GraphQL queue configuration reads without broadening job/App permissions.
+Missing, ambiguous, foreign or changed queue policy fails closed. Read-only signal workflows cannot publish approval. Consumers authenticate
 the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
 
 Review and review-comment wakeups resolve the service-owned PR link from the authenticated
@@ -91,7 +110,8 @@ Crowdin validates its immutable translation diff without updating a behind branc
 policy is active. While strict freshness and the verified queue coexist during rollout, their
 validation remains strict but admission and pending queue reporting already work. Crowdin and
 Dependabot explicitly request authenticated admission and submit a
-head-pinned normal merge. They report queued entries without dispatching main CI early; direct
+head-pinned native enqueue through `enqueuePullRequest` with `expectedHeadOid` in the mutation input. This does not depend
+on the repository auto-merge setting. They report queued entries without dispatching main CI early; direct
 job-token merges dispatch main CI only after the PR is actually merged. Existing dependency,
 translation, fork and credential controls remain enforced.
 
@@ -112,6 +132,15 @@ The dispatch profile is verified before approval and upload. The queue remains o
 60-minute response bound; integration is still full CI plus an anonymous deployed preview.
 
 ## Admission publisher provisioning
+
+Dependabot waits for CI, security and preview gates before explicitly refreshing its exact-head
+admission. In queue mode, older admission controller checks and a failure or pending status
+cannot prevent that refresh. The authenticated receipt must succeed before mergeability is checked; other
+failed checks/statuses still block. A policy-mode change during validation requires a retry.
+
+An obsolete merge-group signal is rejected before publishing to the current PR or replacement
+group. Current review/approval revocations still invalidate both live statuses, and queue
+discovery failures remain fail-closed.
 
 As of 2026-10-14, the organization uses GitHub Free; organization ruleset workflow enforcement is
 unavailable. Generic GitHub Actions identity cannot secure native queue admission: a candidate
@@ -156,7 +185,8 @@ these files does not create an App, install it, set a variable, or store a crede
    deletion/non-fast-forward rules. Do not add bypass actors or use an admin merge.
 3. Activate the reviewed, rendered App-pinned queue template for main while leaving `Main CI freshness` active. Use one
    current, reviewed low-risk canary PR. Record the real merge-group ref/SHA/parents, source PR
-   head, GraphQL entry and job-token event delivery. Prove all full CI jobs, admission, deployed
+   head, GraphQL entry and job-token event delivery. Confirm the queue commit has one parent and
+   that the building entry reports `position` 1; admission denies any other shape. Prove all full CI jobs, admission, deployed
    preview, smoke tests and authoritative result succeed on the queue SHA. Confirm a generic
    Actions-issued admission status cannot satisfy the App-pinned gate.
 4. Enqueue and remove a second isolated canary before completion. Prove its deleted/re-formed ref
@@ -184,17 +214,17 @@ strict freshness active; after activation, restore strict freshness before disab
 ## Agent lifecycle after activation
 
 An agent reviews the immutable PR head, resolves findings, records validation and obtains any
-required independent review. It then submits with:
+required independent review. For queue-required main, it uses a trusted checkout of main and submits with:
 
 ```sh
-gh pr merge <PR> --repo tarkovtracker-org/TarkovTracker --match-head-commit <reviewed-head>
+node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>
 ```
 
-For a queue-required branch this submits the PR to GitHub's queue; it does not bypass checks or
-prove a merge completed. Do not update a behind branch merely for freshness. If admission checks
-are still pending, leave a handoff rather than looping on `gh pr checks --watch` or reviewing an
-unchanged diff again. Auto-merge for pending admission requires separately enabled repository
-support; currently it is disabled.
+The helper pins the native enqueue mutation to the reviewed head and validates the returned
+entry. A queue entry proves submission; report a merge only after observing it. Do not update a
+behind branch merely for freshness. If admission checks are still pending, leave a handoff
+rather than looping on `gh pr checks --watch` or reviewing an unchanged diff again. Native enqueue
+does not require the repository auto-merge setting.
 
 The PR handoff records: reviewed head, findings/review state, validation evidence, queue entry
 or blocking check, branch/worktree, and next command. Report **QUEUED**, not MERGED. End the agent
