@@ -151,13 +151,16 @@ function matchesPreviewRequest(run, decision) {
     run.status !== 'completed',
   ].every(Boolean);
 }
+function requestIdentifier(request, key) {
+  return String(request?.[key] ?? '0');
+}
 function matchesRequestBinding(run, decision) {
-  if (decision.reuseAnyRequestBinding) return matchesAnyPreviewBinding(run, decision.runId);
-  const request = previewGrant(decision.previewRequest);
-  const binding = request ? String(request.commentId) : '0';
-  if (run.display_title === `Preview CI ${decision.runId} request ${binding}`) return true;
-  // Legacy unbound dispatches can still be reused. A command-bound run needs explicit provenance.
-  return matchesLegacyPreviewBinding(run, decision.runId, binding);
+  const grant = previewGrant(decision.previewRequest);
+  const binding = requestIdentifier(grant, 'commentId');
+  const control = requestIdentifier(grant, 'controlRunId');
+  if (run.display_title === `Preview CI ${decision.runId} request ${binding} control ${control}`)
+    return true;
+  return control === '0' && matchesLegacyPreviewBinding(run, decision.runId, binding);
 }
 /** Active dispatches include queued runs and fork runs awaiting environment approval. */
 async function previewRequestInFlight(github, repo, decision) {
@@ -197,11 +200,16 @@ export async function requestPreviewDispatch(github, repo, decision) {
 }
 function previewDispatchInputs(runId, request, authorization, attempt, event) {
   const inputs = { run_id: String(runId), queue: String(event === 'merge_group') };
-  const grant = previewGrant(request);
-  if (grant) inputs.request_comment_id = String(grant.commentId);
+  bindPreviewGrant(inputs, request);
   if (authorization === 'readiness') inputs.authorization = 'readiness';
   if (attempt) inputs.ci_attempt = String(attempt);
   return inputs;
+}
+function bindPreviewGrant(inputs, request) {
+  const grant = previewGrant(request);
+  if (!grant) return;
+  inputs.request_comment_id = String(grant.commentId);
+  if (grant.controlRunId) inputs.request_control_run_id = String(grant.controlRunId);
 }
 function truncateDescription(description) {
   return description.length > 140 ? `${description.slice(0, 137)}...` : description;
@@ -217,13 +225,7 @@ export async function publishStatus(github, repo, { sha, state, description, tar
     target_url: targetUrl,
   });
 }
-function matchesAnyPreviewBinding(run, runId) {
-  const prefix = `Preview CI ${runId} request `;
-  const title = String(run.display_title);
-  if (title === `Preview CI ${runId}`) return true;
-  if (!title.startsWith(prefix)) return false;
-  return /^[0-9]+$/.test(title.slice(prefix.length));
-}
 function matchesLegacyPreviewBinding(run, runId, binding) {
+  if (run.display_title === `Preview CI ${runId} request ${binding}`) return true;
   return binding === '0' && run.display_title === `Preview CI ${runId}`;
 }

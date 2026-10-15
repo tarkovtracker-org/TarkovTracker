@@ -6,6 +6,7 @@ import { requireEvidence } from './review-admission-policy.mjs';
 const RESOLVERS = new Map([
   ['.github/workflows/ci.yml', ciTargets],
   ['.github/workflows/preview.yml', previewTargets],
+  ['.github/workflows/preview-state.yml', previewStateTargets],
   ['.github/workflows/review-admission.yml', admissionTargets],
 ]);
 export async function controlRefreshTargets(github, context) {
@@ -57,7 +58,9 @@ async function linkedCiTargets(github, repo, run) {
   return pull ? [pull.number] : [];
 }
 async function previewTargets(github, repo, run) {
-  const match = /^Preview CI ([1-9]\d*)(?: request [0-9]+)?$/.exec(run.display_title);
+  const match = /^Preview CI ([1-9]\d*)(?: request [0-9]+(?: control [0-9]+)?)?$/.exec(
+    run.display_title
+  );
   requireEvidence(Boolean(match), 'Preview CI locator is malformed.');
   const { data: ci } = await github.rest.actions.getWorkflowRun({
     ...repo,
@@ -105,4 +108,9 @@ async function admissionTargets(github, repo, run) {
 }
 function headRepository(run) {
   return run.head_repository?.full_name;
+}
+function previewStateTargets(github, repo, run) {
+  if (run.event !== 'workflow_dispatch') return [];
+  const match = /^Preview State PR ([1-9]\d*)$/.exec(run.display_title);
+  return match ? [Number(match[1])] : [];
 }

@@ -12,6 +12,7 @@ import {
   publishControllerFailure,
   publishResult,
   reconcileMissingPreviewStatuses,
+  reconcilePreviewRequest,
   successMarker,
   verifyForDeploy,
   verifyManifest,
@@ -30,10 +31,15 @@ import {
   resolveBuildProfile,
 } from '../preview/profile.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
+import { previewControlRecord } from '../preview/control-intents.mjs';
+import { controlContext } from '../ci/pr-control-policy.mjs';
 import { countApiCalls } from './helpers/api-count.mjs';
 import { buildZip } from './helpers/zip.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
+process.env.REVIEW_ADMISSION_APP_ID = '5328610';
+process.env.REVIEW_ADMISSION_BOT_ID = '342940170';
+process.env.REVIEW_ADMISSION_INSTALLATION_ID = '171673328';
 const sha = (letter) => letter.repeat(40);
 const HEAD = sha('a');
 const BASE = sha('b');
@@ -489,7 +495,7 @@ function fakeGithub(t, options = {}) {
   };
   const paginate = (endpoint, params) => paginatedEndpoints(state, endpoint, params, options);
   return {
-    github: { rest, paginate, graphql: commentEditTimesGraphql(state) },
+    github: { rest, paginate, graphql: previewGraphql(state) },
     state,
     manifest,
     dir,
@@ -2406,4 +2412,166 @@ test('queue profile is authenticated before environment selection and repeated b
     ''
   );
   await uploader.verifyForDeploy({ ...args, decision, queue: 'false', destination: tempDir(t) });
+});
+function previewGraphql(state) {
+  const comments = commentEditTimesGraphql(state);
+  return async (query, args) => {
+    if (query.includes('query ControlPointer'))
+      return { repository: { object: { status: { context: null } } } };
+    return comments(query, args);
+  };
+}
+const CONTROL_ACTOR = { id: 22, login: 'maintainer', type: 'User' };
+function controlJournalState(enabled, id = 800) {
+  const run = { id, run_number: id - 790, created_at: `2026-10-15T16:0${id - 800}:00Z` };
+  const record = previewControlRecord({ run, commentId: 55, actor: CONTROL_ACTOR, enabled });
+  return {
+    schema: 1,
+    kind: 'pr-controls',
+    issuer: { appId: 5328610, botId: 342940170, installationId: 171673328, queueAllowed: true },
+    repository: REPO_NAME,
+    number: 42,
+    headSha: HEAD,
+    workflowSourceSha: BASE,
+    commentId: 55,
+    body: 'official canonical panel',
+    lastIntentRunNumber: run.run_number,
+    runId: id,
+    runAttempt: 1,
+    runNumber: run.run_number,
+    counter: 1,
+    grant: null,
+    previewIntent: record,
+    previewGrant: enabled ? record : null,
+    previewStop: enabled ? null : record,
+  };
+}
+function attachControlJournal(f, enabled = true) {
+  f.state.controlJournal = controlJournalState(enabled);
+  const originalGraphql = f.github.graphql;
+  f.github.graphql = async (query, args) => {
+    if (!query.includes('query ControlPointer')) return originalGraphql(query, args);
+    const state = f.state.controlJournal;
+    return {
+      repository: {
+        object: {
+          status: {
+            context: {
+              id: 'journal',
+              context: controlContext(42),
+              state: 'SUCCESS',
+              description: 'Control panel 55 revision 1',
+              targetUrl: `https://github.com/${REPO_NAME}/actions/runs/${state.runId}#artifacts/88`,
+              createdAt: '2026-10-15T16:00:00Z',
+              creator: { databaseId: 342940170 },
+            },
+          },
+        },
+      },
+    };
+  };
+  f.github.rest.repos.compareCommits = async () => ({ data: { status: 'identical' } });
+  f.github.rest.repos.getCollaboratorPermissionLevel = async () => ({
+    data: {
+      role_name: f.state.requesterRole,
+      user: CONTROL_ACTOR,
+    },
+  });
+  f.github.rest.actions.getWorkflowRunAttempt = async ({ run_id, attempt_number }) => {
+    assert.equal(attempt_number, 1);
+    const state = f.state.controlJournal;
+    assert.equal(Number(run_id), state.runId);
+    return {
+      data: {
+        id: state.runId,
+        run_number: state.runNumber,
+        run_attempt: 1,
+        path: '.github/workflows/pr-controls.yml',
+        event: 'workflow_dispatch',
+        head_sha: BASE,
+        head_branch: 'main',
+        repository: { full_name: REPO_NAME },
+      },
+    };
+  };
+  const originalPagination = f.github.paginate;
+  f.github.paginate = async (endpoint, params) => {
+    if (endpoint === 'artifacts' && params.run_id === f.state.controlJournal.runId)
+      return [{ id: 88, name: 'pr-controls-42', expired: false, size_in_bytes: 8000 }];
+    return originalPagination(endpoint, params);
+  };
+  const originalDownload = f.github.rest.actions.downloadArtifact;
+  f.github.rest.actions.downloadArtifact = async (params) => {
+    if (params.artifact_id === 88)
+      return {
+        data: buildZip([{ name: 'state.json', data: JSON.stringify(f.state.controlJournal) }]),
+      };
+    return originalDownload(params);
+  };
+}
+test('control Enable reconciles successful CI and keeps trusted fork deployment checks', async (t) => {
+  const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
+  const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } });
+  const f = fakeGithub(t, { run, pull });
+  attachControlJournal(f);
+  const core = fakeCore();
+  const args = {
+    github: f.github,
+    context: { ...workflowDispatchContext(), ref: 'refs/heads/main' },
+    core,
+    workspace: tempDir(t),
+    number: 42,
+  };
+  const requested = await reconcilePreviewRequest(args);
+  assert.equal(requested.action, 'request');
+  assert.equal(f.state.dispatches[0].inputs.request_comment_id, '55');
+  assert.equal(f.state.dispatches[0].inputs.request_control_run_id, '800');
+  const inputs = { run_id: 900, request_comment_id: '55', request_control_run_id: '800' };
+  const decision = await planPreview({ ...args, workspace: tempDir(t), inputs });
+  assert.equal(decision.action, 'deploy');
+  assert.equal(decision.environment, ENVIRONMENTS.internal);
+  assert.equal(decision.previewRequest.controlRunId, 800);
+  await verifyForDeploy({ ...args, decision, destination: join(tempDir(t), 'valid') });
+  f.state.controlJournal = controlJournalState(false, 801);
+  await assert.rejects(
+    verifyForDeploy({ ...args, decision, destination: join(tempDir(t), 'stopped') }),
+    /revoked or superseded/
+  );
+  f.state.controlJournal = controlJournalState(true, 802);
+  await assert.rejects(
+    verifyForDeploy({ ...args, decision, destination: join(tempDir(t), 'resumed') }),
+    /revoked or superseded/
+  );
+  const stale = await planPreview({ ...args, workspace: tempDir(t), inputs });
+  assert.equal(stale.action, 'fail');
+  assert.match(stale.description, /revoked or superseded/);
+});
+test('control Stop halts automatic reconciliation and role loss prevents upload', async (t) => {
+  const f = fakeGithub(t);
+  attachControlJournal(f, false);
+  const args = {
+    github: f.github,
+    context: { ...workflowDispatchContext(), ref: 'refs/heads/main' },
+    core: fakeCore(),
+    workspace: tempDir(t),
+    number: 42,
+  };
+  assert.equal((await reconcilePreviewRequest(args)).action, 'wait');
+  assert.deepEqual(f.state.dispatches, []);
+  f.state.controlJournal = controlJournalState(true);
+  const decision = await planPreview({
+    ...args,
+    workspace: tempDir(t),
+    inputs: { run_id: 900, request_comment_id: '55', request_control_run_id: '800' },
+  });
+  assert.equal(decision.action, 'deploy');
+  f.state.requesterRole = 'write';
+  await assert.rejects(
+    verifyForDeploy({ ...args, decision, destination: join(tempDir(t), 'role-lost') }),
+    /revoked or superseded/
+  );
+  await assert.rejects(
+    reconcilePreviewRequest({ ...args, context: { ...args.context, ref: 'refs/heads/candidate' } }),
+    /trusted main/
+  );
 });

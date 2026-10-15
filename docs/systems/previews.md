@@ -349,9 +349,15 @@ becomes available later; ordinary synchronize events still wait for current succ
 
 ### PR control panel
 
-The single TarkovTracker PR control comment offers a one-shot preview request for the displayed
-exact commit. It reuses the successful current-head CI/run/attempt selection and the existing
-trusted preview controller; fork environment approval and artifact checks still apply. It does
-not change automatic preview opt-in or expose production deployment. Maintainers and admins
-can use the checkbox, or agents can dispatch the structured `PR Controls` workflow. Authorization,
-durable receipts, and rollout are documented in [merge queue controls](../merge-queue-rollout.md#review-and-preview-controls).
+The single TarkovTracker PR control comment offers persistent **Enable automatic PR previews**
+and **Stop automatic PR previews** controls. They share one ordered intent timeline with the
+existing `/preview` and `/preview stop` commands. A control receipt pins the actual editor and
+live maintain/admin role; queued deployments also pin the enabling control run ID and recheck it
+immediately before upload. Stop/re-enable cannot reuse an earlier deployment grant.
+
+Accepted controls wake Preview State on trusted `main`. Successful current-head CI, matching
+artifact identity, fork protections, and smoke tests still apply. Controls do not affect required
+merge-group previews or independently authorized manual previews. The panel shows the effective
+mode and verified preview link. Agents use the structured `PR Controls` workflow. Authorization,
+durable receipts, capacity limits, and rollout are documented in
+[merge queue controls](../merge-queue-rollout.md#review-and-preview-controls).

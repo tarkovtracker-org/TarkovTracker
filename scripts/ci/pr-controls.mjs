@@ -4,7 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { requestPreviewForHead } from '../preview/comment-request.mjs';
+import { readPreviewAuthorization } from '../preview/request-authorization.mjs';
+import { previewControlRecord, recoveryPreviewStop } from '../preview/control-intents.mjs';
+import { comparePreviewIntents } from '../preview/intent-policy.mjs';
 import { allPages, queuedRefs, requirePrIdentity } from './review-admission-api.mjs';
 import { controlRefreshTargets } from './pr-control-targets.mjs';
 import { controlPanelEvidence } from './pr-control-panel.mjs';
@@ -12,7 +14,7 @@ import {
   CONTROL_MARKER,
   CONTROL_ANCHOR,
   CONTROL_WRITE_LIMIT,
-  REVOCATION_DESCRIPTION,
+  revocationDescription,
   controlContext,
   controlEdit,
   renderControlPanel,
@@ -161,8 +163,8 @@ async function applyIntent(github, context, state, request, pull, run) {
       runNumber: run.run_number,
     };
   if (request.operation === 'revoke-review') state.grant = null;
-  if (request.operation === 'preview')
-    return `Preview request received. [Dispatch result](${runUrl(context)}).`;
+  if (isPreviewOperation(request.operation))
+    return applyPreviewIntent(github, context, state, request, pull, run);
   return `${request.operation} accepted from @${request.actor.login}. [Request receipt](${runUrl(context)}).`;
 }
 async function processIntent(github, context, state, previous, comment, pull, run) {
@@ -200,6 +202,9 @@ const EMPTY_STATE = Object.freeze({
   presentation: null,
   headSha: null,
   body: null,
+  previewIntent: null,
+  previewGrant: null,
+  previewStop: null,
 });
 function nextState(context, pull, previous, comment, grant, run, source) {
   previous = previous ?? EMPTY_STATE;
@@ -221,6 +226,9 @@ function nextState(context, pull, previous, comment, grant, run, source) {
     result: previous.result,
     request: null,
     operationResult: null,
+    previewIntent: previous.previewIntent,
+    previewGrant: previous.previewGrant,
+    previewStop: previous.previewStop,
   };
 }
 async function controlSnapshot(github, context, number) {
@@ -289,13 +297,16 @@ async function prepareState(github, context, snapshot) {
   const state = nextState(context, pull, previous, comment, grant, run, source);
   state.issuer = github.reviewAdmissionIssuer;
   refreshHeadMessage(state, previous);
+  preserveRecoveryPreviewStop(state, previous);
   await processIntent(github, context, state, previous, comment, pull, run);
-  enforceJournalBudget(state);
-  state.presentation = currentPresentation(
-    state,
-    pull,
-    await controlPanelEvidence(github, context.repo, pull.head.sha)
-  );
+  enforceJournalBudget(state, run);
+  const previewAuthorization = await readPreviewAuthorization(github, context.repo, pull.number, {
+    controlState: state,
+  });
+  state.presentation = currentPresentation(state, pull, {
+    ...(await controlPanelEvidence(github, context.repo, pull.head.sha)),
+    previewMode: previewMode(previewAuthorization),
+  });
   if (!meaningfulChange(previous, state, comment)) return null;
   state.body = renderControlPanel({ ...state.presentation, revision: randomUUID() });
   state.previousPointerId = (previous ?? EMPTY_STATE).pointerId;
@@ -318,7 +329,8 @@ export async function prepareControls({
   requireEvidence(context.ref === 'refs/heads/main', 'Controls require trusted main.');
   const snapshot = await controlSnapshot(github, context, number);
   if (unrelatedComment(context, snapshot.previous)) return;
-  if (!journalAvailable(snapshot.previous, context, core)) return;
+  if (!journalAvailable(snapshot.previous, context, core))
+    return repairExhaustedPanel(github, context.repo, snapshot.previous);
   await savePreparedState(await prepareState(github, context, snapshot), core, evidenceDirectory);
 }
 async function revalidateRequest(github, context, state, previous, pull) {
@@ -378,9 +390,14 @@ export async function publishControls({
 }
 async function executeAcceptedRequest(github, context, state, number, pull) {
   if (!state.request) return;
-  if (state.request.operation === 'preview') {
-    const current = await requireCurrentRequestActor(github, context, state, pull);
-    return requestPreviewForHead(github, context.repo, current);
+  if (isPreviewOperation(state.request.operation)) {
+    await requireCurrentRequestActor(github, context, state, pull);
+    return github.rest.actions.createWorkflowDispatch({
+      ...context.repo,
+      workflow_id: 'preview-state.yml',
+      ref: 'main',
+      inputs: { pull_request: String(number) },
+    });
   }
   await github.rest.actions.createWorkflowDispatch({
     ...context.repo,
@@ -416,13 +433,22 @@ async function invalidateRevokedGrant(github, context, pull) {
       sha,
       context: 'Review Admission',
       state: 'failure',
-      description: REVOCATION_DESCRIPTION,
+      description: revocationDescription(pull.number),
       target_url: runUrl(context),
     });
 }
-function enforceJournalBudget(state) {
+function enforceJournalBudget(state, run) {
   if (state.counter < CONTROL_WRITE_LIMIT) return;
   state.grant = null;
+  const stop = previewControlRecord({
+    run,
+    commentId: state.commentId,
+    actor: { id: 41898282, login: 'github-actions[bot]', type: 'Bot' },
+    enabled: false,
+  });
+  state.previewIntent = stop;
+  state.previewStop = stop;
+  state.previewGrant = null;
   state.request = null;
   state.operationResult = {
     status: 'rejected',
@@ -464,4 +490,59 @@ function journalAvailable(previous, context, core) {
   requireEvidence(!isIntent(context), message);
   core.notice(message);
   return false;
+}
+function isPreviewOperation(operation) {
+  return ['preview-enable', 'preview-stop'].includes(operation);
+}
+function reusableControlGrant(authorization) {
+  if (!authorization.latest?.request.enabled) return null;
+  return controlGrant(authorization.grant);
+}
+function controlGrant(record) {
+  return record?.kind === 'control' ? record : null;
+}
+async function applyPreviewIntent(github, context, state, request, pull, run) {
+  const authorization = await readPreviewAuthorization(github, context.repo, pull.number);
+  const enabled = request.operation === 'preview-enable';
+  const record = previewControlRecord({
+    run,
+    commentId: state.commentId,
+    actor: request.actor,
+    enabled,
+  });
+  requirePreviewIntentFresh(authorization.latest, record);
+  state.previewIntent = record;
+  state.previewStop = enabled ? state.previewStop : record;
+  state.previewGrant = acceptedPreviewGrant(enabled, authorization, record);
+  return `Automatic PR previews ${enabled ? 'enabled' : 'stopped'}. [Request receipt](${runUrl(context)}).`;
+}
+function acceptedPreviewGrant(enabled, authorization, record) {
+  if (!enabled) return null;
+  return reusableControlGrant(authorization) ?? record;
+}
+function requirePreviewIntentFresh(latest, record) {
+  if (!latest) return;
+  requireEvidence(
+    comparePreviewIntents(latest, record) >= 0,
+    'A newer preview intent superseded this request.'
+  );
+}
+function preserveRecoveryPreviewStop(state, previous) {
+  if (!previous?.recovered) return;
+  const stop = recoveryPreviewStop(previous);
+  state.previewIntent = stop;
+  state.previewStop = stop;
+  state.previewGrant = null;
+}
+function previewMode(authorization) {
+  if (!authorization.latest) return 'repository default';
+  return authorization.latest.request.enabled ? 'enabled' : 'stopped';
+}
+async function repairExhaustedPanel(github, repo, previous) {
+  const comment = await officialComment(github, repo, previous);
+  const body =
+    previous.body ??
+    `${CONTROL_MARKER}\n### TarkovTracker · PR controls\nControls are disabled for this PR. Use provider/human review, /preview, /preview stop, or the existing manual preview workflow.`;
+  if (comment.body === body) return;
+  await github.rest.issues.updateComment({ ...repo, comment_id: previous.commentId, body });
 }

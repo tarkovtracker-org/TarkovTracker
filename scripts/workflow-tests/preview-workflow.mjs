@@ -100,7 +100,14 @@ test('preview controller runs trusted code only and isolates credentials per job
   assert.match(workflow, /run-name: Preview CI \$\{\{ inputs\.run_id \}\}/);
   assert.match(stateWorkflow, /reconcileMissingPreviewStatuses/);
   assert.doesNotMatch(workflow, /pull_request_target:|workflow_run:/);
-  assert.doesNotMatch(stateWorkflow, /workflow_dispatch:|secrets\.|\bdeploy:|\bsmoke:/);
+  assert.doesNotMatch(stateWorkflow, /secrets\.|\bdeploy:|\bsmoke:/);
+  assert.match(workflowEvent(stateWorkflow, 'workflow_dispatch'), /pull_request:/);
+  assert.match(
+    stateWorkflow,
+    /github\.event_name != 'workflow_dispatch' \|\| github\.ref == 'refs\/heads\/main'/
+  );
+  assert.match(stateWorkflow, /reconcilePreviewRequest/);
+  assert.match(workflowEvent(workflow, 'workflow_dispatch'), /request_control_run_id:/);
   assert.match(stateWorkflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
   assert.match(stateWorkflow, /persist-credentials: false/);
   assert.match(

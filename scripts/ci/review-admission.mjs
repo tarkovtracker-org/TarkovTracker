@@ -417,8 +417,8 @@ function requireEventGroup(eventGroup, current) {
 }
 async function evaluateScope(github, context, core, target, source) {
   const scope = await reviewScope(github, context, target);
-  await writeAdmissionTarget(context, core, scope.number);
   try {
+    await writeAdmissionTarget(context, core, scope.number);
     const head = await evaluateAdmission({ github, context, number: scope.number, source });
     core.setOutput('admission_sha', head.statusSha);
     if (scope.group) await evaluateQueuedScope(github, context, core, scope, source);

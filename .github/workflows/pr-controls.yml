@@ -7,7 +7,7 @@ on:
   issue_comment:
     types: [edited]
   workflow_run:
-    workflows: [CI, Preview, Review Admission]
+    workflows: [CI, Preview, Preview State, Review Admission]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -20,7 +20,7 @@ on:
         required: true
         default: recheck
         type: choice
-        options: [recheck, approve-review, revoke-review, preview]
+        options: [recheck, approve-review, revoke-review, preview-enable, preview-stop]
       expected_head:
         description: Exact 40-character PR head SHA
         required: true

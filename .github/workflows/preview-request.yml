@@ -6,6 +6,9 @@ on:
 permissions: {}
 env:
   PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   request:
     name: Request preview
@@ -21,6 +24,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: write
+      statuses: read
     steps:
       - name: Checkout trusted request handler
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

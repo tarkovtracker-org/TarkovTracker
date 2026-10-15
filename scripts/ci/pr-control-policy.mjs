@@ -3,13 +3,14 @@ import { requireEvidence, SHA } from './review-admission-policy.mjs';
 export const CONTROL_MARKER = '<!-- tarkovtracker:pr-controls:v1 -->';
 export const CONTROL_ANCHOR = '44d4462c3db34b60e7cca69450405c922af15f56';
 export const CONTROL_WRITE_LIMIT = 900;
-export const REVOCATION_DESCRIPTION =
-  'Admin review attestation revoked; fresh admission is required.';
+export const revocationDescription = (number) =>
+  `Admin review attestation revoked for PR #${number}; fresh admission is required.`;
 export const CONTROL_WORKFLOW = '.github/workflows/pr-controls.yml';
 export const CONTROL_ACTIONS = Object.freeze({
   'approve-review': 'Attest that I reviewed this exact commit (repository admin)',
   'revoke-review': 'Revoke the admin review attestation',
-  preview: 'Request a preview of this commit',
+  'preview-enable': 'Enable automatic PR previews',
+  'preview-stop': 'Stop automatic PR previews',
 });
 export const controlContext = (number) => `TarkovTracker Controls #${number}`;
 export function controlEdit(oldBody, newBody, expectedBody) {
@@ -36,7 +37,9 @@ export function requireControlActor(actor, permission, operation) {
     permission.user?.id === actor.id,
     'The live repository role belongs to a different actor.'
   );
-  const roles = operation === 'preview' ? ['maintain', 'admin'] : ['admin'];
+  const roles = ['preview', 'preview-enable', 'preview-stop', 'recheck'].includes(operation)
+    ? ['maintain', 'admin']
+    : ['admin'];
   requireEvidence(
     roles.includes(permission.role_name),
     `${operation} requires ${roles.join(' or ')} access.`
@@ -90,6 +93,7 @@ export function renderControlPanel({
   revision,
   state,
   terminal = false,
+  previewMode = 'repository default',
 }) {
   const review = grant
     ? `Admin attestation by @${grant.actor.login}, for this commit only.`
@@ -102,7 +106,7 @@ export function renderControlPanel({
     '### TarkovTracker · PR controls',
     `**Commit:** \`${headSha}\``,
     `**Review:** ${review}`,
-    `**Preview:** ${preview}`,
+    `**Automatic PR previews:** ${previewMode}. ${preview}`,
     '',
     '| Gate | Current result |',
     '| :--- | :--- |',
@@ -115,10 +119,15 @@ export function renderControlPanel({
     `**Last result:** ${result}`,
     '',
     `PR state: **${state}**. CI, preview, findings, and sensitive-change approval still apply.`,
-    'Checkboxes reset after processing. Agents use the structured PR Controls workflow.',
+    panelGuidance(terminal),
     `<!-- revision:${revision} -->`,
   ].join('\n');
 }
 function panelActions(terminal) {
   return terminal ? [] : Object.values(CONTROL_ACTIONS).map((label) => `- [ ] ${label}`);
+}
+function panelGuidance(terminal) {
+  return terminal
+    ? 'Controls are disabled for this PR. Use provider/human review, /preview, /preview stop, or the existing manual preview workflow.'
+    : 'Checkboxes reset after processing. Agents use the structured PR Controls workflow.';
 }

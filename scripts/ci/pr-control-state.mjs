@@ -11,7 +11,7 @@ import {
   CONTROL_ANCHOR,
   CONTROL_WORKFLOW,
   CONTROL_WRITE_LIMIT,
-  REVOCATION_DESCRIPTION,
+  revocationDescription,
   controlContext,
 } from './pr-control-policy.mjs';
 class ControlStateUnavailable extends Error {}
@@ -152,7 +152,7 @@ export async function currentControlState(github, repo, number, { recover = fals
     ['ahead', 'identical'].includes(data.status),
     'Control policy source is not on trusted main history.'
   );
-  return { ...state, pointerId: pointer.id };
+  return { ...state, pointerId: pointer.id, pointerCreatedAt: pointer.createdAt };
 }
 export function grantForHead(state, head) {
   if (!state?.grant) return null;
@@ -178,7 +178,7 @@ export async function currentAdminAttestation(github, repo, number, head) {
   if (!grant) return null;
   requireEvidence(Number.isSafeInteger(grant.runId), 'Admin attestation binding is malformed.');
   if (!(await currentAdmin(github, repo, grant.actor))) return null;
-  if (await revokedAfterGrant(github, repo, head, grant)) return null;
+  if (await revokedAfterGrant(github, repo, number, head, grant)) return null;
   return {
     provider: 'admin-attestation',
     reviewId: grant.runId,
@@ -194,6 +194,8 @@ function recoveredPointer(pointer, run) {
     commentId: Number(match[1]),
     grant: null,
     recovered: true,
+    runId: run.id,
+    pointerCreatedAt: pointer.createdAt ?? run.created_at,
     counter: Number(match[2]),
     headSha: null,
     body: null,
@@ -227,7 +229,7 @@ async function parseControlArtifact(bytes) {
 }
 const POINTER_QUERY = `query ControlPointer($owner:String!,$repo:String!,$anchor:GitObjectID!,$name:String!) {
  repository(owner:$owner,name:$repo) { object(oid:$anchor) { ... on Commit { status {
-  context(name:$name) { id context state description targetUrl creator { ... on Bot { databaseId } } }
+  context(name:$name) { id context state description targetUrl createdAt creator { ... on Bot { databaseId } } }
  } } } }
 }`;
 async function controlPointer(github, repo, number) {
@@ -252,20 +254,20 @@ async function controlPointer(github, repo, number) {
     target_url: pointer.targetUrl,
   };
 }
-function revocationStatus(status) {
+function revocationStatus(status, number) {
   return [
     status.context === CONTEXT,
     status.state === 'failure',
     status.creator?.id === expectedPublisherBot(),
-    status.description === REVOCATION_DESCRIPTION,
+    status.description === revocationDescription(number),
   ].every(Boolean);
 }
-async function revokedAfterGrant(github, repo, head, grant) {
+async function revokedAfterGrant(github, repo, number, head, grant) {
   const statuses = await allPages(github, github.rest.repos.listCommitStatusesForRef, {
     ...repo,
     ref: head,
   });
-  const revocation = statuses.find(revocationStatus);
+  const revocation = statuses.find((status) => revocationStatus(status, number));
   if (!revocation) return false;
   const prefix = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/`;
   requireEvidence(revocation.target_url?.startsWith(prefix), 'Revocation source URL mismatch.');

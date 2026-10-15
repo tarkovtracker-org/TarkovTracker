@@ -19,8 +19,10 @@ import {
   requireControlActor,
   requireControlOperation,
 } from '../ci/pr-control-policy.mjs';
+import { readPreviewRequest } from '../preview/request-authorization.mjs';
+import { comparePreviewIntents, selectPreviewAuthorization } from '../preview/intent-policy.mjs';
+import { previewBindingError } from '../preview/binding-policy.mjs';
 import { controlTargets, prepareControls, publishControls } from '../ci/pr-controls.mjs';
-import { requestPreviewForHead } from '../preview/comment-request.mjs';
 const EVIDENCE_DIRECTORY = mkdtempSync(join(tmpdir(), 'tt-pr-controls-test-'));
 const repo = { owner: 'example', repo: 'repo' };
 const head = 'a'.repeat(40);
@@ -58,6 +60,7 @@ function zip(receipt, filename = 'state.json') {
 }
 function fixture(operation = 'approve-review') {
   const run = {
+    created_at: '2026-10-15T16:00:00Z',
     id: 800,
     run_attempt: 1,
     run_number: 10,
@@ -112,6 +115,7 @@ function fixture(operation = 'approve-review') {
     creator: { id: issuer.botId },
     state: 'success',
     description: 'Control panel 55 revision 1',
+    createdAt: '2026-10-15T15:00:00Z',
     target_url: 'https://github.com/example/repo/actions/runs/700#artifacts/77',
   };
   const comment = {
@@ -145,6 +149,9 @@ function fixture(operation = 'approve-review') {
     dispatches: [],
     statuses: [],
     artifacts: new Map(),
+    archiveBytes: new Map(),
+    runs: new Map(),
+    intentComments: [],
   };
   const reply = (data) => Promise.resolve({ data });
   const rest = {
@@ -155,7 +162,12 @@ function fixture(operation = 'approve-review') {
       getCollaboratorPermissionLevel: () => reply({ role_name: f.role, user: f.editor }),
       createCommitStatus: (params) => {
         f.pointers.push(params);
-        const status = { ...params, id: 90 + f.pointers.length, creator: { id: issuer.botId } };
+        const status = {
+          ...params,
+          id: 90 + f.pointers.length,
+          createdAt: f.run.created_at,
+          creator: { id: issuer.botId },
+        };
         if (params.context === controlContext(1)) f.pointer = status;
         else f.statuses.unshift(status);
         return reply(status);
@@ -168,7 +180,7 @@ function fixture(operation = 'approve-review') {
     },
     issues: {
       getComment: () => reply(f.comment),
-      listComments: () => reply([f.comment]),
+      listComments: () => reply([f.comment, ...f.intentComments]),
       updateComment: (params) => {
         f.comments.push(params);
         f.comment.body = params.body;
@@ -178,24 +190,10 @@ function fixture(operation = 'approve-review') {
     git: { listMatchingRefs: () => reply([]) },
     checks: { listForRef: () => reply([]) },
     actions: {
-      getWorkflowRun: ({ run_id }) =>
-        reply(
-          Number(run_id) === f.previous.runId
-            ? { ...run, id: f.previous.runId, run_number: f.previous.runNumber }
-            : f.run
-        ),
+      getWorkflowRun: ({ run_id }) => reply(fixtureRun(f, Number(run_id))),
       getWorkflowRunAttempt: ({ run_id, attempt_number }) => {
         assert.equal(attempt_number, 1);
-        return reply(
-          Number(run_id) === f.previous.runId
-            ? {
-                ...run,
-                id: f.previous.runId,
-                run_number: f.previous.runNumber,
-                run_attempt: 1,
-              }
-            : f.run
-        );
+        return reply(fixtureRun(f, Number(run_id)));
       },
       listWorkflowRunArtifacts: ({ run_id }) =>
         reply({
@@ -204,7 +202,8 @@ function fixture(operation = 'approve-review') {
               ? [{ id: 77, name: 'pr-controls-1', expired: false, size_in_bytes: 5000 }]
               : (f.artifacts.get(Number(run_id)) ?? []),
         }),
-      downloadArtifact: () => reply(zip(f.previous)),
+      downloadArtifact: ({ artifact_id }) =>
+        reply(f.archiveBytes.get(artifact_id) ?? zip(f.previous)),
       createWorkflowDispatch: (params) => {
         f.dispatches.push(params);
         return reply({});
@@ -236,6 +235,20 @@ function fixture(operation = 'approve-review') {
             },
           },
         };
+      if (query.includes('PullRequestCommentEdits'))
+        return {
+          repository: {
+            pullRequest: {
+              comments: {
+                nodes: [f.comment, ...f.intentComments].map((c) => ({
+                  fullDatabaseId: String(c.id),
+                  lastEditedAt: c.lastEditedAt ?? null,
+                })),
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        };
       return {
         node: {
           fullDatabaseId: '55',
@@ -247,6 +260,7 @@ function fixture(operation = 'approve-review') {
     },
   };
   f.core = {
+    notice: () => {},
     setOutput: (key, value) => {
       f.outputs[key] = value;
     },
@@ -266,6 +280,19 @@ function fixture(operation = 'approve-review') {
     };
   };
   return f;
+}
+function fixtureRun(f, id) {
+  if (id === f.previous.runId)
+    return { ...f.run, id, run_number: f.previous.runNumber, run_attempt: 1 };
+  if (id === f.run.id) return f.run;
+  return f.runs.get(id);
+}
+function uploaded(f, id) {
+  const state = prepared();
+  f.artifacts.set(state.runId, [
+    { id, name: 'pr-controls-1', expired: false, size_in_bytes: 8000 },
+  ]);
+  f.archiveBytes.set(id, zip(state));
 }
 const prepare = (f) =>
   prepareControls({
@@ -550,52 +577,6 @@ test('head/role changes during upload prevent pointer and comment publication', 
     assert.equal(f.pointers.length, 0);
     assert.equal(f.comments.length, 0);
   }
-});
-test('preview operation rejects missing current successful CI and does not dispatch', async () => {
-  const f = fixture('preview');
-  f.github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [] } });
-  await assert.rejects(requestPreviewForHead(f.github, repo, f.pull), /successful current-head CI/);
-  assert.deepEqual(f.dispatches, []);
-});
-test('one-shot preview reuses exact CI run/attempt and never grants persistent opt-in or production deployment', async () => {
-  const f = fixture('preview');
-  const ci = {
-    id: 40,
-    run_attempt: 2,
-    path: '.github/workflows/ci.yml',
-    event: 'pull_request',
-    head_sha: head,
-    head_repository: { full_name: 'example/repo' },
-    head_branch: 'fix',
-    status: 'completed',
-    conclusion: 'success',
-    pull_requests: [{ number: 1, head: { sha: head }, base: { sha: base } }],
-    updated_at: '2026-10-15T15:00:00Z',
-  };
-  f.github.rest.actions.listWorkflowRuns = async ({ workflow_id }) => ({
-    data: workflow_id === 'ci.yml' ? { workflow_runs: [ci] } : [],
-  });
-  f.github.rest.checks.listForRef = async () => ({
-    data: [
-      {
-        id: 1,
-        app: { id: 15368 },
-        head_sha: head,
-        status: 'completed',
-        conclusion: 'success',
-        details_url: 'https://github.com/example/repo/actions/runs/40/job/77',
-      },
-    ],
-  });
-  const result = await requestPreviewForHead(f.github, repo, f.pull);
-  assert.equal(result.ciRunId, 40);
-  assert.equal(f.dispatches.length, 1);
-  assert.deepEqual(f.dispatches[0], {
-    ...repo,
-    workflow_id: 'preview.yml',
-    ref: 'main',
-    inputs: { run_id: '40', queue: 'false', ci_attempt: '2' },
-  });
 });
 test('successful revocation fails head/queue admission before updating durable control state', async () => {
   const f = fixture('revoke-review');
@@ -968,7 +949,7 @@ test('head or actor changes after upload prevent preview dispatch, including aft
       f.role = 'read';
     },
   ]) {
-    const f = fixture('preview');
+    const f = fixture('preview-enable');
     await prepare(f);
     assert.equal(f.dispatches.length, 0);
     const original = f.github.rest.issues.updateComment;
@@ -988,47 +969,6 @@ test('head or actor changes after upload prevent preview dispatch, including aft
     );
     assert.equal(f.dispatches.length, 0);
   }
-});
-test('one-shot preview reuses an active command-bound deployment instead of canceling it', async () => {
-  const f = fixture('preview');
-  const ci = {
-    id: 40,
-    run_attempt: 2,
-    path: '.github/workflows/ci.yml',
-    event: 'pull_request',
-    head_sha: head,
-    head_repository: { full_name: 'example/repo' },
-    head_branch: 'fix',
-    status: 'completed',
-    conclusion: 'success',
-    pull_requests: [{ number: 1, head: { sha: head }, base: { sha: base } }],
-    updated_at: '2026-10-15T15:00:00Z',
-  };
-  const active = {
-    path: '.github/workflows/preview.yml',
-    event: 'workflow_dispatch',
-    head_branch: 'main',
-    display_title: 'Preview CI 40 request 123',
-    status: 'in_progress',
-    created_at: '2026-10-15T16:00:00Z',
-  };
-  f.github.rest.actions.listWorkflowRuns = async ({ workflow_id }) => ({
-    data: workflow_id === 'ci.yml' ? { workflow_runs: [ci] } : [active],
-  });
-  f.github.rest.checks.listForRef = async () => ({
-    data: [
-      {
-        id: 1,
-        app: { id: 15368 },
-        head_sha: head,
-        status: 'completed',
-        conclusion: 'success',
-        details_url: 'https://github.com/example/repo/actions/runs/40/job/77',
-      },
-    ],
-  });
-  assert.equal((await requestPreviewForHead(f.github, repo, f.pull)).ciRunId, 40);
-  assert.equal(f.dispatches.length, 0);
 });
 test('new-head refresh preserves independently valid admission instead of revoking another revision', async () => {
   const f = fixture();
@@ -1076,4 +1016,217 @@ test('the actual first-attempt endpoint rejects a mismatched rerun receipt while
   await assert.rejects(currentControlState(f.github, repo, 1), /first attempt/);
   assert.equal(f.previous.grant.runId, 600);
   assert.equal(f.pointers.length, 0);
+});
+async function commitPreviewIntent(f, operation, id, timestamp) {
+  f.runs.set(f.run.id, structuredClone(f.run));
+  Object.assign(f.run, { id, run_number: id - 790, created_at: timestamp });
+  f.context.runId = id;
+  f.context.eventName = 'workflow_dispatch';
+  f.context.payload = {
+    sender: actor,
+    inputs: { pull_request: '1', operation, expected_head: f.pull.head.sha },
+  };
+  await prepare(f);
+  assert.equal(prepared().operationResult.status, 'accepted');
+  uploaded(f, id + 1000);
+  await publishControls({
+    github: f.github,
+    context: f.context,
+    number: 1,
+    artifactId: id + 1000,
+    evidenceDirectory: EVIDENCE_DIRECTORY,
+  });
+  return prepared();
+}
+function legacyPreview(id, enabled, at) {
+  return {
+    id,
+    body: enabled ? '/preview' : '/preview stop',
+    created_at: at,
+    user: actor,
+    author_association: 'OWNER',
+  };
+}
+test('Enable and Stop persist across commits; stop/re-enable cannot revive an earlier deployment binding', async () => {
+  const f = fixture('preview-enable');
+  const enabled = await commitPreviewIntent(f, 'preview-enable', 800, '2026-10-15T16:00:00Z');
+  assert.equal(enabled.previewGrant.request.controlRunId, 800);
+  assert.equal(f.dispatches.at(-1).workflow_id, 'preview-state.yml');
+  assert.deepEqual(f.dispatches.at(-1).inputs, { pull_request: '1' });
+  let request = await readPreviewRequest(f.github, repo, 1);
+  assert.equal(request.enabled, true);
+  assert.equal(request.controlRunId, 800);
+  f.pull.head.sha = base;
+  request = await readPreviewRequest(f.github, repo, 1);
+  assert.equal(request.controlRunId, 800);
+  const stopped = await commitPreviewIntent(f, 'preview-stop', 801, '2026-10-15T16:01:00Z');
+  assert.equal(stopped.previewGrant, null);
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+  await commitPreviewIntent(f, 'preview-enable', 802, '2026-10-15T16:02:00Z');
+  request = await readPreviewRequest(f.github, repo, 1, 55);
+  assert.equal(request.controlRunId, 802);
+  assert.match(
+    previewBindingError({ request_comment_id: '55', request_control_run_id: '800' }, request),
+    /superseded/
+  );
+  assert.equal(
+    previewBindingError({ request_comment_id: '55', request_control_run_id: '802' }, request),
+    null
+  );
+});
+test('repeated Enable preserves the oldest continuous grant and a legacy Stop revokes it', async () => {
+  const f = fixture('preview-enable');
+  await commitPreviewIntent(f, 'preview-enable', 800, '2026-10-15T16:00:00Z');
+  await commitPreviewIntent(f, 'preview-enable', 801, '2026-10-15T16:01:00Z');
+  assert.equal((await readPreviewRequest(f.github, repo, 1, 55)).controlRunId, 800);
+  f.intentComments.push(legacyPreview(99, false, '2026-10-15T16:02:00Z'));
+  assert.equal((await readPreviewRequest(f.github, repo, 1, 55)).enabled, false);
+  await commitPreviewIntent(f, 'preview-enable', 802, '2026-10-15T16:03:00Z');
+  assert.equal((await readPreviewRequest(f.github, repo, 1, 55)).controlRunId, 802);
+});
+test('newer legacy Enable wins over a control Stop, but an older queued control cannot override it', async () => {
+  const f = fixture('preview-stop');
+  await commitPreviewIntent(f, 'preview-stop', 800, '2026-10-15T16:00:00Z');
+  f.intentComments.push(legacyPreview(99, true, '2026-10-15T16:02:00Z'));
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).commentId, 99);
+  f.runs.set(f.run.id, structuredClone(f.run));
+  Object.assign(f.run, { id: 801, run_number: 11, created_at: '2026-10-15T16:01:00Z' });
+  f.context.runId = 801;
+  f.context.payload.inputs.operation = 'preview-stop';
+  await prepare(f);
+  assert.equal(prepared().operationResult.status, 'rejected');
+  assert.match(prepared().result, /newer preview intent/);
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).commentId, 99);
+});
+test('live loss of maintainer authority revokes an Enable and an accepted Stop survives role loss', async () => {
+  const f = fixture('preview-enable');
+  await commitPreviewIntent(f, 'preview-enable', 800, '2026-10-15T16:00:00Z');
+  f.role = 'read';
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+  f.role = 'admin';
+  await commitPreviewIntent(f, 'preview-stop', 801, '2026-10-15T16:01:00Z');
+  f.role = 'read';
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+});
+test('long-lived exhausted and expired journals stop old grants while allowing a fresh legacy opt-in', async () => {
+  const f = fixture('preview-enable');
+  f.intentComments.push(legacyPreview(98, true, '2026-10-15T15:00:00Z'));
+  f.previous.counter = 899;
+  f.pointer.description = 'Control panel 55 revision 899';
+  await prepare(f);
+  assert.equal(prepared().previewIntent.request.enabled, false);
+  uploaded(f, 1800);
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 1800,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /900-update limit/
+  );
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+  f.artifacts.set(800, []); // Confirmed artifact expiry/deletion never resets the journal budget.
+  assert.equal((await currentControlState(f.github, repo, 1, { recover: true })).counter, 900);
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+  f.intentComments.push(legacyPreview(99, true, '2026-10-15T16:02:00Z'));
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).commentId, 99);
+  assert.equal((await readPreviewRequest(f.github, repo, 1, 98)).enabled, false);
+  f.role = 'read';
+  assert.equal((await readPreviewRequest(f.github, repo, 1)).enabled, false);
+});
+test('Preview State completion refreshes exactly its named PR and never fans out', async () => {
+  const f = fixture();
+  f.context.eventName = 'workflow_run';
+  f.context.payload = { workflow_run: { id: 800, run_attempt: 1 } };
+  Object.assign(f.run, {
+    path: '.github/workflows/preview-state.yml',
+    status: 'completed',
+    display_title: 'Preview State PR 1',
+  });
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+  f.run.event = 'pull_request_target';
+  assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), []);
+});
+test('revocation proof belongs to the specific PR even when two PRs share a head SHA', async () => {
+  const f = fixture('revoke-review');
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  f.github.rest.repos.createCommitStatus = async (params) => {
+    if (params.context === controlContext(1)) throw new Error('Injected pointer failure');
+    f.statuses.unshift({ ...params, creator: { id: issuer.botId } });
+    return { data: {} };
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /Injected/
+  );
+  const revocation = f.statuses[0];
+  assert.match(revocation.description, /PR #1/);
+  revocation.description = revocation.description.replace('PR #1', 'PR #2');
+  assert.equal((await currentAdminAttestation(f.github, repo, 1, head)).reviewId, 600);
+  revocation.description = revocation.description.replace('PR #2', 'PR #1');
+  assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
+});
+test('a failed terminal comment update can be repaired without another journal write or renewed actions', async () => {
+  const f = fixture();
+  f.previous.counter = 899;
+  f.pointer.description = 'Control panel 55 revision 899';
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  const terminal = prepared();
+  uploaded(f, 1800);
+  const original = f.github.rest.issues.updateComment;
+  f.github.rest.issues.updateComment = async () => {
+    throw new Error('Injected comment failure');
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 1800,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /Injected/
+  );
+  assert.equal(f.pointer.description, 'Control panel 55 revision 900');
+  assert.ok(f.comment.body.includes('- [ ]'));
+  const writes = f.pointers.length;
+  f.runs.set(800, structuredClone(f.run));
+  Object.assign(f.run, { id: 801, run_number: 11 });
+  f.context.runId = 801;
+  f.context.eventName = 'pull_request_target';
+  f.github.rest.issues.updateComment = original;
+  f.outputs = {};
+  await prepare(f);
+  assert.equal(f.comment.body, terminal.body);
+  assert.match(f.comment.body, /Controls are disabled/);
+  assert.ok(!f.comment.body.includes('- [ ]'));
+  assert.equal(f.outputs.changed, undefined);
+  assert.equal(f.pointers.length, writes);
+});
+test('a cross-source timestamp tie favors Stop and same-source ties follow server sequence', () => {
+  const record = (kind, sequence, enabled) => ({
+    kind,
+    sequence,
+    key: `${kind}-${sequence}`,
+    at: '2026-10-15T16:00:00Z',
+    request: { enabled },
+  });
+  for (const [left, right] of [
+    [record('control', 10, true), record('comment', 99, false)],
+    [record('comment', 99, true), record('control', 10, false)],
+  ]) {
+    assert.equal(selectPreviewAuthorization([left, right]).latest.request.enabled, false);
+    assert.equal(selectPreviewAuthorization([right, left]).grant, null);
+  }
+  assert.ok(comparePreviewIntents(record('control', 11, true), record('control', 10, false)) < 0);
 });

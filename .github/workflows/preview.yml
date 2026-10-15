@@ -1,5 +1,5 @@
 name: Preview
-run-name: Preview CI ${{ inputs.run_id }} request ${{ inputs.request_comment_id || '0' }}
+run-name: Preview CI ${{ inputs.run_id }} request ${{ inputs.request_comment_id || '0' }} control ${{ inputs.request_control_run_id || '0' }}
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
@@ -22,6 +22,10 @@ on:
         description: Command authorizing this automatic request; omit for a manual preview.
         required: false
         type: string
+      request_control_run_id:
+        description: App-pinned preview enable intent; supplied by the trusted requester.
+        required: false
+        type: string
       authorization:
         description: Readiness policy provenance; omit for independently authorized dispatches.
         required: false
@@ -40,6 +44,9 @@ permissions:
   contents: read
 env:
   PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   plan:
     name: Plan preview
@@ -72,6 +79,7 @@ jobs:
           RUN_ID_INPUT: ${{ inputs.run_id }}
           QUEUE_INPUT: ${{ inputs.queue }}
           REQUEST_COMMENT_ID_INPUT: ${{ inputs.request_comment_id }}
+          REQUEST_CONTROL_RUN_ID_INPUT: ${{ inputs.request_control_run_id }}
           AUTHORIZATION_INPUT: ${{ inputs.authorization }}
           CI_ATTEMPT_INPUT: ${{ inputs.ci_attempt }}
         with:
@@ -81,7 +89,7 @@ jobs:
               github,
               context,
               core,
-              inputs: { run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
+              inputs: { run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, request_control_run_id: process.env.REQUEST_CONTROL_RUN_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
               workspace: process.env.RUNNER_TEMP,
             });
             core.setOutput('decision', JSON.stringify(decision));
@@ -109,6 +117,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
+      statuses: read
     outputs:
       url: ${{ steps.verify-deployment.outputs.url }}
       deployment_id: ${{ steps.verify-deployment.outputs.deployment_id }}

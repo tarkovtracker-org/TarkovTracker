@@ -2379,3 +2379,24 @@ test('panel target locators use the owned runner temporary directory', async () 
     rmSync(directory, { recursive: true, force: true });
   }
 });
+test('a locator storage error fails the scoped admission statuses instead of leaving them pending', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-target-failure-'));
+  const previous = process.env.RUNNER_TEMP;
+  const blocker = join(directory, 'not-a-directory');
+  writeFileSync(blocker, 'fixture');
+  process.env.RUNNER_TEMP = blocker;
+  try {
+    const f = queuedControlFixture();
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.ok(f.statuses.length > 0);
+    const latest = new Map(f.statuses.map((status) => [status.sha, status.state]));
+    assert.ok(latest.size >= 2);
+    assert.ok([...latest.values()].every((state) => state === 'failure'));
+  } finally {
+    if (previous === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
