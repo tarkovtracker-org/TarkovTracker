@@ -214,17 +214,17 @@ strict freshness active; after activation, restore strict freshness before disab
 ## Agent lifecycle after activation
 
 An agent reviews the immutable PR head, resolves findings, records validation and obtains any
-required independent review. It then submits with:
+required independent review. For queue-required main, it uses a trusted checkout of main and submits with:
 
 ```sh
-gh pr merge <PR> --repo tarkovtracker-org/TarkovTracker --match-head-commit <reviewed-head>
+node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>
 ```
 
-For a queue-required branch this submits the PR to GitHub's queue; it does not bypass checks or
-prove a merge completed. Do not update a behind branch merely for freshness. If admission checks
-are still pending, leave a handoff rather than looping on `gh pr checks --watch` or reviewing an
-unchanged diff again. Auto-merge for pending admission requires separately enabled repository
-support; currently it is disabled.
+The helper pins the native enqueue mutation to the reviewed head and validates the returned
+entry. A queue entry proves submission; report a merge only after observing it. Do not update a
+behind branch merely for freshness. If admission checks are still pending, leave a handoff
+rather than looping on `gh pr checks --watch` or reviewing an unchanged diff again. Native enqueue
+does not require the repository auto-merge setting.
 
 The PR handoff records: reviewed head, findings/review state, validation evidence, queue entry
 or blocking check, branch/worktree, and next command. Report **QUEUED**, not MERGED. End the agent
