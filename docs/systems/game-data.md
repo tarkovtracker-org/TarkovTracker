@@ -259,6 +259,12 @@ parsing, so no purge or coordinated rollout is required. Only public cache/overl
 returned; internal retention and storage metadata remain private to the Cache API. The default
 object-returning path, hideout's post-cache overlay, and precomputed KV validation are unchanged.
 
+On a cache miss, response mode serializes the final payload once and shares that body's two
+streams between the Cache API write and the client. Each receives its own headers: storage keeps
+the longer retention window and internal metadata, while the client receives only the public
+cache/overlay headers. Object-mode consumers retain the original payload and write the stored
+response directly without creating an unused stream branch.
+
 When an edge cache entry exists but is older than `ttl`, the handler:
 
 1. Returns the stale payload immediately with `X-Cache-Status: STALE`.
