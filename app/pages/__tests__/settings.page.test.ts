@@ -230,72 +230,20 @@ describe('settings page', () => {
     const selectedScroll = expected === 'tab' ? scrollTab : scrollPanel;
     const otherScroll = expected === 'tab' ? scrollPanel : scrollTab;
     const options = {
-      behavior: 'instant',
+      behavior: expected === 'tab' ? 'instant' : 'smooth',
       block: 'start',
       inline: 'nearest',
     };
     expect(selectedScroll).toHaveBeenCalledWith(options);
     expect(selectedScroll).toHaveBeenCalledTimes(1);
-    // Both tab and nested-target scrolls settle after a residual hash-scroll frame.
+    // Only the instant tab scroll is re-asserted after an interrupted smooth scroll's last frame.
     vi.spyOn(tab, 'isConnected', 'get').mockReturnValue(true);
-    vi.spyOn(panel, 'isConnected', 'get').mockReturnValue(true);
     frames.splice(0).forEach((callback) => callback(0));
-    expect(selectedScroll).toHaveBeenCalledTimes(2);
+    expect(selectedScroll).toHaveBeenCalledTimes(expected === 'tab' ? 2 : 1);
     expect(selectedScroll).toHaveBeenLastCalledWith(options);
     expect(otherScroll).not.toHaveBeenCalled();
     wrapper.unmount();
   });
-  it.each(['#skills', '#keybinds'])(
-    'settles a nested target after a competing hash scroll for %s',
-    async (hash) => {
-      configureMockState({ routeHash: hash });
-      const target = document.createElement('section');
-      document.body.append(target);
-      let targetTop = 0;
-      target.scrollIntoView = vi.fn(() => {
-        targetTop = 64;
-      });
-      vi.spyOn(document, 'getElementById').mockReturnValue(target);
-      const frames: FrameRequestCallback[] = [];
-      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-        frames.push(callback);
-        return frames.length;
-      });
-      const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
-      await nextTick();
-      expect(targetTop).toBe(64);
-      // Model a residual native/router hash-scroll frame putting the target under the header.
-      targetTop = 0;
-      frames.splice(0).forEach((callback) => callback(0));
-      expect(targetTop, 'nested target settles below the fixed header').toBe(64);
-      wrapper.unmount();
-      target.remove();
-    }
-  );
-  it.each(['hash', 'path', 'removed'])(
-    'does not reassert a nested target after %s changes',
-    async (change) => {
-      configureMockState({ routeHash: '#skills' });
-      const target = document.createElement('section');
-      document.body.append(target);
-      target.scrollIntoView = vi.fn();
-      vi.spyOn(document, 'getElementById').mockReturnValue(target);
-      const frames: FrameRequestCallback[] = [];
-      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-        frames.push(callback);
-        return frames.length;
-      });
-      const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
-      await nextTick();
-      if (change === 'hash') mockState.routeHash = '#preferences';
-      if (change === 'path') mockState.routePath = '/tasks';
-      if (change === 'removed') target.remove();
-      frames.splice(0).forEach((callback) => callback(0));
-      expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
-      wrapper.unmount();
-      target.remove();
-    }
-  );
   it('renders settings layout', async () => {
     const wrapper = await mountSuspended(SettingsPage, {
       global: globalConfig,

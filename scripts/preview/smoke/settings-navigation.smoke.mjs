@@ -182,3 +182,37 @@ test('desktop retains panel scrolling and sticky navigation', async ({ page }) =
   await expectNestedTarget(page, '#keybinds', '#preferences');
   await expect(page.getByTestId('desktop-tab-preferences')).toBeVisible();
 });
+test('nested Skills target stays visible when level metadata replaces its loading hint', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 333, height: 507 });
+  await page.goto(`${origin}/settings#progression`);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document
+            .querySelector('#__nuxt')
+            ?.__vue_app__?.config.globalProperties.$pinia._s.get('metadata')?.playerLevels.length ??
+          0
+      )
+    )
+    .toBeGreaterThan(0);
+  const levels = await page.evaluate(() => {
+    const metadata = document
+      .querySelector('#__nuxt')
+      .__vue_app__.config.globalProperties.$pinia._s.get('metadata');
+    const levels = JSON.parse(JSON.stringify(metadata.playerLevels));
+    metadata.playerLevels = [];
+    return levels;
+  });
+  await navigate(page, '/settings#skills');
+  await expectNestedTarget(page, '#skills', '#progression');
+  // The shorter ready hint must not move the target under the fixed header.
+  await page.evaluate((levels) => {
+    document
+      .querySelector('#__nuxt')
+      .__vue_app__.config.globalProperties.$pinia._s.get('metadata').playerLevels = levels;
+  }, levels);
+  await expectNestedTarget(page, '#skills', '#progression');
+});
