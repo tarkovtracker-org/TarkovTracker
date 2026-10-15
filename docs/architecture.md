@@ -179,6 +179,17 @@ graph TB
     Gateway --> CF
 ```
 
+## Settings navigation
+
+The [player-level card](../app/features/settings/PlayerLevelCard.vue) reserves the translated
+loading hint's height while displaying the current range hint. Loading level metadata can shorten
+that hint; keeping its footprint stable prevents nested `#skills` links below it from moving under
+the fixed header after scrolling. The hidden reservation is excluded from assistive output. Existing
+route scrolling, aliases, refresh and Back/Forward behavior stay in
+[`settings.vue`](../app/pages/settings.vue). The settings navigation
+[browser smoke test](../scripts/preview/smoke/settings-navigation.smoke.mjs) covers the metadata
+transition and verifies geometry after scrolling settles.
+
 ## State Management
 
 ### Three-Store Pattern + Facade
