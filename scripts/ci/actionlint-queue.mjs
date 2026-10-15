@@ -8,6 +8,7 @@ const queuedFiles = new Map([
 const specializedNormalizers = new Map([
   ['.github/workflows/preview.yml', normalizePreviewWorkflow],
   ['.github/workflows/review-admission.yml', normalizeAdmissionWorkflow],
+  ['.github/workflows/pr-controls.yml', normalizeControlsWorkflow],
 ]);
 /** Validate the documented queue extension before the older native parser sees the workflow. */
 export function normalizeQueueWorkflow(source, filename) {
@@ -30,6 +31,12 @@ function normalizePreviewWorkflow(source, filename) {
     expected,
     expected.replace("  queue: ${{ inputs.queue && 'max' || 'single' }}", '')
   );
+}
+function normalizeControlsWorkflow(source, filename) {
+  return normalizeAdmissionWorkflow(
+    source.replace(/^  controls:$/m, '  admission:'),
+    filename
+  ).replace(/^  admission:$/m, '  controls:');
 }
 function normalizeAdmissionWorkflow(source, filename) {
   const expected =

@@ -131,6 +131,83 @@ keep their own per-CI-run lock, so fork approval waits do not block the shared q
 The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
 60-minute response bound; integration is still full CI plus an anonymous deployed preview.
 
+### Review and preview controls
+
+`PR Controls` maintains one TarkovTracker comment per PR. The panel shows the full current
+commit, CI/preview/admission results, a verified preview link when available, and its latest
+request result. Its four checkboxes attest to review of that commit, revoke that attestation,
+enable automatic PR previews, or stop them. The bot resets the checkbox and updates the same comment.
+Presentation lives in `scripts/ci/pr-control-policy.mjs` so branding and copy can change without
+adding action types. Passive refreshes write only when the displayed state changes.
+
+An **admin review attestation** is an explicit alternative to completed provider/non-author human
+review, including when the admin authored the PR. It applies to one exact commit and does not
+assert that an independent reviewer completed a review. It never resolves findings, dismisses
+changes requested, approves a sensitive change, or skips CI, preview, native queue integration,
+or the App-pinned admission gate. Existing provider and non-author human reviews keep priority.
+Sensitive changes still need their separate exact-head collaborator approval.
+
+The action author is the authenticated **editor/event sender**, not the bot that owns the comment
+and not `author_association`. Approval/revocation requires current repository `admin`; preview
+and structured `recheck` require `maintain` or `admin`. The handler rechecks role and head after
+receipt upload. Only one exact unchecked-to-checked transition is accepted; any other text edit,
+copied comment ID, stale body/revision/head, old queued operation, or workflow rerun is rejected.
+Bot edits do not trigger another operation. New commits and lost admin access invalidate the
+attestation; a revoke clears it and fails PR/queue admission statuses synchronously. Missing or
+expired newest state fails closed, without falling back to an older approval. When recovery
+confirms receipt loss, the App fails native PR/queue admission before panel reads or artifact
+preparation/upload, so a later storage or presentation failure cannot leave stale green admission.
+
+Agents use structured dispatch and receipts, without reading or posting conversation commands:
+
+```sh
+gh workflow run pr-controls.yml --ref main \
+  -f pull_request=1234 -f operation=approve-review -f expected_head=FULL_40_CHARACTER_HEAD_SHA
+```
+
+Operations are `recheck`, `approve-review`, `revoke-review`, `preview-enable`, and `preview-stop`. Fetch the dispatched
+run's immutable `pr-controls-<PR>` artifact and read `state.json`: `operationResult.status` is
+`accepted` or `rejected`. Accepted results bind the requested head, actor, and run; rejected results
+record the observed current head, run, and rejection reason, without attesting to the submitted actor/head.
+Acceptance records authorization and intent; successful execution still requires the control job
+and the actual admission/preview receipts. A rejected operation fails the
+run after retaining its receipt. Approval/revocation dispatches the existing admission workflow;
+its successful exact-head receipt remains required before enqueue. Enable/Stop records persistent
+PR preview intent and wakes the existing Preview State controller on `main`. That controller
+selects successful current-head CI and the matching artifact before dispatching Preview. The
+control does not bypass fork protections, artifact checks, or the final pre-upload revalidation.
+There is no production deployment operation.
+
+The new controls job explicitly declares Actions write (dispatch existing workflows) and Issues
+write (maintain its comment), with Contents, Checks, Pull requests, and Statuses read. The existing
+admission job has Actions read and Issues read; the existing preview-request job has Actions
+write, Pull requests write, and Issues read. The controls job receives these grants explicitly.
+Preview Request and the Preview deployment job additionally need Statuses read to authenticate
+the App-owned intent pointer; Preview State and Preview planning already have Statuses write.
+The public App identity variables are passed to those readers; no App key reaches preview jobs.
+The dedicated App retains statuses write and metadata read, the selected-repository installation,
+no webhook, and the main-only `review-admission` environment. Its controls publisher may write
+success only to its fixed journal context and failure only to `Review Admission`. It cannot
+grant native admission. Workflow/permission/policy activation requires an explicitly approved merge.
+
+Durable state uses an immutable Actions artifact plus an App-owned `TarkovTracker Controls #<PR>`
+status pointer on fixed trusted commit `44d4462c3db34b60e7cca69450405c922af15f56`. That anchor is a
+journal location, not a required check or current main. Keeping it fixed preserves revocation
+ordering across head/main changes. Readers verify issuer, source workflow/main history, first
+attempt, repository, PR, head, official comment ID, and the current admin role. The newest pointer
+is authoritative; an unavailable artifact can recover only the official comment ID and an empty
+grant. A fresh explicit attestation is then needed. Receipts retain for 90 days and ordinary
+meaningful refreshes renew state; expiration never reactivates an older approval.
+
+Roll out only after exact-head checks and independent review, with an explicitly approved merge.
+Then exercise a docs-only canary: structured recheck, forged/copied panel rejection, real admin
+checkbox approval, revoke, stale/rerun rejection, new-head invalidation, preview N/A, and a normal
+preview requiring CI/artifact/fork trust. Exercise Enable across a new commit, Stop before
+upload, stop/re-enable with the same panel ID, live role loss, and interleaved legacy commands. Record control and admission receipts, not only green
+runs. To roll back, stop using attestations and revert this feature; provider/human review and
+existing preview entry points remain available. Keep the current queue, strict freshness, and
+retention settings unchanged while commissioning this control surface.
+
 ## Admission publisher provisioning
 
 Dependabot waits for CI, security and preview gates before explicitly refreshing its exact-head
@@ -234,3 +311,32 @@ the handoff and changed evidence, not the entire previous review. Provider cache
 billing are outside GitHub's control; no cache or token saving is guaranteed.
 
 GitHub queue guidance: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>.
+
+The journal reader selects one named GraphQL status context; it does not scan the shared anchor's
+history. Each PR has a 900-write budget, below GitHub's 1,000-status SHA/context limit. The final
+reserved revision clears any admin approval and fails native admission when invalidating that
+attestation. It removes the action checkboxes
+and disables further control writes for that PR. It also records a preview Stop. A typical
+revision consumes a write only when an explicit request or the displayed head/gates/result changes;
+unchanged passive refreshes do not consume capacity. The panel is advisory, so reaching this
+capacity does not prevent provider/human review or normal queue operation. A fresh authorized
+`/preview` posted after that Stop can resume previews, even after the terminal receipt expires.
+The reader keeps the trusted pointer timestamp as a stop barrier and never resets the counter
+or revives old grants. If the terminal comment update fails, passive refreshes may repair that
+one comment without writing another journal status. Manual preview workflows also remain available. This explicit capacity
+limit avoids a journal rollover system.
+A controls-origin native revocation status binds the PR number and is also a durable barrier: even if the journal-pointer
+write fails, later admission rechecks cannot revive a grant older than that revocation run.
+
+Receipt helpers run in Ubuntu/WSL and require Node and `unzip`; workflow tests also use Python 3.
+The bounded `unzip` reader was extracted from the existing admission binding without adding a
+package installation to credential-bearing jobs. Controls jobs explicitly check the prerequisite.
+
+Enable/Stop and the existing `/preview` and `/preview stop` commands share one ordered
+authorization timeline. Server-created run/comment timestamps order the sources; control run
+numbers or comment IDs order ties within a source, and a cross-source timestamp tie favors Stop.
+Repeated Enable preserves the oldest uninterrupted grant. A deployment binds both the official
+comment ID and that grant’s control run ID, so Stop/re-enable cannot resurrect an older queued
+deployment even though the panel ID stays the same. Enables require live maintain/admin access;
+an accepted Stop remains a revocation barrier after role loss. These controls affect PR previews;
+required merge-group previews and explicitly authorized manual previews retain their own rules.

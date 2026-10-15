@@ -27,7 +27,8 @@ import {
   previewBranchName,
 } from './profile.mjs';
 import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
-import { readPreviewRequest } from './request-authorization.mjs';
+import { previewBindingError, samePreviewAuthorization } from './binding-policy.mjs';
+import { readPreviewRequest, previewGrant } from './request-authorization.mjs';
 // Trusted preview controller. Everything here loads from the default branch and treats candidate
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
@@ -599,7 +600,16 @@ async function evaluateQueue({ github, context, state, workspace }) {
 function requestBinding(inputs) {
   return Number(inputs?.request_comment_id) || null;
 }
+function assertControlBindingInputs(inputs) {
+  if (
+    [optional(inputs, 'request_control_run_id'), !optional(inputs, 'request_comment_id')].every(
+      Boolean
+    )
+  )
+    throw ignore('Preview control binding requires its official comment ID.');
+}
 function assertInputAuthorization(inputs) {
+  assertControlBindingInputs(inputs);
   if (inputs?.authorization && inputs.authorization !== 'readiness')
     throw ignore('Unknown preview authorization provenance.');
 }
@@ -667,14 +677,8 @@ function readinessCiJobMatches(job, run) {
   ].every(Boolean);
 }
 function requireRequestedCommand(inputs, request) {
-  const requestedId = optional(inputs, 'request_comment_id');
-  if (!requestedId) return;
-  const activeId = requestCommentId(enabledRequest(request));
-  if (String(requestedId) !== activeId)
-    throw failure('Preview command was revoked or superseded before dispatch.');
-}
-function requestCommentId(request) {
-  return request ? String(request.commentId) : null;
+  const error = previewBindingError(inputs, request);
+  if (error) throw failure(error);
 }
 function draftDecision() {
   return {
@@ -766,7 +770,7 @@ async function deployDecision({ github, context, state, workspace }) {
     destination,
   });
   const commandBound = COMMAND_AUTHORIZATIONS.includes(state.previewAuthorization);
-  const previewRequest = commandBound ? enabledRequest(state.previewRequest) : null;
+  const previewRequest = commandBound ? enabledRequest(previewGrant(state.previewRequest)) : null;
   const common = {
     ...decisionBase(state),
     artifactId: artifact.id,
@@ -1048,14 +1052,6 @@ function usesCommandApproval(decision) {
     (decision.fork && decision.environment === ENVIRONMENTS.internal)
   );
 }
-function samePreviewRequest(request, expected) {
-  if (!request || !expected) return false;
-  return [
-    request.enabled,
-    request.commentId === expected.commentId,
-    request.requestedBy === expected.requestedBy,
-  ].every(Boolean);
-}
 async function verifyPreviewRequest(github, context, decision) {
   if (decision.previewAuthorization === 'readiness') {
     return verifyReadinessRequest(github, context, decision);
@@ -1070,7 +1066,7 @@ async function verifyCommandRequest(github, context, decision) {
     decision.pullRequest,
     decision.previewRequest?.commentId
   );
-  if (!samePreviewRequest(request, decision.previewRequest))
+  if (!samePreviewAuthorization(request, decision.previewRequest))
     throw new Error('Preview request was revoked or superseded; request again.');
 }
 async function verifyReadinessRequest(github, context, decision) {
@@ -1231,4 +1227,13 @@ export async function publishControllerFailure({ github, context, core, inputs, 
     description: 'Preview controller failed; inspect the workflow run.',
   });
   if (!published) core.warning('No failure status was published.');
+}
+/** Explicit wake-up after an accepted persistent control intent. Inputs locate a PR, never authorize it. */
+export async function reconcilePreviewRequest({ github, context, core, workspace, number }) {
+  if (context.ref !== `refs/heads/${PRODUCTION_BRANCH}`)
+    throw new Error('Preview reconciliation requires trusted main.');
+  if (![Number.isSafeInteger(number), number > 0].every(Boolean))
+    throw new Error('Expected a positive PR number.');
+  const pull = await getPull(github, context.repo, number);
+  return planPreview({ github, context: refreshContext(context, pull), core, workspace });
 }

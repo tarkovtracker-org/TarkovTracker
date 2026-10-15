@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import {
   activeQueueGroup,
@@ -11,6 +12,7 @@ import {
   trustedActors,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
+import { currentAdminAttestation } from './pr-control-state.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
@@ -42,7 +44,24 @@ async function evidence(github, repo, pr) {
   const trusted = await trustedActors(github, repo, reviews, comments);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
-  return { pr, files, reviews, comments, checks, threads, trusted, dependencySafe, releaseSafe };
+  const adminAttestation = await currentAdminAttestation(
+    github,
+    repo,
+    pr.number,
+    pr.head.sha
+  ).catch(() => null);
+  return {
+    pr,
+    files,
+    reviews,
+    comments,
+    checks,
+    threads,
+    trusted,
+    dependencySafe,
+    releaseSafe,
+    adminAttestation,
+  };
 }
 function receipt(context, pr, statusSha, decision, source, issuer) {
   return {
@@ -399,6 +418,7 @@ function requireEventGroup(eventGroup, current) {
 async function evaluateScope(github, context, core, target, source) {
   const scope = await reviewScope(github, context, target);
   try {
+    await writeAdmissionTarget(context, core, scope.number);
     const head = await evaluateAdmission({ github, context, number: scope.number, source });
     core.setOutput('admission_sha', head.statusSha);
     if (scope.group) await evaluateQueuedScope(github, context, core, scope, source);
@@ -456,4 +476,17 @@ export async function publishReviewScope({ github, context, head, queued }) {
     await scopeStatuses(github, context, shas, 'failure', error.message);
     throw error;
   }
+}
+async function writeAdmissionTarget(context, core, number) {
+  core.setOutput('pull_request', String(number));
+  if (!process.env.RUNNER_TEMP) return;
+  const locator = {
+    repository: `${context.repo.owner}/${context.repo.repo}`,
+    number,
+    runId: Number(context.runId),
+    runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+  };
+  const directory = join(process.env.RUNNER_TEMP, 'review-admission-target');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'target.json'), `${JSON.stringify(locator)}\n`);
 }

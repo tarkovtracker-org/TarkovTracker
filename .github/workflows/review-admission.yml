@@ -86,6 +86,14 @@ jobs:
             const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
             const publisher = await createReviewPublisher({ github, context, core });
             await runReviewAdmission({ github: publisher, context, core });
+      - name: Retain bounded panel refresh locator
+        if: always() && steps.evaluate.outputs.pull_request != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: review-admission-target-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-admission-target/target.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload exact-head admission receipt
         if: success() && steps.evaluate.outputs.admission_sha != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
