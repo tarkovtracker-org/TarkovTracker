@@ -76,7 +76,9 @@ from an independent write collaborator, or a write collaborator's single-line co
 Agents may record that command only after receiving the specific merge authority required by
 `AGENTS.md`; admission never supplies authorization itself. Changed heads invalidate approval.
 Queue admission re-proves the member PR, live queue ref, current-main parent and single-entry
-`ALLGREEN` configuration. Read-only signal workflows cannot publish approval. Consumers authenticate
+squash `ALLGREEN` configuration. A squash queue commit has current main as its only parent and is
+exactly one commit ahead of it; it does not contain the PR head as an ancestor, so GitHub's queue
+entry (exact PR head and exact queue commit) is the PR binding. Read-only signal workflows cannot publish approval. Consumers authenticate
 the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
 
 Review and review-comment wakeups resolve the service-owned PR link from the authenticated
@@ -165,7 +167,8 @@ these files does not create an App, install it, set a variable, or store a crede
    deletion/non-fast-forward rules. Do not add bypass actors or use an admin merge.
 3. Activate the reviewed, rendered App-pinned queue template for main while leaving `Main CI freshness` active. Use one
    current, reviewed low-risk canary PR. Record the real merge-group ref/SHA/parents, source PR
-   head, GraphQL entry and job-token event delivery. Prove all full CI jobs, admission, deployed
+   head, GraphQL entry and job-token event delivery. Confirm the queue commit has one parent and
+   that the building entry reports `position` 1; admission denies any other shape. Prove all full CI jobs, admission, deployed
    preview, smoke tests and authoritative result succeed on the queue SHA. Confirm a generic
    Actions-issued admission status cannot satisfy the App-pinned gate.
 4. Enqueue and remove a second isolated canary before completion. Prove its deleted/re-formed ref
