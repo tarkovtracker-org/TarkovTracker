@@ -95,9 +95,30 @@ function providerChecks(checks, provider, head) {
     ].every(Boolean)
   );
 }
+function cleanCubicSummary(body) {
+  const summaries = [
+    ...body.matchAll(
+      /<!-- cubic:review-summary:start -->([\s\S]*?)<!-- cubic:review-summary:end -->/g
+    ),
+  ];
+  if (summaries.length !== 1) return false;
+  const summary = summaries[0][1]
+    .trim()
+    .replace(/^<!-- cubic:review-summary:confidence-score:[0-5]\/5 -->\s*/, '');
+  const overall = summary.split('\n')[0].trim();
+  const clean =
+    /^\*\*(?:No issues found|0 issues found|All reported issues were addressed)(?:\*\*(?: across [1-9]\d* files?)?| across [1-9]\d* files?(?: \(changes from recent commits\))?\.?\*\*)$/;
+  return [
+    clean.test(overall),
+    !/\b[1-9]\d* issues? found\b/i.test(body),
+    !/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*)?Review skipped\b/im.test(body),
+    !/^\s*(?:[-*]\s*)?>\s*\*\*(?:No issues found|0 issues found|All reported issues were addressed)\b/im.test(
+      body
+    ),
+  ].every(Boolean);
+}
 function zeroOutsideFindings(review, provider) {
-  if (provider.name === 'Cubic')
-    return /\*\*(?:0 issues found|All reported issues were addressed)/.test(review.body ?? '');
+  if (provider.name === 'Cubic') return cleanCubicSummary(review.body ?? '');
   // Findings outside the diff have no resolvable GitHub thread; require a clean re-review.
   return /Actionable comments posted: 0\*\*/.test(review.body ?? '');
 }
