@@ -34,5 +34,8 @@ export default defineEventHandler(async (event) => {
     }
     return corrected;
   };
-  return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, { cacheKeyPrefix: 'tarkov' });
+  return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, {
+    cacheKeyPrefix: 'tarkov',
+    response: true,
+  });
 });
