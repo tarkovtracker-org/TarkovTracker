@@ -550,7 +550,6 @@ test('one-shot preview reuses exact CI run/attempt and never grants persistent o
     inputs: { run_id: '40', queue: 'false', ci_attempt: '2' },
   });
 });
-
 test('successful revocation fails head/queue admission before updating durable control state', async () => {
   const f = fixture('revoke-review');
   f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
@@ -602,7 +601,6 @@ test('rerunning an old source cannot resurrect a grant after the latest revoke',
   f.github.rest.actions.getWorkflowRun = async () => ({ data: { ...f.run, run_attempt: 2 } });
   assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
 });
-
 test('privileged controls workflow is main-only, serialized, artifact-first, and never executes candidate code', () => {
   const source = readFileSync('.github/workflows/pr-controls.yml', 'utf8');
   assert.match(source, /permissions: \{\}/);
@@ -630,7 +628,6 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   ])
     assert.ok(!source.includes(unsafe));
 });
-
 test('enqueue consumer rejects an old green admission receipt after explicit revocation', async () => {
   const f = fixture();
   f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
@@ -702,7 +699,6 @@ test('enqueue consumer rejects an old green admission receipt after explicit rev
     'Cubic'
   );
 });
-
 test('pull_request_target receipt trusts the protected main policy source, not REST candidate head_sha', async () => {
   const f = fixture();
   const original = f.github.rest.actions.getWorkflowRunAttempt;

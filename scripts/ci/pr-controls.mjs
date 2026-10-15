@@ -382,7 +382,6 @@ async function invalidateChangedGrant(github, context, previous, state, pull) {
   if (state.grant) return;
   await invalidateRevokedGrant(github, context, pull);
 }
-
 async function invalidateRevokedGrant(github, context, pull) {
   const refs = await queuedRefs(github, context.repo, pull.number);
   const shas = new Set([pull.head.sha, ...refs.map((ref) => ref.object.sha)]);
