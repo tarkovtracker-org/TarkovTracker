@@ -901,6 +901,7 @@
       "billing_yearly_interval": "year"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
         "aria_label": "Task views",
         "graph": "Graph"
@@ -1194,6 +1195,7 @@
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
@@ -1236,6 +1238,7 @@
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items": "items",
       "unique_items_count": "{unique} unique ({total} total)",

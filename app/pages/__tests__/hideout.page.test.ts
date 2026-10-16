@@ -217,7 +217,7 @@ describe('hideout page', () => {
     });
     expect(wrapper.text()).not.toContain('common.needed_items');
     expect(wrapper.get('[data-testid="hideout-view-switcher"]').text()).toContain(
-      'COMMON.AVAILABLE'
+      'common.available'
     );
     expect(wrapper.get('[data-testid="hideout-filter-actions"]').text()).toContain(
       'common.settings'

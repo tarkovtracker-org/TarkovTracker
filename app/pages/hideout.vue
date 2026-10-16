@@ -3,67 +3,32 @@
     <div class="px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
         <slot name="header" />
-        <div class="flex flex-col gap-4">
-          <div class="flex justify-center">
+        <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
+        <StatusTabBar
+          :tabs="primaryViews"
+          :model-value="displayPrimaryView"
+          :group-label="t('page.hideout.status_tabs_label')"
+          :inert-when-selected="false"
+          tabs-help-target="hideout-status-filters"
+          data-testid="hideout-view-switcher"
+          data-help-target="hideout-view-switcher"
+          @update:model-value="selectPrimaryView"
+        >
+          <template #actions>
             <div
-              class="bg-surface-900 border-surface-700/50 w-full max-w-4xl rounded-lg border px-4 py-3 shadow-sm"
-              data-testid="hideout-view-switcher"
-              data-help-target="hideout-view-switcher"
+              data-testid="hideout-filter-actions"
+              data-help-target="hideout-filter-actions"
+              class="ml-auto flex items-center gap-2"
             >
-              <div class="grid w-full gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-                <div class="hidden lg:block"></div>
-                <div
-                  data-help-target="hideout-status-filters"
-                  class="flex flex-wrap justify-center gap-2"
-                >
-                  <template v-for="(view, index) in primaryViews" :key="view.view">
-                    <UButton
-                      :icon="`i-${view.icon}`"
-                      :variant="'ghost'"
-                      :color="'neutral'"
-                      size="md"
-                      :data-help-target="`hideout-filter-${view.view}`"
-                      :aria-pressed="displayPrimaryView === view.view"
-                      class="shrink-0"
-                      :class="{
-                        'border-surface-200 rounded-none border-b-2':
-                          displayPrimaryView === view.view,
-                      }"
-                      @click="selectPrimaryView(view.view)"
-                    >
-                      <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
-                      <span
-                        :class="[
-                          'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-                          view.badgeColor,
-                        ]"
-                      >
-                        {{ view.count }}
-                      </span>
-                    </UButton>
-                    <span
-                      v-if="index === 0"
-                      aria-hidden="true"
-                      class="bg-surface-700/60 h-6 w-px self-center"
-                    ></span>
-                  </template>
-                </div>
-                <div
-                  data-testid="hideout-filter-actions"
-                  data-help-target="hideout-filter-actions"
-                  class="flex items-center justify-center gap-2 lg:justify-end"
-                >
-                  <SettingsButton
-                    page-key="hideout"
-                    data-testid="hideout-settings-button"
-                    data-help-target="hideout-settings-button"
-                    :label="t('page.hideout.settings.title')"
-                  />
-                </div>
-              </div>
+              <SettingsButton
+                page-key="hideout"
+                data-testid="hideout-settings-button"
+                data-help-target="hideout-settings-button"
+                :label="t('page.hideout.settings.title')"
+              />
             </div>
-          </div>
-        </div>
+          </template>
+        </StatusTabBar>
         <UModal
           v-model:open="showPrereqConfirm"
           :title="prereqConfirmTitle"
@@ -216,6 +181,7 @@
   import { useBreakpoints, useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import SettingsButton from '@/components/ui/SettingsButton.vue';
+  import StatusTabBar from '@/components/ui/StatusTabBar.vue';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
@@ -226,7 +192,9 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { ALL_TAB_ICON } from '@/utils/statusTones';
   import type { HideoutStation } from '@/types/tarkov';
+  import type { StatusTabItem, StatusTone } from '@/utils/statusTones';
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );
@@ -576,43 +544,32 @@
     }
     handleHideoutHelpStepChange(0);
   });
-  type HideoutPrimaryViewOption = {
-    badgeColor: string;
-    count: number;
-    icon: string;
-    title: string;
+  const PRIMARY_VIEW_TABS: Array<{
     view: HideoutPrimaryView;
-  };
-  const primaryViews = computed<HideoutPrimaryViewOption[]>(() => [
+    labelKey: string;
+    icon: string;
+    tone: StatusTone;
+  }> = [
+    { view: 'all', labelKey: 'common.all', icon: ALL_TAB_ICON, tone: 'neutral' },
     {
-      title: t('common.all'),
-      icon: 'mdi-clipboard-check',
-      view: 'all',
-      count: stationCounts.value.all,
-      badgeColor: 'bg-secondary-600',
-    },
-    {
-      title: t('common.available'),
-      icon: 'mdi-tag-arrow-up-outline',
       view: 'available',
-      count: stationCounts.value.available,
-      badgeColor: 'bg-info-600',
+      labelKey: 'common.available',
+      icon: 'i-mdi-tag-arrow-up-outline',
+      tone: 'info',
     },
-    {
-      title: t('common.locked'),
-      icon: 'mdi-lock',
-      view: 'locked',
-      count: stationCounts.value.locked,
-      badgeColor: 'bg-surface-600 light:text-surface-50',
-    },
-    {
-      title: t('common.maxed'),
-      icon: 'mdi-arrow-collapse-up',
-      view: 'maxed',
-      count: stationCounts.value.maxed,
-      badgeColor: 'bg-success-600',
-    },
-  ]);
+    { view: 'locked', labelKey: 'common.locked', icon: 'i-mdi-lock', tone: 'locked' },
+    { view: 'maxed', labelKey: 'common.maxed', icon: 'i-mdi-arrow-collapse-up', tone: 'success' },
+  ];
+  const primaryViews = computed<StatusTabItem<HideoutPrimaryView>[]>(() =>
+    PRIMARY_VIEW_TABS.map((tab) => ({
+      value: tab.view,
+      label: t(tab.labelKey),
+      icon: tab.icon,
+      tone: tab.tone,
+      count: stationCounts.value[tab.view],
+      helpTarget: `hideout-filter-${tab.view}`,
+    }))
+  );
   const prereqLabels = computed(() => ({
     station: helpText('page.hideout.prereq_filters.station_levels', 'Require station levels'),
     skill: helpText('page.hideout.prereq_filters.skill_levels', 'Require skill levels'),

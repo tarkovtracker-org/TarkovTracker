@@ -8,7 +8,7 @@
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { layoutTaskGraph } from '@/utils/taskGraphLayout';
-  import type { TaskNodeData } from '@/composables/useTaskGraphData';
+  import type { TaskNodeData, TaskNodeStatus } from '@/composables/useTaskGraphData';
   import type { Node } from '@vue-flow/core';
   import '@vue-flow/core/dist/style.css';
   import '@vue-flow/controls/dist/style.css';
@@ -424,23 +424,20 @@
   const legendItems = computed(() => [
     { label: t('common.completed'), colorClass: 'bg-success-500' },
     { label: t('common.available'), colorClass: 'bg-info-500' },
-    { label: t('common.locked'), colorClass: 'bg-surface-500' },
+    { label: t('common.locked'), colorClass: 'bg-locked-500' },
     { label: t('common.failed'), colorClass: 'bg-error-500' },
     { label: t('page.tasks.graph.flow_start'), colorClass: 'bg-primary-400' },
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
   ]);
+  const MINIMAP_STATUS_COLORS: Record<TaskNodeStatus, string> = {
+    completed: 'var(--color-success-500)',
+    available: 'var(--color-info-500)',
+    locked: 'var(--color-locked-500)',
+    failed: 'var(--color-error-500)',
+  };
   const minimapNodeColor = (node: Node<TaskNodeData>) => {
     if (node.data?.isDimmed) return 'hsl(0 0% 32%)';
-    switch (node.data?.status) {
-      case 'completed':
-        return 'var(--color-success-500)';
-      case 'available':
-        return 'var(--color-info-500)';
-      case 'failed':
-        return 'var(--color-error-500)';
-      default:
-        return 'hsl(0 0% 58%)';
-    }
+    return MINIMAP_STATUS_COLORS[node.data?.status ?? 'locked'];
   };
   const minimapNodeStrokeColor = (node: Node<TaskNodeData>) => {
     if (node.id === focusedTaskId.value) return 'var(--color-primary-300)';

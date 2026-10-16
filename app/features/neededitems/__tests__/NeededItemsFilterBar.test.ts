@@ -40,7 +40,13 @@ const createDefaultProps = () => ({
   modelValue: 'all' as const,
   viewMode: 'list' as const,
   filterTabs: [
-    { label: 'All', value: 'all' as const, icon: 'i-mdi-format-list-bulleted', count: 3 },
+    {
+      label: 'All',
+      value: 'all' as const,
+      icon: 'i-mdi-format-list-bulleted',
+      count: 3,
+      tone: 'neutral' as const,
+    },
   ],
   totalCount: 3,
   ungroupedCount: 3,
@@ -63,12 +69,6 @@ const createDefaultGlobal = () => ({
     UIcon: UIconStub,
     UInput: UInputStub,
     SelectMenuFixed: SelectMenuFixedStub,
-    UTabs: {
-      props: ['items', 'modelValue', 'variant'],
-      emits: ['update:modelValue'],
-      template:
-        '<div :data-variant="variant"><button v-for="item in items" :key="item.value" @click="$emit(\'update:modelValue\', item.value)"><i v-if="item.icon" :data-leading-icon="item.icon"></i><slot :item="item">{{ item.label }}</slot></button></div>',
-    },
     UPopover: { template: '<div><slot /><slot name="content" /></div>' },
   },
 });
@@ -76,20 +76,33 @@ describe('NeededItemsFilterBar', () => {
   it('keeps localized source labels accessible with zero and changing counts', async () => {
     const NeededItemsFilterBar = await setup();
     const filterTabs = [
-      { label: 'Alle', value: 'all' as const, icon: 'i-mdi-clipboard-list', count: 0 },
+      {
+        label: 'Alle',
+        value: 'all' as const,
+        icon: 'i-mdi-format-list-bulleted',
+        count: 0,
+        tone: 'neutral' as const,
+      },
       {
         label: 'Aufgaben',
         value: 'tasks' as const,
         icon: 'i-mdi-checkbox-marked-circle-outline',
         count: 0,
+        tone: 'info' as const,
       },
-      { label: 'Versteck', value: 'hideout' as const, icon: 'i-mdi-home', count: 0 },
+      {
+        label: 'Versteck',
+        value: 'hideout' as const,
+        icon: 'i-mdi-home',
+        count: 0,
+        tone: 'info' as const,
+      },
     ];
     const wrapper = mount(NeededItemsFilterBar, {
       props: { ...createDefaultProps(), filterTabs },
       global: createDefaultGlobal(),
     });
-    const tabs = wrapper.find('[data-variant]').findAll('button');
+    const tabs = wrapper.get('[role="group"]').findAll('button');
     for (const [index, tab] of tabs.entries()) {
       const label = tab.find('span');
       expect(label.text()).toBe(filterTabs[index]?.label);
@@ -138,13 +151,46 @@ describe('NeededItemsFilterBar', () => {
     await wrapper.find('button[data-icon="i-mdi-group"]').trigger('click');
     expect(wrapper.emitted('update:groupByItem')).toEqual([[true]]);
   });
-  it('uses link tabs instead of the default pill variant', async () => {
+  it('keeps the source tabs and the list controls on one bar', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    expect(wrapper.find('[data-variant]').attributes('data-variant')).toBe('link');
+    const bar = wrapper.get('[role="group"]').element.parentElement;
+    expect(bar?.contains(wrapper.get('[data-testid="sort-select"]').element)).toBe(true);
+    expect(bar?.contains(wrapper.get('button[data-icon="i-mdi-group"]').element)).toBe(true);
+  });
+  it('shows the Completed tab only once something is done', async () => {
+    const NeededItemsFilterBar = await setup();
+    const completedTab = {
+      label: 'Completed',
+      value: 'completed' as const,
+      icon: 'i-mdi-check-all',
+      count: 0,
+      tone: 'success' as const,
+    };
+    const defaults = createDefaultProps();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...defaults, filterTabs: [...defaults.filterTabs, completedTab] },
+      global: createDefaultGlobal(),
+    });
+    const tabLabels = () =>
+      wrapper
+        .get('[role="group"]')
+        .findAll('.sr-only')
+        .map((label) => label.text());
+    expect(tabLabels()).toEqual(['All']);
+    await wrapper.setProps({
+      filterTabs: [...defaults.filterTabs, { ...completedTab, count: 2 }],
+    });
+    expect(tabLabels()).toEqual(['All', 'Completed']);
+    // Un-completing the last item while Completed is picked keeps the active filter visible.
+    await wrapper.setProps({
+      modelValue: 'completed',
+      filterTabs: [...defaults.filterTabs, completedTab],
+    });
+    expect(tabLabels()).toEqual(['All', 'Completed']);
   });
   it('renders the filter icon only once per tab', async () => {
     const NeededItemsFilterBar = await setup();
@@ -152,8 +198,8 @@ describe('NeededItemsFilterBar', () => {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    expect(wrapper.findAll('[data-leading-icon="i-mdi-format-list-bulleted"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-icon-name="i-mdi-format-list-bulleted"]')).toHaveLength(0);
+    expect(wrapper.findAll('[data-icon-name="i-mdi-format-list-bulleted"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-icon="i-mdi-format-list-bulleted"]')).toHaveLength(0);
   });
   it('normalizes object sort selections before emitting updates', async () => {
     const NeededItemsFilterBar = await setup();
