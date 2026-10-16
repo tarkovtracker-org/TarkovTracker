@@ -97,13 +97,14 @@ Batching pushes and requesting Codex only exceptionally keep reviewer allowances
 reportedly drew over 20 Codex reviews across about 45 pushes. CodeRabbit CLI and PR reviews have
 separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
-Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
-branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
-`CI Result` and `Preview Result` on the new head. Reuse review evidence for an unchanged diff after
+Reviews attach to the PR's own diff. Main merges through the native merge queue, which builds each
+entry on current main, so a behind branch is enqueued unchanged rather than updated
+([current state](merge-queue-rollout.md#current-state)). When a branch changes anyway, `CI Result`
+and `Preview Result` rerun on the new head. Reuse review evidence for an unchanged diff after
 assessing integration with changed base code; a conflict-free merge alone does not establish that
 validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
-re-review triggers. Do not pause other merges for freshness. Repo auto-merge is disabled, so a
-maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
+re-review triggers. Repo auto-merge is disabled; an authorized agent submits the reviewed head with
+the head-pinned enqueue helper and Actions owns the merge.
 
 ### Codex request deduplication and waiting
 
@@ -403,16 +404,22 @@ This removes the duplicate full test suite and database reset from the serialize
 The production build remains a release check. Cloudflare deployments continue independently;
 this workflow controls release/version publication, not when the initial deployment starts.
 
-**Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
-the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
-an empty bypass list before merging the automation changes. It targets
-`refs/heads/main`, requires both `CI Result` and `Preview Result` from GitHub Actions (integration ID `15368`), enables
-`strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
-all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
-rules remain separate. Behind branches must incorporate current main and pass CI again; do not
-use an administrator bypass. GitHub enforces freshness at merge time, closing the interval after
-automation's last base-SHA check. Both Crowdin and release automation verify the effective strict rule before writing main. The
-administrator must verify the deployed ruleset's empty bypass list during rollout and after policy
+**Required main policy:** main is queue-only. The active `Main merge queue (staged)` ruleset
+requires `CI Result`, `Preview Result` and App-issued `Review Admission` on the queue commit
+without strict freshness; its configuration, evidence and rollback are owned by
+[merge queue rollout](merge-queue-rollout.md#current-state). Existing deletion/force-push rules
+remain separate, and no ruleset has bypass actors; do not use an administrator bypass.
+
+`.github/main-ci-ruleset.json` is retained as the rollback template for the now-disabled
+`Main CI freshness` repository ruleset (ID `23539975`). It targets `refs/heads/main`, requires both
+`CI Result` and `Preview Result` from GitHub Actions (integration ID `15368`), enables
+`strict_required_status_checks_policy`, and has an empty `bypass_actors` list, applying to all PRs
+and direct pushes, including administrators and automation. When re-enabled, behind branches must
+incorporate current main and pass CI again, and GitHub enforces freshness at merge time, closing
+the interval after automation's last base-SHA check. Crowdin and release automation verify the
+effective strict or queue rule before writing main, and still support strict and `strict-queue`
+modes for that rollback. The
+administrator must verify the deployed ruleset's empty bypass list after policy
 changes. GitHub hides that list from callers without ruleset write access; automation does not
 request administrative permissions merely to inspect it.
 
@@ -745,8 +752,9 @@ deployment; later deployable revisions can then refresh after their own successf
 
 For pull requests, `Preview Result` is published on the validated head commit only. GitHub
 regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
-status there disappears and blocks the merge; strict ruleset freshness keeps a head-bound result
-tied to current main. Artifact verification still binds to the test merge and accepts a
+status there disappears and blocks the merge. The merge queue then requires its own `Preview Result`
+on the queue commit built on current main (strict freshness, if restored for rollback, instead
+keeps a head-bound result tied to current main). Artifact verification still binds to the test merge and accepts a
 regenerated commit only with the same base/head parents and tree. A dispatched
 branch build associated with a PR can satisfy it only when the build tree matches that test merge
 and the PR base is current main; otherwise the result stays pending. Crowdin, Dependabot, and

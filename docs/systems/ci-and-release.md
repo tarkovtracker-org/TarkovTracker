@@ -215,10 +215,12 @@ checkout stays pinned to the validated SHA. The production build still runs in R
 - Legacy recovery is limited to sources predating asynchronous promotion. It still authenticates
   exact-head CI and the authoritative preview artifact; it cannot treat a new promotion as legacy.
   Implementation and local recovery commands are owned by [the release README](../../scripts/release/README.md).
-- `scripts/ci/github-ci-gate.sh` accepts either the existing strict freshness policy or the complete
+- `scripts/ci/github-ci-gate.sh` accepts either the strict freshness policy or the complete
   same-repository queue policy: GitHub Actions-owned `CI Result` and `Preview Result`, an isolated
   App-owned `Review Admission`, native resolved-thread enforcement, and a single-entry `ALLGREEN` squash queue.
-  During rollout coexistence, `strict-queue` retains strict freshness/tree validation while
+  Live main enforces only the queue policy, so the gate reports `queue` mode
+  ([current state](../merge-queue-rollout.md#current-state)). `strict` and `strict-queue` remain
+  supported for rollback; `strict-queue` retains strict freshness/tree validation while
   authenticating admission and accepting a pending native queue entry. Missing or weakened
   requirements fail closed. Candidate CI/preview waits remain bounded.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
@@ -232,7 +234,9 @@ permits only regular non-English locale JSON files. Strict mode compares against
 queue mode compares the PR changes against its merge base so unrelated main changes do not
 require rewriting the translation branch. Dependency setup and
 project checks run after that checkout. The built-in job token synchronizes translations, updates a
-behind branch in strict mode, explicitly dispatches candidate CI, and requests the merge.
+behind branch only in strict mode, explicitly dispatches candidate CI, and requests the merge or
+queue entry. Live main runs in queue mode, so translation branches are not updated; strict-mode
+behavior below applies only after a rollback re-enables strict freshness.
 Dependency installation and project checks receive no automation credential.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.

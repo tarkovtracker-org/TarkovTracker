@@ -91,8 +91,9 @@ Statuses target only the validated head SHA, for pull requests and standalone br
 alike, so GitHub shows one required result. They never target the controller's default-branch SHA
 or the test-merge commit: GitHub regenerates a PR's test-merge commit (new SHA, same parents and
 tree) when a merge is attempted, which dropped test-merge statuses and blocked every merge. The
-ruleset's strict freshness requires the head to contain current main at merge time, so a
-head-bound result cannot merge against a stale base. The status links to the controller run summary, which
+merge queue requires a separate `Preview Result` on the queue commit built on current main, so a
+head-bound result cannot merge against a stale base (strict freshness, if restored for rollback,
+instead requires the head to contain current main). The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
 Artifact claims still bind to the test merge. When GitHub has not computed it yet, the controller
 retries and leaves the required result pending. A regenerated test merge is the same candidate only

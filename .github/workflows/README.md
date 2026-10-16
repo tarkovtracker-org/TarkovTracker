@@ -50,10 +50,13 @@ GitHub token is required. Explicit `workflow_dispatch` starts CI on `locales` be
 on `main` afterward. No write token is passed to dependency installation or project validation.
 
 When new translations are synchronized, `scripts/ci/crowdin-pr.sh` verifies an open, non-draft,
-same-repository `locales` PR targeting `main`. If the branch is behind, it asks GitHub to merge main
-into it using an expected-head guard and waits for the new head; conflicts fail closed. The gate
-explicitly starts CI for the validated candidate. It then captures the candidate head SHA, fetches that exact commit,
-and compares its full tree with a captured main SHA. Only regular non-English JSON files directly
+same-repository `locales` PR targeting `main`. Live main is queue-only, so the gate leaves a behind
+branch unchanged and compares the PR's changes against its merge base; the queue validates
+integration with current main. In strict mode (after a rollback re-enables `Main CI freshness`),
+it instead asks GitHub to merge main into a behind branch using an expected-head guard, waits for
+the new head, and compares the full tree with a captured main SHA; conflicts fail closed in both
+modes. The gate explicitly starts CI for the validated candidate and captures and fetches the
+exact candidate head. Only regular non-English JSON files directly
 inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from other paths, and stale
 executable code are rejected. The checkout and dependency setup use this validated commit before
 formatting (`format:check`), locale integrity (`i18n:check`), and systems drift (`systems:check`) run.
@@ -63,17 +66,21 @@ is accepted directly. If GitHub reports `MERGEABLE` / `UNSTABLE`, the gate reval
 `CI Result` and `Preview Result` statuses on the exact candidate head, then attempts a regular
 head-pinned merge; GitHub's server-side branch rules still enforce every required check. The gate
 never uses the admin bypass. Unresolved GitHub calculations are retried up to 20 times, three
-seconds apart; conflicting or otherwise ineligible states fail closed. `--match-head-commit`
-atomically guards the squash merge against a last-moment PR push. A fixed commit body prevents
+seconds apart; conflicting or otherwise ineligible states fail closed. `--match-head-commit` (strict
+mode) or the head-pinned queue entry (queue mode) atomically guards against a last-moment PR push.
+A fixed commit body prevents
 inherited CI-skip markers from suppressing the post-merge run. The gate is copied from trusted main
 before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
 If the post-merge dispatch fails, manually dispatch `CI` on `main`; rerunning a no-change sync
 does not recreate the merged PR. Publication still requires successful CI for current main.
-The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
-and `Preview Result` statuses on that exact head (up to thirty minutes) and verifies the effective
-repository rule requires both checks with strict branch freshness. The deployed no-bypass ruleset
-closes the base-advance race at merge time; a missing or weakened required check leaves the PR open.
+Before submitting, the gate awaits successful `CI Result` and `Preview Result` statuses on that
+exact head (up to thirty minutes) and verifies the effective repository rule requires both checks.
+In the live queue mode it also awaits exact-head `Review Admission`, then submits a head-pinned
+native queue entry, reports it as queued, and accepts a behind head; merge-group CI validates the
+combined tree. In strict mode the candidate must contain captured main, and the deployed
+no-bypass strict ruleset closes the base-advance race at merge time. A missing or weakened
+required check leaves the PR open.
 Both trusted gate scripts are preserved before checkout changes. See `docs/workflow-automation.md`
 for the repository-wide policy and release compatibility.
 
@@ -180,9 +187,12 @@ introduce a new pinned SHA.
 
 ## Merge checks
 
-Dependabot PRs always change manifests, so they receive full CI. `Main CI freshness` requires
-successful `CI Result` and `Preview Result` from GitHub Actions on an up-to-date branch, with no
-bypass actors. The preview controller reports success without deployment for verified change sets with no
+Dependabot PRs always change manifests, so they receive full CI. Main merges only through the
+native merge queue ([current state](../../docs/merge-queue-rollout.md#current-state)): the
+`Main merge queue (staged)` ruleset requires successful `CI Result` and `Preview Result` from
+GitHub Actions and `Review Admission` from the Review Admission App on the queue commit, without
+requiring an up-to-date branch, and has no bypass actors. The disabled `Main CI freshness` ruleset
+(strict up-to-date branches) is the rollback path. The preview controller reports success without deployment for verified change sets with no
 deployable paths; preview-required changes stay pending until an explicit validated deployment passes.
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
@@ -198,8 +208,7 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 ## AI Review Bots
 
 The root `AGENTS.md` owns review requirements. See
-[workflow automation](../../docs/workflow-automation.md#push-cadence) for batching and freshness
-reruns.
+[workflow automation](../../docs/workflow-automation.md#push-cadence) for push batching.
 Dashboard settings must be verified separately; checked-in documentation does not prove them.
 
 ## Commands
