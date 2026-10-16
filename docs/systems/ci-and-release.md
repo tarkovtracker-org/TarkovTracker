@@ -273,8 +273,8 @@ Dependency installation and project checks receive no automation credential.
   as well as the head, superseding any earlier success on that merge commit. In verified queue
   mode, dispatched Crowdin CI reports only the immutable head; full merge-group CI proves the
   combined integration tree. It never attests a different, untested test-merge tree.
-- The server-side head guard (`--match-head-commit` in `strict`, the queue entry's
-  `expectedHeadOid` otherwise) must use the SHA that passed all validation.
+- The server-side head guard (`--match-head-commit` in `strict`, the enqueue mutation's
+  `expectedHeadOid` input otherwise) must use the SHA that passed all validation.
 - Merge requests use `GITHUB_TOKEN`. An `OPEN` queue entry is reported as queued, and main CI is
   dispatched only after an actual merge, never on admission. No personal GitHub token is needed.
   CI dispatch failures fail the workflow; candidate failures prevent merging.

@@ -438,7 +438,8 @@ The dispatched CI status-reporting invariant and trusted-code boundary are defin
 Release does not push to main. After rechecking main and the policy, `release-commit.sh` opens a
 version-only PR from the staging branch, explicitly dispatches trusted Review Admission, and the
 run finishes without tagging or publishing. `release-promotion-queue.yml` submits the admitted,
-unchanged PR to the native merge queue; a later trusted Release run finalizes only the actual
+unchanged PR to the native merge queue (in a `strict` rollback it merges with
+`gh pr merge --match-head-commit` instead); a later trusted Release run finalizes only the actual
 merged SHA, creating the tag and GitHub release through the API. The staging branch history is
 retained. No token is written to a Git URL or config. Promotion, finalization and their
 guarantees are owned by [release automation](../scripts/release/README.md#queue-promotion).
