@@ -9,6 +9,8 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+    # Only main CI can wake finalization; the job and gate still authenticate the source.
+    branches: [main]
 permissions:
   contents: read
 env:
