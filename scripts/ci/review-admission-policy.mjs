@@ -17,7 +17,7 @@ const PROVIDERS = Object.freeze([
 ]);
 class AdmissionDenied extends Error {}
 export class AdmissionPending extends Error {}
-// An expected policy hold (draft, missing review, open findings, missing sensitive approval).
+// An expected policy hold (draft or closed PR, missing review, open findings, missing sensitive approval).
 // It still denies and fails the published status; only the controller run itself may succeed.
 export class AdmissionHeld extends AdmissionDenied {}
 export function requireEvidence(condition, message) {

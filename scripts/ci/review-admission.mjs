@@ -488,7 +488,7 @@ export async function runReviewAdmission({ github, context, core }) {
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
   await evaluateScope(github, context, core, selected[0], source);
 }
-// Workflow entry point. A policy hold (draft, review missing, open findings, sensitive approval
+// Workflow entry point. A policy hold (draft or closed PR, review missing, open findings, sensitive approval
 // missing) has already failed every scope status, which is the actual gate, so the run ends green
 // with a notice instead of producing a red run for every review event. Integrity, identity and
 // API errors still fail the run. A hold after any receipt output was set stays a failure so later
