@@ -280,20 +280,21 @@ async function currentPullBaseMismatch(github, context, pull) {
     ...context.repo,
     ref: `heads/${PRODUCTION_BRANCH}`,
   });
-  return pull.base.sha === main.object.sha
+  if (pull.base.sha === main.object.sha) return null;
+  // REST can retain the PR's original base snapshot after main advances. A current test merge
+  // is stronger integration proof; artifact/run base claims remain bound to that snapshot.
+  const merge = await commitShape(github, context, pull.merge_commit_sha);
+  return representsPull(merge, pull, main.object.sha)
     ? null
     : 'PR base is no longer current main; rerun PR CI before requesting a preview.';
 }
 async function dispatchMergeMismatch(github, context, pull, run) {
   const prerequisite = dispatchMergePrerequisite(pull, run);
   if (prerequisite) return prerequisite;
-  const baseMismatch = await currentPullBaseMismatch(github, context, pull);
-  if (baseMismatch) return baseMismatch;
-  const { data: merge } = await github.rest.git.getCommit({
-    ...context.repo,
-    commit_sha: pull.merge_commit_sha,
-  });
-  return merge.tree.sha === runTreeSha(run)
+  const merge = await currentTestMerge(github, context, pull);
+  if (!merge)
+    return 'PR base is no longer current main or test-merge parents are invalid; rerun PR CI before requesting a preview.';
+  return merge.tree === runTreeSha(run)
     ? null
     : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
 }
@@ -314,13 +315,24 @@ async function commitShape(github, context, sha) {
     throw error;
   }
 }
-function representsPull(shape, pull) {
+function representsPull(shape, pull, baseSha) {
+  const parents = shape?.parents ?? [];
   return [
-    shape.parents.length === 2,
-    shape.parents[0] === pull.base.sha,
-    shape.parents[1] === pull.head.sha,
-    SHA_PATTERN.test(String(shape.tree)),
+    parents.length === 2,
+    parents[0] === baseSha,
+    parents[1] === pull.head.sha,
+    SHA_PATTERN.test(String(shape?.tree)),
+    SHA_PATTERN.test(String(baseSha)),
   ].every(Boolean);
+}
+/** Trust the live main ref and GitHub's current PR merge, never the PR's stale base snapshot. */
+async function currentTestMerge(github, context, pull) {
+  const { data: main } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  const merge = await commitShape(github, context, pull.merge_commit_sha);
+  return representsPull(merge, pull, main.object.sha) ? merge : null;
 }
 function comparableMerges(pull, sha) {
   return [sha, pull.merge_commit_sha].every((value) => SHA_PATTERN.test(String(value)));
@@ -328,17 +340,17 @@ function comparableMerges(pull, sha) {
 function sameMergeContent(claimed, current, pull) {
   if (!claimed || !current) return false;
   return [
-    representsPull(claimed, pull),
-    representsPull(current, pull),
+    representsPull(claimed, pull, current.parents[0]),
+    representsPull(current, pull, current.parents[0]),
     claimed.tree === current.tree,
   ].every(Boolean);
 }
 /** True when `sha` is the PR's current test merge or a regenerated equivalent of it. */
 async function equivalentTestMerge(github, context, pull, sha) {
   if (!comparableMerges(pull, sha)) return false;
-  if (sha === pull.merge_commit_sha) return true;
-  const claimed = await commitShape(github, context, sha);
-  const current = await commitShape(github, context, pull.merge_commit_sha);
+  const current = await currentTestMerge(github, context, pull);
+  if (!current) return false;
+  const claimed = sha === pull.merge_commit_sha ? current : await commitShape(github, context, sha);
   return sameMergeContent(claimed, current, pull);
 }
 async function requireDispatchMergeProof(github, context, candidate, pull, run) {
@@ -402,8 +414,8 @@ function bindsTestMerge(candidate, pull) {
 /** pull_request CI checks out the test merge, so its build tree is the merge tree, not the head's.
    Equivalent regenerated merges share that tree, so the current merge's tree binds both. */
 async function testMergeTreeSha(github, context, pull) {
-  const shape = await commitShape(github, context, pull.merge_commit_sha);
-  return shape && representsPull(shape, pull) ? shape.tree : null;
+  const shape = await currentTestMerge(github, context, pull);
+  return shape?.tree ?? null;
 }
 async function mergeBoundExpectation({ github, context, candidate, pull, manifest, expected }) {
   if (!bindsTestMerge(candidate, pull)) return expected;

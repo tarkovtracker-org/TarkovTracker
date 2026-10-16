@@ -118,7 +118,12 @@ GitHub has computed the test merge; other pending reasons are left alone.
   candidate. A regenerated test merge with the same parents and tree is the same candidate.
   A `pull_request` build checks out the test merge, so its tree claim must equal the current test
   merge's tree (not the head commit's, which differs whenever the branch is behind its base); push
-  and dispatched branch builds claim the tree of the commit the run built.
+  and dispatched branch builds claim the tree of the commit the run built. The PR API's base SHA can
+  remain its original snapshot after main advances. That snapshot still binds the run/manifest
+  claims; integration proof instead reads live `heads/main` and requires the current GitHub test
+  merge's ordered parents to be exactly `[live main, PR head]`. The artifact's checked-out merge
+  must have those same parents and tree. This proof is repeated before upload, even when GitHub
+  reports the same test-merge SHA, so advancing main invalidates an older plan.
 - Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
   completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
