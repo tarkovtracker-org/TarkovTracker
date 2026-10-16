@@ -180,6 +180,7 @@ function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   const triggers = releaseWorkflow.slice(0, releaseWorkflow.indexOf('\npermissions:'));
   assert.match(triggers, /^ {2}workflow_dispatch:$/m);
   assert.match(workflowEvent(releaseWorkflow, 'workflow_run'), /workflows: \[CI\]/);
+  assert.match(workflowEvent(releaseWorkflow, 'workflow_run'), /^ {4}branches: \[main\]$/m);
   assert.match(permissionsBlock(eligibility, '    '), /^ {6}actions: write$/m);
   assert.match(
     workflowStep(release, 'Semantic Release'),

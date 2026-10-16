@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
 import { fixture } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 test('Dependabot waits only for the authoritative aggregates supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');
@@ -249,6 +249,7 @@ test('Dependabot auto-merge requires immutable author and event actor identities
   const job = jobBlock(workflow, 'auto-merge');
   const eligibility = job.slice(0, job.indexOf('    steps:'));
   assert.match(workflow, /workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]/);
+  assert.match(workflowEvent(workflow, 'workflow_run'), /^ {4}branches: \['dependabot\/\*\*'\]$/m);
   assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.doesNotMatch(eligibility, /workflow_run\.(actor|triggering_actor)\.id/);
   assert.doesNotMatch(eligibility, /workflow_run\.head_repository/);

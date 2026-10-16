@@ -3,6 +3,8 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+    # Only Dependabot branches can produce a candidate; the job still re-verifies the actor.
+    branches: ['dependabot/**']
 permissions:
   actions: write
   checks: read
