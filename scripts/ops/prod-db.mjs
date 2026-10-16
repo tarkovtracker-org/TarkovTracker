@@ -75,7 +75,15 @@ const INSPECTION_COMMANDS = new Map([
   ['bloat', 'bloat'],
   ['role-stats', 'role-stats'],
 ]);
-const HEALTH_SQL = `select
+const HEALTH_SQL = `with reachable_roles as (
+  select r.* from pg_catalog.pg_roles r
+  where r.rolname = current_user
+    or pg_has_role(current_user, r.oid, 'set')
+), application_schemas as (
+  select n.oid from pg_catalog.pg_namespace n
+  where left(n.nspname, 3) <> 'pg_' and n.nspname <> 'information_schema'
+)
+select
   current_database() as database,
   current_user as role,
   inet_server_addr()::text as server_address,
@@ -83,13 +91,27 @@ const HEALTH_SQL = `select
   current_setting('default_transaction_read_only') as default_transaction_read_only,
   current_setting('statement_timeout') as statement_timeout,
   current_setting('lock_timeout') as lock_timeout,
-  r.rolsuper as is_superuser,
-  r.rolcreatedb as can_create_database,
-  r.rolcreaterole as can_create_role,
-  r.rolreplication as can_replicate,
-  r.rolbypassrls as can_bypass_rls,
-  pg_has_role(current_user, 'pg_write_all_data', 'member') as is_write_role,
+  exists (select 1 from reachable_roles where rolsuper) as is_superuser,
+  exists (select 1 from reachable_roles where rolcreatedb) as can_create_database,
+  exists (select 1 from reachable_roles where rolcreaterole) as can_create_role,
+  exists (
+    select 1 from pg_catalog.pg_auth_members m cross join reachable_roles r
+    where m.admin_option and pg_has_role(r.oid, m.member, 'usage')
+  ) as can_administer_roles,
+  exists (select 1 from reachable_roles where rolreplication) as can_replicate,
+  exists (select 1 from reachable_roles where rolbypassrls) as can_bypass_rls,
+  exists (select 1 from reachable_roles where pg_has_role(oid, 'pg_write_all_data', 'usage')) as is_write_role,
+  exists (
+    select 1 from pg_catalog.pg_roles p cross join reachable_roles r
+    where p.rolname in ('pg_write_server_files', 'pg_read_server_files', 'pg_execute_server_program',
+      'pg_signal_backend', 'pg_checkpoint', 'pg_maintain', 'pg_create_subscription')
+      and pg_has_role(r.oid, p.oid, 'usage')
+  ) as has_unsafe_system_role,
   has_schema_privilege(current_user, 'public', 'create') as can_create_in_public,
+  exists (
+    select 1 from application_schemas n cross join reachable_roles r
+    where has_schema_privilege(r.oid, n.oid, 'create')
+  ) as can_create_in_schema,
   coalesce(
     has_schema_privilege(current_user, to_regnamespace('supabase_migrations'), 'usage'),
     false
@@ -103,26 +125,78 @@ const HEALTH_SQL = `select
     ),
     false
   ) as can_read_migration_versions,
-  coalesce(
-    has_column_privilege(
-      current_user,
+  exists (
+    select 1 from reachable_roles r
+    where coalesce(has_schema_privilege(r.oid, to_regnamespace('supabase_migrations'), 'usage'), false)
+      and coalesce(has_column_privilege(
+      r.oid,
       (select c.oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'supabase_migrations' and c.relname = 'schema_migrations'),
       'statements',
       'select'
-    ),
-    false
+    ), false)
   ) as can_read_migration_statements,
-  has_database_privilege(current_user, current_database(), 'create') as can_create_in_database,
+  exists (
+    select 1 from reachable_roles r
+    where has_database_privilege(r.oid, current_database(), 'create')
+  ) as can_create_in_database,
   exists (
     select 1
     from pg_catalog.pg_class c
-    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    where n.nspname in ('public', 'private')
-      and c.relkind in ('r', 'p')
-      and has_table_privilege(current_user, c.oid, 'insert,update,delete,truncate,references,trigger')
-  ) as has_table_write
-from pg_catalog.pg_roles r
-where r.rolname = current_user`;
+    join application_schemas n on n.oid = c.relnamespace
+    cross join reachable_roles r
+    where c.relkind in ('r', 'p', 'v', 'm', 'f')
+      and has_schema_privilege(r.oid, n.oid, 'usage')
+      and (
+        c.relowner = r.oid
+        or has_table_privilege(r.oid, c.oid, 'insert,update,delete,truncate,references,trigger,maintain')
+        or has_any_column_privilege(r.oid, c.oid, 'insert,update,references')
+      )
+  ) as has_table_write,
+  exists (
+    select 1 from pg_catalog.pg_class c
+    join application_schemas n on n.oid = c.relnamespace
+    cross join reachable_roles r
+    where c.relkind = 'S'
+      and has_schema_privilege(r.oid, n.oid, 'usage')
+      and (c.relowner = r.oid or has_sequence_privilege(r.oid, c.oid, 'usage,update'))
+  ) as has_sequence_write,
+  exists (
+    select 1 from pg_catalog.pg_proc p
+    join application_schemas n on n.oid = p.pronamespace
+    cross join reachable_roles r
+    where p.prosecdef and has_schema_privilege(r.oid, n.oid, 'usage')
+      and has_function_privilege(r.oid, p.oid, 'execute')
+  ) as has_function_write,
+  (current_setting('lo_compat_privileges') = 'on' or exists (
+    select 1 from pg_catalog.pg_proc p cross join reachable_roles r
+    where p.pronamespace = 'pg_catalog'::regnamespace
+      and p.proname in ('lo_create', 'lo_creat', 'lo_from_bytea', 'lo_import')
+      and has_function_privilege(r.oid, p.oid, 'execute')
+  ) or exists (
+    select 1 from pg_catalog.pg_largeobject_metadata l
+    cross join lateral aclexplode(coalesce(l.lomacl, acldefault('L', l.lomowner))) a
+    cross join reachable_roles r
+    where a.privilege_type = 'UPDATE'
+      and (a.grantee = 0 or pg_has_role(r.oid, a.grantee, 'usage'))
+  )) as has_large_object_write,
+  exists (
+    select 1 from pg_catalog.pg_parameter_acl p
+    cross join lateral aclexplode(p.paracl) a
+    cross join reachable_roles r
+    where a.privilege_type in ('SET', 'ALTER SYSTEM')
+      and (a.grantee = 0 or pg_has_role(r.oid, a.grantee, 'usage'))
+  ) as has_parameter_write,
+  exists (
+    select 1 from pg_catalog.pg_shdepend d
+    cross join reachable_roles r
+    where d.refclassid = 'pg_catalog.pg_authid'::regclass and d.deptype = 'o'
+      and pg_has_role(r.oid, d.refobjid, 'usage')
+      and d.dbid in (0, (select oid from pg_catalog.pg_database where datname = current_database()))
+      and not (
+        d.classid = 'pg_catalog.pg_class'::regclass
+        and exists (select 1 from pg_catalog.pg_class c where c.oid = d.objid and c.relpersistence = 't')
+      )
+  ) as has_owned_objects`;
 const RESERVED_SQL_WORDS = new Set([
   'alter',
   'analyze',
@@ -525,11 +599,19 @@ function validateCanaryHealth(report) {
     'is_superuser',
     'can_create_database',
     'can_create_role',
+    'can_administer_roles',
+    'has_unsafe_system_role',
     'can_replicate',
     'can_bypass_rls',
     'is_write_role',
     'has_table_write',
     'can_create_in_public',
+    'can_create_in_schema',
+    'has_sequence_write',
+    'has_function_write',
+    'has_owned_objects',
+    'has_large_object_write',
+    'has_parameter_write',
     'can_create_in_database',
     'can_read_migration_statements',
     'default_transaction_read_only',
@@ -541,11 +623,19 @@ function validateCanaryHealth(report) {
     [health.is_superuser, 'observer role is a superuser'],
     [health.can_create_database, 'observer role can create databases'],
     [health.can_create_role, 'observer role can create roles'],
+    [health.can_administer_roles, 'observer role can administer role memberships'],
+    [health.has_unsafe_system_role, 'observer role can use privileged system operations'],
     [health.can_replicate, 'observer role can replicate'],
     [health.can_bypass_rls, 'observer role can bypass RLS'],
-    [health.is_write_role, 'observer role inherits pg_write_all_data'],
-    [health.has_table_write, 'observer role can write application tables'],
+    [health.is_write_role, 'observer role can use pg_write_all_data'],
+    [health.has_table_write, 'observer role can write application relations or columns'],
     [health.can_create_in_public, 'observer role can create objects in public'],
+    [health.can_create_in_schema, 'observer role can create objects in an application schema'],
+    [health.has_sequence_write, 'observer role can advance or modify application sequences'],
+    [health.has_function_write, 'observer role can execute application SECURITY DEFINER functions'],
+    [health.has_owned_objects, 'observer role owns persistent database objects'],
+    [health.has_large_object_write, 'observer role can modify or create large objects'],
+    [health.has_parameter_write, 'observer role has privileged parameter grants'],
     [health.can_create_in_database, 'observer role can create schemas'],
     [health.can_read_migration_statements, 'observer role can read stored migration statements'],
     [health.default_transaction_read_only !== 'on', 'default_transaction_read_only is not on'],

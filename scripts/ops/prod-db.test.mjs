@@ -59,11 +59,19 @@ let data = [{
   is_superuser: process.env.FAKE_SUPABASE_UNSAFE === 'true',
   can_create_database: false,
   can_create_role: false,
+  can_administer_roles: false,
+  has_unsafe_system_role: false,
   can_replicate: false,
   can_bypass_rls: false,
   is_write_role: false,
   has_table_write: false,
   can_create_in_public: false,
+  can_create_in_schema: false,
+  has_sequence_write: false,
+  has_function_write: false,
+  has_owned_objects: false,
+  has_large_object_write: false,
+  has_parameter_write: false,
   can_use_migration_schema: true,
   can_read_migration_versions: true,
   can_read_migration_statements: process.env.FAKE_SUPABASE_STATEMENT_ACCESS === 'true',
@@ -78,10 +86,12 @@ let data = [{
   literal_password_received: password.includes('literal$HOME'),
 }];
 if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout;
+if (process.env.FAKE_SUPABASE_PRIVILEGE) data[0][process.env.FAKE_SUPABASE_PRIVILEGE] = true;
+if (process.env.FAKE_SUPABASE_MISSING_PRIVILEGE) delete data[0][process.env.FAKE_SUPABASE_MISSING_PRIVILEGE];
 if (sql.includes('pg_catalog.pg_attribute')) {
   data = [{ column_name: 'id' }, { column_name: 'email' }];
 }
-if (sql.includes('aclexplode')) {
+if (sql.includes('as effective_observer_privileges')) {
   data = [{
     schema: 'public',
     relation: 'events',
@@ -288,9 +298,9 @@ describe('prod-db migration preflight', () => {
   it('scans gaps of repeated comment markers without exponential backtracking', () => {
     const markers = ' --'.repeat(50000);
     const source = `update public.events set status = E'a' --${markers};`;
-    const started = Date.now();
+    const started = performance.now();
     const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
-    expect(Date.now() - started).toBeLessThan(1500);
+    expect(performance.now() - started).toBeLessThan(1500);
     expect(result.migration.classification.statement_count).toBe(1);
     expect(result.migration.classification.contains_ddl).toBe(false);
     expect(result.migration.classification.has_malformed_literal).toBe(false);
@@ -531,6 +541,34 @@ describe('prod-db command boundary', () => {
   });
 });
 describe('prod-db canary', () => {
+  it.each([
+    'can_administer_roles',
+    'has_unsafe_system_role',
+    'can_create_in_schema',
+    'has_sequence_write',
+    'has_function_write',
+    'has_owned_objects',
+    'has_large_object_write',
+    'has_parameter_write',
+  ])('rejects effective privilege %s before telemetry', (field) => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_PRIVILEGE: field })).toThrow(
+      'unsafe observer configuration'
+    );
+  });
+  it.each([
+    'can_administer_roles',
+    'has_unsafe_system_role',
+    'can_create_in_schema',
+    'has_sequence_write',
+    'has_function_write',
+    'has_owned_objects',
+    'has_large_object_write',
+    'has_parameter_write',
+  ])('fails closed if effective privilege %s is unreported', (field) => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_MISSING_PRIVILEGE: field })).toThrow(
+      `incomplete observer health report; missing: ${field}`
+    );
+  });
   it('runs a telemetry-only canary without data-shape operations', () => {
     const result = JSON.parse(run(['canary']));
     expect(result.operation).toBe('canary');
