@@ -25,6 +25,7 @@ const {
   publishReviewAdmission,
   publishReviewScope,
   runReviewAdmission,
+  runReviewAdmissionStep,
   relevantComment,
   filterAdmission,
 } = await import('../ci/review-admission.mjs');
@@ -1169,6 +1170,76 @@ test('provider signal authenticates locator via suite API and revokes current he
     assert.equal(f.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
     assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
   }
+});
+function stepCore() {
+  const notices = [];
+  const outputs = {};
+  return {
+    notices,
+    outputs,
+    notice: (message) => notices.push(message),
+    setOutput: (name, value) => {
+      outputs[name] = value;
+    },
+  };
+}
+test('workflow step ends green for policy holds after failing every scope status', async () => {
+  for (const hold of [
+    [(f) => f.f.reviews.push(human('CHANGES_REQUESTED')), /Changes requested remain/],
+    [(f) => (f.f.threads = [{ isResolved: false, isOutdated: false }]), /Unresolved review/],
+    [(f) => (f.f.reviews = []), /Completed exact-head independent review/],
+    [(f) => (f.f.pr.draft = true), /PR must be open and ready/],
+  ]) {
+    const f = signalFixture(queuedControlFixture());
+    hold[0](f);
+    const core = stepCore();
+    await runReviewAdmissionStep({ github: f.github, context: f.context, core });
+    assert.equal(f.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+    assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+    assert.match(core.notices.join('\n'), hold[1]);
+    assert.equal(core.outputs.admission_sha, undefined);
+    assert.equal(core.outputs.queue_sha, undefined);
+  }
+});
+test('workflow step still fails for integrity errors and for holds after a receipt output', async () => {
+  const identity = signalFixture();
+  identity.run.pull_requests = [];
+  await assert.rejects(
+    runReviewAdmissionStep({
+      github: identity.github,
+      context: identity.context,
+      core: stepCore(),
+    }),
+    /Signal PR identity is missing or ambiguous/
+  );
+  // Findings appear after the PR head was admitted but before the queue group is evaluated.
+  const raced = signalFixture(queuedControlFixture());
+  const core = stepCore();
+  const record = core.setOutput;
+  core.setOutput = (name, value) => {
+    record(name, value);
+    if (name === 'admission_sha') raced.f.reviews.push(human('CHANGES_REQUESTED'));
+  };
+  await withReceiptDirectory(async () => {
+    await assert.rejects(
+      runReviewAdmissionStep({ github: raced.github, context: raced.context, core }),
+      /Changes requested remain/
+    );
+  });
+  assert.equal(core.outputs.admission_sha, head);
+  assert.equal(raced.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+  assert.equal(raced.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+  // Without the hold distinction every denial would fail the run again.
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    'if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;',
+    'throw error;'
+  );
+  const held = signalFixture(queuedControlFixture());
+  held.f.reviews = [];
+  await assert.rejects(
+    mutant.runReviewAdmissionStep({ github: held.github, context: held.context, core: stepCore() })
+  );
 });
 test('untrusted suite locator cannot supply approval, provider identity or ambiguous PR mapping', async () => {
   for (const change of [

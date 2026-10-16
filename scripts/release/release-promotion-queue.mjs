@@ -4,6 +4,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { candidateEvidence, promotionBranch } from './release-promotion.mjs';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const ADMISSION_PATH = '.github/workflows/review-admission.yml';
+// Review Admission also uploads a PR Controls refresh locator; it is never a receipt.
+const ADMISSION_LOCATOR = /^review-admission-target-[1-9]\d*$/;
 const RELEASE_PATH = '.github/workflows/release.yml';
 const TRUSTED_ADMISSION_EVENTS = [
   'pull_request_target',
@@ -98,7 +100,9 @@ async function sourceArtifacts(github, repo, run) {
     per_page: 100,
   });
   requireCondition(Array.isArray(artifacts), 'Incomplete source artifact metadata.');
-  const matches = artifacts.filter((artifact) => artifact.name.startsWith(prefix));
+  const matches = artifacts.filter(
+    (artifact) => artifact.name.startsWith(prefix) && !ADMISSION_LOCATOR.test(artifact.name)
+  );
   requireCondition(
     new Set(matches.map((artifact) => artifact.name)).size === matches.length,
     'Duplicate per-head source receipts.'

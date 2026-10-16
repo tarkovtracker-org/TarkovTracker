@@ -17,8 +17,14 @@ const PROVIDERS = Object.freeze([
 ]);
 class AdmissionDenied extends Error {}
 export class AdmissionPending extends Error {}
+// An expected policy hold (draft or closed PR, missing review, open findings, missing sensitive approval).
+// It still denies and fails the published status; only the controller run itself may succeed.
+export class AdmissionHeld extends AdmissionDenied {}
 export function requireEvidence(condition, message) {
   if (!condition) throw new AdmissionDenied(message);
+}
+function requirePolicy(condition, message) {
+  if (!condition) throw new AdmissionHeld(message);
 }
 const SENSITIVE_PATH =
   /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|SECURITY)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
@@ -157,21 +163,21 @@ function explicitComment(comment, head, trusted) {
 }
 function requireReady(pr) {
   requireEvidence(SHA.test(pr.head.sha), 'PR head must be immutable.');
-  requireEvidence(pr.state === 'open' && !pr.draft, 'PR must be open and ready.');
+  requirePolicy(pr.state === 'open' && !pr.draft, 'PR must be open and ready.');
 }
 function requireFindingsResolved(threads, reviews) {
-  requireEvidence(
+  requirePolicy(
     !threads.some((thread) => !thread.isResolved && !thread.isOutdated),
     'Unresolved review findings remain.'
   );
-  requireEvidence(
+  requirePolicy(
     !reviews.some((review) => review.state === 'CHANGES_REQUESTED'),
     'Changes requested remain.'
   );
 }
 function requireSensitiveApproval(sensitive, human, approval) {
   if (!sensitive) return;
-  requireEvidence(
+  requirePolicy(
     Boolean(human || approval),
     'Sensitive or unclassified change needs exact-head collaborator approval.'
   );
@@ -184,7 +190,7 @@ function reviewedHead(input, latest) {
   const { pr, checks, trusted, reviews } = input;
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
   const provider = verifiedProvider(reviews, checks, pr.head.sha);
-  requireEvidence(
+  requirePolicy(
     Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
     'Completed exact-head independent review is required.'
   );

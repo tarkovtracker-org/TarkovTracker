@@ -346,6 +346,27 @@ it('consumes the PR-head receipt alongside its queue-head receipt without re-enq
   expect((await queueReleasePromotion(f)).state).toBe('QUEUED');
   expect(f.operations.submit).toHaveBeenCalledTimes(1);
 });
+it('ignores the PR Controls target locator that admission runs upload beside receipts', async () => {
+  const f = fixture();
+  const locator = { ...f.artifact, id: 101, name: 'review-admission-target-1' };
+  f.github.paginate.mockResolvedValue([locator, f.artifact]);
+  expect((await queueReleasePromotion(f)).state).toBe('QUEUED');
+  // A held admission run uploads only the locator: nothing to enqueue, and no failure.
+  const held = fixture();
+  held.github.paginate.mockResolvedValue([{ ...held.artifact, name: 'review-admission-target-2' }]);
+  expect((await queueReleasePromotion(held)).state).toBe('SKIPPED');
+  expect(held.operations.submit).not.toHaveBeenCalled();
+  // Any other non-SHA admission artifact still fails closed.
+  for (const name of [
+    'review-admission-target-0',
+    'review-admission-target-x',
+    'review-admission-x',
+  ]) {
+    const odd = fixture();
+    odd.github.paginate.mockResolvedValue([{ ...odd.artifact, name }]);
+    await expect(queueReleasePromotion(odd)).rejects.toThrow('Invalid artifact revision.');
+  }
+});
 it('skips ordinary independently reviewed PRs and stale generated source snapshots', async () => {
   const ordinary = fixture();
   ordinary.pr.head.ref = 'fix/app';
