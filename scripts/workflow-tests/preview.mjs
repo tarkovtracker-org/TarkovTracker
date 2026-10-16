@@ -2575,3 +2575,114 @@ test('control Stop halts automatic reconciliation and role loss prevents upload'
     /trusted main/
   );
 });
+function behindSnapshotOptions(overrides = {}) {
+  return {
+    // REST PR metadata and the CI/manifest snapshot retain BASE, while GitHub's actual
+    // test merge integrates this unchanged head with live main.
+    mainSha: sha('7'),
+    commits: {
+      [MERGE]: { tree: { sha: TREE }, parents: [{ sha: sha('7') }, { sha: HEAD }] },
+    },
+    ...overrides,
+  };
+}
+test('a stale base snapshot accepts only the live-main test merge and preserves artifact claims', async (t) => {
+  const automatic = await plan(t, workflowRunContext(), behindSnapshotOptions());
+  assert.equal(automatic.decision.action, 'request', automatic.decision.description);
+  const context = workflowDispatchContext();
+  const result = await plan(t, context, behindSnapshotOptions({ inputs: { run_id: '900' } }));
+  assert.equal(result.decision.action, 'deploy', result.decision.description);
+  assert.equal(
+    result.decision.baseSha,
+    BASE,
+    'retain the authenticated run/artifact base snapshot'
+  );
+  await verifyForDeploy({
+    github: result.github,
+    context,
+    core: fakeCore(),
+    decision: result.decision,
+    destination: join(tempDir(t), 'behind-snapshot'),
+  });
+});
+test('a stale base snapshot rejects wrong test-merge identities and artifact base claims', async (t) => {
+  for (const [label, commit] of [
+    ['stale base parent', { tree: { sha: TREE }, parents: [{ sha: BASE }, { sha: HEAD }] }],
+    ['wrong base parent', { tree: { sha: TREE }, parents: [{ sha: sha('8') }, { sha: HEAD }] }],
+    ['wrong head parent', { tree: { sha: TREE }, parents: [{ sha: sha('7') }, { sha: sha('e') }] }],
+    ['reversed parents', { tree: { sha: TREE }, parents: [{ sha: HEAD }, { sha: sha('7') }] }],
+    [
+      'extra parent',
+      { tree: { sha: TREE }, parents: [{ sha: sha('7') }, { sha: HEAD }, { sha: BASE }] },
+    ],
+    ['wrong tree', { tree: { sha: sha('e') }, parents: [{ sha: sha('7') }, { sha: HEAD }] }],
+  ]) {
+    const result = await plan(
+      t,
+      workflowRunContext(),
+      behindSnapshotOptions({ commits: { [MERGE]: commit }, comments: [previewRequestComment()] })
+    );
+    assert.equal(result.decision.action, 'fail', label);
+    assert.match(result.decision.description, /treeSha/, label);
+  }
+  const wrongClaim = await plan(
+    t,
+    workflowRunContext(),
+    behindSnapshotOptions({ manifest: { baseSha: sha('7') }, comments: [previewRequestComment()] })
+  );
+  assert.equal(wrongClaim.decision.action, 'fail');
+  assert.match(wrongClaim.decision.description, /baseSha/);
+});
+test('a stale base snapshot retains regenerated merge equivalence only on the same live base and tree', async (t) => {
+  const regenerated = sha('9');
+  const merge = { tree: { sha: TREE }, parents: [{ sha: sha('7') }, { sha: HEAD }] };
+  const result = await plan(
+    t,
+    workflowDispatchContext(),
+    behindSnapshotOptions({
+      inputs: { run_id: '900' },
+      pull: pullFixture({ merge_commit_sha: regenerated }),
+      commits: { [MERGE]: merge, [regenerated]: merge },
+    })
+  );
+  assert.equal(result.decision.action, 'deploy', result.decision.description);
+  result.state.pull.merge_commit_sha = sha('8');
+  result.state.commits[sha('8')] = merge;
+  await verifyForDeploy({
+    github: result.github,
+    context: workflowDispatchContext(),
+    core: fakeCore(),
+    decision: result.decision,
+    destination: join(tempDir(t), 'regenerated-behind'),
+  });
+  result.state.commits[sha('8')] = { ...merge, tree: { sha: sha('e') } };
+  await assert.rejects(
+    verifyForDeploy({
+      github: result.github,
+      context: workflowDispatchContext(),
+      core: fakeCore(),
+      decision: result.decision,
+      destination: join(tempDir(t), 'changed-tree'),
+    }),
+    /test merge changed/
+  );
+});
+test('a stale base snapshot cannot hide main advancing before upload even with the same merge SHA', async (t) => {
+  const result = await plan(
+    t,
+    workflowDispatchContext(),
+    behindSnapshotOptions({ inputs: { run_id: '900' } })
+  );
+  assert.equal(result.decision.action, 'deploy', result.decision.description);
+  result.state.mainSha = sha('8');
+  await assert.rejects(
+    verifyForDeploy({
+      github: result.github,
+      context: workflowDispatchContext(),
+      core: fakeCore(),
+      decision: result.decision,
+      destination: join(tempDir(t), 'advanced-main'),
+    }),
+    /test merge changed/
+  );
+});
