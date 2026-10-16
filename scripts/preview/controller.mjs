@@ -291,13 +291,10 @@ async function currentPullBaseMismatch(github, context, pull) {
 async function dispatchMergeMismatch(github, context, pull, run) {
   const prerequisite = dispatchMergePrerequisite(pull, run);
   if (prerequisite) return prerequisite;
-  const baseMismatch = await currentPullBaseMismatch(github, context, pull);
-  if (baseMismatch) return baseMismatch;
-  const { data: merge } = await github.rest.git.getCommit({
-    ...context.repo,
-    commit_sha: pull.merge_commit_sha,
-  });
-  return merge.tree.sha === runTreeSha(run)
+  const merge = await currentTestMerge(github, context, pull);
+  if (!merge)
+    return 'PR base is no longer current main or test-merge parents are invalid; rerun PR CI before requesting a preview.';
+  return merge.tree === runTreeSha(run)
     ? null
     : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
 }

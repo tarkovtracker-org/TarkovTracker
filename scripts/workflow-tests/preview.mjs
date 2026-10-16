@@ -2686,3 +2686,35 @@ test('a stale base snapshot cannot hide main advancing before upload even with t
     /test merge changed/
   );
 });
+test('dispatched PR previews reject matching trees with invalid ordered parents on a fresh base', async (t) => {
+  const pull = pullFixture({ head: { sha: HEAD, ref: 'locales', repo: { full_name: REPO_NAME } } });
+  const previewBranch = previewBranchName({ branch: 'locales' });
+  for (const [label, parents] of [
+    ['stale base', [{ sha: sha('7') }, { sha: HEAD }]],
+    ['wrong head', [{ sha: BASE }, { sha: sha('e') }]],
+    ['reversed parents', [{ sha: HEAD }, { sha: BASE }]],
+    ['extra parent', [{ sha: BASE }, { sha: HEAD }, { sha: sha('7') }]],
+  ]) {
+    for (const filename of ['app/a.ts', 'docs/preview.md']) {
+      const result = await plan(t, workflowDispatchContext(), {
+        inputs: { run_id: '900' },
+        pull,
+        associated: [pull],
+        run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+        manifest: {
+          pullRequest: null,
+          baseSha: null,
+          checkedOutSha: HEAD,
+          previewBranch,
+          appUrl: previewAppUrl(previewBranch),
+        },
+        files: [{ filename }],
+        commits: { [MERGE]: { tree: { sha: TREE }, parents } },
+      });
+      assert.equal(result.decision.action, 'wait', `${label}: ${filename}`);
+      assert.match(result.decision.description, /parents|base is no longer current main/, label);
+      assert.deepEqual(statusStates(result.state.statuses), ['a:pending']);
+      assert.deepEqual(result.state.dispatches, []);
+    }
+  }
+});
