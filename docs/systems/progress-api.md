@@ -176,6 +176,16 @@ sequenceDiagram
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
   never hide a change that came from task metadata or invalidation rather than the user's row.
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
+- Ordinary-task acceptance is explicit. `active` is encoded as `{ complete: false, failed: false,
+active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
+  legacy incomplete task rows means unknown and is never inferred or mass-backfilled; a terminal
+  completed or failed row is inactive by definition and is normalized to `active: false`.
+- Auto-unlocked successors with no stored progress stay absent and their availability is derived
+  from task requirements and current progress. The gateway writes only explicitly requested task
+  IDs, so no implicit successor update can overwrite concurrent or explicit progress. An active
+  prerequisite is satisfied by an explicit active task or a task that has since completed when the
+  task has an `active` field. Legacy rows without `active` retain the client unlockable prerequisite
+  fallback described under Task availability below.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
   so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
   or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents

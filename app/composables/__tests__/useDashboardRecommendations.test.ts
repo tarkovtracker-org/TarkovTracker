@@ -37,6 +37,9 @@ const createTarkovStore = (
   overrides: {
     completedObjectives?: Set<string>;
     completedTasks?: Set<string>;
+    activeTasks?: Set<string>;
+    /** Tasks whose stored row carries an explicit `active: false` (not a legacy row). */
+    inactiveTasks?: Set<string>;
     failedTasks?: Set<string>;
     fenceReputation?: number;
     getCurrentGameMode?: () => 'pvp' | 'pve';
@@ -46,6 +49,8 @@ const createTarkovStore = (
   } = {}
 ) => {
   const completedTasks = overrides.completedTasks ?? new Set<string>();
+  const activeTasks = overrides.activeTasks ?? new Set<string>();
+  const inactiveTasks = overrides.inactiveTasks ?? new Set<string>();
   const failedTasks = overrides.failedTasks ?? new Set<string>();
   const completedObjectives = overrides.completedObjectives ?? new Set<string>();
   return {
@@ -55,6 +60,9 @@ const createTarkovStore = (
     getPrestigeLevel: overrides.getPrestigeLevel ?? (() => 0),
     getTraderReputation: () => overrides.fenceReputation ?? 0,
     isTaskComplete: (taskId: string) => completedTasks.has(taskId),
+    isTaskActive: (taskId: string) => activeTasks.has(taskId),
+    hasExplicitActiveState: (taskId: string) =>
+      activeTasks.has(taskId) || inactiveTasks.has(taskId),
     isTaskFailed: (taskId: string) => failedTasks.has(taskId),
     isTaskObjectiveComplete:
       overrides.isTaskObjectiveComplete ??
@@ -106,6 +114,9 @@ const setup = async (options: SetupOptions = {}) => {
                   {
                     complete: tarkovStore.isTaskComplete(task.id),
                     failed: tarkovStore.isTaskFailed(task.id),
+                    ...(tarkovStore.hasExplicitActiveState(task.id)
+                      ? { active: tarkovStore.isTaskActive(task.id) }
+                      : {}),
                   },
                 ])
               ),
@@ -129,6 +140,49 @@ const setup = async (options: SetupOptions = {}) => {
   return useDashboardRecommendations();
 };
 describe('useDashboardRecommendations', () => {
+  it('follows the shared evaluator for active task prerequisites', async () => {
+    const tasks: Task[] = [
+      {
+        id: 'prerequisite',
+        name: 'Prerequisite',
+        factionName: 'Any',
+        objectives: [{ id: 'prerequisite-1', taskId: 'prerequisite' }],
+      },
+      {
+        id: 'dependent',
+        name: 'Dependent Task',
+        factionName: 'Any',
+        objectives: [{ id: 'dependent-1', taskId: 'dependent' }],
+        taskRequirements: [
+          { task: { id: 'prerequisite', name: 'Prerequisite' }, status: ['active'] },
+        ],
+      },
+    ];
+    // The prerequisite is marked invalid so it never competes for the recommendation slot; the
+    // shared evaluator still sees it, so only the dependent's blockers are under test.
+    const progressStore = createProgressStore({
+      invalidTasks: { prerequisite: { self: true } },
+      tasksCompletions: { prerequisite: { self: false }, dependent: { self: false } },
+      tasksFailed: { prerequisite: { self: false }, dependent: { self: false } },
+    });
+    const prerequisiteBlocker = expect.arrayContaining([
+      expect.objectContaining({ type: 'requirement' }),
+    ]);
+    const dependentBlockers = async (tarkovStore?: ReturnType<typeof createTarkovStore>) => {
+      const recommendations = await setup({ progressStore, tasks, tarkovStore });
+      return recommendations.primaryRecommendation.value?.blockers;
+    };
+    // A legacy row without `active` keeps the unlockable fallback, so the dependent is not blocked.
+    expect(await dependentBlockers()).not.toEqual(prerequisiteBlocker);
+    // An explicit `active: false` is authoritative and is never inferred as accepted.
+    expect(
+      await dependentBlockers(createTarkovStore({ inactiveTasks: new Set(['prerequisite']) }))
+    ).toEqual(prerequisiteBlocker);
+    // An explicit `active: true` satisfies the requirement.
+    expect(
+      await dependentBlockers(createTarkovStore({ activeTasks: new Set(['prerequisite']) }))
+    ).not.toEqual(prerequisiteBlocker);
+  });
   it('picks the available task with the biggest downstream impact', async () => {
     const tasks: Task[] = [
       {

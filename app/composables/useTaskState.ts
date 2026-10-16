@@ -3,6 +3,7 @@ import { useTarkovStore } from '@/stores/useTarkov';
 type TaskStateFlags = {
   isComplete: Ref<boolean>;
   isFailed: Ref<boolean>;
+  isActive: Ref<boolean>;
   isSuccessful: Ref<boolean>;
   isLocked: Ref<boolean>;
   isInvalid: Ref<boolean>;
@@ -30,10 +31,11 @@ export function useTaskState(taskId: MaybeRefOrGetter<string>): TaskStateFlags {
   const progressStore = useProgressStore();
   const isComplete = computed(() => tarkovStore.isTaskComplete(toValue(taskId)));
   const isFailed = computed(() => tarkovStore.isTaskFailed(toValue(taskId)));
+  const isActive = computed(() => tarkovStore.isTaskActive(toValue(taskId)));
   const isSuccessfulComputed = computed(() => isComplete.value && !isFailed.value);
   const isLocked = computed(() => {
     const id = toValue(taskId);
-    return progressStore.unlockedTasks[id]?.self !== true && !isComplete.value;
+    return progressStore.unlockedTasks[id]?.self !== true && !isComplete.value && !isActive.value;
   });
   const isInvalid = computed(() => {
     const id = toValue(taskId);
@@ -42,6 +44,7 @@ export function useTaskState(taskId: MaybeRefOrGetter<string>): TaskStateFlags {
   return {
     isComplete,
     isFailed,
+    isActive,
     isSuccessful: isSuccessfulComputed,
     isLocked,
     isInvalid,

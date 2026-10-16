@@ -385,3 +385,27 @@ describe('reward-based trader unlocks', () => {
     expect(evaluate(other, data(), [introduction]).available).toBe(true);
   });
 });
+describe('active prerequisite requirements', () => {
+  const dependent: Task = {
+    id: 'dependent',
+    taskRequirements: [{ task: { id: 'prerequisite' }, status: ['active'] }],
+  };
+  const prerequisite: Task = { id: 'prerequisite' };
+  const availabilityFor = (completions: TaskAvailabilityTeamData['completions']) =>
+    evaluate(dependent, data({ completions }), [prerequisite], { requireTraderLevels: false })
+      .available;
+  it('keeps legacy incomplete prerequisites available for active requirements', () => {
+    expect(availabilityFor({ prerequisite: { complete: false, failed: false } })).toBe(true);
+  });
+  it('does not infer acceptance from an explicit inactive state', () => {
+    expect(
+      availabilityFor({ prerequisite: { active: false, complete: false, failed: false } })
+    ).toBe(false);
+  });
+  it('accepts explicitly active and completed prerequisites', () => {
+    expect(
+      availabilityFor({ prerequisite: { active: true, complete: false, failed: false } })
+    ).toBe(true);
+    expect(availabilityFor({ prerequisite: { complete: true, failed: false } })).toBe(true);
+  });
+});

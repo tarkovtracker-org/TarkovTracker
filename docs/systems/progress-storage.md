@@ -62,7 +62,11 @@ flowchart LR
    reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
-   reads resolve the active Seasonal number through the database before selecting a row. Persisted
+   reads resolve the active Seasonal number through the database before selecting a row. Task
+   completions live in these JSONB blobs; the optional `active` boolean is preserved by local
+   persistence, merges, realtime, team and sharing transforms. Missing legacy incomplete values
+   remain missing, while terminal complete or failed rows are normalized to `active: false`.
+   Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
    Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
@@ -255,6 +259,15 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   still read the frozen columns until they are dropped (#1028 Phase 4).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
+- Task-completion sanitizers and timestamp merges preserve explicit `active: true` and
+  `active: false` without manufacturing the property on legacy incomplete entries. No migration or
+  bulk rewrite backfills ambiguous rows.
+- Full-mode saves from older clients retain an existing acceptance flag when their nonterminal
+  task entry omits `active` and has the same timestamp. Older legacy entries retain the newer
+  stored task status and timestamp. Newer legacy status writes and
+  progress reset epochs keep their precedence; legacy-only entries remain unknown. The forward
+  merge-function correction also retains the saved-level guard for cached clients carrying
+  `xpOffset`, API task-count metadata, manual activity epochs and availability confirmations.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.

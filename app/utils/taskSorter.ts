@@ -40,6 +40,11 @@ export interface TeammateAvailabilityData {
   /** Task failure status keyed by taskId -> teamId -> boolean. Required. */
   tasksFailed: Record<string, Record<string, boolean>>;
   /**
+   * Whether a team member has explicitly accepted (activated) a task. Active tasks are no longer
+   * "available" to that member. Optional - legacy callers without active tracking omit it.
+   */
+  isTaskActive?: (teamId: string, taskId: string) => boolean;
+  /**
    * Map keyed by team ID used only for membership/visibility checks.
    * Keys present mean the team member is visible. Values are intentionally typed
    * as unknown/opaque since only keys are inspected for determining team membership.
@@ -78,13 +83,14 @@ export function buildTeammateAvailableCounts(
     tasks.forEach((task) => counts.set(task.id, 0));
     return counts;
   }
-  const { unlockedTasks, tasksCompletions, tasksFailed } = data;
+  const { unlockedTasks, tasksCompletions, tasksFailed, isTaskActive } = data;
   tasks.forEach((task) => {
     const availableCount = teamIds.filter((teamId) => {
       const isUnlocked = unlockedTasks?.[task.id]?.[teamId] === true;
       const isCompleted = tasksCompletions?.[task.id]?.[teamId] === true;
       const isFailed = tasksFailed?.[task.id]?.[teamId] === true;
-      return isUnlocked && !isCompleted && !isFailed;
+      const isActive = isTaskActive?.(teamId, task.id) === true;
+      return isUnlocked && !isActive && !isCompleted && !isFailed;
     }).length;
     counts.set(task.id, availableCount);
   });

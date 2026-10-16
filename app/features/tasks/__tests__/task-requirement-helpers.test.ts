@@ -18,8 +18,23 @@ describe('isTaskRequirementSatisfied', () => {
       isTaskRequirementSatisfied(['complete', 'failed'], { complete: true, failed: true })
     ).toBe(true);
   });
-  it('accepts active requirements when prereq is unlockable', () => {
+  it('requires explicit active or completion when the prerequisite is locked', () => {
+    expect(
+      isTaskRequirementSatisfied(['active'], {
+        active: true,
+        complete: false,
+        failed: false,
+      })
+    ).toBe(true);
+    expect(isTaskRequirementSatisfied(['active'], { complete: true, failed: false })).toBe(true);
+    expect(isTaskRequirementSatisfied(['active'], { complete: false, failed: false })).toBe(false);
+    expect(isTaskRequirementSatisfied(['active'], undefined)).toBe(false);
+  });
+  it('matches legacy unlockable fallback without overriding explicit rejection', () => {
     expect(isTaskRequirementSatisfied(['active'], undefined, true)).toBe(true);
+    expect(isTaskRequirementSatisfied(['active'], { complete: false }, true)).toBe(true);
+    expect(isTaskRequirementSatisfied(['active'], { active: false }, true)).toBe(false);
+    expect(isTaskRequirementSatisfied(['active'], { failed: true }, true)).toBe(false);
   });
 });
 describe('getRequiredTaskStatuses', () => {
