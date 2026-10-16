@@ -59,10 +59,11 @@ Main is queue-only as of 2026-10-16:
   (`PREVIEW_QUEUE_RETENTION_ENABLED`) is not enabled. Flaky smoke tests that remove otherwise
   healthy queue entries remain to be fixed.
 
-`.github/main-merge-queue-ruleset.json` remains the reviewed, disabled template; its admission App
-ID `0` is a sentinel that `scripts/ci/render-merge-queue-ruleset.mjs` replaces with the verified
-App ID. `.github/main-ci-ruleset.json` is retained as the `Main CI freshness` rollback template.
-Committing either file changes no live ruleset.
+[`main-merge-queue-ruleset.json`](../.github/main-merge-queue-ruleset.json) remains the reviewed,
+disabled queue template; [`render-merge-queue-ruleset.mjs`](../scripts/ci/render-merge-queue-ruleset.mjs)
+owns rendering it ([provisioning](#admission-publisher-provisioning)).
+[`main-ci-ruleset.json`](../.github/main-ci-ruleset.json) remains the `Main CI freshness` rollback
+template. Committing either file changes no live ruleset.
 
 **Rollback:** re-enable strict freshness before touching the queue ruleset or retention switch:
 
@@ -74,21 +75,24 @@ The policy mode then returns to `strict-queue`. Never leave main without equival
 
 ## Activation gates (history)
 
-These gates preceded activation; the live state above records their outcome.
+These gates preceded activation; the live state above records their outcome. Gates 5 and 6
+correspond to [activation procedure](#activation-procedure-history) steps 5 and 6.
 
 1. Done: queue-aware CI/controller code merged with independent review of the credential boundary.
 2. Done: queue canaries passed full CI, deployed preview and smoke checks, including a removed entry.
 3. Done: release no longer pushes to `main`. `scripts/release/release-commit.sh` pushes only
    `wip/release-*` staging refs, the promotion controller enqueues the reviewed version PR, and
    finalization creates tags through the API after the actual merge.
-4. Done in code: Crowdin's policy validator and Dependabot merge-state handling are queue-aware,
-   and queue submission does not dispatch main CI. Job-token queue events remain unproven (above).
-5. Open: queue-preview Pages retention runs dry-run only. Each re-formed queue group has its own
-   branch, and GitHub ref deletion does not remove its Pages deployment.
-6. Done: required review admission is App-pinned. Bot comments are not GitHub approval rules;
+4. Done: required review admission is App-pinned. Bot comments are not GitHub approval rules;
    enqueue only after reviews are complete and findings resolved. Never use `--admin`.
-7. Done: the queue was activated and strict freshness removed with explicit authorization,
-   keeping the three issuer-pinned contexts, `ALLGREEN`, no bypass actors, and `Main`.
+5. Open: Crowdin's policy validator, Dependabot merge-state handling and release promotion are
+   queue-aware in code, and queue submission does not dispatch main CI. Live proof of job-token
+   enqueue and version promotion is pending (above).
+6. Open: queue-preview Pages retention runs dry-run only. Each re-formed queue group has its own
+   branch, and GitHub ref deletion does not remove its Pages deployment.
+7. Done: with explicit maintainer authorization, the queue was activated and strict freshness was
+   disabled while gates 5 and 6 remained open, because both fail closed. The three issuer-pinned
+   contexts, `ALLGREEN`, no bypass actors, and `Main` were kept.
 
 ## Integrated automation and review admission
 
@@ -290,6 +294,7 @@ these files does not create an App, install it, set a variable, or store a crede
 ## Activation procedure (history)
 
 Steps 1-4 and 7 are complete; steps 5 and 6 remain open. Evidence is in [Current state](#current-state).
+Activation gates 5 and 6 above track the same open steps.
 
 1. Done. Merge the reviewed integration changes and verify their exact main CI/deployment. Run the
    `Preview Retention` workflow on main with `apply=false`; retain its authenticated dry-run report.
@@ -313,14 +318,14 @@ Steps 1-4 and 7 are complete; steps 5 and 6 remain open. Evidence is in [Current
    `preview` environment only after dry-run/lifecycle proofs. Cleanup remains limited to proven,
    obsolete queue previews at least 48 hours old; production, normal PR previews and unknown
    historical deployments are excluded.
-7. Done 2026-10-16 04:34 UTC (behind #1254 merged unchanged). Only after every canary and compatibility gate passes, disable `Main CI freshness`; keep the
-   active queue's three required contexts with their separate issuer pins and single-entry `ALLGREEN` policy.
-   Verify a behind reviewed PR can enqueue unchanged. Record the live ruleset IDs and evidence
-   on the rollout PR/issue.
+7. Done 2026-10-16 04:34 UTC: `Main CI freshness` was disabled with explicit maintainer
+   authorization after steps 1-4 passed. Steps 5 and 6 were not prerequisites: they remained open
+   because both fail closed (a bot entry that starts no CI times out and is removed, and retention
+   stays dry-run). The active queue kept its three required contexts with their separate issuer
+   pins and single-entry `ALLGREEN` policy. A behind reviewed PR (#1254) merged through the queue
+   without a branch update. Live ruleset IDs and evidence are in [Current state](#current-state).
 
-Step 7 was taken with steps 5 and 6 still open; their failure modes are fail-closed (a bot entry
-that starts no CI times out, and retention stays dry-run). Rollback is described under
-[Current state](#current-state).
+Rollback is described under [Current state](#current-state).
 
 ## Agent lifecycle after activation
 
