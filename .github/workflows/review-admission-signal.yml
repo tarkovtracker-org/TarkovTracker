@@ -13,9 +13,12 @@ permissions: {}
 jobs:
   signal:
     name: Admission signal
+    # Provider suites on GitHub's temporary queue commits are not review evidence; the group's
+    # own merge_group signal drives queue admission, so they never wake the serialized controller.
     if: >-
       contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group"]'), github.event_name) ||
-      (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id))
+      (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id) &&
+      !startsWith(github.event.check_suite.head_branch, 'gh-readonly-queue/'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

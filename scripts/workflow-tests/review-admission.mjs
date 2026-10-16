@@ -1252,6 +1252,9 @@ test('provider suites on merge-queue commits select no target and leave every st
     { app: { id: 15368 } },
     { head_branch: `gh-readonly-queue/develop/pr-1-${base}` },
     { head_branch: 'gh-readonly-queue/main/pr-1' },
+    { head_branch: `gh-readonly-queue/main/pr-0-${base}` },
+    { head_branch: `gh-readonly-queue/main/pr-01-${base}` },
+    { head_branch: 'gh-readonly-queue/main/pr-1-abcdef' },
     { pull_requests: [signalPull(), signalPull()] },
   ]) {
     const held = suiteSignalFixture();
@@ -1603,6 +1606,10 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(signal, /name: review-admission-signal-\$\{\{ github.run_attempt \}\}/);
   assert.match(signal, /path: signal.json/);
   assert.match(signal, /SUITE_ID: \$\{\{ github.event.check_suite.id \}\}/);
+  assert.match(
+    signal,
+    /!startsWith\(github\.event\.check_suite\.head_branch, 'gh-readonly-queue\/'\)\)$/m
+  );
   assert.match(signal, /if-no-files-found: error/);
   assert.ok(!signal.includes('secrets.'));
 });

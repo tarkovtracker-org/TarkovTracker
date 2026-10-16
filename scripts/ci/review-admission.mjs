@@ -17,7 +17,7 @@ import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
 import { releaseAssetsEligibility, requireReleaseSource } from './review-admission-release.mjs';
-const QUEUE_SUITE_BRANCH = /^gh-readonly-queue\/main\/pr-\d+-[a-f0-9]+$/;
+const QUEUE_SUITE_BRANCH = /^gh-readonly-queue\/main\/pr-[1-9]\d*-[a-f0-9]{40}$/;
 async function evidence(github, repo, pr) {
   const files = await allPages(github, github.rest.pulls.listFiles, {
     ...repo,
