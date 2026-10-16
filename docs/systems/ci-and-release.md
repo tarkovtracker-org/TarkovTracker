@@ -74,8 +74,9 @@ CodeQL) is selected on every CI run. See
 ### Invariants
 
 - Pushes, dispatches and merge-group candidates retain full validation; only pull requests receive reduced selection.
-- Queue integration support and activation prerequisites are specified in
-  [merge queue rollout](../merge-queue-rollout.md). The production queue is not yet active.
+- Queue integration support, live queue state and rollback are specified in
+  [merge queue rollout](../merge-queue-rollout.md#current-state). The production queue is active
+  and main is queue-only; strict freshness is disabled and remains only a rollback path.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
 - Nested `AGENTS.md`/`CLAUDE.md` instruction files count as documentation, except under `public/`,
   where they would ship as site assets. `format:check` covers them at every depth.
@@ -215,10 +216,12 @@ checkout stays pinned to the validated SHA. The production build still runs in R
 - Legacy recovery is limited to sources predating asynchronous promotion. It still authenticates
   exact-head CI and the authoritative preview artifact; it cannot treat a new promotion as legacy.
   Implementation and local recovery commands are owned by [the release README](../../scripts/release/README.md).
-- `scripts/ci/github-ci-gate.sh` accepts either the existing strict freshness policy or the complete
+- `scripts/ci/github-ci-gate.sh` accepts either the strict freshness policy or the complete
   same-repository queue policy: GitHub Actions-owned `CI Result` and `Preview Result`, an isolated
   App-owned `Review Admission`, native resolved-thread enforcement, and a single-entry `ALLGREEN` squash queue.
-  During rollout coexistence, `strict-queue` retains strict freshness/tree validation while
+  Live main enforces only the queue policy, so the gate reports `queue` mode
+  ([current state](../merge-queue-rollout.md#current-state)). `strict` and `strict-queue` remain
+  supported for rollback; `strict-queue` retains strict freshness/tree validation while
   authenticating admission and accepting a pending native queue entry. Missing or weakened
   requirements fail closed. Candidate CI/preview waits remain bounded.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
@@ -232,7 +235,12 @@ permits only regular non-English locale JSON files. Strict mode compares against
 queue mode compares the PR changes against its merge base so unrelated main changes do not
 require rewriting the translation branch. Dependency setup and
 project checks run after that checkout. The built-in job token synchronizes translations, updates a
-behind branch in strict mode, explicitly dispatches candidate CI, and requests the merge.
+behind branch only while strict freshness is active, explicitly dispatches candidate CI, and
+requests the merge or queue entry. Live main runs in `queue` mode, so translation branches are not
+updated. Below, "strict mode" means strict freshness is active: `strict`, or `strict-queue` when a
+rollback re-enables `Main CI freshness` while the queue stays active. Both strict-freshness modes
+update behind branches and compare against captured main; only `strict` merges directly, while
+`strict-queue` and `queue` await Review Admission and submit a native queue entry.
 Dependency installation and project checks receive no automation credential.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
@@ -244,8 +252,8 @@ Dependency installation and project checks receive no automation credential.
   temporary `BLOCKED` state after
   preview success retry for up to 60 seconds. If GitHub continues to report
   `MERGEABLE / UNSTABLE` for approval-required `pull_request` suites, the gate revalidates the
-  required exact-head `CI Result` and trusted `Preview Result`, then attempts an ordinary
-  head-pinned merge; GitHub's server-side rules still reject any unmet requirement.
+  required exact-head `CI Result` and trusted `Preview Result`, then submits its head-pinned
+  merge or queue entry; GitHub's server-side rules still reject any unmet requirement.
 - The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
   on the exact head (the explicit `locales` dispatch produces the preview even though job-token
   PR updates leave ordinary `pull_request` runs approval-required) and verifies the effective
@@ -265,7 +273,8 @@ Dependency installation and project checks receive no automation credential.
   as well as the head, superseding any earlier success on that merge commit. In verified queue
   mode, dispatched Crowdin CI reports only the immutable head; full merge-group CI proves the
   combined integration tree. It never attests a different, untested test-merge tree.
-- The server-side `--match-head-commit` guard must use the SHA that passed all validation.
+- The server-side head guard (`--match-head-commit` in `strict`, the enqueue mutation's
+  `expectedHeadOid` input otherwise) must use the SHA that passed all validation.
 - Merge requests use `GITHUB_TOKEN`. An `OPEN` queue entry is reported as queued, and main CI is
   dispatched only after an actual merge, never on admission. No personal GitHub token is needed.
   CI dispatch failures fail the workflow; candidate failures prevent merging.
