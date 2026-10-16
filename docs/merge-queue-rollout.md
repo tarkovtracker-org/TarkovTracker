@@ -101,7 +101,11 @@ the controller run, attempt, trusted policy source and uploaded `review-admissio
 Review and review-comment wakeups resolve the service-owned PR link from the authenticated
 signal attempt, then reread its current head and queue. A provider-suite signal supplies only a
 bounded locator: the controller fetches the known completed provider suite from this repository
-and resolves exactly one PR before evaluating live evidence. Missing or ambiguous mappings hold
+and resolves exactly one PR before evaluating live evidence. Provider suites on
+`gh-readonly-queue/` commits are not review evidence and do not run the signal job, because that
+group's own `merge_group` signal drives queue admission. If one still reaches the controller, an
+authenticated provider suite on a canonical main queue ref with no linked PR records a notice and
+changes no status. Missing or ambiguous mappings hold
 admission; an explicit trusted-main dispatch can recover once review evidence is complete. The
 controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
 and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).

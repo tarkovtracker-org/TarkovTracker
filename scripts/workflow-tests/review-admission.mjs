@@ -1226,6 +1226,53 @@ test('suite signal fails closed for wrong source branch, ambiguous head lookup o
   );
   assert.equal(broken.statuses.length, 1);
 });
+test('provider suites on merge-queue commits select no target and leave every status unchanged', async () => {
+  const f = suiteSignalFixture();
+  Object.assign(f.suite, {
+    head_sha: queued,
+    head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+    pull_requests: [],
+  });
+  f.github.rest.pulls.list = 'pulls';
+  f.f.pulls = [signalPull()];
+  const notices = [];
+  const outputs = {};
+  const core = {
+    notice: (message) => notices.push(message),
+    setOutput: (name, value) => {
+      outputs[name] = value;
+    },
+  };
+  await runReviewAdmission({ github: f.github, context: f.context, core });
+  assert.equal(f.statuses.length, 1); // Only the seeded status; nothing pending or failed.
+  assert.deepEqual(outputs, {});
+  assert.match(notices.join('\n'), /merge-queue commit is not review evidence/);
+  // Only an authenticated provider suite on a queue ref with no linked PR is ignored.
+  for (const change of [
+    { app: { id: 15368 } },
+    { head_branch: `gh-readonly-queue/develop/pr-1-${base}` },
+    { head_branch: 'gh-readonly-queue/main/pr-1' },
+    { head_branch: `gh-readonly-queue/main/pr-0-${base}` },
+    { head_branch: `gh-readonly-queue/main/pr-01-${base}` },
+    { head_branch: 'gh-readonly-queue/main/pr-1-abcdef' },
+    { pull_requests: [signalPull(), signalPull()] },
+  ]) {
+    const held = suiteSignalFixture();
+    Object.assign(held.suite, {
+      head_sha: queued,
+      head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+      pull_requests: [],
+      ...change,
+    });
+    held.github.rest.pulls.list = 'pulls';
+    held.f.pulls = [signalPull()];
+    await assert.rejects(
+      runReviewAdmission({ github: held.github, context: held.context, core: held.core }),
+      /identity mismatch|missing or ambiguous/
+    );
+    assert.equal(held.statuses.length, 1);
+  }
+});
 test('signal regression controls detect synthetic-SHA targeting and provider identity bypass', async () => {
   const old = await importMutationSource(
     'review-admission.mjs',
@@ -1559,6 +1606,10 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(signal, /name: review-admission-signal-\$\{\{ github.run_attempt \}\}/);
   assert.match(signal, /path: signal.json/);
   assert.match(signal, /SUITE_ID: \$\{\{ github.event.check_suite.id \}\}/);
+  assert.match(
+    signal,
+    /!startsWith\(github\.event\.check_suite\.head_branch, 'gh-readonly-queue\/'\)\)$/m
+  );
   assert.match(signal, /if-no-files-found: error/);
   assert.ok(!signal.includes('secrets.'));
 });
