@@ -15,7 +15,13 @@ import { readAdmissionArchive } from './review-admission-binding.mjs';
 import { currentAdminAttestation } from './pr-control-state.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
-import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
+import {
+  admissionDecision,
+  AdmissionHeld,
+  CONTEXT,
+  requireEvidence,
+  SHA,
+} from './review-admission-policy.mjs';
 import { releaseAssetsEligibility, requireReleaseSource } from './review-admission-release.mjs';
 const QUEUE_SUITE_BRANCH = /^gh-readonly-queue\/main\/pr-[1-9]\d*-[a-f0-9]{40}$/;
 async function evidence(github, repo, pr) {
@@ -481,6 +487,29 @@ export async function runReviewAdmission({ github, context, core }) {
   }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
   await evaluateScope(github, context, core, selected[0], source);
+}
+// Workflow entry point. A policy hold (draft, review missing, open findings, sensitive approval
+// missing) has already failed every scope status, which is the actual gate, so the run ends green
+// with a notice instead of producing a red run for every review event. Integrity, identity and
+// API errors still fail the run. A hold after any receipt output was set stays a failure so later
+// upload/publication steps cannot run.
+export async function runReviewAdmissionStep({ github, context, core }) {
+  const outputs = new Set();
+  const tracked = Object.assign(Object.create(core), {
+    setOutput(name, value) {
+      outputs.add(name);
+      core.setOutput(name, value);
+    },
+  });
+  try {
+    await runReviewAdmission({ github, context, core: tracked });
+  } catch (error) {
+    if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;
+    core.notice(`Review admission held: ${error.message}`);
+  }
+}
+function receiptOutput(outputs) {
+  return outputs.has('admission_sha') || outputs.has('queue_sha');
 }
 export async function publishReviewScope({ github, context, head, queued }) {
   const shas = [head, queued].filter(Boolean);

@@ -79,6 +79,14 @@ The controller serializes relevant events at job scope, after its event filter. 
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
 including withdrawal of a command with leading whitespace.
 
+The `Review Admission` commit status is the gate. An expected policy hold (draft, missing
+exact-head review, unresolved findings or changes requested, missing sensitive approval) publishes
+`failure` on the PR head and any live queue commit, then ends the controller run green with a
+notice, so a denial does not create a failed run for every review event. Integrity, identity,
+publisher and API errors still fail the run. A hold found after a receipt output was recorded also
+fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
+status, a successful run and an approving receipt.
+
 Small ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Sensitive and unclassified changes require an exact-head approving review
 from an independent write collaborator, or a write collaborator's single-line command:
