@@ -75,9 +75,9 @@ SELECT isnt((SELECT ctid::text FROM public.user_progress
 SELECT is((SELECT current_game_mode FROM public.user_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001086'), 'pvp',
   'API clock advancement does not change selected mode');
-SELECT ok((SELECT pvp_data->>'level' IS NULL AND pve_data->>'level' IS NULL
-  FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001086'),
-  'compatibility clocks do not restore legacy JSON writes');
+SELECT ok((SELECT NOT (to_jsonb(account) ?| ARRAY['pvp_data', 'pve_data'])
+  FROM public.user_progress account WHERE user_id = '00000000-0000-0000-0000-000000001086'),
+  'compatibility clock payloads contain only account metadata');
 SELECT ok(NOT has_function_privilege('authenticated',
   'public.merge_progress_data(uuid,text,jsonb,jsonb,jsonb)', 'EXECUTE'),
   'compatibility does not broaden API write access');

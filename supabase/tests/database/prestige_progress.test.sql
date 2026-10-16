@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(17);
+SELECT plan(15);
 
 CREATE TEMP TABLE prestige_progress_fixture AS
 SELECT
@@ -66,11 +66,6 @@ RESET ROLE;
 CREATE TEMP TABLE prestige_preserved_snapshot AS
 SELECT
   (
-    SELECT pve_data
-    FROM public.user_progress
-    WHERE user_id = fixture.user_id
-  ) AS legacy_pve,
-  (
     SELECT progress_data
     FROM public.user_game_mode_progress
     WHERE user_id = fixture.user_id
@@ -125,12 +120,6 @@ SELECT results_eq(
   'PvP prestige archives the completed run'
 );
 SELECT is(
-  (SELECT pvp_data->>'level' FROM public.user_progress
-   WHERE user_id = (SELECT user_id FROM prestige_progress_fixture)),
-  NULL,
-  'PvP prestige no longer writes the legacy PvP column'
-);
-SELECT is(
   (
     SELECT progress_data
     FROM public.user_game_mode_progress
@@ -140,12 +129,6 @@ SELECT is(
   ),
   (SELECT public.sanitize_user_progress_mode_data(reset_pvp) FROM prestige_progress_fixture),
   'PvP prestige resets normalized PvP progress'
-);
-SELECT is(
-  (SELECT pve_data FROM public.user_progress
-   WHERE user_id = (SELECT user_id FROM prestige_progress_fixture)),
-  (SELECT legacy_pve FROM prestige_preserved_snapshot),
-  'PvP prestige leaves the legacy PvE column unchanged'
 );
 SELECT is(
   (
