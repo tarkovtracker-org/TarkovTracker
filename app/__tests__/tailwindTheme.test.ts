@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { getStatusBadgeClass, type StatusTone } from '@/utils/statusTones';
 /**
  * The light theme remaps the accent foreground range (steps 200-400) so labels
  * and links that were authored for dark surfaces stay legible on the paper
@@ -112,4 +113,66 @@ describe('locked status color', () => {
     const shellRgb = hslToRgb(lightShell!.slice(1, 4).map(Number));
     expect(contrast(hslToRgb(hslToken('locked-700')!), shellRgb)).toBeGreaterThanOrEqual(4.5);
   });
+});
+// CSS Color 4 OKLab inverse matrices, followed by sRGB display clipping.
+// https://www.w3.org/TR/css-color-4/#color-conversion-code
+const oklchToLinearRgb = ([light, chroma, hue]: number[]) => {
+  const a = chroma! * Math.cos((hue! * Math.PI) / 180);
+  const b = chroma! * Math.sin((hue! * Math.PI) / 180);
+  const l = (light! + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (light! - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (light! - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ].map((channel) => Math.max(0, Math.min(1, channel)));
+};
+const linearLuminance = ([r, g, b]: number[]) => 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+const oklchToken = (name: string) => {
+  const match = new RegExp(`--color-${name}:\\s*oklch\\(([^)]+)\\)`).exec(oklchBlock ?? '');
+  expect(match, `oklch ${name}`).not.toBeNull();
+  return match![1]!.split(/\s+/).map(Number);
+};
+const tokenLuminance = (name: string, palette: string) =>
+  palette === 'oklch'
+    ? linearLuminance(oklchToLinearRgb(oklchToken(name)))
+    : luminance(hslToRgb(hslToken(name)!));
+const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+const badgeToken = (tone: StatusTone, light: boolean) => {
+  const classes = getStatusBadgeClass(tone, 1);
+  const background = light ? /light:bg-([\w-]+)/.exec(classes)?.[1] : undefined;
+  return background ?? /(?:^| )bg-([\w-]+)/.exec(classes)![1]!;
+};
+describe.each(['hsl', 'oklch'])('%s status palette contrast', (palette) => {
+  it.each(['info', 'success', 'locked'] as const)('keeps white %s badge numerals at AA', (tone) => {
+    expect(ratio(tokenLuminance(badgeToken(tone, false), palette), 1)).toBeGreaterThanOrEqual(4.5);
+  });
+  it('preserves the light success badge ink and fill at AA', () => {
+    expect(getStatusBadgeClass('success', 1)).toContain('light:text-surface-50');
+    const ink = /--color-surface-50:\s*hsl\(([^)]+)\)/
+      .exec(lightBlock)![1]!
+      .match(/[\d.]+/g)!
+      .map(Number);
+    expect(
+      ratio(tokenLuminance(badgeToken('success', true), palette), luminance(hslToRgb(ink)))
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+  it('keeps selected locked tab text at AA on the light shell', () => {
+    const shell = /--color-surface-900:\s*hsl\(([^)]+)\)/
+      .exec(lightBlock)![1]!
+      .match(/[\d.]+/g)!
+      .map(Number);
+    expect(
+      ratio(tokenLuminance('locked-700', palette), luminance(hslToRgb(shell)))
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+it('checks the OKLCH conversion against black, white and red reference colors', () => {
+  expect(linearLuminance(oklchToLinearRgb([0, 0, 0]))).toBe(0);
+  expect(linearLuminance(oklchToLinearRgb([1, 0, 0]))).toBeCloseTo(1, 6);
+  expect(linearLuminance(oklchToLinearRgb([0.62795536, 0.25768331, 29.233885]))).toBeCloseTo(
+    0.2126,
+    5
+  );
 });

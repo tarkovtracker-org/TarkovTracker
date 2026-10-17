@@ -28,7 +28,7 @@ const STATUS_TONE_CLASSES: Record<StatusTone, StatusToneClasses> = {
       'border-white/15 bg-white/10 text-white ring-1 ring-white/10 light:border-surface-600 light:bg-surface-700/60 light:text-surface-50 light:ring-surface-600/40',
   },
   info: {
-    badge: 'bg-info-500',
+    badge: 'bg-info-600',
     selected:
       'border-info-500/45 bg-info-500/12 text-white ring-1 ring-info-500/25 light:text-info-700',
   },
@@ -39,8 +39,8 @@ const STATUS_TONE_CLASSES: Record<StatusTone, StatusToneClasses> = {
       'border-locked-500/45 bg-locked-500/12 text-white ring-1 ring-locked-500/25 light:text-locked-700',
   },
   success: {
-    // White on success-500 misses AA in the light theme, so it swaps to a pale fill and ink.
-    badge: 'bg-success-500 light:bg-success-100 light:text-surface-50',
+    // Dark badges need success-700 for AA; light badges keep their pale fill and ink.
+    badge: 'bg-success-700 light:bg-success-100 light:text-surface-50',
     selected:
       'border-success-500/45 bg-success-500/12 text-white ring-1 ring-success-500/25 light:text-success-700',
   },

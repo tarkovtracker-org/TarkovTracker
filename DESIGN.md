@@ -155,6 +155,11 @@ Surface token mapping:
 State colors are semantic: `success`, `warning`, `error`, and `info`. Game-mode colors should use
 `pvp` and `pve`, not ad hoc tan or blue classes.
 
+Status count badges use `app/utils/statusTones.ts`; white info/success numerals use deeper fills
+that meet AA in both HSL and OKLCH palettes. Card header and hideout avatar gradients share the
+complete `SemanticColor` mapping in `app/utils/cardHighlights.ts`. Keep its classes literal so
+Tailwind can discover every stop.
+
 Note: Nuxt UI maps its semantic `info` color to the `accent` (teal) palette in `app.config.ts`, so
 `<UButton color="info">` renders teal, while the CSS `text-info-500` class renders blue. This is
 intentional — the teal accent is the primary informational tone in the UI.

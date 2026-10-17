@@ -336,6 +336,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { SPECIAL_STATIONS } from '@/utils/constants';
   import HideoutRequirement from './HideoutRequirement.vue';
   import type {
@@ -389,12 +390,9 @@
     if (!nextLevel.value) return 'primary';
     return prerequisitesMet.value ? 'success' : 'locked';
   });
-  const HIGHLIGHT_GRADIENTS = {
-    primary: 'bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600',
-    success: 'bg-gradient-to-br from-success-800 via-success-700 to-success-600',
-    locked: 'bg-gradient-to-br from-locked-800 via-locked-700 to-locked-600',
-  } as const;
-  const highlightClasses = computed(() => ({ [HIGHLIGHT_GRADIENTS[highlightColor.value]]: true }));
+  const highlightClasses = computed(() => ({
+    [CARD_HIGHLIGHT_GRADIENTS[highlightColor.value]]: true,
+  }));
   const getStationRequirementLink = (requirement: StationLevelRequirement) => {
     const moduleId = metadataStore
       .getStationById(requirement.station.id)

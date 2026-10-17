@@ -66,7 +66,7 @@ describe('StatusTabBar', () => {
     const wrapper = mountBar();
     const badge = (label: string) => tabButton(wrapper, label).get('.rounded-full');
     expect(badge('All').classes()).toContain('bg-surface-500');
-    expect(badge('Available').classes()).toContain('bg-info-500');
+    expect(badge('Available').classes()).toContain('bg-info-600');
     expect(badge('Locked').classes()).toContain('bg-locked-600');
     expect(
       badge('Locked')
@@ -75,7 +75,7 @@ describe('StatusTabBar', () => {
     ).toBe(false);
     // An empty status dims its badge whatever its color.
     expect(badge('Completed').classes()).toContain('bg-surface-600');
-    expect(badge('Completed').classes()).not.toContain('bg-success-500');
+    expect(badge('Completed').classes()).not.toContain('bg-success-700');
   });
   it('outlines idle tabs as buttons and gives the selected tab its status color', () => {
     const wrapper = mountBar({ modelValue: 'locked' });

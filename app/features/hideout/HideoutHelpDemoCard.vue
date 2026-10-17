@@ -330,6 +330,7 @@
 </template>
 <script setup lang="ts">
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { HideoutLevel, HideoutStation, ItemRequirement } from '@/types/tarkov';
   const GenericCard = defineAsyncComponent(() => import('@/components/ui/GenericCard.vue'));
@@ -563,12 +564,9 @@
     if (props.mode === 'maxed') return 'primary';
     return props.mode === 'locked' ? 'locked' : 'success';
   });
-  const HIGHLIGHT_GRADIENTS = {
-    primary: 'bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600',
-    success: 'bg-gradient-to-br from-success-800 via-success-700 to-success-600',
-    locked: 'bg-gradient-to-br from-locked-800 via-locked-700 to-locked-600',
-  } as const;
-  const highlightClasses = computed(() => ({ [HIGHLIGHT_GRADIENTS[highlightColor.value]]: true }));
+  const highlightClasses = computed(() => ({
+    [CARD_HIGHLIGHT_GRADIENTS[highlightColor.value]]: true,
+  }));
   const statusBadgeClasses = computed(() => {
     if (props.mode === 'locked') {
       return 'border-locked-500/50 bg-locked-500/20 text-locked-400';
