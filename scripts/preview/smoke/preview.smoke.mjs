@@ -79,12 +79,18 @@ test.describe('Needed Items source tabs', () => {
     const response = await page.goto(`${origin}/needed-items`, { waitUntil: 'networkidle' });
     expect(response?.status()).toBe(200);
     await expectUsableApplication(page, record);
-    const tablist = page.getByRole('tablist').first();
+    // Accepts the tablist and the toggle-button group so the trusted suite passes before and
+    // after the shared status tab bar (#1224) lands.
+    const sources = page
+      .getByRole('group', { name: 'Needed item filters' })
+      .or(page.getByRole('tablist'))
+      .first();
     for (const width of [333, 400, 1280]) {
       await page.setViewportSize({ width, height: 800 });
       for (const label of ['All', 'Tasks', 'Hideout']) {
+        const name = new RegExp(`^${label}\\s+\\d+$`, 'i');
         await expect(
-          tablist.getByRole('tab', { name: new RegExp(`^${label}\\s+\\d+$`, 'i') }),
+          sources.getByRole('tab', { name }).or(sources.getByRole('button', { name })),
           `${label} tab name at ${width}px`
         ).toBeVisible();
       }
