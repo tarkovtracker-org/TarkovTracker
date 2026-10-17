@@ -14,10 +14,9 @@
           color="neutral"
           size="sm"
           :class="['shrink-0 gap-1.5', ...getTabClass(tab.tone, tab.value === modelValue)]"
-          :disabled="inertWhenSelected && tab.value === modelValue"
           :aria-pressed="tab.value === modelValue"
           :data-help-target="tab.helpTarget"
-          @click="emit('update:modelValue', tab.value)"
+          @click="onTabClick(tab.value)"
         >
           <UIcon :name="tab.icon" class="h-4 w-4 shrink-0" />
           <span class="sr-only text-xs uppercase sm:not-sr-only">{{ tab.label }}</span>
@@ -65,6 +64,10 @@
   const emit = defineEmits<{
     'update:modelValue': [value: T];
   }>();
+  const onTabClick = (value: T) => {
+    if (props.inertWhenSelected && value === props.modelValue) return;
+    emit('update:modelValue', value);
+  };
   defineSlots<{ actions?: () => unknown }>();
   const ALL_TAB = 'all';
   // "All" always leads and is set apart from the narrowing tabs by a divider.

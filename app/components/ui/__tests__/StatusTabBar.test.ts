@@ -85,14 +85,21 @@ describe('StatusTabBar', () => {
     expect(tabButton(wrapper, 'All').classes()).toContain('light:border-surface-600');
     expect(tabButton(wrapper, 'All').classes()).not.toContain('border-white/15');
   });
-  it('marks the selected tab pressed and ignores clicks on it by default', async () => {
+  it('keeps the selected tab focusable and pressed while ignoring clicks by default', async () => {
     const wrapper = mountBar();
     const all = tabButton(wrapper, 'All');
     expect(all.attributes('aria-pressed')).toBe('true');
-    expect(all.attributes('disabled')).toBeDefined();
+    expect(all.attributes('disabled')).toBeUndefined();
+    document.body.appendChild(wrapper.element);
+    (all.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(all.element);
+    expect((all.element as HTMLButtonElement).tabIndex).toBe(0);
+    await all.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     expect(tabButton(wrapper, 'Locked').attributes('aria-pressed')).toBe('false');
     await tabButton(wrapper, 'Locked').trigger('click');
     expect(wrapper.emitted('update:modelValue')).toEqual([['locked']]);
+    wrapper.unmount();
   });
   it('keeps the selected tab clickable when the page re-picks it', async () => {
     const wrapper = mountBar({ inertWhenSelected: false, tabsHelpTarget: 'tour-tabs' });

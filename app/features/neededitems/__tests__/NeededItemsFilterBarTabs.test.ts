@@ -46,6 +46,7 @@ describe('NeededItemsFilterBar source tabs', () => {
   beforeEach(() => setActivePinia(createPinia()));
   it('exposes the sources as labelled toggle buttons that switch on click', async () => {
     const wrapper = await mountSuspended(NeededItemsFilterBar, {
+      attachTo: document.body,
       props: {
         ...props,
         'onUpdate:modelValue': (value: FilterType) => {
@@ -71,11 +72,17 @@ describe('NeededItemsFilterBar source tabs', () => {
       ['Versteck', '4'],
     ]);
     expect(tabs.map((tab) => tab.attributes('aria-pressed'))).toEqual(['true', 'false', 'false']);
-    expect(tabs[0]?.attributes('disabled')).toBeDefined();
+    expect(tabs[0]?.attributes('disabled')).toBeUndefined();
+    (tabs[0]!.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(tabs[0]!.element);
+    await tabs[0]?.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
     await tabs[1]?.trigger('click');
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['tasks']);
     expect(tabs.map((tab) => tab.attributes('aria-pressed'))).toEqual(['false', 'true', 'false']);
-    expect(tabs[0]?.attributes('disabled')).toBeUndefined();
+    expect(tabs[1]?.attributes('disabled')).toBeUndefined();
+    await tabs[1]?.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toEqual([['tasks']]);
     wrapper.unmount();
   });
 });
