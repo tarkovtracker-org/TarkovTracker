@@ -421,8 +421,11 @@ async function evaluateQueuedScope(github, context, core, scope, source) {
 function sensitiveCommand(body) {
   return typeof body === 'string' && body.trimStart().startsWith('/approve-sensitive ');
 }
+function previousCommentBody(payload) {
+  return payload.changes?.body?.from;
+}
 export function relevantComment(payload) {
-  return [payload.comment?.body, payload.changes?.body?.from].some(sensitiveCommand);
+  return [payload.comment?.body, previousCommentBody(payload)].some(sensitiveCommand);
 }
 function relevantPrComment(payload) {
   return Boolean(payload.issue?.pull_request) && relevantComment(payload);
@@ -439,14 +442,20 @@ async function liveWriter(github, repo, login) {
     return true;
   }
 }
-// Only a write collaborator's command can change the decision, so others never queue a recheck.
+// New commands only count from live write collaborators.
 async function writerComment(github, context) {
   const login = commentUser(context.payload);
   if (!login) return false;
   return liveWriter(github, context.repo, login);
 }
+function priorSensitiveCommand(payload) {
+  if (payload.action === 'deleted') return sensitiveCommand(payload.comment?.body);
+  return payload.action === 'edited' && sensitiveCommand(previousCommentBody(payload));
+}
 async function relevantWriterComment(github, context) {
   if (!relevantPrComment(context.payload)) return false;
+  // A former writer's prior command may have admitted this head or queue group.
+  if (priorSensitiveCommand(context.payload)) return true;
   return writerComment(github, context);
 }
 async function successfulSignal(github, context) {

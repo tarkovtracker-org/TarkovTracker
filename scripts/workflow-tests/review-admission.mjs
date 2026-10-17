@@ -2102,15 +2102,14 @@ function permissionGithub(permission) {
 function statusError(status) {
   return Object.assign(new Error(`HTTP ${status}`), { status });
 }
-test('only write collaborator sensitive commands and withdrawals queue a serialized recheck', async () => {
+test('only write collaborator new sensitive commands queue a serialized recheck', async () => {
   const command = `/approve-sensitive ${head}`;
   const payloads = [
     commentPayload({ comment: { body: command, user: writerUser } }),
-    commentPayload({ action: 'deleted', comment: { body: command, user: writerUser } }),
     commentPayload({
       action: 'edited',
-      comment: { body: 'Withdrawn', user: writerUser },
-      changes: { body: { from: command } },
+      comment: { body: command, user: writerUser },
+      changes: { body: { from: 'Ordinary comment' } },
     }),
   ];
   const cases = [
@@ -2151,6 +2150,56 @@ test('only write collaborator sensitive commands and withdrawals queue a seriali
     }),
     false
   );
+});
+test('former writer approval withdrawals always recheck without a permission lookup', async () => {
+  const command = `\t/approve-sensitive ${head}`;
+  const payloads = [
+    commentPayload({ action: 'deleted', comment: { body: command, user: writerUser } }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: 'Withdrawn', user: writerUser },
+      changes: { body: { from: command } },
+    }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: `/approve-sensitive ${base}`, user: writerUser },
+      changes: { body: { from: command } },
+    }),
+  ];
+  for (const permission of ['read', 'triage', statusError(404), statusError(500)]) {
+    for (const payload of payloads) {
+      const github = permissionGithub(permission);
+      assert.equal(
+        await filterAdmission({ github, context: { eventName: 'issue_comment', repo, payload } }),
+        true
+      );
+    }
+  }
+  for (const payload of payloads) {
+    const github = {
+      rest: {
+        repos: {
+          getCollaboratorPermissionLevel: () =>
+            assert.fail('Withdrawal must not depend on live permission'),
+        },
+      },
+    };
+    assert.equal(
+      await filterAdmission({ github, context: { eventName: 'issue_comment', repo, payload } }),
+      true
+    );
+    assert.equal(
+      await filterAdmission({
+        github,
+        context: {
+          eventName: 'issue_comment',
+          repo,
+          payload: { ...payload, issue: { number: 1 } },
+        },
+      }),
+      false
+    );
+  }
 });
 test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
   const peer = simpleLock()

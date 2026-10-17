@@ -63,11 +63,13 @@ was emitted. Low-risk bot admission does not create a human approving review.
 
 The controller serializes relevant events at job scope, after its event filter. Ordinary issue
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
-including withdrawal of a command with leading whitespace. The filter admits a command event only
-when its author has live write permission; others' commands never count, so they cannot queue a
-recheck or flip a queued status to pending. `author_association` is not used, because it does not
-reliably reflect write access. A 404 means no collaborator and is ignored; any other permission
-lookup error still rechecks.
+including withdrawal of a command with leading whitespace. Edits of a prior approval command and
+deletion of an approval command always recheck: an author may have lost write permission since
+that command admitted the head or queue group. New commands (including edits of ordinary comments
+into commands) require live write permission before they queue a recheck. `author_association` is
+not used, because it does not reliably reflect write access. For new commands, a 404 means no
+collaborator and is ignored; any other permission lookup error still rechecks. Rechecking never
+grants approval by itself; the controller validates the current evidence and live permissions.
 
 Small ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Sensitive and unclassified changes require an exact-head approving review
