@@ -2387,7 +2387,7 @@
       "history_filter_label": "Wipe / prestige history",
       "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
       "import_since": "{mode}: import events at or after",
-      "selection_summary": "Selected: {count} quest states → {modes}",
+      "selection_summary": "Selected quest states ({count}): {modes}",
       "no_modes": "no modes",
       "version_unknown": "Unknown Version",
       "source_file": "Source File",
@@ -2423,6 +2423,7 @@
       "cleared_logs_toast_title": "No quest history in this selection",
       "cleared_logs_toast_description": "A session may contain no quest changes. Try including more sessions from the same character history, including notification or output logs. Deleted logs cannot be recovered.",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
         "budget_exceeded": "The selected logs exceed the safe import budget. Select fewer recent sessions or extract only the relevant log files. No progress was imported.",
         "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",

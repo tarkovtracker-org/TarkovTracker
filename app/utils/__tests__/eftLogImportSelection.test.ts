@@ -34,7 +34,10 @@ describe('EFT import selection', () => {
     expect(hasInvalidEftLogCutoff(selection, 'pvp')).toBe(false);
     const unidentified = { ...selection, modes: ['unknown'] as const };
     expect(hasInvalidEftLogCutoff(unidentified, 'pve')).toBe(false);
-    expect(hasInvalidEftLogCutoff(unidentified, 'pvp')).toBe(true);
+    expect(hasInvalidEftLogCutoff(unidentified, 'pvp')).toBe(false);
+    expect(hasInvalidEftLogCutoff({ ...unidentified, modes: ['pvp', 'unknown'] }, 'pvp')).toBe(
+      true
+    );
     expect(hasInvalidEftLogCutoff({ ...selection, modes: ['pvp'] }, 'pve')).toBe(true);
   });
   it('imports only the selected source mode without routing excluded unknown events', () => {
@@ -43,6 +46,16 @@ describe('EFT import selection', () => {
     );
     const selection = { ...createEftLogImportSelection(events), modes: ['pve'] as const };
     expect(selectEftImportEvents(events, selection, 'pvp')).toEqual([events[1]]);
+  });
+  it('does not route unidentified evidence without an explicit included destination', () => {
+    const events = [event('unknown', 'completed')];
+    const selection = {
+      ...createEftLogImportSelection(events),
+      modes: ['pve', 'unknown'] as const,
+    };
+    expect(selectEftImportEvents(events, selection, 'pvp')).toEqual([]);
+    expect(selectEftImportEvents(events, selection)).toEqual([]);
+    expect(selectEftImportEvents(events, selection, 'pve')[0]?.mode).toBe('pve');
   });
   it('filters states after reconciliation instead of resurrecting an older completion', () => {
     const events = [event('pve', 'completed'), event('pve', 'failed', 2000)];

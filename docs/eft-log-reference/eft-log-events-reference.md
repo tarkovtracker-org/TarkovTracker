@@ -936,8 +936,9 @@ context, and identifier-label values.
 - Generic events inherit a session mode envelope. Only a direct gateway/WSS marker or explicit session
   mode proves the message's environment.
 - No explicit quest-accept route or unambiguous item-handover event was retained. Typed chat
-  notifications still establish started/failed/completed quest states (message types 10/11/12);
-  route absence does not mean there is no start evidence.
+  notifications establish started/completed quest states (message types 10/12). Type 11 failures
+  are fixture-covered only; none were observed in the latest corpus. Route absence does not mean
+  there is no start evidence.
 - No verified self-prestige/reset event or authoritative self-XP snapshot was established.
   `/client/prestige/list` is a catalogue request; `PrestigeLevel` in friend/group snapshots can
   describe other players. The 296 inspected change-event arrays in the latest corpus were empty.

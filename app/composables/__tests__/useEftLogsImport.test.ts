@@ -170,6 +170,24 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
     expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
   });
+  it('never applies unidentified evidence into an excluded destination', async () => {
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([completionLog()], 'log_unknown/notifications.log'),
+      new File(
+        [
+          backendLog('gw-pve-01.escapefromtarkov.com') +
+            '\n' +
+            completionLog().replace('event-123', 'pve-event'),
+        ],
+        'log_pve/output.log'
+      ),
+    ]);
+    importer.setSelection({ ...importer.selection.value, modes: ['pve', 'unknown'] });
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+  });
   it('does not let an excluded unidentified event block a Seasonal destination', async () => {
     const importer = await loadComposable();
     await importer.parseFiles([

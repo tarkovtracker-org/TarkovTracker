@@ -22,7 +22,7 @@
     name: 'GameModeToggle',
   });
   const { modelValue, disabledModes = [] } = defineProps<{
-    modelValue: GameMode;
+    modelValue: GameMode | undefined;
     disabledModes?: GameMode[];
   }>();
   const emit = defineEmits<{

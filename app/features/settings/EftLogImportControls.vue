@@ -71,7 +71,7 @@
   const props = defineProps<{
     modelValue: EftLogImportSelection;
     events: EftQuestImportEvent[];
-    targetMode: GameMode;
+    targetMode?: GameMode;
     disabled: boolean;
   }>();
   const emit = defineEmits<{ 'update:modelValue': [selection: EftLogImportSelection] }>();
@@ -96,7 +96,8 @@
   const cutoffModes = computed(() =>
     GAME_MODE_VALUES.filter(
       (mode) =>
-        (props.modelValue.modes.includes(mode) && modeCount(mode) > 0) ||
+        (props.modelValue.modes.includes(mode) &&
+          (modeCount(mode) > 0 || props.modelValue.since[mode] !== undefined)) ||
         (props.modelValue.modes.includes('unknown') && props.targetMode === mode)
     )
   );

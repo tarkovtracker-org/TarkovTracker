@@ -183,8 +183,10 @@ four-character suffix. Switching accounts resets version and data selection to t
 
 - Users can include/exclude detected PvP, PvE, Seasonal, and unidentified-mode evidence, and
   completed, started/active, or failed quest states. Known modes default on. Unidentified events
-  default off when eligible known-mode evidence exists; unidentified-only histories retain the
-  explicit destination picker. Excluded modes are never switched into or mutated.
+  default off when eligible known-mode evidence exists; all selected unidentified histories require an
+  explicit destination choice, including mixed logs. The destination must remain included;
+  excluded modes are never switched into or mutated.
+- Saved cutoffs remain editable when a version filter removes that mode's events.
 - A per-destination **import since** time is an inclusive lower bound, entered in browser-local
   time. It applies to the original notification time (`dt`) when available, otherwise the receipt
   timestamp; undated evidence is excluded when a cutoff exists. Unidentified evidence uses its
@@ -206,4 +208,4 @@ Completed-task imports restore objectives and may infer prerequisite states, min
 requirements, and story gates. They do not provide exact self XP, skill snapshots, partial objective
 handovers, or hideout progress. Missing history remains missing. If combining log and profile
 imports, apply the selected logs first, then a refreshed matching profile to align level/skills to
-that snapshot. Raw cumulative profile XP is converted locally once; saved level remains authoritative.
+that snapshot. The profile importer derives and saves the level from cumulative profile XP.

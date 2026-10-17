@@ -99,7 +99,7 @@ const {
     parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
-    previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
+    previewData: {} as Ref<Record<string, unknown> | null>,
     importState: {
       __v_isRef: true as const,
       value: 'idle' as 'idle' | 'preview' | 'success' | 'error',
@@ -295,7 +295,7 @@ describe('DataManagementCard', () => {
     eftLogsState.isImporting = ref(false);
     eftLogsState.isParsing = ref(false);
     eftLogsState.parseProgress = ref({ bytesRead: 0, totalBytes: 0 });
-    eftLogsState.previewData.value = null;
+    eftLogsState.previewData = ref(null);
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
     tarkovDevFns.setError.mockImplementation((message: string) => {
@@ -409,6 +409,69 @@ describe('DataManagementCard', () => {
       since: { pvp: NaN },
     };
     const wrapper = createWrapper({ view: 'imports' });
+    expect(
+      findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
+    ).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('requires an explicit unidentified destination instead of inheriting the active mode', async () => {
+    const questId = '61604635c725987e815b1a46';
+    const events = [
+      {
+        mode: 'unknown' as const,
+        status: 'completed' as const,
+        questId,
+        eventKey: 'unknown',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData = ref({
+      events,
+      matchedTaskIdsByMode: { unknown: [questId] },
+      matchedStartedTaskIdsByMode: { unknown: [] },
+    });
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    const wrapper = createWrapper({ view: 'imports' });
+    const confirm = findButtonByText(wrapper, 'common.confirm_import')!;
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('settings.log_import.errors.choose_unknown_mode');
+    await wrapper.findComponent({ name: 'GameModeToggle' }).vm.$emit('update:modelValue', 'pvp');
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeUndefined();
+    eftLogsState.selection.value = { ...eftLogsState.selection.value, modes: ['pve', 'unknown'] };
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(wrapper.findComponent({ name: 'GameModeToggle' }).props('disabledModes')).toContain(
+      'pvp'
+    );
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    eftLogsState.previewData.value = {
+      ...eftLogsState.previewData.value,
+      selectedAccount: 'other-account',
+    };
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+  it('keeps a selected invalid cutoff editable after a version removes that mode history', async () => {
+    const questId = '61604635c725987e815b1a46';
+    const events = (['pvp', 'pve'] as const).map((mode) => ({
+      mode,
+      status: 'completed' as const,
+      questId,
+      eventKey: mode,
+      timestamp: null,
+    }));
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData = ref({ events });
+    eftLogsState.selection.value = { ...createEftLogImportSelection(events), since: { pvp: NaN } };
+    const wrapper = createWrapper({ view: 'imports' });
+    eftLogsState.previewData.value = { events: [events[1]] };
+    await wrapper.vm.$nextTick();
+    const cutoff = wrapper.find('input[id$="-pvp"]');
+    expect(cutoff.exists()).toBe(true);
+    await cutoff.setValue('');
     expect(
       findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
     ).toBeUndefined();
@@ -1155,6 +1218,10 @@ describe('DataManagementCard', () => {
       };
       tarkovStoreState.currentMode = 'seasonal';
       const wrapper = createWrapper();
+      await wrapper
+        .findComponent({ name: 'GameModeToggle' })
+        .vm.$emit('update:modelValue', 'seasonal');
+      await wrapper.vm.$nextTick();
       const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
       expect(vm.eftLogsCompletedCount).toBe(0);
       expect(wrapper.text()).toContain('settings.log_import.errors.outside_active_season');

@@ -688,9 +688,7 @@
               </label>
               <GameModeToggle
                 v-model="eftLogsTargetMode"
-                :disabled-modes="
-                  eftLogsIsImporting ? [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL] : []
-                "
+                :disabled-modes="eftLogsDisabledTargetModes"
               />
               <p class="text-surface-400 text-xs">
                 {{ $t('settings.log_import.import_unknown_to_mode_hint') }}
@@ -1399,7 +1397,15 @@
   );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
   const eftLogsFolderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
-  const eftLogsTargetMode = ref<GameMode>(currentImportableMode());
+  const eftLogsTargetMode = ref<GameMode>();
+  watch([eftLogsImportState, () => eftLogsPreview.value?.selectedAccount], () => {
+    eftLogsTargetMode.value = undefined;
+  });
+  const eftLogsDisabledTargetModes = computed(() =>
+    GAME_MODE_VALUES.filter(
+      (mode) => eftLogsIsImporting.value || !eftLogsSelection.value.modes.includes(mode)
+    )
+  );
   const eftLogsNoQuestEventsError = computed(() =>
     t('settings.log_import.errors.no_quest_events_found')
   );
@@ -1694,8 +1700,9 @@
     }
   }
   async function handleEftLogsConfirm() {
+    if (eftLogsDestinationError.value) return;
     try {
-      await confirmEftLogsImport(eftLogsTargetMode.value);
+      await confirmEftLogsImport(eftLogsTargetMode.value ?? currentImportableMode());
     } catch (err) {
       logger.error(
         'DataManagementCard: confirmEftLogsImport failed',
@@ -1754,7 +1761,10 @@
   );
   /** Applies the confirmation guard before enabling a Seasonal import. */
   const eftLogsHasOutsideSeasonEvents = computed(() =>
-    hasOutsideSeasonEvents(eftLogsSelectedEvents.value, eftLogsTargetMode.value)
+    hasOutsideSeasonEvents(
+      eftLogsSelectedEvents.value,
+      eftLogsTargetMode.value ?? currentImportableMode()
+    )
   );
   const eftLogsInvalidDate = computed(() =>
     hasInvalidEftLogCutoff(eftLogsSelection.value, eftLogsTargetMode.value)
@@ -1768,7 +1778,15 @@
       return t('settings.log_import.errors.empty_selection');
     return null;
   }
-  const eftLogsPreviewError = computed(() => eftLogsImportError.value ?? eftLogsSelectionError());
+  const eftLogsDestinationError = computed(() => {
+    if (!eftLogsRequiresManualModeSelection.value) return null;
+    const target = eftLogsTargetMode.value;
+    if (target && eftLogsSelection.value.modes.includes(target)) return null;
+    return t('settings.log_import.errors.choose_unknown_mode');
+  });
+  const eftLogsPreviewError = computed(
+    () => eftLogsImportError.value ?? eftLogsDestinationError.value ?? eftLogsSelectionError()
+  );
   const eftLogsSelectedModeLabel = computed(
     () =>
       GAME_MODE_VALUES.filter((mode) =>

@@ -26,22 +26,33 @@ export function isInvalidEftLogCutoff(time: number | undefined): boolean {
   if (time === undefined) return false;
   return !Number.isFinite(time) || time < 0 || time > 8.64e15;
 }
+/** Unidentified history may only route into an explicitly chosen, included destination. */
+function selectedDestination(
+  mode: EftQuestEventMode,
+  selection: EftLogImportSelection,
+  targetMode?: GameMode
+): GameMode | undefined {
+  const destination = mode === 'unknown' ? targetMode : mode;
+  return destination && selection.modes.includes(destination) ? destination : undefined;
+}
 /** Only selected sources and the unidentified destination can apply a cutoff. */
 export function hasInvalidEftLogCutoff(
   selection: EftLogImportSelection,
-  targetMode: GameMode
+  targetMode?: GameMode
 ): boolean {
-  return selection.modes.some((mode) =>
-    isInvalidEftLogCutoff(selection.since[mode === 'unknown' ? targetMode : mode])
-  );
+  return selection.modes.some((mode) => {
+    const destination = selectedDestination(mode, selection, targetMode);
+    return destination !== undefined && isInvalidEftLogCutoff(selection.since[destination]);
+  });
 }
 /** Applies the destination's reset cutoff to original event time, never its replay delivery time. */
 function isWithinImportHistory(
   event: EftQuestImportEvent,
   selection: EftLogImportSelection,
-  targetMode: GameMode
+  targetMode?: GameMode
 ): boolean {
-  const mode = event.mode === 'unknown' ? targetMode : event.mode;
+  const mode = selectedDestination(event.mode, selection, targetMode);
+  if (!mode) return false;
   const cutoff = selection.since[mode];
   if (cutoff === undefined) return true;
   const time = knownQuestEventTime(event);
@@ -53,7 +64,7 @@ function isWithinImportHistory(
 export function selectEftImportEvents(
   events: EftQuestImportEvent[],
   selection: EftLogImportSelection,
-  targetMode: GameMode
+  targetMode?: GameMode
 ): EftQuestImportEvent[] {
   const history = events.filter(
     (event) =>
