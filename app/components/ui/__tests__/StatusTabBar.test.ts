@@ -89,6 +89,8 @@ describe('StatusTabBar', () => {
     const wrapper = mountBar();
     const all = tabButton(wrapper, 'All');
     expect(all.attributes('aria-pressed')).toBe('true');
+    expect(all.classes()).toContain('cursor-default!');
+    expect(tabButton(wrapper, 'Locked').classes()).not.toContain('cursor-default!');
     expect(all.attributes('disabled')).toBeUndefined();
     document.body.appendChild(wrapper.element);
     (all.element as HTMLButtonElement).focus();
@@ -104,6 +106,7 @@ describe('StatusTabBar', () => {
   it('keeps the selected tab clickable when the page re-picks it', async () => {
     const wrapper = mountBar({ inertWhenSelected: false, tabsHelpTarget: 'tour-tabs' });
     const all = tabButton(wrapper, 'All');
+    expect(all.classes()).not.toContain('cursor-default!');
     expect(all.attributes('disabled')).toBeUndefined();
     await all.trigger('click');
     expect(wrapper.emitted('update:modelValue')).toEqual([['all']]);

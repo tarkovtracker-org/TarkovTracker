@@ -13,7 +13,11 @@
           variant="ghost"
           color="neutral"
           size="sm"
-          :class="['shrink-0 gap-1.5', ...getTabClass(tab.tone, tab.value === modelValue)]"
+          :class="[
+            'shrink-0 gap-1.5',
+            ...getTabClass(tab.tone, tab.value === modelValue),
+            { 'cursor-default!': inertWhenSelected && tab.value === modelValue },
+          ]"
           :aria-pressed="tab.value === modelValue"
           :data-help-target="tab.helpTarget"
           @click="onTabClick(tab.value)"
