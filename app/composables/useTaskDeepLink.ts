@@ -4,6 +4,7 @@ import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
+import { TASK_STATE } from '@/utils/constants';
 import { getQueryString } from '@/utils/routeHelpers';
 import { isTaskListPath, TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
 import type { Task } from '@/types/tarkov';
@@ -24,7 +25,7 @@ export interface UseTaskDeepLinkReturn {
   highlightObjective: (objectiveId: string) => Promise<void>;
   cleanup: () => void;
 }
-type TaskStatus = 'available' | 'locked' | 'completed' | 'failed';
+type TaskStatus = 'active' | 'available' | 'locked' | 'completed' | 'failed';
 export function useTaskDeepLink({
   filteredTasks,
   leafletMapRef,
@@ -37,7 +38,7 @@ export function useTaskDeepLink({
   const progressStore = useProgressStore();
   const { trackFocusedTaskVisible } = useDashboardFocusAnalytics();
   const { tasks } = storeToRefs(metadataStore);
-  const { tasksCompletions, unlockedTasks, tasksFailed } = storeToRefs(progressStore);
+  const { tasksCompletions, tasksState, unlockedTasks, tasksFailed } = storeToRefs(progressStore);
   const pinnedTaskId = ref<string | null>(null);
   const highlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const objectiveHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
@@ -54,6 +55,7 @@ export function useTaskDeepLink({
     if (isFailed) return 'failed';
     const isCompleted = tasksCompletions.value?.[taskId]?.['self'] ?? false;
     if (isCompleted) return 'completed';
+    if (tasksState.value[taskId] === TASK_STATE.ACTIVE) return 'active';
     const isUnlocked = unlockedTasks.value?.[taskId]?.['self'] ?? false;
     if (isUnlocked) return 'available';
     return 'locked';

@@ -71,6 +71,9 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     if (typeof completion.failed === 'boolean') {
       normalized.failed = completion.failed;
     }
+    if (typeof completion.active === 'boolean') {
+      normalized.active = completion.active;
+    }
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
     }

@@ -12,7 +12,15 @@ export function detectDataConflicts(
   for (const taskId of taskIds) {
     const localFlags = getCompletionFlags(localTasks[taskId] as RawTaskCompletion);
     const remoteFlags = getCompletionFlags(remoteTasks[taskId] as RawTaskCompletion);
-    if (localFlags.complete !== remoteFlags.complete || localFlags.failed !== remoteFlags.failed) {
+    // Only `active: true` is authoritative acceptance, so a legacy row without
+    // the field agrees with an explicit `active: false` instead of conflicting.
+    const localActive = localTasks[taskId]?.active === true;
+    const remoteActive = remoteTasks[taskId]?.active === true;
+    if (
+      localFlags.complete !== remoteFlags.complete ||
+      localFlags.failed !== remoteFlags.failed ||
+      localActive !== remoteActive
+    ) {
       conflictCount++;
     }
   }
