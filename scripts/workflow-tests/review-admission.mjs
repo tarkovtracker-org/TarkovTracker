@@ -2176,11 +2176,14 @@ test('former writer approval withdrawals always recheck without a permission loo
     }
   }
   for (const payload of payloads) {
+    let permissionLookups = 0;
     const github = {
       rest: {
         repos: {
-          getCollaboratorPermissionLevel: () =>
-            assert.fail('Withdrawal must not depend on live permission'),
+          getCollaboratorPermissionLevel: async () => {
+            permissionLookups++;
+            return { data: { permission: 'write' } };
+          },
         },
       },
     };
@@ -2199,6 +2202,7 @@ test('former writer approval withdrawals always recheck without a permission loo
       }),
       false
     );
+    assert.equal(permissionLookups, 0, 'Withdrawal must not depend on live permission');
   }
 });
 test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
