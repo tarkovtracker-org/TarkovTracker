@@ -97,13 +97,14 @@ Batching pushes and requesting Codex only exceptionally keep reviewer allowances
 reportedly drew over 20 Codex reviews across about 45 pushes. CodeRabbit CLI and PR reviews have
 separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
-Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
-branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
-`CI Result` and `Preview Result` on the new head. Reuse review evidence for an unchanged diff after
+Reviews attach to the PR's own diff. Main merges through the native merge queue, which builds each
+entry on current main, so a behind branch is enqueued unchanged rather than updated
+([current state](merge-queue-rollout.md#current-state)). When a branch changes anyway, `CI Result`
+and `Preview Result` rerun on the new head. Reuse review evidence for an unchanged diff after
 assessing integration with changed base code; a conflict-free merge alone does not establish that
 validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
-re-review triggers. Do not pause other merges for freshness. Repo auto-merge is disabled, so a
-maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
+re-review triggers. Repo auto-merge is disabled; an authorized agent submits the reviewed head with
+the head-pinned enqueue helper and Actions owns the merge.
 
 ### Codex request deduplication and waiting
 
@@ -396,25 +397,24 @@ candidate.
 
 Only release jobs share the non-cancelling `release-main` concurrency group. CI can cancel obsolete
 validation independently; an active publisher is not cancelled by a newer merge. A merge in the
-small interval after the last check remains subject to semantic-release's upstream check and git's
-non-fast-forward push protection. No force push or rebase onto an unvalidated commit is permitted.
+small interval after the last check remains subject to semantic-release's upstream check, and an
+interleaved main change fails promotion closed
+([recovery](../scripts/release/README.md#recovery-when-main-or-the-queue-interleaves-changes)).
+No force push or rebase onto an unvalidated commit is permitted.
 
 This removes the duplicate full test suite and database reset from the serialized release path.
 The production build remains a release check. Cloudflare deployments continue independently;
 this workflow controls release/version publication, not when the initial deployment starts.
 
-**Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
-the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
-an empty bypass list before merging the automation changes. It targets
-`refs/heads/main`, requires both `CI Result` and `Preview Result` from GitHub Actions (integration ID `15368`), enables
-`strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
-all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
-rules remain separate. Behind branches must incorporate current main and pass CI again; do not
-use an administrator bypass. GitHub enforces freshness at merge time, closing the interval after
-automation's last base-SHA check. Both Crowdin and release automation verify the effective strict rule before writing main. The
-administrator must verify the deployed ruleset's empty bypass list during rollout and after policy
-changes. GitHub hides that list from callers without ruleset write access; automation does not
-request administrative permissions merely to inspect it.
+**Required main policy:** main is queue-only. The active queue ruleset, the disabled
+`Main CI freshness` rollback template, evidence and rollback are owned by
+[merge queue rollout](merge-queue-rollout.md#current-state); do not use an administrator bypass.
+Crowdin and release automation read the effective main policy through
+`scripts/ci/github-ci-gate.sh` (`queue` live; `strict` or `strict-queue` after a rollback) before
+submitting to main, and fail closed when it is missing or weakened. The administrator verifies the
+deployed rulesets' empty bypass lists after policy changes. GitHub hides those lists from callers
+without ruleset write access; automation does not request administrative permissions merely to
+inspect them.
 
 **Version-bump commit:** `scripts/release/release-commit.mjs` prepares the bumped `package.json` and
 `CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
@@ -435,24 +435,21 @@ compare the checked-out commit with its parent, so dispatching main does not com
 The dispatched CI status-reporting invariant and trusted-code boundary are defined in
 [release publication spec](systems/ci-and-release.md#release-validation-and-publication).
 
-After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
-main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
-unvalidated assets. The required check is already successful on that commit. The token suppresses
-recursive main Actions runs; semantic-release then tags and publishes the validated version.
-Successful promotion deletes only the staging ref still pointing at that SHA. Failed attempts
-retain the staging branch for diagnosis. A cleanup failure emits a warning without undoing
-publication. No token is written to a Git URL or config.
+Release does not push to main. After rechecking main and the policy, `release-commit.sh` opens a
+version-only PR from the staging branch, explicitly dispatches trusted Review Admission, and the
+run finishes without tagging or publishing. `release-promotion-queue.yml` submits the admitted,
+unchanged PR to the native merge queue (in a `strict` rollback it merges with
+`gh pr merge --match-head-commit` instead); a later trusted Release run finalizes only the actual
+merged SHA, creating the tag and GitHub release through the API. The staging branch history is
+retained. No token is written to a Git URL or config. Promotion, finalization and their
+guarantees are owned by [release automation](../scripts/release/README.md#queue-promotion).
 
-**Interrupted publication:** If tag pushing or GitHub publication fails after main promotion, rerun
-the original Release workflow. `release-recovery.mjs` is enabled only for reruns and recognizes
-only the direct version-commit child of the original successful main CI revision. It requires
-successful exact-SHA GitHub Actions `CI Result` and `Preview Result`, exactly the two generated modified assets, a
-manifest whose only change is the matching version, and a changelog that preserves all previous
-content. It reconstructs the original notes and creates the missing tag/release idempotently.
-An existing tag must point to that same commit; an unrelated main successor, unsuccessful CI,
-conflicting tag, draft/prerelease publication, or changed asset content cannot be recovered.
-The recovery step rechecks the evidence before publication and never moves main or creates another
-version commit. Failures before promotion use the ordinary original-workflow retry path.
+**Interrupted publication:** pending finalization of a merged version PR resumes on trusted main
+CI completion, schedule or dispatch, and recovers a missing tag/release idempotently without
+moving main or creating another version commit. Recovery of legacy direct-push versions and of
+interleaved or stale version PRs is owned by
+[release automation](../scripts/release/README.md#recovery-when-main-or-the-queue-interleaves-changes)
+and the [release publication spec](systems/ci-and-release.md#release-validation-and-publication).
 
 Cloudflare Git deployments remain independent and build the version commit. The footer version
 comes from `packageJson.version` in `nuxt.config.ts`, so this second production build makes the
@@ -745,8 +742,9 @@ deployment; later deployable revisions can then refresh after their own successf
 
 For pull requests, `Preview Result` is published on the validated head commit only. GitHub
 regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
-status there disappears and blocks the merge; strict ruleset freshness keeps a head-bound result
-tied to current main. Artifact verification still binds to the test merge and accepts a
+status there disappears and blocks the merge. The merge queue then requires its own `Preview Result`
+on the queue commit built on current main (strict freshness, if restored for rollback, instead
+keeps a head-bound result tied to current main). Artifact verification still binds to the test merge and accepts a
 regenerated commit only with the same base/head parents and tree. A dispatched
 branch build associated with a PR can satisfy it only when the build tree matches that test merge
 and the PR base is current main; otherwise the result stays pending. Crowdin, Dependabot, and
@@ -794,7 +792,9 @@ environments, and the repository-scoped copy was removed. GitHub confirms secret
 not reveal its value or scope; the first manual deployment checks that the token works. The connected
 Cloudflare API credential cannot create API tokens.
 
-Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if it is absent):
+Ordered rollout (history, run in 2026-09 under strict freshness). `Preview Result` is now
+required by the active queue ruleset on the queue commit; verify current enforcement and rollback
+in [merge queue rollout](merge-queue-rollout.md#current-state), not with step 7 below:
 
 1. Capture settings (done above). Readback commands, run with a scoped `CLOUDFLARE_API_TOKEN`:
 
@@ -823,17 +823,18 @@ Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if 
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
    PR #896's current head. Confirm upload, deployment record, smoke suite, and head-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
-7. Verify that the deployed ruleset already requires `Preview Result` alongside `CI Result`, with
-   strict freshness and the empty bypass list, and that a preview-required PR with a missing or
-   pending `Preview Result` is blocked. Apply `.github/main-ci-ruleset.json` only if that
-   requirement is absent, then repeat the verification. Confirm one current-head application PR
+7. Done under the 2026-09 strict policy: the deployed `Main CI freshness` ruleset was verified to
+   require `Preview Result` alongside `CI Result`, with strict freshness and the empty bypass list,
+   and a preview-required PR with a missing or pending `Preview Result` was blocked. The procedure
+   applied `.github/main-ci-ruleset.json` only if that requirement was absent; applying it now
+   re-enables strict freshness, which is a rollback. Confirm one current-head application PR
    uploads, passes smoke tests, and publishes `Preview Result: success`, and that its prior
    automatic result stayed pending without a Pages build. Review the controller's failure and
    stale-revision fixtures and the existing failed PR evidence:
 
    ```bash
    gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
-   # Only if Preview Result is not already required:
+   # Historical: this re-enables strict freshness; use it only for a documented rollback.
    gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    ```
 
@@ -844,8 +845,10 @@ Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if 
 8. Remove temporary compatibility behavior after the new paths are verified.
 
 **Rollback:** before enforcement, disable the `Preview` workflow and re-enable automatic Cloudflare
-preview builds. After enforcement, an operator must first remove `Preview Result` from the ruleset
-(explicit ruleset change) before disabling the controller; never manufacture a successful preview
+preview builds. After enforcement, an operator must first remove `Preview Result` from the
+required-check rulesets (an explicit ruleset change; the live queue ruleset is listed in
+[current state](merge-queue-rollout.md#current-state)) before disabling the controller; never
+manufacture a successful preview
 status. Worker deployment, authenticated backend behavior, and production rollout keep their
 existing separate verification.
 
@@ -1029,7 +1032,7 @@ pnpm run build
 
 ### Coverage Reports
 
-- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `.github/codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
+- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `.github/codecov.yml`; results are reported as `codecov/*` statuses and PR comments are disabled. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` holds a non-empty value, so local builds without that variable and fork pull requests are unaffected. A fork pull request receives no org secrets, so the secret expression expands to an empty string rather than being absent; the emptiness check is what keeps the plugin from loading without a usable upload token.
 - The `validate` job's production build runs on fork pull requests too. It needs no secrets: `SUPABASE_URL` and `SUPABASE_ANON_KEY` expand to empty strings and the app builds in its offline configuration, which still exercises the same TypeScript, bundling, and Nitro output. Coverage and bundle uploads stay fork-skipped because those do require the org token.
 - Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.

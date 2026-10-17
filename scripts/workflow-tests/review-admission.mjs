@@ -25,6 +25,7 @@ const {
   publishReviewAdmission,
   publishReviewScope,
   runReviewAdmission,
+  runReviewAdmissionStep,
   relevantComment,
   filterAdmission,
 } = await import('../ci/review-admission.mjs');
@@ -32,6 +33,25 @@ const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const queued = 'c'.repeat(40);
 const repo = { owner: 'example', repo: 'repo' };
+const queueRulesRoute = 'GET /repos/{owner}/{repo}/rules/branches/{branch}';
+function queueRules() {
+  return [
+    {
+      type: 'merge_queue',
+      ruleset_id: 43,
+      ruleset_source_type: 'Repository',
+      ruleset_source: 'example/repo',
+      parameters: {
+        max_entries_to_build: 1,
+        max_entries_to_merge: 1,
+        min_entries_to_merge: 1,
+        grouping_strategy: 'ALLGREEN',
+        merge_method: 'SQUASH',
+        check_response_timeout_minutes: 60,
+      },
+    },
+  ];
+}
 function fixture() {
   return {
     pr: {
@@ -58,6 +78,7 @@ function fixture() {
     comments: [],
     checks: [],
     trusted: new Set(['maintainer']),
+    [queueRulesRoute]: queueRules(),
   };
 }
 function human(state = 'APPROVED', change = {}) {
@@ -69,6 +90,74 @@ function human(state = 'APPROVED', change = {}) {
     ...change,
   };
 }
+// Summary emitted by Cubic on PR #1230's exact head (review 5527226774).
+const cubicCleanSummary = `<!-- cubic:review-summary:start -->
+<!-- cubic:review-summary:confidence-score:5/5 -->
+**No issues found** across 1 file
+
+Confidence score: **5/5**
+- Automated review surfaced no issues in the provided summaries.
+- No files require special attention.
+<!-- cubic:review-summary:end -->`;
+test('Cubic admission requires one clean overall summary instead of quoted or conflicting results', () => {
+  const f = fixture();
+  for (const result of [
+    '**No issues found** across 1 file',
+    '**0 issues found**',
+    '**0 issues found across 1 file (changes from recent commits).**',
+    '**All reported issues were addressed** across 3 files',
+  ]) {
+    f.reviews[0].body = cubicCleanSummary.replace('**No issues found** across 1 file', result);
+    assert.equal(admissionDecision(f).approved, true, result);
+  }
+  for (const body of [
+    cubicCleanSummary + '\n**1 issue found**',
+    cubicCleanSummary + '\nReview skipped',
+    cubicCleanSummary + '\n> **No issues found**',
+    cubicCleanSummary.replace('No files require special attention.', 'Review skipped'),
+    cubicCleanSummary.replace('No files require special attention.', '> **No issues found**'),
+    cubicCleanSummary.replace('**No issues found**', '**1 issue found**') + '\n**No issues found**',
+    cubicCleanSummary.replace('**No issues found**', '**1 issue found**') +
+      '\n' +
+      cubicCleanSummary,
+    cubicCleanSummary.replace(
+      '**No issues found** across 1 file',
+      '**No issues found** for file A\n**1 issue found** for file B'
+    ),
+    cubicCleanSummary.replace(
+      'No files require special attention.',
+      '1 issue found in another file.'
+    ),
+    cubicCleanSummary.replace(
+      '**No issues found**',
+      'Review skipped; previously **No issues found**'
+    ),
+  ]) {
+    f.reviews[0].body = body;
+    assert.throws(() => admissionDecision(f), /Completed exact-head independent review/, body);
+  }
+});
+test('live Cubic clean summary admits the reviewed head while preserving admission guards', () => {
+  const f = fixture();
+  f.reviews[0].body = cubicCleanSummary;
+  f.checks = [{ app: { id: 1082092 }, head_sha: head, status: 'completed', conclusion: 'success' }];
+  assert.equal(admissionDecision(f).review.provider, 'Cubic');
+  for (const change of [
+    { commit_id: base },
+    { user: { id: 55, type: 'Bot' } },
+    { state: 'PENDING' },
+    { submitted_at: null },
+    { body: cubicCleanSummary.replace('**No issues found**', '**1 issue found**') },
+    { body: cubicCleanSummary.replace('**No issues found**', 'Review skipped') },
+  ]) {
+    assert.throws(() => admissionDecision({ ...f, reviews: [{ ...f.reviews[0], ...change }] }));
+  }
+  f.threads = [{ isResolved: false, isOutdated: false }];
+  assert.throws(() => admissionDecision(f), /Unresolved review findings/);
+  f.threads = [];
+  f.files[0].filename = '.github/workflows/ci.yml';
+  assert.throws(() => admissionDecision(f), /exact-head collaborator approval/);
+});
 test('only completed authenticated exact-head provider review admits ordinary fixes', () => {
   assert.equal(admissionDecision(fixture()).risk, 'low');
   for (const change of [
@@ -463,20 +552,15 @@ function queueFixture() {
   const state = {
     ref: queued,
     main: base,
-    parent: base,
-    status: 'ahead',
+    parents: [base],
+    comparison: { status: 'ahead', ahead_by: 1, behind_by: 0 },
+    commitRequests: [],
+    rules: queueRules(),
     entry: {
       position: 1,
       baseCommit: { oid: base },
       headCommit: { oid: queued },
       pullRequest: { number: 1, headRefOid: head },
-      mergeQueue: {
-        configuration: {
-          maximumEntriesToBuild: 1,
-          maximumEntriesToMerge: 1,
-          mergingStrategy: 'ALLGREEN',
-        },
-      },
     },
   };
   const github = {
@@ -485,24 +569,41 @@ function queueFixture() {
         getRef: async ({ ref }) => ({
           data: { object: { sha: ref === 'heads/main' ? state.main : state.ref } },
         }),
-        getCommit: async () => ({ data: { parents: [{ sha: state.parent }] } }),
+        getCommit: async ({ commit_sha }) => {
+          state.commitRequests.push(commit_sha);
+          return { data: { parents: state.parents.map((sha) => ({ sha })) } };
+        },
       },
-      repos: { compareCommits: async () => ({ data: { status: state.status } }) },
+      repos: {
+        compareCommits: async ({ base: from, head: to }) => {
+          assert.deepEqual([from, to], [base, queued]);
+          return { data: state.comparison };
+        },
+      },
     },
-    graphql: async () => ({
-      repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } },
-    }),
+    paginate: async (route, params) => {
+      assert.equal(route, queueRulesRoute);
+      assert.deepEqual(params, { ...repo, branch: 'main', per_page: 100 });
+      return state.rules;
+    },
+    graphql: async (query) => {
+      assert.doesNotMatch(query, /configuration|\bmergeQueue\s*\{/);
+      return { repository: { pullRequest: { headRefOid: head, mergeQueueEntry: state.entry } } };
+    },
   };
   return { github, pr, group, state };
 }
-test('queue admission proves live ref, main parent, PR ancestry and exact queued entry', async () => {
+test('queue admission proves live ref, single squash commit on main and exact queued entry', async () => {
   const f = queueFixture();
   await queueIdentity(f.github, repo, f.group, f.pr);
+  assert.deepEqual(f.state.commitRequests, [queued]);
   for (const change of [
     { ref: head },
     { main: head },
-    { parent: head },
-    { status: 'diverged' },
+    { parents: [head] },
+    { parents: [base, head] },
+    { comparison: { status: 'diverged', ahead_by: 1, behind_by: 1 } },
+    { comparison: { status: 'ahead', ahead_by: 2, behind_by: 0 } },
     { entry: null },
     { entry: { ...f.state.entry, headCommit: { oid: head } } },
     { entry: { ...f.state.entry, position: 2 } },
@@ -517,8 +618,62 @@ test('queue admission proves live ref, main parent, PR ancestry and exact queued
     { head_ref: 'refs/heads/gh-readonly-queue/main/pr-2-abcdef' },
   ])
     await assert.rejects(queueIdentity(f.github, repo, { ...f.group, ...change }, f.pr));
-  f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+  f.state.rules[0].parameters.max_entries_to_build = 2;
   await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  const merge = queueFixture();
+  merge.state.rules[0].parameters.merge_method = 'MERGE';
+  await assert.rejects(queueIdentity(merge.github, repo, merge.group, merge.pr), /squash/);
+});
+test('queue configuration remains fail-closed through the public effective-rules read', async () => {
+  for (const change of [
+    (f) => {
+      f.state.rules = [];
+    },
+    (f) => {
+      f.state.rules.push(structuredClone(f.state.rules[0]));
+    },
+    (f) => {
+      f.state.rules[0].ruleset_source_type = 'Organization';
+    },
+    (f) => {
+      f.state.rules[0].ruleset_source = 'foreign/repo';
+    },
+    (f) => {
+      f.state.rules[0].parameters.max_entries_to_merge = 2;
+    },
+    (f) => {
+      f.state.rules[0].parameters.min_entries_to_merge = 2;
+    },
+    (f) => {
+      f.state.rules[0].parameters.grouping_strategy = 'HEADGREEN';
+    },
+    (f) => {
+      f.state.rules[0].parameters.check_response_timeout_minutes = 120;
+    },
+    (f) => {
+      f.github.paginate = async () => {
+        throw new Error('REST unavailable');
+      };
+    },
+  ]) {
+    const f = queueFixture();
+    change(f);
+    await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr));
+  }
+});
+test('queue metadata errors identify the denied field without exposing request credentials', async () => {
+  const f = queueFixture();
+  f.github.graphql = async () => {
+    const error = new Error('sensitive request diagnostic');
+    error.errors = [{ type: 'FORBIDDEN', path: ['repository', 'pullRequest', 'mergeQueueEntry'] }];
+    error.request = { headers: { authorization: 'not-a-real-token' } };
+    throw error;
+  };
+  await assert.rejects(queueIdentity(f.github, repo, f.group, f.pr), (error) => {
+    assert.match(error.message, /repository\.pullRequest\.mergeQueueEntry/);
+    assert.doesNotMatch(error.message, /sensitive request|authorization|not-a-real-token/);
+    return true;
+  });
 });
 function bindingFixture() {
   const run = {
@@ -924,8 +1079,34 @@ test('service-linked review and native queue signals still prepare both current 
     };
     await withReceiptDirectory(async () => {
       await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-      assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+      assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
     });
+  }
+});
+test('delayed obsolete queue signals cannot revoke a successful replacement or current head', async () => {
+  for (const replacement of [queued, null]) {
+    const f = signalFixture(queuedControlFixture());
+    f.run.event = 'merge_group';
+    f.run.head_sha = 'd'.repeat(40);
+    f.run.head_branch = 'gh-readonly-queue/main/pr-1-123abc';
+    f.context.payload.workflow_run = { ...f.run };
+    f.f.jobs[0].head_sha = f.run.head_sha;
+    f.statuses.push({ sha: head, state: 'success' });
+    if (replacement === null) {
+      f.f.refs = [];
+      f.q.state.entry = null;
+    }
+    const before = structuredClone(f.statuses);
+    const outputs = {};
+    f.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core }),
+      /Requested queue group is no longer current/
+    );
+    assert.deepEqual(f.statuses, before);
+    assert.deepEqual(outputs, {});
   }
 });
 test('review signal rejects missing, ambiguous or foreign PR links without guessing from run SHA', async () => {
@@ -990,6 +1171,76 @@ test('provider signal authenticates locator via suite API and revokes current he
     assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
   }
 });
+function stepCore() {
+  const notices = [];
+  const outputs = {};
+  return {
+    notices,
+    outputs,
+    notice: (message) => notices.push(message),
+    setOutput: (name, value) => {
+      outputs[name] = value;
+    },
+  };
+}
+test('workflow step ends green for policy holds after failing every scope status', async () => {
+  for (const hold of [
+    [(f) => f.f.reviews.push(human('CHANGES_REQUESTED')), /Changes requested remain/],
+    [(f) => (f.f.threads = [{ isResolved: false, isOutdated: false }]), /Unresolved review/],
+    [(f) => (f.f.reviews = []), /Completed exact-head independent review/],
+    [(f) => (f.f.pr.draft = true), /PR must be open and ready/],
+  ]) {
+    const f = signalFixture(queuedControlFixture());
+    hold[0](f);
+    const core = stepCore();
+    await runReviewAdmissionStep({ github: f.github, context: f.context, core });
+    assert.equal(f.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+    assert.equal(f.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+    assert.match(core.notices.join('\n'), hold[1]);
+    assert.equal(core.outputs.admission_sha, undefined);
+    assert.equal(core.outputs.queue_sha, undefined);
+  }
+});
+test('workflow step still fails for integrity errors and for holds after a receipt output', async () => {
+  const identity = signalFixture();
+  identity.run.pull_requests = [];
+  await assert.rejects(
+    runReviewAdmissionStep({
+      github: identity.github,
+      context: identity.context,
+      core: stepCore(),
+    }),
+    /Signal PR identity is missing or ambiguous/
+  );
+  // Findings appear after the PR head was admitted but before the queue group is evaluated.
+  const raced = signalFixture(queuedControlFixture());
+  const core = stepCore();
+  const record = core.setOutput;
+  core.setOutput = (name, value) => {
+    record(name, value);
+    if (name === 'admission_sha') raced.f.reviews.push(human('CHANGES_REQUESTED'));
+  };
+  await withReceiptDirectory(async () => {
+    await assert.rejects(
+      runReviewAdmissionStep({ github: raced.github, context: raced.context, core }),
+      /Changes requested remain/
+    );
+  });
+  assert.equal(core.outputs.admission_sha, head);
+  assert.equal(raced.statuses.filter((item) => item.sha === head).at(-1).state, 'failure');
+  assert.equal(raced.statuses.filter((item) => item.sha === queued).at(-1).state, 'failure');
+  // Without the hold distinction every denial would fail the run again.
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    'if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;',
+    'throw error;'
+  );
+  const held = signalFixture(queuedControlFixture());
+  held.f.reviews = [];
+  await assert.rejects(
+    mutant.runReviewAdmissionStep({ github: held.github, context: held.context, core: stepCore() })
+  );
+});
 test('untrusted suite locator cannot supply approval, provider identity or ambiguous PR mapping', async () => {
   for (const change of [
     { id: 56 },
@@ -1045,6 +1296,53 @@ test('suite signal fails closed for wrong source branch, ambiguous head lookup o
     runReviewAdmission({ github: broken.github, context: broken.context, core: broken.core })
   );
   assert.equal(broken.statuses.length, 1);
+});
+test('provider suites on merge-queue commits select no target and leave every status unchanged', async () => {
+  const f = suiteSignalFixture();
+  Object.assign(f.suite, {
+    head_sha: queued,
+    head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+    pull_requests: [],
+  });
+  f.github.rest.pulls.list = 'pulls';
+  f.f.pulls = [signalPull()];
+  const notices = [];
+  const outputs = {};
+  const core = {
+    notice: (message) => notices.push(message),
+    setOutput: (name, value) => {
+      outputs[name] = value;
+    },
+  };
+  await runReviewAdmission({ github: f.github, context: f.context, core });
+  assert.equal(f.statuses.length, 1); // Only the seeded status; nothing pending or failed.
+  assert.deepEqual(outputs, {});
+  assert.match(notices.join('\n'), /merge-queue commit is not review evidence/);
+  // Only an authenticated provider suite on a queue ref with no linked PR is ignored.
+  for (const change of [
+    { app: { id: 15368 } },
+    { head_branch: `gh-readonly-queue/develop/pr-1-${base}` },
+    { head_branch: 'gh-readonly-queue/main/pr-1' },
+    { head_branch: `gh-readonly-queue/main/pr-0-${base}` },
+    { head_branch: `gh-readonly-queue/main/pr-01-${base}` },
+    { head_branch: 'gh-readonly-queue/main/pr-1-abcdef' },
+    { pull_requests: [signalPull(), signalPull()] },
+  ]) {
+    const held = suiteSignalFixture();
+    Object.assign(held.suite, {
+      head_sha: queued,
+      head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+      pull_requests: [],
+      ...change,
+    });
+    held.github.rest.pulls.list = 'pulls';
+    held.f.pulls = [signalPull()];
+    await assert.rejects(
+      runReviewAdmission({ github: held.github, context: held.context, core: held.core }),
+      /identity mismatch|missing or ambiguous/
+    );
+    assert.equal(held.statuses.length, 1);
+  }
 });
 test('signal regression controls detect synthetic-SHA targeting and provider identity bypass', async () => {
   const old = await importMutationSource(
@@ -1114,7 +1412,7 @@ function queuedControlFixture() {
   f.f.refs = [{ ref: q.group.head_ref, object: { sha: queued } }];
   f.github.graphql = async (query) =>
     query.includes('mergeQueueEntry')
-      ? q.github.graphql()
+      ? q.github.graphql(query)
       : {
           repository: {
             pullRequest: {
@@ -1145,7 +1443,7 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
       outputs[key] = value;
     };
     await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-    assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
+    assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
     assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'pending');
     f.f.artifacts = [head, queued].map((sha) => ({
       name: `review-admission-${sha}`,
@@ -1294,9 +1592,9 @@ test('original queue and binding assertions reject reintroduced identity/attempt
       },
     },
     {
-      before: 'config.maximumEntriesToBuild === 1',
+      before: 'await requireQueueConfiguration(github, repo)',
       change: (f) => {
-        f.state.entry.mergeQueue.configuration.maximumEntriesToBuild = 2;
+        f.state.rules[0].parameters.max_entries_to_build = 2;
       },
     },
   ];
@@ -1379,6 +1677,10 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(signal, /name: review-admission-signal-\$\{\{ github.run_attempt \}\}/);
   assert.match(signal, /path: signal.json/);
   assert.match(signal, /SUITE_ID: \$\{\{ github.event.check_suite.id \}\}/);
+  assert.match(
+    signal,
+    /!startsWith\(github\.event\.check_suite\.head_branch, 'gh-readonly-queue\/'\)\)$/m
+  );
   assert.match(signal, /if-no-files-found: error/);
   assert.ok(!signal.includes('secrets.'));
 });
@@ -2101,7 +2403,7 @@ catch (error) { if (error.code === ${JSON.stringify(expectedCode)}) console.log(
   }
 }
 test('admission unzip listing and extraction have hard deadlines and forced termination', () => {
-  const source = readFileSync('scripts/ci/review-admission-binding.mjs', 'utf8');
+  const source = readFileSync('scripts/ci/review-admission-archive.mjs', 'utf8');
   const calls = source.split("execFileSync('unzip',").slice(1);
   assert.equal(calls.length, 2);
   for (const call of calls) {
@@ -2128,5 +2430,95 @@ test('admission unzip listing and extraction have hard deadlines and forced term
     assert.equal(boundedAdmissionUnzip(fast, mode, 'ETIMEDOUT').output, 'bounded\n');
     const unlimited = fast.replaceAll('timeout: 100', 'timeout: 0');
     assert.equal(boundedAdmissionUnzip(unlimited, mode, 'ETIMEDOUT').signal, 'SIGKILL');
+  }
+});
+test('controls publisher is confined to its fixed journal and admission failure; ordinary publisher cannot write control state', async () => {
+  const { CONTROL_ANCHOR, controlContext } = await import('../ci/pr-control-policy.mjs');
+  const f = issuerFixture();
+  f.args.scope = 'controls';
+  f.args.context.workflow = 'PR Controls';
+  f.responses[`/repos/example/repo/statuses/${CONTROL_ANCHOR}`] = { id: 2 };
+  const github = await createReviewPublisher(f.args);
+  await github.rest.repos.createCommitStatus({
+    ...repo,
+    sha: CONTROL_ANCHOR,
+    context: controlContext(1),
+    state: 'success',
+  });
+  await github.rest.repos.createCommitStatus({
+    ...repo,
+    sha: head,
+    context: 'Review Admission',
+    state: 'failure',
+  });
+  for (const params of [
+    { ...repo, sha: head, context: 'Review Admission', state: 'success' },
+    { ...repo, sha: head, context: controlContext(1), state: 'success' },
+    { ...repo, sha: CONTROL_ANCHOR, context: 'Other', state: 'success' },
+    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'pending' },
+    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'failure' },
+  ])
+    await assert.rejects(github.rest.repos.createCommitStatus(params));
+  const ordinary = await createReviewPublisher(issuerFixture().args);
+  await assert.rejects(
+    ordinary.rest.repos.createCommitStatus({
+      ...repo,
+      sha: CONTROL_ANCHOR,
+      context: controlContext(1),
+      state: 'success',
+    })
+  );
+  f.args.context.workflow = 'Unrelated';
+  await assert.rejects(createReviewPublisher(f.args), /dedicated workflow/);
+});
+test('controls scope cannot fall through to the unconfigured legacy writer', async () => {
+  const f = issuerFixture();
+  f.args.scope = 'controls';
+  f.args.context.workflow = 'PR Controls';
+  f.args.env = {};
+  await assert.rejects(createReviewPublisher(f.args), /dedicated App configuration/);
+  f.args.context.ref = 'refs/heads/candidate';
+  await assert.rejects(createReviewPublisher(f.args), /trusted main/);
+});
+test('panel target locators use the owned runner temporary directory', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-target-fixture-'));
+  const previous = process.env.RUNNER_TEMP;
+  process.env.RUNNER_TEMP = directory;
+  try {
+    const f = queuedControlFixture();
+    await withReceiptDirectory(async () => {
+      await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+      const locator = JSON.parse(
+        readFileSync(join(directory, 'review-admission-target/target.json'), 'utf8')
+      );
+      assert.equal(locator.number, 1);
+      assert.equal(locator.repository, 'example/repo');
+      assert.equal(locator.runId, Number(f.context.runId));
+    });
+  } finally {
+    if (previous === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+test('a locator storage error fails the scoped admission statuses instead of leaving them pending', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'admission-target-failure-'));
+  const previous = process.env.RUNNER_TEMP;
+  const blocker = join(directory, 'not-a-directory');
+  writeFileSync(blocker, 'fixture');
+  process.env.RUNNER_TEMP = blocker;
+  try {
+    const f = queuedControlFixture();
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.ok(f.statuses.length > 0);
+    const latest = new Map(f.statuses.map((status) => [status.sha, status.state]));
+    assert.ok(latest.size >= 2);
+    assert.ok([...latest.values()].every((state) => state === 'failure'));
+  } finally {
+    if (previous === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous;
+    rmSync(directory, { recursive: true, force: true });
   }
 });

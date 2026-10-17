@@ -17,8 +17,14 @@ const PROVIDERS = Object.freeze([
 ]);
 class AdmissionDenied extends Error {}
 export class AdmissionPending extends Error {}
+// An expected policy hold (draft or closed PR, missing review, open findings, missing sensitive approval).
+// It still denies and fails the published status; only the controller run itself may succeed.
+export class AdmissionHeld extends AdmissionDenied {}
 export function requireEvidence(condition, message) {
   if (!condition) throw new AdmissionDenied(message);
+}
+function requirePolicy(condition, message) {
+  if (!condition) throw new AdmissionHeld(message);
 }
 const SENSITIVE_PATH =
   /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|SECURITY)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
@@ -95,9 +101,30 @@ function providerChecks(checks, provider, head) {
     ].every(Boolean)
   );
 }
+function cleanCubicSummary(body) {
+  const summaries = [
+    ...body.matchAll(
+      /<!-- cubic:review-summary:start -->([\s\S]*?)<!-- cubic:review-summary:end -->/g
+    ),
+  ];
+  if (summaries.length !== 1) return false;
+  const summary = summaries[0][1]
+    .trim()
+    .replace(/^<!-- cubic:review-summary:confidence-score:[0-5]\/5 -->\s*/, '');
+  const overall = summary.split('\n')[0].trim();
+  const clean =
+    /^\*\*(?:No issues found|0 issues found|All reported issues were addressed)(?:\*\*(?: across [1-9]\d* files?)?| across [1-9]\d* files?(?: \(changes from recent commits\))?\.?\*\*)$/;
+  return [
+    clean.test(overall),
+    !/\b[1-9]\d* issues? found\b/i.test(body),
+    !/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*)?Review skipped\b/im.test(body),
+    !/^\s*(?:[-*]\s*)?>\s*\*\*(?:No issues found|0 issues found|All reported issues were addressed)\b/im.test(
+      body
+    ),
+  ].every(Boolean);
+}
 function zeroOutsideFindings(review, provider) {
-  if (provider.name === 'Cubic')
-    return /\*\*(?:0 issues found|All reported issues were addressed)/.test(review.body ?? '');
+  if (provider.name === 'Cubic') return cleanCubicSummary(review.body ?? '');
   // Findings outside the diff have no resolvable GitHub thread; require a clean re-review.
   return /Actionable comments posted: 0\*\*/.test(review.body ?? '');
 }
@@ -136,21 +163,21 @@ function explicitComment(comment, head, trusted) {
 }
 function requireReady(pr) {
   requireEvidence(SHA.test(pr.head.sha), 'PR head must be immutable.');
-  requireEvidence(pr.state === 'open' && !pr.draft, 'PR must be open and ready.');
+  requirePolicy(pr.state === 'open' && !pr.draft, 'PR must be open and ready.');
 }
 function requireFindingsResolved(threads, reviews) {
-  requireEvidence(
+  requirePolicy(
     !threads.some((thread) => !thread.isResolved && !thread.isOutdated),
     'Unresolved review findings remain.'
   );
-  requireEvidence(
+  requirePolicy(
     !reviews.some((review) => review.state === 'CHANGES_REQUESTED'),
     'Changes requested remain.'
   );
 }
 function requireSensitiveApproval(sensitive, human, approval) {
   if (!sensitive) return;
-  requireEvidence(
+  requirePolicy(
     Boolean(human || approval),
     'Sensitive or unclassified change needs exact-head collaborator approval.'
   );
@@ -163,11 +190,28 @@ function reviewedHead(input, latest) {
   const { pr, checks, trusted, reviews } = input;
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
   const provider = verifiedProvider(reviews, checks, pr.head.sha);
-  requireEvidence(
-    Boolean(provider || human),
+  requirePolicy(
+    Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
     'Completed exact-head independent review is required.'
   );
   return { human, provider };
+}
+function positiveReviewId(value) {
+  return [Number.isSafeInteger(value), value > 0].every(Boolean);
+}
+function adminReview(review, head) {
+  if (!review) return null;
+  return [
+    review.provider === 'admin-attestation',
+    review.commit === head,
+    positiveReviewId(review.actorId),
+    positiveReviewId(review.reviewId),
+  ].every(Boolean)
+    ? review
+    : null;
+}
+function humanReview(human, head) {
+  return human ? { provider: 'human', reviewId: human.id, commit: head } : null;
 }
 export function admissionDecision(input) {
   const { pr, files, threads, comments, trusted, reviews } = input;
@@ -181,7 +225,7 @@ export function admissionDecision(input) {
   return {
     approved: true,
     risk: risk.sensitive ? 'sensitive' : 'low',
-    review: provider ?? { provider: 'human', reviewId: human.id, commit: pr.head.sha },
+    review: provider ?? humanReview(human, pr.head.sha) ?? input.adminAttestation,
     sensitiveApprovalId: approvalId(human, approval),
   };
 }

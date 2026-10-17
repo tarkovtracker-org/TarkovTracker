@@ -91,8 +91,9 @@ Statuses target only the validated head SHA, for pull requests and standalone br
 alike, so GitHub shows one required result. They never target the controller's default-branch SHA
 or the test-merge commit: GitHub regenerates a PR's test-merge commit (new SHA, same parents and
 tree) when a merge is attempted, which dropped test-merge statuses and blocked every merge. The
-ruleset's strict freshness requires the head to contain current main at merge time, so a
-head-bound result cannot merge against a stale base. The status links to the controller run summary, which
+merge queue requires a separate `Preview Result` on the queue commit built on current main, so a
+head-bound result cannot merge against a stale base (strict freshness, if restored for rollback,
+instead requires the head to contain current main). The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
 Artifact claims still bind to the test merge. When GitHub has not computed it yet, the controller
 retries and leaves the required result pending. A regenerated test merge is the same candidate only
@@ -118,7 +119,12 @@ GitHub has computed the test merge; other pending reasons are left alone.
   candidate. A regenerated test merge with the same parents and tree is the same candidate.
   A `pull_request` build checks out the test merge, so its tree claim must equal the current test
   merge's tree (not the head commit's, which differs whenever the branch is behind its base); push
-  and dispatched branch builds claim the tree of the commit the run built.
+  and dispatched branch builds claim the tree of the commit the run built. The PR API's base SHA can
+  remain its original snapshot after main advances. That snapshot still binds the run/manifest
+  claims; integration proof instead reads live `heads/main` and requires the current GitHub test
+  merge's ordered parents to be exactly `[live main, PR head]`. The artifact's checked-out merge
+  must have those same parents and tree. This proof is repeated before upload, even when GitHub
+  reports the same test-merge SHA, so advancing main invalidates an older plan.
 - Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
   completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
@@ -346,3 +352,18 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `scripts/ci/github-ci-gate.sh`, `scripts/release/release-recovery.mjs` — dual-gate waits for automation
 - `wrangler.toml` — isolated preview variables and game-data KV binding
 - `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests
+
+### PR control panel
+
+The single TarkovTracker PR control comment offers persistent **Enable automatic PR previews**
+and **Stop automatic PR previews** controls. They share one ordered intent timeline with the
+existing `/preview` and `/preview stop` commands. A control receipt pins the actual editor and
+live maintain/admin role; queued deployments also pin the enabling control run ID and recheck it
+immediately before upload. Stop/re-enable cannot reuse an earlier deployment grant.
+
+Accepted controls wake Preview State on trusted `main`. Successful current-head CI, matching
+artifact identity, fork protections, and smoke tests still apply. Stop pauses automatic PR previews and leaves existing deployments available. Required
+merge-group previews and independently authorized manual previews use their own authorization. The panel shows the effective
+mode and verified preview link. Agents use the structured `PR Controls` workflow. Authorization,
+durable receipts, capacity limits, and rollout are documented in
+[merge queue controls](../merge-queue-rollout.md#review-and-preview-controls).

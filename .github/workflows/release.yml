@@ -9,6 +9,8 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+    # Only main CI can wake finalization; the job and gate still authenticate the source.
+    branches: [main]
 permissions:
   contents: read
 env:
@@ -56,7 +58,7 @@ jobs:
             await mkdir(releasePath, { recursive: true });
             await cp(`${process.env.GITHUB_WORKSPACE}/scripts/release`, releasePath, { recursive: true });
             await mkdir(`${process.env.RUNNER_TEMP}/ci`, { recursive: true });
-            for (const name of ['review-admission-binding.mjs', 'review-admission-api.mjs', 'review-admission-policy.mjs', 'review-admission-issuer.mjs']) {
+            for (const name of ['review-admission-binding.mjs', 'review-admission-api.mjs', 'review-admission-policy.mjs', 'review-admission-issuer.mjs', 'queue-configuration.mjs', 'review-admission-archive.mjs', 'pr-control-policy.mjs', 'pr-control-state.mjs']) {
               await cp(`${process.env.GITHUB_WORKSPACE}/scripts/ci/${name}`, `${process.env.RUNNER_TEMP}/ci/${name}`);
             }
             const gatePath = `${releasePath}/release-gate.mjs`;

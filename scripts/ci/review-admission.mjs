@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import {
   activeQueueGroup,
@@ -11,10 +12,18 @@ import {
   trustedActors,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
+import { currentAdminAttestation } from './pr-control-state.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
-import { admissionDecision, CONTEXT, requireEvidence, SHA } from './review-admission-policy.mjs';
+import {
+  admissionDecision,
+  AdmissionHeld,
+  CONTEXT,
+  requireEvidence,
+  SHA,
+} from './review-admission-policy.mjs';
 import { releaseAssetsEligibility, requireReleaseSource } from './review-admission-release.mjs';
+const QUEUE_SUITE_BRANCH = /^gh-readonly-queue\/main\/pr-[1-9]\d*-[a-f0-9]{40}$/;
 async function evidence(github, repo, pr) {
   const files = await allPages(github, github.rest.pulls.listFiles, {
     ...repo,
@@ -42,7 +51,24 @@ async function evidence(github, repo, pr) {
   const trusted = await trustedActors(github, repo, reviews, comments);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
-  return { pr, files, reviews, comments, checks, threads, trusted, dependencySafe, releaseSafe };
+  const adminAttestation = await currentAdminAttestation(
+    github,
+    repo,
+    pr.number,
+    pr.head.sha
+  ).catch(() => null);
+  return {
+    pr,
+    files,
+    reviews,
+    comments,
+    checks,
+    threads,
+    trusted,
+    dependencySafe,
+    releaseSafe,
+    adminAttestation,
+  };
 }
 function receipt(context, pr, statusSha, decision, source, issuer) {
   return {
@@ -277,6 +303,7 @@ async function suiteTargets(github, repo, run) {
     check_suite_id: locator.suiteId,
   });
   requireProviderSuite(suite, repo, locator.suiteId);
+  if (queueCommitSuite(suite)) return null;
   if (suite.pull_requests?.length) return linkedPullTarget(suite.pull_requests, repo);
   const pulls = await allPages(github, github.rest.pulls.list, {
     ...repo,
@@ -285,6 +312,12 @@ async function suiteTargets(github, repo, run) {
   });
   const matches = pulls.filter((pr) => pr.head.sha === suite.head_sha);
   return linkedPullTarget(matches, repo);
+}
+// Providers also check GitHub's temporary queue commits. Those suites are not review evidence
+// (admission binds the member PR head) and the group's own merge_group signal already drives
+// queue admission, so an authenticated provider suite on a queue ref selects no target.
+function queueCommitSuite(suite) {
+  return QUEUE_SUITE_BRANCH.test(suite.head_branch ?? '') && !suite.pull_requests?.length;
 }
 function requireProviderSuite(suite, repo, id) {
   requireEvidence(
@@ -370,6 +403,16 @@ async function reviewScope(github, context, target) {
   requirePrIdentity(pr, context.repo);
   const refs = await queuedRefs(github, context.repo, pr.number);
   const shas = [...new Set([pr.head.sha, ...refs.map((ref) => ref.object.sha)])];
+  let group;
+  try {
+    group = await activeQueueGroup(github, context.repo, pr, refs);
+  } catch (error) {
+    await scopeStatuses(github, context, shas, 'failure', error.message);
+    throw error;
+  }
+  // An old merge-group signal has no authority to invalidate its replacement.
+  // Discovery errors still revoke the known scope; a proven obsolete target does not.
+  requireEventGroup(target.group, group);
   await scopeStatuses(
     github,
     context,
@@ -377,14 +420,7 @@ async function reviewScope(github, context, target) {
     'pending',
     'Rechecking PR and queue review admission after evidence changes.'
   );
-  try {
-    const group = await activeQueueGroup(github, context.repo, pr, refs);
-    requireEventGroup(target.group, group);
-    return { number: pr.number, group, shas };
-  } catch (error) {
-    await scopeStatuses(github, context, shas, 'failure', error.message);
-    throw error;
-  }
+  return { number: pr.number, group, shas };
 }
 function requireEventGroup(eventGroup, current) {
   if (!eventGroup) return;
@@ -396,6 +432,7 @@ function requireEventGroup(eventGroup, current) {
 async function evaluateScope(github, context, core, target, source) {
   const scope = await reviewScope(github, context, target);
   try {
+    await writeAdmissionTarget(context, core, scope.number);
     const head = await evaluateAdmission({ github, context, number: scope.number, source });
     core.setOutput('admission_sha', head.statusSha);
     if (scope.group) await evaluateQueuedScope(github, context, core, scope, source);
@@ -442,8 +479,37 @@ export async function runReviewAdmission({ github, context, core }) {
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
   await requireSignal(github, context);
   const selected = await targets(github, context);
+  if (selected === null) {
+    core.notice(
+      'Provider suite on a merge-queue commit is not review evidence; no status changed.'
+    );
+    return;
+  }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
   await evaluateScope(github, context, core, selected[0], source);
+}
+// Workflow entry point. A policy hold (draft or closed PR, review missing, open findings, sensitive approval
+// missing) has already failed every scope status, which is the actual gate, so the run ends green
+// with a notice instead of producing a red run for every review event. Integrity, identity and
+// API errors still fail the run. A hold after any receipt output was set stays a failure so later
+// upload/publication steps cannot run.
+export async function runReviewAdmissionStep({ github, context, core }) {
+  const outputs = new Set();
+  const tracked = Object.assign(Object.create(core), {
+    setOutput(name, value) {
+      outputs.add(name);
+      core.setOutput(name, value);
+    },
+  });
+  try {
+    await runReviewAdmission({ github, context, core: tracked });
+  } catch (error) {
+    if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;
+    core.notice(`Review admission held: ${error.message}`);
+  }
+}
+function receiptOutput(outputs) {
+  return outputs.has('admission_sha') || outputs.has('queue_sha');
 }
 export async function publishReviewScope({ github, context, head, queued }) {
   const shas = [head, queued].filter(Boolean);
@@ -453,4 +519,17 @@ export async function publishReviewScope({ github, context, head, queued }) {
     await scopeStatuses(github, context, shas, 'failure', error.message);
     throw error;
   }
+}
+async function writeAdmissionTarget(context, core, number) {
+  core.setOutput('pull_request', String(number));
+  if (!process.env.RUNNER_TEMP) return;
+  const locator = {
+    repository: `${context.repo.owner}/${context.repo.repo}`,
+    number,
+    runId: Number(context.runId),
+    runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+  };
+  const directory = join(process.env.RUNNER_TEMP, 'review-admission-target');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'target.json'), `${JSON.stringify(locator)}\n`);
 }

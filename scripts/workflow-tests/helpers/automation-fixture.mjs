@@ -115,6 +115,38 @@ if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
   process.exit(0);
 }
 if (args[0] === 'api') {
+  const waitEndpoint = args[1];
+  if (waitEndpoint === 'graphql') {
+    const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
+    const queued = { id: 'MQE_fixture', pullRequest: { number: Number(p.PR_NUMBER), headRefOid: p.ACTUAL_HEAD } };
+    if (payload.query.startsWith('query')) {
+      console.log(JSON.stringify({data:{repository:{pullRequest:{headRefOid:p.ACTUAL_HEAD,mergeQueueEntry:null}}}}));
+      process.exit(0);
+    }
+    const expected = {pullRequestId:'PR_fixture_' + p.PR_NUMBER,expectedHeadOid:p.ACTUAL_HEAD};
+    if (!payload.query.includes('enqueuePullRequest') || JSON.stringify(payload.variables.input) !== JSON.stringify(expected)) {
+      console.error('Unexpected or unguarded queue mutation'); process.exit(1);
+    }
+    if (p.MERGE_FAIL === 'true') { console.error('Server-side branch rules rejected enqueue'); process.exit(1); }
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'enqueue',input:payload.variables.input,invocation:p.INVOCATION_ID}) + '\n');
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'merge',state:p.MERGE_OUTCOME || 'OPEN',invocation:p.INVOCATION_ID}) + '\n');
+    console.log(JSON.stringify({data:{enqueuePullRequest:{mergeQueueEntry:queued}}}));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
+    const input = JSON.stringify({ check_runs: JSON.parse(p.WAIT_CHECK_RUNS || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/status') {
+    const input = JSON.stringify({ statuses: JSON.parse(p.WAIT_STATUSES || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER) {
+    console.log(JSON.stringify({ number:Number(p.PR_NUMBER), node_id:'PR_fixture_' + p.PR_NUMBER, state:'open', draft:false, base:{ref:'main',repo:{full_name:p.GITHUB_REPOSITORY}}, head:{sha:p.ACTUAL_HEAD,repo:{full_name:p.GITHUB_REPOSITORY}} }));
+    process.exit(0);
+  }
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
     if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
       console.error('Head changed at branch update'); process.exit(1);
@@ -177,7 +209,9 @@ if (args[0] === 'api') {
     process.exit(0);
   }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
-    console.log(p.CURRENT_BASE); process.exit(0);
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const enqueued = events.some((event) => event.type === 'enqueue' && event.invocation === p.INVOCATION_ID);
+    console.log(enqueued && p.AFTER_ENQUEUE_BASE ? p.AFTER_ENQUEUE_BASE : p.CURRENT_BASE); process.exit(0);
   }
   console.error('Unexpected gh api endpoint: ' + endpoint); process.exit(2);
 }
@@ -190,10 +224,13 @@ if (args[1] === 'view') {
   const pr = states[Math.min(index, states.length - 1)];
   const admitted = events.some((event) => event.type === 'admission-success' && event.invocation === p.INVOCATION_ID);
   const observed = p.BLOCKED_UNTIL_ADMISSION === 'true' && !admitted ? { ...pr, mergeStateStatus: 'BLOCKED' } : pr;
-  console.log(JSON.stringify(merge ? { ...observed, state: merge.state } : observed));
+  const after = merge ? { ...observed, state: merge.state } : observed;
+  if (merge && p.AFTER_ENQUEUE_HEAD) after.headRefOid = p.AFTER_ENQUEUE_HEAD;
+  console.log(JSON.stringify(after));
   process.exit(0);
 }
 if (args[1] === 'merge') {
+  if (p.AUTO_MERGE_DISABLED === 'true') { console.error('Auto merge is not allowed for this repository (enablePullRequestAutoMerge)'); process.exit(1); }
   const supplied = args[args.indexOf('--match-head-commit') + 1];
   if (supplied !== p.ACTUAL_HEAD) { console.error('Head changed at merge'); process.exit(1); }
   if (p.ACTUAL_BASE && p.ACTUAL_BASE !== p.BASE_SHA && p.QUEUE_ENFORCED !== 'true') { console.error('Base advanced at merge'); process.exit(1); }

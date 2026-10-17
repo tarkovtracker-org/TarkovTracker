@@ -1,4 +1,5 @@
 import { expectedPublisherBot, requireReceiptIssuer } from './review-admission-issuer.mjs';
+import { requireQueueConfiguration } from './queue-configuration.mjs';
 import { AdmissionPending, CONTEXT, SHA, requireEvidence } from './review-admission-policy.mjs';
 export async function allPages(github, endpoint, params) {
   const result = await github.paginate(endpoint, { ...params, per_page: 100 });
@@ -59,9 +60,7 @@ export function requirePrIdentity(pr, repo) {
 const QUEUE_QUERY = `query($owner:String!,$repo:String!,$number:Int!) {
  repository(owner:$owner,name:$repo) { pullRequest(number:$number) {
   headRefOid mergeQueueEntry { position baseCommit { oid } headCommit { oid }
-   pullRequest { number headRefOid } mergeQueue { configuration {
-    maximumEntriesToBuild maximumEntriesToMerge mergingStrategy
-   } } }
+   pullRequest { number headRefOid } }
  } }
 }`;
 export async function queuedRefs(github, repo, number) {
@@ -76,8 +75,19 @@ export async function queuedRefs(github, repo, number) {
   );
   return refs;
 }
+function queueErrorField(error) {
+  const path = error.errors?.[0]?.path;
+  return Array.isArray(path) ? path.join('.') : 'unknown';
+}
+async function queueEntry(github, repo, number) {
+  try {
+    return await github.graphql(QUEUE_QUERY, { ...repo, number });
+  } catch (error) {
+    requireEvidence(false, `Queue metadata read failed at ${queueErrorField(error)}.`);
+  }
+}
 export async function activeQueueGroup(github, repo, pr, refs) {
-  const data = await github.graphql(QUEUE_QUERY, { ...repo, number: pr.number });
+  const data = await queueEntry(github, repo, pr.number);
   const queried = data.repository.pullRequest;
   requireEvidence(queried.headRefOid === pr.head.sha, 'Queue discovery PR revision changed.');
   requireEvidence(Object.hasOwn(queried, 'mergeQueueEntry'), 'Queue entry metadata missing.');
@@ -116,15 +126,6 @@ function requireQueueEntry(data, pr, sha, base) {
 function requireQueueMember(entry, pr) {
   requireEvidence(entry.pullRequest.number === pr.number, 'Queue PR number mismatch.');
   requireEvidence(entry.pullRequest.headRefOid === pr.head.sha, 'Queue member revision mismatch.');
-  const config = entry.mergeQueue.configuration;
-  requireEvidence(
-    [
-      config.maximumEntriesToBuild === 1,
-      config.maximumEntriesToMerge === 1,
-      config.mergingStrategy === 'ALLGREEN',
-    ].every(Boolean),
-    'Queue configuration is not single-entry ALLGREEN.'
-  );
 }
 export async function queueIdentity(github, repo, group, pr) {
   requireEvidence(group.base_ref === 'refs/heads/main', 'Queue target must be main.');
@@ -136,26 +137,31 @@ export async function queueIdentity(github, repo, group, pr) {
   );
   const { data: live } = await github.rest.git.getRef({ ...repo, ref: `heads/${ref}` });
   requireEvidence(live.object.sha === group.head_sha, 'Queue ref changed or was removed.');
-  await queueCommit(github, repo, group, pr);
-  const data = await github.graphql(QUEUE_QUERY, { ...repo, number: pr.number });
+  await queueCommit(github, repo, group);
+  const data = await queueEntry(github, repo, pr.number);
   requireQueueEntry(data, pr, group.head_sha, group.base_sha);
+  await requireQueueConfiguration(github, repo);
 }
-async function queueCommit(github, repo, group, pr) {
+// A squash queue commit has main as its only parent and does not contain the PR head as an
+// ancestor. GitHub's queue entry binds it to the exact PR head; prove one commit on current main.
+async function queueCommit(github, repo, group) {
   const { data: main } = await github.rest.git.getRef({ ...repo, ref: 'heads/main' });
   const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: group.head_sha });
   requireEvidence(main.object.sha === group.base_sha, 'Queue base is not current main.');
   requireEvidence(
-    commit.parents?.[0]?.sha === group.base_sha,
-    'Queue first parent differs from main.'
+    [commit.parents?.length === 1, commit.parents?.[0]?.sha === group.base_sha].every(Boolean),
+    'Queue commit is not a single squash commit on main.'
   );
   const { data: comparison } = await github.rest.repos.compareCommits({
     ...repo,
-    base: pr.head.sha,
+    base: group.base_sha,
     head: group.head_sha,
   });
   requireEvidence(
-    ['ahead', 'identical'].includes(comparison.status),
-    'PR head is not included in the queue commit.'
+    [comparison.status === 'ahead', comparison.ahead_by === 1, comparison.behind_by === 0].every(
+      Boolean
+    ),
+    'Queue commit is not exactly one commit ahead of main.'
   );
 }
 export async function admissionRun(github, repo, head, expectedRunId) {

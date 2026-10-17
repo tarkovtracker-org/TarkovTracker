@@ -4,6 +4,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { candidateEvidence, promotionBranch } from './release-promotion.mjs';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const ADMISSION_PATH = '.github/workflows/review-admission.yml';
+// Review Admission also uploads a PR Controls refresh locator; it is never a receipt.
+const ADMISSION_LOCATOR = /^review-admission-target-[1-9]\d*$/;
 const RELEASE_PATH = '.github/workflows/release.yml';
 const TRUSTED_ADMISSION_EVENTS = [
   'pull_request_target',
@@ -43,7 +45,7 @@ function requireRunIdentity(run, repo, event) {
     [ADMISSION_PATH, RELEASE_PATH].includes(run.path),
     'Unknown release enqueue source workflow.'
   );
-  requireCondition(FULL_SHA.test(run.head_sha), 'Missing immutable controller source.');
+  requireCondition(FULL_SHA.test(run.head_sha), 'Missing immutable source run revision.');
 }
 function requireMainSource(run, repo) {
   const identity = [run.head_branch, run.head_repository?.full_name];
@@ -75,20 +77,20 @@ async function sourceWakeup(github, context) {
   const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: event.id });
   requireRunIdentity(run, repo, event);
   if (!requireSourceEvent(run, repo)) return null;
-  if (run.run_attempt > event.run_attempt) return null;
-  requireCondition(run.run_attempt === event.run_attempt, 'Source attempt identity changed.');
-  if (run.status !== 'completed') return null;
-  requireCondition(run.conclusion === 'success', 'Source workflow did not succeed.');
-  const { data: comparison } = await github.rest.repos.compareCommits({
-    ...repo,
-    base: run.head_sha,
-    head: 'main',
-  });
-  requireCondition(
-    ['ahead', 'identical'].includes(comparison.status),
-    'Controller source is outside trusted main history.'
-  );
+  if (!completedAttempt(run, event)) return null;
+  if (run.path === RELEASE_PATH) await requirePolicySource(github, repo, run.head_sha);
   return run;
+}
+function completedAttempt(run, event) {
+  if (run.run_attempt > event.run_attempt) return false;
+  requireCondition(run.run_attempt === event.run_attempt, 'Source attempt identity changed.');
+  if (run.status !== 'completed') return false;
+  requireCondition(run.conclusion === 'success', 'Source workflow did not succeed.');
+  return true;
+}
+async function requirePolicySource(github, repo, sha) {
+  const { requireTrustedPolicySource } = await binding();
+  await requireTrustedPolicySource(github, repo, sha);
 }
 async function sourceArtifacts(github, repo, run) {
   const prefix = run.path === ADMISSION_PATH ? 'review-admission-' : 'release-promotion-';
@@ -98,7 +100,9 @@ async function sourceArtifacts(github, repo, run) {
     per_page: 100,
   });
   requireCondition(Array.isArray(artifacts), 'Incomplete source artifact metadata.');
-  const matches = artifacts.filter((artifact) => artifact.name.startsWith(prefix));
+  const matches = artifacts.filter(
+    (artifact) => artifact.name.startsWith(prefix) && !ADMISSION_LOCATOR.test(artifact.name)
+  );
   requireCondition(
     new Set(matches.map((artifact) => artifact.name)).size === matches.length,
     'Duplicate per-head source receipts.'
@@ -154,6 +158,9 @@ async function admissionCandidate(github, repo, run, source) {
     run,
     source.head
   );
+  // Admission event metadata may identify the candidate; the run-owned receipt records
+  // the actual trusted checkout. Prove that source before considering even skipped PRs.
+  await requirePolicySource(github, repo, receipt.workflowSourceSha);
   if (receipt.statusSha !== receipt.headSha) return null; // Integration receipts cannot enqueue a PR again.
   requireCondition(
     Number.isSafeInteger(receipt.number) && receipt.number > 0,
@@ -269,8 +276,24 @@ export function queueOperations(repo) {
       { env, encoding: 'utf8' }
     ).trim();
   const submit = (number, head, mode) => {
-    const args = ['pr', 'merge', String(number), '--repo', repository, '--match-head-commit', head];
-    if (['strict', 'strict-queue'].includes(mode)) args.push('--squash');
+    if (mode !== 'strict') {
+      const helper = fileURLToPath(new URL('../ci/enqueue-pr-cli.mjs', import.meta.url));
+      execFileSync(process.execPath, [helper, repository, String(number), head], {
+        env,
+        stdio: 'inherit',
+      });
+      return;
+    }
+    const args = [
+      'pr',
+      'merge',
+      String(number),
+      '--repo',
+      repository,
+      '--match-head-commit',
+      head,
+      '--squash',
+    ];
     execFileSync('gh', args, { env, stdio: 'inherit' });
   };
   const dispatchMain = () =>

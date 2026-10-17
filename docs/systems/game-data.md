@@ -252,12 +252,18 @@ and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry 
 
 ### Stale-while-revalidate
 
-The full-items route opts into `edgeCache({ response: true })`: final cached JSON is streamed on
+The full-items and items-lite routes opt into `edgeCache({ response: true })`: final cached JSON is streamed on
 hits rather than parsed and serialized again. New entries store sanitized overlay headers and an
 internal response-format marker alongside their body. Older or unknown markers fall back to JSON
 parsing, so no purge or coordinated rollout is required. Only public cache/overlay headers are
 returned; internal retention and storage metadata remain private to the Cache API. The default
 object-returning path, hideout's post-cache overlay, and precomputed KV validation are unchanged.
+
+On a cache miss, response mode serializes the final payload once and shares that body's two
+streams between the Cache API write and the client. Each receives its own headers: storage keeps
+the longer retention window and internal metadata, while the client receives only the public
+cache/overlay headers. Object-mode consumers retain the original payload and write the stored
+response directly without creating an unused stream branch.
 
 When an edge cache entry exists but is older than `ttl`, the handler:
 

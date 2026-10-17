@@ -29,6 +29,11 @@ Admission for the created PR because job-token PR events can be suppressed or ne
 trigger failure reports a retry command; it never counts as approval and cannot authorize publication. The successful preparation run retains
 `release-promotion-<candidate-sha>` proof; PR body text cannot substitute for it.
 
+Admission wakeups authenticate the source workflow and attempt before reading its receipt, then
+prove the receipt's `workflowSourceSha` belongs to main history before reading a PR. The event's
+run SHA may identify an unmerged candidate, especially for `pull_request_target`; it is not the
+policy checkout SHA. Preparation wakeups still prove their main run SHA before reading artifacts.
+
 Successful trusted main CI completion immediately wakes finalization of a pending merged version;
 schedule/dispatch also recover pending publication. CI callbacks never start new preparation or
 change publication cadence.

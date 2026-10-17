@@ -320,10 +320,13 @@ export async function edgeCache<T>(
       const response = await fetcher();
       const overlayMeta = getOverlayHeadersMeta(response);
       const cacheResponse = buildStoredResponse(response, ttl, staleTtl, fullCacheKey);
+      // Response mode shares the serialized body between storage and the client.
+      // Object consumers keep their payload; no unused stream branch is needed.
+      const storedResponse = asResponse ? cacheResponse.clone() : cacheResponse;
       if (cfContext?.waitUntil) {
-        cfContext.waitUntil(cache.put(cacheKeyRequest, cacheResponse.clone()));
+        cfContext.waitUntil(cache.put(cacheKeyRequest, storedResponse));
       } else {
-        await cache.put(cacheKeyRequest, cacheResponse.clone());
+        await cache.put(cacheKeyRequest, storedResponse);
       }
       const headers = setCacheResponseHeaders(
         event,
@@ -333,7 +336,7 @@ export async function edgeCache<T>(
         ttl,
         overlayMeta
       );
-      return cacheResult(response, headers, asResponse);
+      return cacheResult(asResponse ? cacheResponse : response, headers, asResponse);
     }
     logger.info(`Fetching data for ${fullCacheKey} (DEV)`);
     const response = await fetcher();
