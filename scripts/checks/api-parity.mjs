@@ -45,8 +45,19 @@ for (const packageRoot of [installed, join(destination, 'progress-contracts')]) 
 const files = compareCompiledContracts(installed, join(destination, 'progress-contracts'));
 run(destination, ['--filter', '@tarkovtracker/progress-contracts', 'run', 'test', '--silent']);
 for (const command of ['typecheck', 'types:check', 'validate:openapi', 'test', 'build'])
-  // API-owned CI runs tooling tests; consumer parity retains every API/DO runtime test.
-  run(destination, ['run', command, ...(command === 'test' ? ['src/', '--silent'] : [])]);
+  // Retain API runtime and source/config contract guards; API-owned CI runs tooling tests.
+  run(destination, [
+    'run',
+    command,
+    ...(command === 'test'
+      ? [
+          'src/',
+          'scripts/supabase-surface.test.ts',
+          'scripts/deployment-routes.test.ts',
+          '--silent',
+        ]
+      : []),
+  ]);
 run(root, ['exec', 'vitest', 'run', 'workers/contract-tests/'], {
   ...process.env,
   TARKOV_VERSIONED_API_DIRECTORY: destination,

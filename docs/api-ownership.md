@@ -25,7 +25,8 @@ A dependency update changes the frontend manifest, lockfile and `api-version.jso
 Run `pnpm run check:progress-contracts`, frontend tests/typecheck and `pnpm run verify:api-parity`.
 The parity command fetches only the recorded API commit into a fresh temporary checkout, uses its
 frozen lockfile, compares every compiled rule export and fixture to the installed release, runs
-its type/schema checks, every API/DO runtime test under `src/`, and dry-run build, then checks
+its type/schema checks, every API/DO runtime test under `src/`, source-to-Supabase-manifest and
+deployment-route contract guards, and dry-run build, then checks
 real browser/Nitro adapters against that versioned API in PvP, PvE and Seasonal modes. API-owned CI
 runs the API's full suite, including repository-tooling tests; consumer CI does not duplicate those
 unrelated script/formatter tests. CI runs this command explicitly; ordinary
