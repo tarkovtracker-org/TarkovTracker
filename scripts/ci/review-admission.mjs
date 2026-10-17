@@ -10,6 +10,7 @@ import {
   requirePrIdentity,
   reviewThreads,
   trustedActors,
+  writeCollaborator,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
 import { currentAdminAttestation } from './pr-control-state.mjs';
@@ -454,11 +455,42 @@ async function evaluateQueuedScope(github, context, core, scope, source) {
 function sensitiveCommand(body) {
   return typeof body === 'string' && body.trimStart().startsWith('/approve-sensitive ');
 }
+function previousCommentBody(payload) {
+  return payload.changes?.body?.from;
+}
 export function relevantComment(payload) {
-  return [payload.comment?.body, payload.changes?.body?.from].some(sensitiveCommand);
+  return [payload.comment?.body, previousCommentBody(payload)].some(sensitiveCommand);
 }
 function relevantPrComment(payload) {
   return Boolean(payload.issue?.pull_request) && relevantComment(payload);
+}
+function commentUser(payload) {
+  const user = payload.comment?.user;
+  return user?.type === 'User' ? user.login : null;
+}
+// A failed permission lookup still rechecks: re-evaluation is safe, a missed withdrawal is not.
+async function liveWriter(github, repo, login) {
+  try {
+    return await writeCollaborator(github, repo, login);
+  } catch {
+    return true;
+  }
+}
+// New commands only count from live write collaborators.
+async function writerComment(github, context) {
+  const login = commentUser(context.payload);
+  if (!login) return false;
+  return liveWriter(github, context.repo, login);
+}
+function priorSensitiveCommand(payload) {
+  if (payload.action === 'deleted') return sensitiveCommand(payload.comment?.body);
+  return payload.action === 'edited' && sensitiveCommand(previousCommentBody(payload));
+}
+async function relevantWriterComment(github, context) {
+  if (!relevantPrComment(context.payload)) return false;
+  // A former writer's prior command may have admitted this head or queue group.
+  if (priorSensitiveCommand(context.payload)) return true;
+  return writerComment(github, context);
 }
 async function successfulSignal(github, context) {
   if (context.payload.workflow_run.conclusion !== 'success') return false;
@@ -466,7 +498,7 @@ async function successfulSignal(github, context) {
   return true;
 }
 export async function filterAdmission({ github, context }) {
-  if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
+  if (context.eventName === 'issue_comment') return relevantWriterComment(github, context);
   if (context.eventName === 'workflow_run') return successfulSignal(github, context);
   return true;
 }

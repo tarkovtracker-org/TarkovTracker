@@ -2099,8 +2099,8 @@ test('only sensitive approval comments and their edits/deletions enter serialize
 test('comment filter regression controls detect old-body revocation loss and workflow-level contention', async () => {
   const mutant = await importMutationSource(
     'review-admission.mjs',
-    '[payload.comment?.body, payload.changes?.body?.from]',
-    '[payload.comment?.body]'
+    'return payload.changes?.body?.from;',
+    'return undefined;'
   );
   const payload = commentPayload({
     action: 'edited',
@@ -2267,11 +2267,134 @@ test('Cubic event filtering skips unsuccessful signals and uses the exact commen
     `/approve-sensitive ${head}`,
     `\t/approve-sensitive ${head}`,
   ]) {
-    const payload = commentPayload({ comment: { body } });
+    const payload = commentPayload({ comment: { body, user: writerUser } });
     assert.equal(
-      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      await filterAdmission({
+        github: permissionGithub('write'),
+        context: { eventName: 'issue_comment', repo, payload },
+      }),
       relevantComment(payload)
     );
+  }
+});
+const writerUser = { login: 'maintainer', type: 'User' };
+function permissionGithub(permission) {
+  return {
+    rest: {
+      repos: {
+        getCollaboratorPermissionLevel: async ({ username }) => {
+          assert.equal(username, writerUser.login);
+          if (permission instanceof Error) throw permission;
+          return { data: { permission } };
+        },
+      },
+    },
+  };
+}
+function statusError(status) {
+  return Object.assign(new Error(`HTTP ${status}`), { status });
+}
+test('only write collaborator new sensitive commands queue a serialized recheck', async () => {
+  const command = `/approve-sensitive ${head}`;
+  const payloads = [
+    commentPayload({ comment: { body: command, user: writerUser } }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: command, user: writerUser },
+      changes: { body: { from: 'Ordinary comment' } },
+    }),
+  ];
+  const cases = [
+    ['write', true],
+    ['maintain', true],
+    ['admin', true],
+    ['read', false],
+    ['triage', false],
+    [statusError(404), false],
+    // A failed lookup must never drop a possible approval or withdrawal.
+    [statusError(500), true],
+  ];
+  for (const payload of payloads) {
+    for (const [permission, expected] of cases) {
+      const context = { eventName: 'issue_comment', repo, payload };
+      assert.equal(
+        await filterAdmission({ github: permissionGithub(permission), context }),
+        expected
+      );
+    }
+  }
+  for (const user of [undefined, { login: writerUser.login, type: 'Bot' }]) {
+    const context = {
+      eventName: 'issue_comment',
+      repo,
+      payload: commentPayload({ comment: { body: command, user } }),
+    };
+    assert.equal(await filterAdmission({ github: permissionGithub('write'), context }), false);
+  }
+  const issue = commentPayload({
+    issue: { number: 1 },
+    comment: { body: command, user: writerUser },
+  });
+  assert.equal(
+    await filterAdmission({
+      github: permissionGithub('write'),
+      context: { eventName: 'issue_comment', repo, payload: issue },
+    }),
+    false
+  );
+});
+test('former writer approval withdrawals always recheck without a permission lookup', async () => {
+  const command = `\t/approve-sensitive ${head}`;
+  const payloads = [
+    commentPayload({ action: 'deleted', comment: { body: command, user: writerUser } }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: 'Withdrawn', user: writerUser },
+      changes: { body: { from: command } },
+    }),
+    commentPayload({
+      action: 'edited',
+      comment: { body: `/approve-sensitive ${base}`, user: writerUser },
+      changes: { body: { from: command } },
+    }),
+  ];
+  for (const permission of ['read', 'triage', statusError(404), statusError(500)]) {
+    for (const payload of payloads) {
+      const github = permissionGithub(permission);
+      assert.equal(
+        await filterAdmission({ github, context: { eventName: 'issue_comment', repo, payload } }),
+        true
+      );
+    }
+  }
+  for (const payload of payloads) {
+    let permissionLookups = 0;
+    const github = {
+      rest: {
+        repos: {
+          getCollaboratorPermissionLevel: async () => {
+            permissionLookups++;
+            return { data: { permission: 'write' } };
+          },
+        },
+      },
+    };
+    assert.equal(
+      await filterAdmission({ github, context: { eventName: 'issue_comment', repo, payload } }),
+      true
+    );
+    assert.equal(
+      await filterAdmission({
+        github,
+        context: {
+          eventName: 'issue_comment',
+          repo,
+          payload: { ...payload, issue: { number: 1 } },
+        },
+      }),
+      false
+    );
+    assert.equal(permissionLookups, 0, 'Withdrawal must not depend on live permission');
   }
 });
 test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
@@ -2321,8 +2444,8 @@ test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse a
 test('Cubic prefilter mutations cannot silently admit quoted commands or failed signals', async () => {
   const comments = await importMutationSource(
     'review-admission.mjs',
-    'return relevantPrComment(context.payload);',
-    'return true;'
+    "if (context.eventName === 'issue_comment') return relevantWriterComment(github, context);",
+    "if (context.eventName === 'issue_comment') return true;"
   );
   const context = {
     eventName: 'issue_comment',

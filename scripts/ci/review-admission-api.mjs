@@ -33,7 +33,7 @@ function nextCursor(page, previous) {
   requireEvidence(Boolean(cursor) && cursor !== previous, 'Thread pagination did not advance.');
   return cursor;
 }
-async function collaborator(github, repo, username) {
+export async function writeCollaborator(github, repo, username) {
   try {
     const { data } = await github.rest.repos.getCollaboratorPermissionLevel({ ...repo, username });
     return ['write', 'maintain', 'admin'].includes(data.permission);
@@ -47,7 +47,7 @@ export async function trustedActors(github, repo, reviews, comments) {
   const names = [...new Set(actors.map((item) => item.user.login))];
   const trusted = new Set();
   for (const name of names) {
-    if (await collaborator(github, repo, name)) trusted.add(name);
+    if (await writeCollaborator(github, repo, name)) trusted.add(name);
   }
   return trusted;
 }

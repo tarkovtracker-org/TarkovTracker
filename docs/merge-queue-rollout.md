@@ -111,7 +111,13 @@ was emitted. Low-risk bot admission does not create a human approving review.
 
 The controller serializes relevant events at job scope, after its event filter. Ordinary issue
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
-including withdrawal of a command with leading whitespace.
+including withdrawal of a command with leading whitespace. Edits of a prior approval command and
+deletion of an approval command always recheck: an author may have lost write permission since
+that command admitted the head or queue group. New commands (including edits of ordinary comments
+into commands) require live write permission before they queue a recheck. `author_association` is
+not used, because it does not reliably reflect write access. For new commands, a 404 means no
+collaborator and is ignored; any other permission lookup error still rechecks. Rechecking never
+grants approval by itself; the controller validates the current evidence and live permissions.
 
 The `Review Admission` commit status is the gate. An expected policy hold (draft or closed PR,
 missing exact-head review, unresolved findings or changes requested, missing sensitive approval) publishes
