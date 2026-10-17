@@ -1907,8 +1907,8 @@ test('only sensitive approval comments and their edits/deletions enter serialize
 test('comment filter regression controls detect old-body revocation loss and workflow-level contention', async () => {
   const mutant = await importMutationSource(
     'review-admission.mjs',
-    '[payload.comment?.body, payload.changes?.body?.from]',
-    '[payload.comment?.body]'
+    'return payload.changes?.body?.from;',
+    'return undefined;'
   );
   const payload = commentPayload({
     action: 'edited',
