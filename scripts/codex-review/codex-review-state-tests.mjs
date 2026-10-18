@@ -69,6 +69,17 @@ test('top-level security report envelopes never establish code-review completion
     'complete'
   );
 });
+test('receipt-wrapped security reviews never block or complete code review', () => {
+  const receipt = {
+    user: { login: 'chatgpt-codex-connector[bot]' },
+    body: '<!-- codex-review-receipt:v1 -->\n\n### 🛡️ Codex Security Review · _Automatically triggered_\n\nSecurity review completed. No security issues were found in this pull request.\n\n**Reviewed commit:** `84671de394`',
+    created_at: '2026-09-27T02:30:00Z',
+  };
+  assert.deepEqual(evidenceShas([receipt]), []);
+  assert.equal(classifyState(inputs({ comments: [receipt] }), now).status, 'unreviewed');
+  const previous = reviewComment(otherHead, '2026-09-27T02:00:00Z');
+  assert.equal(classifyState(inputs({ comments: [previous, receipt] }), now).status, 'unreviewed');
+});
 test('untagged requests require a later completion for the exact current head', () => {
   const requested = request('2026-09-27T01:30:00Z');
   const olderHeadCompletion = reviewComment(otherHead, '2026-09-27T02:30:00Z');
