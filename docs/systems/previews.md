@@ -114,8 +114,9 @@ rebuild the artifact.
 
 On the candidate CI run, choose **Re-run all jobs**, or run `gh run rerun <CI_RUN_ID>` without
 `--failed`. This rebuilds the preview artifact and manifest for the new attempt. Wait for CI
-Result and the normal automatic preview on an open, ready same-repository PR. Forks and stopped
-previews retain their existing authorization requirements. Do not edit the manifest, reuse an
+Result and the normal automatic preview on an open, ready same-repository PR. Stopped previews
+need a fresh maintainer `/preview` or the enable control. Forks need a live maintainer opt-in or
+approval through `preview-fork`; a CI rerun grants neither. Do not edit the manifest, reuse an
 older artifact, or relax attempt verification. A changed head or base can require a fresh build
 with current revision evidence as well.
 

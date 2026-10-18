@@ -381,7 +381,7 @@ function claimErrors(manifest, expected) {
     .filter(([key, value]) => manifest[key] !== value)
     .map(([key, value]) => {
       const recovery =
-        key === 'runAttempt' ? ' Re-run all CI jobs to rebuild the preview artifact.' : '';
+        key === 'runAttempt' ? '. Re-run all CI jobs to rebuild the preview artifact.' : '';
       return `${key}: manifest ${String(manifest[key])}, expected ${String(value)}${recovery}`;
     });
 }
