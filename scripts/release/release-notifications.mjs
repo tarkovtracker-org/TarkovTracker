@@ -15,6 +15,13 @@ function compareVersions(left, right) {
   }
   return 0;
 }
+const isPublished = (release) => !release.draft && !release.prerelease;
+function lowerStableReleases(releases, current) {
+  return releases
+    .filter(isPublished)
+    .map((release) => ({ tag: release.tag_name, parts: versionParts(release.tag_name) }))
+    .filter((release) => release.parts && compareVersions(release.parts, current) < 0);
+}
 /** The newest stable published release below `tag`; drafts and prereleases never bound a range. */
 export async function previousStableTag(github, repo, tag) {
   const current = versionParts(tag);
@@ -23,15 +30,10 @@ export async function previousStableTag(github, repo, tag) {
     ...repo,
     per_page: PAGE,
   });
-  let previous = null;
-  for (const release of releases) {
-    const parts = versionParts(release.tag_name);
-    if (release.draft || release.prerelease || !parts) continue;
-    if (compareVersions(parts, current) >= 0) continue;
-    if (!previous || compareVersions(parts, previous.parts) > 0)
-      previous = { tag: release.tag_name, parts };
-  }
-  return previous?.tag ?? null;
+  const [previous] = lowerStableReleases(releases, current).sort((left, right) =>
+    compareVersions(right.parts, left.parts)
+  );
+  return previous ? previous.tag : null;
 }
 async function rangeShas(github, repo, base, head) {
   const shas = [];
@@ -47,18 +49,20 @@ async function rangeShas(github, repo, base, head) {
     if (data.commits.length < PAGE) return shas;
   }
 }
+const mergedToMain = (pr) => Boolean(pr.merged_at) && pr.base?.ref === 'main';
+async function commitPullRequests(github, repo, sha) {
+  const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+    ...repo,
+    commit_sha: sha,
+    per_page: PAGE,
+  });
+  return data.filter(mergedToMain).map((pr) => pr.number);
+}
 /** Merged main PRs for each released commit, excluding the generated version commit itself. */
 async function releasedPullRequests(github, repo, shas) {
   const numbers = new Set();
   for (const sha of shas) {
-    const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-      ...repo,
-      commit_sha: sha,
-      per_page: PAGE,
-    });
-    for (const pr of data) {
-      if (pr.merged_at && pr.base?.ref === 'main') numbers.add(pr.number);
-    }
+    for (const number of await commitPullRequests(github, repo, sha)) numbers.add(number);
   }
   return [...numbers].sort((left, right) => left - right);
 }
@@ -85,29 +89,30 @@ async function notifyPullRequest(github, repo, number, tag, url) {
   }
   await github.rest.issues.addLabels({ ...repo, issue_number: number, labels: [LABEL] });
 }
-/** Comment on and label every PR shipped in a published stable release; reruns stay idempotent. */
-export async function notifyReleasedPullRequests({ github, context, version, sha }) {
-  const repo = context.repo;
-  const tag = `v${version}`;
-  const { data: release } = await github.rest.repos.getReleaseByTag({ ...repo, tag });
-  if (release.draft || release.prerelease) throw new Error(`${tag} is not a stable publication.`);
-  const previous = await previousStableTag(github, repo, tag);
-  if (!previous) return { tag, previous, notified: [], failed: [] };
-  const shas = (await rangeShas(github, repo, previous, sha)).filter((item) => item !== sha);
-  const numbers = await releasedPullRequests(github, repo, shas);
+async function notifyEach(github, repo, numbers, tag, url) {
   const notified = [];
   const failed = [];
   for (const number of numbers) {
     try {
-      await notifyPullRequest(github, repo, number, tag, release.html_url);
+      await notifyPullRequest(github, repo, number, tag, url);
       notified.push(number);
     } catch (error) {
       failed.push({ number, message: error.message });
     }
   }
-  if (failed.length) {
-    const detail = failed.map((item) => `#${item.number}: ${item.message}`).join('; ');
-    throw new Error(`Notified ${notified.length} PRs for ${tag}; failed ${detail}`);
-  }
-  return { tag, previous, notified, failed };
+  if (!failed.length) return { notified, failed };
+  const detail = failed.map((item) => `#${item.number}: ${item.message}`).join('; ');
+  throw new Error(`Notified ${notified.length} PRs for ${tag}; failed ${detail}`);
+}
+/** Comment on and label every PR shipped in a published stable release; reruns stay idempotent. */
+export async function notifyReleasedPullRequests({ github, context, version, sha }) {
+  const repo = context.repo;
+  const tag = `v${version}`;
+  const { data: release } = await github.rest.repos.getReleaseByTag({ ...repo, tag });
+  if (!isPublished(release)) throw new Error(`${tag} is not a stable publication.`);
+  const previous = await previousStableTag(github, repo, tag);
+  if (!previous) return { tag, previous, notified: [], failed: [] };
+  const shas = (await rangeShas(github, repo, previous, sha)).filter((item) => item !== sha);
+  const numbers = await releasedPullRequests(github, repo, shas);
+  return { tag, previous, ...(await notifyEach(github, repo, numbers, tag, release.html_url)) };
 }
