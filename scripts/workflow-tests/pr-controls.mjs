@@ -22,7 +22,12 @@ import {
 import { readPreviewRequest } from '../preview/request-authorization.mjs';
 import { comparePreviewIntents, selectPreviewAuthorization } from '../preview/intent-policy.mjs';
 import { previewBindingError } from '../preview/binding-policy.mjs';
-import { controlTargets, prepareControls, publishControls } from '../ci/pr-controls.mjs';
+import {
+  controlTargets,
+  publicationTargets,
+  prepareControls,
+  publishControls,
+} from '../ci/pr-controls.mjs';
 const EVIDENCE_DIRECTORY = mkdtempSync(join(tmpdir(), 'tt-pr-controls-test-'));
 const repo = { owner: 'example', repo: 'repo' };
 const head = 'a'.repeat(40);
@@ -642,12 +647,12 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
   assert.match(caller, /permissions: \{\}/);
   assert.match(source, /permissions: \{\}/);
-  assert.match(source, /environment: review-admission/);
   assert.match(
     source,
     /group: review-admission-publication\n      queue: max\n      cancel-in-progress: false/
   );
   const controls = jobBlock(source, 'controls');
+  assertPublisherEnvironment(controls);
   const invocation = jobBlock(caller, 'controls');
   const targets = jobBlock(caller, 'targets');
   for (const job of [targets, controls]) {
@@ -669,7 +674,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   );
   assert.equal(
     permissionsBlock(targets, '    ').trim(),
-    'actions: read\n      contents: read\n      pull-requests: read'
+    'actions: read\n      checks: read\n      contents: read\n      issues: read\n      pull-requests: read\n      statuses: read'
   );
   assert.match(targets, /pull-requests: read/);
   assert.match(source, /scope: 'controls'/);
@@ -1285,4 +1290,502 @@ test('confirmed receipt loss fails native head/group admission before panel or a
     assert.equal(f.comments.length, 0);
     await assert.rejects(currentAdminAttestation(f.github, repo, 1, head), /missing/);
   }
+});
+async function passiveFixture() {
+  const f = fixture();
+  f.context.eventName = 'pull_request_target';
+  f.context.payload.action = 'edited';
+  await prepare(f);
+  f.previous = { ...prepared(), runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+  f.comment.body = f.previous.body;
+  delete f.github.reviewAdmissionIssuer;
+  return f;
+}
+const eligible = (f) => publicationTargets({ github: f.github, context: f.context, numbers: [1] });
+test('read-only preflight skips a verified unchanged panel before obtaining any publisher identity', async () => {
+  const f = await passiveFixture();
+  assert.deepEqual(await eligible(f), []);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
+test('preflight retains changed head, base, draft, gates, comment body and missing or forged receipt', async () => {
+  const changes = [
+    (f) => {
+      f.pull.head.sha = 'd'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.statuses = [{ context: 'Preview Result', state: 'pending', creator: { id: 41898282 } }];
+    },
+    (f) => {
+      f.comment.body += ' changed';
+    },
+    (f) => {
+      f.stateAvailable = false;
+    },
+    (f) => {
+      f.pointer.creator.id = 999;
+    },
+    (f) => {
+      f.run.run_attempt = 2;
+    },
+    (f) => {
+      f.github.rest.pulls.get = async () => {
+        throw new Error('API unavailable');
+      };
+    },
+  ];
+  for (const change of changes) {
+    const f = await passiveFixture();
+    change(f);
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('all explicit operations, checkbox edits, unknown events and untrusted refs bypass preflight reads', async () => {
+  for (const eventName of ['issue_comment', 'workflow_dispatch', 'future_event']) {
+    const f = fixture();
+    f.context.eventName = eventName;
+    let reads = 0;
+    f.github.rest.pulls.get = () => {
+      reads++;
+      throw new Error('must not be read');
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.equal(reads, 0);
+  }
+  for (const change of [
+    (f) => {
+      f.context.ref = 'refs/heads/topic';
+    },
+    (f) => {
+      f.context.payload.action = 'synchronize';
+    },
+  ]) {
+    const f = fixture();
+    f.context.eventName = 'pull_request_target';
+    change(f);
+    let reads = 0;
+    f.github.rest.pulls.get = () => {
+      reads++;
+      throw new Error('must not be read');
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.equal(reads, 0);
+  }
+});
+test('preflight rechecks live head/base, pointer and gates across concurrent observations', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.head.sha = 'd'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pointer.id = 999;
+    },
+    (f) => {
+      f.statuses = [{ context: 'Preview Result', state: 'pending', creator: { id: 41898282 } }];
+    },
+  ]) {
+    const f = await passiveFixture();
+    const get = f.github.rest.pulls.get;
+    let reads = 0;
+    f.github.rest.pulls.get = async (...args) => {
+      if (++reads === 2) change(f);
+      const { data } = await get(...args);
+      return { data: structuredClone(data) };
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('a verified early skip does not replace the protected publisher revalidation after a later change', async () => {
+  const f = await passiveFixture();
+  assert.deepEqual(await eligible(f), []);
+  f.pull.base.sha = 'e'.repeat(40);
+  assert.deepEqual(await eligible(f), [1]);
+  f.github.reviewAdmissionIssuer = issuer;
+  await prepare(f);
+  assert.equal(prepared().presentation.baseSha, f.pull.base.sha);
+});
+test('modeled observed body-edit and ready burst saves only the verified redundant publication', async () => {
+  const f = await passiveFixture();
+  f.pull.draft = true;
+  f.github.reviewAdmissionIssuer = issuer;
+  await prepare(f);
+  f.previous = { ...prepared(), runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+  f.comment.body = f.previous.body;
+  delete f.github.reviewAdmissionIssuer;
+  const bodyEdit = (await eligible(f)).length;
+  f.pull.draft = false;
+  f.context.payload.action = 'ready_for_review';
+  const ready = (await eligible(f)).length;
+  // Admission is a distinct security evaluator and is deliberately outside this optimization.
+  const admission = 1;
+  const modeled = { baselineEligible: 3, optimizedEligible: bodyEdit + ready + admission };
+  assert.deepEqual(modeled, { baselineEligible: 3, optimizedEligible: 2 });
+  if (process.env.TT_CONTROL_MEASUREMENTS) console.log('MODELED_17_03_SEQUENCE', modeled);
+});
+test('modeled stable refreshes skip publication while concurrent changed snapshots remain eligible', async () => {
+  const f = await passiveFixture();
+  let eligibleCount = 0;
+  for (let index = 0; index < 8; index++) eligibleCount += (await eligible(f)).length;
+  assert.equal(eligibleCount, 0);
+  f.pull.base.sha = 'e'.repeat(40);
+  const overlapping = await Promise.all(Array.from({ length: 3 }, () => eligible(f)));
+  assert.deepEqual(overlapping, [[1], [1], [1]]);
+  // No receipt was committed between these observations: all three retain final revalidation.
+  if (process.env.TT_CONTROL_MEASUREMENTS)
+    console.log('MODELED_STABLE_AND_CONCURRENT', {
+      stableBaseline: 8,
+      stableOptimized: 0,
+      changedBaseline: 3,
+      changedOptimized: 3,
+    });
+});
+test('workflow completion locators skip unchanged panels and retain current head or pointer changes', async () => {
+  const cases = [
+    { change: () => {}, expected: [] },
+    {
+      change: (f) => {
+        f.pull.head.sha = 'd'.repeat(40);
+      },
+      expected: [1],
+    },
+    {
+      change: (f) => {
+        f.pointer.id = 999;
+      },
+      expected: [1],
+      duringSecondRead: true,
+    },
+  ];
+  for (const { change, expected, duringSecondRead } of cases) {
+    const f = await passiveFixture();
+    f.context.eventName = 'workflow_run';
+    f.context.payload = { workflow_run: { id: 950, run_attempt: 1 } };
+    f.runs.set(950, {
+      id: 950,
+      run_attempt: 1,
+      path: '.github/workflows/ci.yml',
+      repository: { full_name: 'example/repo' },
+      status: 'completed',
+      event: 'pull_request',
+      pull_requests: [{ number: 1 }],
+    });
+    assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+    if (duringSecondRead) {
+      const get = f.github.rest.pulls.get;
+      let reads = 0;
+      f.github.rest.pulls.get = async (...args) => {
+        if (++reads === 2) change(f);
+        return get(...args);
+      };
+    } else change(f);
+    assert.deepEqual(await eligible(f), expected);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('unavailable or invalid preview evidence is inconclusive even when the published link is null', async () => {
+  const invalid = [
+    (f) => {
+      const get = f.github.rest.actions.getWorkflowRun;
+      f.github.rest.actions.getWorkflowRun = (args) => {
+        if (Number(args.run_id) === 950) throw new Error('preview metadata unavailable');
+        return get(args);
+      };
+    },
+    (f) => {
+      f.runs.get(950).path = '.github/workflows/foreign.yml';
+    },
+    (f) => {
+      f.artifacts.set(950, []);
+    },
+    (f) => {
+      f.archiveBytes.set(
+        88,
+        zip(
+          {
+            project: 'tarkovtracker',
+            environment: 'preview',
+            commitHash: 'd'.repeat(40),
+            controllerRunId: 950,
+            branch: 'preview-pr-1',
+            url: 'https://abcd.tarkovtrackernuxt.pages.dev',
+          },
+          'deployment-evidence.json'
+        )
+      );
+    },
+  ];
+  for (const change of invalid) {
+    const f = await passiveFixture();
+    f.statuses = [
+      {
+        context: 'Preview Result',
+        state: 'success',
+        description: 'deployed',
+        creator: { id: 41898282 },
+        target_url: 'https://github.com/example/repo/actions/runs/950',
+      },
+    ];
+    f.runs.set(950, {
+      id: 950,
+      path: '.github/workflows/preview.yml',
+      event: 'workflow_dispatch',
+      head_branch: 'main',
+      repository: { full_name: 'example/repo' },
+      status: 'completed',
+      conclusion: 'success',
+    });
+    f.artifacts.set(950, [
+      { id: 88, name: `preview-deployment-${head}`, expired: false, size_in_bytes: 5000 },
+    ]);
+    change(f);
+    f.github.reviewAdmissionIssuer = issuer;
+    await prepare(f);
+    f.previous = { ...prepared(), runId: 700 };
+    f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+    f.comment.body = f.previous.body;
+    delete f.github.reviewAdmissionIssuer;
+    assert.equal(f.previous.presentation.previewUrl, null);
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+function assertPublisherEnvironment(job) {
+  const environment = job.match(/^ {4}environment:\n((?: {6}.*\n)+)/m)?.[1] ?? '';
+  assert.match(environment, /^ {6}name: review-admission$/m);
+  assert.match(environment, /^ {6}deployment: false$/m);
+}
+test('final in-lock publication rejects base and lifecycle changes after receipt preparation', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.ref = 'release';
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.pull.state = 'closed';
+    },
+  ]) {
+    const f = fixture();
+    f.context.eventName = 'pull_request_target';
+    f.context.payload.action = 'edited';
+    await prepare(f);
+    change(f);
+    await assert.rejects(
+      publishControls({
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+      }),
+      /The PR base or lifecycle changed while saving control evidence\./
+    );
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('final publication rereads PR identity after awaited request permission checks', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.ref = 'release';
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.pull.state = 'closed';
+    },
+  ]) {
+    const f = fixture();
+    await prepare(f);
+    f.github.rest.pulls.get = async () => ({ data: structuredClone(f.pull) });
+    const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+    let changed = false;
+    f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+      const result = await permission(...args);
+      change(f);
+      changed = true;
+      return result;
+    };
+    await assert.rejects(
+      publishControls({
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+      }),
+      /The PR base or lifecycle changed while saving control evidence\./
+    );
+    assert.equal(changed, true);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('publication drift cannot undo an already requested fail-closed revocation', async () => {
+  const f = fixture('revoke-review');
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+  f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+    const result = await permission(...args);
+    f.pull.base.sha = 'e'.repeat(40);
+    return result;
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /The PR base or lifecycle changed while saving control evidence\./
+  );
+  assert.deepEqual(
+    f.pointers.map((item) => [item.context, item.state]),
+    [['Review Admission', 'failure']]
+  );
+  assert.deepEqual([f.comments, f.dispatches], [[], []]);
+  assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
+});
+test('final publication rejects head changes during request permission checks', async () => {
+  const f = fixture();
+  await prepare(f);
+  f.github.rest.pulls.get = async () => ({ data: structuredClone(f.pull) });
+  const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+  f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+    const result = await permission(...args);
+    f.pull.head.sha = 'd'.repeat(40);
+    return result;
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /The PR head changed while saving control evidence\./
+  );
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
+test('preflight deadline aborts a slow request and retains unfinished targets', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const get = f.github.rest.pulls.get;
+  const reads = [];
+  let signal;
+  let cancelled = false;
+  let entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  f.github.rest.pulls.get = (params) => {
+    reads.push(params.pull_number);
+    if (params.pull_number !== 2) return get(params);
+    signal = params.request?.signal;
+    entered();
+    if (!signal) throw new Error('Missing request cancellation signal.');
+    return new Promise((resolve, reject) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          cancelled = true;
+          reject(signal.reason);
+        },
+        { once: true }
+      );
+    });
+  };
+  const pending = publicationTargets({ github: f.github, context: f.context, numbers: [1, 2, 3] });
+  await started;
+  t.mock.timers.tick(30000);
+  assert.deepEqual(await pending, [2, 3]);
+  assert.equal(signal?.aborted, true);
+  assert.equal(cancelled, true);
+  assert.deepEqual(reads, [1, 1, 2]);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
+test('preflight shares its deadline across REST, GraphQL and pagination without altering the publisher', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const observed = new Map();
+  const record = (kind, params) => {
+    assert.ok(params.request.signal instanceof AbortSignal);
+    observed.set(kind, params.request.signal);
+  };
+  const get = f.github.rest.actions.getWorkflowRun;
+  f.github.rest.actions.getWorkflowRun = (params) => {
+    record('rest', params);
+    return get(params);
+  };
+  const graphql = f.github.graphql;
+  f.github.graphql = (query, params) => {
+    record('graphql', params);
+    return graphql(query, params);
+  };
+  const paginate = f.github.paginate;
+  const endpoint = f.github.rest.repos.listCommitStatusesForRef;
+  endpoint.endpoint = { marker: 'pagination metadata' };
+  let metadataObserved = false;
+  f.github.paginate = (method, params) => {
+    record('paginate', params);
+    if (method.endpoint === endpoint.endpoint) metadataObserved = true;
+    return paginate(method, params);
+  };
+  assert.deepEqual(await eligible(f), []);
+  assert.deepEqual([...observed.keys()].sort(), ['graphql', 'paginate', 'rest']);
+  assert.equal(new Set(observed.values()).size, 1);
+  t.mock.timers.tick(30000);
+  assert.equal(observed.get('rest').aborted, false);
+  assert.equal(f.github.rest.repos.listCommitStatusesForRef, endpoint);
+  assert.equal(metadataObserved, true);
+});
+test('preflight deadline returns even when transport delays cancellation and stops later reads', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let signal;
+  let release;
+  let reads = 0;
+  f.github.rest.actions.getWorkflowRun = (params) => {
+    signal = params.request?.signal;
+    return new Promise((resolve) => {
+      release = () => resolve({ data: f.run });
+    });
+  };
+  f.github.rest.pulls.get = async () => {
+    reads++;
+    return { data: f.pull };
+  };
+  const pending = eligible(f);
+  t.mock.timers.tick(30000);
+  const outcome = await Promise.race([
+    pending,
+    new Promise((resolve) => setImmediate(() => resolve('deadline did not release selection'))),
+  ]);
+  release();
+  await new Promise(setImmediate);
+  assert.deepEqual(outcome, [1]);
+  assert.equal(signal.aborted, true);
+  assert.equal(reads, 0);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
 });

@@ -64,6 +64,106 @@ export async function controlTargets({ github, context }) {
   if (context.eventName === 'issue_comment') return commentTargets(context);
   return directTargets(context);
 }
+// Scheduling only: uncertainty retains the protected publisher, which still revalidates in-lock.
+export async function publicationTargets({ github, context, numbers, core }) {
+  if (!passiveSchedulingContext(context)) return numbers;
+  const controller = new AbortController();
+  let timer;
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      core?.notice('Panel preflight deadline reached; retaining unfinished targets.');
+      resolve(true);
+    }, 30000);
+  });
+  const client = preflightClient(github, controller.signal);
+  try {
+    return await retainPublicationTargets(
+      client,
+      { context, numbers, core },
+      controller.signal,
+      deadline
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function retainPublicationTargets(github, { context, numbers, core }, signal, deadline) {
+  const retained = [];
+  for (const [index, number] of numbers.entries()) {
+    if (signal.aborted) return [...retained, ...numbers.slice(index)];
+    const needed = passivePublicationNeeded(github, context, number, core);
+    if (await Promise.race([needed, deadline])) retained.push(number);
+  }
+  return retained;
+}
+function preflightClient(github, signal) {
+  const rest = Object.fromEntries(
+    Object.entries(github.rest).map(([scope, methods]) => [
+      scope,
+      Object.fromEntries(
+        Object.entries(methods).map(([name, request]) => [name, abortableRequest(request, signal)])
+      ),
+    ])
+  );
+  return {
+    ...github,
+    rest,
+    graphql: abortableRequest(github.graphql, signal),
+    paginate: abortableRequest(github.paginate, signal),
+  };
+}
+function abortableRequest(request, signal) {
+  return Object.assign((...args) => {
+    signal.throwIfAborted();
+    const params = args.pop();
+    return request(...args, { ...params, request: { ...params?.request, signal } });
+  }, request);
+}
+function passiveSchedulingContext(context) {
+  return [
+    context.ref === 'refs/heads/main',
+    ['workflow_run', 'pull_request_target'].includes(context.eventName),
+    context.payload.action !== 'synchronize',
+  ].every(Boolean);
+}
+async function passivePublicationNeeded(github, context, number, core) {
+  try {
+    return await passivePanelChanged(github, context, number);
+  } catch {
+    core?.notice('Panel preflight inconclusive; retaining protected publication.');
+    return true;
+  }
+}
+async function passivePanelChanged(github, context, number) {
+  const before = await controlSnapshot(github, context, number);
+  if (!canPreflight(before.previous)) return true;
+  const initial = schedulingSnapshot(before);
+  if (await prepareState(github, context, before, { strictPreviewLookup: true })) return true;
+  return passiveSnapshotChanged(github, context, number, initial, before.previous.body);
+}
+function canPreflight(previous) {
+  return [Boolean(previous), !previous?.recovered, previous?.counter < CONTROL_WRITE_LIMIT].every(
+    Boolean
+  );
+}
+async function passiveSnapshotChanged(github, context, number, initial, body) {
+  const after = await controlSnapshot(github, context, number);
+  if (!isDeepStrictEqual(initial, schedulingSnapshot(after))) return true;
+  if (await prepareState(github, context, after, { strictPreviewLookup: true })) return true;
+  const comment = await officialComment(github, context.repo, after.previous);
+  return comment.body !== body;
+}
+function schedulingSnapshot({ pull, previous }) {
+  return {
+    head: pull.head.sha,
+    baseSha: pull.base.sha,
+    baseRef: pull.base.ref,
+    state: pull.state,
+    draft: pull.draft,
+    pointer: previous?.pointerId,
+  };
+}
 async function officialComment(github, repo, state) {
   const { data } = await github.rest.issues.getComment({ ...repo, comment_id: state.commentId });
   requireEvidence(
@@ -256,6 +356,8 @@ function currentPresentation(state, pull, evidence) {
   return {
     ...evidence,
     headSha: state.headSha,
+    baseSha: pull.base.sha,
+    baseRef: pull.base.ref,
     grant: state.grant,
     result: state.result,
     state: pull.draft ? 'draft' : pull.state,
@@ -285,7 +387,7 @@ function synchronizeGrant(grant, context, run) {
   ].every(Boolean);
   return invalidated ? null : grant;
 }
-async function prepareState(github, context, snapshot) {
+async function prepareState(github, context, snapshot, options = {}) {
   const { pull, previous, run } = snapshot;
   const comment = await panelComment(github, context.repo, previous, pull.number);
   const grant = synchronizeGrant(
@@ -304,7 +406,7 @@ async function prepareState(github, context, snapshot) {
     controlState: state,
   });
   state.presentation = currentPresentation(state, pull, {
-    ...(await controlPanelEvidence(github, context.repo, pull.head.sha)),
+    ...(await controlPanelEvidence(github, context.repo, pull.head.sha, options)),
     previewMode: previewMode(previewAuthorization),
   });
   if (!meaningfulChange(previous, state, comment)) return null;
@@ -372,6 +474,11 @@ export async function publishControls({
     'Uploaded control artifact ID is invalid.'
   );
   await invalidateChangedGrant(github, context, previous, state, pull);
+  const { data: currentPull } = await github.rest.pulls.get({
+    ...context.repo,
+    pull_number: number,
+  });
+  requireCurrentPanelPull(currentPull, state, context.repo);
   await github.rest.repos.createCommitStatus({
     ...context.repo,
     sha: CONTROL_ANCHOR,
@@ -387,7 +494,22 @@ export async function publishControls({
   });
   await recheckAfterInvalidation(github, context, previous, state, number);
   requireEvidence(state.operationResult?.status !== 'rejected', state.result);
-  await executeAcceptedRequest(github, context, state, number, pull);
+  await executeAcceptedRequest(github, context, state, number, currentPull);
+}
+function requireCurrentPanelPull(pull, state, repo) {
+  requireEvidence(
+    pull.head.sha === state.headSha,
+    'The PR head changed while saving control evidence.'
+  );
+  requireEvidence(
+    [
+      pull.base.sha === state.presentation.baseSha,
+      pull.base.ref === state.presentation.baseRef,
+      (pull.draft ? 'draft' : pull.state) === state.presentation.state,
+    ].every(Boolean),
+    'The PR base or lifecycle changed while saving control evidence.'
+  );
+  requirePrIdentity(pull, repo);
 }
 async function executeAcceptedRequest(github, context, state, number, pull) {
   if (!state.request) return;

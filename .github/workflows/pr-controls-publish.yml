@@ -23,7 +23,9 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: review-admission
+    environment:
+      name: review-admission
+      deployment: false
     permissions:
       actions: write
       checks: read

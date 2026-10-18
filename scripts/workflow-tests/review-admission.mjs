@@ -1715,7 +1715,7 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(job, /persist-credentials: false/);
   assert.match(job, /if-no-files-found: error/);
   assert.ok(!workflow.includes('pnpm install'));
-  assert.match(job, /environment: review-admission/);
+  assert.match(job, /environment:\n      name: review-admission\n      deployment: false/);
   assert.equal(
     (
       job.match(

@@ -232,17 +232,41 @@ keeps the active invocation and replaces older waiting refreshes with the newest
 invocation includes time waiting for the shared publication lock and is never cancelled. Each PR
 can therefore contribute one passive publisher to that queue and retain one pending refresh outside
 it. Superseded waiting refreshes show as cancelled; they never start a publisher runner or use its
-credentials. Target-selection jobs still run, and there is no additional preflight runner/API pass.
+credentials. The existing target-selection runner now performs an additional read-only preflight
+before admitting a panel to publication. It verifies the App-pinned journal, live panel, current
+head/base, grant role, preview intent and gate presentation twice. Only a verified unchanged panel
+with a stable pointer/head/base can skip the protected job. Missing, corrupt or changing evidence
+retains publication. The passive preflight has one 30-second deadline shared by REST, GraphQL
+and paginated requests. Expiry aborts in-flight requests and retains the unfinished targets;
+completed decisions remain unchanged. The deadline is cleared after completion, and its request
+client is separate from the protected publisher. The protected publisher still rereads and
+revalidates everything in-lock.
+The selector receives only read permissions and public issuer IDs, never the App private key.
 
-PR lifecycle events (including `synchronize`), checkbox edits, structured dispatches, and controls
-reruns retain separate invocations. A rejected rerun must not displace a valid pending refresh.
+Checkbox edits, structured dispatches, `synchronize` events and controls reruns bypass the preflight
+shortcut and retain separate invocations. Other lifecycle events, including body edits, may skip
+only after the same verified unchanged-state comparison; event type alone never discards an edit. A rejected rerun must not displace a valid pending refresh.
 A synchronize event can invalidate an attestation even after returning to a previous commit, so it
 must not be coalesced with an ordinary refresh. Review Admission keeps its
 existing queue. The reusable
 [`publisher`](../.github/workflows/pr-controls-publish.yml) requires the original caller on `main`,
 keeps the protected environment, and shares the same non-cancelling `queue: max` publication lock.
 It rereads live head, role, journal and intent before publication. Caller run identity, receipt names,
-App scope, and the dispatch interface remain unchanged.
+App scope, and the dispatch interface remain unchanged. Both configuration-only protected jobs
+use `environment.deployment: false`: they keep the `review-admission` secrets and branch protection
+without creating misleading deployment-history entries. This mode is incompatible with custom
+deployment protection apps; the audited environment has only its main-only branch policy.
+See [GitHub's environment behavior](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments).
+
+The preflight regression models the observed body-edit / ready / admission sequence after a current
+receipt exists: three publication candidates become two, retaining the ready refresh and admission.
+Eight already-current panel refreshes become zero publishers; three simultaneous observations of
+changed state remain three until a publisher commits the update. Old receipts gain the base binding
+on their next publication, so the initial rollout does not promise those savings. These are modeled
+eligibility counts, not hosted timing or notification measurements. Workflow intake still occurs;
+GitHub can notify on successful, skipped or cancelled workflows independently of deployment records.
+Choosing Actions notifications for failed workflows only reduces that separate inbox delivery while
+leaving review/approval subscriptions alone; this change does not alter account settings.
 
 The baseline and rollout measurements are tracked in [#1277](https://github.com/tarkovtracker-org/TarkovTracker/issues/1277).
 The workflow-driven burst regression models 40 simultaneous refreshes for each of two PRs: four

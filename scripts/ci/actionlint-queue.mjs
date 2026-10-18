@@ -64,10 +64,42 @@ function requireSingleConcurrency(source, filename) {
   if (occurrences.length !== 1)
     throw new Error(`Ambiguous serialized job concurrency: ${filename}`);
 }
+const publisherJobs = new Map([
+  ['.github/workflows/review-admission.yml', 'admission'],
+  ['.github/workflows/pr-controls-publish.yml', 'controls'],
+]);
+/** Validate the exact supported environment extension; keep every other native parser check. */
+export function normalizePublisherEnvironment(source, filename) {
+  const name = publisherJobs.get(filename);
+  if (!name) return source;
+  const jobs = matchingBlock(source, /^jobs:\n(?:[ \t]+[^\n]*\n|[ \t]*\n)*/m);
+  const job = matchingBlock(
+    jobs,
+    new RegExp(`^ {2}${name}:\\n(?:[ \\t]{4,}[^\\n]*\\n|[ \\t]*\\n)*`, 'm')
+  );
+  const block = matchingBlock(job, /^ {4}environment:\n(?:[ \t]{6,}[^\n]*\n)*/m);
+  requirePublisherEnvironment(block, filename);
+  requireSingleDeploymentExtension(source, filename);
+  return source.replace(block, block.replace('      deployment: false', ''));
+}
+function requirePublisherEnvironment(block, filename) {
+  const properties = block.split('\n').slice(1, -1).sort().join('\n');
+  const expected = '      deployment: false\n      name: review-admission';
+  if (properties !== expected)
+    throw new Error(`Invalid configuration-only publisher environment: ${filename}`);
+}
+function requireSingleDeploymentExtension(source, filename) {
+  const declarations = source.match(/^[ \t]*deployment:/gm) ?? [];
+  if (declarations.length !== 1)
+    throw new Error(`Ambiguous publisher deployment extension: ${filename}`);
+}
 /** Run unchanged native checks, extending only the strictly validated serialization blocks. */
 function lintWorkflow(binary, filename) {
   const source = readFileSync(filename, 'utf8');
-  const normalized = normalizeQueueWorkflow(source, filename);
+  const normalized = normalizePublisherEnvironment(
+    normalizeQueueWorkflow(source, filename),
+    filename
+  );
   const args = ['-color', '-stdin-filename', filename, '-'];
   const result = spawnSync(binary, args, {
     input: normalized,
