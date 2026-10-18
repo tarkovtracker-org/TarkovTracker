@@ -77,12 +77,16 @@ export function normalizePublisherEnvironment(source, filename) {
     jobs,
     new RegExp(`^ {2}${name}:\\n(?:[ \\t]{4,}[^\\n]*\\n|[ \\t]*\\n)*`, 'm')
   );
-  const expected = '    environment:\n      name: review-admission\n      deployment: false\n';
   const block = matchingBlock(job, /^ {4}environment:\n(?:[ \t]{6,}[^\n]*\n)*/m);
-  if (block !== expected)
-    throw new Error(`Invalid configuration-only publisher environment: ${filename}`);
+  requirePublisherEnvironment(block, filename);
   requireSingleDeploymentExtension(source, filename);
-  return source.replace(expected, expected.replace('      deployment: false', ''));
+  return source.replace(block, block.replace('      deployment: false', ''));
+}
+function requirePublisherEnvironment(block, filename) {
+  const properties = block.split('\n').slice(1, -1).sort().join('\n');
+  const expected = '      deployment: false\n      name: review-admission';
+  if (properties !== expected)
+    throw new Error(`Invalid configuration-only publisher environment: ${filename}`);
 }
 function requireSingleDeploymentExtension(source, filename) {
   const declarations = source.match(/^[ \t]*deployment:/gm) ?? [];

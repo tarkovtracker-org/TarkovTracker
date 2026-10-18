@@ -92,7 +92,7 @@ async function passivePanelChanged(github, context, number) {
   const before = await controlSnapshot(github, context, number);
   if (!canPreflight(before.previous)) return true;
   const initial = schedulingSnapshot(before);
-  if (await prepareState(github, context, before)) return true;
+  if (await prepareState(github, context, before, { strictPreviewLookup: true })) return true;
   return passiveSnapshotChanged(github, context, number, initial, before.previous.body);
 }
 function canPreflight(previous) {
@@ -103,7 +103,7 @@ function canPreflight(previous) {
 async function passiveSnapshotChanged(github, context, number, initial, body) {
   const after = await controlSnapshot(github, context, number);
   if (!isDeepStrictEqual(initial, schedulingSnapshot(after))) return true;
-  if (await prepareState(github, context, after)) return true;
+  if (await prepareState(github, context, after, { strictPreviewLookup: true })) return true;
   const comment = await officialComment(github, context.repo, after.previous);
   return comment.body !== body;
 }
@@ -340,7 +340,7 @@ function synchronizeGrant(grant, context, run) {
   ].every(Boolean);
   return invalidated ? null : grant;
 }
-async function prepareState(github, context, snapshot) {
+async function prepareState(github, context, snapshot, options = {}) {
   const { pull, previous, run } = snapshot;
   const comment = await panelComment(github, context.repo, previous, pull.number);
   const grant = synchronizeGrant(
@@ -359,7 +359,7 @@ async function prepareState(github, context, snapshot) {
     controlState: state,
   });
   state.presentation = currentPresentation(state, pull, {
-    ...(await controlPanelEvidence(github, context.repo, pull.head.sha)),
+    ...(await controlPanelEvidence(github, context.repo, pull.head.sha, options)),
     previewMode: previewMode(previewAuthorization),
   });
   if (!meaningfulChange(previous, state, comment)) return null;

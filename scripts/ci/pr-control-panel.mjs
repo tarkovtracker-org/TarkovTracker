@@ -16,16 +16,18 @@ function previewRunId(status, repo) {
   const id = url.startsWith(prefix) ? url.slice(prefix.length) : '';
   return /^[1-9]\d*$/.test(id) ? Number(id) : null;
 }
-async function previewLink(github, repo, head, status) {
+async function previewLink(github, repo, head, status, options) {
   if (!status) return null;
   if (status.state !== 'success') return null;
   const id = previewRunId(status, repo);
-  if (id === null) return null;
-  return validatedPreviewLink(github, repo, head, id);
+  if (id === null) return unavailablePreviewLink(options);
+  return validatedPreviewLink(github, repo, head, id, options);
 }
-async function validatedPreviewLink(github, repo, head, id) {
+async function validatedPreviewLink(github, repo, head, id, options) {
   const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: id });
-  return validPreviewRun(run, repo) ? deploymentLink(github, repo, head, run) : null;
+  return validPreviewRun(run, repo)
+    ? deploymentLink(github, repo, head, run, options)
+    : unavailablePreviewLink(options);
 }
 function validPreviewRun(run, repo) {
   return [
@@ -37,7 +39,7 @@ function validPreviewRun(run, repo) {
     run.conclusion === 'success',
   ].every(Boolean);
 }
-async function deploymentLink(github, repo, head, run) {
+async function deploymentLink(github, repo, head, run, options) {
   const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
     ...repo,
     run_id: run.id,
@@ -45,14 +47,15 @@ async function deploymentLink(github, repo, head, run) {
   const matches = artifacts.filter(
     (item) => item.name === `preview-deployment-${head}` && !item.expired
   );
-  if (matches.length !== 1 || matches[0].size_in_bytes > 100000) return null;
+  if (matches.length !== 1 || matches[0].size_in_bytes > 100000)
+    return unavailablePreviewLink(options);
   const { data } = await github.rest.actions.downloadArtifact({
     ...repo,
     artifact_id: matches[0].id,
     archive_format: 'zip',
   });
   const record = await readAdmissionArchive(Buffer.from(data), 'deployment-evidence');
-  return validDeployment(record, head, run.id) ? record.url : null;
+  return validDeployment(record, head, run.id) ? record.url : unavailablePreviewLink(options);
 }
 function validDeployment(record, head, runId) {
   return [
@@ -64,7 +67,7 @@ function validDeployment(record, head, runId) {
     /^https:\/\/[a-f0-9-]+\.tarkovtrackernuxt\.pages\.dev\/?$/.test(record.url),
   ].every(Boolean);
 }
-export async function controlPanelEvidence(github, repo, head) {
+export async function controlPanelEvidence(github, repo, head, options = {}) {
   const statuses = await allPages(github, github.rest.repos.listCommitStatusesForRef, {
     ...repo,
     ref: head,
@@ -84,6 +87,15 @@ export async function controlPanelEvidence(github, repo, head) {
       'Preview Result': preview,
       'Review Admission': gateStatus(statuses, 'Review Admission', expectedPublisherBot()),
     },
-    previewUrl: await previewLink(github, repo, head, preview).catch(() => null),
+    previewUrl: await panelPreviewLink(github, repo, head, preview, options),
   };
+}
+async function panelPreviewLink(github, repo, head, preview, options) {
+  if (options.strictPreviewLookup) return previewLink(github, repo, head, preview, options);
+  return previewLink(github, repo, head, preview, options).catch(() => null);
+}
+function unavailablePreviewLink(options) {
+  if (options.strictPreviewLookup)
+    throw new Error('Preview link evidence is unavailable or invalid.');
+  return null;
 }

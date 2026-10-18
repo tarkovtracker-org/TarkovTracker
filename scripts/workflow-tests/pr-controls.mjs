@@ -647,12 +647,12 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
   assert.match(caller, /permissions: \{\}/);
   assert.match(source, /permissions: \{\}/);
-  assert.match(source, /environment:\n      name: review-admission\n      deployment: false/);
   assert.match(
     source,
     /group: review-admission-publication\n      queue: max\n      cancel-in-progress: false/
   );
   const controls = jobBlock(source, 'controls');
+  assertPublisherEnvironment(controls);
   const invocation = jobBlock(caller, 'controls');
   const targets = jobBlock(caller, 'targets');
   for (const job of [targets, controls]) {
@@ -1440,7 +1440,8 @@ test('modeled stable refreshes skip publication while concurrent changed snapsho
   for (let index = 0; index < 8; index++) eligibleCount += (await eligible(f)).length;
   assert.equal(eligibleCount, 0);
   f.pull.base.sha = 'e'.repeat(40);
-  for (let index = 0; index < 3; index++) assert.deepEqual(await eligible(f), [1]);
+  const overlapping = await Promise.all(Array.from({ length: 3 }, () => eligible(f)));
+  assert.deepEqual(overlapping, [[1], [1], [1]]);
   // No receipt was committed between these observations: all three retain final revalidation.
   if (process.env.TT_CONTROL_MEASUREMENTS)
     console.log('MODELED_STABLE_AND_CONCURRENT', {
@@ -1450,3 +1451,118 @@ test('modeled stable refreshes skip publication while concurrent changed snapsho
       changedOptimized: 3,
     });
 });
+test('workflow completion locators skip unchanged panels and retain current head or pointer changes', async () => {
+  const cases = [
+    { change: () => {}, expected: [] },
+    {
+      change: (f) => {
+        f.pull.head.sha = 'd'.repeat(40);
+      },
+      expected: [1],
+    },
+    {
+      change: (f) => {
+        f.pointer.id = 999;
+      },
+      expected: [1],
+      duringSecondRead: true,
+    },
+  ];
+  for (const { change, expected, duringSecondRead } of cases) {
+    const f = await passiveFixture();
+    f.context.eventName = 'workflow_run';
+    f.context.payload = { workflow_run: { id: 950, run_attempt: 1 } };
+    f.runs.set(950, {
+      id: 950,
+      run_attempt: 1,
+      path: '.github/workflows/ci.yml',
+      repository: { full_name: 'example/repo' },
+      status: 'completed',
+      event: 'pull_request',
+      pull_requests: [{ number: 1 }],
+    });
+    assert.deepEqual(await controlTargets({ github: f.github, context: f.context }), [1]);
+    if (duringSecondRead) {
+      const get = f.github.rest.pulls.get;
+      let reads = 0;
+      f.github.rest.pulls.get = async (...args) => {
+        if (++reads === 2) change(f);
+        return get(...args);
+      };
+    } else change(f);
+    assert.deepEqual(await eligible(f), expected);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('unavailable or invalid preview evidence is inconclusive even when the published link is null', async () => {
+  const invalid = [
+    (f) => {
+      const get = f.github.rest.actions.getWorkflowRun;
+      f.github.rest.actions.getWorkflowRun = (args) => {
+        if (Number(args.run_id) === 950) throw new Error('preview metadata unavailable');
+        return get(args);
+      };
+    },
+    (f) => {
+      f.runs.get(950).path = '.github/workflows/foreign.yml';
+    },
+    (f) => {
+      f.artifacts.set(950, []);
+    },
+    (f) => {
+      f.archiveBytes.set(
+        88,
+        zip(
+          {
+            project: 'tarkovtracker',
+            environment: 'preview',
+            commitHash: 'd'.repeat(40),
+            controllerRunId: 950,
+            branch: 'preview-pr-1',
+            url: 'https://abcd.tarkovtrackernuxt.pages.dev',
+          },
+          'deployment-evidence.json'
+        )
+      );
+    },
+  ];
+  for (const change of invalid) {
+    const f = await passiveFixture();
+    f.statuses = [
+      {
+        context: 'Preview Result',
+        state: 'success',
+        description: 'deployed',
+        creator: { id: 41898282 },
+        target_url: 'https://github.com/example/repo/actions/runs/950',
+      },
+    ];
+    f.runs.set(950, {
+      id: 950,
+      path: '.github/workflows/preview.yml',
+      event: 'workflow_dispatch',
+      head_branch: 'main',
+      repository: { full_name: 'example/repo' },
+      status: 'completed',
+      conclusion: 'success',
+    });
+    f.artifacts.set(950, [
+      { id: 88, name: `preview-deployment-${head}`, expired: false, size_in_bytes: 5000 },
+    ]);
+    change(f);
+    f.github.reviewAdmissionIssuer = issuer;
+    await prepare(f);
+    f.previous = { ...prepared(), runId: 700 };
+    f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+    f.comment.body = f.previous.body;
+    delete f.github.reviewAdmissionIssuer;
+    assert.equal(f.previous.presentation.previewUrl, null);
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+function assertPublisherEnvironment(job) {
+  const environment = job.match(/^ {4}environment:\n((?: {6}.*\n)+)/m)?.[1] ?? '';
+  assert.match(environment, /^ {6}name: review-admission$/m);
+  assert.match(environment, /^ {6}deployment: false$/m);
+}
