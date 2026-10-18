@@ -3,7 +3,8 @@ import { createI18n } from 'vue-i18n';
 import { useCraftableItem } from '@/composables/useCraftableItem';
 import en from '@/locales/en.json';
 import type { CraftSource } from '@/stores/useMetadata';
-const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } });
+import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
+const i18n = createI18n({ legacy: false, locale: 'en', messages: createTestLocaleMessages(en) });
 const craftSourcesByItemId = new Map<string, CraftSource[]>();
 const hideoutLevels: Record<string, { self: number }> = {};
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -51,7 +52,7 @@ describe('useCraftableItem craftableTitle', () => {
           title: '{status} – {sources}{more}',
         },
       },
-    });
+    } as never);
     i18n.global.locale.value = 'de';
     craftSourcesByItemId.set('item-3', [source('workbench', 'Werkbank', 1)]);
     hideoutLevels.workbench = { self: 1 };
