@@ -64,11 +64,11 @@ jobs:
       fail-fast: false
       matrix:
         number: ${{ fromJSON(needs.targets.outputs.numbers) }}
-    # Only completed-workflow refreshes are interchangeable. Single-pending is the native
+    # Only first-attempt workflow refreshes are interchangeable. Single-pending is the native
     # default; keep the active invocation (including its publisher) and newest waiting one.
     # Lifecycle events, checkbox edits and dispatches each retain their own invocation.
     concurrency:
-      group: ${{ github.event_name == 'workflow_run' && format('pr-controls-refresh-{0}', matrix.number) || format('pr-controls-event-{0}-{1}-{2}', github.run_id, github.run_attempt, matrix.number) }}
+      group: ${{ github.event_name == 'workflow_run' && github.run_attempt == 1 && format('pr-controls-refresh-{0}', matrix.number) || format('pr-controls-event-{0}-{1}-{2}', github.run_id, github.run_attempt, matrix.number) }}
       cancel-in-progress: false
     permissions:
       actions: write

@@ -30,7 +30,7 @@ function event(id, number = 1, name = 'workflow_run', action) {
 }
 // Native single-pending groups replace only waiting invocations. Active invocations can be
 // waiting for the inner publication lock; their replacement must wait until they finish.
-// Hold publication during a burst, then drain that FIFO queue with a fixed service time.
+// Hold publication during a burst, then drain the FIFO publication queue.
 class PublicationQueue {
   constructor(source) {
     this.policy = scheduling(source);
@@ -113,6 +113,15 @@ test('only workflow completion refreshes share a group; retries and explicit req
   for (const other of [event(2, 1, 'workflow_dispatch'), retry, event(1, 2, 'workflow_dispatch')])
     assert.notEqual(policy.group(first), policy.group(other));
   assert.notEqual(policy.group(first), policy.group(event(1)));
+});
+test('a rejected controls rerun cannot replace a valid pending passive refresh', () => {
+  const active = event(100);
+  const pending = event(102);
+  const old = event(90);
+  const rerun = { ...old, github: { ...old.github, run_attempt: 2 } };
+  const completed = burst(caller(), [active, pending, rerun]);
+  assert.ok(completed.includes(pending), 'the first-attempt refresh must survive an invalid rerun');
+  assert.notEqual(scheduling(caller()).group(active), scheduling(caller()).group(rerun));
 });
 test('arrivals during publication preserve the active writer and leave a refresh after its snapshot', () => {
   const completed = burst(caller(), [event(1)], (current, queue) => {
