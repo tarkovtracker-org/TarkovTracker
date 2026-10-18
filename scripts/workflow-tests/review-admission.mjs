@@ -1545,9 +1545,10 @@ test('original admission assertions reject reintroduced review, thread and sensi
 });
 async function admissionMutation(original, mutation) {
   assert.ok(original.includes(mutation.before), mutation.before);
-  const source = original.replace(mutation.before, mutation.after);
-  const mutant = await import(
-    `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  const mutant = await importMutationSource(
+    'review-admission-policy.mjs',
+    mutation.before,
+    mutation.after
   );
   const f = fixture();
   mutation.change(f);
@@ -2521,4 +2522,232 @@ test('a locator storage error fails the scoped admission statuses instead of lea
     else process.env.RUNNER_TEMP = previous;
     rmSync(directory, { recursive: true, force: true });
   }
+});
+// Sanitized verbatim completion/coverage sections from CodeRabbit comment 6241906527 on #1224.
+const codeRabbitComment = JSON.parse(
+  readFileSync(new URL('./fixtures/coderabbit-clean-comment.json', import.meta.url), 'utf8')
+);
+function commentReviewFixture() {
+  const f = fixture();
+  f.reviews = [];
+  f.comments = [
+    {
+      ...codeRabbitComment,
+      body: codeRabbitComment.body.replaceAll('97ee413a714f39e94ee8aaba7e22c8c86e70e5c3', head),
+    },
+  ];
+  return f;
+}
+test('captured CodeRabbit issue-comment completion admits only its exact reviewed head', () => {
+  const f = commentReviewFixture();
+  assert.deepEqual(admissionDecision(f).review, {
+    provider: 'CodeRabbit',
+    reviewId: codeRabbitComment.id,
+    commit: head,
+    kind: 'issue-comment',
+  });
+});
+test('CodeRabbit comment identity, completion and unambiguous coverage fail closed', () => {
+  const mutations = [
+    (c) => {
+      c.user = { ...c.user, id: 55 };
+    },
+    (c) => {
+      c.user = { ...c.user, type: 'User' };
+    },
+    (c) => {
+      c.user = { ...c.user, login: 'imposter[bot]' };
+    },
+    (c) => {
+      c.id = 0;
+    },
+    (c) => {
+      c.updated_at = null;
+    },
+    (c) => {
+      c.created_at = 'invalid';
+    },
+    (c) => {
+      c.updated_at = '2020-01-01T00:00:00Z';
+    },
+    (c) => {
+      c.body = c.body.replaceAll(head, base);
+    },
+    (c) => {
+      c.body = c.body.replace('"sourceCommitId":"' + head + '"', '"sourceCommitId":"' + base + '"');
+    },
+    (c) => {
+      c.body = c.body.replace(
+        '"coveredCommitId":"' + head + '"',
+        '"coveredCommitId":"' + base + '"'
+      );
+    },
+    (c) => {
+      c.body = c.body.replace('"kind":"reviewed"', '"kind":"inherited"');
+    },
+    (c) => {
+      c.body = c.body.replace('"kind":"reviewed"', '"kind":"reviewed","kind":"reviewed"');
+    },
+    (c) => {
+      c.body = c.body.replace('final_review_risk_coverage:{', 'final_review_risk_coverage:broken{');
+    },
+    (c) => {
+      c.body = c.body.replace('<!-- recent_review_end -->', '');
+    },
+    (c) => {
+      c.body = c.body.replace('<!-- final_review_risk_end -->', '');
+    },
+    (c) => {
+      c.body += '\n' + c.body;
+    },
+    (c) => {
+      c.body = c.body
+        .split('\n')
+        .map((line) => '> ' + line)
+        .join('\n');
+    },
+    (c) => {
+      c.body = '```\n' + c.body + '\n```';
+    },
+    (c) => {
+      c.body = c.body.replace(
+        'No actionable comments were generated in the recent review. 🎉',
+        'Review in progress'
+      );
+    },
+    (c) => {
+      c.body = c.body.replace('⚪ Minimal', '🔴 High');
+    },
+    (c) => {
+      c.body += '\n**Actionable comments posted: 1**';
+    },
+    (c) => {
+      c.body += '\nOutside diff range comments: 1';
+    },
+    (c) => {
+      c.body += '\nReview skipped';
+    },
+    (c) => {
+      c.body += '\n1 issue found in another file.';
+    },
+    (c) => {
+      c.body += '\nReview incomplete';
+    },
+    (c) => {
+      c.body = c.body.replace(
+        '**Merge Risk:** **⚪ Minimal**',
+        '**Merge Risk:** **🔴 High**\n**Merge Risk:** **⚪ Minimal**'
+      );
+    },
+  ];
+  mutations.push(
+    (c) => {
+      c.body += '\n<!-- review_in_progress_start -->';
+    },
+    (c) => {
+      c.body = c.body.replace('final_review_risk_coverage:', 'unsupported_coverage:');
+    }
+  );
+  for (const fence of ['```', '  ```', '~~~']) {
+    mutations.push((c) => {
+      c.body = fence + '\n' + c.body + '\n' + fence;
+    });
+    mutations.push((c) => {
+      c.body = fence + '\n' + c.body;
+    });
+  }
+  mutations.push((c) => {
+    c.body += '\nOutside diff range comments (1)';
+  });
+  for (const mutate of mutations) {
+    const f = commentReviewFixture();
+    mutate(f.comments[0]);
+    assert.throws(
+      () => admissionDecision(f),
+      /Completed exact-head independent review/,
+      String(mutate)
+    );
+  }
+  const f = commentReviewFixture();
+  f.comments.push(structuredClone(f.comments[0]));
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.comments[1].body = '<!-- recent_review_start -->\nReview in progress';
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+});
+test('CodeRabbit comment completion cannot bypass findings, review checks or sensitive approval', () => {
+  const f = commentReviewFixture();
+  f.threads = [{ isResolved: false, isOutdated: false }];
+  assert.throws(() => admissionDecision(f), /Unresolved review findings/);
+  f.threads = [];
+  f.reviews = [human('CHANGES_REQUESTED')];
+  assert.throws(() => admissionDecision(f), /Changes requested/);
+  f.reviews = [
+    {
+      ...fixture().reviews[0],
+      user: { id: 136622811, type: 'Bot' },
+      body: '**Actionable comments posted: 1**',
+    },
+  ];
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.reviews = [];
+  f.checks = [{ app: { id: 347564 }, head_sha: head, status: 'in_progress', conclusion: null }];
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.checks = [];
+  f.files[0].filename = 'scripts/ci/review-admission-policy.mjs';
+  assert.throws(() => admissionDecision(f), /exact-head collaborator approval/);
+  f.comments.push({
+    user: { login: 'maintainer', type: 'User' },
+    id: 20,
+    body: `/approve-sensitive ${head}`,
+  });
+  assert.equal(admissionDecision(f).risk, 'sensitive');
+});
+test('only authenticated CodeRabbit completion lifecycle events additionally wake admission', async () => {
+  for (const action of ['created', 'edited', 'deleted']) {
+    const payload = {
+      action,
+      issue: { pull_request: {} },
+      comment: structuredClone(codeRabbitComment),
+    };
+    assert.equal(await filterAdmission({ context: { eventName: 'issue_comment', payload } }), true);
+    payload.comment.body = 'Completion removed';
+    payload.changes = { body: { from: codeRabbitComment.body } };
+    assert.equal(await filterAdmission({ context: { eventName: 'issue_comment', payload } }), true);
+    payload.comment.user.id = 55;
+    assert.equal(
+      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      false
+    );
+    payload.comment.user = { ...codeRabbitComment.user };
+    delete payload.changes;
+    assert.equal(
+      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      false
+    );
+  }
+});
+test('comment evidence reaches the receipt and a withdrawn completion revokes publication', async () => {
+  await withReceiptDirectory(async () => {
+    const f = publishingFixture();
+    Object.assign(f.f, commentReviewFixture());
+    const receipt = await evaluateAdmission({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      source: base,
+    });
+    assert.equal(receipt.review.kind, 'issue-comment');
+    assert.equal(receipt.review.reviewId, codeRabbitComment.id);
+    f.context.payload = { pull_request: { number: 1 } };
+    f.f.artifacts = [{ name: `review-admission-${head}`, expired: false }];
+    f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+    await publishReviewAdmission({ github: f.github, context: f.context, sha: head });
+    assert.equal(f.statuses.at(-1).state, 'success');
+    f.f.comments = [];
+    await assert.rejects(
+      publishReviewAdmission({ github: f.github, context: f.context, sha: head }),
+      /Completed exact-head independent review/
+    );
+    assert.equal(f.statuses.at(-1).state, 'failure');
+  });
 });

@@ -101,6 +101,16 @@ The staged integration implements the compatibility gates; it does not activate 
 controller verifies a completed exact-head CodeRabbit/Cubic review or an independent collaborator
 approval, complete review-thread evidence, and no outstanding changes requested. A bot comment or
 green provider check without completed review evidence is insufficient.
+CodeRabbit completion may also come from its GitHub-authenticated bot issue comment: one clean
+recent-review section, minimal-risk section, and a unique `reviewed` coverage marker whose source
+and covered commits both equal the current head. The observed marker schema is checked strictly;
+quoted/fenced, stale, malformed, duplicate, incomplete, or conflicting evidence does not qualify.
+Receipts identify this evidence as `kind: issue-comment`; the id is the issue-comment id. Provider
+check failures, current review findings, unresolved threads, and sensitive-change approval still
+apply. No new token permissions are needed. Creation, edits, and deletion of these authenticated
+provider comment sections recheck admission,
+including edits that withdraw the previous completion body. Other ordinary comments remain
+filtered before serialization. The existing admission-only dispatch can also recheck evidence.
 Cubic completion requires one marked summary with a clean overall result, including its
 `No issues found` wording; quoted clean text and conflicting issue counts do not grant admission.
 
