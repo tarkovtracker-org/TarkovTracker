@@ -445,10 +445,10 @@
       "hint": "Get a quick overview of what the dashboard is showing and where to click next.",
       "sections": {
         "focus": {
-          "title": "Best next step",
-          "description": "The top card highlights the clearest immediate progress based on your current filters and tracked progress.",
-          "bullet_one": "Use it when you want one strong recommendation instead of browsing the full task list.",
-          "bullet_two": "If it looks wrong, check your task filters first because hidden tasks can change the recommendation."
+          "title": "Up next",
+          "description": "The Up next list ranks the tasks you can start right now, favoring trader unlocks, tasks that open follow-ups, and tasks you are close to finishing.",
+          "bullet_one": "When nothing is available, it shows the locked tasks that are one requirement away from opening.",
+          "bullet_two": "If it looks wrong, check your task filters first because hidden tasks change the list."
         },
         "progress": {
           "title": "Progress cards",
@@ -627,86 +627,27 @@
         "empty": "No updates yet.",
         "view_all": "View all"
       },
-      "focus": {
-        "title": {
-          "default": "What should I do next?",
-          "multiple": "Several good next steps",
-          "blocked": "Nothing is ready right now",
-          "complete": "You are caught up"
-        },
-        "heading": {
-          "start": "Start {task}",
-          "continue": "Continue {task}",
-          "finish": "Finish {task}",
-          "review_filters": "Review your task filters",
-          "closest_unlock": "Closest unlock: {task}",
-          "caught_up": "Everything visible is done"
-        },
-        "summary": {
-          "unlock_trader": "{task} is the unlock step for {trader}.",
-          "impact": "{task} has the biggest downstream payoff in your current queue.",
-          "close": "{task} is one of your closest available completions.",
-          "kappa": "{task} is your clearest Kappa step right now.",
-          "lightkeeper": "{task} is your clearest Lightkeeper step right now.",
-          "default": "{task} is the clearest immediate win on your dashboard.",
-          "filter_hidden_one": "Your current filters hide 1 available task.",
-          "filter_hidden_other": "Your current filters hide {count} available tasks.",
-          "blocked_requirement": "{task} is blocked by its requirements.",
-          "complete": "You have finished every visible task in this dashboard scope."
-        },
-        "stat": {
-          "why": "Why it won",
-          "status": "Status",
-          "secondary": "Other good options",
-          "secondary_actionable": "Use these if the primary plan is not a fit.",
-          "secondary_blocked": "These are the next closest unlocks in your queue.",
-          "secondary_empty": "This is the clearest next step right now."
-        },
+      "up_next": {
+        "title": "Up next",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
           "unlock_trader": "Unlocks {trader}",
-          "impact_one": "Opens 1 follow-up task",
-          "impact_other": "Opens {count} follow-up tasks",
-          "close": "One of your closest completions",
-          "kappa": "Advances Kappa",
-          "lightkeeper": "Advances Lightkeeper",
-          "trader": "Advances {trader}",
-          "filters": "Current filters are hiding viable tasks",
-          "complete": "Everything visible is complete",
-          "default": "Immediate progress"
-        },
-        "proof": {
-          "unlock_trader_one": "Top unlock priority: unlocks {trader} with 1 objective left.",
-          "unlock_trader_other": "Top unlock priority: unlocks {trader} with {count} objectives left.",
-          "impact_one": "Highest payoff: opens 1 follow-up task.",
-          "impact_other": "Highest payoff: opens {count} follow-up tasks.",
-          "close_one": "Fastest available: only 1 objective left.",
-          "close_other": "Fastest available: only {count} objectives left.",
-          "ready_one": "Best available: 1 objective left.",
-          "ready_other": "Best available: {count} objectives left.",
-          "ready_zero": "Best available: ready to turn in now.",
-          "kappa_one": "Best special-chain progress: advances Kappa with 1 objective left.",
-          "kappa_other": "Best special-chain progress: advances Kappa with {count} objectives left.",
-          "lightkeeper_one": "Best special-chain progress: advances Lightkeeper with 1 objective left.",
-          "lightkeeper_other": "Best special-chain progress: advances Lightkeeper with {count} objectives left.",
-          "filters_one": "No visible options: 1 available task is hidden by your filters.",
-          "filters_other": "No visible options: {count} available tasks are hidden by your filters.",
-          "complete": "No visible work remains in this dashboard scope."
-        },
-        "status": {
-          "ready_one": "Ready now. 1 objective left.",
-          "ready_other": "Ready now. {count} objectives left.",
-          "ready_no_objectives": "Ready now.",
-          "filters": "Adjust your task filters to reveal the hidden options.",
-          "complete": "No blockers. Nothing visible is left undone."
-        },
-        "badge": {
-          "based_on_filters": "Based on current filters",
-          "hidden_available_one": "Filters hide 1 available task",
-          "hidden_available_other": "Filters hide {count} available tasks"
-        },
-        "cta": {
-          "open_task": "Open task",
-          "open_tasks": "Open task list"
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Lightkeeper",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "Ready"
         }
       },
       "progress": {
