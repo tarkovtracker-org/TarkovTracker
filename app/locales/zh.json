@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "加载任务及藏身处数据中",
       "search_placeholder": "搜索物品、任务或藏身处设施...",
-      "items": "物品",
       "empty": "没有符合搜索的物品。",
       "error": "无法加载所需物品。",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "智能填充",
     "unknown_task": "未知任务",
     "unknown_station": "未知车站",
-    "lvl": "等级",
     "needed": "需要的",
     "view_details_for": "查看 {name} 的详情",
     "locked_before": "前置 {count}",

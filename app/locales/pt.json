@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "Carregando dados de tarefas e do esconderijo",
       "search_placeholder": "Pesquisar itens, tarefas ou postos do esconderijo...",
-      "items": "itens",
       "empty": "Nenhum item corresponde à sua pesquisa.",
       "error": "Não foi possível carregar os itens necessários.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "Preenchimento inteligente",
     "unknown_task": "Tarefa desconhecida",
     "unknown_station": "Posto desconhecido",
-    "lvl": "Nível",
     "needed": "necessário",
     "view_details_for": "Ver detalhes de {name}",
     "locked_before": "{count} antes",

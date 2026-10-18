@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "Lade Aufgaben- und Versteckdaten",
       "search_placeholder": "Suche Gegenstände, Aufgaben oder Versteck-Stationen...",
-      "items": "Gegenstände",
       "empty": "Keine Gegenstände entsprechen deiner Suche.",
       "error": "Benötigte Gegenstände konnten nicht geladen werden.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "Intelligente Füllung",
     "unknown_task": "Unbekannte Aufgabe",
     "unknown_station": "Unbekannter Bahnhof",
-    "lvl": "Stufe",
     "needed": "benötigt",
     "view_details_for": "Details für {name} anzeigen",
     "locked_before": "{count} davor",

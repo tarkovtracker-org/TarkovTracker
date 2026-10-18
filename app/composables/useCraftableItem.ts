@@ -28,6 +28,7 @@ export function useCraftableItem(
 ): UseCraftableItemReturn {
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
+  const { t } = useI18n({ useScope: 'global' });
   const craftSources = computed(() => {
     const currentItemId = toValue(itemId);
     if (!currentItemId) {
@@ -81,17 +82,19 @@ export function useCraftableItem(
     if (!isCraftable.value) {
       return '';
     }
-    const prefix = isCraftableAvailable.value
-      ? 'Craftable now'
-      : 'Craftable (station level too low)';
-    const preview = craftSourceStatuses.value
-      .slice(0, 3)
-      .map(
-        (source) => `${source.stationName} ${source.stationLevel} (you: ${source.currentLevel})`
-      );
+    const status = isCraftableAvailable.value
+      ? t('needed_items.craft.available')
+      : t('needed_items.craft.unavailable');
+    const preview = craftSourceStatuses.value.slice(0, 3).map((source) =>
+      t('needed_items.craft.source', {
+        station: source.stationName,
+        level: source.stationLevel,
+        current: source.currentLevel,
+      })
+    );
     const remainingCount = craftSourceStatuses.value.length - preview.length;
-    const remainingText = remainingCount > 0 ? ` +${remainingCount} more` : '';
-    return `${prefix}: ${preview.join(', ')}${remainingText}`;
+    const more = remainingCount > 0 ? t('needed_items.craft.more', { count: remainingCount }) : '';
+    return t('needed_items.craft.title', { status, sources: preview.join(', '), more });
   });
   const goToCraftStation = async () => {
     if (!craftStationTargetId.value) {

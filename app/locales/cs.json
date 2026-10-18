@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "Načítání úkolů a skrytých dat",
       "search_placeholder": "Hledat položky, úkoly nebo skrývací stanice...",
-      "items": "položky",
       "empty": "Hledání neodpovídají žádné položky.",
       "error": "Nelze načíst potřebné položky.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "Chytré vyplnění",
     "unknown_task": "Neznámý úkol",
     "unknown_station": "Neznámá stanice",
-    "lvl": "Lvl",
     "needed": "potřebný",
     "view_details_for": "Zobrazit podrobnosti pro {name}",
     "locked_before": "{count} před",

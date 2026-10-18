@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "タスクとハイドアウトのデータを読み込み中",
       "search_placeholder": "アイテム、タスク、ハイドアウト施設を検索…",
-      "items": "アイテム",
       "empty": "検索条件に一致するアイテムはありませんでした。",
       "error": "必要なアイテムを読み込めません。",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "スマート補充",
     "unknown_task": "不明なタスク",
     "unknown_station": "不明なステーション",
-    "lvl": "レベル",
     "needed": "必要",
     "view_details_for": "{name}の詳細を表示",
     "locked_before": "{count}より前",

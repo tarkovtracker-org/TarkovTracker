@@ -112,7 +112,7 @@
           unique: props.totalCount,
           total: props.ungroupedCount,
         })
-      : `${props.totalCount} ${t('page.needed_items.items')}`
+      : t('page.needed_items.items_count', { count: props.totalCount }, props.totalCount)
   );
   // Kappa only narrows task needs, so it does nothing on the Hideout tab.
   const isKappaDisabled = computed(() => props.modelValue === 'hideout');

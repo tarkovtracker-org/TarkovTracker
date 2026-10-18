@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "작업 및 힐아웃 데이터 불러오는 중",
       "search_placeholder": "아이템, 작업 또는 힐아웃 스테이션 검색...",
-      "items": "아이템",
       "empty": "검색과 일치하는 아이템이 없습니다.",
       "error": "필요 아이템을 불러올 수 없습니다.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "스마트 채우기",
     "unknown_task": "알 수 없는 작업",
     "unknown_station": "알 수 없는 스테이션",
-    "lvl": "레벨",
     "needed": "필요",
     "view_details_for": "{name} 세부 정보 보기",
     "locked_before": "이전 {count}개",

@@ -44,9 +44,7 @@
             class="text-lg font-bold"
             :class="isComplete ? 'text-success-400' : 'text-primary-400'"
           >
-            {{ formatCompactNumber(groupedItem.currentCount) }}/{{
-              formatCompactNumber(groupedItem.total)
-            }}
+            {{ formatNumber(groupedItem.currentCount) }}/{{ formatNumber(groupedItem.total) }}
           </span>
         </div>
       </div>
@@ -191,7 +189,7 @@
 </template>
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
-  import { formatCompactNumber } from '@/utils/formatters';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type {
     GroupedNeededItem,
     NeededItemHideoutModule,
@@ -203,6 +201,7 @@
     hideoutModules: NeededItemHideoutModule[];
     activeFilter?: 'all' | 'tasks' | 'hideout' | 'completed';
   }>();
+  const formatNumber = useLocaleNumberFormatter();
   const showModal = ref(false);
   const handleCardClick = (event: MouseEvent | KeyboardEvent) => {
     const target = event.target instanceof Element ? event.target : null;

@@ -6,10 +6,10 @@
     <AppTooltip v-if="foundInRaid" :text="foundInRaidTitle">
       <UIcon name="i-mdi-checkbox-marked-circle-outline" :class="firIconClass" />
     </AppTooltip>
-    <AppTooltip v-if="kappaRequired" :text="kappaTitleText">
+    <AppTooltip v-if="kappaRequired" :text="kappaTitle">
       <UIcon name="i-mdi-trophy" :class="kappaIconClass" />
     </AppTooltip>
-    <AppTooltip v-if="lightkeeperRequired" :text="lightkeeperTitleText">
+    <AppTooltip v-if="lightkeeperRequired" :text="lightkeeperTitle">
       <UIcon name="i-mdi-lighthouse" :class="lightkeeperIconClass" />
     </AppTooltip>
     <AppTooltip v-if="isCraftable" :text="craftableTitleText">
@@ -32,45 +32,31 @@
       craftableTitle?: string;
       firIconClass?: string;
       foundInRaid: boolean;
-      foundInRaidTitle?: string;
       isCraftable: boolean;
       kappaIconClass?: string;
       kappaRequired?: boolean;
-      kappaTitle?: string;
       lightkeeperIconClass?: string;
       lightkeeperRequired?: boolean;
-      lightkeeperTitle?: string;
     }>(),
     {
       craftableIconBaseClass: 'h-5 w-5',
       craftableIconClass: '',
-      craftableTitle: 'Craftable',
+      craftableTitle: '',
       firIconClass: 'h-5 w-5',
-      foundInRaidTitle: 'Found in Raid required',
       kappaIconClass: 'h-5 w-5 text-kappa',
       kappaRequired: false,
-      kappaTitle: 'Required for Kappa quest',
       lightkeeperIconClass: 'h-5 w-5 text-lightkeeper',
       lightkeeperRequired: false,
-      lightkeeperTitle: 'This quest is required to unlock the Lightkeeper trader',
     }
   );
   const emit = defineEmits<{
     craft: [];
   }>();
-  // Parents may pass an empty/whitespace string; trim so tooltip/aria-label are never blank.
-  const craftableTitleText = computed(() => {
-    const title = props.craftableTitle?.trim();
-    return title && title.length > 0 ? title : 'Craftable';
-  });
-  const kappaTitleText = computed(() => {
-    const title = props.kappaTitle?.trim();
-    return title && title.length > 0 ? title : 'Required for Kappa quest';
-  });
-  const lightkeeperTitleText = computed(() => {
-    const title = props.lightkeeperTitle?.trim();
-    return title && title.length > 0
-      ? title
-      : 'This quest is required to unlock the Lightkeeper trader';
-  });
+  const { t } = useI18n({ useScope: 'global' });
+  const foundInRaidTitle = computed(() => t('common.found_in_raid_required'));
+  const kappaTitle = computed(() => t('needed_items.task_kappa_req'));
+  const lightkeeperTitle = computed(() => t('page.tasks.questcard.lightkeeper_tooltip'));
+  const craftableTitleText = computed(
+    () => props.craftableTitle.trim() || t('needed_items.craft.craftable')
+  );
 </script>

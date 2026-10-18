@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "Wczytywanie danych zadań i kryjówki",
       "search_placeholder": "Szukaj przedmiotów, zadań lub stacji kryjówki...",
-      "items": "przedmiotów",
       "empty": "Żaden przedmiot nie pasuje do wyszukiwania.",
       "error": "Nie można wczytać potrzebnych przedmiotów.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "Inteligentne uzupełnianie",
     "unknown_task": "Nieznane zadanie",
     "unknown_station": "Nieznana stacja",
-    "lvl": "Poz.",
     "needed": "potrzebne",
     "view_details_for": "Wyświetl szczegóły: {name}",
     "locked_before": "{count} przed",

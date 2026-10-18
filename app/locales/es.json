@@ -1214,7 +1214,6 @@
     "needed_items": {
       "loading": "Cargando datos de misiones y escondite",
       "search_placeholder": "Buscar objetos...",
-      "items": "artículos",
       "empty": "No hay objetos que coincidan con tu búsqueda.",
       "error": "No se pueden cargar los elementos necesarios.",
       "filters": {
@@ -2450,7 +2449,6 @@
     "smart_fill": "Llenado inteligente",
     "unknown_task": "Tarea desconocida",
     "unknown_station": "Estación desconocida",
-    "lvl": "nivel",
     "needed": "necesario",
     "view_details_for": "Ver detalles de {name}",
     "locked_before": "{count} antes",
