@@ -877,8 +877,8 @@ Archives and aggregate receipts stay outside Git.
 
 The pinned synthetic baseline is retained with the owner's local task artifacts at
 `../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump` relative to this
-cleanup checkout. Its SHA-256 is
-`18673d23b70f698cf73dfd4dbde0fe953bdc229f587941ae7e21d119c0964572`.
+cleanup checkout. The [rehearsal script](../scripts/checks/legacy-progress-cleanup-rehearsal.py)
+owns and verifies its pinned SHA-256.
 Use that retained artifact through authorized local access; a teammate without it must
 obtain the synthetic baseline from the task owner before running this rehearsal. It is
 not downloadable from Git and must not be replaced with a production dump or a newly
