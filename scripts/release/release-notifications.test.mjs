@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { notifyReleasedPullRequests, previousStableTag } from './release-notifications.mjs';
+import { publishRecoveredRelease } from './release-recovery.mjs';
 const sha = 'f'.repeat(40);
 const repo = { owner: 'owner', repo: 'repo' };
 const url = 'https://github.com/owner/repo/releases/tag/v1.3.0';
@@ -9,6 +10,14 @@ const merged = (number, base = 'main') => ({
   merged_at: '2026-10-18T00:00:00Z',
   base: { ref: base },
 });
+async function associatedPages(method, params) {
+  const items = [];
+  for (let page = 1; ; page += 1) {
+    const { data } = await method({ ...params, page });
+    items.push(...data);
+    if (data.length < params.per_page) return items;
+  }
+}
 function fixture({ comments = {}, prsBySha, releases } = {}) {
   const byPage = {
     'v1.2.0': [{ sha: 'a' }, { sha: 'b' }, { sha: 'c' }, { sha }],
@@ -22,7 +31,10 @@ function fixture({ comments = {}, prsBySha, releases } = {}) {
   const rest = {
     repos: {
       getReleaseByTag: vi.fn().mockResolvedValue({
-        data: { draft: false, prerelease: false, html_url: url },
+        data: { tag_name: 'v1.3.0', draft: false, prerelease: false, html_url: url },
+      }),
+      getLatestRelease: vi.fn().mockResolvedValue({
+        data: { tag_name: 'v1.3.0', draft: false, prerelease: false, html_url: url },
       }),
       listReleases: vi.fn(),
       compareCommitsWithBasehead: vi.fn(async ({ basehead }) => ({
@@ -32,26 +44,27 @@ function fixture({ comments = {}, prsBySha, releases } = {}) {
         data: prs[commit_sha] ?? [],
       })),
     },
+    git: { getRef: vi.fn().mockResolvedValue({ data: { object: { type: 'commit', sha } } }) },
     issues: {
       listComments: vi.fn(),
       createComment: vi.fn().mockResolvedValue({}),
       addLabels: vi.fn().mockResolvedValue({}),
     },
   };
-  const github = {
-    rest,
-    paginate: vi.fn(async (method, params) => {
-      if (method === rest.repos.listReleases)
-        return (
-          releases ?? [
-            { tag_name: 'v1.3.0', draft: false, prerelease: false },
-            { tag_name: 'v1.2.0', draft: false, prerelease: false },
-            { tag_name: 'v1.1.0', draft: false, prerelease: false },
-          ]
-        );
-      return comments[params.issue_number] ?? [];
-    }),
-  };
+  const stableReleases = releases ?? [
+    { tag_name: 'v1.3.0', draft: false, prerelease: false },
+    { tag_name: 'v1.2.0', draft: false, prerelease: false },
+    { tag_name: 'v1.1.0', draft: false, prerelease: false },
+  ];
+  const pages = new Map([
+    [rest.repos.listReleases, () => stableReleases],
+    [
+      rest.repos.listPullRequestsAssociatedWithCommit,
+      (params) => associatedPages(rest.repos.listPullRequestsAssociatedWithCommit, params),
+    ],
+    [rest.issues.listComments, (params) => comments[params.issue_number] ?? []],
+  ]);
+  const github = { rest, paginate: vi.fn((method, params) => pages.get(method)(params)) };
   return { github, rest, context: { repo }, version: '1.3.0', sha };
 }
 describe('release PR notifications', () => {
@@ -105,15 +118,18 @@ describe('release PR notifications', () => {
     const f = fixture();
     f.rest.issues.createComment.mockRejectedValueOnce(new Error('HTTP 403'));
     await expect(notifyReleasedPullRequests(f)).rejects.toThrow(
-      'Notified 1 PRs for v1.3.0; failed #10: HTTP 403'
+      'Notified 1 PRs for v1.3.0; failed #10: comment: HTTP 403'
     );
     expect(f.rest.issues.addLabels).toHaveBeenCalledWith(
-      expect.objectContaining({ issue_number: 11 })
+      expect.objectContaining({ issue_number: 10 })
     );
   });
-  it('refuses to notify for a draft or prerelease publication', async () => {
+  it.each([
+    { draft: true, prerelease: false },
+    { draft: false, prerelease: true },
+  ])('refuses to notify for a draft or prerelease publication: %j', async (flags) => {
     const f = fixture();
-    f.rest.repos.getReleaseByTag.mockResolvedValue({ data: { draft: true, prerelease: false } });
+    f.rest.repos.getReleaseByTag.mockResolvedValue({ data: { tag_name: 'v1.3.0', ...flags } });
     await expect(notifyReleasedPullRequests(f)).rejects.toThrow('not a stable publication');
     expect(f.rest.issues.createComment).not.toHaveBeenCalled();
   });
@@ -125,15 +141,132 @@ describe('release PR notifications', () => {
     await expect(notifyReleasedPullRequests(f)).rejects.toThrow('is not ahead of v1.2.0');
     expect(f.rest.issues.createComment).not.toHaveBeenCalled();
   });
+  it('attempts labels independently and reports both operation failures', async () => {
+    const f = fixture();
+    f.rest.issues.createComment.mockRejectedValueOnce(new Error('comment HTTP 403'));
+    f.rest.issues.addLabels.mockRejectedValueOnce(new Error('label HTTP 500'));
+    await expect(notifyReleasedPullRequests(f)).rejects.toThrow(
+      '#10: comment: comment HTTP 403; label: label HTTP 500'
+    );
+    expect(f.rest.issues.addLabels).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 10 })
+    );
+    expect(f.rest.issues.createComment).toHaveBeenCalledTimes(2);
+  });
+  it('retries notifications after successful publication when recovery is skipped', async () => {
+    const comments = {};
+    const f = fixture({ comments });
+    let published;
+    let tagged;
+    const missing = () => Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+    f.rest.git.getRef.mockImplementation(() =>
+      tagged ? Promise.resolve({ data: tagged }) : missing()
+    );
+    f.rest.git.createRef = vi.fn(async () => {
+      tagged = { object: { type: 'commit', sha } };
+    });
+    f.rest.repos.getReleaseByTag.mockImplementation(() =>
+      published ? Promise.resolve({ data: published }) : missing()
+    );
+    f.rest.repos.createRelease = vi.fn(async (release) => {
+      published = { ...release, html_url: url };
+    });
+    f.rest.repos.getLatestRelease.mockImplementation(async () => ({ data: published }));
+    await publishRecoveredRelease({
+      ...f,
+      recovery: { version: f.version, sha, notes: 'validated notes' },
+    });
+    expect(f.rest.repos.createRelease).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ tag_name: 'v1.3.0', target_commitish: sha })
+    );
+    f.rest.issues.createComment.mockImplementation(async ({ issue_number, body }) => {
+      (comments[issue_number] ??= []).push({ user: { login: 'github-actions[bot]' }, body });
+    });
+    f.rest.issues.addLabels.mockRejectedValueOnce(new Error('temporary label failure'));
+    // The publication already exists. Workflow reruns have empty recovery outputs.
+    const retry = { ...f, version: '', sha: '' };
+    await expect(notifyReleasedPullRequests(retry)).rejects.toThrow('temporary label failure');
+    expect(f.rest.issues.createComment).toHaveBeenCalledTimes(2);
+    await expect(notifyReleasedPullRequests(retry)).resolves.toMatchObject({ notified: [10, 11] });
+    expect(f.rest.repos.getLatestRelease).toHaveBeenCalledTimes(2);
+    expect(f.rest.git.getRef).toHaveBeenCalledWith({ ...repo, ref: 'tags/v1.3.0' });
+    expect(f.rest.repos.compareCommitsWithBasehead).toHaveBeenCalledWith(
+      expect.objectContaining({ basehead: `v1.2.0...${sha}` })
+    );
+    expect(f.rest.issues.createComment).toHaveBeenCalledTimes(2);
+    expect(f.rest.issues.addLabels).toHaveBeenCalledTimes(4);
+    expect(f.rest.repos.createRelease).toHaveBeenCalledTimes(1);
+    expect(f.rest.git.createRef).toHaveBeenCalledTimes(1);
+  });
+  it('skips catch-up before the first publication without writing anything', async () => {
+    const f = fixture();
+    f.rest.repos.getLatestRelease.mockRejectedValue({ status: 404 });
+    await expect(notifyReleasedPullRequests({ ...f, version: '', sha: '' })).resolves.toBeNull();
+    expect(f.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(f.rest.issues.addLabels).not.toHaveBeenCalled();
+  });
+  it('rejects a tag that does not match the recovered exact commit before notifying', async () => {
+    const f = fixture();
+    f.rest.git.getRef.mockResolvedValue({
+      data: { object: { type: 'commit', sha: 'e'.repeat(40) } },
+    });
+    await expect(notifyReleasedPullRequests(f)).rejects.toThrow('does not match notification SHA');
+    expect(f.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(f.rest.issues.addLabels).not.toHaveBeenCalled();
+  });
+  it.each([
+    { type: 'tag', sha },
+    { type: 'commit', sha: 'main' },
+  ])('rejects unresolved or malformed tag objects before catch-up: %j', async (object) => {
+    const f = fixture();
+    f.rest.git.getRef.mockResolvedValue({ data: { object } });
+    await expect(notifyReleasedPullRequests({ ...f, version: '', sha: '' })).rejects.toThrow(
+      'exact commit'
+    );
+    expect(f.rest.issues.addLabels).not.toHaveBeenCalled();
+  });
+  it('paginates associated PRs beyond the first page', async () => {
+    const f = fixture({ prsBySha: {} });
+    f.rest.repos.listPullRequestsAssociatedWithCommit.mockImplementation(
+      async ({ commit_sha, page }) => ({
+        data:
+          commit_sha !== 'a'
+            ? []
+            : page === 1
+              ? Array.from({ length: 100 }, (_, i) => merged(i + 1))
+              : [merged(101)],
+      })
+    );
+    const result = await notifyReleasedPullRequests(f);
+    expect(result.notified).toHaveLength(101);
+    expect(f.rest.repos.listPullRequestsAssociatedWithCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ commit_sha: 'a', page: 2 })
+    );
+    expect(f.rest.issues.addLabels).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 101 })
+    );
+  });
   it('pages through large release ranges', async () => {
     const f = fixture({ prsBySha: {} });
     const first = Array.from({ length: 100 }, (_, index) => ({ sha: `p${index}` }));
-    f.rest.repos.compareCommitsWithBasehead
-      .mockResolvedValueOnce({ data: { status: 'ahead', commits: first } })
-      .mockResolvedValueOnce({ data: { status: 'ahead', commits: [{ sha: 'last' }] } });
+    f.rest.repos.compareCommitsWithBasehead.mockImplementation(async ({ page }) => ({
+      data: { status: 'ahead', commits: page === 1 ? first : [{ sha: 'last' }] },
+    }));
     await notifyReleasedPullRequests(f);
     expect(f.rest.repos.compareCommitsWithBasehead).toHaveBeenCalledTimes(2);
-    expect(f.rest.repos.listPullRequestsAssociatedWithCommit).toHaveBeenCalledTimes(101);
+    expect(f.rest.repos.compareCommitsWithBasehead).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ page: 1 })
+    );
+    expect(f.rest.repos.compareCommitsWithBasehead).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ page: 2 })
+    );
+    expect(
+      f.github.paginate.mock.calls.filter(
+        ([method]) => method === f.rest.repos.listPullRequestsAssociatedWithCommit
+      )
+    ).toHaveLength(101);
   });
 });
 describe('previousStableTag', () => {

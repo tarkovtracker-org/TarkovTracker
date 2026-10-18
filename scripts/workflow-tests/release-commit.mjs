@@ -313,11 +313,12 @@ test('release permission key order does not change dispatch authorization', () =
   assert.notEqual(reordered, workflow, 'permission reordering must apply');
   assertReleaseWorkflowBoundaries(ci, reordered);
 });
-function assertOptionalNotifications(release) {
+function assertOptionalNotifications(workflow) {
+  const release = jobBlock(workflow, 'release');
   const recover = workflowStep(release, 'Recover interrupted version publication');
   const notify = workflowStep(release, 'Notify released pull requests');
   assert.doesNotMatch(recover, /continue-on-error/);
-  assert.match(notify, /^ {8}if: steps\.recover\.outcome == 'success'$/m);
+  assert.match(notify, /^ {8}if: steps\.eligible\.outcome == 'success'$/m);
   assert.match(notify, /^ {8}continue-on-error: true$/m);
   assert.ok(release.indexOf(recover) < release.indexOf(notify));
 }
@@ -326,10 +327,16 @@ test('post-publication PR notifications cannot fail a completed release', () => 
   assertOptionalNotifications(release);
   for (const [before, after] of [
     ['        continue-on-error: true\n', ''],
-    ["if: steps.recover.outcome == 'success'", "if: steps.eligible.outputs.recovery == 'true'"],
+    ["if: steps.eligible.outcome == 'success'", "if: steps.recover.outcome == 'success'"],
   ]) {
     const mutated = release.replace(before, after);
     assert.notEqual(mutated, release);
     assert.throws(() => assertOptionalNotifications(mutated));
   }
+});
+test('unrelated job steps cannot satisfy post-publication notification boundaries', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  const notify = workflowStep(jobBlock(release, 'release'), 'Notify released pull requests');
+  const moved = release.replace(notify, '') + '\n  unrelated:\n    steps:\n' + notify;
+  assert.throws(() => assertOptionalNotifications(moved));
 });

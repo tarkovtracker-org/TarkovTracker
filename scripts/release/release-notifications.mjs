@@ -4,6 +4,7 @@ const BOT = 'github-actions[bot]';
 const LABEL = 'released';
 const PAGE = 100;
 const STABLE_TAG = /^v(\d+)\.(\d+)\.(\d+)$/;
+const FULL_SHA = /^[0-9a-f]{40}$/;
 const marker = (tag) => `<!-- release-notification:${tag} -->`;
 function versionParts(tag) {
   const match = STABLE_TAG.exec(tag);
@@ -15,7 +16,7 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-const isPublished = (release) => !release.draft && !release.prerelease;
+const isPublished = (release) => release.draft === false && release.prerelease === false;
 function lowerStableReleases(releases, current) {
   return releases
     .filter(isPublished)
@@ -51,7 +52,7 @@ async function rangeShas(github, repo, base, head) {
 }
 const mergedToMain = (pr) => Boolean(pr.merged_at) && pr.base?.ref === 'main';
 async function commitPullRequests(github, repo, sha) {
-  const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+  const data = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
     ...repo,
     commit_sha: sha,
     per_page: PAGE,
@@ -74,20 +75,73 @@ function alreadyNotified(comments, tag) {
       (comment.body?.includes(marker(tag)) || comment.body?.includes(legacy))
   );
 }
-async function notifyPullRequest(github, repo, number, tag, url) {
+async function commentPullRequest(github, repo, number, tag, url) {
   const comments = await github.paginate(github.rest.issues.listComments, {
     ...repo,
     issue_number: number,
     per_page: PAGE,
   });
-  if (!alreadyNotified(comments, tag)) {
-    await github.rest.issues.createComment({
-      ...repo,
-      issue_number: number,
-      body: `${marker(tag)}\n:tada: This PR is included in version ${tag.slice(1)} :tada:\n\nThe release is available on [GitHub release](${url})`,
-    });
+  if (alreadyNotified(comments, tag)) return;
+  await github.rest.issues.createComment({
+    ...repo,
+    issue_number: number,
+    body: `${marker(tag)}\n:tada: This PR is included in version ${tag.slice(1)} :tada:\n\nThe release is available on [GitHub release](${url})`,
+  });
+}
+async function notifyPullRequest(github, repo, number, tag, url) {
+  const results = await Promise.allSettled([
+    commentPullRequest(github, repo, number, tag, url),
+    github.rest.issues.addLabels({ ...repo, issue_number: number, labels: [LABEL] }),
+  ]);
+  const operations = ['comment', 'label'];
+  const errors = results.flatMap((result, index) =>
+    result.status === 'rejected' ? [`${operations[index]}: ${result.reason.message}`] : []
+  );
+  if (errors.length) throw new Error(errors.join('; '));
+}
+/** Catch up only an existing stable publication; no tag/release write API is used here. */
+async function latestPublication(github, repo) {
+  try {
+    return (await github.rest.repos.getLatestRelease(repo)).data;
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    return null;
   }
-  await github.rest.issues.addLabels({ ...repo, issue_number: number, labels: [LABEL] });
+}
+function stablePublication(release) {
+  if (!isPublished(release) || !STABLE_TAG.test(release.tag_name))
+    throw new Error(`${release.tag_name} is not a stable publication.`);
+  return release;
+}
+async function publication(github, repo, version, sha) {
+  if (!version && !sha) {
+    const release = await latestPublication(github, repo);
+    return release ? bindPublication(github, repo, stablePublication(release)) : null;
+  }
+  return recoveredPublication(github, repo, version, sha);
+}
+async function recoveredPublication(github, repo, version, sha) {
+  if (!STABLE_TAG.test(`v${version}`) || !FULL_SHA.test(String(sha)))
+    throw new Error('Notification publication requires a stable version and exact SHA.');
+  const { data: release } = await github.rest.repos.getReleaseByTag({
+    ...repo,
+    tag: `v${version}`,
+  });
+  if (release.tag_name !== `v${version}`) throw new Error('Release tag identity changed.');
+  return bindPublication(github, repo, stablePublication(release), sha);
+}
+const isCommitTag = (object) => object?.type === 'commit' && FULL_SHA.test(String(object.sha));
+function exactTagSha(data) {
+  if (!isCommitTag(data.object)) throw new Error('Release tag must identify an exact commit.');
+  return data.object.sha;
+}
+async function bindPublication(github, repo, release, expectedSha) {
+  const tag = release.tag_name;
+  const { data } = await github.rest.git.getRef({ ...repo, ref: `tags/${tag}` });
+  const sha = exactTagSha(data);
+  if (expectedSha && sha !== expectedSha)
+    throw new Error('Release tag does not match notification SHA.');
+  return { tag, sha, release };
 }
 async function notifyEach(github, repo, numbers, tag, url) {
   const notified = [];
@@ -104,15 +158,17 @@ async function notifyEach(github, repo, numbers, tag, url) {
   const detail = failed.map((item) => `#${item.number}: ${item.message}`).join('; ');
   throw new Error(`Notified ${notified.length} PRs for ${tag}; failed ${detail}`);
 }
-/** Comment on and label every PR shipped in a published stable release; reruns stay idempotent. */
+/** Notify a just-published version, or catch up the latest stable publication on ordinary reruns. */
 export async function notifyReleasedPullRequests({ github, context, version, sha }) {
   const repo = context.repo;
-  const tag = `v${version}`;
-  const { data: release } = await github.rest.repos.getReleaseByTag({ ...repo, tag });
-  if (!isPublished(release)) throw new Error(`${tag} is not a stable publication.`);
+  const published = await publication(github, repo, version, sha);
+  if (!published) return null;
+  const { tag, sha: releasedSha, release } = published;
   const previous = await previousStableTag(github, repo, tag);
   if (!previous) return { tag, previous, notified: [], failed: [] };
-  const shas = (await rangeShas(github, repo, previous, sha)).filter((item) => item !== sha);
+  const shas = (await rangeShas(github, repo, previous, releasedSha)).filter(
+    (item) => item !== releasedSha
+  );
   const numbers = await releasedPullRequests(github, repo, shas);
   return { tag, previous, ...(await notifyEach(github, repo, numbers, tag, release.html_url)) };
 }

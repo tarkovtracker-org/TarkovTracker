@@ -96,9 +96,10 @@ jobs:
             core.setOutput('version', result.recovery.version);
             core.setOutput('sha', result.recovery.sha);
             core.info(`Recovered publication of v${result.recovery.version} at ${result.recovery.sha}.`);
-      # Optional notices only: publication already succeeded, so failures here must stay warnings.
+      # Optional notices only: catch up an existing publication even when recovery was skipped.
+      # This step cannot publish; failures stay warnings and never change publication gates.
       - name: Notify released pull requests
-        if: steps.recover.outcome == 'success'
+        if: steps.eligible.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -110,7 +111,8 @@ jobs:
             const { notifyReleasedPullRequests } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release/release-notifications.mjs`));
             try {
               const result = await notifyReleasedPullRequests({ github, context, version: process.env.RELEASE_VERSION, sha: process.env.RELEASE_SHA });
-              core.info(`Notified ${result.notified.length} PRs for ${result.tag} since ${result.previous ?? 'the first release'}.`);
+              if (result) core.info(`Notified ${result.notified.length} PRs for ${result.tag} since ${result.previous ?? 'the first release'}.`);
+              else core.info('No stable publication to notify.');
             } catch (error) {
               core.warning(`Release PR notifications incomplete: ${error.message}`);
               throw error;
