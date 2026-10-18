@@ -110,7 +110,8 @@ select
   has_schema_privilege(current_user, 'public', 'create') as can_create_in_public,
   exists (
     select 1 from pg_catalog.pg_namespace n cross join reachable_roles r
-    where has_schema_privilege(r.oid, n.oid, 'create')
+    where n.nspname !~ '^pg_(toast_)?temp_'
+      and has_schema_privilege(r.oid, n.oid, 'create')
   ) as can_create_in_schema,
   coalesce(
     has_schema_privilege(current_user, to_regnamespace('supabase_migrations'), 'usage'),

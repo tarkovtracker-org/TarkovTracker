@@ -191,6 +191,7 @@ describe('prod-db observer', () => {
     const createCheck = query.slice(query.lastIndexOf('select', end), end);
     expect(createCheck).toContain('from pg_catalog.pg_namespace n');
     expect(createCheck).not.toContain('application_schemas');
+    expect(createCheck).toContain("n.nspname !~ '^pg_(toast_)?temp_'");
   });
   it('allowlists only the aggregate owner-only cleanup view', () => {
     const result = JSON.parse(run(['owner-only-teams']));
