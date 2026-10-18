@@ -638,18 +638,29 @@ test('a rerun cannot change the immutable first-attempt source receipt', async (
   assert.equal(f.pointers.length, 0);
 });
 test('privileged controls workflow is main-only, serialized, artifact-first, and never executes candidate code', () => {
-  const source = readFileSync('.github/workflows/pr-controls.yml', 'utf8');
+  const caller = readFileSync('.github/workflows/pr-controls.yml', 'utf8');
+  const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
+  assert.match(caller, /permissions: \{\}/);
   assert.match(source, /permissions: \{\}/);
   assert.match(source, /environment: review-admission/);
   assert.match(
     source,
     /group: review-admission-publication\n      queue: max\n      cancel-in-progress: false/
   );
-  assert.equal((source.match(/ref: main/g) ?? []).length, 2);
-  assert.equal((source.match(/persist-credentials: false/g) ?? []).length, 2);
+  assert.equal((`${caller}${source}`.match(/ref: main/g) ?? []).length, 2);
+  assert.equal((`${caller}${source}`.match(/persist-credentials: false/g) ?? []).length, 2);
   const controls = jobBlock(source, 'controls');
-  const targets = jobBlock(source, 'targets');
-  assert.match(controls, /if: github.ref == 'refs\/heads\/main'/);
+  const invocation = jobBlock(caller, 'controls');
+  const targets = jobBlock(caller, 'targets');
+  assert.match(invocation, /if: github.ref == 'refs\/heads\/main'/);
+  assert.match(controls, /github.ref == 'refs\/heads\/main'/);
+  assert.match(invocation, /uses: \.\/\.github\/workflows\/pr-controls-publish.yml/);
+  assert.match(invocation, /pull_request: \$\{\{ matrix.number \}\}/);
+  assert.match(controls, /CONTROL_PR: \$\{\{ inputs.pull_request \}\}/);
+  assert.equal(
+    permissionsBlock(invocation, '    ').trim(),
+    permissionsBlock(controls, '    ').trim()
+  );
   assert.equal(
     permissionsBlock(controls, '    ').trim(),
     'actions: write\n      checks: read\n      contents: read\n      issues: read\n      pull-requests: write\n      statuses: read'
@@ -658,7 +669,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
     permissionsBlock(targets, '    ').trim(),
     'actions: read\n      contents: read\n      pull-requests: read'
   );
-  assert.match(source, /pull-requests: read/);
+  assert.match(targets, /pull-requests: read/);
   assert.match(source, /scope: 'controls'/);
   assert.ok(
     source.indexOf('Save immutable control receipt') < source.indexOf('Commit App-pinned state')
@@ -671,7 +682,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
     'secrets: inherit',
     'overwrite: true',
   ])
-    assert.ok(!source.includes(unsafe));
+    assert.ok(!`${caller}${source}`.includes(unsafe));
 });
 test('enqueue consumer rejects an old green admission receipt after explicit revocation', async () => {
   const f = fixture();

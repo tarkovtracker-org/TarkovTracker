@@ -64,13 +64,12 @@ jobs:
       fail-fast: false
       matrix:
         number: ${{ fromJSON(needs.targets.outputs.numbers) }}
+    # Only completed-workflow refreshes are interchangeable. Single-pending is the native
+    # default; keep the active invocation (including its publisher) and newest waiting one.
+    # Lifecycle events, checkbox edits and dispatches each retain their own invocation.
     concurrency:
-      group: review-admission-publication
-      queue: max
+      group: ${{ github.event_name == 'workflow_run' && format('pr-controls-refresh-{0}', matrix.number) || format('pr-controls-event-{0}-{1}-{2}', github.run_id, github.run_attempt, matrix.number) }}
       cancel-in-progress: false
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: review-admission
     permissions:
       actions: write
       checks: read
@@ -78,50 +77,6 @@ jobs:
       issues: read
       pull-requests: write
       statuses: read
-    env:
-      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
-      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
-      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
-      CONTROL_PR: ${{ matrix.number }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - name: Verify bounded archive prerequisite
-        run: command -v unzip >/dev/null
-      - name: Validate operation and prepare meaningful panel changes
-        id: prepare
-        env:
-          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { prepareControls } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
-            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
-            const publisher = await createReviewPublisher({ github, context, core, scope: 'controls' });
-            await prepareControls({ github: publisher, context, core, number: Number(process.env.CONTROL_PR) });
-      - name: Save immutable control receipt
-        id: receipt
-        if: steps.prepare.outputs.changed == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pr-controls-${{ matrix.number }}
-          path: pr-control-evidence/state.json
-          if-no-files-found: error
-          retention-days: 90
-      - name: Commit App-pinned state and update the same panel
-        if: steps.prepare.outputs.changed == 'true'
-        env:
-          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
-          CONTROL_ARTIFACT_ID: ${{ steps.receipt.outputs.artifact-id }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { publishControls } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
-            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
-            const publisher = await createReviewPublisher({ github, context, core, scope: 'controls' });
-            await publishControls({ github: publisher, context, number: Number(process.env.CONTROL_PR), artifactId: Number(process.env.CONTROL_ARTIFACT_ID) });
+    uses: ./.github/workflows/pr-controls-publish.yml
+    with:
+      pull_request: ${{ matrix.number }}

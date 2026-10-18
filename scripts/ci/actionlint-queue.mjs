@@ -7,7 +7,7 @@ const queuedFiles = new Map([
 const specializedNormalizers = new Map([
   ['.github/workflows/preview.yml', normalizePreviewWorkflow],
   ['.github/workflows/review-admission.yml', normalizeAdmissionWorkflow],
-  ['.github/workflows/pr-controls.yml', normalizeControlsWorkflow],
+  ['.github/workflows/pr-controls-publish.yml', normalizeControlsWorkflow],
   ['.github/workflows/release-promotion-queue.yml', normalizePromotionWorkflow],
 ]);
 /** Validate the documented queue extension before the older native parser sees the workflow. */

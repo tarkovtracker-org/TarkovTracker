@@ -224,6 +224,33 @@ enable automatic PR previews, or stop them. The bot resets the checkbox and upda
 Presentation lives in `scripts/ci/pr-control-policy.mjs` so branding and copy can change without
 adding action types. Passive refreshes write only when the displayed state changes.
 
+Completed-workflow refreshes are coalesced **per PR before publication** by the caller job in
+[`pr-controls.yml`](../.github/workflows/pr-controls.yml). GitHub's
+[single-pending concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency)
+keeps the active invocation and replaces older waiting refreshes with the newest one. The active
+invocation includes time waiting for the shared publication lock and is never cancelled. Each PR
+can therefore contribute one passive publisher to that queue and retain one pending refresh outside
+it. Superseded waiting refreshes show as cancelled; they never start a publisher runner or use its
+credentials. Target-selection jobs still run, and there is no additional preflight runner/API pass.
+
+PR lifecycle events (including `synchronize`), checkbox edits, and structured dispatches retain
+separate invocations. A synchronize event can invalidate an attestation even after returning to a
+previous commit, so it must not be coalesced with an ordinary refresh. Review Admission keeps its
+existing queue. The reusable
+[`publisher`](../.github/workflows/pr-controls-publish.yml) requires the original caller on `main`,
+keeps the protected environment, and shares the same non-cancelling `queue: max` publication lock.
+It rereads live head, role, journal and intent before publication. Caller run identity, receipt names,
+App scope, and the dispatch interface remain unchanged.
+
+The baseline and rollout measurements are tracked in [#1277](https://github.com/tarkovtracker-org/TarkovTracker/issues/1277).
+The workflow-driven burst regression models 40 simultaneous refreshes for each of two PRs: four
+publisher invocations survive instead of 80, while every explicit/lifecycle event survives. This is
+a scheduling model, not a live latency measurement. Before closing the issue, collect a bounded live
+burst after the merged workflow activates: compare selector/publisher counts, time waiting for the
+publication lock, runner time and avoided publisher API work. Verify that an interleaved legitimate
+operation and current-head/revocation checks still succeed; preserve the existing CI and deployed
+preview gates. Candidate CI never receives the protected publisher credential.
+
 An **admin review attestation** is an explicit alternative to completed provider/non-author human
 review, including when the admin authored the PR. It applies to one exact commit and does not
 assert that an independent reviewer completed a review. It never resolves findings, dismisses
