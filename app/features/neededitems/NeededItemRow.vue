@@ -173,7 +173,7 @@
                           </div>
                         </template>
                         <RequirementInfo
-                          class="mt-1 justify-center"
+                          class="mt-1 justify-center text-sm"
                           :level-required="levelRequired"
                           :locked-before="lockedBefore"
                           :player-level="tarkovStore.playerLevel()"
@@ -250,7 +250,7 @@
             </div>
             <div v-else class="flex flex-row">
               <RequirementInfo
-                class="mr-2 self-center"
+                class="mr-2 self-center text-sm"
                 :level-required="levelRequired"
                 :locked-before="lockedBefore"
                 :player-level="tarkovStore.playerLevel()"
