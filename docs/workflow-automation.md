@@ -369,6 +369,15 @@ GitHub release.
 - Creates GitHub releases
 - Updates version in package.json
 
+Optional PR comments and `released` labels run after recovery actually publishes the reviewed
+version. The Semantic Release step only prepares a version PR and stops before publication.
+On ordinary Release reruns where recovery is skipped, notifications catch up the latest existing
+stable publication instead: its version tag must resolve to a full commit SHA. Only the recovery
+case supplies a version/SHA pair, which must match that tag exactly; skipped recovery supplies no
+version/SHA outputs. This path never creates or republishes a release. Bot-owned per-version
+comment markers prevent duplicates; labels are attempted independently, and either operation's
+errors are reported as nonfatal warnings so later attempts can finish partial notifications.
+
 **Triggers:** A daily eligibility check at 15:00 UTC and manual `workflow_dispatch` on `main`
 (Actions → Release → Run workflow) when a notable change should ship as a release sooner.
 Scheduled publication requires seven full days since the newest stable GitHub release, including
