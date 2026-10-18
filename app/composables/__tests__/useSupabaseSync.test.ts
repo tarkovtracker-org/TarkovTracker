@@ -65,6 +65,43 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it('saves retained preferences from a stale payload after all seven retired columns are rejected', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const columns = [
+      'hideout_sort_ready_first',
+      'hideout_collapse_completed',
+      'task_card_density',
+      'show_task_ids',
+      'show_not_required_labels',
+      'enable_holiday_effects',
+      'neededitems_style',
+    ];
+    const payload = {
+      user_id: 'user-1',
+      streamer_mode: true,
+      ...Object.fromEntries(columns.map((column) => [column, 'synthetic-legacy'])),
+    };
+    upsert.mockImplementation(async (candidate: Record<string, unknown>) => {
+      const missing = columns.find((column) => column in candidate);
+      return missing
+        ? {
+            error: {
+              code: 'PGRST204',
+              message: `Could not find the '${missing}' column of 'user_preferences' in the schema cache`,
+            },
+          }
+        : { error: null };
+    });
+    const store = createMockStore({ streamerMode: true });
+    const sync = useSupabaseSync({ store, table: 'user_preferences', transform: () => payload });
+    await sync.syncToSupabase();
+    expect(upsert).toHaveBeenCalledTimes(columns.length + 1);
+    expect(upsert).toHaveBeenLastCalledWith({ user_id: 'user-1', streamer_mode: true });
+    expect(sync.hasPendingChanges!()).toBe(false);
+    expect(payload).toHaveProperty(columns[0]!);
+    expect(store.$state).toEqual({ streamerMode: true });
+    sync.cleanup();
+  });
   it.each(['realtime', 'snapshot'])(
     'persists a revert to an earlier upload after a %s observation',
     async (observation) => {
