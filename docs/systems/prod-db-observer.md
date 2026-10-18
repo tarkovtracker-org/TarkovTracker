@@ -125,7 +125,8 @@ flowchart LR
   application relations or columns, advance sequences, create persistent objects, owns persistent
   database objects, can read stored migration `statements`, lacks
   default read-only transactions, or has unbounded statement or lock timeouts.
-- These checks cover every non-system schema and roles reachable through inheritance or `SET ROLE`.
+- These checks cover every non-system schema and roles reachable through inheritance or `SET ROLE`;
+  schema `CREATE` is checked on system schemas too.
   Application `SECURITY DEFINER` execution is rejected conservatively: telemetry needs no such
   functions, and their bodies can bypass direct grants. The health flag does not claim each function
   writes. Membership administration and privileged server-file, program, signal, maintenance,

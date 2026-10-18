@@ -184,6 +184,14 @@ describe('prod-db observer', () => {
     expect(query).toContain('"id"');
     expect(query).not.toContain('email');
   });
+  it('checks schema CREATE privileges across system schemas too', () => {
+    const result = JSON.parse(run(['health']));
+    const query = result.data.rows[0].arguments.at(-1);
+    const end = query.indexOf('as can_create_in_schema');
+    const createCheck = query.slice(query.lastIndexOf('select', end), end);
+    expect(createCheck).toContain('from pg_catalog.pg_namespace n');
+    expect(createCheck).not.toContain('application_schemas');
+  });
   it('allowlists only the aggregate owner-only cleanup view', () => {
     const result = JSON.parse(run(['owner-only-teams']));
     expect(result.ok).toBe(true);

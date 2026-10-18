@@ -109,7 +109,7 @@ select
   ) as has_unsafe_system_role,
   has_schema_privilege(current_user, 'public', 'create') as can_create_in_public,
   exists (
-    select 1 from application_schemas n cross join reachable_roles r
+    select 1 from pg_catalog.pg_namespace n cross join reachable_roles r
     where has_schema_privilege(r.oid, n.oid, 'create')
   ) as can_create_in_schema,
   coalesce(
@@ -630,7 +630,7 @@ function validateCanaryHealth(report) {
     [health.is_write_role, 'observer role can use pg_write_all_data'],
     [health.has_table_write, 'observer role can write application relations or columns'],
     [health.can_create_in_public, 'observer role can create objects in public'],
-    [health.can_create_in_schema, 'observer role can create objects in an application schema'],
+    [health.can_create_in_schema, 'observer role can create objects in a schema'],
     [health.has_sequence_write, 'observer role can advance or modify application sequences'],
     [health.has_function_write, 'observer role can execute application SECURITY DEFINER functions'],
     [health.has_owned_objects, 'observer role owns persistent database objects'],
