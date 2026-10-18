@@ -244,6 +244,12 @@ Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) 
 `finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
 opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
 locked on the dashboard also locks its tasks.
+
+Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
+current profile's edition, prestige and faction eligibility. Ineligible children contribute no
+“Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
+do not remove an otherwise eligible follow-up from that count.
+
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
