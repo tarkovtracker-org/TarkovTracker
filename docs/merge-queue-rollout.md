@@ -321,6 +321,12 @@ manifest is [`.github/review-admission-app-manifest.json`](../.github/review-adm
 - The trusted publisher validates the App, bot, selected installation and repository before
   minting a short-lived statuses-only token. Candidate jobs never receive that key/token;
   CI, release and queue consumers receive only the public IDs.
+- Bot identity is read through the workflow's existing authenticated metadata client, avoiding
+  the anonymous API quota. The fixed bot ID/type and App/installation/token scope checks still
+  fail closed. Publisher API failures report only the method/path, HTTP status and validated
+  request ID/rate-limit/retry headers; response bodies, credentials and raw client errors are
+  omitted. No anonymous fallback or new retry loop is used. Inspect the reported reset or
+  `retry-after` time before retrying a denied run.
 - With no App variables, strict-mode head receipts retain their legacy Actions issuer.
   Queue-group admission is denied. Partial configuration or a missing configured key fails
   closed; there is no fallback from a configured App to Actions.
