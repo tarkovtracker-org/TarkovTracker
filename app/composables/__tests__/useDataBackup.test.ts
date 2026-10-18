@@ -43,7 +43,7 @@ const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   },
 }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: supabaseUser } }));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: reactive(supabaseUser) } }));
 const tarkovStore = {
   $state: {
     currentGameMode: 'pvp',
@@ -1642,6 +1642,30 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it('does not report a new import failure when accounts change after success', async () => {
+    const scope = effectScope();
+    const backup = scope.run(() => useDataBackup())!;
+    try {
+      const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      await backup.parseBackupFile(
+        createFile(
+          JSON.stringify({
+            _format: 'tarkovtracker-device-progress',
+            _version: 1,
+            current: raw,
+          })
+        )
+      );
+      await backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(backup.importState.value).toBe('success');
+      reactive(supabaseUser).id = 'different';
+      expect(backup.importState.value).toBe('idle');
+      expect(backup.importError.value).toBeNull();
+    } finally {
+      scope.stop();
+      supabaseUser.id = 'user-123';
+    }
+  });
   it.each(['onerror', 'onmessageerror'] as const)(
     'does not strand archive selection after worker %s',
     async (event) => {

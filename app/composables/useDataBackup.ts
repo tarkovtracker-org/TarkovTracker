@@ -656,7 +656,7 @@ export function useDataBackup(): UseDataBackupReturn {
       () => $supabase.user.id ?? null,
       () => {
         if (previewOwner === undefined) return;
-        const wasActive = importState.value !== 'idle';
+        const wasActive = importState.value === 'parsing' || importState.value === 'preview';
         resetImport();
         if (!wasActive) return;
         importState.value = 'error';
