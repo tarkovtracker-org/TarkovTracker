@@ -2797,6 +2797,7 @@ function graphComment(comment = codeRabbitComment) {
     __typename: 'IssueComment',
     id: comment.node_id,
     databaseId: comment.id,
+    fullDatabaseId: String(comment.id),
     author: { __typename: 'Bot', databaseId: 136622811, login: 'coderabbitai' },
     editor: comment.editor,
     lastEditedAt: comment.lastEditedAt,
@@ -2829,7 +2830,7 @@ test('CodeRabbit snapshot binds body and actor provenance in the same GraphQL re
 test('CodeRabbit snapshots reject missing identity, foreign author/editor and missing provenance', async () => {
   for (const change of [
     { id: 'different-node' },
-    { databaseId: 55 },
+    { fullDatabaseId: '55' },
     { __typename: 'Issue' },
     { author: { __typename: 'Bot', databaseId: 55, login: 'coderabbitai' } },
     { author: { __typename: 'User', databaseId: 136622811, login: 'coderabbitai' } },
@@ -2857,4 +2858,47 @@ test('CodeRabbit snapshots reject missing identity, foreign author/editor and mi
   };
   const comments = await readCodeRabbitComments(unedited, f.comments);
   assert.equal(admissionDecision({ ...f, comments }).approved, true);
+});
+test('CodeRabbit full comment IDs preserve safe REST numbers beyond GraphQL Int range', async () => {
+  const f = commentReviewFixture();
+  const snapshot = {
+    ...graphComment(f.comments[0]),
+    databaseId: null,
+    fullDatabaseId: String(f.comments[0].id),
+  };
+  const github = {
+    graphql: async (query) => {
+      assert.match(query, /id fullDatabaseId body/);
+      assert.doesNotMatch(query, /id databaseId body/);
+      return { node: snapshot };
+    },
+  };
+  const comments = await readCodeRabbitComments(github, f.comments);
+  const review = admissionDecision({ ...f, comments }).review;
+  assert.equal(review.reviewId, 6241906527);
+  assert.equal(typeof review.reviewId, 'number');
+});
+test('CodeRabbit full comment IDs reject mismatched, absent and unsafe identifiers', async () => {
+  for (const fullId of [
+    undefined,
+    null,
+    '',
+    6241906527,
+    '55',
+    '06241906527',
+    '6241906527.0',
+    '9007199254740993',
+  ]) {
+    const f = commentReviewFixture();
+    const github = {
+      graphql: async () => ({ node: { ...graphComment(f.comments[0]), fullDatabaseId: fullId } }),
+    };
+    await assert.rejects(readCodeRabbitComments(github, f.comments), /snapshot identity/);
+  }
+  for (const restId of [undefined, null, 0, -1, 1.5, '6241906527', Number.MAX_SAFE_INTEGER + 1]) {
+    const f = commentReviewFixture();
+    f.comments[0].id = restId;
+    const github = { graphql: async () => ({ node: graphComment(f.comments[0]) }) };
+    await assert.rejects(readCodeRabbitComments(github, f.comments), /snapshot identity/);
+  }
 });

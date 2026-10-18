@@ -108,6 +108,8 @@ quoted/fenced, stale, malformed, duplicate, incomplete, or conflicting evidence 
 The REST comment list only locates candidates. One GraphQL `IssueComment` response supplies the
 body, author, editor, and edit time together; missing provenance or a last edit by anyone other
 than CodeRabbit rejects the evidence. Never-edited comments require explicit null edit metadata.
+Comment identity uses GraphQL `fullDatabaseId`, matched as a decimal string against a positive safe
+REST integer; the receipt preserves that REST number without a lossy numeric conversion.
 Line endings are normalized; positive counts (including leading zeros) and contradictory
 merge-risk statements anywhere in the full body reject admission.
 Receipts identify this evidence as `kind: issue-comment`; the id is the issue-comment id. Provider

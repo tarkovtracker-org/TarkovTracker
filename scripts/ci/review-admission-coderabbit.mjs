@@ -17,7 +17,7 @@ export function codeRabbitCommentEvent(payload) {
 }
 const COMMENT_SNAPSHOT = `query($id: ID!) {
   node(id: $id) { __typename ... on IssueComment {
-    id databaseId body createdAt updatedAt lastEditedAt
+    id fullDatabaseId body createdAt updatedAt lastEditedAt
     author { __typename login ... on Bot { databaseId } }
     editor { __typename login ... on Bot { databaseId } }
   } }
@@ -39,15 +39,23 @@ async function commentSnapshot(github, comment) {
     ![
       node.__typename === 'IssueComment',
       node.id === comment.node_id,
-      node.databaseId === comment.id,
+      sameCommentId(node.fullDatabaseId, comment.id),
     ].every(Boolean)
   )
     throw new Error('CodeRabbit comment snapshot identity is missing or changed.');
-  return snapshotComment(node);
+  return snapshotComment(node, comment.id);
 }
-function snapshotComment(node) {
+function sameCommentId(fullId, restId) {
+  return [
+    Number.isSafeInteger(restId),
+    restId > 0,
+    typeof fullId === 'string',
+    fullId === String(restId),
+  ].every(Boolean);
+}
+function snapshotComment(node, restId) {
   return {
-    id: node.databaseId,
+    id: restId,
     node_id: node.id,
     user: {
       id: node.author?.databaseId,
