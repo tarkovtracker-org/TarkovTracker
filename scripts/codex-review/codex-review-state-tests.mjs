@@ -79,6 +79,9 @@ test('receipt-wrapped security reviews never block or complete code review', () 
   assert.equal(classifyState(inputs({ comments: [receipt] }), now).status, 'unreviewed');
   const previous = reviewComment(otherHead, '2026-09-27T02:00:00Z');
   assert.equal(classifyState(inputs({ comments: [previous, receipt] }), now).status, 'unreviewed');
+  const wrappedReview = reviewComment(head);
+  wrappedReview.body = `<!-- codex-review-receipt:v1 -->\n\n${wrappedReview.body}`;
+  assert.equal(classifyState(inputs({ comments: [wrappedReview] }), now).status, 'complete');
 });
 test('untagged requests require a later completion for the exact current head', () => {
   const requested = request('2026-09-27T01:30:00Z');
