@@ -58,3 +58,17 @@ export const parseUserScopedStorage = <T>(raw: string): UserScopedStorageEnvelop
     return null;
   }
 };
+const recoveryEnvelopeOwner = (value: unknown): string | null | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const owner = (value as Record<string, unknown>)._userId;
+  return owner === null || typeof owner === 'string' ? owner : undefined;
+};
+export const recoveryRawOwner = (raw: string): string | null | undefined => {
+  try {
+    return recoveryEnvelopeOwner(JSON.parse(raw));
+  } catch {
+    return undefined;
+  }
+};
+export const isOwnedProgressRecovery = (raw: string | null, owner: string | null): raw is string =>
+  raw !== null && recoveryRawOwner(raw) === owner;

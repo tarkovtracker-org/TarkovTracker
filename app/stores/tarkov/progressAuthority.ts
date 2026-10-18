@@ -6,6 +6,8 @@ import {
   type ProgressOwnerToken,
 } from '@/stores/tarkov/progressRepository';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { isOwnedProgressRecovery, recoveryRawOwner } from '@/utils/userScopedStorage';
+export { isOwnedProgressRecovery } from '@/utils/userScopedStorage';
 type Repository = Awaited<ReturnType<typeof openActiveProgressRepository>>;
 type Result = { ok: true } | { ok: false; error: unknown; canceled?: true };
 type CommitAction = { action: () => void; requiresCurrentRevision: boolean };
@@ -63,20 +65,6 @@ const withRepository = async <T>(operation: (db: Repository) => Promise<T>): Pro
     return await operation(await openRepository());
   }
 };
-const recoveryEnvelopeOwner = (value: unknown): string | null | undefined => {
-  if (!value || typeof value !== 'object') return undefined;
-  const owner = (value as Record<string, unknown>)._userId;
-  return owner === null || typeof owner === 'string' ? owner : undefined;
-};
-const recoveryRawOwner = (raw: string): string | null | undefined => {
-  try {
-    return recoveryEnvelopeOwner(JSON.parse(raw));
-  } catch {
-    return undefined;
-  }
-};
-export const isOwnedProgressRecovery = (raw: string | null, owner: string | null): raw is string =>
-  raw !== null && recoveryRawOwner(raw) === owner;
 export const ownedLegacyUpdates = (record: ActiveProgressRecord, owner: string | null): string[] =>
   (record.legacyUpdates ?? []).filter((raw): raw is string => isOwnedProgressRecovery(raw, owner));
 const legacySource = (): string | null =>

@@ -935,6 +935,20 @@
               </div>
             </div>
           </template>
+          <div
+            v-if="backupImportState === 'parsing'"
+            class="flex items-center gap-3"
+            role="status"
+            aria-live="polite"
+          >
+            <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" aria-hidden="true" />
+            <p class="text-surface-300 text-sm">
+              {{ $t('settings.data_management.reading_backup') }}
+            </p>
+            <UButton variant="soft" color="neutral" @click="resetBackupPreview">
+              {{ $t('common.cancel') }}
+            </UButton>
+          </div>
           <div v-if="recoveryArchiveEntries.length" class="space-y-2">
             <p class="text-surface-400 text-sm">
               {{ $t('settings.data_management.recovery_archive_select_entry') }}
@@ -945,6 +959,7 @@
               color="neutral"
               :variant="selectedRecoveryArchiveEntry === index ? 'solid' : 'soft'"
               :data-testid="`recovery-archive-entry-${index}`"
+              :disabled="backupImportState === 'parsing'"
               @click="reviewRecoveryArchiveEntry(index)"
             >
               {{
@@ -1869,7 +1884,7 @@
     if (isEftLogsPreviewActive.value || eftLogsIsParsing.value) {
       return 'eft-logs';
     }
-    if (backupImportState.value === 'preview') {
+    if (backupImportState.value === 'preview' || backupImportState.value === 'parsing') {
       return 'backup';
     }
     return null;
@@ -1904,6 +1919,7 @@
   const isAnyImportActive = computed(
     () =>
       isAnyImportPreviewActive.value ||
+      backupImportState.value === 'parsing' ||
       tarkovDevImportState.value === 'loading' ||
       eftLogsIsParsing.value
   );
