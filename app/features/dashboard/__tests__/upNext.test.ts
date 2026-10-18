@@ -129,6 +129,13 @@ describe('rankUpNext', () => {
       ['b-fresh', 'ready'],
     ]);
   });
+  it('keeps untouched single-objective tasks ready', () => {
+    const [item] = rankUpNext(
+      [task('solo', { objectives: [{ id: 'solo-1' }] } as Partial<Task>)],
+      context()
+    );
+    expect(item?.reason).toBe('ready');
+  });
   it('ignores optional objectives when counting progress', () => {
     const [item] = rankUpNext(
       [task('t', { objectives: [{ id: 'req' }, { id: 'opt', optional: true }] } as Partial<Task>)],

@@ -90,8 +90,8 @@ const flagReason = (task: Task, opens: number, traderName?: string): UpNextReaso
   return task.kappaRequired ? 'kappa' : null;
 };
 const progressReason = (progress: UpNextProgress): UpNextReason => {
-  if (progress.remaining <= 1) return 'almost-done';
-  return progress.completed > 0 ? 'in-progress' : 'ready';
+  if (progress.completed === 0) return 'ready';
+  return progress.remaining <= 1 ? 'almost-done' : 'in-progress';
 };
 const flagScore = (task: Task, opens: number, traderName?: string): number =>
   (traderName ? 1000 : 0) +
