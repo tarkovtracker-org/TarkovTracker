@@ -10,6 +10,7 @@ import {
   collectChanges,
   aggregateResults,
   fullJobs,
+  optionalJobs,
 } from '../ci/validation-plan.mjs';
 import { gitExecutable } from '../ci/validation-tools.mjs';
 const cli = resolve('scripts/ci/validate-changes.mjs');
@@ -232,6 +233,42 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
     if (!plan.full)
       assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
   }
+});
+function passingNeeds(plan) {
+  return {
+    changes: { result: 'success' },
+    ...Object.fromEntries(
+      fullJobs.map((job) => [job, { result: plan.jobs.includes(job) ? 'success' : 'skipped' }])
+    ),
+  };
+}
+function assertCoverageOutcomes(plan) {
+  const needs = passingNeeds(plan);
+  const expected = plan.full ? 'success' : 'skipped';
+  const mismatched = ['success', 'failure', 'cancelled', 'skipped', undefined].filter(
+    (result) => result !== expected
+  );
+  // Older candidate workflows without the job keep passing during the compatibility window.
+  assert.deepEqual(aggregateResults(plan, needs), []);
+  assert.deepEqual(aggregateResults(plan, { ...needs, coverage: { result: expected } }), []);
+  for (const result of mismatched) {
+    const errors = aggregateResults(plan, { ...needs, coverage: { result } });
+    assert.deepEqual(errors, [`coverage: expected ${expected}, received ${String(result)}`]);
+  }
+}
+test('compatibility window: the coverage gate may be absent, but a planned or reported outcome must match', () => {
+  assert.deepEqual(optionalJobs, ['coverage']);
+  assertCoverageOutcomes(classifyPaths(['README.md']));
+  const plan = classifyPaths(['app/a.ts']);
+  assertCoverageOutcomes(plan);
+  // A newer candidate plan may already list the job; the trusted aggregate accepts it but then
+  // requires it to report success.
+  const planned = { ...plan, jobs: [...plan.jobs, 'coverage'] };
+  const needs = passingNeeds(plan);
+  assert.deepEqual(aggregateResults(planned, { ...needs, coverage: { result: 'success' } }), []);
+  assert.deepEqual(aggregateResults(planned, needs), [
+    'coverage: expected success, received undefined',
+  ]);
 });
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));

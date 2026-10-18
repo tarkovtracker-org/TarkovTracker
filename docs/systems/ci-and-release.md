@@ -191,8 +191,12 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   the trusted contract before it can gate. The `security` gate is selected by every plan; every
   selected job must report `success`, every known but unselected job must report `skipped`, and a
   missing result fails the aggregate — so an older candidate workflow that omits a required job
-  can never pass. (The former `optionalJobs` compatibility window expired when all active
-  candidate workflows had landed the `security` job.) Status publication errors fail the
+  can never pass. `optionalJobs` lists jobs in a compatibility window: the trusted aggregate
+  accepts a candidate workflow that omits them, but once one is planned or reports, a full plan
+  requires `success` and a reduced plan requires `skipped`. `coverage` (merged shard coverage
+  thresholds, #1029) is in this window until its activation moves it into `fullJobs`; the earlier
+  `security` window expired when all active candidate workflows had landed that job. Status
+  publication errors fail the
   CI Result job, so automation cannot promote the commit.
 - Release prepares only `package.json` version and `CHANGELOG.md` on a canonical
   `wip/release-<version>-<run>-<attempt>` branch, validates dispatched candidate CI and an
