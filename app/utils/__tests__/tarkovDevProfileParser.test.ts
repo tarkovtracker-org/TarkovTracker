@@ -55,6 +55,22 @@ describe('validateTarkovDevProfile', () => {
       validateTarkovDevProfile(buildValidProfile({ info: { nickname: 'X', side: 'Usec' } }))
     ).toBe(false);
   });
+  it.each([-1, NaN, Infinity, -Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, '100'])(
+    'rejects invalid cumulative XP %s',
+    (experience) => {
+      const base = buildValidProfile();
+      const profile = { ...base, info: { ...base.info, experience } };
+      expect(validateTarkovDevProfile(profile)).toBe(false);
+      expect(parseTarkovDevProfile(profile).ok).toBe(false);
+    }
+  );
+  it.each([0, 1, Number.MAX_SAFE_INTEGER])('preserves valid cumulative XP %s', (experience) => {
+    const base = buildValidProfile();
+    const profile = { ...base, info: { ...base.info, experience } };
+    expect(validateTarkovDevProfile(profile)).toBe(true);
+    const result = parseTarkovDevProfile(profile);
+    expect(result.ok && result.data.totalXP).toBe(experience);
+  });
   it('rejects missing skills.Common', () => {
     expect(validateTarkovDevProfile(buildValidProfile({ skills: {} }))).toBe(false);
   });

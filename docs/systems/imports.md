@@ -76,8 +76,11 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - Siteverify responses are pinned to the canonical `APP_URL` hostname, so a token minted on another
   origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
   reports `example.com` for every origin; it only validates test-key tokens, never production ones.
-- Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
-  entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
+- Cached and upstream `200` payloads must pass the import profile schema before use. Cumulative
+  `info.experience` must be a nonnegative safe integer (zero is valid); negative, fractional,
+  non-finite, or imprecisely represented XP is rejected before deriving level or applying progress.
+  Invalid cached entries are treated as misses, and invalid upstream payloads fail without
+  entering shared cache.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
   never be imported from cache either.
 - Profile page modes use the centralized upstream slugs `regular`, `pve`, and `pvp-season`; the
