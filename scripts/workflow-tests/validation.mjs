@@ -258,7 +258,16 @@ function assertCoverageOutcomes(plan) {
 }
 test('compatibility window: the coverage gate may be absent, but a planned or reported outcome must match', () => {
   assert.deepEqual(optionalJobs, ['coverage']);
-  assertCoverageOutcomes(classifyPaths(['README.md']));
+  const reduced = classifyPaths(['README.md']);
+  assertCoverageOutcomes(reduced);
+  // Like any planned job, a reduced plan that lists coverage requires it to run and succeed.
+  assert.deepEqual(
+    aggregateResults(
+      { ...reduced, jobs: [...reduced.jobs, 'coverage'] },
+      { ...passingNeeds(reduced), coverage: { result: 'skipped' } }
+    ),
+    ['coverage: expected success, received skipped']
+  );
   const plan = classifyPaths(['app/a.ts']);
   assertCoverageOutcomes(plan);
   // A newer candidate plan may already list the job; the trusted aggregate accepts it but then

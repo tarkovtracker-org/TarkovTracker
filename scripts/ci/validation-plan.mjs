@@ -15,8 +15,8 @@ export const fullJobs = [
 ];
 const reducedJobs = ['lint-format', 'systems-drift', 'security'];
 // Compatibility window for the merged coverage gate: the trusted default-branch aggregate accepts a
-// candidate workflow with or without the `coverage` job. Once it reports or is planned, full plans
-// must succeed and reduced plans must skip. The activation change moves it into `fullJobs`.
+// candidate workflow with or without the `coverage` job. Once it reports or is planned, it must
+// succeed when planned or the plan is full, and skip otherwise. The activation change moves it into `fullJobs`.
 export const optionalJobs = ['coverage'];
 // Agent instruction files (root or nested AGENTS.md/CLAUDE.md) are
 // documentation. Under `public/` they would ship as site assets, so they stay full.

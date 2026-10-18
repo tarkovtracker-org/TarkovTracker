@@ -192,8 +192,8 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   selected job must report `success`, every known but unselected job must report `skipped`, and a
   missing result fails the aggregate — so an older candidate workflow that omits a required job
   can never pass. `optionalJobs` lists jobs in a compatibility window: the trusted aggregate
-  accepts a candidate workflow that omits them, but once one is planned or reports, a full plan
-  requires `success` and a reduced plan requires `skipped`. `coverage` (merged shard coverage
+  accepts a candidate workflow that omits them, but once one is planned or reports, it must report
+  `success` when planned or the plan is full, and `skipped` otherwise. `coverage` (merged shard coverage
   thresholds, #1029) is in this window until its activation moves it into `fullJobs`; the earlier
   `security` window expired when all active candidate workflows had landed that job. Status
   publication errors fail the
