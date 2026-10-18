@@ -161,8 +161,8 @@ const setup = async (
 };
 const defaultGlobalStubs = {
   AppTooltip: { template: '<span><slot /></span>' },
-  DashboardNextActions: {
-    template: '<div data-testid="dashboard-focus-card"></div>',
+  DashboardUpNext: {
+    template: '<div data-testid="dashboard-up-next"></div>',
   },
   DashboardMigrationBanner: {
     template: '<div data-testid="dashboard-migration-banner"></div>',
@@ -187,12 +187,12 @@ const defaultGlobalStubs = {
   UIcon: true,
 };
 describe('dashboard page', () => {
-  it('renders the next action focus area', async () => {
+  it('renders the up next list', async () => {
     const { DashboardPage } = await setup();
     const wrapper = await mountSuspended(DashboardPage, {
       global: { stubs: defaultGlobalStubs },
     });
-    expect(wrapper.find('[data-testid="dashboard-focus-card"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="dashboard-up-next"]').exists()).toBe(true);
   });
   it('renders the migration guide banner', async () => {
     const { DashboardPage } = await setup();

@@ -125,24 +125,23 @@ const setup = async (options: SetupOptions = {}) => {
   vi.doMock('@/stores/useTarkov', () => ({
     useTarkovStore: () => tarkovStore,
   }));
-  const { useDashboardRecommendations } = await import('@/composables/useDashboardRecommendations');
-  return useDashboardRecommendations();
+  const { useDashboardUpNext } = await import('@/composables/useDashboardUpNext');
+  return useDashboardUpNext();
 };
-describe('useDashboardRecommendations', () => {
-  it('picks the available task with the biggest downstream impact', async () => {
+const flags = (ids: string[], value = false) =>
+  Object.fromEntries(ids.map((id) => [id, { self: value }]));
+describe('useDashboardUpNext', () => {
+  it('ranks by follow-ups that completing the task actually opens', async () => {
     const tasks: Task[] = [
       {
         id: 'task-impact',
         name: 'Impact Task',
         factionName: 'Any',
-        kappaRequired: true,
-        lightkeeperRequired: true,
         objectives: [
           { id: 'impact-1', taskId: 'task-impact' },
           { id: 'impact-2', taskId: 'task-impact' },
         ],
-        successors: ['follow-up-1', 'follow-up-2'],
-        trader: { id: 'therapist', name: 'Therapist' },
+        children: ['follow-up-1', 'follow-up-2', 'follow-up-gated'],
       },
       {
         id: 'task-close',
@@ -152,54 +151,67 @@ describe('useDashboardRecommendations', () => {
           { id: 'close-1', taskId: 'task-close' },
           { id: 'close-2', taskId: 'task-close' },
         ],
-        trader: { id: 'prapor', name: 'Prapor' },
       },
-      {
-        id: 'follow-up-1',
-        name: 'Follow Up 1',
+      ...['follow-up-1', 'follow-up-2'].map((id) => ({
+        id,
+        name: id,
         factionName: 'Any',
-        objectives: [{ id: 'follow-1', taskId: 'follow-up-1' }],
-      },
+        objectives: [{ id: `${id}-obj`, taskId: id }],
+        taskRequirements: [{ task: { id: 'task-impact' } }],
+      })),
       {
-        id: 'follow-up-2',
-        name: 'Follow Up 2',
+        id: 'follow-up-gated',
+        name: 'Gated Follow Up',
         factionName: 'Any',
-        objectives: [{ id: 'follow-2', taskId: 'follow-up-2' }],
+        minPlayerLevel: 50,
+        objectives: [{ id: 'gated-obj', taskId: 'follow-up-gated' }],
+        taskRequirements: [{ task: { id: 'task-impact' } }],
       },
     ];
+    const ids = tasks.map((task) => task.id);
     const progressStore = createProgressStore({
-      tasksCompletions: {
-        'task-impact': { self: false },
-        'task-close': { self: false },
-        'follow-up-1': { self: false },
-        'follow-up-2': { self: false },
-      },
-      tasksFailed: {
-        'task-impact': { self: false },
-        'task-close': { self: false },
-        'follow-up-1': { self: false },
-        'follow-up-2': { self: false },
-      },
-      unlockedTasks: {
-        'task-impact': { self: true },
-        'task-close': { self: true },
-      },
+      tasksCompletions: flags(ids),
+      tasksFailed: flags(ids),
+      unlockedTasks: flags(['task-impact', 'task-close'], true),
     });
-    const tarkovStore = createTarkovStore({
-      completedObjectives: new Set(['close-1']),
-    });
-    const recommendations = await setup({
-      progressStore,
-      tasks,
-      tarkovStore,
-    });
-    expect(recommendations.mode.value).toBe('actionable');
-    expect(recommendations.primaryRecommendation.value?.taskId).toBe('task-impact');
-    expect(recommendations.primaryRecommendation.value?.reason).toBe('impact');
-    expect(recommendations.primaryRecommendation.value?.tone).toBe('primary');
-    expect(recommendations.secondaryRecommendations.value[0]?.taskId).toBe('task-close');
+    const tarkovStore = createTarkovStore({ completedObjectives: new Set(['close-1']) });
+    const upNext = await setup({ progressStore, tasks, tarkovStore });
+    expect(upNext.state.value).toBe('actionable');
+    expect(upNext.items.value.map((item) => item.taskId)).toEqual(['task-impact', 'task-close']);
+    expect(upNext.items.value[0]).toMatchObject({ reason: 'opens', opens: 2 });
+    expect(upNext.items.value[1]?.reason).toBe('almost-done');
   });
-  it('surfaces filter blockers when filters hide all currently available tasks', async () => {
+  it('flags reward-based trader unlock tasks while the trader is still locked', async () => {
+    const tasks: Task[] = [
+      {
+        id: 'task-reward',
+        name: 'Reward Unlock',
+        factionName: 'Any',
+        objectives: [{ id: 'reward-1', taskId: 'task-reward' }],
+        finishRewards: { traderUnlock: [{ id: 'jaeger' }] },
+      } as unknown as Task,
+      {
+        id: 'task-plain',
+        name: 'A Plain Task',
+        factionName: 'Any',
+        lightkeeperRequired: true,
+        objectives: [{ id: 'plain-1', taskId: 'task-plain' }],
+      },
+    ];
+    const traders = [{ id: 'jaeger', name: 'Jaeger', normalizedName: 'jaeger-test' } as Trader];
+    const progressStore = createProgressStore({
+      tasksCompletions: flags(['task-reward', 'task-plain']),
+      tasksFailed: flags(['task-reward', 'task-plain']),
+      unlockedTasks: flags(['task-reward', 'task-plain'], true),
+    });
+    const upNext = await setup({ progressStore, tasks, traders });
+    expect(upNext.items.value[0]).toMatchObject({
+      taskId: 'task-reward',
+      reason: 'unlock-trader',
+      traderName: 'Jaeger',
+    });
+  });
+  it('reports the filtered state when filters hide every available task', async () => {
     const tasks: Task[] = [
       {
         id: 'task-kappa',
@@ -210,22 +222,18 @@ describe('useDashboardRecommendations', () => {
       },
     ];
     const progressStore = createProgressStore({
-      tasksCompletions: { 'task-kappa': { self: false } },
-      tasksFailed: { 'task-kappa': { self: false } },
-      unlockedTasks: { 'task-kappa': { self: true } },
+      tasksCompletions: flags(['task-kappa']),
+      tasksFailed: flags(['task-kappa']),
+      unlockedTasks: flags(['task-kappa'], true),
     });
     const preferencesStore = createPreferencesStore({
       getHideNonKappaTasks: true,
       getShowNonSpecialTasks: false,
     });
-    const recommendations = await setup({
-      preferencesStore,
-      progressStore,
-      tasks,
-    });
-    expect(recommendations.mode.value).toBe('blocked');
-    expect(recommendations.primaryRecommendation.value?.reason).toBe('filter-hidden');
-    expect(recommendations.hiddenAvailableCount.value).toBe(1);
+    const upNext = await setup({ preferencesStore, progressStore, tasks });
+    expect(upNext.state.value).toBe('filtered');
+    expect(upNext.hiddenAvailableCount.value).toBe(1);
+    expect(upNext.items.value).toEqual([]);
   });
   it('reports zero remaining when all counted objectives are complete but hand-in is still pending', async () => {
     const tasks: Task[] = [
@@ -237,26 +245,19 @@ describe('useDashboardRecommendations', () => {
       },
     ];
     const progressStore = createProgressStore({
-      tasksCompletions: { 'task-hand-in': { self: false } },
-      tasksFailed: { 'task-hand-in': { self: false } },
-      unlockedTasks: { 'task-hand-in': { self: true } },
+      tasksCompletions: flags(['task-hand-in']),
+      tasksFailed: flags(['task-hand-in']),
+      unlockedTasks: flags(['task-hand-in'], true),
     });
-    const tarkovStore = createTarkovStore({
-      completedObjectives: new Set(['hand-in-1']),
-    });
-    const recommendations = await setup({
-      progressStore,
-      tasks,
-      tarkovStore,
-    });
-    expect(recommendations.mode.value).toBe('actionable');
-    expect(recommendations.primaryRecommendation.value?.progress).toMatchObject({
-      completed: 1,
-      remaining: 0,
-      total: 1,
+    const tarkovStore = createTarkovStore({ completedObjectives: new Set(['hand-in-1']) });
+    const upNext = await setup({ progressStore, tasks, tarkovStore });
+    expect(upNext.state.value).toBe('actionable');
+    expect(upNext.items.value[0]).toMatchObject({
+      reason: 'almost-done',
+      progress: { completed: 1, remaining: 0, total: 1 },
     });
   });
-  it('chooses the closest blocked task when nothing is actionable', async () => {
+  it('lists single-gate locked tasks when nothing is available', async () => {
     const tasks: Task[] = [
       {
         id: 'task-level',
@@ -264,54 +265,30 @@ describe('useDashboardRecommendations', () => {
         factionName: 'Any',
         minPlayerLevel: 15,
         objectives: [{ id: 'level-1', taskId: 'task-level' }],
-        successors: ['follow-up-a', 'follow-up-b'],
       },
       {
-        id: 'task-prereq',
-        name: 'Prereq Gate',
+        id: 'task-double',
+        name: 'Double Gate',
         factionName: 'Any',
-        objectives: [{ id: 'prereq-1', taskId: 'task-prereq' }],
-        taskRequirements: [
-          { task: { id: 'missing-a', name: 'Missing A' } },
-          { task: { id: 'missing-b', name: 'Missing B' } },
-        ],
-      },
-      {
-        id: 'follow-up-a',
-        name: 'Follow Up A',
-        factionName: 'Any',
-        objectives: [{ id: 'follow-a', taskId: 'follow-up-a' }],
-      },
-      {
-        id: 'follow-up-b',
-        name: 'Follow Up B',
-        factionName: 'Any',
-        objectives: [{ id: 'follow-b', taskId: 'follow-up-b' }],
+        minPlayerLevel: 15,
+        objectives: [{ id: 'double-1', taskId: 'task-double' }],
+        taskRequirements: [{ task: { id: 'task-level' } }],
       },
     ];
     const progressStore = createProgressStore({
       getLevel: () => 13,
-      tasksCompletions: {
-        'task-level': { self: false },
-        'task-prereq': { self: false },
-        'follow-up-a': { self: false },
-        'follow-up-b': { self: false },
-      },
-      tasksFailed: {
-        'task-level': { self: false },
-        'task-prereq': { self: false },
-        'follow-up-a': { self: false },
-        'follow-up-b': { self: false },
-      },
+      tasksCompletions: flags(['task-level', 'task-double']),
+      tasksFailed: flags(['task-level', 'task-double']),
       unlockedTasks: {},
     });
-    const recommendations = await setup({
-      progressStore,
-      tasks,
+    const upNext = await setup({ progressStore, tasks });
+    expect(upNext.state.value).toBe('blocked');
+    expect(upNext.items.value).toHaveLength(1);
+    expect(upNext.items.value[0]).toMatchObject({
+      taskId: 'task-level',
+      reason: 'blocked',
+      blocker: { type: 'player_level', required: 15 },
     });
-    expect(recommendations.mode.value).toBe('blocked');
-    expect(recommendations.primaryRecommendation.value?.taskId).toBe('task-level');
-    expect(recommendations.primaryRecommendation.value?.reason).toBe('blocked-requirement');
   });
   it('returns a complete state when every visible task is done', async () => {
     const tasks: Task[] = [
@@ -323,21 +300,17 @@ describe('useDashboardRecommendations', () => {
       },
     ];
     const progressStore = createProgressStore({
-      tasksCompletions: { 'task-done': { self: true } },
-      tasksFailed: { 'task-done': { self: false } },
+      tasksCompletions: flags(['task-done'], true),
+      tasksFailed: flags(['task-done']),
       unlockedTasks: {},
     });
     const tarkovStore = createTarkovStore({
       completedObjectives: new Set(['done-1']),
       completedTasks: new Set(['task-done']),
     });
-    const recommendations = await setup({
-      progressStore,
-      tasks,
-      tarkovStore,
-    });
-    expect(recommendations.mode.value).toBe('complete');
-    expect(recommendations.primaryRecommendation.value?.reason).toBe('complete');
+    const upNext = await setup({ progressStore, tasks, tarkovStore });
+    expect(upNext.state.value).toBe('complete');
+    expect(upNext.items.value).toEqual([]);
   });
   it('does not report complete when the visible branch only contains failed tasks', async () => {
     const tasks: Task[] = [
@@ -349,19 +322,13 @@ describe('useDashboardRecommendations', () => {
       },
     ];
     const progressStore = createProgressStore({
-      tasksCompletions: { 'task-failed': { self: false } },
-      tasksFailed: { 'task-failed': { self: true } },
+      tasksCompletions: flags(['task-failed']),
+      tasksFailed: flags(['task-failed'], true),
       unlockedTasks: {},
     });
-    const tarkovStore = createTarkovStore({
-      failedTasks: new Set(['task-failed']),
-    });
-    const recommendations = await setup({
-      progressStore,
-      tasks,
-      tarkovStore,
-    });
-    expect(recommendations.mode.value).toBe('empty');
-    expect(recommendations.primaryRecommendation.value).toBeNull();
+    const tarkovStore = createTarkovStore({ failedTasks: new Set(['task-failed']) });
+    const upNext = await setup({ progressStore, tasks, tarkovStore });
+    expect(upNext.state.value).toBe('empty');
+    expect(upNext.items.value).toEqual([]);
   });
 });
