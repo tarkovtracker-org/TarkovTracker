@@ -157,6 +157,21 @@ test('the reusable publisher requires the original caller on trusted main before
   assert.match(job, /environment: review-admission/);
   assert.match(job, /name: pr-controls-\$\{\{ inputs.pull_request \}\}/);
 });
+test('only the required publisher key is forwarded explicitly into the protected reusable job', () => {
+  const invocation = jobBlock(caller(), 'controls');
+  const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
+  const inputs = workflowEvent(source, 'workflow_call');
+  assert.equal(
+    invocation.match(/^ {4}secrets:\n((?: {6}.+\n)+)/m)?.[1],
+    '      REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}\n'
+  );
+  assert.equal(
+    `${inputs}\n`.match(/^ {4}secrets:\n((?: {6,}.+\n)+)/m)?.[1],
+    '      REVIEW_ADMISSION_PRIVATE_KEY:\n        required: true\n'
+  );
+  assert.match(jobBlock(source, 'controls'), /environment: review-admission/);
+  assert.doesNotMatch(invocation, /secrets: inherit/);
+});
 test('the caller coalescer and admission publisher use distinct locks without replacement cancellation', () => {
   const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
   const publisher = jobBlock(source, 'controls');

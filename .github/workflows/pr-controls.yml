@@ -80,3 +80,5 @@ jobs:
     uses: ./.github/workflows/pr-controls-publish.yml
     with:
       pull_request: ${{ matrix.number }}
+    secrets:
+      REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
