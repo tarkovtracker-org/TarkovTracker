@@ -14,12 +14,15 @@ export const skipLineComment = (source, index) => {
   while (index < source.length && source[index] !== '\n') index += 1;
   return index;
 };
+const hasAnsiQuotePrefix = (source, index) => {
+  if (source[index - 1] !== '$') return false;
+  let previous = index - 2;
+  while (source[previous] === '\\') previous -= 1;
+  return (index - 2 - previous) % 2 === 0;
+};
 const openShellQuote = (source, cursor) => {
   cursor.quote = source[cursor.index];
-  cursor.ansiQuote = cursor.index > 0 && cursor.dollarIndex === cursor.index - 1;
-};
-const recordShellDollar = (character, cursor) => {
-  cursor.dollarIndex = character === '$' ? cursor.index : -1;
+  cursor.ansiQuote = hasAnsiQuotePrefix(source, cursor.index);
 };
 export const consumeShellPrefix = (source, cursor) => {
   const character = source[cursor.index];
@@ -28,10 +31,7 @@ export const consumeShellPrefix = (source, cursor) => {
   } else if (character === '\\') cursor.index += 1;
   else if (isQuote(character)) {
     openShellQuote(source, cursor);
-  } else {
-    recordShellDollar(character, cursor);
-    return false;
-  }
+  } else return false;
   return true;
 };
 export const endsWithContinuation = (line) => {
