@@ -47,6 +47,9 @@
     () => props.objectivesByItemId.get(selectedItemId.value ?? '') ?? EMPTY_OBJECTIVES
   );
   const isModalOpen = ref(false);
+  watch(selectedGroup, (group) => {
+    if (!group) isModalOpen.value = false;
+  });
   const openGroup = (itemId: string) => {
     selectedItemId.value = itemId;
     isModalOpen.value = true;

@@ -9,7 +9,7 @@ export const neededItemBorderClass = (
   needType: (NeededItemTaskObjective | NeededItemHideoutModule)['needType']
 ) => {
   const bg = backgroundColor?.toLowerCase();
-  if (bg && bg in RARITY_BORDER_MAP) return RARITY_BORDER_MAP[bg];
+  if (bg && Object.hasOwn(RARITY_BORDER_MAP, bg)) return RARITY_BORDER_MAP[bg];
   return REQUIREMENT_BORDER_MAP[needType] ?? 'border-l-surface-600';
 };
 export const neededItemSurfaceClass = (isComplete: boolean, direction: 'l' | 't') =>

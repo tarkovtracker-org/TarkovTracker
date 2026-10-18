@@ -30,7 +30,9 @@
                 craftable-icon-base-class="h-4 w-4 opacity-90"
                 :craftable-icon-class="craftableIconClass"
                 :kappa-required="isKappaRequired"
+                kappa-icon-class="h-4 w-4 text-kappa"
                 :lightkeeper-required="isLightkeeperRequired"
+                lightkeeper-icon-class="h-4 w-4 text-lightkeeper"
                 @craft="goToCraftStation"
               />
             </div>

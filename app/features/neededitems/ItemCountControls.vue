@@ -37,7 +37,7 @@
             <button
               type="button"
               :disabled="disabled"
-              class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white transition-colors"
+              class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               :class="sizeClasses.text"
               :aria-label="$t('needed_items.aria.click_to_enter_value')"
               @click="startEdit"

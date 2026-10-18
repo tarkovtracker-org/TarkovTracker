@@ -165,6 +165,16 @@ describe('NeededItemGroupedModal', () => {
     const closeBtn = wrapper.find('button[aria-label="common.close"]');
     expect(closeBtn.classes()).toContain('light:hover:text-surface-50');
   });
+  it('treats a zero-count need as one needed item', () => {
+    mockCounts.objectiveCount = 0;
+    const wrapper = createWrapper({
+      taskObjectives: [{ ...mockTaskObjective, count: 0 }],
+      hideoutModules: [],
+    });
+    expect(findCountButtons(wrapper).map((button) => button.text())).toEqual(['0/1']);
+    expect(wrapper.text()).toContain('0/1');
+    expect(wrapper.text()).not.toContain('0/0');
+  });
   it('marks objective and hideout rows complete when counts meet requirement', () => {
     mockCounts.objectiveCount = 3;
     mockCounts.hideoutCount = 2;

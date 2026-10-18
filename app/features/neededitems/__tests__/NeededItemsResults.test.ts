@@ -70,6 +70,14 @@ describe('NeededItemsResults', () => {
     expect(wrapper.findAll('[data-testid="modal"]')).toHaveLength(1);
     expect(wrapper.get('[data-testid="modal"]').attributes('data-item')).toBe('item-a');
   });
+  it('keeps the modal closed when a selected group drops out and comes back', async () => {
+    const wrapper = mountResults({ groupByItem: true, groupedItems });
+    await wrapper.findAll('[data-testid="group"]')[0]!.trigger('click');
+    await wrapper.setProps({ groupedItems: groupedItems.slice(1) });
+    expect(wrapper.find('[data-testid="modal"]').exists()).toBe(false);
+    await wrapper.setProps({ groupedItems });
+    expect(wrapper.get('[data-testid="modal"]').attributes('data-open')).toBe('false');
+  });
   it.each(['list', 'grid'] as const)(
     'exposes one scroll sentinel in %s view while more items remain',
     async (viewMode) => {

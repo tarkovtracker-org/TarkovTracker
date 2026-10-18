@@ -118,7 +118,7 @@
                   <ItemCountControls
                     size="sm"
                     :current-count="progress.storedCountOf(obj)"
-                    :needed-count="obj.count"
+                    :needed-count="neededCountOf(obj)"
                     :disabled="!isTargetGameModeActive"
                     :decrease-label="
                       t('needed_items.aria.decrease_objective_count', {
@@ -184,7 +184,7 @@
                   <ItemCountControls
                     size="sm"
                     :current-count="progress.storedCountOf(mod)"
-                    :needed-count="mod.count"
+                    :needed-count="neededCountOf(mod)"
                     :disabled="!isTargetGameModeActive"
                     :decrease-label="
                       t('needed_items.aria.decrease_hideout_count', {
@@ -213,7 +213,10 @@
 <script setup lang="ts">
   import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import NeededItemGroupedInputControls from '@/features/neededitems/NeededItemGroupedInputControls.vue';
-  import { useNeededItemProgress } from '@/features/neededitems/useNeededItemProgress';
+  import {
+    neededCountOf,
+    useNeededItemProgress,
+  } from '@/features/neededitems/useNeededItemProgress';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
@@ -298,11 +301,12 @@
     nonFirCurrent: number;
   };
   const addNeed = (totals: NeedTotals, need: NeededItemTaskObjective | NeededItemHideoutModule) => {
-    const current = Math.min(progress.storedCountOf(need), need.count);
+    const needed = neededCountOf(need);
+    const current = Math.min(progress.storedCountOf(need), needed);
     const source = need.foundInRaid ? 'fir' : 'nonFir';
-    totals.needed += need.count;
+    totals.needed += needed;
     totals.current += current;
-    totals[`${source}Needed`] += need.count;
+    totals[`${source}Needed`] += needed;
     totals[`${source}Current`] += current;
     return totals;
   };

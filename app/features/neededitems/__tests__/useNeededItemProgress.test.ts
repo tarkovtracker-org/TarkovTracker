@@ -33,6 +33,12 @@ describe('useNeededItemProgress', () => {
     store.getObjectiveCount.mockImplementation((id: string) => store.counts[id]);
     store.getHideoutPartCount.mockImplementation((id: string) => store.counts[id]);
     store.isHideoutPartComplete.mockImplementation((id: string) => store.completeParts.has(id));
+    store.setObjectiveCount.mockImplementation((id: string, count: number) => {
+      store.counts[id] = count;
+    });
+    store.setHideoutPartCount.mockImplementation((id: string, count: number) => {
+      store.counts[id] = count;
+    });
   });
   it('treats a missing or zero count as one needed item', () => {
     expect(neededCountOf({ ...objective, count: 0 })).toBe(1);
@@ -49,7 +55,7 @@ describe('useNeededItemProgress', () => {
     progress.increase(objective);
     expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 2);
     progress.decrease(objective);
-    expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 0);
+    expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 1);
     progress.increase(objective, 3);
     progress.decrease(objective, 0);
     expect(store.setObjectiveCount).toHaveBeenCalledTimes(2);
