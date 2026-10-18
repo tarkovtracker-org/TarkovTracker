@@ -64,6 +64,59 @@ export async function controlTargets({ github, context }) {
   if (context.eventName === 'issue_comment') return commentTargets(context);
   return directTargets(context);
 }
+// Scheduling only: uncertainty retains the protected publisher, which still revalidates in-lock.
+export async function publicationTargets({ github, context, numbers, core }) {
+  if (!passiveSchedulingContext(context)) return numbers;
+  const retained = [];
+  for (const number of numbers) {
+    if (await passivePublicationNeeded(github, context, number, core)) retained.push(number);
+  }
+  return retained;
+}
+function passiveSchedulingContext(context) {
+  return [
+    context.ref === 'refs/heads/main',
+    ['workflow_run', 'pull_request_target'].includes(context.eventName),
+    context.payload.action !== 'synchronize',
+  ].every(Boolean);
+}
+async function passivePublicationNeeded(github, context, number, core) {
+  try {
+    return await passivePanelChanged(github, context, number);
+  } catch {
+    core?.notice('Panel preflight inconclusive; retaining protected publication.');
+    return true;
+  }
+}
+async function passivePanelChanged(github, context, number) {
+  const before = await controlSnapshot(github, context, number);
+  if (!canPreflight(before.previous)) return true;
+  const initial = schedulingSnapshot(before);
+  if (await prepareState(github, context, before)) return true;
+  return passiveSnapshotChanged(github, context, number, initial, before.previous.body);
+}
+function canPreflight(previous) {
+  return [Boolean(previous), !previous?.recovered, previous?.counter < CONTROL_WRITE_LIMIT].every(
+    Boolean
+  );
+}
+async function passiveSnapshotChanged(github, context, number, initial, body) {
+  const after = await controlSnapshot(github, context, number);
+  if (!isDeepStrictEqual(initial, schedulingSnapshot(after))) return true;
+  if (await prepareState(github, context, after)) return true;
+  const comment = await officialComment(github, context.repo, after.previous);
+  return comment.body !== body;
+}
+function schedulingSnapshot({ pull, previous }) {
+  return {
+    head: pull.head.sha,
+    baseSha: pull.base.sha,
+    baseRef: pull.base.ref,
+    state: pull.state,
+    draft: pull.draft,
+    pointer: previous?.pointerId,
+  };
+}
 async function officialComment(github, repo, state) {
   const { data } = await github.rest.issues.getComment({ ...repo, comment_id: state.commentId });
   requireEvidence(
@@ -256,6 +309,8 @@ function currentPresentation(state, pull, evidence) {
   return {
     ...evidence,
     headSha: state.headSha,
+    baseSha: pull.base.sha,
+    baseRef: pull.base.ref,
     grant: state.grant,
     result: state.result,
     state: pull.draft ? 'draft' : pull.state,

@@ -163,7 +163,7 @@ test('the reusable publisher requires the original caller on trusted main before
     source,
     /workflow_dispatch:|pull_request_target:|workflow_run:|secrets: inherit/
   );
-  assert.match(job, /environment: review-admission/);
+  assert.match(job, /environment:\n      name: review-admission\n      deployment: false/);
   assert.match(job, /name: pr-controls-\$\{\{ inputs.pull_request \}\}/);
 });
 test('only the required publisher key is forwarded explicitly into the protected reusable job', () => {
@@ -178,7 +178,10 @@ test('only the required publisher key is forwarded explicitly into the protected
     `${inputs}\n`.match(/^ {4}secrets:\n((?: {6,}.+\n)+)/m)?.[1],
     '      REVIEW_ADMISSION_PRIVATE_KEY:\n        required: true\n'
   );
-  assert.match(jobBlock(source, 'controls'), /environment: review-admission/);
+  assert.match(
+    jobBlock(source, 'controls'),
+    /environment:\n      name: review-admission\n      deployment: false/
+  );
   assert.doesNotMatch(invocation, /secrets: inherit/);
 });
 test('the caller coalescer and admission publisher use distinct locks without replacement cancellation', () => {

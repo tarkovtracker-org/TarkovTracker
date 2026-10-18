@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { normalizeQueueWorkflow } from '../ci/actionlint-queue.mjs';
+import { normalizeQueueWorkflow, normalizePublisherEnvironment } from '../ci/actionlint-queue.mjs';
 const path = '.github/workflows/preview-retention.yml';
 const block =
   'concurrency:\n  group: pages-preview-lifecycle\n  queue: max\n  cancel-in-progress: false\n';
@@ -122,4 +122,30 @@ test('preview extension accepts only the exact queue-profile conditional group',
     current.replace('cancel-in-progress: ${{ !inputs.queue }}', 'cancel-in-progress: false'),
   ])
     assert.throws(() => normalizeQueueWorkflow(changed, filename));
+});
+test('configuration-only publisher extension is exact, job-scoped and preserves line numbers', () => {
+  for (const filename of [
+    '.github/workflows/review-admission.yml',
+    '.github/workflows/pr-controls-publish.yml',
+  ]) {
+    const source = readFileSync(filename, 'utf8');
+    assert.equal(
+      normalizePublisherEnvironment(source, filename),
+      source.replace('      deployment: false', '')
+    );
+    const unsafe = [
+      source.replace('deployment: false', 'deployment: true'),
+      source.replace('deployment: false', 'deployment: ${{ inputs.enabled }}'),
+      source.replace('      deployment: false\n', ''),
+      source.replace('name: review-admission', 'name: other'),
+      source.replace('    environment:', '    other:'),
+      source.replace('      deployment: false', '      deployment: false\n      unknown: true'),
+      `${source}    deployment: false\n`,
+    ];
+    for (const changed of unsafe)
+      assert.throws(() => normalizePublisherEnvironment(changed, filename));
+    const invalid = source.replace('runs-on: ubuntu-latest', 'unknown-key: true');
+    assert.match(normalizePublisherEnvironment(invalid, filename), /unknown-key: true/);
+    assert.equal(normalizePublisherEnvironment(source, '.github/workflows/foreign.yml'), source);
+  }
 });

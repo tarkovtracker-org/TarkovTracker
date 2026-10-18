@@ -22,7 +22,12 @@ import {
 import { readPreviewRequest } from '../preview/request-authorization.mjs';
 import { comparePreviewIntents, selectPreviewAuthorization } from '../preview/intent-policy.mjs';
 import { previewBindingError } from '../preview/binding-policy.mjs';
-import { controlTargets, prepareControls, publishControls } from '../ci/pr-controls.mjs';
+import {
+  controlTargets,
+  publicationTargets,
+  prepareControls,
+  publishControls,
+} from '../ci/pr-controls.mjs';
 const EVIDENCE_DIRECTORY = mkdtempSync(join(tmpdir(), 'tt-pr-controls-test-'));
 const repo = { owner: 'example', repo: 'repo' };
 const head = 'a'.repeat(40);
@@ -642,7 +647,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   const source = readFileSync('.github/workflows/pr-controls-publish.yml', 'utf8');
   assert.match(caller, /permissions: \{\}/);
   assert.match(source, /permissions: \{\}/);
-  assert.match(source, /environment: review-admission/);
+  assert.match(source, /environment:\n      name: review-admission\n      deployment: false/);
   assert.match(
     source,
     /group: review-admission-publication\n      queue: max\n      cancel-in-progress: false/
@@ -669,7 +674,7 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
   );
   assert.equal(
     permissionsBlock(targets, '    ').trim(),
-    'actions: read\n      contents: read\n      pull-requests: read'
+    'actions: read\n      checks: read\n      contents: read\n      issues: read\n      pull-requests: read\n      statuses: read'
   );
   assert.match(targets, /pull-requests: read/);
   assert.match(source, /scope: 'controls'/);
@@ -1285,4 +1290,163 @@ test('confirmed receipt loss fails native head/group admission before panel or a
     assert.equal(f.comments.length, 0);
     await assert.rejects(currentAdminAttestation(f.github, repo, 1, head), /missing/);
   }
+});
+async function passiveFixture() {
+  const f = fixture();
+  f.context.eventName = 'pull_request_target';
+  f.context.payload.action = 'edited';
+  await prepare(f);
+  f.previous = { ...prepared(), runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+  f.comment.body = f.previous.body;
+  delete f.github.reviewAdmissionIssuer;
+  return f;
+}
+const eligible = (f) => publicationTargets({ github: f.github, context: f.context, numbers: [1] });
+test('read-only preflight skips a verified unchanged panel before obtaining any publisher identity', async () => {
+  const f = await passiveFixture();
+  assert.deepEqual(await eligible(f), []);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
+test('preflight retains changed head, base, draft, gates, comment body and missing or forged receipt', async () => {
+  const changes = [
+    (f) => {
+      f.pull.head.sha = 'd'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.statuses = [{ context: 'Preview Result', state: 'pending', creator: { id: 41898282 } }];
+    },
+    (f) => {
+      f.comment.body += ' changed';
+    },
+    (f) => {
+      f.stateAvailable = false;
+    },
+    (f) => {
+      f.pointer.creator.id = 999;
+    },
+    (f) => {
+      f.run.run_attempt = 2;
+    },
+    (f) => {
+      f.github.rest.pulls.get = async () => {
+        throw new Error('API unavailable');
+      };
+    },
+  ];
+  for (const change of changes) {
+    const f = await passiveFixture();
+    change(f);
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('all explicit operations, checkbox edits, unknown events and untrusted refs bypass preflight reads', async () => {
+  for (const eventName of ['issue_comment', 'workflow_dispatch', 'future_event']) {
+    const f = fixture();
+    f.context.eventName = eventName;
+    let reads = 0;
+    f.github.rest.pulls.get = () => {
+      reads++;
+      throw new Error('must not be read');
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.equal(reads, 0);
+  }
+  for (const change of [
+    (f) => {
+      f.context.ref = 'refs/heads/topic';
+    },
+    (f) => {
+      f.context.payload.action = 'synchronize';
+    },
+  ]) {
+    const f = fixture();
+    f.context.eventName = 'pull_request_target';
+    change(f);
+    let reads = 0;
+    f.github.rest.pulls.get = () => {
+      reads++;
+      throw new Error('must not be read');
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.equal(reads, 0);
+  }
+});
+test('preflight rechecks live head/base, pointer and gates across concurrent observations', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.head.sha = 'd'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pointer.id = 999;
+    },
+    (f) => {
+      f.statuses = [{ context: 'Preview Result', state: 'pending', creator: { id: 41898282 } }];
+    },
+  ]) {
+    const f = await passiveFixture();
+    const get = f.github.rest.pulls.get;
+    let reads = 0;
+    f.github.rest.pulls.get = async (...args) => {
+      if (++reads === 2) change(f);
+      const { data } = await get(...args);
+      return { data: structuredClone(data) };
+    };
+    assert.deepEqual(await eligible(f), [1]);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('a verified early skip does not replace the protected publisher revalidation after a later change', async () => {
+  const f = await passiveFixture();
+  assert.deepEqual(await eligible(f), []);
+  f.pull.base.sha = 'e'.repeat(40);
+  assert.deepEqual(await eligible(f), [1]);
+  f.github.reviewAdmissionIssuer = issuer;
+  await prepare(f);
+  assert.equal(prepared().presentation.baseSha, f.pull.base.sha);
+});
+test('modeled observed body-edit and ready burst saves only the verified redundant publication', async () => {
+  const f = await passiveFixture();
+  f.pull.draft = true;
+  f.github.reviewAdmissionIssuer = issuer;
+  await prepare(f);
+  f.previous = { ...prepared(), runId: 700 };
+  f.pointer.description = `Control panel 55 revision ${f.previous.counter}`;
+  f.comment.body = f.previous.body;
+  delete f.github.reviewAdmissionIssuer;
+  const bodyEdit = (await eligible(f)).length;
+  f.pull.draft = false;
+  f.context.payload.action = 'ready_for_review';
+  const ready = (await eligible(f)).length;
+  // Admission is a distinct security evaluator and is deliberately outside this optimization.
+  const admission = 1;
+  const modeled = { baselineEligible: 3, optimizedEligible: bodyEdit + ready + admission };
+  assert.deepEqual(modeled, { baselineEligible: 3, optimizedEligible: 2 });
+  if (process.env.TT_CONTROL_MEASUREMENTS) console.log('MODELED_17_03_SEQUENCE', modeled);
+});
+test('modeled stable refreshes skip publication while concurrent changed snapshots remain eligible', async () => {
+  const f = await passiveFixture();
+  let eligibleCount = 0;
+  for (let index = 0; index < 8; index++) eligibleCount += (await eligible(f)).length;
+  assert.equal(eligibleCount, 0);
+  f.pull.base.sha = 'e'.repeat(40);
+  for (let index = 0; index < 3; index++) assert.deepEqual(await eligible(f), [1]);
+  // No receipt was committed between these observations: all three retain final revalidation.
+  if (process.env.TT_CONTROL_MEASUREMENTS)
+    console.log('MODELED_STABLE_AND_CONCURRENT', {
+      stableBaseline: 8,
+      stableOptimized: 0,
+      changedBaseline: 3,
+      changedOptimized: 3,
+    });
 });

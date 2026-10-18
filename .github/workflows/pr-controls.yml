@@ -39,8 +39,15 @@ jobs:
     timeout-minutes: 3
     permissions:
       actions: read
+      checks: read
       contents: read
+      issues: read
       pull-requests: read
+      statuses: read
+    env:
+      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
     outputs:
       numbers: ${{ steps.targets.outputs.numbers }}
     steps:
@@ -54,8 +61,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { controlTargets } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
-            core.setOutput('numbers', JSON.stringify(await controlTargets({ github, context })));
+            const { controlTargets, publicationTargets } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/pr-controls.mjs`);
+            const numbers = await controlTargets({ github, context });
+            core.setOutput('numbers', JSON.stringify(await publicationTargets({ github, context, numbers, core })));
   controls:
     name: PR control panel
     needs: targets
