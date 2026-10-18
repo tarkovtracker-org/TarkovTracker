@@ -549,19 +549,16 @@ export type Database = {
         Row: {
           created_at: string | null
           dashboard_notice_dismissed: boolean
-          enable_holiday_effects: boolean | null
           enable_manual_task_fail: boolean | null
           hide_completed_map_objectives: boolean | null
           hide_completed_task_objectives: boolean | null
           hide_global_tasks: boolean | null
           hide_non_kappa_tasks: boolean | null
           hide_task_rewards: boolean | null
-          hideout_collapse_completed: boolean
           hideout_primary_view: string | null
           hideout_require_skill_levels: boolean
           hideout_require_station_levels: boolean
           hideout_require_trader_loyalty: boolean
-          hideout_sort_ready_first: boolean
           items_hide_non_fir: boolean | null
           items_team_hide_all: boolean | null
           items_team_hide_hideout: boolean | null
@@ -585,7 +582,6 @@ export type Database = {
           needed_items_sort_direction: string | null
           needed_items_view_mode: string | null
           needed_type_view: string | null
-          neededitems_style: string | null
           only_tasks_with_required_keys: boolean
           pinned_task_ids: Json | null
           profile_share_pve_public: boolean
@@ -601,13 +597,10 @@ export type Database = {
           show_map_extracts: boolean | null
           show_next_quests: boolean | null
           show_non_special_tasks: boolean | null
-          show_not_required_labels: boolean | null
           show_previous_quests: boolean | null
           show_required_labels: boolean | null
-          show_task_ids: boolean | null
           skill_sort_mode: string | null
           streamer_mode: boolean | null
-          task_card_density: string | null
           task_collapse_default: boolean | null
           task_filter_presets: Json | null
           task_map_view: string | null
@@ -629,19 +622,16 @@ export type Database = {
         Insert: {
           created_at?: string | null
           dashboard_notice_dismissed?: boolean
-          enable_holiday_effects?: boolean | null
           enable_manual_task_fail?: boolean | null
           hide_completed_map_objectives?: boolean | null
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null
           hide_non_kappa_tasks?: boolean | null
           hide_task_rewards?: boolean | null
-          hideout_collapse_completed?: boolean
           hideout_primary_view?: string | null
           hideout_require_skill_levels?: boolean
           hideout_require_station_levels?: boolean
           hideout_require_trader_loyalty?: boolean
-          hideout_sort_ready_first?: boolean
           items_hide_non_fir?: boolean | null
           items_team_hide_all?: boolean | null
           items_team_hide_hideout?: boolean | null
@@ -665,7 +655,6 @@ export type Database = {
           needed_items_sort_direction?: string | null
           needed_items_view_mode?: string | null
           needed_type_view?: string | null
-          neededitems_style?: string | null
           only_tasks_with_required_keys?: boolean
           pinned_task_ids?: Json | null
           profile_share_pve_public?: boolean
@@ -681,13 +670,10 @@ export type Database = {
           show_map_extracts?: boolean | null
           show_next_quests?: boolean | null
           show_non_special_tasks?: boolean | null
-          show_not_required_labels?: boolean | null
           show_previous_quests?: boolean | null
           show_required_labels?: boolean | null
-          show_task_ids?: boolean | null
           skill_sort_mode?: string | null
           streamer_mode?: boolean | null
-          task_card_density?: string | null
           task_collapse_default?: boolean | null
           task_filter_presets?: Json | null
           task_map_view?: string | null
@@ -709,19 +695,16 @@ export type Database = {
         Update: {
           created_at?: string | null
           dashboard_notice_dismissed?: boolean
-          enable_holiday_effects?: boolean | null
           enable_manual_task_fail?: boolean | null
           hide_completed_map_objectives?: boolean | null
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null
           hide_non_kappa_tasks?: boolean | null
           hide_task_rewards?: boolean | null
-          hideout_collapse_completed?: boolean
           hideout_primary_view?: string | null
           hideout_require_skill_levels?: boolean
           hideout_require_station_levels?: boolean
           hideout_require_trader_loyalty?: boolean
-          hideout_sort_ready_first?: boolean
           items_hide_non_fir?: boolean | null
           items_team_hide_all?: boolean | null
           items_team_hide_hideout?: boolean | null
@@ -745,7 +728,6 @@ export type Database = {
           needed_items_sort_direction?: string | null
           needed_items_view_mode?: string | null
           needed_type_view?: string | null
-          neededitems_style?: string | null
           only_tasks_with_required_keys?: boolean
           pinned_task_ids?: Json | null
           profile_share_pve_public?: boolean
@@ -761,13 +743,10 @@ export type Database = {
           show_map_extracts?: boolean | null
           show_next_quests?: boolean | null
           show_non_special_tasks?: boolean | null
-          show_not_required_labels?: boolean | null
           show_previous_quests?: boolean | null
           show_required_labels?: boolean | null
-          show_task_ids?: boolean | null
           skill_sort_mode?: string | null
           streamer_mode?: boolean | null
-          task_card_density?: string | null
           task_collapse_default?: boolean | null
           task_filter_presets?: Json | null
           task_map_view?: string | null

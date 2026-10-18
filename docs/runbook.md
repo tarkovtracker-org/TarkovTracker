@@ -443,6 +443,33 @@ References: [migration history](https://supabase.com/docs/reference/cli/supabase
 [squash limitations](https://supabase.com/docs/reference/cli/supabase-migration-squash), and
 [history repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).
 
+### Retired preference columns (#1223)
+
+`drop_unused_user_preferences_columns` removes seven retired columns from `public.user_preferences`
+with `RESTRICT`; it does not change policies, triggers, RPCs, retained preferences or progress storage.
+Keep `LEGACY_PREFERENCE_KEYS` and hydration sanitizers: cached local state can outlive the schema.
+Current writers omit the retired fields; clients before #1222 still sent the hideout fields but
+already retry missing-column errors without those fields. That fallback dates from 2026-02-17;
+older bundles without it can fail preference saves until reloaded. A client compatibility window
+and a reload/recovery plan must be accepted before the drop, not inferred from absent current reads.
+
+Before merge/apply, retain target identity, migration-history and bounded catalog/lock evidence,
+independent review and explicit approval for this exact irreversible drop. #1272's observer hold is
+separate; use only the separately authorized inspection route until its boundary is repaired.
+This cleanup is independent of the held legacy progress cleanup (#1155).
+
+Use the normal transactional migration runner: five-second lock and thirty-second statement
+budgets bound the operation. A failure before commit rolls back the schema and stored values.
+After a committed drop, recreating columns restores **schema/defaults only**, not their old values.
+Before any production apply, require an approved backup and an isolated restoration rehearsal that
+covers these seven columns, keyed by `user_id`, with their type/default/nullability/ACL metadata.
+Restore only those fields when recovering so intervening retained-preference changes are preserved;
+do not overwrite full rows or rewrite migration history. No down migration is automatic.
+The local synthetic rollback/recovery proof is not evidence that a production backup exists.
+
+Dropping columns does not promise immediate physical disk reclamation; do not schedule a table
+rewrite or `VACUUM FULL` as part of this change.
+
 ### Seasonal-team index recovery (#646)
 
 The applied migration `20260804043344_add_seasonal_team_index_concurrently.sql` uses

@@ -286,6 +286,13 @@ describe('preferences sync plugin', () => {
     const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
     const preferencesStore = createPreferencesStore({
       useAutomaticLevelCalculation: true,
+      hideoutSortReadyFirst: true,
+      hideoutCollapseCompleted: true,
+      taskCardDensity: 'comfortable',
+      showTaskIds: true,
+      showNotRequiredLabels: true,
+      enableHolidayEffects: true,
+      neededitemsStyle: 'legacy',
       profileSharePvpPublic: true,
       profileSharePvePublic: true,
     });
@@ -306,9 +313,39 @@ describe('preferences sync plugin', () => {
     };
     const payload = syncOptions.transform(preferencesStore.$state);
     expect(payload).not.toHaveProperty('use_automatic_level_calculation');
+    for (const column of [
+      'hideout_sort_ready_first',
+      'hideout_collapse_completed',
+      'task_card_density',
+      'show_task_ids',
+      'show_not_required_labels',
+      'enable_holiday_effects',
+      'neededitems_style',
+    ])
+      expect(payload).not.toHaveProperty(column);
     expect(payload).not.toHaveProperty('profile_share_pvp_public');
     expect(payload).not.toHaveProperty('profile_share_pve_public');
     expect(payload.user_id).toBe('user-1');
+  });
+  it('hydrates a select-star row after retired columns disappear without restoring cached keys', async () => {
+    vi.mocked(useSupabaseSync).mockReturnValue(createSyncController());
+    const preferencesStore = createPreferencesStore({ streamerMode: false, localeOverride: 'en' });
+    preferencesStore.resetToDefaults.mockImplementation(() => {});
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { user_id: 'user-1', streamer_mode: true, locale_override: 'de' },
+      error: null,
+    });
+    const select = vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) }));
+    const from = vi.fn(() => ({ select }));
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      app: unknown
+    ) => unknown;
+    plugin({ $pinia: {}, $supabase: { client: { from }, user: { id: 'user-1', loggedIn: true } } });
+    await waitForWatchCallback();
+    expect(select).toHaveBeenCalledWith('*');
+    expect(preferencesStore.$state).toEqual({ streamerMode: true, localeOverride: 'de' });
+    expect(useSupabaseSync).toHaveBeenCalledTimes(1);
   });
   it('prefers the preserved scoped snapshot over guest preferences after logout', async () => {
     const cleanup = vi.fn();
