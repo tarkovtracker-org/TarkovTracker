@@ -50,10 +50,7 @@ const {
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
     importPreview: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
-    importState: {
-      __v_isRef: true as const,
-      value: 'idle' as 'idle' | 'preview' | 'success' | 'error',
-    },
+    importState: {} as Ref<'idle' | 'parsing' | 'preview' | 'success' | 'error'>,
   },
   tarkovDevFns: {
     confirmImport: vi.fn(async () => undefined),
@@ -284,7 +281,7 @@ describe('DataManagementCard', () => {
     backupState.exportError.value = null;
     backupState.importError.value = null;
     backupState.importPreview.value = null;
-    backupState.importState.value = 'idle';
+    backupState.importState = ref('idle');
     tarkovDevState.importError.value = null;
     tarkovDevState.importErrorCode.value = null;
     tarkovDevState.importErrorMeta.value = null;
@@ -530,6 +527,33 @@ describe('DataManagementCard', () => {
     expect(liveRegion.find('button').exists()).toBe(false);
     expect(wrapper.find('progress').exists()).toBe(true);
     expect(findButtonByText(wrapper, 'common.cancel')).toBeTruthy();
+    wrapper.unmount();
+  });
+  it('keeps the backup reading announcement mounted and separates it from cancellation controls', async () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    const live = wrapper.find('[data-testid="backup-reading-status"]');
+    expect(live.exists()).toBe(true);
+    backupState.importState.value = 'parsing';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="backup-reading-status"]').element).toBe(live.element);
+    expect(live.text()).toContain('settings.data_management.reading_backup');
+    expect(live.find('button').exists()).toBe(false);
+    expect(findButtonByText(wrapper, 'common.cancel')).toBeTruthy();
+    wrapper.unmount();
+  });
+  it('returns focus to the backup picker after cancelling background parsing', async () => {
+    backupState.importState.value = 'parsing';
+    const wrapper = createWrapper({ view: 'backup' }, { attachTo: document.body });
+    const cancel = findButtonByText(wrapper, 'common.cancel')!;
+    (cancel.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(cancel.element);
+    backupFns.resetImport.mockImplementation(() => {
+      backupState.importState.value = 'idle';
+    });
+    await cancel.trigger('click');
+    await wrapper.vm.$nextTick();
+    const picker = findButtonByText(wrapper, 'settings.data_management.import_backup_button')!;
+    expect(document.activeElement).toBe(picker.element);
     wrapper.unmount();
   });
   it('returns focus to the folder picker after cancelling a folder read', async () => {

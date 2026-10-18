@@ -2049,6 +2049,7 @@
       "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "Are you sure you want to reset your PvP progress?",
       "reset_pvp_warning": "This will permanently delete all your PvP progress, including tasks, hideout, and level. Your PvE data will not be affected.",
       "reset_pve_confirmation": "Are you sure you want to reset your PvE progress?",
