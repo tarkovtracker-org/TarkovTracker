@@ -11,42 +11,43 @@ const { Miniflare } = workerRequire('miniflare');
 const { build } = workerRequire('esbuild');
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const scratch = await mkdtemp(join(tmpdir(), 'precomputed-response-profile-'));
-const outfile = join(scratch, 'worker.mjs');
-const fixture = JSON.parse(await readFile(resolve(process.argv[2]), 'utf8'));
-const source = JSON.stringify({
-  payload: fixture,
-  overlay: { version: fixture.dataOverlay.version, sha256: fixture.dataOverlay.sha256 },
-  storedAt: Date.now(),
-  version: 2,
-});
-await build({
-  entryPoints: [join(root, 'scripts/checks/precomputed-response-worker.ts')],
-  bundle: true,
-  format: 'esm',
-  platform: 'browser',
-  outfile,
-  alias: { '@': join(root, 'app') },
-  tsconfigRaw: { compilerOptions: { target: 'ES2022' } },
-});
-const mf = new Miniflare({
-  workers: [
-    {
-      config: {
-        name: 'precomputed-response-profile',
-        compatibilityDate: '2026-01-09',
-        manifest: {
-          mainModule: 'worker.mjs',
-          modules: { 'worker.mjs': { type: 'esm', contents: await readFile(outfile, 'utf8') } },
-        },
-        env: { SNAPSHOTS: { type: 'kv', id: 'local-snapshot-profile' } },
-      },
-    },
-  ],
-  inspectorPort: 0,
-  telemetry: { enabled: false },
-});
+let mf;
 let socket;
 try {
+  const outfile = join(scratch, 'worker.mjs');
+  const fixture = JSON.parse(await readFile(resolve(process.argv[2]), 'utf8'));
+  const source = JSON.stringify({
+    payload: fixture,
+    overlay: { version: fixture.dataOverlay.version, sha256: fixture.dataOverlay.sha256 },
+    storedAt: Date.now(),
+    version: 2,
+  });
+  await build({
+    entryPoints: [join(root, 'scripts/checks/precomputed-response-worker.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    outfile,
+    alias: { '@': join(root, 'app') },
+    tsconfigRaw: { compilerOptions: { target: 'ES2022' } },
+  });
+  mf = new Miniflare({
+    workers: [
+      {
+        config: {
+          name: 'precomputed-response-profile',
+          compatibilityDate: '2026-01-09',
+          manifest: {
+            mainModule: 'worker.mjs',
+            modules: { 'worker.mjs': { type: 'esm', contents: await readFile(outfile, 'utf8') } },
+          },
+          env: { SNAPSHOTS: { type: 'kv', id: 'local-snapshot-profile' } },
+        },
+      },
+    ],
+    inspectorPort: 0,
+    telemetry: { enabled: false },
+  });
   const kv = await mf.getKVNamespace('SNAPSHOTS', 'precomputed-response-profile');
   await kv.put('snapshot', source);
   const inspector = await mf.getInspectorURL();
@@ -88,6 +89,34 @@ try {
     expected ??= result;
     assert.equal(result.sha256, expected.sha256);
   }
+  for (const [input, count] of [
+    ['-2', 0],
+    ['2.9', 2],
+    ['NaN', 1],
+    ['1000', 30],
+  ]) {
+    const result = await (await mf.dispatchFetch(`https://local/warm?iterations=${input}`)).json();
+    assert.equal(result.iterations, count);
+  }
+  const before = await (await mf.dispatchFetch('https://local/warm?iterations=1')).json();
+  assert.equal(typeof before.validations, 'number');
+  assert.ok(before.validations > 0);
+  let after = before;
+  for (let i = 0; i < 20; i++) {
+    after = await (await mf.dispatchFetch('https://local/warm?iterations=1')).json();
+    assert.equal(after.sha256, before.sha256);
+  }
+  assert.equal(
+    after.validations,
+    before.validations,
+    'native KV binding identity must support reuse across fetch invocations'
+  );
+  const crossDispatch = {
+    requests: 20,
+    validationsBefore: before.validations,
+    validationsAfter: after.validations,
+    identicalBodies: true,
+  };
   for (let round = 0; round < 3; round++) {
     for (const mode of round % 2 ? ['warm', 'baseline', 'cold'] : ['baseline', 'warm', 'cold']) {
       await command('Profiler.start');
@@ -129,6 +158,7 @@ try {
     JSON.stringify(
       {
         runtime: 'local workerd via installed Miniflare',
+        crossDispatch,
         fixtureBytes: Buffer.byteLength(source),
         bytes: expected.bytes,
         sha256: expected.sha256,
@@ -150,7 +180,10 @@ try {
     )
   );
 } finally {
-  socket?.close();
-  await mf.dispose();
-  await rm(scratch, { recursive: true, force: true });
+  try {
+    socket?.close();
+    await mf?.dispose();
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 }
