@@ -223,6 +223,7 @@ describe('release PR notifications', () => {
     await expect(notifyReleasedPullRequests({ ...f, version: '', sha: '' })).rejects.toThrow(
       'exact commit'
     );
+    expect(f.rest.issues.createComment).not.toHaveBeenCalled();
     expect(f.rest.issues.addLabels).not.toHaveBeenCalled();
   });
   it('paginates associated PRs beyond the first page', async () => {
