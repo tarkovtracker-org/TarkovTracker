@@ -63,6 +63,8 @@ describe('useNeededItemProgress', () => {
     expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 2);
     progress.toggle({ ...objective, count: 1 }, 1);
     expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 0);
+    progress.toggle(objective, 5);
+    expect(store.setObjectiveCount).toHaveBeenLastCalledWith('obj-1', 2);
   });
   it('completes a hideout part when its count reaches the requirement', () => {
     const progress = useNeededItemProgress();

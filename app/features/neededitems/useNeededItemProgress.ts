@@ -30,7 +30,7 @@ export const useNeededItemProgress = () => {
   };
   const toggle = (need: Need, current = storedCountOf(need)) => {
     const needed = neededCountOf(need);
-    setCount(need, current === needed ? Math.max(0, needed - 1) : needed);
+    setCount(need, current >= needed ? Math.max(0, needed - 1) : needed);
   };
   return { storedCountOf, setCount, increase, decrease, toggle };
 };
