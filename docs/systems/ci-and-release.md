@@ -36,8 +36,9 @@ the loader never reaches a real import.
   lifecycle that produced the error instead.
 - Shard count, shard command, and the `Test (shard N/4)` check names stay stable. Changing them
   requires updating branch protection and `scripts/workflow-tests/workflows.mjs` together.
-- Coverage thresholds apply only to the unsharded run, and `VITEST_SHARD` decides that. A sharded
-  invocation must set it or the run enforces thresholds it cannot satisfy.
+- Coverage thresholds apply to the merged full-validation gate and the unsharded local run.
+  Individual shards skip thresholds: each sharded invocation must set `VITEST_SHARD` or it
+  enforces thresholds it cannot satisfy.
 - A test mounting a `defineAsyncComponent` must not let the real module load, or must settle the
   load before the file ends.
 - Per-test timeouts stay scoped to the test that needs them; suite-wide timeouts are not raised to
