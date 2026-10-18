@@ -1593,8 +1593,75 @@ test('final in-lock publication rejects base and lifecycle changes after receipt
         number: 1,
         artifactId: 88,
         evidenceDirectory: EVIDENCE_DIRECTORY,
-      })
+      }),
+      /The PR base or lifecycle changed while saving control evidence\./
     );
     assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
   }
+});
+test('final publication rereads PR identity after awaited request permission checks', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.ref = 'release';
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.pull.state = 'closed';
+    },
+  ]) {
+    const f = fixture();
+    await prepare(f);
+    const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+    let changed = false;
+    f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+      const result = await permission(...args);
+      change(f);
+      changed = true;
+      return result;
+    };
+    await assert.rejects(
+      publishControls({
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+      }),
+      /The PR base or lifecycle changed while saving control evidence\./
+    );
+    assert.equal(changed, true);
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});
+test('publication drift cannot undo an already requested fail-closed revocation', async () => {
+  const f = fixture('revoke-review');
+  f.previous.grant = { actor, headSha: head, runId: 600, runNumber: 5 };
+  await prepare(f);
+  const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+  f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+    const result = await permission(...args);
+    f.pull.base.sha = 'e'.repeat(40);
+    return result;
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /The PR base or lifecycle changed while saving control evidence\./
+  );
+  assert.deepEqual(
+    f.pointers.map((item) => [item.context, item.state]),
+    [['Review Admission', 'failure']]
+  );
+  assert.deepEqual([f.comments, f.dispatches], [[], []]);
+  assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
 });

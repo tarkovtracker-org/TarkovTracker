@@ -153,7 +153,7 @@ test('configuration-only publisher extension is exact, job-scoped and preserves 
       normalizePublisherEnvironment(reordered, filename),
       reordered.replace('      deployment: false', '')
     );
-    const invalid = source.replace('runs-on: ubuntu-latest', 'unknown-key: true');
+    const invalid = source.replace(/^ {4}runs-on: .+$/m, '    unknown-key: true');
     assert.match(normalizePublisherEnvironment(invalid, filename), /unknown-key: true/);
     assert.equal(normalizePublisherEnvironment(source, '.github/workflows/foreign.yml'), source);
   }

@@ -421,13 +421,17 @@ export async function publishControls({
     pull.head.sha === state.headSha,
     'The PR head changed while saving control evidence.'
   );
-  requireCurrentPanelPull(pull, state, context.repo);
   await revalidateRequest(github, context, state, previous, pull);
   requireEvidence(
     Number.isSafeInteger(artifactId) && artifactId > 0,
     'Uploaded control artifact ID is invalid.'
   );
   await invalidateChangedGrant(github, context, previous, state, pull);
+  const { data: currentPull } = await github.rest.pulls.get({
+    ...context.repo,
+    pull_number: number,
+  });
+  requireCurrentPanelPull(currentPull, state, context.repo);
   await github.rest.repos.createCommitStatus({
     ...context.repo,
     sha: CONTROL_ANCHOR,
@@ -443,10 +447,13 @@ export async function publishControls({
   });
   await recheckAfterInvalidation(github, context, previous, state, number);
   requireEvidence(state.operationResult?.status !== 'rejected', state.result);
-  await executeAcceptedRequest(github, context, state, number, pull);
+  await executeAcceptedRequest(github, context, state, number, currentPull);
 }
 function requireCurrentPanelPull(pull, state, repo) {
-  requirePrIdentity(pull, repo);
+  requireEvidence(
+    pull.head.sha === state.headSha,
+    'The PR head changed while saving control evidence.'
+  );
   requireEvidence(
     [
       pull.base.sha === state.presentation.baseSha,
@@ -455,6 +462,7 @@ function requireCurrentPanelPull(pull, state, repo) {
     ].every(Boolean),
     'The PR base or lifecycle changed while saving control evidence.'
   );
+  requirePrIdentity(pull, repo);
 }
 async function executeAcceptedRequest(github, context, state, number, pull) {
   if (!state.request) return;
