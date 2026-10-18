@@ -9,6 +9,7 @@
   import { useTaskGraphData } from '@/composables/useTaskGraphData';
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { normalizeSecondaryView } from '@/utils/taskFilterNormalization';
   import { layoutTaskGraph } from '@/utils/taskGraphLayout';
   import { TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
   import type { TaskNodeData, TaskNodeStatus } from '@/composables/useTaskGraphData';
@@ -30,7 +31,7 @@
     path: TASK_ROUTE_PATHS.traders,
     query: {
       trader: getTaskTraderView.value,
-      status: preferencesStore.getTaskSecondaryView,
+      status: normalizeSecondaryView(preferencesStore.taskSecondaryView ?? 'available'),
       sort: preferencesStore.getTaskSortMode,
       sortDir: preferencesStore.getTaskSortDirection,
       ...(searchQuery.value ? { q: searchQuery.value } : {}),

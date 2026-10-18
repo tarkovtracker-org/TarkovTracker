@@ -6,6 +6,7 @@ import { computed, ref } from 'vue';
 import TaskGraphView from '@/features/tasks/TaskGraphView.vue';
 const isLgAndUp = ref(false);
 const searchQuery = ref('');
+const savedStatus = ref<string | null>('locked');
 mockNuxtImport('useSharedBreakpoints', () => () => ({ lgAndUp: computed(() => isLgAndUp.value) }));
 mockNuxtImport('useRouter', () => () => ({ push: vi.fn() }));
 vi.mock('@/composables/useRouteSearchQuery', () => ({
@@ -17,7 +18,10 @@ vi.mock('@/composables/useTaskGraphData', () => ({
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     getTaskTraderView: '54cb57776803fa99248b456e',
-    getTaskSecondaryView: 'locked',
+    getTaskSecondaryView: 'all',
+    get taskSecondaryView() {
+      return savedStatus.value;
+    },
     getTaskSortMode: 'alphabetical',
     getTaskSortDirection: 'asc',
     setTaskPrimaryView: vi.fn(),
@@ -55,6 +59,7 @@ describe('TaskGraphView narrow screens', () => {
   beforeEach(() => {
     isLgAndUp.value = false;
     searchQuery.value = '';
+    savedStatus.value = 'locked';
   });
   it('explains the width requirement under a labelled heading', () => {
     const notice = mountGraph().get('[data-testid="task-graph-narrow"]');
@@ -63,16 +68,21 @@ describe('TaskGraphView narrow screens', () => {
     expect(heading.text()).toBe('page.tasks.graph.narrow_title');
     expect(notice.text()).toContain('page.tasks.graph.narrow_description:{"width":1024}');
   });
-  it.each(['', 'mole'])(
-    'keeps the selected trader, saved filters and search %j in the Traders link',
-    (search) => {
+  it.each([
+    ['', 'locked', 'locked'],
+    ['mole', 'locked', 'locked'],
+    ['', null, 'available'],
+  ] as const)(
+    'keeps search %j and saved status %j as %j in the Traders link',
+    (search, status, expectedStatus) => {
       searchQuery.value = search;
+      savedStatus.value = status;
       const link = mountGraph().get('[data-testid="task-graph-narrow-traders-link"]');
       expect(JSON.parse(link.attributes('data-to') ?? '')).toEqual({
         path: '/tasks/traders',
         query: {
           trader: '54cb57776803fa99248b456e',
-          status: 'locked',
+          status: expectedStatus,
           sort: 'alphabetical',
           sortDir: 'asc',
           ...(search ? { q: search } : {}),
