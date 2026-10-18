@@ -32,7 +32,7 @@ const SENSITIVE_PATH =
 const LOW_RISK_PATH =
   /^(?:docs\/|[^/]+\.md$|app\/locales\/|app\/(?:components|pages|features|layouts|assets|composables|utils|types|stores)\/|(?:app|scripts)\/.*(?:\.test\.[cm]?[jt]s|\.spec\.[cm]?[jt]s)$|scripts\/workflow-tests\/)/;
 const SENSITIVE_PATCH =
-  /(?:supabase|stripe|service.role|secret|credential|authorization|authentication|permission|access.check|session|process\.env|runtimeConfig|localStorage|indexedDB|persist|defineEventHandler|fetch\(|\$fetch\()/i;
+  /(?:supabase|stripe|service.role|secret|credential|authorization|authentication|permission|access.check|session|process\.env|runtimeConfig|localStorage|indexedDB|persist|defineEventHandler|fetch\(|\$fetch\(|sendBeacon|XMLHttpRequest|WebSocket|EventSource|useFetch|useLazyFetch)/i;
 const REVIEW_ONLY_PATH =
   /^(?:docs\/|[^/]+\.md$|app\/locales\/)|\.(?:test|spec)\.[cm]?[jt]s$|^scripts\/workflow-tests\//;
 function ordinaryFile(file) {
