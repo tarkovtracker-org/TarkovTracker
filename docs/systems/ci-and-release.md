@@ -13,8 +13,10 @@ inherit that bound instead of passing a worker flag, since a CLI flag would over
 
 CI splits the suite across four coverage shards. The `VITEST_SHARD` variable — not the `--shard`
 argument alone — selects sharded coverage mode, which drops the global and per-file thresholds
-because one shard exercises only part of the suite; the unsharded `test:coverage` run enforces
-them. The `Test (shard N/4)` check names and the shard command are contract: branch protection and
+because one shard exercises only part of the suite. The required `Coverage thresholds` job
+merges the four blob reports and enforces those thresholds against the full application denominator,
+as does the unsharded `test:coverage` run. The `Test (shard N/4)` check names and the shard command
+are contract: branch protection and
 `dependabot-auto-merge.yml` require those names, and `scripts/workflow-tests/workflows.mjs` asserts the
 command.
 
@@ -191,13 +193,10 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   the trusted contract before it can gate. The `security` gate is selected by every plan. For the
   required jobs in `fullJobs` (`scripts/ci/validation-plan.mjs`), every selected job must report
   `success`, every unselected job must report `skipped`, and a missing result fails the aggregate,
-  so an older candidate workflow that omits a required job can never pass. `optionalJobs` lists
-  jobs in a compatibility window: the aggregate accepts a candidate workflow that omits them, but
-  once one is planned or reports, it must report `success` when planned or the plan is full, and
-  `skipped` otherwise. `coverage` (merged shard coverage thresholds, #1029) is in this window until
-  #1278 moves it into `fullJobs`; the earlier `security` window expired when all active candidate
-  workflows had landed that job. Status publication errors fail the
-  CI Result job, so automation cannot promote the commit.
+  so an older candidate workflow that omits a required job can never pass. The coverage rollout
+  compatibility window is closed: `coverage` is now in `fullJobs`, and full-validation candidates
+  must include it. Older draft branches must integrate the coverage job before becoming ready.
+  Status publication errors fail the CI Result job, so automation cannot promote the commit.
 - Release prepares only `package.json` version and `CHANGELOG.md` on a canonical
   `wip/release-<version>-<run>-<attempt>` branch, validates dispatched candidate CI and an
   Actions-owned preview, and opens a generated version PR. The successful source Release run

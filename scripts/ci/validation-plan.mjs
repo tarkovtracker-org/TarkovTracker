@@ -15,10 +15,6 @@ export const fullJobs = [
   'security',
 ];
 const reducedJobs = ['lint-format', 'systems-drift', 'security'];
-// Compatibility window for the merged coverage gate: the trusted default-branch aggregate accepts a
-// candidate workflow with or without the `coverage` job. Once it reports or is planned, it must
-// succeed when planned or the plan is full, and skip otherwise. The activation change moves it into `fullJobs`.
-export const optionalJobs = ['coverage'];
 // Agent instruction files (root or nested AGENTS.md/CLAUDE.md) are
 // documentation. Under `public/` they would ship as site assets, so they stay full.
 function agentInstructionPath(path) {
@@ -197,7 +193,7 @@ export function isValidPlan(plan) {
   return expected.every((job) => plan.jobs.includes(job)) && plan.jobs.every(isKnownJob);
 }
 function isKnownJob(job) {
-  return fullJobs.includes(job) || optionalJobs.includes(job);
+  return fullJobs.includes(job);
 }
 function outcomeError(needs, job, expected) {
   const result = needs[job]?.result;
@@ -205,18 +201,6 @@ function outcomeError(needs, job, expected) {
 }
 function jobOutcomeError(plan, needs, job) {
   return outcomeError(needs, job, plan.jobs.includes(job) ? 'success' : 'skipped');
-}
-function optionalJobExpected(plan, job) {
-  return plan.full || plan.jobs.includes(job) ? 'success' : 'skipped';
-}
-// An optional job may be absent from an older candidate workflow, but a planned job must report and
-// a reported outcome must match the plan, so a failed or cancelled run still fails the aggregate.
-function optionalJobActive(plan, needs, job) {
-  return plan.jobs.includes(job) || Object.hasOwn(needs, job);
-}
-function optionalJobError(plan, needs, job) {
-  if (!optionalJobActive(plan, needs, job)) return null;
-  return outcomeError(needs, job, optionalJobExpected(plan, job));
 }
 // The trusted default-branch aggregator must not silently ignore validation jobs it does not know;
 // an unexpected dependency fails closed until the trusted contract is updated first.
@@ -231,7 +215,6 @@ export function aggregateResults(plan, needs) {
   if (!isValidPlan(plan)) return ['Missing or invalid validation plan'];
   return [
     ...fullJobs.map((job) => jobOutcomeError(plan, needs, job)),
-    ...optionalJobs.map((job) => optionalJobError(plan, needs, job)),
     classifierError(needs),
     unexpectedJobsError(needs),
   ].filter(Boolean);
