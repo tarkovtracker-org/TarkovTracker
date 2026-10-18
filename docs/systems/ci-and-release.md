@@ -188,15 +188,15 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
-  the trusted contract before it can gate. The `security` gate is selected by every plan; every
-  selected job must report `success`, every known but unselected job must report `skipped`, and a
-  missing result fails the aggregate — so an older candidate workflow that omits a required job
-  can never pass. `optionalJobs` lists jobs in a compatibility window: the trusted aggregate
-  accepts a candidate workflow that omits them, but once one is planned or reports, it must report
-  `success` when planned or the plan is full, and `skipped` otherwise. `coverage` (merged shard coverage
-  thresholds, #1029) is in this window until its activation moves it into `fullJobs`; the earlier
-  `security` window expired when all active candidate workflows had landed that job. Status
-  publication errors fail the
+  the trusted contract before it can gate. The `security` gate is selected by every plan. For the
+  required jobs in `fullJobs` (`scripts/ci/validation-plan.mjs`), every selected job must report
+  `success`, every unselected job must report `skipped`, and a missing result fails the aggregate,
+  so an older candidate workflow that omits a required job can never pass. `optionalJobs` lists
+  jobs in a compatibility window: the aggregate accepts a candidate workflow that omits them, but
+  once one is planned or reports, it must report `success` when planned or the plan is full, and
+  `skipped` otherwise. `coverage` (merged shard coverage thresholds, #1029) is in this window until
+  #1278 moves it into `fullJobs`; the earlier `security` window expired when all active candidate
+  workflows had landed that job. Status publication errors fail the
   CI Result job, so automation cannot promote the commit.
 - Release prepares only `package.json` version and `CHANGELOG.md` on a canonical
   `wip/release-<version>-<run>-<attempt>` branch, validates dispatched candidate CI and an

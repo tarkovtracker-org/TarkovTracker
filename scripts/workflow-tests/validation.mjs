@@ -278,6 +278,10 @@ test('compatibility window: the coverage gate may be absent, but a planned or re
   assert.deepEqual(aggregateResults(planned, needs), [
     'coverage: expected success, received undefined',
   ]);
+  for (const result of ['failure', 'cancelled', 'skipped'])
+    assert.deepEqual(aggregateResults(planned, { ...needs, coverage: { result } }), [
+      `coverage: expected success, received ${result}`,
+    ]);
 });
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));
