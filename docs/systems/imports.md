@@ -4,14 +4,13 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 ## Tarkov.dev profile import
 
-**Summary.** Settings → Data Management lets a user import their in-game profile (level/XP,
-skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
+**Summary.** Settings → Data Management lets a user import their in-game profile (level derived
+from cumulative XP, skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
 players.tarkov.dev host (the `profile/{aid}` path for PvP, `pve/{aid}` for PvE, and
 `pvp-season/{aid}` for Seasonal, each with a JSON suffix). Profile URLs fix the target mode, so
-Seasonal snapshots write only into active Seasonal progress. The upstream JSON only refreshes when
-a human views the player page on tarkov.dev
-(Turnstile-guarded
-there); tarkov.dev purges its CDN copy on refresh, so a new snapshot is visible to us immediately.
+Seasonal snapshots write only into active Seasonal progress. Opening the matching player page on tarkov.dev is the documented refresh workflow (Turnstile-guarded
+there); refetching here retrieves that snapshot, not live game progress. Snapshot freshness is
+checked independently, and propagation timing is not guaranteed.
 The upstream sends no CORS headers, so the browser cannot fetch it directly — everything goes
 through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse controls.
 
@@ -100,12 +99,18 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
 PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
 diagnostics, and group-member snapshots do not establish additional player progress. See
-`docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
+`docs/eft-log-reference/` for the historical format inventory and latest re-audit (through observed
+build `1.2.0.0.47965`) and
 [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
 The importer accepts legacy/rotated notification and backend filenames, and application/output
-context, in folders, individual files, and ZIPs. Folder files and ZIP members are read incrementally without fixed file-count,
-file-size, archive-size, or combined-byte limits. Raw reads use 256 KiB slices; compressed ZIP
-input uses 16 KiB slices to bound each inflation step. These are buffer sizes, not import limits.
+context, in folders, individual files, and ZIPs. Explicit `output|notifications|` and
+`output|push-notifications|` mirrors are another source of the same quest evidence; their
+application/backend source prefixes are also unwrapped for routing. Generic output chatter is
+not a notification. Dedicated and mirrored deliveries share identity/time deduplication.
+Folder files and ZIP members are read incrementally under the selection-wide
+[resource budgets](../eft-log-reference/README.md#import-resource-budgets).
+Raw reads and decoded batches use 256 KiB buffers; compressed ZIP inflation uses 1 KiB slices.
+These buffer sizes are separate from the import budgets.
 Supported members are consumed immediately; unsupported members use a discard decoder so
 fflate cannot retain deferred compressed contents. Declared ZIP sizes never drive allocation;
 synchronous decoders reject incomplete streams on final input; supported entries must match
@@ -117,7 +122,8 @@ multiline JSON, and final records without a trailing newline. An individual unfi
 is limited to 8 Mi characters to reject malformed/unbounded records; this fails the selection
 explicitly instead of silently skipping history. No progress is applied on reading errors.
 Completed text is discarded after extracting quest events and mode signals. Version selection
-rebuilds previews from that evidence without rereading files. Memory still scales with meaningful
+rebuilds previews from that evidence without rereading files. Mode, quest-state, and history
+selection also reuse that evidence. Memory still scales with meaningful
 events, mode evidence, and selected-file metadata, not total source bytes; browser resources and
 processing time remain practical limits. Progress reports selected source bytes (compressed bytes
 for ZIPs). Cancel or reselection aborts between slices and invalidates pending catalog/preview
@@ -161,6 +167,8 @@ to retry; state-setting operations preserve successful completions.
 Seasonal events outside the active season are skipped; assigning unresolved out-of-season
 events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
 guard shows the date warning and disables confirmation immediately for an invalid selection.
+The guard examines only selected history/states; excluded unidentified events cannot block an
+otherwise valid import.
 Malformed/skipped records are reported in the preview.
 Accounts are separated by the `AccountId` on `SelectProfile`, `PrepareSelectedProfileLocally`,
 and `CompleteSelectedProfile` lines in the `application` and `output` channels (`ProfileId`
@@ -172,7 +180,35 @@ every account and is used only to discover destination modes). Events before a s
 retained selection also remain available in the `unidentified` bucket, alongside sessions with
 no recorded selection: it joins the only identified account, but stays
 separate when two or more accounts exist. Account IDs stay in memory and are shown only as a
-four-character suffix. Switching accounts resets version selection to that account's defaults.
-Version filters are compatibility filters, not wipe/prestige boundaries: users must
-select the character sessions they intend to restore. Missing logs, objective handovers, XP,
-skills, and hideout progress cannot be reconstructed from these quest notifications.
+four-character suffix. Switching accounts resets version and data selection to that account's defaults.
+
+### Preview selection and reset history
+
+- Users can include/exclude detected PvP, PvE, Seasonal, and unidentified-mode evidence, and
+  completed, started/active, or failed quest states. Known modes default on. Unidentified events
+  default off when eligible known-mode evidence exists; all selected unidentified histories require an
+  explicit destination choice, including mixed logs. The destination must remain included;
+  excluded modes are never switched into or mutated.
+- Saved cutoffs remain editable when a version filter removes that mode's events.
+- A per-destination **import since** time is an inclusive lower bound, entered in browser-local
+  time. It applies to the original notification time (`dt`) when available, otherwise the receipt
+  timestamp; undated evidence is excluded when a cutoff exists. Unidentified evidence uses its
+  chosen destination's cutoff. Clearing a cutoff includes all selected history for that mode.
+- Mode/history filters run before destination reconciliation. State filters run **after** choosing
+  each quest's latest state, so excluding a later failure/restart cannot resurrect an earlier
+  completion. Preview totals and confirmation use the same selection helper. Empty selections
+  disable confirmation and the composable rejects them before any progress/mode mutation.
+- Selections are transient and locked during application. Cutoffs do not reset saved progress or
+  change prestige; existing completed tasks remain preserved. Reset existing tracker progress
+  separately if restoring a new character generation.
+- Version filters are compatibility filters, not wipe/prestige boundaries. No verified
+  self-prestige/reset event was established by the corpus: `/client/prestige/list` is a catalogue
+  request; `PrestigeLevel` in friend/group snapshots may describe other players. Neither clears
+  quests nor assigns the importing user's prestige. Do not infer reset boundaries from build
+  versions or a profile ID changing between modes.
+
+Completed-task imports restore objectives and may infer prerequisite states, minimum level/trader
+requirements, and story gates. They do not provide exact self XP, skill snapshots, partial objective
+handovers, or hideout progress. Missing history remains missing. If combining log and profile
+imports, apply the selected logs first, then a refreshed matching profile to align level/skills to
+that snapshot. The profile importer derives and saves the level from cumulative profile XP.

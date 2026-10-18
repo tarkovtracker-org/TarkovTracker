@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
 import { ACTIVE_SEASON } from '@/utils/constants';
+import {
+  createEftLogImportSelection,
+  type EftLogImportSelection,
+} from '@/utils/eftLogImportSelection';
 import { parseEftLogsForQuestImport } from '@/utils/eftLogQuestParser';
 const {
   backupFns,
@@ -87,13 +91,15 @@ const {
     reset: vi.fn(),
     setIncludedVersions: vi.fn(),
     setAccount: vi.fn(),
+    setSelection: vi.fn(),
   },
   eftLogsState: {
+    selection: {} as Ref<EftLogImportSelection>,
     isParsing: {} as Ref<boolean>,
     parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
-    previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
+    previewData: {} as Ref<Record<string, unknown> | null>,
     importState: {
       __v_isRef: true as const,
       value: 'idle' as 'idle' | 'preview' | 'success' | 'error',
@@ -176,6 +182,8 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseFiles: eftLogsFns.parseFiles,
     setIncludedVersions: eftLogsFns.setIncludedVersions,
     setAccount: eftLogsFns.setAccount,
+    selection: eftLogsState.selection,
+    setSelection: eftLogsFns.setSelection,
     confirmImport: eftLogsFns.confirmImport,
     reset: eftLogsFns.reset,
   }),
@@ -257,6 +265,10 @@ describe('DataManagementCard', () => {
     eftLogsFns.reset.mockReset();
     eftLogsFns.setIncludedVersions.mockReset();
     eftLogsFns.setAccount.mockReset();
+    eftLogsState.selection = ref(createEftLogImportSelection());
+    eftLogsFns.setSelection.mockReset().mockImplementation((selection: EftLogImportSelection) => {
+      eftLogsState.selection.value = selection;
+    });
     tarkovStoreState.setTarkovUid.mockClear();
     tarkovStoreState.setTarkovUid.mockImplementation((uid: number | null) => {
       tarkovStoreState.tarkovUid = uid;
@@ -283,7 +295,7 @@ describe('DataManagementCard', () => {
     eftLogsState.isImporting = ref(false);
     eftLogsState.isParsing = ref(false);
     eftLogsState.parseProgress = ref({ bytesRead: 0, totalBytes: 0 });
-    eftLogsState.previewData.value = null;
+    eftLogsState.previewData = ref(null);
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
     tarkovDevFns.setError.mockImplementation((message: string) => {
@@ -329,7 +341,7 @@ describe('DataManagementCard', () => {
           },
           UCheckbox: {
             template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
+              '<input type="checkbox" :aria-label="label" :disabled="disabled" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
             props: ['disabled', 'label', 'modelValue'],
             emits: ['update:model-value'],
           },
@@ -343,6 +355,148 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('updates preview totals and confirmation when modes, states, and reset history are excluded', async () => {
+    const timestamp = new Date(Date.parse(ACTIVE_SEASON.startsOn) + 86400000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace('Z', '');
+    const events = (['pvp', 'pve', 'seasonal', 'unknown'] as const).map((mode) => ({
+      mode,
+      status: 'completed' as const,
+      questId: '61604635c725987e815b1a46',
+      eventKey: mode,
+      timestamp,
+    }));
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    const wrapper = createWrapper({ view: 'imports' });
+    const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
+    expect(vm.eftLogsCompletedCount).toBe(3);
+    const controls = wrapper.findComponent({ name: 'EftLogImportControls' });
+    await controls.find('input[aria-label="common.pvp (1)"]').setValue(false);
+    await controls.find('input[aria-label="common.seasonal_pvp (1)"]').setValue(false);
+    expect(vm.eftLogsCompletedCount).toBe(1);
+    expect(eftLogsState.selection.value.modes).not.toContain('unknown');
+    expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(false);
+    await controls.find('input[type="datetime-local"]').setValue('2099-01-01T00:00:00');
+    expect(vm.eftLogsCompletedCount).toBe(0);
+    const confirm = findButtonByText(wrapper, 'common.confirm_import')!;
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await controls.find('input[type="datetime-local"]').setValue('');
+    expect(vm.eftLogsCompletedCount).toBe(1);
+    await controls.find('input[aria-label="settings.log_import.states.completed"]').setValue(false);
+    expect(vm.eftLogsCompletedCount).toBe(0);
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(eftLogsFns.confirmImport).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('does not let a hidden invalid cutoff disable an otherwise valid mode selection', () => {
+    const events = [
+      {
+        mode: 'pve' as const,
+        status: 'completed' as const,
+        questId: '61604635c725987e815b1a46',
+        eventKey: 'pve',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = {
+      ...createEftLogImportSelection(events),
+      modes: ['pve'],
+      since: { pvp: NaN },
+    };
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(
+      findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
+    ).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('requires an explicit unidentified destination instead of inheriting the active mode', async () => {
+    const questId = '61604635c725987e815b1a46';
+    const events = [
+      {
+        mode: 'unknown' as const,
+        status: 'completed' as const,
+        questId,
+        eventKey: 'unknown',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData = ref({
+      events,
+      matchedTaskIdsByMode: { unknown: [questId] },
+      matchedStartedTaskIdsByMode: { unknown: [] },
+    });
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    const wrapper = createWrapper({ view: 'imports' });
+    const confirm = findButtonByText(wrapper, 'common.confirm_import')!;
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('settings.log_import.errors.choose_unknown_mode');
+    await wrapper.findComponent({ name: 'GameModeToggle' }).vm.$emit('update:modelValue', 'pvp');
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeUndefined();
+    eftLogsState.selection.value = { ...eftLogsState.selection.value, modes: ['pve', 'unknown'] };
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeDefined();
+    expect(wrapper.findComponent({ name: 'GameModeToggle' }).props('disabledModes')).toContain(
+      'pvp'
+    );
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    eftLogsState.previewData.value = {
+      ...eftLogsState.previewData.value,
+      selectedAccount: 'other-account',
+    };
+    await wrapper.vm.$nextTick();
+    expect(confirm.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+  it('keeps a selected invalid cutoff editable after a version removes that mode history', async () => {
+    const questId = '61604635c725987e815b1a46';
+    const events = (['pvp', 'pve'] as const).map((mode) => ({
+      mode,
+      status: 'completed' as const,
+      questId,
+      eventKey: mode,
+      timestamp: null,
+    }));
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData = ref({ events });
+    eftLogsState.selection.value = { ...createEftLogImportSelection(events), since: { pvp: NaN } };
+    const wrapper = createWrapper({ view: 'imports' });
+    eftLogsState.previewData.value = { events: [events[1]] };
+    await wrapper.vm.$nextTick();
+    const cutoff = wrapper.find('input[id$="-pvp"]');
+    expect(cutoff.exists()).toBe(true);
+    await cutoff.setValue('');
+    expect(
+      findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
+    ).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('locks every data-selection control while progress is being applied', async () => {
+    const events = [
+      {
+        mode: 'pve' as const,
+        status: 'started' as const,
+        questId: '61604635c725987e815b1a46',
+        eventKey: 'start',
+        timestamp: null,
+      },
+    ];
+    eftLogsState.importState.value = 'preview';
+    eftLogsState.previewData.value = { events };
+    eftLogsState.selection.value = createEftLogImportSelection(events);
+    eftLogsState.isImporting.value = true;
+    const wrapper = createWrapper({ view: 'imports' });
+    const inputs = wrapper.findComponent({ name: 'EftLogImportControls' }).findAll('input');
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.every((input) => input.attributes('disabled') !== undefined)).toBe(true);
+    wrapper.unmount();
+  });
   it('keeps a live region mounted and shows cancellable folder-read progress', async () => {
     const wrapper = createWrapper({ view: 'imports' });
     const liveRegion = wrapper.find('output');
@@ -1064,6 +1218,10 @@ describe('DataManagementCard', () => {
       };
       tarkovStoreState.currentMode = 'seasonal';
       const wrapper = createWrapper();
+      await wrapper
+        .findComponent({ name: 'GameModeToggle' })
+        .vm.$emit('update:modelValue', 'seasonal');
+      await wrapper.vm.$nextTick();
       const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
       expect(vm.eftLogsCompletedCount).toBe(0);
       expect(wrapper.text()).toContain('settings.log_import.errors.outside_active_season');
