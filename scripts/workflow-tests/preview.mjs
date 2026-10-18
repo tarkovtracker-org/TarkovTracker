@@ -2747,7 +2747,12 @@ function queueDocsComparison() {
 test('proven docs-only queue publishes the required result without build artifacts, dispatch, deployment or smoke', async (t) => {
   const f = queueFixture(t);
   f.state.artifacts = [];
-  f.github.rest.repos.compareCommits = async () => ({ data: queueDocsComparison() });
+  let comparisons = 0;
+  f.github.rest.repos.compareCommits = async (params) => {
+    assert.deepEqual(params, { ...REPO, base: BASE, head: HEAD, per_page: 100, page: 1 });
+    comparisons++;
+    return { data: queueDocsComparison() };
+  };
   f.github.rest.actions.downloadArtifact = () => {
     throw new Error('docs must not download a build');
   };
@@ -2758,6 +2763,7 @@ test('proven docs-only queue publishes the required result without build artifac
     workspace: tempDir(t),
   };
   const decision = await planPreview(args);
+  assert.equal(comparisons, 1);
   assert.equal(decision.action, 'skip');
   assert.equal(decision.state, 'success');
   assert.match(decision.description, /Not applicable/);
