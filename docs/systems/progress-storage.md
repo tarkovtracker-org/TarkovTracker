@@ -150,7 +150,7 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
 - `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` - historical
   range backfill and completion gate, retired by the physical legacy cleanup migration
-- `supabase/migrations/20261014094925_drop_legacy_progress_columns.sql` - removes only the two
+- `supabase/migrations/20261018203633_drop_legacy_progress_columns.sql` - removes only the two
   legacy columns and their reader/trigger/backfill dependencies; keeps account metadata,
   compatibility clocks, normalized progress, all Seasonal history and prestige archives
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — former

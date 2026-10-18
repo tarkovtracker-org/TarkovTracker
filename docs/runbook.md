@@ -801,7 +801,7 @@ preserve applied migrations.
 
 The historical backfill was completed before #1072 removed normalized-reader fallbacks.
 After #1086 retired legacy writes, its frozen JSON must never seed newer normalized state.
-The forward migration `20261014094925_drop_legacy_progress_columns.sql` removes the range
+The forward migration `20261018203633_drop_legacy_progress_columns.sql` removes the range
 helper, completion gate and flag helper with the old columns. Do not run historical backfill
 commands or use their old numeric-level gate as a cleanup precondition.
 

@@ -86,7 +86,7 @@ OUT.mkdir(parents=True, exist_ok=False)
 STAMP = dt.datetime.now(dt.timezone.utc).strftime("%H%M%S")
 LAB = "tt_cleanup_lab_" + STAMP
 RECOVERY = "tt_cleanup_recovered_" + STAMP
-CANDIDATE = (ROOT / "supabase/migrations/20261014094925_drop_legacy_progress_columns.sql").read_text()
+CANDIDATE = (ROOT / "supabase/migrations/20261018203633_drop_legacy_progress_columns.sql").read_text()
 checks = []
 
 def command(args, data=None, expected=0):
