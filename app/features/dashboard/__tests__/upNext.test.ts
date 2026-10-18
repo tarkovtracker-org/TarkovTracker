@@ -124,4 +124,25 @@ describe('pickClosestBlocked', () => {
       blocker: { type: 'player_level' },
     });
   });
+  it('skips unactionable blockers and multi-task prerequisites', () => {
+    const items = pickClosestBlocked(
+      [
+        task('one-prereq'),
+        task('two-prereqs'),
+        task('bare-prereq'),
+        task('branch'),
+        task('unknown'),
+        task('variable'),
+      ],
+      context({
+        'one-prereq': waitsOn('a'),
+        'two-prereqs': waitsOn('a', 'b'),
+        'bare-prereq': blocked({ type: 'prerequisite' }),
+        branch: blocked({ type: 'failed_branch' }),
+        unknown: blocked({ type: 'unknown' }),
+        variable: blocked({ type: 'global_variable_unknown' }),
+      })
+    );
+    expect(items.map((item) => item.taskId)).toEqual(['one-prereq']);
+  });
 });

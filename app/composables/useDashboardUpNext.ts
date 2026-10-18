@@ -35,12 +35,24 @@ function useUpNextTaskSets({
         task && (!task.factionName || task.factionName === 'Any' || task.factionName === faction)
     );
   });
-  const filteredTasks = computed(() =>
-    filterTasksByTypeSettings(
-      baseTasks.value,
-      buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore)
-    )
+  const typeOptions = computed(() =>
+    buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore)
   );
+  const eligibleTasks = computed(() =>
+    filterTasksByTypeSettings(baseTasks.value, {
+      ...typeOptions.value,
+      showKappa: true,
+      showLightkeeper: true,
+      showNonSpecial: true,
+    })
+  );
+  const onlyKeyTasks = () =>
+    preferencesStore.getOnlyTasksWithRequiredKeys && metadataStore.tasksObjectivesHydrated;
+  const filteredTasks = computed(() => {
+    const typed = filterTasksByTypeSettings(baseTasks.value, typeOptions.value);
+    if (!onlyKeyTasks()) return typed;
+    return typed.filter((task) => (task.requiredKeys?.length ?? 0) > 0);
+  });
   const isTrackable = (task: Task) =>
     !tarkovStore.isTaskFailed(task.id) && progressStore.invalidTasks?.[task.id]?.self !== true;
   const isPending = (task: Task) => isTrackable(task) && !tarkovStore.isTaskComplete(task.id);
@@ -49,7 +61,7 @@ function useUpNextTaskSets({
   const available = computed(() => pending.value.filter(isAvailable));
   const hiddenAvailableCount = computed(() => {
     const visible = new Set(available.value.map((task) => task.id));
-    return baseTasks.value.filter(
+    return eligibleTasks.value.filter(
       (task) => isPending(task) && isAvailable(task) && !visible.has(task.id)
     ).length;
   });

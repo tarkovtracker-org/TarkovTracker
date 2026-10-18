@@ -24,14 +24,12 @@ const createProgressStore = (
     invalidTasks?: Record<string, Record<string, boolean>>;
     tasksCompletions?: Record<string, Record<string, boolean>>;
     tasksFailed?: Record<string, Record<string, boolean>>;
-    unlockedTasks?: Record<string, Record<string, boolean>>;
   } = {}
 ) => ({
   getLevel: overrides.getLevel ?? (() => 10),
   invalidTasks: overrides.invalidTasks ?? {},
   tasksCompletions: overrides.tasksCompletions ?? {},
   tasksFailed: overrides.tasksFailed ?? {},
-  unlockedTasks: overrides.unlockedTasks ?? {},
 });
 const createTarkovStore = (
   overrides: {
@@ -62,6 +60,8 @@ const createTarkovStore = (
   };
 };
 interface SetupOptions {
+  excludedTaskIds?: string[];
+  objectivesHydrated?: boolean;
   preferencesStore?: ReturnType<typeof createPreferencesStore>;
   progressStore?: ReturnType<typeof createProgressStore>;
   tasks?: Task[];
@@ -75,12 +75,48 @@ const setup = async (options: SetupOptions = {}) => {
   const preferencesStore = options.preferencesStore ?? createPreferencesStore();
   const tarkovStore = options.tarkovStore ?? createTarkovStore();
   const metadataStore = {
-    getExcludedTaskIdsForEdition: () => new Set<string>(),
+    getExcludedTaskIdsForEdition: () => new Set(options.excludedTaskIds ?? []),
     prestigeTaskMap: new Map<string, number>(),
     sortedTraders: traders,
     tasks,
+    tasksObjectivesHydrated: options.objectivesHydrated ?? true,
     traders,
   };
+  const taskEvaluations = buildTaskEvaluations(
+    tasks,
+    new Map([
+      [
+        'self',
+        {
+          level: progressStore.getLevel('self'),
+          faction: tarkovStore.getPMCFaction(),
+          mode: tarkovStore.getCurrentGameMode(),
+          completions: Object.fromEntries(
+            tasks.map((task) => [
+              task.id,
+              {
+                complete: tarkovStore.isTaskComplete(task.id),
+                failed: tarkovStore.isTaskFailed(task.id),
+              },
+            ])
+          ),
+          traders: Object.fromEntries(
+            traders.map((trader) => [
+              trader.id,
+              { level: 1, reputation: tarkovStore.getTraderReputation() },
+            ])
+          ),
+        },
+      ],
+    ]),
+    { requireTraderLevels: true }
+  );
+  const unlockedTasks = Object.fromEntries(
+    Object.entries(taskEvaluations).map(([id, byTeam]) => [
+      id,
+      { self: byTeam.self?.available === true },
+    ])
+  );
   vi.resetModules();
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => metadataStore,
@@ -89,38 +125,7 @@ const setup = async (options: SetupOptions = {}) => {
     usePreferencesStore: () => preferencesStore,
   }));
   vi.doMock('@/stores/useProgress', () => ({
-    useProgressStore: () => ({
-      ...progressStore,
-      taskEvaluations: buildTaskEvaluations(
-        tasks,
-        new Map([
-          [
-            'self',
-            {
-              level: progressStore.getLevel('self'),
-              faction: tarkovStore.getPMCFaction(),
-              mode: tarkovStore.getCurrentGameMode(),
-              completions: Object.fromEntries(
-                tasks.map((task) => [
-                  task.id,
-                  {
-                    complete: tarkovStore.isTaskComplete(task.id),
-                    failed: tarkovStore.isTaskFailed(task.id),
-                  },
-                ])
-              ),
-              traders: Object.fromEntries(
-                traders.map((trader) => [
-                  trader.id,
-                  { level: 1, reputation: tarkovStore.getTraderReputation() },
-                ])
-              ),
-            },
-          ],
-        ]),
-        { requireTraderLevels: true }
-      ),
-    }),
+    useProgressStore: () => ({ ...progressStore, taskEvaluations, unlockedTasks }),
   }));
   vi.doMock('@/stores/useTarkov', () => ({
     useTarkovStore: () => tarkovStore,
@@ -172,7 +177,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(ids),
       tasksFailed: flags(ids),
-      unlockedTasks: flags(['task-impact', 'task-close'], true),
     });
     const tarkovStore = createTarkovStore({ completedObjectives: new Set(['close-1']) });
     const upNext = await setup({ progressStore, tasks, tarkovStore });
@@ -202,7 +206,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(['task-reward', 'task-plain']),
       tasksFailed: flags(['task-reward', 'task-plain']),
-      unlockedTasks: flags(['task-reward', 'task-plain'], true),
     });
     const upNext = await setup({ progressStore, tasks, traders });
     expect(upNext.items.value[0]).toMatchObject({
@@ -224,7 +227,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(['task-kappa']),
       tasksFailed: flags(['task-kappa']),
-      unlockedTasks: flags(['task-kappa'], true),
     });
     const preferencesStore = createPreferencesStore({
       getHideNonKappaTasks: true,
@@ -234,6 +236,61 @@ describe('useDashboardUpNext', () => {
     expect(upNext.state.value).toBe('filtered');
     expect(upNext.hiddenAvailableCount.value).toBe(1);
     expect(upNext.items.value).toEqual([]);
+  });
+  it('does not count edition-excluded tasks as hidden by filters', async () => {
+    const tasks: Task[] = ['task-kappa', 'task-edition'].map((id) => ({
+      id,
+      name: id,
+      factionName: 'Any',
+      kappaRequired: true,
+      objectives: [{ id: `${id}-1`, taskId: id }],
+    }));
+    const ids = tasks.map((task) => task.id);
+    const progressStore = createProgressStore({
+      tasksCompletions: flags(ids),
+      tasksFailed: flags(ids),
+    });
+    const preferencesStore = createPreferencesStore({
+      getHideNonKappaTasks: true,
+      getShowNonSpecialTasks: false,
+    });
+    const upNext = await setup({
+      excludedTaskIds: ['task-edition'],
+      preferencesStore,
+      progressStore,
+      tasks,
+    });
+    expect(upNext.hiddenAvailableCount.value).toBe(1);
+  });
+  it('applies the required-keys filter once objectives are hydrated', async () => {
+    const tasks: Task[] = [
+      {
+        id: 'task-keys',
+        name: 'Key Task',
+        factionName: 'Any',
+        objectives: [{ id: 'keys-1', taskId: 'task-keys' }],
+        requiredKeys: [{ keys: [{ id: 'key-1' }] }],
+      } as Task,
+      {
+        id: 'task-plain',
+        name: 'A Plain Task',
+        factionName: 'Any',
+        objectives: [{ id: 'plain-1', taskId: 'task-plain' }],
+      },
+    ];
+    const ids = tasks.map((task) => task.id);
+    const preferencesStore = createPreferencesStore({ getOnlyTasksWithRequiredKeys: true });
+    const progress = () =>
+      createProgressStore({ tasksCompletions: flags(ids), tasksFailed: flags(ids) });
+    const hydrated = await setup({ preferencesStore, progressStore: progress(), tasks });
+    expect(hydrated.items.value.map((item) => item.taskId)).toEqual(['task-keys']);
+    const loading = await setup({
+      objectivesHydrated: false,
+      preferencesStore,
+      progressStore: progress(),
+      tasks,
+    });
+    expect(loading.items.value).toHaveLength(2);
   });
   it('reports zero remaining when all counted objectives are complete but hand-in is still pending', async () => {
     const tasks: Task[] = [
@@ -247,7 +304,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(['task-hand-in']),
       tasksFailed: flags(['task-hand-in']),
-      unlockedTasks: flags(['task-hand-in'], true),
     });
     const tarkovStore = createTarkovStore({ completedObjectives: new Set(['hand-in-1']) });
     const upNext = await setup({ progressStore, tasks, tarkovStore });
@@ -279,7 +335,6 @@ describe('useDashboardUpNext', () => {
       getLevel: () => 13,
       tasksCompletions: flags(['task-level', 'task-double']),
       tasksFailed: flags(['task-level', 'task-double']),
-      unlockedTasks: {},
     });
     const upNext = await setup({ progressStore, tasks });
     expect(upNext.state.value).toBe('blocked');
@@ -302,7 +357,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(['task-done'], true),
       tasksFailed: flags(['task-done']),
-      unlockedTasks: {},
     });
     const tarkovStore = createTarkovStore({
       completedObjectives: new Set(['done-1']),
@@ -324,7 +378,6 @@ describe('useDashboardUpNext', () => {
     const progressStore = createProgressStore({
       tasksCompletions: flags(['task-failed']),
       tasksFailed: flags(['task-failed'], true),
-      unlockedTasks: {},
     });
     const tarkovStore = createTarkovStore({ failedTasks: new Set(['task-failed']) });
     const upNext = await setup({ progressStore, tasks, tarkovStore });

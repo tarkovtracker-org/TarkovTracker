@@ -139,12 +139,27 @@ export const rankUpNext = (
     mapTasks(availableTasks, (task) => buildItem(task, context)),
     limit
   );
-const singleBlocker = (result: TaskAvailabilityResult | undefined): TaskBlocker | undefined =>
-  result?.blockers.length === 1 ? result.blockers[0] : undefined;
-const BLOCKED_SKIP = new Set<TaskBlocker['type']>(['complete', 'failed', 'disabled', 'cycle']);
+const BLOCKED_SKIP = new Set<TaskBlocker['type']>([
+  'complete',
+  'failed',
+  'failed_branch',
+  'disabled',
+  'cycle',
+  'faction',
+  'unknown',
+  'global_variable_unknown',
+]);
+const isSingleGate = (blocker: TaskBlocker): boolean =>
+  blocker.type === 'prerequisite'
+    ? blocker.requirements?.length === 1
+    : !BLOCKED_SKIP.has(blocker.type);
+const singleBlocker = (result: TaskAvailabilityResult | undefined): TaskBlocker | undefined => {
+  const [blocker, ...rest] = result?.blockers ?? [];
+  return blocker && !rest.length && isSingleGate(blocker) ? blocker : undefined;
+};
 const buildBlocked = (task: Task, context: UpNextContext): UpNextItem | null => {
   const blocker = singleBlocker(context.evaluation(task.id));
-  if (!blocker || BLOCKED_SKIP.has(blocker.type)) return null;
+  if (!blocker) return null;
   const item = buildItem(task, context);
   return { ...item, reason: 'blocked', blocker };
 };
