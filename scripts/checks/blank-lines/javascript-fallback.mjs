@@ -85,19 +85,65 @@ const scanRegexCharacter = (source, cursor) => {
 const commentIntroducers = new Set(['/', '*']);
 const skipRegex = (source, start) => {
   const cursor = { inClass: false, index: start + 1 };
-  for (; cursor.index < source.length; cursor.index += 1) {
-    if (!scanRegexCharacter(source, cursor)) continue;
-    // Revisit an adjacent slash/star so a following comment still gets scanned.
-    if (commentIntroducers.has(source[cursor.index + 1])) cursor.index -= 1;
-    break;
+  const end = start + source.slice(start).match(/^[^\r\n\u2028\u2029]*/)[0].length;
+  for (; cursor.index < end; cursor.index += 1) {
+    if (scanRegexCharacter(source, cursor)) return cursor.index;
   }
-  return cursor.index;
+  return start;
 };
-const isRegexContext = (source, index) => index === 0 || /[=(:,!&|?{;[\s]/.test(source[index - 1]);
-const isRegexStart = (source, index) =>
-  source[index] === '/' &&
-  !commentIntroducers.has(source[index + 1]) &&
-  isRegexContext(source, index);
+const regexKeywords = new Set([
+  'await',
+  'case',
+  'delete',
+  'do',
+  'else',
+  'in',
+  'instanceof',
+  'new',
+  'of',
+  'return',
+  'throw',
+  'typeof',
+  'void',
+  'yield',
+]);
+const regexOperators = new Set('=(:,!&|?{;[+-*~%^<>/');
+const isRegexContext = (cursor) =>
+  regexKeywords.has(cursor.previousToken) || regexOperators.has(cursor.previousToken);
+const isRegexStart = (source, cursor) =>
+  source[cursor.index] === '/' &&
+  !commentIntroducers.has(source[cursor.index + 1]) &&
+  isRegexContext(cursor);
+const readToken = (source, index) =>
+  source.slice(index).match(/^(?:[$A-Z_a-z][$\w]*|\+\+|--)/)?.[0];
+const controlConditions = new Set(['catch', 'for', 'if', 'switch', 'while', 'with']);
+const readPunctuation = (source, cursor) => {
+  const token = source[cursor.index];
+  if (token === '(') cursor.parentheses.push(controlConditions.has(cursor.previousToken));
+  if (token === ')') return cursor.parentheses.pop() ? ';' : ')';
+  return token;
+};
+const recordToken = (source, cursor) => {
+  if (/\s/.test(source[cursor.index])) return;
+  const token = readToken(source, cursor.index);
+  cursor.previousToken = token ?? readPunctuation(source, cursor);
+  if (token) cursor.index += token.length - 1;
+};
+const consumeRegex = (source, cursor) => {
+  const end = skipRegex(source, cursor.index);
+  cursor.previousToken = end === cursor.index ? '/' : 'value';
+  cursor.index = end;
+};
+const consumeTemplate = (source, cursor, ranges) => {
+  const end = findTemplateEnd(source, cursor.index);
+  ranges.push({ end: end + 1, start: cursor.index });
+  cursor.previousToken = 'value';
+  cursor.index = end;
+};
+const openQuote = (source, cursor) => {
+  cursor.quote = source[cursor.index];
+  cursor.previousToken = 'value';
+};
 const consumeBlockComment = (source, cursor, ranges) => {
   const end = source.indexOf('*/', cursor.index + 2);
   if (end !== -1) {
@@ -108,24 +154,22 @@ const consumeBlockComment = (source, cursor, ranges) => {
 const scanOpening = (source, cursor, ranges) => {
   if (isPair(source, cursor.index, '/*')) {
     consumeBlockComment(source, cursor, ranges);
-  } else if (isRegexStart(source, cursor.index)) {
-    cursor.index = skipRegex(source, cursor.index);
+  } else if (isRegexStart(source, cursor)) {
+    consumeRegex(source, cursor);
   } else if (source[cursor.index] === '`') {
-    const end = findTemplateEnd(source, cursor.index);
-    ranges.push({ end: end + 1, start: cursor.index });
-    cursor.index = end;
-  }
+    consumeTemplate(source, cursor, ranges);
+  } else recordToken(source, cursor);
 };
 const scanFallbackCharacter = (source, cursor, ranges) => {
   if (cursor.quote) consumeQuote(source, cursor);
   else if (isPair(source, cursor.index, '//')) {
     cursor.index = skipLineComment(source, cursor.index);
-  } else if (isQuote(source[cursor.index])) cursor.quote = source[cursor.index];
+  } else if (isQuote(source[cursor.index])) openQuote(source, cursor);
   else scanOpening(source, cursor, ranges);
 };
 export const getFallbackRanges = (source, extension) => {
   if (extension === '.tsx') return [{ end: source.length, start: 0 }];
-  const cursor = { index: 0, quote: null };
+  const cursor = { index: 0, parentheses: [], previousToken: ';', quote: null };
   const ranges = [];
   for (; cursor.index < source.length; cursor.index += 1) {
     scanFallbackCharacter(source, cursor, ranges);

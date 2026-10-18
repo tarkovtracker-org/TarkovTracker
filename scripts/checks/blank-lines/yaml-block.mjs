@@ -6,6 +6,14 @@ import {
   spaceIndentOf,
   stripDecorators,
 } from './yaml-context.mjs';
+const scalarBaseIndent = (content, indent) => {
+  const sequenceMapping = content.match(/^(?:-[\t ]+)+(?=.*?:\s)/);
+  return sequenceMapping ? indent + sequenceMapping[0].length : indent;
+};
+const explicitContentIndent = (value, content, indent) => {
+  const indicator = value.match(/[1-9]/);
+  return indicator ? scalarBaseIndent(content, indent) + Number(indicator[0]) : null;
+};
 const getScalarHeader = (line) => {
   const match = line.match(/^(\s*)(.*)$/);
   if (!match) return null;
@@ -16,7 +24,11 @@ const getScalarHeader = (line) => {
   const valueMatch = content.match(/^(?:.*?:\s*|-\s*)(.*)$/);
   const value = stripDecorators((valueMatch ? valueMatch[1] : content).trim());
   if (!/^[|>](?:[+-]?\d?[+-]?)?$/.test(value)) return null;
-  return { contentIndent: null, indent: match[1].length, keepChomping: value.includes('+') };
+  return {
+    contentIndent: explicitContentIndent(value, content, match[1].length),
+    indent: match[1].length,
+    keepChomping: value.includes('+'),
+  };
 };
 const protectsBlank = (lines, index, scalar) => {
   if (scalar.keepChomping) return true;

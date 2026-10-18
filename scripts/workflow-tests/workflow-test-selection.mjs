@@ -132,6 +132,8 @@ test('incomplete plans and invalid job contracts retain the full suite', () => {
   }
 });
 test('scanner coverage remains required on full validation', () => {
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+  assert.match(packageJson.scripts['test:blank-lines'], /(?:^|\s)--coverage(?:\s|$)/);
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   const broken = workflow.replace('run: pnpm run test:blank-lines', 'run: echo disabled');
   assert.throws(() => assertWorkflowContracts(broken));

@@ -1,12 +1,20 @@
 // @vitest-environment node
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const script = fileURLToPath(new URL('./lint-blank-lines.mjs', import.meta.url));
-const directory = mkdtempSync(join(tmpdir(), 'blank-lines-cli-'));
+const directory = realpathSync(mkdtempSync(join(tmpdir(), 'blank-lines-cli-')));
 const source = 'const first = 1;\n\nconst second = 2;\n';
 const expected = 'const first = 1;\nconst second = 2;\n';
 const write = (name, content = source) => {
@@ -28,14 +36,18 @@ describe('blank-line CLI contract', () => {
     const file = write('check.mjs');
     const dirty = run([file]);
     expect(dirty.status).toBe(1);
-    expect(dirty.stdout).toContain('blank lines check.mjs: 1');
-    expect(dirty.stderr).toContain('Found 1 removable blank line(s) in 1 file(s).');
+    expect(dirty.stdout).toBe('blank lines check.mjs: 1\n');
+    expect(dirty.stderr).toBe('Found 1 removable blank line(s) in 1 file(s).\n');
     expect(readFileSync(file, 'utf8')).toBe(source);
     const fixed = run(['--fix', file]);
     expect(fixed.status).toBe(0);
-    expect(fixed.stdout).toContain('fixed check.mjs: 1');
+    expect(fixed.stdout).toBe('fixed check.mjs: 1\n');
+    expect(fixed.stderr).toBe('');
     expect(readFileSync(file, 'utf8')).toBe(expected);
-    expect(run([file]).status).toBe(0);
+    const clean = run([file]);
+    expect(clean.status).toBe(0);
+    expect(clean.stdout).toBe('');
+    expect(clean.stderr).toBe('');
   });
   it.each([
     'dist/example.mjs',

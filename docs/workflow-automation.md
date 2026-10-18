@@ -323,6 +323,13 @@ The CLI owns file discovery, exclusions, symlink handling and writes. The pure
 Preserve exact output, removal counts, newline endings and idempotence when changing
 scanners. Retain CLI smoke tests for the `LINT_BLANK_LINES_FORCE_FALLBACK` flag.
 
+JavaScript comment protection follows parser trivia so templates and regexes cannot
+desynchronize comment scanning. The parser-free fallback distinguishes division from
+regex context conservatively. YAML block scalars honor explicit indentation indicators
+([YAML 1.2.2](https://yaml.org/spec/1.2.2/#8111-block-indentation-indicator)) rather
+than inferring indentation from the first content line. Regression fixtures preserve
+embedded blank lines in these cases.
+
 #### Codebase metrics
 
 `pnpm run metrics` prints a JSON snapshot of the working tree: lines and files for runtime code,

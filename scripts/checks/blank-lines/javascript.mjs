@@ -1,20 +1,17 @@
 import { getFallbackRanges } from './javascript-fallback.mjs';
-const getCommentRanges = (source, extension, typescript) => {
-  const scanner = typescript.createScanner(
-    typescript.ScriptTarget.Latest,
-    false,
-    extension === '.tsx' ? typescript.LanguageVariant.JSX : typescript.LanguageVariant.Standard,
-    source
-  );
-  const ranges = [];
-  let token;
-  while ((token = scanner.scan()) !== typescript.SyntaxKind.EndOfFileToken) {
-    if (token === typescript.SyntaxKind.MultiLineCommentTrivia) {
-      ranges.push({ end: scanner.getTextPos(), start: scanner.getTokenPos() });
+const getNodeComments = (source, node, typescript) => [
+  ...(typescript.getLeadingCommentRanges(source, node.pos) ?? []),
+  ...(typescript.getTrailingCommentRanges(source, node.end) ?? []),
+];
+const protectComments = (comments, ranges, typescript) => {
+  for (const comment of comments) {
+    if (comment.kind === typescript.SyntaxKind.MultiLineCommentTrivia) {
+      ranges.set(comment.pos, { end: comment.end, start: comment.pos });
     }
   }
-  return ranges;
 };
+const startsInsideLiteral = (comment, literals) =>
+  literals.some((literal) => literal.start <= comment.start && comment.start < literal.end);
 const getScriptKind = (extension, typescript) => {
   if (extension === '.tsx') return typescript.ScriptKind.TSX;
   if (extension === '.ts') return typescript.ScriptKind.TS;
@@ -22,7 +19,8 @@ const getScriptKind = (extension, typescript) => {
 };
 export const getJavaScriptRanges = (source, filePath, extension, typescript) => {
   if (!typescript) return getFallbackRanges(source, extension);
-  const ranges = getCommentRanges(source, extension, typescript);
+  const ranges = [];
+  const comments = new Map();
   const sourceFile = typescript.createSourceFile(
     filePath,
     source,
@@ -38,11 +36,15 @@ export const getJavaScriptRanges = (source, filePath, extension, typescript) => 
     typescript.SyntaxKind.JsxText,
   ]);
   const visit = (node) => {
+    protectComments(getNodeComments(source, node, typescript), comments, typescript);
     if (protectedKinds.has(node.kind)) {
       ranges.push({ end: node.getEnd(), start: node.getStart(sourceFile) });
     }
-    typescript.forEachChild(node, visit);
+    for (const child of node.getChildren(sourceFile)) visit(child);
   };
   visit(sourceFile);
-  return ranges;
+  const realComments = [...comments.values()].filter(
+    (comment) => !startsInsideLiteral(comment, ranges)
+  );
+  return [...ranges, ...realComments];
 };

@@ -631,7 +631,12 @@ queue:
     notes: null
   - id: CH-026
     area: Blank-line lint tooling
-    paths: [scripts/checks/lint-blank-lines*.mjs, scripts/checks/blank-lines/**]
+    paths:
+      [
+        scripts/checks/lint-blank-lines*.mjs,
+        scripts/checks/blank-lines/**,
+        scripts/checks/blank-lines.vitest.config.mjs,
+      ]
     status: pr_open
     priority: P2
     dependencies: []
@@ -656,7 +661,7 @@ queue:
         runtime_loc: 115345,
       }
     pr: 1285
-    notes: Per-language scanners extracted; 78 exact-output and CLI tests, dedicated coverage gate, mutation checks and baseline differential checks pass. Local CodeRabbit review completed with zero findings. Live CI and review status is on PR 1285; exact-head collaborator approval is required before merge.
+    notes: Scanners extracted with 99 regression and CLI cases, a dedicated coverage gate, mutation checks and baseline differential checks. Data-preservation regressions cover JavaScript comments/templates, fallback division and explicit YAML indentation. Live CI and review state is on PR 1285; exact-head collaborator approval is required before merge.
   - id: CH-027
     area: API gateway handlers + router
     paths:
