@@ -130,10 +130,15 @@ function providerDiagnostics(headers) {
     ['retry-after', /^\d{1,12}$/],
   ];
   const details = fields.flatMap(([name, pattern]) => {
-    const value = headers?.get?.(name) ?? headers?.[name];
+    const value = diagnosticHeader(headers, name);
     return typeof value === 'string' && pattern.test(value) ? [`${name}=${value}`] : [];
   });
   return details.length ? ` (${details.join('; ')})` : '';
+}
+function diagnosticHeader(headers, name) {
+  if (!headers) return undefined;
+  if (typeof headers.get === 'function') return headers.get(name);
+  return headers[name];
 }
 function statusesOnly(permissions) {
   requireEvidence(permissions.statuses === 'write', 'App needs commit-status write permission.');
