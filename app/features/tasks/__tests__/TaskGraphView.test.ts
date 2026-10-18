@@ -17,6 +17,9 @@ vi.mock('@/composables/useTaskGraphData', () => ({
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     getTaskTraderView: '54cb57776803fa99248b456e',
+    getTaskSecondaryView: 'locked',
+    getTaskSortMode: 'alphabetical',
+    getTaskSortDirection: 'asc',
     setTaskPrimaryView: vi.fn(),
   }),
 }));
@@ -61,7 +64,7 @@ describe('TaskGraphView narrow screens', () => {
     expect(notice.text()).toContain('page.tasks.graph.narrow_description:{"width":1024}');
   });
   it.each(['', 'mole'])(
-    'keeps the selected non-first trader and search %j in the Traders link',
+    'keeps the selected trader, saved filters and search %j in the Traders link',
     (search) => {
       searchQuery.value = search;
       const link = mountGraph().get('[data-testid="task-graph-narrow-traders-link"]');
@@ -69,6 +72,9 @@ describe('TaskGraphView narrow screens', () => {
         path: '/tasks/traders',
         query: {
           trader: '54cb57776803fa99248b456e',
+          status: 'locked',
+          sort: 'alphabetical',
+          sortDir: 'asc',
           ...(search ? { q: search } : {}),
         },
       });

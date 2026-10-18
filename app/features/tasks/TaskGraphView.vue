@@ -25,11 +25,14 @@
   const { getTaskTraderView } = storeToRefs(preferencesStore);
   const { lgAndUp: isLgAndUp } = useSharedBreakpoints();
   const { searchQuery } = useRouteSearchQuery();
-  // Traders shows the same selected trader as a list, so it is the narrow-screen alternative.
+  // Carry saved list filters too: an explicit trader query makes the route apply missing defaults.
   const tradersViewLink = computed(() => ({
     path: TASK_ROUTE_PATHS.traders,
     query: {
       trader: getTaskTraderView.value,
+      status: preferencesStore.getTaskSecondaryView,
+      sort: preferencesStore.getTaskSortMode,
+      sortDir: preferencesStore.getTaskSortDirection,
       ...(searchQuery.value ? { q: searchQuery.value } : {}),
     },
   }));
