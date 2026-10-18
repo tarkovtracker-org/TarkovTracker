@@ -105,6 +105,11 @@ CodeRabbit completion may also come from its GitHub-authenticated bot issue comm
 recent-review section, minimal-risk section, and a unique `reviewed` coverage marker whose source
 and covered commits both equal the current head. The observed marker schema is checked strictly;
 quoted/fenced, stale, malformed, duplicate, incomplete, or conflicting evidence does not qualify.
+The REST comment list only locates candidates. One GraphQL `IssueComment` response supplies the
+body, author, editor, and edit time together; missing provenance or a last edit by anyone other
+than CodeRabbit rejects the evidence. Never-edited comments require explicit null edit metadata.
+Line endings are normalized; positive counts (including leading zeros) and contradictory
+merge-risk statements anywhere in the full body reject admission.
 Receipts identify this evidence as `kind: issue-comment`; the id is the issue-comment id. Provider
 check failures, current review findings, unresolved threads, and sensitive-change approval still
 apply. No new token permissions are needed. Creation, edits, and deletion of these authenticated

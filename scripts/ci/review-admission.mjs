@@ -13,7 +13,7 @@ import {
   trustedActors,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
-import { codeRabbitCommentEvent } from './review-admission-coderabbit.mjs';
+import { codeRabbitCommentEvent, readCodeRabbitComments } from './review-admission-coderabbit.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import {
@@ -39,10 +39,11 @@ async function evidence(github, repo, pr) {
     ...repo,
     pull_number: pr.number,
   });
-  const comments = await allPages(github, github.rest.issues.listComments, {
+  const listedComments = await allPages(github, github.rest.issues.listComments, {
     ...repo,
     issue_number: pr.number,
   });
+  const comments = await readCodeRabbitComments(github, listedComments);
   const checks = await allPages(github, github.rest.checks.listForRef, {
     ...repo,
     ref: pr.head.sha,
