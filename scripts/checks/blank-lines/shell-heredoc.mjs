@@ -1,4 +1,4 @@
-import { consumeQuote, consumeShellPrefix, isQuote } from './shared.mjs';
+import { consumeShellQuote, consumeShellPrefix, isQuote } from './shared.mjs';
 const isArithmeticStart = (line, index) => {
   if (line.slice(index, index + 3) === '$((') return true;
   return line.slice(index, index + 2) === '((' && (index === 0 || /[\s;]/.test(line[index - 1]));
@@ -87,7 +87,7 @@ const scanHeredocCharacter = (line, cursor, heredocs) => {
   if (cursor.arithmeticDepth > 0) {
     consumeArithmetic(line[cursor.index], cursor);
   } else if (cursor.quote) {
-    consumeQuote(line, cursor);
+    consumeShellQuote(line, cursor);
   } else if (!consumeShellPrefix(line, cursor)) scanHeredocOpening(line, cursor, heredocs);
 };
 export const getShellHeredocs = (line) => {

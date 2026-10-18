@@ -646,6 +646,24 @@ const fixtures = [
     source: "printf '%s' $'first\\'quoted\n\nsecond'\n\necho done\n",
     expected: "printf '%s' $'first\\'quoted\n\nsecond'\necho done\n",
   },
+  {
+    name: 'shell-escaped-dollar-single-quote',
+    extension: 'sh',
+    source: "printf '%s' \\$'a\\'\n\necho done\n",
+    expected: "printf '%s' \\$'a\\'\necho done\n",
+  },
+  {
+    name: 'shell-even-backslashes-ansi-quote',
+    extension: 'sh',
+    source: "printf '%s' \\\\$'first\\'quoted\n\nsecond'\n\necho done\n",
+    expected: "printf '%s' \\\\$'first\\'quoted\n\nsecond'\necho done\n",
+  },
+  {
+    name: 'shell-single-backslash-before-heredoc',
+    extension: 'sh',
+    source: "printf '%s' 'a\\'; cat <<EOF\n\ntext\nEOF\n\necho done\n",
+    expected: "printf '%s' 'a\\'; cat <<EOF\n\ntext\nEOF\necho done\n",
+  },
 ];
 describe('blank-line language scanners', () => {
   it.each(fixtures)('$name', ({ name, source, extension, fallback, expected }) => {
