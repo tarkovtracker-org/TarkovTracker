@@ -1,4 +1,5 @@
 name: Preview State
+run-name: Preview State PR ${{ inputs.pull_request || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || 'refresh' }}
 # Trusted controller for automatic PR and CI events. It publishes status and may request a
 # separate Preview run; deployment jobs exist only in that dispatched workflow.
 #
@@ -8,6 +9,12 @@ name: Preview State
 # to this workflow (GitHub blocks it by default from 2026-11-02); see "Preview Controller" in
 # docs/workflow-automation.md. Removing that policy silently disables automatic preview state.
 on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: PR whose current preview intent should be reconciled
+        required: true
+        type: string
   schedule:
     - cron: '17 * * * *'
   workflow_run:
@@ -16,19 +23,24 @@ on:
   pull_request_target:
     types: [ready_for_review, converted_to_draft, reopened, auto_merge_enabled, closed]
 concurrency:
-  group: preview-state-${{ format('{0}@{1}', github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name, github.event.pull_request.head.ref || github.event.workflow_run.head_branch) }}
+  group: preview-state-${{ inputs.pull_request || format('{0}@{1}', github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name, github.event.pull_request.head.ref || github.event.workflow_run.head_branch) }}
   cancel-in-progress: false
 permissions: {}
 env:
   PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   state:
     name: Refresh preview state
     if: >-
-      github.event_name != 'workflow_run' ||
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_run' ||
       github.event.workflow_run.event == 'pull_request' ||
-      github.event.workflow_run.event == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+      github.event.workflow_run.event == 'workflow_dispatch' ||
+      github.event.workflow_run.event == 'merge_group')
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: write
@@ -50,7 +62,11 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { planPreview, publishControllerFailure, reconcileMissingPreviewStatuses } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            const { planPreview, publishControllerFailure, reconcileMissingPreviewStatuses, reconcilePreviewRequest } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            if (context.eventName === 'workflow_dispatch') {
+              await reconcilePreviewRequest({ github, context, core, workspace: process.env.RUNNER_TEMP, number: Number(context.payload.inputs.pull_request) });
+              return;
+            }
             if (context.eventName === 'schedule') {
               await reconcileMissingPreviewStatuses({ github, context, core, workspace: process.env.RUNNER_TEMP });
               return;

@@ -375,6 +375,16 @@
     "validation_error": "Validation Error",
     "got_it": "Got it"
   },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "Clear filters",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
+  },
   "page_help": {
     "button": "Help",
     "launcher": {
@@ -435,10 +445,10 @@
       "hint": "Get a quick overview of what the dashboard is showing and where to click next.",
       "sections": {
         "focus": {
-          "title": "Best next step",
-          "description": "The top card highlights the clearest immediate progress based on your current filters and tracked progress.",
-          "bullet_one": "Use it when you want one strong recommendation instead of browsing the full task list.",
-          "bullet_two": "If it looks wrong, check your task filters first because hidden tasks can change the recommendation."
+          "title": "Up next",
+          "description": "The Up next list ranks the tasks you can start right now, favoring trader unlocks, tasks that open follow-ups, and tasks you are close to finishing.",
+          "bullet_one": "When nothing is available, it shows the locked tasks that are one requirement away from opening.",
+          "bullet_two": "If it looks wrong, check your task filters first because hidden tasks change the list."
         },
         "progress": {
           "title": "Progress cards",
@@ -470,14 +480,14 @@
         },
         "filters": {
           "title": "Trim the list",
-          "description": "Status filters let you focus on what is available now, locked, completed, or failed without leaving the page.",
+          "description": "Status tabs focus on what is available, locked, completed, or failed. The Filters button narrows tasks by type, keys, team, or map.",
           "bullet_one": "Search works across task names and helps when the list feels too large.",
-          "bullet_two": "If a count looks lower than expected, one of the status or teammate filters is usually hiding results."
+          "bullet_two": "Active filters show as chips under the toolbar; select one to remove it, or use Clear all."
         },
         "settings": {
           "title": "Adjust behavior",
-          "description": "The cog opens display and filtering preferences that change how the task list behaves across sessions.",
-          "bullet_one": "Use settings when you want different default filters, team visibility, or map behavior.",
+          "description": "The Settings button opens display preferences: what task cards show, which status tabs appear, and how sorting and fail actions behave.",
+          "bullet_one": "Use Filters to change which tasks appear, and Settings to change how they look.",
           "bullet_two": "If the page feels off, settings are the first place to check before assuming data is missing."
         }
       },
@@ -488,7 +498,7 @@
     "needed_items": {
       "title": "Needed items guide",
       "summary": "Use needed items to combine task and hideout materials, then narrow the list to the exact items you still care about.",
-      "hint": "Get a quick explanation of the tabs, view modes, and the filters behind the cog.",
+      "hint": "Get a quick explanation of the tabs, view modes, and the Filters button.",
       "sections": {
         "scopes": {
           "title": "Choose a scope",
@@ -504,8 +514,8 @@
         },
         "filters": {
           "title": "Refine the list",
-          "description": "The settings drawer controls owned-item visibility, FIR rules, team needs, and other high-impact filters.",
-          "bullet_one": "If an item disappears unexpectedly, a drawer filter is usually the reason.",
+          "description": "The Filters button controls owned-item visibility, FIR rules, team needs, and Kappa-only items. Active filters show as chips under the toolbar.",
+          "bullet_one": "If an item disappears unexpectedly, check the filter chips; remove one to bring those items back.",
           "bullet_two": "Sorting by priority is best when you want the highest-impact items first."
         }
       }
@@ -617,86 +627,27 @@
         "empty": "No updates yet.",
         "view_all": "View all"
       },
-      "focus": {
-        "title": {
-          "default": "What should I do next?",
-          "multiple": "Several good next steps",
-          "blocked": "Nothing is ready right now",
-          "complete": "You are caught up"
-        },
-        "heading": {
-          "start": "Start {task}",
-          "continue": "Continue {task}",
-          "finish": "Finish {task}",
-          "review_filters": "Review your task filters",
-          "closest_unlock": "Closest unlock: {task}",
-          "caught_up": "Everything visible is done"
-        },
-        "summary": {
-          "unlock_trader": "{task} is the unlock step for {trader}.",
-          "impact": "{task} has the biggest downstream payoff in your current queue.",
-          "close": "{task} is one of your closest available completions.",
-          "kappa": "{task} is your clearest Kappa step right now.",
-          "lightkeeper": "{task} is your clearest Lightkeeper step right now.",
-          "default": "{task} is the clearest immediate win on your dashboard.",
-          "filter_hidden_one": "Your current filters hide 1 available task.",
-          "filter_hidden_other": "Your current filters hide {count} available tasks.",
-          "blocked_requirement": "{task} is blocked by its requirements.",
-          "complete": "You have finished every visible task in this dashboard scope."
-        },
-        "stat": {
-          "why": "Why it won",
-          "status": "Status",
-          "secondary": "Other good options",
-          "secondary_actionable": "Use these if the primary plan is not a fit.",
-          "secondary_blocked": "These are the next closest unlocks in your queue.",
-          "secondary_empty": "This is the clearest next step right now."
-        },
+      "up_next": {
+        "title": "Up next",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
           "unlock_trader": "Unlocks {trader}",
-          "impact_one": "Opens 1 follow-up task",
-          "impact_other": "Opens {count} follow-up tasks",
-          "close": "One of your closest completions",
-          "kappa": "Advances Kappa",
-          "lightkeeper": "Advances Lightkeeper",
-          "trader": "Advances {trader}",
-          "filters": "Current filters are hiding viable tasks",
-          "complete": "Everything visible is complete",
-          "default": "Immediate progress"
-        },
-        "proof": {
-          "unlock_trader_one": "Top unlock priority: unlocks {trader} with 1 objective left.",
-          "unlock_trader_other": "Top unlock priority: unlocks {trader} with {count} objectives left.",
-          "impact_one": "Highest payoff: opens 1 follow-up task.",
-          "impact_other": "Highest payoff: opens {count} follow-up tasks.",
-          "close_one": "Fastest available: only 1 objective left.",
-          "close_other": "Fastest available: only {count} objectives left.",
-          "ready_one": "Best available: 1 objective left.",
-          "ready_other": "Best available: {count} objectives left.",
-          "ready_zero": "Best available: ready to turn in now.",
-          "kappa_one": "Best special-chain progress: advances Kappa with 1 objective left.",
-          "kappa_other": "Best special-chain progress: advances Kappa with {count} objectives left.",
-          "lightkeeper_one": "Best special-chain progress: advances Lightkeeper with 1 objective left.",
-          "lightkeeper_other": "Best special-chain progress: advances Lightkeeper with {count} objectives left.",
-          "filters_one": "No visible options: 1 available task is hidden by your filters.",
-          "filters_other": "No visible options: {count} available tasks are hidden by your filters.",
-          "complete": "No visible work remains in this dashboard scope."
-        },
-        "status": {
-          "ready_one": "Ready now. 1 objective left.",
-          "ready_other": "Ready now. {count} objectives left.",
-          "ready_no_objectives": "Ready now.",
-          "filters": "Adjust your task filters to reveal the hidden options.",
-          "complete": "No blockers. Nothing visible is left undone."
-        },
-        "badge": {
-          "based_on_filters": "Based on current filters",
-          "hidden_available_one": "Filters hide 1 available task",
-          "hidden_available_other": "Filters hide {count} available tasks"
-        },
-        "cta": {
-          "open_task": "Open task",
-          "open_tasks": "Open task list"
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Lightkeeper",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "Ready"
         }
       },
       "progress": {
@@ -891,6 +842,7 @@
       "billing_yearly_interval": "year"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
         "aria_label": "Task views",
         "graph": "Graph"
@@ -917,7 +869,36 @@
       },
       "filters": {
         "team_aria_label": "Show progress for {name}",
-        "whole_team": "Whole team"
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "Regular",
+          "kappa": "Kappa",
+          "lightkeeper": "Lightkeeper"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "Default order",
@@ -927,53 +908,39 @@
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
-        "ascending": "Ascending",
-        "descending": "Descending",
         "aria_label": "Sort tasks",
         "progression": "Progression"
       },
       "settings": {
         "title": "Task Settings",
-        "tabs": {
-          "filters": "Task Filters",
-          "filter_bar": "Filter Bar",
-          "advanced": "Advanced"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "Rewards",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "Control which tasks appear.",
-          "regular_tasks": "Regular Tasks",
-          "kappa_required": "Kappa Required",
-          "lightkeeper_required": "Lightkeeper Required",
-          "team_shared_only": "Team Shared Only",
-          "has_required_keys": "Only Tasks with Keys",
-          "show_global_tasks": "Show Global Tasks on Map",
-          "impact_respects_filters": "Impact Respects Task Filters",
-          "hide_completed_map_objectives": "Hide Map-Complete Tasks"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "Tune how task cards look.",
-          "required_labels": "\"Required\" Labels",
-          "experience_rewards": "Experience Rewards",
-          "next_tasks": "Next Tasks",
-          "previous_tasks": "Previous Tasks",
-          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks"
-        },
-        "filter_bar": {
-          "hint": "Toggle task status filters on or off to control which tasks are visible.",
-          "all_filter": "Show All Tasks",
-          "all_filter_hint": "Display every task regardless of status.",
-          "available_filter": "Show Available",
-          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
-          "locked_filter": "Show Locked",
-          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
-          "completed_filter": "Show Completed",
-          "completed_filter_hint": "Tasks you've already finished.",
-          "failed_filter": "Show Failed",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "Manual Fail Actions",
-          "failed_tasks_label": "Failed tasks",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "Repair failed tasks",
           "repair_failed_confirm": "Repair failed tasks by clearing failed flags that are not supported by current fail conditions?",
           "repair_failed_done": "Cleared failed status for {count} tasks.",
@@ -1169,13 +1136,10 @@
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
-      "collapse_completed": "Collapse completed stations",
-      "sort": {
-        "ready_first": "Sort ready to build first"
-      },
       "prereq_filters": {
         "title": "Availability requirements",
         "station_levels": "Require station levels",
@@ -1208,22 +1172,49 @@
           "mark_incomplete": "Mark Incomplete",
           "set_custom_amount": "Set Custom Amount:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items": "items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
       "filters": {
-        "label": "Filters",
-        "non_fir": "NON-FIR",
-        "hide_owned": "HIDE OWNED",
-        "hide_non_fir_special_equipment_title": "Hide non-FIR special equipment (e.g., MS2000 Markers, Wi-Fi Cameras)",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Show only items required for Kappa tasks",
-        "kappa_only_disabled_tooltip": "Kappa filter applies to tasks only.",
-        "hide_team_needs": "HIDE TEAM NEEDS"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "Non-FIR"
+        },
+        "hide": {
+          "title": "Hide",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "Tasks",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "Sort",
@@ -1236,10 +1227,7 @@
         "grid": "Grid view",
         "combined": "Combined view"
       },
-      "teammates_needed": "Teammates need this",
-      "settings": {
-        "title": "Needed Items Settings"
-      }
+      "teammates_needed": "Teammates need this"
     },
     "settings": {
       "card": {
@@ -2002,6 +1990,7 @@
       "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "Are you sure you want to reset your PvP progress?",
       "reset_pvp_warning": "This will permanently delete all your PvP progress, including tasks, hideout, and level. Your PvE data will not be affected.",
       "reset_pve_confirmation": "Are you sure you want to reset your PvE progress?",
@@ -2329,25 +2318,40 @@
       "multiple_accounts_description": "Only the selected option's sessions (one account, or sessions without a recorded account) are imported, into this tracker's progress. The most recently played account is selected by default. Importing a second account here would add its quests on top of the first.",
       "version_filter_label": "Include Log Versions",
       "version_filter_hint": "Latest major version is selected by default. Include only logs from the character and wipe you want to restore.",
-      "version_filter_tooltip": "Versions do not identify wipes or prestige resets. Select the appropriate session folders before importing. Seasonal events must fall within the active season.",
+      "version_filter_tooltip": "Versions do not identify wipes or prestige resets. Use the history cutoff or select the appropriate session folders. Seasonal events must fall within the active season.",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "Completed",
+        "started": "Started / active",
+        "failed": "Failed"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "Unknown Version",
       "source_file": "Source File",
       "selected_files": "Selected files",
       "selected_files_count": "{count} selected files",
       "logs_scanned": "Log Files Parsed",
-      "logs_scanned_tooltip": "Notification log files parsed after the version filter is applied.",
+      "logs_scanned_tooltip": "Dedicated notification files and output files containing notification evidence, after the version filter is applied.",
       "entries_scanned": "Archive Entries Scanned",
       "entries_scanned_tooltip": "Total selected files or archive entries scanned while looking for EFT logs.",
       "chat_messages": "Chat Messages",
       "chat_messages_tooltip": "Chat notification payloads read from included notification logs, across all accounts in those logs.",
       "completion_events": "Quest Completion Events",
-      "completion_events_tooltip": "Unique quest completion events after deduping repeated log lines.",
+      "completion_events_tooltip": "Unique quest completion events for the selected account and versions, before mode, state, and history filters.",
       "started_events": "Quest Start Events",
-      "started_events_tooltip": "Unique quest start events after deduping repeated log lines.",
+      "started_events_tooltip": "Unique quest start events for the selected account and versions, before mode, state, and history filters.",
       "matched_tasks": "Matched Tasks",
-      "matched_tasks_tooltip": "Unique completion quest IDs that match tasks in the current TarkovTracker dataset.",
+      "matched_tasks_tooltip": "Selected completed quest states matched to their destination catalogs. A quest can count once per game mode.",
       "matched_started_tasks": "Matched Active Tasks",
-      "matched_started_tasks_tooltip": "Unique started quest IDs that match current tasks, excluding tasks already counted as completed.",
+      "matched_started_tasks_tooltip": "Selected started quest states matched to their destination catalogs, after latest-state reconciliation. A quest can count once per game mode.",
       "detected_mode": "Detected Mode",
       "detected_mode_tooltip": "Detected from session mode declarations and gateway or notification connections. PvP, PvE, and Seasonal PvP are supported; unresolved events require a destination.",
       "unknown_mode_events": "Unknown Mode Events",
@@ -2361,20 +2365,23 @@
       "success_title": "EFT Logs Imported",
       "success_description": "Processed {complete_count} completed, {active_count} active, and {failed_count} failed quest states from game logs. Existing completed tasks are preserved.",
       "error_title": "EFT Logs Import Failed",
-      "cleared_logs_toast_title": "Old logs were likely cleared",
-      "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
+      "cleared_logs_toast_title": "No quest history in this selection",
+      "cleared_logs_toast_description": "A session may contain no quest changes. Try including more sessions from the same character history, including notification or output logs. Deleted logs cannot be recovered.",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
         "budget_exceeded": "The selected logs exceed the safe import budget. Select fewer recent sessions or extract only the relevant log files. No progress was imported.",
         "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
         "no_files_selected": "No files were selected.",
         "no_matching_tasks_found": "Quest events were found, but none match current TarkovTracker tasks.",
-        "no_notification_logs_found": "No notification logs were found in the selected files.",
+        "no_notification_logs_found": "No notification or output logs were found in the selected files.",
         "no_quest_events_found": "No quest start, completion, or failure events were found in the selected logs.",
         "parse_failed": "Failed to parse EFT logs.",
         "task_metadata_not_loaded": "Task metadata is not loaded yet. Please refresh and try again.",
         "invalid_mode": "Select a valid destination game mode.",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "These logs contain events outside the active season or without a usable date. Select sessions from the active season before importing into Seasonal PvP."
       },
       "failed_tasks": "Matched failed tasks: {count}",

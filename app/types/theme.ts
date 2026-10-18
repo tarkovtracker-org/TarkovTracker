@@ -10,4 +10,5 @@ export type SemanticColor =
   | 'pve'
   | 'kappa'
   | 'lightkeeper'
+  | 'locked'
   | 'accent';

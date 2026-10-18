@@ -9,6 +9,8 @@ on:
       - '.github/workflows/crowdin.yml'
       - 'scripts/ci/crowdin-pr.sh'
       - 'scripts/ci/github-ci-gate.sh'
+      - 'scripts/ci/enqueue-pr*.mjs'
+      - 'scripts/ci/queue-configuration.mjs'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
@@ -22,10 +24,14 @@ permissions:
 concurrency:
   group: crowdin-sync
   cancel-in-progress: false
+env:
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   sync:
     if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - name: Checkout repository
@@ -35,7 +41,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Preserve trusted merge gate
-        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh "$RUNNER_TEMP/"
+        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh scripts/ci/review-admission*.mjs scripts/ci/enqueue-pr*.mjs scripts/ci/queue-configuration.mjs scripts/ci/pr-control-policy.mjs scripts/ci/pr-control-state.mjs "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@9c23991700c0ec5256fd41089b9d9d7d540e424e # v3.3.0

@@ -133,6 +133,92 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
+  it('imports output-only notification mirrors through the public file API', async () => {
+    const importer = await loadComposable();
+    const text =
+      '2026-02-21 10:00:00.000|Info|output|application|Session mode: Pve\n' +
+      completionLog().replace('|push-notifications|', '|output|push-notifications|');
+    await importer.parseFile(new File([text], 'output_000.log'));
+    expect(importer.importState.value).toBe('preview');
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+  });
+  it('keeps excluded modes untouched and rejects an empty selection before switching', async () => {
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File(
+        [
+          backendLog('gw-pvp-01.escapefromtarkov.com') +
+            '\n' +
+            completionLog().replace('event-123', 'pvp-event'),
+        ],
+        'log_pvp/output.log'
+      ),
+      new File(
+        [backendLog('gw-pve-01.escapefromtarkov.com') + '\n' + completionLog()],
+        'log_pve/output.log'
+      ),
+    ]);
+    importer.setSelection({ ...importer.selection.value, modes: [], since: { pvp: NaN } });
+    await importer.confirmImport('pvp');
+    expect(importer.importState.value).toBe('preview');
+    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    importer.setSelection({ ...importer.selection.value, modes: ['pve'] });
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+  });
+  it('never applies unidentified evidence into an excluded destination', async () => {
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([completionLog()], 'log_unknown/notifications.log'),
+      new File(
+        [
+          backendLog('gw-pve-01.escapefromtarkov.com') +
+            '\n' +
+            completionLog().replace('event-123', 'pve-event'),
+        ],
+        'log_pve/output.log'
+      ),
+    ]);
+    importer.setSelection({ ...importer.selection.value, modes: ['pve', 'unknown'] });
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+  });
+  it('does not let an excluded unidentified event block a Seasonal destination', async () => {
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([completionLog()], 'log_unknown/notifications.log'),
+      new File(
+        [
+          backendLog('gw-pve-01.escapefromtarkov.com') +
+            '\n' +
+            completionLog().replace('event-123', 'pve-event'),
+        ],
+        'log_pve/output.log'
+      ),
+    ]);
+    importer.setSelection({ ...importer.selection.value, modes: ['pve'] });
+    await importer.confirmImport('seasonal');
+    expect(importer.importState.value).toBe('success');
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+  });
+  it.each([NaN, Infinity, -1, 1e30])(
+    'rejects invalid cutoff %s without applying any progress',
+    async (time) => {
+      const importer = await loadComposable();
+      await importer.parseFile(new File([completionLog()], 'notifications.log'));
+      importer.setSelection({ ...importer.selection.value, since: { pve: time } });
+      await importer.confirmImport('pve');
+      expect(importer.importState.value).toBe('preview');
+      expect(importer.importError.value).toBe('settings.log_import.errors.invalid_date');
+      expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+      expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+    }
+  );
   it('reports an oversized individual record without retaining or applying a partial preview', async () => {
     const importer = await loadComposable();
     await importer.parseFile(new File(['x'.repeat(9 * 1024 * 1024)], 'notifications.log'));

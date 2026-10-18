@@ -21,7 +21,7 @@ jobs:
   plan:
     name: Plan finalization shadow
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: read
@@ -62,7 +62,7 @@ jobs:
     name: Build finalization shadow
     needs: plan
     if: needs.plan.result == 'success' && fromJSON(needs.plan.outputs.decision).previewRequired
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -112,7 +112,7 @@ jobs:
       always() && needs.plan.result == 'success' &&
       (needs.build.result == 'success' ||
       (needs.build.result == 'skipped' && !fromJSON(needs.plan.outputs.decision).previewRequired))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       actions: read

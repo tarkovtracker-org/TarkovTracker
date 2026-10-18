@@ -30,9 +30,9 @@ check_identity() {
 check_translation_tree() {
   local paths file mode
   paths="$(mktemp)"
-  # A full tree comparison also rejects stale executable code on a behind branch.
+  # Strict mode compares the full tree; queue mode validates only the immutable PR diff.
   # Disable rename detection so moving a disallowed file cannot hide its old path.
-  git diff --no-renames --name-only -z "$BASE_SHA" "$HEAD_SHA" -- > "$paths"
+  git diff --no-renames --name-only -z "$DIFF_BASE_SHA" "$HEAD_SHA" -- > "$paths"
   [[ -s "$paths" ]] || fail "No translation changes to validate."
   while IFS= read -r -d '' file; do
     [[ "$file" =~ ^app/locales/[a-zA-Z0-9_-]+\.json$ && "$file" != app/locales/en.json ]] ||
@@ -45,6 +45,8 @@ check_translation_tree() {
 # Incorporate trusted main before capturing the candidate that project checks will validate.
 update() {
   [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN is required to update the translation branch."
+  require_main_ci_policy
+  [[ "$MAIN_MERGE_MODE" == queue ]] && return
   local pr head base updated attempt
   pr="$(read_pr)"
   check_identity "$pr"
@@ -70,6 +72,7 @@ update() {
 # Fetch and validate immutable revisions, then publish the detached checkout identity.
 prepare() {
   local pr
+  require_main_ci_policy
   pr="$(read_pr)"
   check_identity "$pr"
   HEAD_SHA="$(jq -r "$PR_HEAD_QUERY" <<< "$pr")"
@@ -79,16 +82,27 @@ prepare() {
   require_sha "$BASE_SHA"
   git fetch origin "$HEAD_SHA"
   [[ "$(git rev-parse FETCH_HEAD)" == "$HEAD_SHA" ]] || fail "Fetched PR head changed."
-  git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA" || fail "Crowdin head must include current main."
+  DIFF_BASE_SHA="$BASE_SHA"
+  if [[ "$MAIN_MERGE_MODE" == queue ]]; then
+    DIFF_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+    require_sha "$DIFF_BASE_SHA"
+  else
+    git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA" || fail "Crowdin head must include current main."
+  fi
   check_translation_tree
   git checkout --detach "$HEAD_SHA"
   printf 'head_sha=%s\nbase_sha=%s\n' "$HEAD_SHA" "$BASE_SHA" >> "$GITHUB_OUTPUT"
 }
-# Reject observed head or base changes since the candidate passed validation.
-check_revision() {
+# The captured PR head remains immutable before and after queue submission.
+check_head_revision() {
   local pr="$1"
   [[ "$(jq -r "$PR_HEAD_QUERY" <<< "$pr")" == "$HEAD_SHA" ]] ||
     fail "Crowdin PR head changed after validation."
+}
+# Strict freshness applies before submission; accepted queue entries own fresh integration.
+check_revision() {
+  check_head_revision "$1"
+  [[ "$MAIN_MERGE_MODE" == queue ]] && return
   local current_base
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
   [[ "$current_base" == "$BASE_SHA" ]] || fail "Main changed after validation; rerun Crowdin Sync."
@@ -105,6 +119,9 @@ wait_for_mergeability() {
     check_revision "$pr"
     mergeable="$(jq -r '.mergeable' <<< "$pr")"
     merge_state="$(jq -r '.mergeStateStatus' <<< "$pr")"
+    if [[ "$MAIN_MERGE_MODE" == queue && "$mergeable" == MERGEABLE ]]; then
+      case "$merge_state" in CLEAN|UNSTABLE|BEHIND) return ;; esac
+    fi
     case "$mergeable/$merge_state" in
       MERGEABLE/CLEAN) return ;;
       MERGEABLE/UNSTABLE)
@@ -143,13 +160,30 @@ merge() {
   check_revision "$pr"
   # Preview Result targets the validated head; GitHub may regenerate the test merge at merge time.
   wait_for_preview_result "$HEAD_SHA"
+  require_main_ci_policy
+  if [[ "$MAIN_MERGE_MODE" != strict ]]; then
+    wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
+  fi
   wait_for_mergeability
   require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.
-  gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-    --match-head-commit "$HEAD_SHA" --squash \
-    --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)" \
-    --body "Automated translation updates from Crowdin."
+  if [[ "$MAIN_MERGE_MODE" != strict ]]; then
+    enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"
+  else
+    gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+      --match-head-commit "$HEAD_SHA" --squash \
+      --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)" \
+      --body "Automated translation updates from Crowdin."
+  fi
+  pr="$(read_pr)"
+  if [[ "$(jq -r '.state' <<< "$pr")" == OPEN ]]; then
+    [[ "$MAIN_MERGE_MODE" != strict ]] || fail "Translation merge did not complete."
+    check_identity "$pr"
+    check_head_revision "$pr"
+    echo "::notice::Translations submitted to the merge queue; integration CI owns the merge."
+    return
+  fi
+  [[ "$(jq -r '.state' <<< "$pr")" == MERGED ]] || fail "Translation merge did not complete."
   # A job-token merge does not emit push CI; validate current main explicitly for release.
   dispatch_ci main
 }

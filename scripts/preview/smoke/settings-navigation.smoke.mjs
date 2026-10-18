@@ -51,13 +51,25 @@ async function expectActiveTabVisible(page, name, focused = false) {
 }
 async function expectNestedTarget(page, hash, panel) {
   await expect(page.locator(panel)).toBeVisible();
+  // Observe visibility and unchanged geometry across three animation frames. This is a bounded
+  // settling check, not a guarantee against future layout changes; metadata is exercised below.
   await expect
     .poll(() =>
-      page.locator(hash).evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return (
-          rect.top >= document.querySelector('header').getBoundingClientRect().bottom &&
-          rect.top < innerHeight
+      page.locator(hash).evaluate(async (element) => {
+        const samples = [];
+        for (let frame = 0; frame < 3; frame++) {
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          const rect = element.getBoundingClientRect();
+          const headerBottom = document.querySelector('header').getBoundingClientRect().bottom;
+          samples.push({
+            visible: rect.top >= headerBottom && rect.top < innerHeight,
+            geometry: [scrollX, scrollY, rect.top, rect.bottom, headerBottom, innerHeight],
+          });
+        }
+        return samples.every(
+          (sample) =>
+            sample.visible &&
+            sample.geometry.every((value, index) => value === samples[0].geometry[index])
         );
       })
     )
@@ -178,4 +190,38 @@ test('desktop retains panel scrolling and sticky navigation', async ({ page }) =
   await navigate(page, '/settings#keybinds');
   await expectNestedTarget(page, '#keybinds', '#preferences');
   await expect(page.getByTestId('desktop-tab-preferences')).toBeVisible();
+});
+test('nested Skills target stays visible when level metadata replaces its loading hint', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 333, height: 507 });
+  await page.goto(`${origin}/settings#progression`);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document
+            .querySelector('#__nuxt')
+            ?.__vue_app__?.config.globalProperties.$pinia._s.get('metadata')?.playerLevels.length ??
+          0
+      )
+    )
+    .toBeGreaterThan(0);
+  const levels = await page.evaluate(() => {
+    const metadata = document
+      .querySelector('#__nuxt')
+      .__vue_app__.config.globalProperties.$pinia._s.get('metadata');
+    const levels = JSON.parse(JSON.stringify(metadata.playerLevels));
+    metadata.playerLevels = [];
+    return levels;
+  });
+  await navigate(page, '/settings#skills');
+  await expectNestedTarget(page, '#skills', '#progression');
+  // The shorter ready hint must not move the target under the fixed header.
+  await page.evaluate((levels) => {
+    document
+      .querySelector('#__nuxt')
+      .__vue_app__.config.globalProperties.$pinia._s.get('metadata').playerLevels = levels;
+  }, levels);
+  await expectNestedTarget(page, '#skills', '#progression');
 });

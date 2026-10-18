@@ -18,7 +18,7 @@ const isCodex = (item) => item.user?.login === BOT;
 const bodyOf = (item) => item.body ?? '';
 const isSecurity = (body) =>
   /^(?:<!-- codex-security-review-finding:v1 -->|#{1,3}[ \t]+[^\r\n]*Codex Security Review\b)/i.test(
-    body.trimStart()
+    body.trimStart().replace(/^<!-- codex-review-receipt:v1 -->\s*/i, '')
   );
 function resolvedAbbreviation(sha, resolvedShas) {
   if (!ABBREVIATED_SHA.test(sha)) return null;

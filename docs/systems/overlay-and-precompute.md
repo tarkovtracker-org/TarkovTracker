@@ -27,6 +27,41 @@ future rule shared with that API belongs in its progress-contracts package.
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Precompute credential boundary
+
+Production precompute runs only from `refs/heads/main` and checks out the immutable event SHA.
+The `production-precompute` GitHub environment must allow deployments from the `main` branch only,
+with no tag rule. Store `CLOUDFLARE_API_TOKEN` and `OVERLAY_TOKEN` only in that environment. A job
+condition alone is insufficient: a branch author can change its workflow, so the environment policy
+and absence of repository-level credential copies provide the external boundary.
+
+Before merging this safeguard, an authorized operator must coordinate the following credential
+migration with a recent successful precompute run (snapshots expire after seven days):
+
+1. Create `production-precompute` with selected deployment branches and a single branch rule for
+   `main`; verify the policy through the GitHub environment API or repository settings.
+2. Provision replacement credentials: Cloudflare Workers KV Storage Edit restricted to the owning
+   account, and read-only Contents access restricted to the private overlay repository. Inventory
+   every consumer before revocation: the Pages runtime also reads `OVERLAY_TOKEN`; if it shares
+   the old credential, provision its replacement through Pages' production secret configuration.
+   GitHub's encrypted secret metadata cannot establish whether those values are shared. Store the
+   precompute replacements
+   with `gh secret set CLOUDFLARE_API_TOKEN --env production-precompute` and
+   `gh secret set OVERLAY_TOKEN --env production-precompute`; provide values through private input.
+3. Recheck all workflow consumers, then remove the repository-scoped copies with
+   `gh secret delete CLOUDFLARE_API_TOKEN`, `gh secret delete CF_API_TOKEN` (the legacy alias),
+   and `gh secret delete OVERLAY_TOKEN`, and revoke their old platform credentials. Coordinate this step with the reviewed workflow merge; do not declare the
+   finding resolved while any repository copy remains accessible. Inspect queued and in-flight
+   workflow runs before cutover: repository secrets are captured when a run is queued, so deleting
+   the repository copies alone does not revoke those snapshots. Old credentials must also be
+   revoked at their providers after all legitimate consumers use their replacements.
+4. Verify the environment remains main-only and that a non-main dispatch cannot obtain these
+   credentials. Run the reviewed main workflow through the approved operational process and verify
+   snapshot freshness. Never test the boundary by exposing a secret in output.
+
+These are manual production credential changes requiring explicit authorization. A local workflow
+test verifies the committed safeguards, not the live environment policy or secret placement.
+
 ## Overlay corrections
 
 **Summary.** `json.tarkov.dev` is community-maintained and sometimes wrong (e.g. a task's
@@ -265,8 +300,9 @@ handler read it back through `edgeCache({ precomputed: true })`.
 
 ### Why GitHub Actions and not a scheduled Worker?
 
-The account is on the Workers Free tier, whose CPU limit rules out a scheduled Worker doing the full
-adapt pipeline. A scheduled GitHub Actions workflow on `pnpm` has no such limit and can reuse the
+The original request-path pipeline exceeded the Workers Free CPU limit. Keeping bulk adaptation
+in GitHub Actions also avoids charging that repeated work to request CPU on a paid plan. The
+scheduled workflow on `pnpm` can reuse the
 exact same `app/server/utils` pipeline via `tsx` with the repo's tsconfig paths, so the precompute
 output is byte-identical to what the request handler would have produced.
 
@@ -309,6 +345,60 @@ flowchart LR
   request timeout per attempt. Retries reuse the same key, payload and TTL; permanent API errors
   fail immediately, and exhausted retries retain the existing per-combination failure handling.
 
+### Consumer precedence and response reuse
+
+| Dataset / consumer                                       | Primary source                                                                    | Missing or failed source                                                                            |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Pages `/api/tarkov/tasks-core`                           | Validated final KV envelope for the exact language/mode                           | Per-colo Cache API, then live fetch/adapt/overlay; stale-cache background refresh remains unchanged |
+| Pages `/api/tarkov/tasks-import`                         | Valid, correctly scoped, age-bounded English KV snapshot                          | 503; no runtime generation or borrowing another mode                                                |
+| Pages items, items-lite, tasks-objectives, tasks-rewards | Per-colo final-response cache                                                     | Live fetch/adapt/overlay, with existing provenance requirements and stale retention                 |
+| Pages hideout / editions                                 | Cached base data or seasonal metadata plus request-time overlay projection        | Existing upstream/overlay error and last-good rules; the core KV envelope is not interchangeable    |
+| Pages bootstrap / map-spawns                             | Per-colo adapted-response cache                                                   | `json.tarkov.dev`; no core KV reuse                                                                 |
+| Pages prestige                                           | Per-colo corrected-response cache                                                 | Upstream plus required overlay; missing corrections fail closed                                     |
+| Public `api-gateway` Worker in TarkovTracker-API         | Its own normalized public catalog memory cache, then versioned Cache API snapshot | `json.tarkov.dev`; unavailable required rule catalogs fail closed                                   |
+
+The public Worker's cache is owned by the [API progress spec](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/5829b8946ab2ea91ddf8d46178675d24ea1b06dd/docs/progress-api.md#flow)
+and its [normalized snapshot loader](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/5829b8946ab2ea91ddf8d46178675d24ea1b06dd/src/services/catalog-cache.ts), not this Pages KV producer.
+
+Only tasks-core and the three whole import catalogs are generated by this workflow. The 48-row
+core manifest does not certify import writes; inspect the runner's separate `imports` results.
+Production and preview `TARKOV_DATA` namespaces are distinct. A production manifest cannot prove
+that preview keys exist, and an ordinary preview can legitimately use its runtime fallback. A filtered
+English-only preview seed covers all three import keys and three English core keys, while other
+core locales retain the fallback path. Such a partial seed does not publish the 48-row fleet
+manifest: a missing preview manifest alone does not prove that its core/import keys are missing.
+The workflow does not automatically maintain a complete production-sized preview fleet.
+
+For final response consumers, `precomputedResponse.ts` reads KV as text on **every request**. An
+isolate can reuse a validated serialized body only when the binding object, cache namespace,
+complete key and full source text match its one retained entry. Changed source is parsed and
+validated immediately. Missing, invalid or failed reads never substitute the retained body:
+they use the existing edge-cache fallback. This adds no application TTL and does not change KV's
+own eventual consistency or cache settings. Object consumers, including the age-sensitive import
+validator, retain their existing JSON path and do not share this memo.
+
+The retained source, body, key, namespace and overlay-header strings share a 16 MiB budget,
+conservatively counting UTF-16 code units; oversized entries are served normally without retention and replace any previous memo.
+Only public strings and fixed metadata are retained, never mutable payload objects, request state,
+Responses or streams. Each caller receives its own Response. Concurrent KV reads remain independent,
+so a slow earlier read cannot supply another request's body or hide a newer value returned by KV.
+
+`edgeCacheResponse.test.ts` covers the H3 response/header, bypass, provenance and fallback contracts;
+`precomputedResponse.test.ts` covers equality reuse, updates, isolation, size limits and concurrent
+reads. To compare the original JSON path with the actual helper in local workerd, save an ordinary
+public tasks-core response outside the repository and run:
+
+```sh
+node scripts/checks/precomputed-response-benchmark.mjs /path/to/public-tasks.json
+```
+
+The benchmark uses only local KV and imports the production helper. It checks identical body hashes
+and reports baseline, warm and cold V8 profiles plus elapsed time. A separate multi-fetch control
+verifies unchanged native KV binding identity reuses validation across distinct invocations. Sampled active V8 time excludes
+idle samples; elapsed time includes local KV/IPC. Neither equals billed production CPU or proves
+account-wide savings. Measure production route mix and warm/cold frequency before projecting
+allowance headroom. The benchmark does not dispatch refreshes, contact production KV or load test.
+
 ### Release verification
 
 A run pins the first validated overlay SHA, or `EXPECTED_OVERLAY_SHA` supplied by a manual dispatch.
@@ -323,32 +413,34 @@ Only a complete, unfiltered, failure-free run updates `overlay-precompute-manife
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
 
-Release order: publish the overlay, dispatch precompute with its expected SHA for all 48 supported
-language/mode combinations, check the manifest, then advance the existing browser cache-purge marker
-and purge corrected edge entries through the established operator workflow. When changing the
-consumer contract, precompute the new versioned keys from the reviewed consumer revision before
-promoting that app revision; old app revisions keep reading their old keys. The reviewed runner
-must seed all three new import keys before promoting a consumer that uses them; a successful older
-core-only run or its 48-row manifest does not establish import readiness. Inspect the runner's
-`imports` results as well as the core manifest. Missing core keys still have the existing live
-fallback, but that is not proof of production readiness for cold colos. Missing import keys fail
-closed, so promotion requires explicit successful seeding rather than a request-time fallback.
+Release order: reviewed producer changes first land on `main`, then publish the overlay and
+dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to its verified SHA
+for all 48 supported language/mode combinations. Check the matching manifest before advancing the
+existing browser cache-purge marker and purging corrected edge entries through the established
+operator workflow. When changing the consumer contract, split producer and consumer changes into
+separate releases whenever preseeding is required: land the compatible producer first, seed the new
+versioned keys, then promote the consumer. Old app revisions keep reading their old keys.
+The reviewed runner must seed all three new import keys before promoting a consumer that uses
+them; a successful older core-only run or its 48-row manifest does not establish import readiness.
+Inspect the runner's `imports` results as well as the core manifest. Missing core keys still have
+the existing live fallback, but that is not proof of production readiness for cold colos. Missing
+import keys fail closed, so promotion requires explicit successful seeding.
 
-Initial promotion is held by leaving the consumer PR in draft until an approved `workflow_dispatch`
-of `precompute-tarkov-data.yml` on its reviewed branch succeeds with `lang=en`, no mode filter,
-and the verified overlay SHA. That dispatch runs the reviewed producer and writes three English
-core keys and three whole import keys. Read back each import envelope from the existing production
-namespace and verify its version, scope, storage age, task/objective validity and overlay identity
-before making the PR ready or merging it. Production Pages deploys `main` automatically; a runbook
-warning or an unrelated successful CI build is not a deploy gate. This PR does not add build-time
-KV credentials, change Pages settings, or execute that dispatch.
+Hold the consumer PR in draft until an approved `workflow_dispatch` on `main` succeeds with
+`lang=en`, no mode filter, and `expectedOverlaySha` set to the verified overlay SHA. That dispatch
+runs the reviewed producer already on `main` and writes three English core keys and three whole
+import keys. Read back each import envelope from the existing production namespace and verify its
+version, scope, fresh storage age, task/objective validity and matching overlay identity before
+making the consumer PR ready or merging it. Production Pages deploys `main` automatically, so a
+producer release must remain compatible with the existing consumer and must not enable the new
+consumer before its snapshots are verified. A runbook warning or an unrelated successful CI build
+is not a deploy gate. This process does not add build-time KV credentials or change Pages settings.
 
-Actions previews remain isolated: the Pages preview configuration has no `TARKOV_DATA` binding.
-The snapshot-only import endpoint therefore returns 503 there, while the ordinary public metadata
-routes retain their live fallback. Preview build/UI checks cannot establish production import
-readiness. Supporting functional imports on those previews requires an independently seeded preview
-namespace and trusted configuration work; it must not reuse the production binding or execute
-untrusted candidate code with deployment credentials.
+Actions previews use a separate, expendable `TARKOV_DATA` namespace containing only merged public
+game catalogs. The snapshot-only import endpoint returns 503 until the preview namespace is seeded;
+ordinary public metadata routes retain their live fallback. Preview build/UI checks cannot establish
+production import readiness. Preview refreshes must never reuse the production binding, copy private
+overlay payloads or credentials, or execute untrusted candidate code with deployment credentials.
 
 Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
 new private temporary directory. The command writes
@@ -376,6 +468,7 @@ fallbacks are intentionally reported as drift after a failed release, never as a
 - `scripts/precompute/kv.ts` — Cloudflare KV REST writer.
 - `scripts/precompute/nuxt-imports.ts` — bridges Nuxt auto-imports for `tsx`.
 - `.github/workflows/precompute-tarkov-data.yml` — schedule and secrets.
+- `app/server/utils/precomputedResponse.ts` — bounded validated final-response reuse with a fresh KV read.
 - `app/server/utils/precomputedTarkov.ts` — shared contract (binding name, envelope, key builder).
 - `app/server/utils/taskImportSnapshot.ts` and `app/utils/taskImportCatalog.ts` - import key,
   envelope age/scope, and whole catalog validation shared by producer, route and client.

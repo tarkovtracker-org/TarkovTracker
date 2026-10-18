@@ -21,7 +21,7 @@ function versionCommit(commit, baseSha) {
     : null;
 }
 /** Reconstruct the exact appended release notes without accepting other manifest changes. */
-async function recoveryAssets(github, repo, baseSha, sha, version) {
+export async function recoveryAssets(github, repo, baseSha, sha, version) {
   const [oldManifest, newManifest, oldLog, newLog] = await Promise.all([
     readAsset(github, repo, baseSha, 'package.json'),
     readAsset(github, repo, sha, 'package.json'),
@@ -167,11 +167,19 @@ async function validatedPreview(github, repo, sha) {
   return previewRunEvidence(github, repo, run, sha);
 }
 /** Interrupted recovery requires both gates on the exact version commit, like staging did. */
-async function validatedVersion(github, repo, sha) {
+export async function validatedVersion(github, repo, sha) {
   return (await validatedCi(github, repo, sha)) && (await validatedPreview(github, repo, sha));
+}
+/** Legacy direct-push recovery is unavailable to PR-era sources; absence must be a real 404. */
+async function legacyPreparation(github, repo, baseSha) {
+  const source = await optionalResource(() =>
+    github.rest.repos.getContent({ ...repo, ref: baseSha, path: 'scripts/release/release-run.mjs' })
+  );
+  return !source;
 }
 /** On explicit reruns, recover only a validated version child of the original main CI commit. */
 export async function findReleaseRecovery({ github, context, baseSha, sha }) {
+  if (!(await legacyPreparation(github, context.repo, baseSha))) return null;
   const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: sha });
   const version = versionCommit(commit, baseSha);
   if (!version || !(await validatedVersion(github, context.repo, sha))) return null;

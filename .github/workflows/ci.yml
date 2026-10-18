@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -13,7 +15,7 @@ permissions:
 jobs:
   changes:
     name: Validation plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
@@ -32,21 +34,25 @@ jobs:
       - name: Classify changes
         id: plan
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        # Pull requests receive path-based selection; pushes and dispatches always validate fully.
+        # PRs select by path; queues reduce only proven inert docs. Pushes and dispatches stay full.
         # Rollback: re-add the shadow flag of scripts/ci/validate-changes.mjs to force every job and
         # invert the shadow-flag assertion in scripts/workflow-tests/workflows.mjs in the same change.
         run: |
           args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA")
-          if [ "$EVENT_NAME" != "pull_request" ]; then args+=(--full); fi
+          if [ "$EVENT_NAME" = "merge_group" ]; then
+            args+=(--queue)
+          elif [ "$EVENT_NAME" != "pull_request" ]; then
+            args+=(--full)
+          fi
           node scripts/ci/validate-changes.mjs "${args[@]}"
   fallow:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Fallow audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,10 +64,10 @@ jobs:
         id: fallow-base
         env:
           EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ]; then
             BASE="$PR_BASE_SHA"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             BASE="$(git rev-parse HEAD^ 2>/dev/null || true)"
@@ -85,7 +91,7 @@ jobs:
   lint-format:
     needs: changes
     name: Lint & Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,8 +113,14 @@ jobs:
       - name: Validate locales
         if: needs.changes.outputs.i18n == 'true'
         run: pnpm run i18n:check
+      - name: Test blank-line scanners with coverage
+        if: needs.changes.outputs.full == 'true'
+        run: pnpm run test:blank-lines
       - name: Test workflow tooling
         if: needs.changes.outputs.full == 'true'
+        env:
+          WORKFLOW_TEST_PLAN: ${{ needs.changes.outputs.plan }}
+          WORKFLOW_TEST_EVENT: ${{ github.event_name }}
         run: pnpm run test:workflow
       - name: Lint GitHub Actions workflows
         if: needs.changes.outputs.workflows == 'true'
@@ -136,13 +148,14 @@ jobs:
           fetch_verified zizmor \
             "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz" \
             "$ZIZMOR_SHA256"
-          "$RUNNER_TEMP/actionlint" -color
+          # Validate GitHub's newer queue:max extension, then retain all native parser/security checks.
+          env -u GH_TOKEN node scripts/ci/actionlint-queue.mjs "$RUNNER_TEMP/actionlint"
           "$RUNNER_TEMP/zizmor" --no-progress --min-severity low .github/
   typecheck:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,7 +168,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -181,6 +194,14 @@ jobs:
         run: pnpm run test:deno
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard="$VITEST_SHARD"
+      - name: Upload blob report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -200,12 +221,39 @@ jobs:
           files: ./test-report.junit.xml
           flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
+  # Shards skip thresholds; merging their blob reports applies the vitest.config.ts thresholds.
+  coverage:
+    needs: [changes, test]
+    if: needs.changes.outputs.full == 'true'
+    name: Coverage thresholds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-project
+      - name: Download blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+      - name: Merge shards and enforce thresholds
+        run: pnpm exec vitest run --merge-reports --coverage
+      - name: Upload merged coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-final
+          path: coverage/coverage-final.json
+          if-no-files-found: error
+          retention-days: 30
   validate:
     needs: changes
     # Translation-only pull requests keep the reduced test selection but still build a preview.
     if: needs.changes.outputs.full == 'true' || needs.changes.outputs.preview == 'true'
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -238,7 +286,7 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           PREVIEW_BRANCH: ${{ steps.profile.outputs.preview_branch }}
           APP_URL: ${{ steps.profile.outputs.app_url }}
         run: node scripts/preview/write-manifest.mjs
@@ -261,7 +309,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Supabase DB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -272,7 +320,7 @@ jobs:
         run: pnpm run supabase:check
   systems-drift:
     name: Systems drift check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -288,7 +336,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Workers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -322,13 +370,14 @@ jobs:
         lint-format,
         typecheck,
         test,
+        coverage,
         validate,
         supabase-db,
         systems-drift,
         workers,
         security,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout trusted CI aggregation
@@ -350,6 +399,7 @@ jobs:
         if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
+          REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
           VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
         with:
           script: |

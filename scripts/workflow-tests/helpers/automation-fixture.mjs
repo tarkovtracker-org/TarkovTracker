@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 // Native Node test execution has no Nuxt @/ alias resolution.
 import { gitExecutable } from '../../ci/validation-tools.mjs';
+// Missing-status cases poll the stubbed gh hundreds of times; loaded CI runners need the headroom.
+const GATE_SPAWN_TIMEOUT_MS = 60_000;
 const gate = resolve('scripts/ci/crowdin-pr.sh');
 const releaseGate = resolve('scripts/release/release-commit.sh');
 const read = (path) => readFileSync(path, 'utf8');
@@ -23,6 +25,24 @@ export function fixture(t, changes) {
   const bin = join(root, 'bin');
   mkdirSync(repo);
   mkdirSync(bin);
+  writeFileSync(
+    join(bin, 'node'),
+    String.raw`#!${process.execPath}
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0].endsWith('/review-admission-cli.mjs')) {
+  fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission', sha: args[2], number: args[3], runId: args[4] }) + '\n');
+  if (process.env.ADMISSION_FAIL === 'true') { console.error('Review Admission denied'); process.exit(1); }
+  if (process.env.ADMISSION_PENDING === 'true') { console.error('Review Admission pending'); process.exit(2); }
+  fs.appendFileSync(process.env.EVENTS, JSON.stringify({ type: 'admission-success', invocation: process.env.INVOCATION_ID }) + '\n');
+  process.exit(0);
+}
+try { execFileSync(process.env.REAL_NODE, args, { stdio: 'inherit' }); }
+catch (error) { process.exit(error.status || 1); }
+`,
+    { mode: 0o755 }
+  );
   git(repo, 'init', '-b', 'main');
   git(repo, 'config', 'user.name', 'Workflow Test');
   git(repo, 'config', 'user.email', 'workflow@example.invalid');
@@ -73,6 +93,16 @@ if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'ci.yml') {
   fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1], sha }) + '\n');
   process.exit(p.DISPATCH_FAIL === 'true' ? 1 : 0);
 }
+if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'review-admission.yml') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'admission-dispatch', ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  process.exit(p.ADMISSION_DISPATCH_FAIL === 'true' ? 1 : 0);
+}
+if (args[0] === 'api' && args.includes('repos/' + p.GITHUB_REPOSITORY + '/actions/workflows/review-admission.yml/dispatches')) {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'admission-dispatch', ref: args[args.indexOf('-f') + 1], details: args.includes('return_run_details=true') }) + '\n');
+  if (p.ADMISSION_DISPATCH_FAIL === 'true') process.exit(1);
+  console.log(p.ADMISSION_RUN_ID || '777');
+  process.exit(0);
+}
 if (args[0] === 'run' && args[1] === 'watch') {
   fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'ci-watch', runId: args[2] }) + '\n');
   process.exit(p.CI_WATCH_FAIL === 'true' ? 1 : 0);
@@ -85,6 +115,38 @@ if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
   process.exit(0);
 }
 if (args[0] === 'api') {
+  const waitEndpoint = args[1];
+  if (waitEndpoint === 'graphql') {
+    const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
+    const queued = { id: 'MQE_fixture', pullRequest: { number: Number(p.PR_NUMBER), headRefOid: p.ACTUAL_HEAD } };
+    if (payload.query.startsWith('query')) {
+      console.log(JSON.stringify({data:{repository:{pullRequest:{headRefOid:p.ACTUAL_HEAD,mergeQueueEntry:null}}}}));
+      process.exit(0);
+    }
+    const expected = {pullRequestId:'PR_fixture_' + p.PR_NUMBER,expectedHeadOid:p.ACTUAL_HEAD};
+    if (!payload.query.includes('enqueuePullRequest') || JSON.stringify(payload.variables.input) !== JSON.stringify(expected)) {
+      console.error('Unexpected or unguarded queue mutation'); process.exit(1);
+    }
+    if (p.MERGE_FAIL === 'true') { console.error('Server-side branch rules rejected enqueue'); process.exit(1); }
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'enqueue',input:payload.variables.input,invocation:p.INVOCATION_ID}) + '\n');
+    fs.appendFileSync(p.EVENTS, JSON.stringify({type:'merge',state:p.MERGE_OUTCOME || 'OPEN',invocation:p.INVOCATION_ID}) + '\n');
+    console.log(JSON.stringify({data:{enqueuePullRequest:{mergeQueueEntry:queued}}}));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
+    const input = JSON.stringify({ check_runs: JSON.parse(p.WAIT_CHECK_RUNS || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/status') {
+    const input = JSON.stringify({ statuses: JSON.parse(p.WAIT_STATUSES || '[]') });
+    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+    process.exit(0);
+  }
+  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER) {
+    console.log(JSON.stringify({ number:Number(p.PR_NUMBER), node_id:'PR_fixture_' + p.PR_NUMBER, state:'open', draft:false, base:{ref:'main',repo:{full_name:p.GITHUB_REPOSITORY}}, head:{sha:p.ACTUAL_HEAD,repo:{full_name:p.GITHUB_REPOSITORY}} }));
+    process.exit(0);
+  }
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
     if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
       console.error('Head changed at branch update'); process.exit(1);
@@ -147,7 +209,9 @@ if (args[0] === 'api') {
     process.exit(0);
   }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
-    console.log(p.CURRENT_BASE); process.exit(0);
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const enqueued = events.some((event) => event.type === 'enqueue' && event.invocation === p.INVOCATION_ID);
+    console.log(enqueued && p.AFTER_ENQUEUE_BASE ? p.AFTER_ENQUEUE_BASE : p.CURRENT_BASE); process.exit(0);
   }
   console.error('Unexpected gh api endpoint: ' + endpoint); process.exit(2);
 }
@@ -155,14 +219,23 @@ if (args[1] === 'view') {
   const states = JSON.parse(p.PR_STATES);
   const index = Number(fs.readFileSync(p.COUNTER, 'utf8'));
   fs.writeFileSync(p.COUNTER, String(index + 1));
-  console.log(JSON.stringify(states[Math.min(index, states.length - 1)]));
+  const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+  const merge = events.findLast((event) => event.type === 'merge' && event.invocation === p.INVOCATION_ID);
+  const pr = states[Math.min(index, states.length - 1)];
+  const admitted = events.some((event) => event.type === 'admission-success' && event.invocation === p.INVOCATION_ID);
+  const observed = p.BLOCKED_UNTIL_ADMISSION === 'true' && !admitted ? { ...pr, mergeStateStatus: 'BLOCKED' } : pr;
+  const after = merge ? { ...observed, state: merge.state } : observed;
+  if (merge && p.AFTER_ENQUEUE_HEAD) after.headRefOid = p.AFTER_ENQUEUE_HEAD;
+  console.log(JSON.stringify(after));
   process.exit(0);
 }
 if (args[1] === 'merge') {
+  if (p.AUTO_MERGE_DISABLED === 'true') { console.error('Auto merge is not allowed for this repository (enablePullRequestAutoMerge)'); process.exit(1); }
   const supplied = args[args.indexOf('--match-head-commit') + 1];
   if (supplied !== p.ACTUAL_HEAD) { console.error('Head changed at merge'); process.exit(1); }
-  if (p.ACTUAL_BASE && p.ACTUAL_BASE !== p.BASE_SHA) { console.error('Base advanced at merge'); process.exit(1); }
+  if (p.ACTUAL_BASE && p.ACTUAL_BASE !== p.BASE_SHA && p.QUEUE_ENFORCED !== 'true') { console.error('Base advanced at merge'); process.exit(1); }
   if (p.MERGE_FAIL === 'true') { console.error('Server-side branch rules rejected merge'); process.exit(1); }
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'merge', state: p.MERGE_OUTCOME || 'MERGED', invocation: p.INVOCATION_ID }) + '\n');
   process.exit(0);
 }
 process.exit(2);
@@ -208,11 +281,15 @@ process.exit(result.status ?? 1);
     GITHUB_OUTPUT: join(root, 'output'),
     GH_TOKEN: 'test-only',
     GITHUB_TOKEN: 'test-main',
+    REVIEW_ADMISSION_APP_ID: '987654',
+    REVIEW_ADMISSION_BOT_ID: '987655',
+    REVIEW_ADMISSION_INSTALLATION_ID: '987656',
     RELEASE_VERSION: '1.2.3',
     GITHUB_RUN_ID: '123',
     GITHUB_RUN_ATTEMPT: '1',
     REMOTE: remote,
     REAL_GIT: gitExecutable(),
+    REAL_NODE: process.execPath,
     PUSHES: join(root, 'pushes'),
     EVENTS: join(root, 'events'),
     RULES: JSON.stringify([
@@ -239,6 +316,7 @@ process.exit(result.status ?? 1);
     CALLS: join(root, 'calls'),
     COUNTER: join(root, 'counter'),
   };
+  let invocation = 0;
   return {
     env,
     repo,
@@ -249,16 +327,24 @@ process.exit(result.status ?? 1);
     run: (phase, overrides) =>
       spawnSync('/bin/bash', [gate, phase], {
         cwd: repo,
-        env: { ...env, ...overrides },
+        env: { ...env, ...overrides, INVOCATION_ID: String(++invocation) },
         encoding: 'utf8',
-        timeout: 20000,
+        timeout: GATE_SPAWN_TIMEOUT_MS,
+      }),
+    shell: (script, overrides) =>
+      // Suppress remote/noninteractive startup files that can replace the mocked PATH.
+      spawnSync('/bin/bash', ['--noprofile', '--norc', '-c', script], {
+        cwd: repo,
+        env: { ...env, ...overrides, INVOCATION_ID: String(++invocation) },
+        encoding: 'utf8',
+        timeout: GATE_SPAWN_TIMEOUT_MS,
       }),
     release: (overrides) =>
       spawnSync('/bin/bash', [releaseGate], {
         cwd: repo,
         env: { ...env, ...overrides },
         encoding: 'utf8',
-        timeout: 20000,
+        timeout: GATE_SPAWN_TIMEOUT_MS,
       }),
     events: () => read(env.EVENTS).trim().split('\n').filter(Boolean).map(JSON.parse),
     pushes: () => read(env.PUSHES).trim().split('\n').filter(Boolean).map(JSON.parse),

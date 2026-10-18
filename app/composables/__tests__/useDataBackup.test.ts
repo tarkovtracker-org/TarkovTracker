@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { effectScope, reactive } from 'vue';
 import * as progressAuthority from '@/stores/tarkov/progressAuthority';
+import { backupWorkerError } from '@/utils/backup/errors';
+import { createBackupImportSession } from '@/utils/backup/importSession';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData, UserState } from '@/stores/progressState';
+import type { BackupCommand } from '@/utils/backup/importSession';
 const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   mockLogger: {
     debug: vi.fn(),
@@ -40,7 +43,7 @@ const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   },
 }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: supabaseUser } }));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: reactive(supabaseUser) } }));
 const tarkovStore = {
   $state: {
     currentGameMode: 'pvp',
@@ -169,6 +172,26 @@ vi.mock('@/utils/logger', () => ({
 mockNuxtImport('useRuntimeConfig', () => () => ({
   public: { appVersion: '1.8.2' },
 }));
+class TestBackupWorker {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  terminated = false;
+  run = createBackupImportSession();
+  async postMessage({ id, command }: { id: number; command: BackupCommand }) {
+    try {
+      const reply = await this.run(command);
+      if (!this.terminated) this.onmessage?.({ data: { id, reply } } as MessageEvent);
+    } catch (error) {
+      if (!this.terminated)
+        this.onmessage?.({ data: { id, error: backupWorkerError(error) } } as MessageEvent);
+    }
+  }
+  terminate() {
+    this.terminated = true;
+  }
+}
+beforeEach(() => vi.stubGlobal('Worker', TestBackupWorker));
 const createFile = (text: string): File =>
   ({
     text: vi.fn().mockResolvedValue(text),
@@ -1619,6 +1642,252 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it('does not report a new import failure when accounts change after success', async () => {
+    const scope = effectScope();
+    const backup = scope.run(() => useDataBackup())!;
+    try {
+      const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      await backup.parseBackupFile(
+        createFile(
+          JSON.stringify({
+            _format: 'tarkovtracker-device-progress',
+            _version: 1,
+            current: raw,
+          })
+        )
+      );
+      await backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(backup.importState.value).toBe('success');
+      reactive(supabaseUser).id = 'different';
+      expect(backup.importState.value).toBe('idle');
+      expect(backup.importError.value).toBeNull();
+    } finally {
+      scope.stop();
+      supabaseUser.id = 'user-123';
+    }
+  });
+  it.each(['onerror', 'onmessageerror'] as const)(
+    'does not strand archive selection after worker %s',
+    async (event) => {
+      let worker!: TestBackupWorker;
+      vi.stubGlobal(
+        'Worker',
+        vi.fn(function () {
+          worker = new TestBackupWorker();
+          return worker;
+        })
+      );
+      const backup = useDataBackup();
+      const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      await backup.parseBackupFile(
+        createFile(
+          JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
+        )
+      );
+      worker[event]?.();
+      await backup.reviewRecoveryArchiveEntry(0);
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importError.value).toBeTruthy();
+      expect(backup.recoveryArchiveEntries.value).toEqual([]);
+    }
+  );
+  it.each(['success', 'failure'] as const)(
+    'ignores an obsolete retained-copy read %s after a newer file preview',
+    async (outcome) => {
+      const backup = useDataBackup();
+      const raw = (level: number) =>
+        JSON.stringify({
+          _userId: 'user-123',
+          data: { ...tarkovStore.$state, pvp: { ...tarkovStore.$state.pvp, level } },
+        });
+      const record = {
+        version: 1 as const,
+        revision: 0,
+        raw: null,
+        legacyRaw: null,
+        legacyUpdates: [raw(10)],
+      };
+      let settle!: () => void;
+      const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockReturnValue(
+        new Promise((resolve, reject) => {
+          settle = () =>
+            outcome === 'success' ? resolve(record) : reject(new Error('Delayed read failure'));
+        })
+      );
+      const owned = vi
+        .spyOn(progressAuthority, 'ownedLegacyUpdates')
+        .mockReturnValue(record.legacyUpdates);
+      try {
+        const pending = backup.reviewOlderTabProgress(0);
+        await backup.parseBackupFile(
+          createFile(
+            JSON.stringify({
+              _format: 'tarkovtracker-device-progress',
+              _version: 1,
+              current: raw(42),
+            })
+          )
+        );
+        settle();
+        await pending;
+        expect(backup.importState.value).toBe('preview');
+        expect(backup.importPreview.value?.pvp.level).toBe(42);
+        expect(backup.importError.value).toBeNull();
+        tarkovStore.$patch.mockClear();
+        await backup.confirmBackupImport({ pvp: true, pve: false });
+        const patch = tarkovStore.$patch.mock.calls[0]![0] as (state: UserState) => void;
+        const target = structuredClone(tarkovStore.$state);
+        patch(target);
+        expect(target.pvp.level).toBe(42);
+      } finally {
+        read.mockRestore();
+        owned.mockRestore();
+      }
+    }
+  );
+  it('does not restore a retained-copy preview after cancellation', async () => {
+    const backup = useDataBackup();
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    const record = {
+      version: 1 as const,
+      revision: 0,
+      raw: null,
+      legacyRaw: null,
+      legacyUpdates: [raw],
+    };
+    let finish!: (value: typeof record) => void;
+    const read = vi.spyOn(progressAuthority, 'readCommittedProgressAuthority').mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates').mockReturnValue([raw]);
+    try {
+      const pending = backup.reviewOlderTabProgress(0);
+      backup.resetImport();
+      finish(record);
+      await pending;
+      expect(backup.importState.value).toBe('idle');
+      expect(backup.importPreview.value).toBeNull();
+    } finally {
+      read.mockRestore();
+      owned.mockRestore();
+    }
+  });
+  it('removes archive entry controls after a successful confirmed import releases its worker', async () => {
+    const backup = useDataBackup();
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
+      )
+    );
+    expect(backup.recoveryArchiveEntries.value).toHaveLength(1);
+    await backup.confirmBackupImport({ pvp: true, pve: true });
+    expect(backup.importState.value).toBe('success');
+    expect(backup.recoveryArchiveEntries.value).toEqual([]);
+    expect(backup.selectedRecoveryArchiveEntry.value).toBeNull();
+  });
+  it.each(['cancel', 'owner'] as const)(
+    'never applies a selected snapshot after %s during transfer',
+    async (action) => {
+      const backup = useDataBackup();
+      const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+      await backup.parseBackupFile(
+        createFile(
+          JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
+        )
+      );
+      const original = TestBackupWorker.prototype.postMessage;
+      let resume!: () => Promise<void>;
+      const delivery = vi
+        .spyOn(TestBackupWorker.prototype, 'postMessage')
+        .mockImplementation(function (this: TestBackupWorker, message) {
+          if (message.command.op !== 'read') return original.call(this, message);
+          resume = () => original.call(this, message);
+          return Promise.resolve();
+        });
+      tarkovStore.$patch.mockClear();
+      const pending = backup.confirmBackupImport({ pvp: true, pve: true });
+      expect(backup.importState.value).toBe('parsing');
+      if (action === 'cancel') backup.resetImport();
+      else supabaseUser.id = 'different';
+      delivery.mockRestore();
+      try {
+        await resume();
+        await pending;
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+        expect(backup.importState.value).toBe(action === 'cancel' ? 'idle' : 'error');
+      } finally {
+        supabaseUser.id = 'user-123';
+      }
+    }
+  );
+  it('terminates pending parsing when its Vue scope is disposed', async () => {
+    const scope = effectScope();
+    const backup = scope.run(() => useDataBackup())!;
+    const file = { size: 100, text: () => new Promise<string>(() => {}) } as File;
+    const pending = backup.parseBackupFile(file);
+    expect(backup.importState.value).toBe('parsing');
+    scope.stop();
+    await pending;
+    expect(backup.importState.value).toBe('idle');
+  });
+  it('rejects worker startup failure without falling back to a main-thread file read', async () => {
+    vi.stubGlobal(
+      'Worker',
+      vi.fn(function () {
+        throw new Error('Worker unavailable');
+      })
+    );
+    const text = vi.fn();
+    const backup = useDataBackup();
+    await backup.parseBackupFile({ size: 100, text } as unknown as File);
+    expect(backup.importState.value).toBe('error');
+    expect(text).not.toHaveBeenCalled();
+  });
+  it('ignores a replaced file read even when the old read finishes last', async () => {
+    const backup = useDataBackup();
+    const raw = (level: number) =>
+      JSON.stringify({
+        _format: 'tarkovtracker-device-progress',
+        _version: 1,
+        current: JSON.stringify({
+          _userId: 'user-123',
+          data: { ...tarkovStore.$state, pvp: { ...tarkovStore.$state.pvp, level } },
+        }),
+      });
+    let finish!: (text: string) => void;
+    const first = backup.parseBackupFile({
+      size: 100,
+      text: () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    } as File);
+    await backup.parseBackupFile(createFile(raw(9)));
+    finish(raw(42));
+    await first;
+    expect(backup.importPreview.value?.pvp.level).toBe(9);
+  });
+  it('does not resurrect a cancelled file read', async () => {
+    const backup = useDataBackup();
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    let finish!: (text: string) => void;
+    const file = {
+      size: 100,
+      text: () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    } as File;
+    const pending = backup.parseBackupFile(file);
+    backup.resetImport();
+    finish(JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw }));
+    await pending;
+    expect(backup.importState.value).toBe('idle');
+    expect(backup.importPreview.value).toBeNull();
+  });
   it('imports an owned exported archive larger than the ordinary backup limit', async () => {
     const raw =
       JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state }) +
@@ -1729,13 +1998,13 @@ describe('older-tab recovery review', () => {
       { kind: 'older', index: 0 },
       { kind: 'older', index: 1 },
     ]);
-    backup.reviewRecoveryArchiveEntry(0);
+    await backup.reviewRecoveryArchiveEntry(0);
     expect(backup.importPreview.value?.pvp.level).toBe(10);
-    backup.reviewRecoveryArchiveEntry(1);
+    await backup.reviewRecoveryArchiveEntry(1);
     expect(backup.importPreview.value?.pvp.level).toBe(20);
     expect(tarkovStore.$patch).not.toHaveBeenCalled();
     expect(older).toHaveLength(3);
-    backup.reviewRecoveryArchiveEntry(99);
+    await backup.reviewRecoveryArchiveEntry(99);
     expect(backup.importError.value).toBe('settings.data_management.older_edit_unavailable');
     expect(backup.importState.value).toBe('error');
     expect(backup.importPreview.value).toBeNull();
@@ -1800,14 +2069,14 @@ describe('older-tab recovery review', () => {
         })
       )
     );
-    backup.reviewRecoveryArchiveEntry(1);
+    await backup.reviewRecoveryArchiveEntry(1);
     expect(backup.importState.value).toBe('error');
     expect(backup.recoveryArchiveEntries.value).toHaveLength(3);
-    backup.reviewRecoveryArchiveEntry(2);
+    await backup.reviewRecoveryArchiveEntry(2);
     expect(backup.importState.value).toBe('preview');
     supabaseUser.id = 'different';
     try {
-      backup.reviewRecoveryArchiveEntry(0);
+      await backup.reviewRecoveryArchiveEntry(0);
       expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
       expect(backup.importState.value).toBe('error');
     } finally {

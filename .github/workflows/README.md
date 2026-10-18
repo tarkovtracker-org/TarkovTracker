@@ -21,7 +21,8 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
   (`.github/zizmor.yml` records accepted findings)
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
-- `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
+- `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only and skip thresholds; Codecov merges their lcov uploads.
+- `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds. Uploads `coverage-final` for metrics.
 - `Validate` — Production Nuxt build (all pull requests, forks included) + artifact upload (main branch only)
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
@@ -44,38 +45,58 @@ workflow manually when translations must ship sooner. It never uploads local tra
 existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-Synchronization, branch updates, CI dispatch, and the final merge use the built-in `GITHUB_TOKEN`.
+Synchronization, branch updates, CI dispatch, and the final merge or queue submission use the
+built-in `GITHUB_TOKEN`.
 The job grants contents/pull-request write, actions write, and checks read permissions. No personal
 GitHub token is required. Explicit `workflow_dispatch` starts CI on `locales` before merging and
 on `main` afterward. No write token is passed to dependency installation or project validation.
 
 When new translations are synchronized, `scripts/ci/crowdin-pr.sh` verifies an open, non-draft,
-same-repository `locales` PR targeting `main`. If the branch is behind, it asks GitHub to merge main
-into it using an expected-head guard and waits for the new head; conflicts fail closed. The gate
-explicitly starts CI for the validated candidate. It then captures the candidate head SHA, fetches that exact commit,
-and compares its full tree with a captured main SHA. Only regular non-English JSON files directly
+same-repository `locales` PR targeting `main`, explicitly starts CI for the validated candidate,
+and captures and fetches the exact candidate head. Only regular non-English JSON files directly
 inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from other paths, and stale
 executable code are rejected. The checkout and dependency setup use this validated commit before
 formatting (`format:check`), locale integrity (`i18n:check`), and systems drift (`systems:check`) run.
 
-The final merge step rechecks PR identity, both commit SHAs, and mergeability. `MERGEABLE` / `CLEAN`
-is accepted directly. If GitHub reports `MERGEABLE` / `UNSTABLE`, the gate revalidates successful
-`CI Result` and `Preview Result` statuses on the exact candidate head, then attempts a regular
-head-pinned merge; GitHub's server-side branch rules still enforce every required check. The gate
-never uses the admin bypass. Unresolved GitHub calculations are retried up to 20 times, three
-seconds apart; conflicting or otherwise ineligible states fail closed. `--match-head-commit`
-atomically guards the squash merge against a last-moment PR push. A fixed commit body prevents
-inherited CI-skip markers from suppressing the post-merge run. The gate is copied from trusted main
-before synchronization and survives checkout.
-If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
-If the post-merge dispatch fails, manually dispatch `CI` on `main`; rerunning a no-change sync
-does not recreate the merged PR. Publication still requires successful CI for current main.
-The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
-and `Preview Result` statuses on that exact head (up to thirty minutes) and verifies the effective
-repository rule requires both checks with strict branch freshness. The deployed no-bypass ruleset
-closes the base-advance race at merge time; a missing or weakened required check leaves the PR open.
-Both trusted gate scripts are preserved before checkout changes. See `docs/workflow-automation.md`
-for the repository-wide policy and release compatibility.
+The gate's behavior follows the main policy mode reported by `scripts/ci/github-ci-gate.sh`
+([current state](../../docs/merge-queue-rollout.md#current-state)):
+
+- `queue` (live): a behind branch is left unchanged and the PR's changes are compared against its
+  merge base. Later rechecks verify only that the PR head is unchanged, not the captured main SHA;
+  the queue validates integration with current main. `MERGEABLE` with `CLEAN`, `UNSTABLE` or
+  `BEHIND` is accepted.
+- `strict` or `strict-queue` (strict freshness active; re-enabling `Main CI freshness` while the
+  queue stays active yields `strict-queue`): the gate asks GitHub to merge main into a behind
+  branch using an expected-head guard and waits for the new head. The candidate must contain
+  captured main, its full tree is compared with that main SHA, and rechecks reject a changed PR
+  head or main SHA. `MERGEABLE` / `CLEAN` is accepted directly; for `MERGEABLE` / `UNSTABLE` the
+  gate first revalidates `CI Result` and `Preview Result` on the exact head.
+
+Before submitting, the gate awaits successful `CI Result` and `Preview Result` on the exact
+candidate head (each wait bounded to 60 minutes) and verifies that the effective repository rule
+enforces strict freshness or the complete queue policy. Unresolved GitHub calculations are retried
+up to 20 times, three seconds apart; conflicts and otherwise ineligible states fail closed in
+every mode. The gate never uses the admin bypass, and GitHub's server-side branch rules still
+enforce every required check; a missing or weakened required check leaves the PR open.
+
+- `queue` and `strict-queue`: the gate awaits exact-head `Review Admission`, then submits a native
+  queue entry pinned to the validated head (`scripts/ci/enqueue-pr-cli.mjs`) and reports it as
+  queued. Merge-group CI validates the combined tree; main CI is not dispatched for a queued entry.
+  Whether a `GITHUB_TOKEN` submission starts `merge_group` CI is still an open gate
+  ([current state](../../docs/merge-queue-rollout.md#current-state)); if it does not, the entry
+  times out and is removed.
+- `strict` only: `gh pr merge --squash --match-head-commit` atomically guards against a
+  last-moment PR push, and a fixed commit body prevents inherited CI-skip markers from
+  suppressing the post-merge run. After the merge the gate dispatches `CI` on `main`; if that
+  dispatch fails, dispatch it manually (rerunning a no-change sync does not recreate the merged
+  PR). Publication still requires successful CI for current main.
+
+If the PR head changes during validation (or, with strict freshness active, main changes), rerun
+Crowdin Sync; do not bypass the guard. The gate is copied from trusted main before
+synchronization, and both trusted gate scripts are preserved before checkout changes. The
+[Crowdin automatic merges](../../docs/systems/ci-and-release.md#crowdin-automatic-merges) spec owns
+the invariants; see `docs/workflow-automation.md` for the repository-wide policy and release
+compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
 successful push or dispatched CI for current main, and semantic-release decides whether a version is warranted;
@@ -168,7 +189,8 @@ performance/accessibility work instead of treating the current floors as long-te
 **Trigger:** Dependabot PR opened/updated/reopened/ready for review
 **Jobs:** `Auto-merge safe Dependabot PR` (Dependabot-authored and Dependabot-triggered only, npm
 tooling allowlist gate, wait for check runs and legacy status contexts, verify and match the
-validated head SHA, squash merge). Every GitHub Actions
+validated head SHA, then squash merge in `strict` mode or, in `queue`/`strict-queue`, await
+exact-head `Review Admission` and submit a head-pinned native queue entry). Every GitHub Actions
 workflow-file change requires manual review, including changes to permissions, triggers, or commands.
 Action updates additionally require repository or organization allowlist verification when they
 introduce a new pinned SHA.
@@ -180,15 +202,17 @@ introduce a new pinned SHA.
 
 ## Merge checks
 
-Dependabot PRs always change manifests, so they receive full CI. `Main CI freshness` requires
-successful `CI Result` and `Preview Result` from GitHub Actions on an up-to-date branch, with no
-bypass actors. The preview controller reports success without deployment for verified change sets with no
+Dependabot PRs always change manifests, so they receive full CI. Main merges only through the
+native merge queue; its required checks and the strict-freshness rollback are owned by
+[merge queue rollout](../../docs/merge-queue-rollout.md#current-state). The preview controller reports success without deployment for verified change sets with no
 deployable paths; preview-required changes stay pending until an explicit validated deployment passes.
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
-`Release` checks daily for a weekly publication or runs on manual dispatch, not on CI completion;
-it publishes only when the newest main CI run for its commit succeeded.
+`Release` prepares a version PR only on its daily check or manual dispatch; trusted main CI
+completion only wakes finalization of an already merged version PR
+([release automation](../../scripts/release/README.md#queue-promotion)). It publishes only when
+the newest main CI run for its commit succeeded.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets
@@ -198,8 +222,7 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 ## AI Review Bots
 
 The root `AGENTS.md` owns review requirements. See
-[workflow automation](../../docs/workflow-automation.md#push-cadence) for batching and freshness
-reruns.
+[workflow automation](../../docs/workflow-automation.md#push-cadence) for push batching.
 Dashboard settings must be verified separately; checked-in documentation does not prove them.
 
 ## Commands

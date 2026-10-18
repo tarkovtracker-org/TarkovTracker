@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
@@ -13,6 +14,20 @@ import {
 /** Stage realistic generated assets without modifying application code. */
 function releaseFixture(t) {
   const f = fixture(t);
+  const ghPath = join(f.env.PATH.split(':')[0], 'gh');
+  const mock = readFileSync(ghPath, 'utf8');
+  writeFileSync(
+    ghPath,
+    mock.replace(
+      "if (args[0] === 'api') {",
+      String.raw`  if (args[0] === 'api' && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls')) {
+    if (p.CREATE_PR_FAIL === 'true') process.exit(1);
+    fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'release-pr', args }) + '\n');
+    console.log(p.RELEASE_PR_URL || 'https://github.com/' + p.GITHUB_REPOSITORY + '/pull/901'); process.exit(0);
+  }
+  if (args[0] === 'api') {`
+    )
+  );
   writeFileSync(join(f.repo, 'package.json'), '{"private":true,"version":"1.2.3"}');
   writeFileSync(join(f.repo, 'CHANGELOG.md'), '# 1.2.3\n');
   return f;
@@ -35,12 +50,37 @@ test('comments cannot satisfy the daily catch-up schedule requirement', () => {
     assertDailyReleaseSchedule(release.replace("- cron: '0 15 * * *'", "# cron: '0 15 * * *'"))
   );
 });
-test('release validates a staging commit before promoting that identical SHA without PAT bypass', (t) => {
+test('the trusted release snapshot includes loadable admission dependencies', (t) => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+  const step = workflowStep(jobBlock(workflow, 'release'), 'Check validated commit before setup');
+  const script = step.split('script: |\n')[1];
+  assert.ok(script, 'release bootstrap script is missing');
+  const boundary = script.indexOf('const gatePath =');
+  assert.ok(boundary > 0, 'release bootstrap boundary is missing');
+  const bootstrap = script.slice(0, boundary);
+  const directory = mkdtempSync(join(tmpdir(), 'release-admission-snapshot-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      `(async () => {
+        ${bootstrap}
+        await import(pathToFileURL(process.env.RUNNER_TEMP + '/ci/review-admission-binding.mjs'));
+      })().catch((error) => { console.error(error); process.exitCode = 1; });`,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_WORKSPACE: process.cwd(), RUNNER_TEMP: directory },
+    }
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+test('release stages a version-only reviewed PR without pushing main or waiting for its merge', (t) => {
   const f = releaseFixture(t);
   const result = f.release();
   assert.equal(result.status, 0, result.stderr);
   const sha = git(f.repo, 'rev-parse', 'HEAD');
-  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), sha);
   assert.ok(
     f
       .calls()
@@ -50,39 +90,48 @@ test('release validates a staging commit before promoting that identical SHA wit
         )
       )
   );
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   const events = f.events();
-  const dispatchIndex = events.findIndex((event) => event.type === 'dispatch');
-  assert.equal(events[dispatchIndex]?.ref, 'wip/release-1.2.3-123-1');
-  const ciIndex = events.findIndex((event) => event.type === 'ci-result');
-  const requestIndex = events.findIndex((event) => event.type === 'preview-dispatch');
   const previewIndex = events.findIndex((event) => event.type === 'preview-result');
-  const mainIndex = events.findIndex(
-    (event) => event.type === 'push' && event.args.at(-1) === `${sha}:refs/heads/main`
+  const prIndex = events.findIndex((event) => event.type === 'release-pr');
+  assert.ok(previewIndex > 0 && prIndex > previewIndex);
+  const pr = events[prIndex].args;
+  assert.ok(pr.includes('head=wip/release-1.2.3-123-1'));
+  assert.ok(pr.includes('base=main'));
+  assert.ok(pr.includes('title=chore(release): 1.2.3'));
+  assert.ok(
+    pr.some((arg) => arg.includes(`Source: ${f.base}`) && arg.includes(`Candidate: ${sha}`))
   );
-  assert.ok(dispatchIndex < ciIndex, 'dispatch must precede waiting for CI');
-  assert.notEqual(ciIndex, -1, 'missing CI result event');
-  assert.notEqual(mainIndex, -1, 'missing main promotion event');
-  assert.deepEqual(events[ciIndex], {
-    type: 'ci-result',
-    sha,
-    status: 'completed',
-    conclusion: 'success',
-  });
-  assert.ok(ciIndex < mainIndex, 'successful exact-head CI must precede main promotion');
-  assert.ok(ciIndex < requestIndex && requestIndex < previewIndex && previewIndex < mainIndex);
-  assert.deepEqual(events[requestIndex], {
-    type: 'preview-dispatch',
-    runId: 'run_id=1',
-    ref: 'main',
-  });
-  const pushes = f.pushes();
-  assert.equal(pushes[0].credential, 'main');
-  assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
-  assert.equal(pushes[1].credential, 'main');
-  assert.equal(pushes[1].args.at(-1), `${sha}:refs/heads/main`);
-  assert.equal(git(f.repo, 'log', '-1', '--format=%s'), 'chore(release): 1.2.3');
-  assert.equal(git(f.repo, 'rev-parse', 'HEAD^'), f.base);
-  assert.equal(git(f.repo, '--git-dir', f.remote, 'branch', '--list', 'wip/release-*'), '');
+  assert.equal(f.pushes().length, 1);
+  assert.equal(f.pushes()[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
+  const admission = f
+    .calls()
+    .find((args) => args[0] === 'workflow' && args[2] === 'review-admission.yml');
+  assert.ok(admission.includes('pull_request=901'));
+  assert.equal(admission[admission.indexOf('--ref') + 1], 'main');
+  assert.ok(events.findIndex((event) => event.type === 'admission-dispatch') > prIndex);
+});
+test('admission trigger failure remains retryable without publishing or waiting for approval', (t) => {
+  const f = releaseFixture(t);
+  const result = f.release({ ADMISSION_DISPATCH_FAIL: 'true' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Version PR #901 awaits admission; retry:/);
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+  assert.equal(f.pushes().length, 1);
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'tag', '--list'), '');
+});
+test('a malformed or foreign PR response cannot trigger admission for an unchecked identity', (t) => {
+  for (const RELEASE_PR_URL of [
+    'https://github.com/example/repo/pull/not-a-number',
+    'https://github.com/other/repo/pull/901',
+  ]) {
+    const f = releaseFixture(t);
+    const result = f.release({ RELEASE_PR_URL });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unexpected release PR response/);
+    assert.ok(!f.events().some((event) => event.type === 'admission-dispatch'));
+  }
 });
 test('failed staging CI leaves main unchanged and never attempts promotion', (t) => {
   const f = releaseFixture(t);
@@ -120,12 +169,15 @@ test('a version commit without a successful preview is never promoted', (t) => {
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /Timed out waiting for Preview Result/);
 });
-test('concurrent main advancement is rejected by the actual Git push', (t) => {
+test('failed PR creation retains recoverable staging assets and leaves main unchanged', (t) => {
   const f = releaseFixture(t);
-  const result = f.release({ RACE_MAIN_SHA: f.head });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /non-fast-forward|fetch first/);
-  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.head);
+  assert.notEqual(f.release({ CREATE_PR_FAIL: 'true' }).status, 0);
+  assert.equal(
+    git(f.repo, '--git-dir', f.remote, 'rev-parse', 'refs/heads/wip/release-1.2.3-123-1'),
+    git(f.repo, 'rev-parse', 'HEAD')
+  );
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+  assert.equal(f.pushes().length, 1);
 });
 test('release refuses missing CI credentials or a missing strict CI policy', (t) => {
   const f = releaseFixture(t);
@@ -154,13 +206,44 @@ function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   assert.match(workflowEvent(releaseWorkflow, 'schedule'), /cron: '[^']+'/);
   const triggers = releaseWorkflow.slice(0, releaseWorkflow.indexOf('\npermissions:'));
   assert.match(triggers, /^ {2}workflow_dispatch:$/m);
-  assert.doesNotMatch(releaseWorkflow, /^ {2}workflow_run:/m);
+  assert.match(workflowEvent(releaseWorkflow, 'workflow_run'), /workflows: \[CI\]/);
+  assert.match(workflowEvent(releaseWorkflow, 'workflow_run'), /^ {4}branches: \[main\]$/m);
   assert.match(permissionsBlock(eligibility, '    '), /^ {6}actions: write$/m);
   assert.match(
     workflowStep(release, 'Semantic Release'),
     /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/
   );
 }
+function assertPromotionBoundary(releaseWorkflow) {
+  const release = jobBlock(releaseWorkflow, 'release');
+  const validation = workflowStep(release, 'Validate merged release preview');
+  assert.match(validation, /require_main_revision "\$RELEASE_SHA"/);
+  assert.match(validation, /request_preview_after_dispatched_ci "\$RELEASE_SHA"/);
+  const recovery = workflowStep(release, 'Recover interrupted version publication');
+  assert.match(recovery, /validatePromotion: true/);
+  assert.match(recovery, /if \(!result\.recovery\) throw/);
+  const record = workflowStep(release, 'Record prepared promotion provenance');
+  assert.match(record, /name: release-promotion-\$\{\{ steps\.prepare\.outputs\.sha \}\}/);
+  assert.match(record, /if-no-files-found: error/);
+  assert.match(
+    workflowStep(release, 'Semantic Release'),
+    /run: node scripts\/release\/release-run\.mjs/
+  );
+}
+test('publication rechecks exact merged preview and owns immutable preparation provenance', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assertPromotionBoundary(release);
+  for (const [before, after] of [
+    ['validatePromotion: true', 'validatePromotion: false'],
+    ['require_main_revision "$RELEASE_SHA"', 'true'],
+    ['if-no-files-found: error', 'if-no-files-found: warn'],
+    ['release-promotion-${{ steps.prepare.outputs.sha }}', 'release-promotion-latest'],
+  ]) {
+    const mutated = release.replace(before, after);
+    assert.notEqual(mutated, release);
+    assert.throws(() => assertPromotionBoundary(mutated));
+  }
+});
 test('release staging runs ordinary CI while publication retains its main-only gate', () => {
   const read = (path) => readFileSync(path, 'utf8');
   assertReleaseWorkflowBoundaries(
@@ -190,7 +273,7 @@ test('unrelated triggers, jobs and steps cannot satisfy the release workflow con
     "\n  unrelated:\n    if: github.ref == 'refs/heads/main'\n";
   assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongJob));
   const wrongStep =
-    release.replace('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}', 'GITHUB_TOKEN: missing') +
+    release.replaceAll('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}', 'GITHUB_TOKEN: missing') +
     '\n      - name: Unrelated\n        env:\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n';
   assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongStep));
 });
@@ -231,7 +314,10 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
   const step = workflowStep(jobBlock(ci, 'fallow'), 'Resolve Fallow base');
   // The step reads event data through `env:` rather than inline template expansion.
   assert.match(step, /EVENT_NAME: \$\{\{ github.event_name \}\}/);
-  assert.match(step, /PR_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(
+    step,
+    /PR_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \|\| github.event.merge_group.base_sha \}\}/
+  );
   assert.match(step, /PUSH_BEFORE_SHA: \$\{\{ github.event.before \}\}/);
   const script = step.slice(step.indexOf('run: |\n') + 'run: |\n'.length);
   assert.doesNotMatch(script, /\$\{\{/);
@@ -253,4 +339,31 @@ test('release permission key order does not change dispatch authorization', () =
   );
   assert.notEqual(reordered, workflow, 'permission reordering must apply');
   assertReleaseWorkflowBoundaries(ci, reordered);
+});
+function assertOptionalNotifications(workflow) {
+  const release = jobBlock(workflow, 'release');
+  const recover = workflowStep(release, 'Recover interrupted version publication');
+  const notify = workflowStep(release, 'Notify released pull requests');
+  assert.doesNotMatch(recover, /continue-on-error/);
+  assert.match(notify, /^ {8}if: steps\.eligible\.outcome == 'success'$/m);
+  assert.match(notify, /^ {8}continue-on-error: true$/m);
+  assert.ok(release.indexOf(recover) < release.indexOf(notify));
+}
+test('post-publication PR notifications cannot fail a completed release', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assertOptionalNotifications(release);
+  for (const [before, after] of [
+    ['        continue-on-error: true\n', ''],
+    ["if: steps.eligible.outcome == 'success'", "if: steps.recover.outcome == 'success'"],
+  ]) {
+    const mutated = release.replace(before, after);
+    assert.notEqual(mutated, release);
+    assert.throws(() => assertOptionalNotifications(mutated));
+  }
+});
+test('unrelated job steps cannot satisfy post-publication notification boundaries', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  const notify = workflowStep(jobBlock(release, 'release'), 'Notify released pull requests');
+  const moved = release.replace(notify, '') + '\n  unrelated:\n    steps:\n' + notify;
+  assert.throws(() => assertOptionalNotifications(moved));
 });

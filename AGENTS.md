@@ -77,10 +77,16 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   Keep workflow access checks, artifact validation, and fork protections.
 - Translations are reviewed like docs. The local CodeRabbit review for executable changes is
   `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`).
-- The `Main CI freshness` ruleset blocks merging a behind branch; update it
-  (`gh pr update-branch <PR>`) and CI and applicable previews rerun on the new head. Request
-  `@coderabbitai review` for substantial diff changes, hand-resolved conflicts, or unresolved
-  integration risks (incremental reviews are off). Do not pause other merges for freshness.
+- `main` merges only through the native merge queue, which builds each entry on current main; do
+  not update a behind branch merely to enqueue it. Review Admission verifies the immutable PR head
+  and resolved findings; sensitive changes need exact-head collaborator approval, or a write
+  collaborator's `/approve-sensitive <head>` after explicit merge authority. From a trusted main
+  checkout, enqueue with `node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>`,
+  report `QUEUED`, and let Actions own integration/merge. State, lifecycle and rollback:
+  `docs/merge-queue-rollout.md`.
+- When a branch must change anyway (conflicts, new commits), request `@coderabbitai review` for
+  substantial diff changes, hand-resolved conflicts, or unresolved integration risks (incremental
+  reviews are off).
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
   (omit `--request` to check status), only when CodeRabbit is rate-limited or for the final review
   of a change that needs independent review (below). Never post raw `@codex review`, repost, or

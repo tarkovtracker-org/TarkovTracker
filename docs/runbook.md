@@ -443,6 +443,38 @@ References: [migration history](https://supabase.com/docs/reference/cli/supabase
 [squash limitations](https://supabase.com/docs/reference/cli/supabase-migration-squash), and
 [history repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).
 
+### Retired preference columns (#1223)
+
+[The retirement migration](../supabase/migrations/20261018162607_drop_unused_user_preferences_columns.sql)
+removes seven retired columns from `public.user_preferences`
+with `RESTRICT`; it does not change policies, triggers, RPCs, retained preferences or progress storage.
+Keep `LEGACY_PREFERENCE_KEYS` and hydration sanitizers: cached local state can outlive the schema.
+Current writers omit the retired fields; clients before #1222 still sent the hideout fields but
+already retry missing-column errors without those fields. Repeated removal dates from commit
+`a4112c81` (2026-02-08): each recognized missing-column error removes that field from the retry
+payload until the retained fields save. Earlier single-retry bundles can fail the entire preference
+write when two or more removed fields remain; bundles without fallback fail on the first removed
+field. Those writes are not acknowledged as synced. Reloading the current app restores the supported
+writer; this migration does not recover unsynced changes from an obsolete bundle. Treat pre-`a4112c81`
+bundles as unsupported after the drop and announce the reload requirement before deployment.
+
+Before merge/apply, retain target identity, migration-history and bounded catalog/lock evidence,
+independent review and explicit approval for this exact irreversible drop. #1272's observer hold is
+separate; use only the separately authorized inspection route until its boundary is repaired.
+This cleanup is independent of the held legacy progress cleanup (#1155).
+
+Use the normal transactional migration runner; the linked migration owns the lock and statement
+timeout budgets. A failure before commit rolls back the schema and stored values.
+After a committed drop, recreating columns restores **schema/defaults only**, not their old values.
+Before any production apply, require an approved backup and an isolated restoration rehearsal that
+covers these seven columns, keyed by `user_id`, with their type/default/nullability/ACL metadata.
+Restore only those fields when recovering so intervening retained-preference changes are preserved;
+do not overwrite full rows or rewrite migration history. No down migration is automatic.
+The local synthetic rollback/recovery proof is not evidence that a production backup exists.
+
+Dropping columns does not promise immediate physical disk reclamation; do not schedule a table
+rewrite or `VACUUM FULL` as part of this change.
+
 ### Seasonal-team index recovery (#646)
 
 The applied migration `20260804043344_add_seasonal_team_index_concurrently.sql` uses
@@ -1184,12 +1216,17 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, read access to stored
+privileged or write-capable roles across non-system schemas, column writes, sequence advancement,
+persistent-object ownership or creation, application `SECURITY DEFINER` execution, read access to stored
 migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
 interpret cumulative counters.
+
+Health checks include inherited roles and roles reachable through `SET ROLE`. Application
+`SECURITY DEFINER` execution is rejected as an unneeded bypass route; the check does not inspect
+function bodies or assert that every such function writes. See the [observer specification](./systems/prod-db-observer.md).
 
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and
@@ -1226,6 +1263,19 @@ holding the observer credential read stored migration SQL and any literal inside
 conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.
+
+Large-object creation needs explicit review even for an otherwise read-only role. PostgreSQL
+commonly grants PUBLIC execution of `lo_create`, `lo_creat`, and `lo_from_bytea`; `lo_import`
+execution can also create persistent objects. The canary rejects reachable execution of these
+functions, existing large-object UPDATE grants, privileged parameter grants, and enabled
+`lo_compat_privileges`. A role cannot shed a PUBLIC grant in isolation. An authorized database
+operator must review existing consumers before revoking PUBLIC creator execution and regranting
+it only to approved non-observer identities. Do not run blanket revokes as routine cleanup, weaken
+the canary to accept default grants, or treat read-only connection defaults as the boundary.
+Production privilege changes require separate authorization; until the boundary is provisioned,
+the canary intentionally fails closed. Catalog telemetry and migration-version SELECT remain
+supported for a correctly provisioned role. These checks do not constitute an audit of every
+extension or built-in function's implementation.
 
 The production canary should be run manually after provisioning, using only the telemetry commands
 above. Confirm the role, reset timestamps, timeouts, and negligible observer impact before enabling
@@ -1281,21 +1331,24 @@ first edit ([decision record](./decision-browser-progress.md#historical-rollback
 The progression and overlay changes ship together through PR #826, which supersedes PR #825.
 Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
 v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
-Only the combined revision may publish v3 entries. There is no intermediate application release.
+Only the reviewed combined producer contract may publish v3 entries. Split producer and consumer
+changes when preseeding is required: first land the compatible producer on `main`, while the
+application continues reading v2 keys.
 
 For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
-`.github/workflows/precompute-tarkov-data.yml` from the approved combined revision before merging
-or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
-48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
+`.github/workflows/precompute-tarkov-data.yml` on `main` after the reviewed producer changes land
+and before merging or promoting the v3 consumer. Leave both workflow inputs, `lang` and
+`gameMode`, empty to include all 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
 verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
 revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
 a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
 identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
 `overlay-precompute-manifest-json-v3` contains all 48 matching identities.
 
-Before rollout, confirm neither original PR revision has a production deployment or an in-flight
-precompute run. After the v3 population is verified, merge the combined PR only and
-close #825 as superseded. The scheduled workflow then refreshes the combined v3 contract.
+Before rollout, confirm no incompatible original PR revision has a production deployment or an
+in-flight precompute run. After the fresh v3 population and matching overlay identities are
+verified, merge the consumer PR and close #825 as superseded. The scheduled workflow then
+refreshes the combined v3 contract.
 Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
 entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
 standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
@@ -1308,16 +1361,19 @@ fleet verification before closing issue #729.
 503 while a key is missing, so seed before Pages deploys the consumer
 ([release order](./systems/overlay-and-precompute.md#release-verification)):
 
-1. Read the published overlay `$meta.sha256`. Dispatch `precompute-tarkov-data.yml` on the PR
-   branch with `lang=en`, no mode, and that `expectedOverlaySha`. Require the run's
+1. Split producer and consumer changes if preseeding is required. Land the reviewed producer
+   changes on `main` while keeping the existing consumer compatible. Read the published overlay
+   `$meta.sha256`, then dispatch `precompute-tarkov-data.yml` on `main` with `lang=en`, no mode,
+   and that `expectedOverlaySha`. Require the run's
    `importSnapshots.failures` to be empty.
 2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
    overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
-3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
-   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+3. Only after the fresh matching snapshots are verified, merge the consumer PR. After Pages
+   deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
    environment or a secret store) reports no import mismatches.
-4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
-   entries and the import keys share the release.
+4. If the overlay changes before consumer promotion, repeat the dispatch and snapshot verification
+   with the new approved `expectedOverlaySha` before merging. Use an unfiltered run on `main` so
+   all 48 core entries and the import keys share the release.
 
 Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
 which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail

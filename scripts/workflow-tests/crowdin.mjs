@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
@@ -19,6 +19,101 @@ function rejected(result, message) {
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, message);
 }
+/** Mirror the live effective rules rather than accepting a loose non-strict status rule. */
+function queueRules() {
+  const policy = JSON.parse(read('.github/main-merge-queue-ruleset.json'));
+  return policy.rules.map((rule) => ({
+    ...rule,
+    ...(rule.type === 'required_status_checks'
+      ? {
+          parameters: {
+            ...rule.parameters,
+            required_status_checks: rule.parameters.required_status_checks.map((check) =>
+              check.context === 'Review Admission' ? { ...check, integration_id: 987654 } : check
+            ),
+          },
+        }
+      : {}),
+    ruleset_source_type: 'Repository',
+    ruleset_source: 'example/repo',
+    ruleset_id: 43,
+  }));
+}
+test('queue admission validates the PR diff without rewriting a behind translation branch', (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.repo, 'main-only.txt'), 'trusted new main content');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'main advanced');
+  const base = git(f.repo, 'rev-parse', 'HEAD');
+  const queue = { RULES: JSON.stringify(queueRules()) };
+  passed(f.run('update', queue));
+  assert.ok(!f.calls().some((args) => args.includes('PUT')));
+  passed(f.run('prepare', queue));
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.head);
+  assert.equal(f.output(), `head_sha=${f.head}\nbase_sha=${base}\n`);
+  passed(
+    f.run('merge', {
+      ...queue,
+      BASE_SHA: base,
+      CURRENT_BASE: 'b'.repeat(40),
+      AUTO_MERGE_DISABLED: 'true',
+      MERGE_OUTCOME: 'OPEN',
+      PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
+    })
+  );
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+  assert.deepEqual(
+    f.events().filter((event) => event.type === 'admission'),
+    [{ type: 'admission', sha: f.head, number: '857', runId: '777' }]
+  );
+  const enqueue = f.events().filter((event) => event.type === 'enqueue');
+  assert.equal(enqueue.length, 1);
+  assert.equal(enqueue[0].input.expectedHeadOid, f.head);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
+});
+test('queue policy rejects missing review/provider/group controls and unknown API responses', (t) => {
+  for (const change of [
+    (rules) => rules.pop(),
+    (rules) => (rules[2].parameters.required_review_thread_resolution = false),
+    (rules) => (rules[2].ruleset_id = 44),
+    (rules) => (rules[1].parameters.grouping_strategy = 'HEADGREEN'),
+    (rules) => (rules[1].parameters.max_entries_to_build = 2),
+    (rules) => (rules[1].ruleset_id = 44),
+    (rules) => rules[0].parameters.required_status_checks.pop(),
+    (rules) => (rules[0].parameters.required_status_checks[0].integration_id = 1),
+    (rules) => (rules[1].ruleset_source = 'foreign/repo'),
+  ]) {
+    const f = fixture(t);
+    const rules = queueRules();
+    change(rules);
+    rejected(f.run('prepare', { RULES: JSON.stringify(rules) }), /Missing strict main/);
+    assert.equal(f.output(), '');
+  }
+  const f = fixture(t);
+  rejected(f.run('prepare', { RULES: 'not json' }), /parse error/);
+});
+test('queue mode still rejects executable translation changes and head movement', (t) => {
+  const queue = { RULES: JSON.stringify(queueRules()) };
+  const executable = fixture(t, { 'scripts/evil.mjs': 'untrusted' });
+  rejected(executable.run('prepare', queue), /non-translation path/);
+  const f = fixture(t);
+  passed(f.run('prepare', queue));
+  rejected(
+    f.run('merge', {
+      ...queue,
+      PR_STATES: JSON.stringify([{ ...f.pr, headRefOid: 'b'.repeat(40) }]),
+    }),
+    /head changed/
+  );
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+  rejected(f.run('merge', { ...queue, ADMISSION_FAIL: 'true' }), /Review Admission denied/);
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+  rejected(
+    f.run('merge', { ...queue, ADMISSION_PENDING: 'true' }),
+    /Timed out waiting for authenticated/
+  );
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
 test('valid translation checkout and merge use the same immutable SHA', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
@@ -454,4 +549,87 @@ test('Crowdin permission key order does not change dispatch authorization', () =
   );
   assert.notEqual(reordered, workflow, 'permission reordering must apply');
   assertWorkflowBoundaries(reordered);
+});
+test('Crowdin binds admission to the accepted dispatch and rejects missing run identity', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  rejected(
+    f.run('merge', { RULES: JSON.stringify(queueRules()), ADMISSION_RUN_ID: 'null' }),
+    /no authenticated run ID/
+  );
+  assert.ok(!f.events().some((event) => event.type === 'admission'));
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
+  passed(f.run('merge', { RULES: JSON.stringify(queueRules()), ADMISSION_RUN_ID: '888' }));
+  assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '888'));
+  assert.ok(
+    f
+      .calls()
+      .some(
+        (args) =>
+          args.includes('return_run_details=true') &&
+          args.includes('X-GitHub-Api-Version: 2022-11-28')
+      )
+  );
+});
+test('a coexisting foreign or organization strict rule cannot be classified as an active queue', (t) => {
+  const f = fixture(t);
+  const rules = queueRules();
+  rules.push({
+    ...rules[0],
+    ruleset_source_type: 'Organization',
+    ruleset_source: 'example',
+    ruleset_id: 99,
+    parameters: { ...rules[0].parameters, strict_required_status_checks_policy: true },
+  });
+  rejected(f.run('prepare', { RULES: JSON.stringify(rules) }), /Missing strict main/);
+});
+function strictQueueRules() {
+  const rules = queueRules();
+  rules.push({
+    ...rules[0],
+    ruleset_id: 42,
+    parameters: { ...rules[0].parameters, strict_required_status_checks_policy: true },
+  });
+  return rules;
+}
+test('rollout coexistence preserves Crowdin freshness while accepting a reviewed native queue submission', (t) => {
+  const f = fixture(t);
+  const rollout = { RULES: JSON.stringify(strictQueueRules()) };
+  passed(f.run('prepare', rollout));
+  passed(f.run('merge', { ...rollout, MERGE_OUTCOME: 'OPEN' }));
+  assert.ok(f.events().some((event) => event.type === 'admission'));
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+  const behind = fixture(t);
+  writeFileSync(join(behind.repo, 'new-main.txt'), 'later main');
+  git(behind.repo, 'add', '.');
+  git(behind.repo, 'commit', '-m', 'main advanced');
+  rejected(
+    behind.run('prepare', { ...rollout, CURRENT_BASE: git(behind.repo, 'rev-parse', 'HEAD') }),
+    /must include current main/
+  );
+});
+test('strict-queue accepts main advancing after enqueue while still rejecting a changed head', (t) => {
+  const f = fixture(t);
+  const rollout = { RULES: JSON.stringify(strictQueueRules()), AFTER_ENQUEUE_BASE: 'b'.repeat(40) };
+  passed(f.run('prepare', rollout));
+  passed(f.run('merge', rollout));
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+  const raced = fixture(t);
+  passed(raced.run('prepare', rollout));
+  rejected(raced.run('merge', { ...rollout, AFTER_ENQUEUE_HEAD: 'c'.repeat(40) }), /head changed/);
+  assert.equal(raced.events().filter((event) => event.type === 'enqueue').length, 1);
+});
+test('Crowdin requests admission before inspecting mergeability blocked on the missing admission gate', (t) => {
+  const f = fixture(t);
+  const queue = {
+    RULES: JSON.stringify(queueRules()),
+    BLOCKED_UNTIL_ADMISSION: 'true',
+    MERGE_OUTCOME: 'OPEN',
+  };
+  passed(f.run('prepare', queue));
+  passed(f.run('merge', queue));
+  assert.ok(f.events().some((event) => event.type === 'admission-success'));
+  assert.ok(f.events().some((event) => event.type === 'merge'));
+  assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
 });

@@ -26,28 +26,31 @@ before returning it.
 
 ### Endpoints
 
-| Endpoint                       | Purpose                      | Cache TTL  | Precomputed? | Overlay? |
-| ------------------------------ | ---------------------------- | ---------- | ------------ | -------- |
-| `/api/tarkov/bootstrap`        | Player levels (no `lang`)    | 12h        | no           | no       |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders         | 12h        | **yes**      | yes      |
-| `/api/tarkov/tasks-objectives` | Task objectives              | 12h        | no           | yes      |
-| `/api/tarkov/tasks-rewards`    | Task rewards                 | 12h        | no           | yes      |
-| `/api/tarkov/hideout`          | Hideout stations             | 12h        | no           | yes      |
-| `/api/tarkov/items-lite`       | Items (minimal)              | 24h        | no           | yes      |
-| `/api/tarkov/items`            | Items (full)                 | 24h        | no           | yes      |
-| `/api/tarkov/prestige`         | Prestige levels              | 24h        | no           | yes      |
-| `/api/tarkov/editions`         | Editions, chapters, perks    | 1h overlay | no           | yes      |
-| `/api/tarkov/overlay-status`   | Last complete fleet manifest | no-store   | no           | metadata |
-| `/api/tarkov/map-spawns`       | Map spawn points             | 12h        | no           | no       |
-| `/api/tarkov/cache-meta`       | Cache purge status           | 5m edge    | no           | no       |
-| `/api/tarkov/access-check`     | Browser clearance probe      | no-store   | no           | no       |
+| Endpoint                       | Purpose                          | Cache TTL  | Precomputed? | Overlay? |
+| ------------------------------ | -------------------------------- | ---------- | ------------ | -------- |
+| `/api/tarkov/bootstrap`        | Player levels (no `lang`)        | 12h        | no           | no       |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders             | 12h        | **yes**      | yes      |
+| `/api/tarkov/tasks-import`     | Whole English EFT import catalog | no-store   | **yes**      | yes      |
+| `/api/tarkov/tasks-objectives` | Task objectives                  | 12h        | no           | yes      |
+| `/api/tarkov/tasks-rewards`    | Task rewards                     | 12h        | no           | yes      |
+| `/api/tarkov/hideout`          | Hideout stations                 | 12h        | no           | yes      |
+| `/api/tarkov/items-lite`       | Items (minimal)                  | 24h        | no           | yes      |
+| `/api/tarkov/items`            | Items (full)                     | 24h        | no           | yes      |
+| `/api/tarkov/prestige`         | Prestige levels                  | 24h        | no           | yes      |
+| `/api/tarkov/editions`         | Editions, chapters, perks        | 1h overlay | no           | yes      |
+| `/api/tarkov/overlay-status`   | Last complete fleet manifest     | no-store   | no           | metadata |
+| `/api/tarkov/map-spawns`       | Map spawn points                 | 12h        | no           | no       |
+| `/api/tarkov/cache-meta`       | Cache purge status               | 5m edge    | no           | no       |
+| `/api/tarkov/access-check`     | Browser clearance probe          | no-store   | no           | no       |
 
 Task, hideout, item and prestige endpoints consume overlays. The editions endpoint projects
 editions, story chapters and Seasonal perks from the same validated loader. Bootstrap and
 map-spawns remain upstream-only; cache-meta, overlay-status and
 [`access-check`](../../app/server/api/tarkov/access-check.get.ts) are operational routes.
 
-Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
+`tasks-core` is precomputed for every supported language/mode. The three whole English
+`tasks-import` catalogs are also precomputed and are snapshot-only, with mode/age/provenance
+validation and no runtime fallback. Other catalog endpoints use their route-specific cache paths.
 See [Precompute](./overlay-and-precompute.md#precompute-workflow).
 
 The hideout route is the cache-order exception: its `json-v5` edge entry stores the adapted base
@@ -252,12 +255,19 @@ and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry 
 
 ### Stale-while-revalidate
 
-The full-items route opts into `edgeCache({ response: true })`: final cached JSON is streamed on
+The full-items, items-lite, task-objectives, and task-rewards routes opt into
+`edgeCache({ response: true })`: final cached JSON is streamed on
 hits rather than parsed and serialized again. New entries store sanitized overlay headers and an
 internal response-format marker alongside their body. Older or unknown markers fall back to JSON
 parsing, so no purge or coordinated rollout is required. Only public cache/overlay headers are
 returned; internal retention and storage metadata remain private to the Cache API. The default
 object-returning path, hideout's post-cache overlay, and precomputed KV validation are unchanged.
+
+On a cache miss, response mode serializes the final payload once and shares that body's two
+streams between the Cache API write and the client. Each receives its own headers: storage keeps
+the longer retention window and internal metadata, while the client receives only the public
+cache/overlay headers. Object-mode consumers retain the original payload and write the stored
+response directly without creating an unused stream branch.
 
 When an edge cache entry exists but is older than `ttl`, the handler:
 

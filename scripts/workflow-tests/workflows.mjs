@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { test } from 'node:test';
 import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
-import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import { fixture } from './helpers/automation-fixture.mjs';
+import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 test('Dependabot waits only for the authoritative aggregates supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');
@@ -154,7 +155,7 @@ test('path selection applies to pull requests only; pushes, forks and Deno check
   const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
   // Shadow mode ended once the rollout evidence in docs/workflow-automation.md was captured.
   assert.doesNotMatch(classify, /--shadow/);
-  assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
+  assert.match(classify, /elif \[ "\$EVENT_NAME" != "pull_request" \]; then\n\s+args\+=\(--full\)/);
   assert.match(ci, /args\+=\(--full\)/);
   assert.match(ci, /vitest run --coverage --shard=/);
   assert.match(ci, /run: pnpm run test:deno$/m);
@@ -234,7 +235,11 @@ test('workflow linting is selected only for automation changes and fails closed 
   assert.match(lintStep, /ZIZMOR_VERSION: \d+\.\d+\.\d+\n/);
   assert.match(lintStep, /ZIZMOR_SHA256: [0-9a-f]{64}\n/);
   assert.match(lintStep, /"\$ZIZMOR_SHA256"/);
-  assert.match(lintStep, /"\$RUNNER_TEMP\/actionlint" -color/);
+  assert.match(lintStep, /node scripts\/ci\/actionlint-queue\.mjs "\$RUNNER_TEMP\/actionlint"/);
+  assert.match(
+    read('scripts/ci/actionlint-queue.mjs'),
+    /'-color', '-stdin-filename', filename, '-'/
+  );
   assert.match(lintStep, /"\$RUNNER_TEMP\/zizmor" --no-progress --min-severity low \.github\//);
   assert.doesNotMatch(lintStep, /pipx|pip install|npx /);
   assert.match(read('scripts/ci/validate-changes.mjs'), /workflows=\$\{plan.workflows\}/);
@@ -244,6 +249,7 @@ test('Dependabot auto-merge requires immutable author and event actor identities
   const job = jobBlock(workflow, 'auto-merge');
   const eligibility = job.slice(0, job.indexOf('    steps:'));
   assert.match(workflow, /workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]/);
+  assert.match(workflowEvent(workflow, 'workflow_run'), /^ {4}branches: \['dependabot\/\*\*'\]$/m);
   assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.doesNotMatch(eligibility, /workflow_run\.(actor|triggering_actor)\.id/);
   assert.doesNotMatch(eligibility, /workflow_run\.head_repository/);
@@ -291,4 +297,269 @@ test('Deno resolves the functions config and fails on lockfile drift', () => {
   for (const file of ['.github/workflows/ci.yml', 'scripts/ci/validate-changes.mjs'])
     assert.doesNotMatch(read(file), /\bdeno test\b/, file);
   assert.match(read('.gitignore'), /^\/deno\.lock$/m);
+});
+function dependabotScript(name) {
+  const step = workflowStep(autoMergeJob(), name);
+  return step
+    .split('run: |\n')[1]
+    .replaceAll(/^ {10}/gm, '')
+    .replaceAll(
+      'source scripts/ci/github-ci-gate.sh',
+      `source '${resolve('scripts/ci/github-ci-gate.sh')}'`
+    );
+}
+const dependabotMergeScript = () => dependabotScript('Merge Dependabot PR');
+function dependabotChecks(state) {
+  return {
+    WAIT_CHECK_RUNS: JSON.stringify([
+      { name: 'CI Result', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
+      { name: 'PR Meta', app: { id: 15368 }, status: 'completed', conclusion: 'success' },
+      {
+        name: 'Review admission controller',
+        app: { id: 15368 },
+        status: 'completed',
+        conclusion: 'failure',
+      },
+      {
+        name: 'Filter admission event',
+        app: { id: 15368 },
+        status: 'in_progress',
+        conclusion: null,
+      },
+      {
+        name: 'Socket Security: Pull Request Alerts',
+        app: { id: 156372 },
+        status: 'completed',
+        conclusion: 'success',
+      },
+    ]),
+    WAIT_STATUSES: JSON.stringify([
+      { id: 1, context: 'Preview Result', state: 'success' },
+      ...(state === undefined ? [] : [{ id: 2, context: 'Review Admission', state }]),
+    ]),
+  };
+}
+test('Dependabot recovers stale admission before checking GitHub mergeability', (t) => {
+  for (const state of ['failure', 'pending', undefined]) {
+    const f = fixture(t);
+    const result = f.shell(
+      'set -e\n(' + dependabotScript('Wait for checks') + ')\n(' + dependabotMergeScript() + ')',
+      {
+        ...dependabotChecks(state),
+        RULES: JSON.stringify(activeQueueRules()),
+        CHECKED_MERGE_MODE: 'queue',
+        BLOCKED_UNTIL_ADMISSION: 'true',
+        MERGE_OUTCOME: 'OPEN',
+      }
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(f.output(), /merge_mode=queue/);
+    assert.ok(f.events().some((event) => event.type === 'admission-success'));
+    assert.ok(f.events().some((event) => event.type === 'merge'));
+    assert.ok(!f.events().some((event) => event.type === 'dispatch'));
+  }
+});
+test('Dependabot never submits a candidate when refreshed admission fails', (t) => {
+  const f = fixture(t);
+  const result = f.shell(dependabotMergeScript(), {
+    RULES: JSON.stringify(activeQueueRules()),
+    CHECKED_MERGE_MODE: 'queue',
+    BLOCKED_UNTIL_ADMISSION: 'true',
+    ADMISSION_FAIL: 'true',
+  });
+  assert.equal(result.status, 1);
+  assert.ok(f.events().some((event) => event.type === 'admission'));
+  assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
+});
+test('Dependabot retries if policy mode changed since the checks step', (t) => {
+  const merge = workflowStep(autoMergeJob(), 'Merge Dependabot PR');
+  assert.match(merge, /CHECKED_MERGE_MODE: \$\{\{ steps\.checks\.outputs\.merge_mode \}\}/);
+  for (const checked of ['strict', 'strict-queue', '']) {
+    const f = fixture(t);
+    const result = f.shell(dependabotMergeScript(), {
+      RULES: JSON.stringify(activeQueueRules()),
+      CHECKED_MERGE_MODE: checked,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /Main merge policy changed since Dependabot checks/);
+    assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+  }
+  const f = fixture(t);
+  const rollback = f.shell(dependabotMergeScript(), { CHECKED_MERGE_MODE: 'queue' });
+  assert.equal(rollback.status, 1);
+  assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+});
+test('Dependabot retains strict admission failures and unrelated queue status failures', (t) => {
+  const strict = fixture(t);
+  const denied = strict.shell(dependabotScript('Wait for checks'), dependabotChecks('failure'));
+  assert.equal(denied.status, 1);
+  assert.match(denied.stdout, /Review Admission concluded failure/);
+  const queue = fixture(t);
+  const checks = dependabotChecks('failure');
+  const statuses = JSON.parse(checks.WAIT_STATUSES);
+  statuses.push({ id: 3, context: 'Other security gate', state: 'failure' });
+  const blocked = queue.shell(dependabotScript('Wait for checks'), {
+    ...checks,
+    RULES: JSON.stringify(activeQueueRules()),
+    WAIT_STATUSES: JSON.stringify(statuses),
+  });
+  assert.equal(blocked.status, 1);
+  assert.match(blocked.stdout, /Other security gate concluded failure/);
+  assert.ok(!queue.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+});
+test('Dependabot retains unrelated and foreign admission-named check failures', (t) => {
+  for (const check of [
+    { name: 'Other security check', app: { id: 15368 } },
+    { name: 'Review admission controller', app: { id: 44 } },
+  ]) {
+    const f = fixture(t);
+    const gates = dependabotChecks('failure');
+    const checks = JSON.parse(gates.WAIT_CHECK_RUNS);
+    checks.push({ ...check, status: 'completed', conclusion: 'failure' });
+    const result = f.shell(dependabotScript('Wait for checks'), {
+      ...gates,
+      RULES: JSON.stringify(activeQueueRules()),
+      WAIT_CHECK_RUNS: JSON.stringify(checks),
+    });
+    assert.equal(result.status, 1);
+    assert.ok(!f.events().some((event) => event.type === 'admission' || event.type === 'merge'));
+  }
+});
+function activeQueueRules() {
+  return JSON.parse(read('.github/main-merge-queue-ruleset.json')).rules.map((rule) => ({
+    ...rule,
+    ...(rule.type === 'required_status_checks'
+      ? {
+          parameters: {
+            ...rule.parameters,
+            required_status_checks: rule.parameters.required_status_checks.map((check) =>
+              check.context === 'Review Admission' ? { ...check, integration_id: 987654 } : check
+            ),
+          },
+        }
+      : {}),
+    ruleset_source_type: 'Repository',
+    ruleset_source: 'example/repo',
+    ruleset_id: 43,
+  }));
+}
+test('Dependabot queue submission preserves behind head and never dispatches main CI early', (t) => {
+  const f = fixture(t);
+  const result = f.shell(dependabotMergeScript(), {
+    MAIN_MERGE_MODE: 'queue',
+    CHECKED_MERGE_MODE: 'queue',
+    RULES: JSON.stringify(activeQueueRules()),
+    PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
+    MERGE_OUTCOME: 'OPEN',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Submitted reviewed Dependabot PR/);
+  assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '777'));
+  assert.ok(!f.events().some((event) => event.type === 'dispatch'));
+  const enqueue = f.events().find((event) => event.type === 'enqueue');
+  assert.equal(enqueue.input.expectedHeadOid, f.head);
+  assert.ok(!f.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
+});
+test('Dependabot native enqueue works when repository auto-merge is disabled', (t) => {
+  const f = fixture(t);
+  const options = {
+    RULES: JSON.stringify(activeQueueRules()),
+    CHECKED_MERGE_MODE: 'queue',
+    AUTO_MERGE_DISABLED: 'true',
+    MERGE_OUTCOME: 'OPEN',
+    PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'UNSTABLE' }]),
+  };
+  const result = f.shell(dependabotMergeScript(), options);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  const cliMutant = dependabotMergeScript().replace(
+    'enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"',
+    'gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --match-head-commit "$HEAD_SHA" --squash'
+  );
+  assert.notEqual(cliMutant, dependabotMergeScript());
+  const denied = f.shell(cliMutant, options);
+  assert.equal(denied.status, 1);
+  assert.match(denied.stderr, /Auto merge is not allowed/);
+});
+test('Dependabot dispatches main CI only after actual merge and holds failed admission', (t) => {
+  const f = fixture(t);
+  const queue = {
+    MAIN_MERGE_MODE: 'queue',
+    CHECKED_MERGE_MODE: 'queue',
+    RULES: JSON.stringify(activeQueueRules()),
+  };
+  const denied = f.shell(dependabotMergeScript(), { ...queue, ADMISSION_FAIL: 'true' });
+  assert.equal(denied.status, 1);
+  assert.ok(!f.events().some((event) => event.type === 'merge' || event.type === 'dispatch'));
+  const merged = f.shell(dependabotMergeScript(), { ...queue, MERGE_OUTCOME: 'MERGED' });
+  assert.equal(merged.status, 0, merged.stderr);
+  assert.ok(f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+});
+test('Dependabot rollout coexistence retains freshness and admission while reporting native queue submission', (t) => {
+  const f = fixture(t);
+  const rules = activeQueueRules();
+  rules.push({
+    ...rules[0],
+    ruleset_id: 42,
+    parameters: { ...rules[0].parameters, strict_required_status_checks_policy: true },
+  });
+  const rollout = {
+    RULES: JSON.stringify(rules),
+    CHECKED_MERGE_MODE: 'strict-queue',
+    MERGE_OUTCOME: 'OPEN',
+  };
+  const queued = f.shell(dependabotMergeScript(), rollout);
+  assert.equal(queued.status, 0, queued.stderr);
+  assert.ok(f.events().some((event) => event.type === 'admission'));
+  assert.ok(!f.events().some((event) => event.type === 'dispatch'));
+  const before = f.events().length;
+  const behind = f.shell(dependabotMergeScript(), {
+    ...rollout,
+    PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus: 'BEHIND' }]),
+  });
+  assert.equal(behind.status, 1);
+  assert.match(behind.stdout + behind.stderr, /Behind PR requires strict freshness/);
+  assert.ok(
+    !f
+      .events()
+      .slice(before)
+      .some((event) => event.type === 'admission' || event.type === 'merge')
+  );
+});
+test('automation shell keeps fixture commands ahead of host startup tooling', (t) => {
+  const f = fixture(t);
+  const result = f.shell(
+    'node /fixture/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$HEAD_SHA" "$PR_NUMBER" 777',
+    { SHLVL: '0' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(f.events().some((event) => event.type === 'admission' && event.runId === '777'));
+  const harness = read('scripts/workflow-tests/helpers/automation-fixture.mjs');
+  assert.match(harness, /\['--noprofile', '--norc', '-c', script\]/);
+});
+test('repository-controlled workflow normalization receives no online-audit token', (t) => {
+  const workflow = read('.github/workflows/ci.yml');
+  const step = workflowStep(jobBlock(workflow, 'lint-format'), 'Lint GitHub Actions workflows');
+  assert.match(step, /GH_TOKEN: \$\{\{ github.token \}\}/);
+  assert.match(step, /"\$RUNNER_TEMP\/zizmor" --no-progress/);
+  const command = step
+    .match(/^ +(?:env -u GH_TOKEN )?node scripts\/ci\/actionlint-queue\.mjs[^\n]*$/m)[0]
+    .trim();
+  const dir = mkdtempSync(join(tmpdir(), 'workflow-token-scope-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(
+    join(dir, 'node'),
+    '#!/bin/sh\n[ -z "${GH_TOKEN+x}" ] || exit 9\nprintf "token-absent\\n"\n',
+    { mode: 0o755 }
+  );
+  const env = {
+    PATH: `${dir}:${process.env.PATH}`,
+    GH_TOKEN: 'synthetic-audit-token',
+    RUNNER_TEMP: dir,
+  };
+  const run = (script) =>
+    spawnSync('/bin/bash', ['--noprofile', '--norc', '-c', script], { env, encoding: 'utf8' });
+  assert.equal(run(command).status, 0);
+  assert.equal(run(command).stdout.trim(), 'token-absent');
+  assert.equal(run(command.replace('env -u GH_TOKEN ', '')).status, 9);
 });

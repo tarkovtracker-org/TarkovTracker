@@ -19,6 +19,12 @@
     "scripts/workflow-tests/*.mjs",
     "scripts/ci/workflow-metrics.mjs",
     "scripts/ci/check-ci-result.mjs",
+    "scripts/ci/actionlint-queue.mjs",
+    "scripts/ci/render-merge-queue-ruleset.mjs",
+    "scripts/ci/review-admission.mjs",
+    "scripts/ci/review-admission-cli.mjs",
+    "scripts/release/release-promotion-recovery.mjs",
+    "scripts/release/release-promotion-queue.mjs",
     "scripts/preview/build-profile.mjs",
     "scripts/preview/write-manifest.mjs",
     "scripts/preview/verify-deployment.mjs",
@@ -26,7 +32,9 @@
     "scripts/preview/smoke/playwright.config.mjs",
     "scripts/preview/smoke/*.smoke.mjs",
     "app/server/plugins/**/*.ts",
-    "app/features/seo-pages/*.vue"
+    "app/features/seo-pages/*.vue",
+    "scripts/checks/precomputed-response-benchmark.mjs",
+    "scripts/checks/precomputed-response-worker.ts"
   ],
   "ignoreDependencies": [
     "shared",

@@ -10,6 +10,7 @@ name: Precompute Tarkov Data
 # lang x gameMode transform.
 #
 # Requires (see scripts/precompute/run.ts):
+#   environment production-precompute - main branch only; credentials below must not exist at repository scope
 #   secret CLOUDFLARE_API_TOKEN          - scoped to Workers KV Storage: Edit
 #   secret OVERLAY_TOKEN                 - read-only Contents on the private tarkov-data-overlay repo
 #   variable CLOUDFLARE_ACCOUNT_ID       - account that owns the namespace
@@ -41,11 +42,14 @@ permissions:
 jobs:
   precompute:
     name: Precompute tasks-core payloads
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production-precompute
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Precompute and write to KV
