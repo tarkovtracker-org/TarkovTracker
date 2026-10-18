@@ -1214,6 +1214,7 @@
     "needed_items": {
       "loading": "Chargement des données des items requis",
       "search_placeholder": "Rechercher des items...",
+      "items": "articles",
       "empty": "Aucun objet ne correspond à votre recherche.",
       "error": "Impossible de charger les objets requis.",
       "filters": {
@@ -2449,6 +2450,7 @@
     "smart_fill": "Remplissage intelligent",
     "unknown_task": "Tâche inconnue",
     "unknown_station": "Gare inconnue",
+    "lvl": "Niveau",
     "needed": "nécessaire",
     "view_details_for": "Voir les détails de {name}",
     "locked_before": "{count} avant",

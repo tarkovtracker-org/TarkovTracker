@@ -1214,6 +1214,7 @@
     "needed_items": {
       "loading": "Caricamento dati missioni e rifugio",
       "search_placeholder": "Cerca oggetti, missioni o stazioni rifugio nascoste...",
+      "items": "oggetti",
       "empty": "Nessun risultato per la tua ricerca.",
       "error": "Impossibile caricare oggetti richiesti.",
       "filters": {
@@ -2449,6 +2450,7 @@
     "smart_fill": "Riempimento intelligente",
     "unknown_task": "Missione sconosciuta",
     "unknown_station": "Stazione Sconosciuta",
+    "lvl": "Lvl",
     "needed": "richiesto",
     "view_details_for": "Visualizza i dettagli per {name}",
     "locked_before": "{count} prima",
