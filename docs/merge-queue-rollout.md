@@ -174,7 +174,10 @@ exactly one commit ahead of it; it does not contain the PR head as an ancestor, 
 entry (exact PR head and exact queue commit) is the PR binding. Configuration is re-proved from
 the one repository-owned effective main queue rule through the public REST branch-rules endpoint;
 this removes GraphQL queue configuration reads without broadening job/App permissions.
-Missing, ambiguous, foreign or changed queue policy fails closed. Read-only signal workflows cannot publish approval. Consumers authenticate
+Missing, ambiguous, foreign or changed queue policy fails closed. With one build slot, a later
+entry stays `QUEUED` with no integration commit or `gh-readonly-queue/` ref; admission then
+evaluates only the PR head, and the group's own `merge_group` signal re-runs it once built. Any
+other entry without a provable integration commit still fails closed. Read-only signal workflows cannot publish approval. Consumers authenticate
 the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
 
 Review and review-comment wakeups resolve the service-owned PR link from the authenticated

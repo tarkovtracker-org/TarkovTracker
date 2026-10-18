@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fixture as automationFixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-const { admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
+const { activeQueueGroup, admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
   await import('../ci/review-admission-api.mjs');
 const { readAdmissionArchive, requireReviewAdmission } =
   await import('../ci/review-admission-binding.mjs');
@@ -1525,6 +1525,76 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
     );
   });
 });
+function awaitingBuildFixture(entry = {}) {
+  const f = queuedControlFixture();
+  f.q.state.entry = {
+    ...f.q.state.entry,
+    position: 2,
+    state: 'QUEUED',
+    headCommit: null,
+    ...entry,
+  };
+  f.f.refs = [];
+  const outputs = {};
+  f.core.setOutput = (key, value) => {
+    outputs[key] = value;
+  };
+  return { ...f, outputs };
+}
+const lastStatus = (f, sha) => f.statuses.filter((status) => status.sha === sha).at(-1);
+test('an entry still waiting for its single build slot admits the exact PR head only', async () => {
+  // Stale refs from an earlier queue attempt stay in revocation scope but are never the group.
+  const stale = { ref: 'refs/heads/gh-readonly-queue/main/pr-1-0123', object: { sha: queued } };
+  for (const refs of [[], [stale]]) {
+    const f = awaitingBuildFixture();
+    f.f.refs = refs;
+    await withReceiptDirectory(() =>
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
+    );
+    assert.deepEqual(f.outputs, { pull_request: '1', admission_sha: head });
+    assert.equal(lastStatus(f, head).state, 'pending');
+    assert.ok(f.statuses.every((status) => status.state !== 'failure'));
+  }
+});
+test('queue discovery still fails closed for entries without a provable integration commit', async () => {
+  for (const [entry, message] of [
+    [{ state: 'AWAITING_CHECKS' }, /no integration commit/],
+    [{ state: 'UNMERGEABLE' }, /no integration commit/],
+    [{ state: undefined }, /no integration commit/],
+    [{ headCommit: { oid: queued } }, /integration ref is missing or ambiguous/],
+  ]) {
+    const f = awaitingBuildFixture(entry);
+    await assert.rejects(
+      runReviewAdmission({ github: f.github, context: f.context, core: f.core }),
+      message
+    );
+    assert.equal(lastStatus(f, head).state, 'failure');
+    assert.equal(f.outputs.admission_sha, undefined);
+  }
+  const missing = awaitingBuildFixture();
+  delete missing.q.state.entry.headCommit;
+  await assert.rejects(
+    runReviewAdmission({ github: missing.github, context: missing.context, core: missing.core }),
+    /integration metadata missing/
+  );
+  const unbuilt = queueFixture();
+  unbuilt.state.entry = { ...unbuilt.state.entry, state: 'QUEUED', headCommit: null };
+  await assert.rejects(
+    queueIdentity(unbuilt.github, repo, unbuilt.group, unbuilt.pr),
+    /does not identify this integration commit/
+  );
+});
+test('regression assertions detect a reintroduced unbuilt-entry state bypass', async () => {
+  const mutant = await importMutationSource(
+    'review-admission-api.mjs',
+    "entry.state === 'QUEUED'",
+    'true'
+  );
+  const f = awaitingBuildFixture({ state: 'AWAITING_CHECKS' });
+  const { pr } = f.q;
+  await assert.rejects(activeQueueGroup(f.github, repo, pr, []), /no integration commit/);
+  assert.equal(await mutant.activeQueueGroup(f.github, repo, pr, []), null);
+});
 test('regression assertions detect reintroduced head-only revocation and manifest-only dependency bypasses', async () => {
   const scopeMutant = await importMutationSource(
     'review-admission.mjs',
@@ -1648,7 +1718,7 @@ test('original queue and binding assertions reject reintroduced identity/attempt
       },
     },
     {
-      before: 'entry.headCommit.oid === sha',
+      before: 'entry.headCommit?.oid === sha',
       change: (f) => {
         f.state.entry.headCommit.oid = head;
       },

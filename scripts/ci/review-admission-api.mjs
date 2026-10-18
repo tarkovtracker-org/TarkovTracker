@@ -59,7 +59,7 @@ export function requirePrIdentity(pr, repo) {
 }
 const QUEUE_QUERY = `query($owner:String!,$repo:String!,$number:Int!) {
  repository(owner:$owner,name:$repo) { pullRequest(number:$number) {
-  headRefOid mergeQueueEntry { position baseCommit { oid } headCommit { oid }
+  headRefOid mergeQueueEntry { position state baseCommit { oid } headCommit { oid }
    pullRequest { number headRefOid } }
  } }
 }`;
@@ -97,7 +97,17 @@ export async function activeQueueGroup(github, repo, pr, refs) {
     entry.pullRequest.number === pr.number,
     'Queue discovery member number mismatch.'
   );
+  if (awaitingBuild(entry)) return null;
   return referencedGroup(refs, entry);
+}
+// With one build slot, later entries stay QUEUED with no integration commit until they reach the
+// front. Only the PR head is in scope then; the group's own merge_group signal re-runs admission
+// once GitHub builds it. Any other entry without an integration commit still fails closed.
+function awaitingBuild(entry) {
+  requireEvidence(Object.hasOwn(entry, 'headCommit'), 'Queue entry integration metadata missing.');
+  if (entry.headCommit !== null) return false;
+  requireEvidence(entry.state === 'QUEUED', 'Queue entry has no integration commit.');
+  return true;
 }
 function referencedGroup(refs, entry) {
   const matches = refs.filter((ref) => ref.object.sha === entry.headCommit.oid);
@@ -116,7 +126,7 @@ function requireQueueEntry(data, pr, sha, base) {
   requireEvidence(Boolean(entry), 'PR is no longer in the queue.');
   requireEvidence(queried.headRefOid === pr.head.sha, 'Queue PR head changed.');
   requireEvidence(
-    entry.headCommit.oid === sha,
+    entry.headCommit?.oid === sha,
     'Queue entry does not identify this integration commit.'
   );
   requireEvidence(entry.baseCommit.oid === base, 'Queue entry base changed.');
