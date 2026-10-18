@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { Handle, Position } from '@vue-flow/core';
-  import type { TaskNodeData } from '@/composables/useTaskGraphData';
+  import type { TaskNodeData, TaskNodeStatus } from '@/composables/useTaskGraphData';
   const props = defineProps<{
     data: TaskNodeData;
   }>();
@@ -10,20 +10,17 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const isKeyboardFocused = ref(false);
+  const STATUS_NODE_CLASSES: Record<TaskNodeStatus, string> = {
+    completed: 'border-success-500/60 bg-success-500/10',
+    available: 'border-info-500/60 bg-info-500/10',
+    locked: 'border-locked-500/60 bg-locked-500/10',
+    failed: 'border-error-500/60 bg-error-500/10',
+  };
   const statusClasses = computed(() => {
     if (props.data.isDimmed) {
       return 'border-surface-700 bg-surface-900/50 opacity-30';
     }
-    switch (props.data.status) {
-      case 'completed':
-        return 'border-success-500/60 bg-success-500/10';
-      case 'available':
-        return 'border-info-500/60 bg-info-500/10';
-      case 'failed':
-        return 'border-error-500/60 bg-error-500/10';
-      default:
-        return 'border-surface-600 bg-surface-800';
-    }
+    return STATUS_NODE_CLASSES[props.data.status];
   });
   const focusRingClass = computed(() => {
     if (props.data.isFocused || isKeyboardFocused.value) return 'ring-2 ring-primary-500';
