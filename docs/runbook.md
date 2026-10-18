@@ -1128,12 +1128,17 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, read access to stored
+privileged or write-capable roles across non-system schemas, column writes, sequence advancement,
+persistent-object ownership or creation, application `SECURITY DEFINER` execution, read access to stored
 migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
 interpret cumulative counters.
+
+Health checks include inherited roles and roles reachable through `SET ROLE`. Application
+`SECURITY DEFINER` execution is rejected as an unneeded bypass route; the check does not inspect
+function bodies or assert that every such function writes. See the [observer specification](./systems/prod-db-observer.md).
 
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and
@@ -1170,6 +1175,19 @@ holding the observer credential read stored migration SQL and any literal inside
 conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.
+
+Large-object creation needs explicit review even for an otherwise read-only role. PostgreSQL
+commonly grants PUBLIC execution of `lo_create`, `lo_creat`, and `lo_from_bytea`; `lo_import`
+execution can also create persistent objects. The canary rejects reachable execution of these
+functions, existing large-object UPDATE grants, privileged parameter grants, and enabled
+`lo_compat_privileges`. A role cannot shed a PUBLIC grant in isolation. An authorized database
+operator must review existing consumers before revoking PUBLIC creator execution and regranting
+it only to approved non-observer identities. Do not run blanket revokes as routine cleanup, weaken
+the canary to accept default grants, or treat read-only connection defaults as the boundary.
+Production privilege changes require separate authorization; until the boundary is provisioned,
+the canary intentionally fails closed. Catalog telemetry and migration-version SELECT remain
+supported for a correctly provisioned role. These checks do not constitute an audit of every
+extension or built-in function's implementation.
 
 The production canary should be run manually after provisioning, using only the telemetry commands
 above. Confirm the role, reset timestamps, timeouts, and negligible observer impact before enabling
