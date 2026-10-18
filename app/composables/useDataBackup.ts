@@ -929,6 +929,9 @@ export function useDataBackup(): UseDataBackupReturn {
       });
       importClient?.cancel();
       importClient = null;
+      workerOwner = undefined;
+      recoveryArchiveEntries.value = [];
+      selectedRecoveryArchiveEntry.value = null;
       importState.value = 'success';
     } catch (e) {
       importState.value = 'error';

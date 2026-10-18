@@ -1641,6 +1641,20 @@ describe('useDataBackup', () => {
   });
 });
 describe('older-tab recovery review', () => {
+  it('removes archive entry controls after a successful confirmed import releases its worker', async () => {
+    const backup = useDataBackup();
+    const raw = JSON.stringify({ _userId: 'user-123', data: tarkovStore.$state });
+    await backup.parseBackupFile(
+      createFile(
+        JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
+      )
+    );
+    expect(backup.recoveryArchiveEntries.value).toHaveLength(1);
+    await backup.confirmBackupImport({ pvp: true, pve: true });
+    expect(backup.importState.value).toBe('success');
+    expect(backup.recoveryArchiveEntries.value).toEqual([]);
+    expect(backup.selectedRecoveryArchiveEntry.value).toBeNull();
+  });
   it.each(['cancel', 'owner'] as const)(
     'never applies a selected snapshot after %s during transfer',
     async (action) => {
