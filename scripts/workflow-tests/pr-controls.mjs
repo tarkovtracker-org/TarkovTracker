@@ -647,11 +647,13 @@ test('privileged controls workflow is main-only, serialized, artifact-first, and
     source,
     /group: review-admission-publication\n      queue: max\n      cancel-in-progress: false/
   );
-  assert.equal((`${caller}${source}`.match(/ref: main/g) ?? []).length, 2);
-  assert.equal((`${caller}${source}`.match(/persist-credentials: false/g) ?? []).length, 2);
   const controls = jobBlock(source, 'controls');
   const invocation = jobBlock(caller, 'controls');
   const targets = jobBlock(caller, 'targets');
+  for (const job of [targets, controls]) {
+    assert.equal([...job.matchAll(/^          ref: main$/gm)].length, 1);
+    assert.equal([...job.matchAll(/^          persist-credentials: false$/gm)].length, 1);
+  }
   assert.match(invocation, /if: github.ref == 'refs\/heads\/main'/);
   assert.match(controls, /github.ref == 'refs\/heads\/main'/);
   assert.match(invocation, /uses: \.\/\.github\/workflows\/pr-controls-publish.yml/);
