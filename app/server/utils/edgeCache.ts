@@ -10,6 +10,7 @@ import { buildEdgeCacheRequest } from '@/server/utils/edgeCacheKey';
 import { sanitizeErrorMessage } from '@/server/utils/edgeCacheSanitizers';
 import { createLogger } from '@/server/utils/logger';
 import { buildOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
+import { readPrecomputedResponse } from '@/server/utils/precomputedResponse';
 import { getPrecomputedStore, isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
 import type { PrecomputedKvReader } from '@/server/utils/precomputedTarkov';
 import type { H3Event } from 'h3';
@@ -53,6 +54,16 @@ function getOverlayHeadersMeta(payload: unknown): OverlayHeadersMeta | null {
   const meta = (payload as { dataOverlay?: OverlayHeadersMeta }).dataOverlay;
   if (!meta || typeof meta !== 'object') return null;
   return meta;
+}
+async function readPrecomputedPayload<T>(
+  store: PrecomputedKvReader,
+  key: string,
+  namespace: string,
+  response: boolean
+): Promise<T | Response | undefined> {
+  if (response) return (await readPrecomputedResponse(store, key, namespace)) ?? undefined;
+  const envelope = await store.get(key, 'json');
+  return isPrecomputedEnvelope<T>(envelope) ? envelope.payload : undefined;
 }
 function readStoredOverlayMeta(headers: Headers): OverlayHeadersMeta {
   const fields = ['status', 'version', 'generated', 'sha256'] as const;
@@ -239,9 +250,14 @@ export async function edgeCache<T>(
         deps?.precomputedStore !== undefined ? deps.precomputedStore : getPrecomputedStore(event);
       if (precomputedStore) {
         try {
-          const envelope = await precomputedStore.get(key, 'json');
-          if (isPrecomputedEnvelope<T>(envelope)) {
-            const overlayMeta = getOverlayHeadersMeta(envelope.payload);
+          const payload = await readPrecomputedPayload<T>(
+            precomputedStore,
+            key,
+            fullCacheKey,
+            asResponse
+          );
+          if (payload !== undefined) {
+            const overlayMeta = getOverlayHeadersMeta(payload);
             const headers = setCacheResponseHeaders(
               event,
               setHeaders,
@@ -250,7 +266,7 @@ export async function edgeCache<T>(
               ttl,
               overlayMeta
             );
-            return cacheResult(envelope.payload, headers, asResponse);
+            return cacheResult(payload, headers, asResponse);
           }
           logger.info(`No precomputed entry for ${key}; falling back to edge cache`);
         } catch (precomputedError) {

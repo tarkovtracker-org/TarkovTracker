@@ -120,7 +120,8 @@
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",
     "test:workflow": "node --test scripts/workflow-tests/*.mjs scripts/codex-review/*-tests.mjs",
     "check:progress-contracts": "node scripts/checks/progress-contracts.mjs",
-    "verify:api-parity": "node scripts/checks/api-parity.mjs"
+    "verify:api-parity": "node scripts/checks/api-parity.mjs",
+    "bench:precomputed-response": "node scripts/checks/precomputed-response-benchmark.mjs"
   },
   "type": "module",
   "lint-staged": {
