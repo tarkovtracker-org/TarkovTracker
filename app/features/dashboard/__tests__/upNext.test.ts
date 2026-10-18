@@ -6,6 +6,7 @@ import {
   rankUpNext,
   type UpNextContext,
 } from '@/features/dashboard/upNext';
+import { buildTaskEvaluations } from '@/stores/taskAvailability';
 import type { TaskAvailabilityResult, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
 const task = (id: string, extra: Partial<Task> = {}): Task =>
@@ -28,6 +29,35 @@ const context = (
   ...overrides,
 });
 describe('opensCount', () => {
+  it.each([
+    { status: undefined, opens: 1 },
+    { status: [], opens: 1 },
+    { status: ['complete'], opens: 1 },
+    { status: ['completed'], opens: 1 },
+    { status: ['COMPLETED'], opens: 1 },
+    { status: ['complete', 'failed'], opens: 1 },
+    { status: ['active'], opens: 0 },
+    { status: ['accept'], opens: 0 },
+    { status: ['accepted'], opens: 0 },
+    { status: ['failed'], opens: 0 },
+    { status: ['FAILED'], opens: 0 },
+  ])('counts $status prerequisites only when completion opens them', ({ status, opens }) => {
+    const parent = task('parent', { children: ['child'] });
+    const child = task('child', { taskRequirements: [{ task: { id: parent.id }, status }] });
+    const evaluate = (completions: Record<string, { complete: boolean }>) =>
+      buildTaskEvaluations(
+        [parent, child],
+        new Map([['self', { completions, faction: 'USEC', level: 50, mode: 'pvp', traders: {} }]]),
+        { requireTraderLevels: true }
+      );
+    const before = evaluate({});
+    const after = evaluate({ parent: { complete: true } });
+    const count = opensCount(parent, (id) => before[id]?.self);
+    expect(after.child?.self?.available).toBe(
+      before.child?.self?.available === true || opens === 1
+    );
+    expect(count).toBe(opens);
+  });
   it('counts only children whose sole gate is this task', () => {
     const parent = task('parent', { children: ['a', 'b', 'c', 'd'] });
     const evaluations = {

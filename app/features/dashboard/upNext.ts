@@ -1,5 +1,9 @@
+import {
+  normalizeRequirementStatuses,
+  requiresCompletionOrActive,
+} from '@tarkovtracker/progress-contracts/requirementStatus';
 import type { TaskAvailabilityResult, TaskBlocker } from '@/stores/taskAvailability';
-import type { Task, TaskObjective } from '@/types/tarkov';
+import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 export type UpNextReason =
   | 'unlock-trader'
   | 'opens'
@@ -55,11 +59,14 @@ const taskProgress = (
 };
 const directChildren = (task: Task): string[] =>
   task.children?.length ? task.children : (task.successors ?? []);
+const opensOnCompletion = (taskId: string, requirement: TaskRequirement): boolean =>
+  requirement.task.id === taskId &&
+  requiresCompletionOrActive(normalizeRequirementStatuses(requirement.status));
 const onlyWaitsOn = (taskId: string, result: TaskAvailabilityResult | undefined): boolean => {
   const [blocker, ...rest] = result?.blockers ?? [];
   if (!blocker || rest.length || blocker.type !== 'prerequisite') return false;
   const requirements = blocker.requirements ?? [];
-  return requirements.length > 0 && requirements.every((req) => req.task.id === taskId);
+  return requirements.length > 0 && requirements.every((req) => opensOnCompletion(taskId, req));
 };
 /** Follow-up tasks whose only remaining gate is completing `task`. */
 export const opensCount = (task: Task, evaluation: EvaluationLookup): number =>
