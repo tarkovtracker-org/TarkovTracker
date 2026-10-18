@@ -188,6 +188,7 @@ export default withNuxt(
       'scripts/workflow-tests/preview.mjs',
       'scripts/workflow-tests/preview-request.mjs',
       'scripts/workflow-tests/review-admission.mjs',
+      'scripts/workflow-tests/controller-events.mjs',
       'scripts/workflow-tests/actionlint-queue.mjs',
       'scripts/workflow-tests/merge-queue-policy.mjs',
       'scripts/workflow-tests/merge-queue.mjs',

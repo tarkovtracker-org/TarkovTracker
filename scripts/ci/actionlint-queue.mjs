@@ -3,12 +3,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const queuedFiles = new Map([
   ['.github/workflows/preview-retention.yml', 'pages-preview-lifecycle'],
-  ['.github/workflows/release-promotion-queue.yml', 'release-promotion-queue'],
 ]);
 const specializedNormalizers = new Map([
   ['.github/workflows/preview.yml', normalizePreviewWorkflow],
   ['.github/workflows/review-admission.yml', normalizeAdmissionWorkflow],
   ['.github/workflows/pr-controls.yml', normalizeControlsWorkflow],
+  ['.github/workflows/release-promotion-queue.yml', normalizePromotionWorkflow],
 ]);
 /** Validate the documented queue extension before the older native parser sees the workflow. */
 export function normalizeQueueWorkflow(source, filename) {
@@ -34,17 +34,25 @@ function normalizePreviewWorkflow(source, filename) {
 }
 function normalizeControlsWorkflow(source, filename) {
   return normalizeAdmissionWorkflow(
-    source.replace(/^  controls:$/m, '  admission:'),
+    source.replace(/^ {2}controls:$/m, '  admission:'),
     filename
-  ).replace(/^  admission:$/m, '  controls:');
+  ).replace(/^ {2}admission:$/m, '  controls:');
 }
 function normalizeAdmissionWorkflow(source, filename) {
-  const expected =
-    '    concurrency:\n      group: review-admission-publication\n      queue: max\n      cancel-in-progress: false\n';
+  return normalizeSerializedJob(source, filename, 'admission', 'review-admission-publication');
+}
+function normalizePromotionWorkflow(source, filename) {
+  return normalizeSerializedJob(source, filename, 'enqueue', 'release-promotion-queue');
+}
+function normalizeSerializedJob(source, filename, name, group) {
+  const expected = `    concurrency:\n      group: ${group}\n      queue: max\n      cancel-in-progress: false\n`;
   const jobs = matchingBlock(source, /^jobs:\n(?:[ \t]+[^\n]*\n|[ \t]*\n)*/m);
-  const job = matchingBlock(jobs, /^ {2}admission:\n(?:[ \t]{4,}[^\n]*\n|[ \t]*\n)*/m);
+  const job = matchingBlock(
+    jobs,
+    new RegExp(`^ {2}${name}:\\n(?:[ \\t]{4,}[^\\n]*\\n|[ \\t]*\\n)*`, 'm')
+  );
   const block = matchingBlock(job, /^ {4}concurrency:\n(?:[ \t]{6,}[^\n]*\n)*/m);
-  if (block !== expected) throw new Error(`Invalid admission job concurrency: ${filename}`);
+  if (block !== expected) throw new Error(`Invalid serialized job concurrency: ${filename}`);
   requireSingleConcurrency(source, filename);
   return source.replace(expected, expected.replace('      queue: max', ''));
 }

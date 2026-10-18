@@ -19,7 +19,19 @@ permissions: {}
 jobs:
   filter:
     name: Filter admission event
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Coarse intake only: trusted main still authenticates and evaluates every retained event.
+    # Preserve old bodies so edited/deleted approvals and provider withdrawals revoke admission.
+    if: >-
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
+      (github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '/approve-sensitive ') ||
+      contains(github.event.changes.body.from, '/approve-sensitive ') ||
+      (github.event.comment.user.id == 136622811 && github.event.comment.user.type == 'Bot' &&
+      (contains(github.event.comment.body, '<!-- recent_review_start') ||
+      contains(github.event.comment.body, '<!-- final_review_risk_coverage:') ||
+      contains(github.event.changes.body.from, '<!-- recent_review_start') ||
+      contains(github.event.changes.body.from, '<!-- final_review_risk_coverage:'))))))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

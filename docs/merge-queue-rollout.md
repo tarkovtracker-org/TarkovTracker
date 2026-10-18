@@ -130,6 +130,15 @@ The controller serializes relevant events at job scope, after its event filter. 
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
 including withdrawal of a command with leading whitespace.
 
+An intake condition also skips ordinary comments before allocating the read-only filter runner.
+It is a coarse selector, never approval evidence: trusted main still verifies retained events.
+Both current and previous comment bodies are checked so approval edits/deletions and provider
+withdrawals still reach revocation. Skipped source workflows do not allocate control-panel runners,
+and only eligible release-promotion jobs enter their serialized queue. GitHub may still display
+skipped workflow records; these records perform no validation or publication work.
+Post-merge main CI remains required by release provenance checks even when queue CI used the same
+commit; it must not be removed without updating and validating those consumers.
+
 The `Review Admission` commit status is the gate. An expected policy hold (draft or closed PR,
 missing exact-head review, unresolved findings or changes requested, missing sensitive approval) publishes
 `failure` on the PR head and any live queue commit, then ends the controller run green with a
