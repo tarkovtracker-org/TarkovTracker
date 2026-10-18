@@ -40,7 +40,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request' ||
       github.event.workflow_run.event == 'workflow_dispatch' ||
       github.event.workflow_run.event == 'merge_group')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: write

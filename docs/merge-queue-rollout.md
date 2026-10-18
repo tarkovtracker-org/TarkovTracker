@@ -189,6 +189,17 @@ admission; an explicit trusted-main dispatch can recover once review evidence is
 controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
 and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).
 
+Review and review-comment signals are debounced per PR: each waits 45 seconds inside a per-PR
+`cancel-in-progress` group, so a review and its inline comments wake the serialized controller
+once. Cancelled signals are already ignored by the controller's success-only intake, and the
+surviving signal still rereads live evidence, so no review state is lost. Queue and
+provider-suite signals keep unique groups. Two coarse prefilters keep follow-on controllers off
+the shared queues: Release Promotion Queue skips Review Admission runs whose display-only
+`run-name` names an ordinary branch (`wip/release-*`, queue refs, `unscoped` and pre-locator
+titles still wake it), and PR Controls skips CI runs that are not `pull_request`/`merge_group`
+and Preview State runs that are not dispatches, which the target resolver maps to no PR anyway.
+Neither title nor event is evidence; every retained run is authenticated as before.
+
 Crowdin validates its immutable translation diff without updating a behind branch when queue
 policy is active, as it is now. In `strict-queue` mode (strict freshness and the queue both
 active, as during rollout or after rollback), validation remains strict while admission and

@@ -15,7 +15,7 @@ permissions:
 jobs:
   changes:
     name: Validation plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
@@ -48,7 +48,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Fallow audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,7 +87,7 @@ jobs:
   lint-format:
     needs: changes
     name: Lint & Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -148,7 +148,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,7 +161,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -219,7 +219,7 @@ jobs:
     needs: [changes, test]
     if: needs.changes.outputs.full == 'true'
     name: Coverage thresholds
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -246,7 +246,7 @@ jobs:
     # Translation-only pull requests keep the reduced test selection but still build a preview.
     if: needs.changes.outputs.full == 'true' || needs.changes.outputs.preview == 'true'
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -302,7 +302,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Supabase DB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -313,7 +313,7 @@ jobs:
         run: pnpm run supabase:check
   systems-drift:
     name: Systems drift check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -329,7 +329,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Workers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -370,7 +370,7 @@ jobs:
         workers,
         security,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout trusted CI aggregation
