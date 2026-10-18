@@ -18,11 +18,14 @@ import { hasStoryUnlockProgress, type TaskBlocker } from '@/stores/taskAvailabil
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
+import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
 import type {
   NormalizedTraderRequirement,
   RequirementComparison,
   Task,
+  TaskOtherRequirement,
   TaskRequirement,
 } from '@/types/tarkov';
 export type TaskRequirementKind =
@@ -38,6 +41,7 @@ export type TaskRequirementRow = {
 type TraderKind = 'trader_level' | 'trader_reputation';
 type KnownTraderRequirement = Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }>;
 type StatusLists = Array<string[] | undefined>;
+type KnownOtherRequirement = Exclude<TaskOtherRequirement, { type: 'unknown' }>;
 const TERMINAL_BLOCKERS = new Set<TaskBlocker['type']>(['complete', 'failed']);
 const SUMMARY_FROM_TASK_DATA = new Set<TaskBlocker['type']>([
   'complete',
@@ -216,23 +220,81 @@ export const useTaskRequirements = (task: () => Task) => {
           requirement.requirementType !== 'unknown'
       )
       .map(traderSummaryRow);
+  const storyProgress = computed(() =>
+    effectiveStoryProgress(
+      progressData.value.storyChapters,
+      storyCatalogForMode(
+        metadataStore.storyChapters ?? [],
+        metadataStore.storyChaptersGameMode,
+        tarkovStore.$state.currentGameMode
+      )
+    )
+  );
   const storyBypass = computed(() =>
     (task().storyUnlocks ?? []).some((chapter) =>
-      hasStoryUnlockProgress(chapter.id, progressData.value)
+      hasStoryUnlockProgress(chapter.id, { storyChapters: storyProgress.value })
     )
   );
   const taskSummary = (): TaskRequirementRow[] =>
     [...groupStatusesByTask(task().taskRequirements ?? [])].map(([id, lists]) =>
-      taskRow(id, lists, storyBypass.value || unmetStatusLists(id, lists).length === 0)
+      taskRow(id, lists, unmetStatusLists(id, lists).length === 0)
     );
+  const storySummary = (): TaskRequirementRow[] => {
+    const chapters = task().storyUnlocks ?? [];
+    if (!chapters.length) return [];
+    return [
+      {
+        kind: 'other',
+        met: storyBypass.value,
+        label: t('page.tasks.requirements.story_alternative', {
+          chapters: chapterNames(chapters.map((chapter) => chapter.id)),
+        }),
+      },
+    ];
+  };
   const otherSummary = (): TaskRequirementRow[] =>
     blockers.value
       .filter((blocker) => !SUMMARY_FROM_TASK_DATA.has(blocker.type))
       .flatMap(otherRows);
+  const otherRequirementLabels: {
+    [K in KnownOtherRequirement['type']]: (
+      requirement: Extract<KnownOtherRequirement, { type: K }>
+    ) => string;
+  } = {
+    dialogue: () => t('page.tasks.requirements.dialogue'),
+    storyObjective: (requirement) =>
+      t('page.tasks.requirements.story_objective', {
+        objective: requirement.objective.name ?? requirement.objective.id,
+        chapter: requirement.storyChapter.name ?? requirement.storyChapter.id,
+      }),
+    globalVariable: (requirement) =>
+      t('page.tasks.requirements.global_variable', {
+        requirement: formatComparison(t, requirement.compareMethod, requirement.value),
+      }),
+  };
+  const otherRequirementLabel = (requirement: KnownOtherRequirement): string =>
+    (otherRequirementLabels[requirement.type] as (value: KnownOtherRequirement) => string)(
+      requirement
+    );
+  const metOtherSummary = (): TaskRequirementRow[] => {
+    const blocked = new Set(blockers.value.map((blocker) => blocker.requirementId));
+    return normalizeOtherRequirements(task().otherRequirements)
+      .filter(
+        (requirement): requirement is KnownOtherRequirement =>
+          requirement.type !== 'unknown' && !blocked.has(requirement.id)
+      )
+      .map((requirement) => ({
+        kind: 'other',
+        met: true,
+        label: otherRequirementLabel(requirement),
+      }));
+  };
   const summary = computed(() => [
     ...levelSummary(),
     ...traderSummary(),
     ...taskSummary(),
+    ...storySummary(),
+    ...metOtherSummary(),
     ...otherSummary(),
   ]);
   return { blocking, summary };

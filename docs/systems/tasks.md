@@ -223,8 +223,8 @@ failed branches, faction, trader unlocks, prestige and unsupported data. `usePro
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
 card builds one requirement list with `useTaskRequirements`: while a card is locked, its header
 lists only the unmet requirements as chips (three, then an inline "+N more"), and the expanded body
-has a collapsible Requirements row that marks every level, trader and prerequisite requirement met
-or unmet. Cards carry no separate level or trader requirement badges. Comparisons are worded in
+has a collapsible Requirements row that marks every level, trader, prerequisite and server-side
+(`otherRequirements`) requirement met or unmet. Cards carry no separate level or trader requirement badges. Comparisons are worded in
 plain language by `requirement-format.ts` (`15+`, `exactly 1`, never `>=`); the dashboard's
 `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
@@ -257,8 +257,9 @@ Shared story chapters followed by matching mode corrections produce `Task.storyU
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
 wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
 condition. Client chapters merge the same mode patches (including partial objectives), and
-edition/chapter caches and in-flight requests are mode-scoped. A satisfied story route also
-marks the card's quest prerequisites as met in its Requirements row. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
+edition/chapter caches and in-flight requests are mode-scoped. The Requirements row lists a
+story route as its own "Or progress a story chapter" line, met from the same effective story
+progress the evaluator reads; the quest prerequisites keep their own state. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
 faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
 unresolved references remain blocked until metadata is available.
 

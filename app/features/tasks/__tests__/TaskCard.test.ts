@@ -6,7 +6,7 @@ import TaskCard from '@/features/tasks/TaskCard.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
-import type { Task } from '@/types/tarkov';
+import type { StoryChapter, Task } from '@/types/tarkov';
 const en = JSON.parse(readFileSync('app/locales/en.json', 'utf8'));
 const resolveEn = (key: string): unknown =>
   key.split('.').reduce<unknown>((value, part) => (value as Record<string, unknown>)?.[part], en);
@@ -29,6 +29,7 @@ const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
 };
 const tarkovStoreMock = {
+  $state: { currentGameMode: 'pvp' },
   clearTaskAvailability: vi.fn(),
   getCurrentProgressData: vi.fn((): Partial<UserProgressData> => ({ taskCompletions: {} })),
   getObjectiveCount: vi.fn(() => 0),
@@ -46,6 +47,8 @@ const metadataStoreMock = {
   editions: [],
   getTaskById: vi.fn(),
   mapsWithSvg: [],
+  storyChapters: [] as StoryChapter[],
+  storyChaptersGameMode: null as string | null,
   tasks: [] as Task[],
   tasksObjectivesHydrated: true,
   tasksObjectivesPending: false,
@@ -207,6 +210,8 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
     metadataStoreMock.getTaskById.mockReset();
+    metadataStoreMock.storyChapters = [];
+    metadataStoreMock.storyChaptersGameMode = null;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
   it('offers a task-local confirmation reset without touching objectives', async () => {
@@ -324,14 +329,7 @@ describe('TaskCard appearance and expansion controls', () => {
     tarkovStoreMock.playerLevel.mockReturnValue(1);
     wrapper.unmount();
   });
-  it.each([
-    [false, 'Not met'],
-    [true, 'Met'],
-  ])('treats a prerequisite as met with storyline progress: %s', async (complete, status) => {
-    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
-      taskCompletions: {},
-      storyChapters: { chapter: { complete } },
-    });
+  const storyRouteSummary = async () => {
     metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
     const wrapper = await mountTaskCard({
       parents: ['prior'],
@@ -340,7 +338,59 @@ describe('TaskCard appearance and expansion controls', () => {
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     await summary.get('button').trigger('click');
-    expect(summary.get('li').text()).toMatch(new RegExp(`^${status}:\\s*Complete Prior quest`));
+    return { wrapper, rows: summary.findAll('li').map((item) => item.text()) };
+  };
+  it.each([
+    [false, 'Not met'],
+    [true, 'Met'],
+  ])('reports storyline progress as its own route: %s', async (complete, status) => {
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      storyChapters: { chapter: { complete } },
+    });
+    const { wrapper, rows } = await storyRouteSummary();
+    expect(rows[0]).toMatch(/^Not met:\s*Complete Prior quest/);
+    expect(rows[1]).toMatch(new RegExp(`^${status}:\\s*Or progress a story chapter: Chapter`));
+    wrapper.unmount();
+  });
+  it('counts automatic story objectives toward the storyline route', async () => {
+    metadataStoreMock.storyChapters = [
+      {
+        id: 'chapter',
+        objectives: { intro: { id: 'intro', completionPolicy: 'tutorial' } },
+      } as unknown as StoryChapter,
+    ];
+    metadataStoreMock.storyChaptersGameMode = 'pvp';
+    const { wrapper, rows } = await storyRouteSummary();
+    expect(rows[1]).toMatch(/^Met:\s*Or progress a story chapter/);
+    wrapper.unmount();
+  });
+  it('lists satisfied server-side requirements as met', async () => {
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: { available: false, blockers: [{ type: 'dialogue', requirementId: 'talk' }] },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        { type: 'dialogue', id: 'talk', traders: ['trader'] },
+        {
+          type: 'storyObjective',
+          id: 'story',
+          storyChapter: { id: 'chapter', name: 'Chapter' },
+          objective: { id: 'goal', name: 'Goal' },
+        },
+        { type: 'globalVariable', id: 'var', variableId: 'v', compareMethod: '>=', value: 3 },
+      ],
+    });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    await summary.get('button').trigger('click');
+    const rows = summary.findAll('li').map((item) => item.text());
+    expect(rows).toEqual([
+      expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
+      expect.stringMatching(/^Met:\s*Server progression 3\+/),
+      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
+    ]);
     wrapper.unmount();
   });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {

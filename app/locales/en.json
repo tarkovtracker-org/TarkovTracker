@@ -1138,7 +1138,10 @@
         "you": "you: {value}",
         "story_alternative": "Or progress a story chapter: {chapters}",
         "met": "Met",
-        "unmet": "Not met"
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Server progression {requirement}"
       }
     },
     "hideout": {

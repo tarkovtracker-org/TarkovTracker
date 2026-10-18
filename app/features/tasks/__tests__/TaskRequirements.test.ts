@@ -37,6 +37,16 @@ describe('task requirement components', () => {
     expect(toggle.attributes('aria-expanded')).toBe('true');
     expect(toggle.text()).toBe('page.tasks.requirements.show_less');
   });
+  it('drops the show-less toggle once the expanded rows fit under the cap', async () => {
+    const wrapper = mountRequirements(
+      ['A', 'B', 'C', 'D'].map((label) => row(label)),
+      'blocking'
+    );
+    await wrapper.get('button').trigger('click');
+    await wrapper.setProps({ rows: [row('A'), row('B')] });
+    expect(wrapper.findAll('[data-testid="task-requirement-chip"]')).toHaveLength(2);
+    expect(wrapper.find('button').exists()).toBe(false);
+  });
   it('shows progress on chips and dedupes hints', () => {
     const wrapper = mountRequirements(
       [

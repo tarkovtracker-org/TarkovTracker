@@ -44,7 +44,8 @@
   import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
   const props = defineProps<{ rows: TaskRequirementRow[]; id: string }>();
   const { t } = useI18n({ useScope: 'global' });
-  const LINK_CLASS = 'underline decoration-white/30 underline-offset-2 hover:decoration-white/60';
+  const LINK_CLASS =
+    'underline decoration-white/30 underline-offset-2 hover:decoration-white/60 light:decoration-surface-900/30 light:hover:decoration-surface-900/60';
   const MET_STATE = {
     met: { icon: 'i-mdi-check-circle', iconClass: 'text-success-400', key: 'met' },
     unmet: { icon: 'i-mdi-close-circle', iconClass: 'text-error-400', key: 'unmet' },

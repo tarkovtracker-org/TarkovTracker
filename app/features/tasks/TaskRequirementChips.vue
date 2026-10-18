@@ -70,7 +70,7 @@
     }))
   );
   const toggleLabel = computed(() => {
-    if (expanded.value) return t('page.tasks.requirements.show_less');
+    if (expanded.value && hiddenCount.value > 0) return t('page.tasks.requirements.show_less');
     return hiddenCount.value > 0
       ? t('page.tasks.requirements.show_more', { count: hiddenCount.value })
       : '';
