@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
@@ -6,6 +7,9 @@ import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
+const en = JSON.parse(readFileSync('app/locales/en.json', 'utf8'));
+const resolveEn = (key: string): unknown =>
+  key.split('.').reduce<unknown>((value, part) => (value as Record<string, unknown>)?.[part], en);
 const taskState = reactive({
   complete: false,
   failed: false,
@@ -107,7 +111,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({
     t: (key: string, ...args: unknown[]) => {
       const fallback = args.at(-1);
-      return typeof fallback === 'string' ? fallback : key;
+      if (typeof fallback === 'string') return fallback;
+      const template = resolveEn(key);
+      if (typeof template !== 'string') return key;
+      const params = (args[0] ?? {}) as Record<string, unknown>;
+      return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
     },
   }),
 }));
@@ -128,7 +136,7 @@ const TaskCardHeaderStub = {
 };
 const TaskCardBadgesStub = {
   template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
-  props: ['task', 'traderRequirements'],
+  props: ['task'],
 };
 const TaskCardActionsStub = {
   template: '<div data-testid="task-card-actions" />',
@@ -217,7 +225,7 @@ describe('TaskCard appearance and expansion controls', () => {
     const wrapper = await mountTaskCard(gated);
     const reset = wrapper
       .findAll('button')
-      .find((button) => button.text() === 'page.tasks.questcard.clear_availability_confirmation');
+      .find((button) => button.text() === en.page.tasks.questcard.clear_availability_confirmation);
     expect(reset).toBeDefined();
     await reset!.trigger('click');
     expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
@@ -242,17 +250,30 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     const wrapper = await mountTaskCard();
     expect(wrapper.get('[data-testid="task-card-title"]').text()).toBe('Sample task');
-    expect(wrapper.find('[data-testid="task-blockers"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     wrapper.unmount();
   });
-  it('renders canonical blockers and evaluates reputation badges', async () => {
+  it('lists each unmet requirement once, in plain language, under the header', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     progressStoreMock.taskEvaluations = {
       'task-1': {
-        self: { available: false, blockers: [{ type: 'player_level', current: 1, required: 20 }] },
+        self: {
+          available: false,
+          blockers: [
+            { type: 'player_level', current: 1, required: 20, compareMethod: '>=' },
+            {
+              type: 'trader_reputation',
+              trader: { id: 'prapor', name: 'Prapor' },
+              current: 0,
+              required: 0.5,
+              compareMethod: '>=',
+            },
+          ],
+        },
       },
     };
     const wrapper = await mountTaskCard({
+      minPlayerLevel: 20,
       normalizedTraderRequirements: [
         {
           id: 'rep',
@@ -263,29 +284,65 @@ describe('TaskCard appearance and expansion controls', () => {
         },
       ],
     });
-    expect(wrapper.get('[data-testid="task-blockers"]').text()).not.toBe('');
-    expect(wrapper.findComponent(TaskCardBadgesStub).props('traderRequirements')).toEqual([
-      expect.objectContaining({ id: 'rep', met: false }),
+    const chips = wrapper
+      .findAll('[data-testid="task-requirement-chip"]')
+      .map((chip) => chip.text());
+    expect(chips).toEqual([
+      expect.stringContaining('Level 20+'),
+      expect.stringContaining('Prapor reputation 0.50+'),
     ]);
+    expect(chips[0]).toContain('you: 1');
+    expect(wrapper.text()).not.toMatch(/[<>]=|!=/);
+    expect(wrapper.get('[data-testid="task-card-badges"]').attributes()).not.toHaveProperty(
+      'trader-requirements'
+    );
     wrapper.unmount();
   });
-  it.each([false, true])(
-    'shows pending prerequisites only without storyline progress: %s',
-    async (complete) => {
-      tarkovStoreMock.getCurrentProgressData.mockReturnValue({
-        taskCompletions: {},
-        storyChapters: { chapter: { complete } },
-      });
-      metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
-      const wrapper = await mountTaskCard({
-        parents: ['prior'],
-        storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
-        taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
-      });
-      expect(wrapper.text().includes('Prior quest')).toBe(!complete);
-      wrapper.unmount();
-    }
-  );
+  it('keeps met requirements out of the header of an available card', async () => {
+    tarkovStoreMock.playerLevel.mockReturnValue(30);
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [
+            {
+              type: 'trader_level',
+              trader: { id: 'prapor', name: 'Prapor' },
+              current: 1,
+              required: 2,
+            },
+          ],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({ minPlayerLevel: 20 });
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.text()).toContain('1 of 1 met');
+    await summary.get('button').trigger('click');
+    expect(summary.text()).toContain('Level 20+');
+    tarkovStoreMock.playerLevel.mockReturnValue(1);
+    wrapper.unmount();
+  });
+  it.each([
+    [false, 'Not met'],
+    [true, 'Met'],
+  ])('treats a prerequisite as met with storyline progress: %s', async (complete, status) => {
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      storyChapters: { chapter: { complete } },
+    });
+    metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
+    const wrapper = await mountTaskCard({
+      parents: ['prior'],
+      storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+    });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    await summary.get('button').trigger('click');
+    expect(summary.get('li').text()).toMatch(new RegExp(`^${status}:\\s*Complete Prior quest`));
+    wrapper.unmount();
+  });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {
     const wrapper = await mountTaskCard();
     const header = wrapper.get('[data-testid="task-card-header"]');

@@ -1,3 +1,4 @@
+import { formatComparison, formatReputation } from '@/features/tasks/requirement-format';
 import { useMetadataStore } from '@/stores/useMetadata';
 import type { TaskBlocker } from '@/stores/taskAvailability';
 export const useTaskBlockerText = () => {
@@ -43,10 +44,12 @@ export const useTaskBlockerText = () => {
     });
   };
   const taskName = (id = '') => tasks.value.get(id) ?? id;
+  const formatValue = (blocker: TaskBlocker, value = 0) =>
+    blocker.type === 'trader_reputation' ? formatReputation(value) : value;
   const numericParams = (blocker: TaskBlocker) => ({
-    current: blocker.current ?? 0,
+    current: formatValue(blocker, blocker.current),
     required: blocker.required ?? 0,
-    comparison: blocker.compareMethod ?? '>=',
+    requirement: formatComparison(t, blocker.compareMethod, formatValue(blocker, blocker.required)),
   });
   const namedParams = (blocker: TaskBlocker) => ({
     trader: blocker.trader?.name ?? '',
@@ -55,8 +58,18 @@ export const useTaskBlockerText = () => {
     objective: blocker.objective?.name ?? '',
     chapter: (blocker.chapterIds ?? []).map((id) => chapters.value.get(id) ?? id).join(', '),
   });
+  const renamedKeys: Partial<Record<TaskBlocker['type'], string>> = {
+    player_level: 'player_level_required',
+    trader_level: 'trader_level_required',
+    trader_reputation: 'trader_reputation_required',
+    global_variable: 'global_variable_required',
+    global_variable_unknown: 'global_variable_unknown_required',
+    task_counter: 'task_counter_required',
+  };
   const blockerKey = (blocker: TaskBlocker) =>
-    blocker.type === 'trader_unlock' && blocker.objective ? 'trader_story_unlock' : blocker.type;
+    blocker.type === 'trader_unlock' && blocker.objective
+      ? 'trader_story_unlock'
+      : (renamedKeys[blocker.type] ?? blocker.type);
   return (blocker: TaskBlocker): string =>
     blocker.type === 'prerequisite'
       ? prerequisiteText(blocker)

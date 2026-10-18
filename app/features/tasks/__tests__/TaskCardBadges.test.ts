@@ -14,7 +14,6 @@ const mountBadges = (props: Partial<InstanceType<typeof TaskCardBadges>['$props'
       task: { id: 'task-1', name: 'Test task' },
       isPinned: false,
       isOurFaction: true,
-      traderRequirements: [],
       locationTooltip: 'Any map',
       isFailed: false,
       isInvalid: false,
@@ -38,25 +37,22 @@ describe('TaskCardBadges', () => {
     expect(mountBadges({ isInvalid: true }).text()).toContain('common.blocked');
   });
 });
-it.each(['level', 'reputation'] as const)(
-  'renders the %s requirement details',
-  (requirementType) => {
-    const wrapper = mountBadges({
-      traderRequirements: [
+it('leaves trader requirements to the requirements surface', () => {
+  const wrapper = mountBadges({
+    task: {
+      id: 'task-1',
+      name: 'Test task',
+      normalizedTraderRequirements: [
         {
           id: 'prapor-requirement',
           trader: { id: 'prapor', name: 'Prapor' },
-          requirementType,
+          requirementType: 'level',
           compareMethod: '>=',
           value: 2,
-          met: false,
         },
       ],
-    });
-    expect(wrapper.text()).toContain('page.tasks.questcard.trader_requirement_badge');
-    expect(wrapper.text()).toContain('"trader":"Prapor"');
-    expect(wrapper.text()).toContain('"value":2');
-    expect(wrapper.text()).toContain(requirementType === 'level' ? 'loyalty_level' : 'reputation');
-    wrapper.unmount();
-  }
-);
+    },
+  });
+  expect(wrapper.text()).not.toContain('Prapor');
+  wrapper.unmount();
+});

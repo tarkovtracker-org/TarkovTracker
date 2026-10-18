@@ -78,25 +78,6 @@
           />
         </a>
       </AppTooltip>
-      <AppTooltip
-        v-if="(task.minPlayerLevel ?? 0) > 0"
-        :text="
-          t(
-            'page.tasks.questcard.level_badge_tooltip',
-            { level: task.minPlayerLevel },
-            `Minimum player level ${task.minPlayerLevel} required to unlock this quest`
-          )
-        "
-      >
-        <UBadge
-          size="xs"
-          :color="meetsLevelRequirement ? 'success' : 'error'"
-          variant="soft"
-          class="shrink-0 cursor-help text-[11px]"
-        >
-          {{ t('page.tasks.questcard.level_badge', { count: task.minPlayerLevel }) }}
-        </UBadge>
-      </AppTooltip>
     </div>
   </div>
 </template>
@@ -106,7 +87,6 @@
   import type { Task } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
-    meetsLevelRequirement: boolean;
   }>();
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });
