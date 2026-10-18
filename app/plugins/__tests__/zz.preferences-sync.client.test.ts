@@ -327,7 +327,7 @@ describe('preferences sync plugin', () => {
     expect(payload).not.toHaveProperty('profile_share_pve_public');
     expect(payload.user_id).toBe('user-1');
   });
-  it('hydrates a select-star row after retired columns disappear without restoring cached keys', async () => {
+  it('hydrates a select-star row that omits retired preference columns', async () => {
     vi.mocked(useSupabaseSync).mockReturnValue(createSyncController());
     const preferencesStore = createPreferencesStore({ streamerMode: false, localeOverride: 'en' });
     preferencesStore.resetToDefaults.mockImplementation(() => {});
