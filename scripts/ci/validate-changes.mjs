@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { appendFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { classifyPaths, collectChanges } from './validation-plan.mjs';
+import { classifyPaths, classifyQueuePaths, collectChanges } from './validation-plan.mjs';
 import { pnpmEntry } from './validation-tools.mjs';
 const args = process.argv.slice(2);
 const options = { mode: 'local', explain: false, full: false, shadow: false };
@@ -15,15 +15,17 @@ while (args.length) {
       break;
     }
     options[arg.slice(2)] = value;
-  } else if (['--explain', '--full', '--shadow'].includes(arg)) {
+  } else if (['--explain', '--full', '--shadow', '--queue'].includes(arg)) {
     options[arg.slice(2)] = true;
   } else {
     malformed = true;
   }
 }
 if (!['local', 'ci', 'full'].includes(options.mode)) malformed = true;
+if (options.queue && options.mode !== 'ci') malformed = true;
 const changes = collectChanges({ ...options, local: options.mode !== 'ci' });
-const proposed = classifyPaths(changes.paths, {
+const classify = options.queue ? classifyQueuePaths : classifyPaths;
+const proposed = classify(changes.paths, {
   forceFull: Boolean(changes.error) || malformed || options.full || options.mode === 'full',
   reason:
     changes.error || (malformed ? 'Malformed arguments; selecting full validation' : undefined),

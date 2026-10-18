@@ -5,10 +5,17 @@ Owner: [CI and release](systems/ci-and-release.md). Preview security remains own
 
 ## Candidate validation
 
-CI handles `merge_group: checks_requested` with full validation, including all test shards,
-Supabase, contracts, Fallow and security. The queue's temporary integration commit is built with
-the anonymous preview profile. The trusted Preview State controller requests the existing
-credential-isolated deploy/smoke pipeline after that exact CI attempt succeeds.
+CI handles `merge_group: checks_requested` using the exact event base and checked-out integration
+head. The new docs-only queue reduction reuses the existing path classifier. A complete
+single-parent delta containing only inert documentation keeps formatting, systems drift and
+security required, while skipping app build and tests. Agent policy files, GitHub configuration, mixed changes and uncertain evidence stay full.
+The trusted Preview State controller independently verifies the same live queue revision and a
+complete base/head comparison before publishing `Preview Result: success` as not applicable,
+without expecting a build artifact. A capped comparison, stale revision or changed CI attempt
+cannot establish that exemption. All other integrations retain full validation and the anonymous
+credential-isolated preview deployment/smoke pipeline after that exact CI attempt succeeds.
+The reduction has local replay/regression coverage; live docs-only queue skips remain a rollout
+verification item after authorized merge.
 
 The preview status targets the queue commit, not any member PR head. Before planning, upload and
 success publication, the controller verifies the same-repository `gh-readonly-queue/main/` ref,
@@ -228,7 +235,8 @@ deployment lifecycle are described in [previews](systems/previews.md#queue-previ
 Native queue previews serialize with retention using `queue: max`. Ordinary and fork previews
 keep their own per-CI-run lock, so fork approval waits do not block the shared queue lifecycle.
 The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
-60-minute response bound; integration is still full CI plus an anonymous deployed preview.
+60-minute response bound. Only proven inert docs integrations use the reduced validation and
+not-applicable preview described above; other integrations keep full CI and a deployed preview.
 
 ### Review and preview controls
 

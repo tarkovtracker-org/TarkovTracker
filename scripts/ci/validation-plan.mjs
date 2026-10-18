@@ -124,6 +124,29 @@ export function classifyPaths(paths, { forceFull = false, reason } = {}) {
     paths,
   };
 }
+// Queue reductions are narrower than ordinary PR reductions: only existing inert documentation.
+// Agent policy files and all GitHub configuration retain full queue validation.
+function queueDocumentationPath(path) {
+  if (typeof path !== 'string' || path.startsWith('.github/')) return false;
+  if (agentInstructionPath(path)) return false;
+  return [pathCategory(path) === 'docs', inertPath(path)].every(Boolean);
+}
+export function classifyQueuePaths(paths, options = {}) {
+  return classifyPaths(paths, {
+    ...options,
+    forceFull: options.forceFull || paths.length >= 300 || !paths.every(queueDocumentationPath),
+  });
+}
+function queueComparisonBase(git, base, head, baseSha, headSha) {
+  if (![base, head].every((sha) => /^[a-f0-9]{40}$/.test(sha)))
+    throw new Error('Queue revisions must be immutable');
+  const parents = git('rev-list', '--parents', '-n', '1', headSha).trim().split(' ');
+  if (parents.join(' ') !== `${headSha} ${baseSha}`)
+    throw new Error('Queue integration must have the exact base as its only parent');
+  if (git('rev-parse', 'HEAD').trim() !== headSha)
+    throw new Error('Queue checkout does not match the event head');
+  return baseSha;
+}
 function assertCompletePaths(paths, count) {
   if (paths.length !== count || paths.some((path) => !path)) throw new Error('Missing Git path');
 }
@@ -143,10 +166,19 @@ export function parseNameStatus(output) {
   while (fields.length) paths.push(...takeStatusPaths(fields));
   return paths;
 }
+function collectLocalPaths(git, paths, local) {
+  if (!local) return;
+  paths.push(
+    ...parseNameStatus(git('diff', '--name-status', '-z', '--find-renames', '--')),
+    ...parseNameStatus(git('diff', '--cached', '--name-status', '-z', '--find-renames', '--')),
+    ...git('ls-files', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean)
+  );
+}
 export function collectChanges({
   base = 'origin/main',
   head = 'HEAD',
   local = true,
+  queue = false,
   cwd = process.cwd(),
 } = {}) {
   const git = (...args) =>
@@ -159,17 +191,13 @@ export function collectChanges({
     // Resolve refs first so user-supplied revision arguments cannot become Git options.
     const baseSha = git('rev-parse', '--verify', '--end-of-options', `${base}^{commit}`).trim();
     const headSha = git('rev-parse', '--verify', '--end-of-options', `${head}^{commit}`).trim();
-    const mergeBase = git('merge-base', baseSha, headSha).trim();
+    const mergeBase = queue
+      ? queueComparisonBase(git, base, head, baseSha, headSha)
+      : git('merge-base', baseSha, headSha).trim();
     const paths = parseNameStatus(
       git('diff', '--name-status', '-z', '--find-renames', mergeBase, headSha, '--')
     );
-    if (local) {
-      paths.push(
-        ...parseNameStatus(git('diff', '--name-status', '-z', '--find-renames', '--')),
-        ...parseNameStatus(git('diff', '--cached', '--name-status', '-z', '--find-renames', '--')),
-        ...git('ls-files', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean)
-      );
-    }
+    collectLocalPaths(git, paths, local && !queue);
     return { paths: [...new Set(paths)], baseSha, headSha };
   } catch {
     return {

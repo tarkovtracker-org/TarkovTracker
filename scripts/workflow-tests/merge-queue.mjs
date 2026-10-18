@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { resolveProfileOutputs } from '../preview/build-profile.mjs';
-import { queueRevision, requireQueueCi } from '../preview/merge-queue.mjs';
+import { queueRevision, requireQueueCi, queueRequiresPreview } from '../preview/merge-queue.mjs';
 import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
@@ -109,11 +109,12 @@ test('queue builds use anonymous preview settings, not production identifiers', 
   assert.equal(result.buildEnv.SUPABASE_URL, '');
   assert.equal(result.buildEnv.CODECOV_TOKEN, '');
 });
-test('queue workflow runs full validation and retains existing merge protections during rollout', () => {
+test('queue workflow selects proven documentation and retains existing merge protections', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.match(ci, /merge_group:\n {4}types: \[checks_requested\]/);
   const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
-  assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
+  assert.match(classify, /if \[ "\$EVENT_NAME" = "merge_group" \]; then\n\s+args\+=\(--queue\)/);
+  assert.match(classify, /elif \[ "\$EVENT_NAME" != "pull_request" \]; then\n\s+args\+=\(--full\)/);
   assert.match(classify, /BASE_SHA:.*github.event.merge_group.base_sha/);
   assert.match(
     readFileSync('.github/workflows/preview-state.yml', 'utf8'),
@@ -132,4 +133,88 @@ test('queue workflow runs full validation and retains existing merge protections
       .required_status_checks,
     { context: 'Review Admission', integration_id: 0 },
   ]);
+});
+function comparison(files) {
+  return {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    total_commits: 1,
+    base_commit: { sha: base },
+    merge_base_commit: { sha: base },
+    commits: [{ sha: head, parents: [{ sha: base }] }],
+    files,
+  };
+}
+test('trusted queue preview uses the full authenticated integration comparison, including renamed and deleted paths', async () => {
+  const f = fixture();
+  const revision = { baseSha: base, treeSha: tree };
+  let data;
+  f.github.rest.repos = {
+    compareCommits: async (params) => {
+      assert.deepEqual(params, {
+        owner: 'example',
+        repo: 'repo',
+        base,
+        head,
+        per_page: 100,
+        page: 1,
+      });
+      return { data };
+    },
+  };
+  for (const files of [
+    [{ filename: 'docs/a.md', status: 'added' }],
+    [{ filename: 'docs/deleted.md', status: 'removed' }],
+    [{ filename: 'docs/new.md', previous_filename: 'docs/old.md', status: 'renamed' }],
+  ]) {
+    data = comparison(files);
+    assert.equal(await queueRequiresPreview(f.github, f.context, f.candidate, revision), false);
+  }
+  const docs = [{ filename: 'docs/a.md', status: 'modified' }];
+  const invalid = [
+    comparison([]),
+    comparison([...docs, { filename: 'app/a.ts', status: 'modified' }]),
+    comparison([{ filename: 'docs/a.md', previous_filename: 'app/a.ts', status: 'renamed' }]),
+    comparison([{ filename: '.github/workflows/ci.yml', status: 'modified' }]),
+    comparison([{ filename: 'docs/new.md', status: 'renamed' }]),
+    comparison([{ filename: 'docs/a.md', status: 'unknown' }]),
+    comparison(
+      Array.from({ length: 300 }, (_, i) => ({ filename: `docs/${i}.md`, status: 'added' }))
+    ),
+    { ...comparison(docs), commits: [{ sha: tree, parents: [{ sha: base }] }] },
+    { ...comparison(docs), base_commit: { sha: tree } },
+    { ...comparison(docs), merge_base_commit: { sha: tree } },
+    { ...comparison(docs), status: 'diverged' },
+    { ...comparison(docs), ahead_by: 2 },
+    { ...comparison(docs), behind_by: 1 },
+    { ...comparison(docs), commits: [] },
+    { ...comparison(docs), commits: [...comparison(docs).commits, ...comparison(docs).commits] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [] }] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [{ sha: tree }] }] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [{ sha: base }, { sha: tree }] }] },
+    { ...comparison(docs), commits: [null] },
+    comparison([null]),
+    null,
+    { ...comparison(docs), total_commits: 2 },
+    { ...comparison(docs), files: undefined },
+  ];
+  for (data of invalid)
+    assert.equal(await queueRequiresPreview(f.github, f.context, f.candidate, revision), true);
+  f.github.rest.repos.compareCommits = async () => {
+    throw new Error('comparison unavailable');
+  };
+  await assert.rejects(
+    queueRequiresPreview(f.github, f.context, f.candidate, revision),
+    /comparison unavailable/
+  );
+  for (const status of [404, 422]) {
+    f.github.rest.repos.compareCommits = async () => {
+      throw Object.assign(new Error('missing comparison'), { status });
+    };
+    await assert.rejects(
+      queueRequiresPreview(f.github, f.context, f.candidate, revision),
+      /Queue comparison is no longer available/
+    );
+  }
 });

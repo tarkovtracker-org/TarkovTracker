@@ -548,6 +548,12 @@ function repoEndpoints(state) {
       },
     },
     repos: {
+      compareCommits: async () => ({
+        data: {
+          ...queueDocsComparison(),
+          files: state.files.map((file) => ({ status: 'modified', ...file })),
+        },
+      }),
       getCollaboratorPermissionLevel: async () => ({ data: { role_name: state.requesterRole } }),
       listPullRequestsAssociatedWithCommit: 'associated',
       listCommitStatusesForRef: 'statuses',
@@ -2724,5 +2730,112 @@ test('dispatched PR previews reject matching trees with invalid ordered parents 
       assert.deepEqual(statusStates(result.state.statuses), ['a:pending']);
       assert.deepEqual(result.state.dispatches, []);
     }
+  }
+});
+function queueDocsComparison() {
+  return {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    total_commits: 1,
+    base_commit: { sha: BASE },
+    merge_base_commit: { sha: BASE },
+    commits: [{ sha: HEAD, parents: [{ sha: BASE }] }],
+    files: [{ filename: 'docs/guide.md', status: 'modified' }],
+  };
+}
+test('proven docs-only queue publishes the required result without build artifacts, dispatch, deployment or smoke', async (t) => {
+  const f = queueFixture(t);
+  f.state.artifacts = [];
+  let comparisons = 0;
+  f.github.rest.repos.compareCommits = async (params) => {
+    assert.deepEqual(params, { ...REPO, base: BASE, head: HEAD, per_page: 100, page: 1 });
+    comparisons++;
+    return { data: queueDocsComparison() };
+  };
+  f.github.rest.actions.downloadArtifact = () => {
+    throw new Error('docs must not download a build');
+  };
+  const args = {
+    github: f.github,
+    context: workflowRunContext(f.state.run),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  const decision = await planPreview(args);
+  assert.equal(comparisons, 1);
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.state, 'success');
+  assert.match(decision.description, /Not applicable/);
+  assert.equal(decision.headSha, HEAD);
+  assert.equal(decision.baseSha, BASE);
+  assert.equal(f.state.dispatches.length, 0);
+  assert.equal(f.state.statuses.at(-1).sha, HEAD);
+  assert.equal(
+    await publishResult({ ...args, decision, outcomes: { deploy: 'skipped', smoke: 'skipped' } }),
+    'success'
+  );
+});
+test('docs-only queue cannot publish success after ref, base or CI attempt changes during comparison', async (t) => {
+  for (const [change, reason] of [
+    [
+      (f) => {
+        f.state.queueSha = MERGE;
+      },
+      /Queue revision moved/,
+    ],
+    [
+      (f) => {
+        f.state.mainSha = MERGE;
+      },
+      /Queue base is no longer current main/,
+    ],
+    [
+      (f) => {
+        f.state.run = { ...f.state.run, run_attempt: 2 };
+      },
+      /CI run attempt superseded/,
+    ],
+  ]) {
+    const f = queueFixture(t);
+    f.github.rest.repos.compareCommits = async () => {
+      change(f);
+      return { data: queueDocsComparison() };
+    };
+    const decision = await planPreview({
+      github: f.github,
+      context: workflowRunContext(f.state.run),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.equal(decision.action, 'ignore');
+    assert.match(decision.description, reason);
+    assert.equal(f.state.dispatches.length, 0);
+    assert.equal(f.state.statuses.length, 0);
+  }
+});
+test('queue comparison errors preserve structured obsolete failures and propagate API outages', async (t) => {
+  for (const status of [404, 422, 503]) {
+    const f = queueFixture(t);
+    f.github.rest.repos.compareCommits = async () => {
+      throw Object.assign(new Error('comparison service unavailable'), { status });
+    };
+    const pending = planPreview({
+      github: f.github,
+      context: workflowRunContext(f.state.run),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    if (status === 503) await assert.rejects(pending, /comparison service unavailable/);
+    else {
+      const decision = await pending;
+      assert.equal(decision.action, 'fail');
+      assert.match(decision.description, /Queue comparison is no longer available/);
+    }
+    assert.equal(f.state.dispatches.length, 0);
+    assert.equal(
+      f.state.statuses.some((x) => x.state === 'success'),
+      false
+    );
   }
 });

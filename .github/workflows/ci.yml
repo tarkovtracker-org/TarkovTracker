@@ -37,12 +37,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        # Pull requests receive path-based selection; pushes and dispatches always validate fully.
+        # PRs select by path; queues reduce only proven inert docs. Pushes and dispatches stay full.
         # Rollback: re-add the shadow flag of scripts/ci/validate-changes.mjs to force every job and
         # invert the shadow-flag assertion in scripts/workflow-tests/workflows.mjs in the same change.
         run: |
           args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA")
-          if [ "$EVENT_NAME" != "pull_request" ]; then args+=(--full); fi
+          if [ "$EVENT_NAME" = "merge_group" ]; then
+            args+=(--queue)
+          elif [ "$EVENT_NAME" != "pull_request" ]; then
+            args+=(--full)
+          fi
           node scripts/ci/validate-changes.mjs "${args[@]}"
   fallow:
     needs: changes

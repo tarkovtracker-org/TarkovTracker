@@ -1,5 +1,6 @@
 // Queue candidates are temporary integration commits, never PR heads. Reuse the trusted
 // preview uploader only while the exact queue ref and CI attempt remain live.
+import { classifyQueuePaths } from '../ci/validation-plan.mjs';
 import { PRODUCTION_BRANCH } from './profile.mjs';
 const SHA = /^[0-9a-f]{40}$/;
 export class QueueValidationError extends Error {}
@@ -74,4 +75,72 @@ export async function requireQueueCi(github, context, run) {
     ].every(Boolean)
   )
     throw new QueueValidationError('Queue CI Result did not succeed for this attempt.');
+}
+function comparisonRange(data, baseSha) {
+  return [
+    data.status === 'ahead',
+    data.ahead_by === 1,
+    data.behind_by === 0,
+    data.total_commits === 1,
+    data.base_commit?.sha === baseSha,
+    data.merge_base_commit?.sha === baseSha,
+  ].every(Boolean);
+}
+function comparisonParent(parents, baseSha) {
+  if (!Array.isArray(parents) || parents.length !== 1) return false;
+  return parents[0]?.sha === baseSha;
+}
+function comparisonHead(commits, headSha, baseSha) {
+  if (!Array.isArray(commits) || commits.length !== 1) return false;
+  const commit = commits[0] ?? {};
+  return [commit.sha === headSha, comparisonParent(commit.parents, baseSha)].every(Boolean);
+}
+function exactQueueComparison(data, candidate, revision) {
+  return [
+    comparisonRange(data, revision.baseSha),
+    comparisonHead(data.commits, candidate.headSha, revision.baseSha),
+  ].every(Boolean);
+}
+function comparisonName(path) {
+  return typeof path === 'string' && path.length > 0;
+}
+function comparisonFilePaths(file) {
+  const { status, filename, previous_filename } = file ?? {};
+  const paths = ['renamed', 'copied'].includes(status) ? [filename, previous_filename] : [filename];
+  return [
+    ['added', 'modified', 'removed', 'renamed', 'copied'].includes(status),
+    paths.every(comparisonName),
+  ].every(Boolean)
+    ? paths
+    : null;
+}
+function comparisonPaths(files) {
+  // Compare returns at most 300 files on page one; at the cap completeness is unknown.
+  if (!Array.isArray(files) || files.length >= 300) return [];
+  const paths = files.map(comparisonFilePaths);
+  return paths.includes(null) ? [] : paths.flat();
+}
+function comparisonRequiresPreview(data, candidate, revision) {
+  const paths = exactQueueComparison(data ?? {}, candidate, revision)
+    ? comparisonPaths(data.files)
+    : [];
+  return classifyQueuePaths(paths).previewRequired;
+}
+export async function queueRequiresPreview(github, context, candidate, revision) {
+  try {
+    const { data } = await github.rest.repos.compareCommits({
+      ...context.repo,
+      base: revision.baseSha,
+      head: candidate.headSha,
+      per_page: 100,
+      page: 1,
+    });
+    return comparisonRequiresPreview(data, candidate, revision);
+  } catch (error) {
+    if ([404, 422].includes(error.status))
+      throw new QueueValidationError(
+        'Queue comparison is no longer available; wait for a fresh queue run.'
+      );
+    throw error;
+  }
 }
