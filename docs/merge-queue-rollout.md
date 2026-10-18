@@ -196,7 +196,8 @@ surviving signal still rereads live evidence, so no review state is lost. Queue 
 provider-suite signals keep unique groups. Two coarse prefilters keep follow-on controllers off
 the shared queues: Release Promotion Queue skips Review Admission runs whose display-only
 `run-name` names an ordinary branch (`wip/release-*`, queue refs, `unscoped` and pre-locator
-titles still wake it), and PR Controls skips CI runs that are not `pull_request`/`merge_group`
+titles still wake it; provider-suite admissions stay `unscoped` because their signal runs on
+`main`), and PR Controls skips CI runs that are not `pull_request`/`merge_group`
 and Preview State runs that are not dispatches, which the target resolver maps to no PR anyway.
 Neither title nor event is evidence; every retained run is authenticated as before.
 

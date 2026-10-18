@@ -204,7 +204,8 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   retains the candidate/source/version receipt and GitHub-only notes. No version tag or GitHub
   release is published during preparation.
 - The trusted Release Promotion Queue controller wakes after completed Release or Review Admission
-  runs (admissions for ordinary PR branches are prefiltered by their display-only run name),
+  runs (admissions for ordinary PR branches are prefiltered by their display-only run name;
+  provider-suite admissions stay unscoped to preserve promotion wakeups),
   authenticates the source receipt, assets, exact-head admission, CI and preview, and requests
   an ordinary head-pinned squash merge. It uses neither a bypass nor an approving review. Queue
   admission requires the version candidate's sole parent to equal the queue group's main base,

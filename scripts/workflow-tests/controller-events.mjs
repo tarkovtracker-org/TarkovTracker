@@ -155,12 +155,45 @@ test('ordinary PR admissions never wake the release promotion queue', () => {
       true
     );
 });
-test('the admission run-name locator names the candidate branch or stays unscoped', () => {
+/** Evaluate the actual display locator and feed its title into promotion intake. */
+function admissionTitle(payload = {}) {
   const workflow = readFileSync('.github/workflows/review-admission.yml', 'utf8');
-  assert.match(
-    workflow,
-    /^run-name: Review Admission \$\{\{ github\.event\.pull_request\.head\.ref \|\| github\.event\.workflow_run\.head_branch \|\| 'unscoped' \}\}$/m
+  const expression = workflow.match(/^run-name: Review Admission \$\{\{ (.+) \}\}$/m);
+  assert.ok(expression, 'admission workflow has no display locator');
+  const github = event('workflow_run', { pull_request: { head: { ref: '' } }, ...payload });
+  return `Review Admission ${new Function('github', `return (${expression[1]});`)(github)}`;
+}
+test('provider-suite admissions retain promotion wakeups from the default branch', () => {
+  const title = admissionTitle({ workflow_run: { event: 'check_suite', head_branch: 'main' } });
+  assert.equal(title, 'Review Admission unscoped');
+  assert.equal(
+    allows(
+      'release-promotion-queue',
+      'enqueue',
+      sourceRun('review-admission', { display_title: title })
+    ),
+    true
   );
+});
+test('the admission locator preserves candidate branches and unscoped events', () => {
+  for (const [payload, branch] of [
+    [{ pull_request: { head: { ref: 'wip/release-1.2.3' } } }, 'wip/release-1.2.3'],
+    [{ pull_request: { head: { ref: 'feat/dashboard' } } }, 'feat/dashboard'],
+    [
+      { workflow_run: { event: 'pull_request_review', head_branch: 'wip/release-1.2.3' } },
+      'wip/release-1.2.3',
+    ],
+    [
+      { workflow_run: { event: 'pull_request_review_comment', head_branch: 'feat/dashboard' } },
+      'feat/dashboard',
+    ],
+    [
+      { workflow_run: { event: 'merge_group', head_branch: 'gh-readonly-queue/main/pr-7-abcdef' } },
+      'gh-readonly-queue/main/pr-7-abcdef',
+    ],
+    [{}, 'unscoped'],
+  ])
+    assert.equal(admissionTitle(payload), `Review Admission ${branch}`);
 });
 const controlSources = [
   ['ci', 'pull_request', true],
