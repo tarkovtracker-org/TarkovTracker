@@ -84,6 +84,17 @@ describe('public changelog text', () => {
       'Update PvEmode with 2 3.',
     ]);
   });
+  it('finishes Highlights sentences and drops reference-only Highlights', () => {
+    const reference = `([${sha.slice(0, 7)}](${repo}/commit/${sha}))`;
+    const body = `### Highlights\n\n* faster \\maps &AMP; \\d+ ${reference}\n* ${reference}\n* Done!`;
+    expect(releaseEntries(body, 'v1')).toEqual([
+      { text: 'Faster \\maps & \\d+.', shas: [sha] },
+      { text: 'Done!', shas: [] },
+    ]);
+  });
+  it('drops release entries whose subject is only references', () => {
+    expect(toReleaseBullet(`**app:** ([#946](${repo}/issues/946))`)).toBeNull();
+  });
   it('pairs each release entry with the full commit SHAs it links', () => {
     const other = 'ce67df4f5bc7aa72d28d4b18d68ef6a6ef6ab288';
     expect(
