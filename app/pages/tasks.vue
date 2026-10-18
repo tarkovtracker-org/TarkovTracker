@@ -5,7 +5,9 @@
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
+          <!-- Narrow Graph shows only its explanation; v-show keeps the bar's selection watchers. -->
           <TaskFilterBar
+            v-show="!isNarrowGraphView"
             :is-search-active="hasSearchQuery"
             :active-status-view="effectiveTaskSecondaryView"
             :search-status-counts="searchStatusCounts"
@@ -538,6 +540,7 @@
   import { useMapTime } from '@/composables/useMapTime';
   import { usePageHelpState } from '@/composables/usePageHelpState';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
+  import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useTarkovTime } from '@/composables/useTarkovTime';
   import { useTaskDeepLink } from '@/composables/useTaskDeepLink';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
@@ -653,6 +656,9 @@
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
+  const { lgAndUp } = useSharedBreakpoints();
+  // Below lg the Graph route explains its width requirement, and the toolbar has nothing to act on.
+  const isNarrowGraphView = computed(() => showGraphView.value && !lgAndUp.value);
   const showSearchScopeHint = computed(() => isSearchActive.value && !showGraphView.value);
   const {
     isDesktopHelpPanelOpen,

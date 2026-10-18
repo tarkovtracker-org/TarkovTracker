@@ -350,6 +350,18 @@ describe('TaskFilterBar', () => {
     expect(buttonTexts.some((text) => text.includes('failed'))).toBe(false);
     expect(buttonTexts.some((text) => text.includes('all2'))).toBe(true);
   });
+  it('drops the list-only sort control from the graph view', async () => {
+    const sortDirection = '[data-icon="i-mdi-sort-ascending"]';
+    for (const [view, hasSort] of [
+      ['traders', true],
+      ['maps', true],
+      ['graph', false],
+    ] as const) {
+      const { TaskFilterBar } = await setup({ preferencesStore: { getTaskPrimaryView: view } });
+      const wrapper = mountTaskFilterBar(TaskFilterBar);
+      expect(wrapper.find(sortDirection).exists()).toBe(hasSort);
+    }
+  });
   it('moves off a hidden active status filter', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({
       preferencesStore: {

@@ -845,14 +845,17 @@
       "status_tabs_label": "Task status",
       "primary_views": {
         "aria_label": "Task views",
-        "graph": "Graph"
+        "graph": "Graph",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "Showing dependency chain for {taskName}",
         "isolate_chain": "Isolate chain",
         "show_context": "Show context",
         "no_tasks": "No tasks found for this trader.",
-        "mobile_unavailable": "Graph view is best experienced on a wider screen.",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "Legend",
         "flow_start": "Start (no prereqs)",
         "flow_end": "End (no follow-ups)",
