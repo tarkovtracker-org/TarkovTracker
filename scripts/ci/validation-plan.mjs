@@ -189,7 +189,7 @@ function selectExpectedJobs(full, previewRequired) {
   const withPreview = previewRequired ? ['validate'] : [];
   return [...reducedJobs, ...withPreview];
 }
-function isValidPlan(plan) {
+export function isValidPlan(plan) {
   if (!hasPlanShape(plan)) return false;
   if (typeof plan.previewRequired !== 'boolean') return false;
   const expected = selectExpectedJobs(plan.full, plan.previewRequired);

@@ -21,7 +21,7 @@ fails locally. Run with `pnpm run test:workflow`.
 | `helpers/`                | Shared fixtures: temp repos, workflow block parsing, ZIP building.                 |
 
 CI supplies its existing validation plan to `scripts/ci/run-workflow-tests.mjs`. Only pull requests
-whose complete diff contains `app/utils/changelog.ts` and/or its unit test select the release
+whose complete diff consists only of `app/utils/changelog.ts` and/or its unit test select the release
 commit contract tests and selection regressions. The helper is consumed by
 `scripts/release/release-highlights.test.mjs` and `scripts/release/release-scope.test.mjs`; those
 Vitest tests, the application tests, all required CI jobs and the aggregate remain unchanged.

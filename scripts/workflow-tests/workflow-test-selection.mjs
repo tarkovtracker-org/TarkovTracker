@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { selectWorkflowTests, workflowTestFiles } from '../ci/workflow-test-selection.mjs';
 import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
+import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const helper = 'app/utils/changelog.ts';
 const helperTests = 'app/utils/__tests__/changelog.test.ts';
 const all = workflowTestFiles();
@@ -66,12 +67,61 @@ test('release consumers and required aggregate jobs remain covered', () => {
   const highlights = readFileSync('scripts/release/release-highlights.test.mjs', 'utf8');
   const scope = readFileSync('scripts/release/release-scope.test.mjs', 'utf8');
   assert.match(highlights, /from ['"]@\/utils\/changelog['"]/);
-  assert.match(scope, /app\/utils\/changelog\.ts/);
-  assert.ok(classifyPaths([helper]).jobs.includes('test'));
-  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.match(
-    workflow,
-    /name: Test workflow tooling\n\s+if: needs.changes.outputs.full == 'true'\n\s+env:\n\s+WORKFLOW_TEST_PLAN: \$\{\{ needs.changes.outputs.plan \}\}\n\s+WORKFLOW_TEST_EVENT: \$\{\{ github.event_name \}\}\n\s+run: pnpm run test:workflow/
+    scope,
+    /readFileSync\(new URL\('\.\.\/\.\.\/app\/utils\/changelog\.ts', import\.meta\.url\), 'utf8'\)/
   );
-  assert.match(workflow, /pnpm exec vitest run/);
+  assert.ok(classifyPaths([helper]).jobs.includes('test'));
+  assertWorkflowContracts(readFileSync('.github/workflows/ci.yml', 'utf8'));
+});
+function assertWorkflowContracts(workflow) {
+  const tooling = workflowStep(jobBlock(workflow, 'lint-format'), 'Test workflow tooling');
+  assert.match(tooling, /^ {8}if: needs.changes.outputs.full == 'true'$/m);
+  assert.match(tooling, /^ {10}WORKFLOW_TEST_PLAN: \$\{\{ needs.changes.outputs.plan \}\}$/m);
+  assert.match(tooling, /^ {10}WORKFLOW_TEST_EVENT: \$\{\{ github.event_name \}\}$/m);
+  assert.match(tooling, /^ {8}run: pnpm run test:workflow$/m);
+  const tests = jobBlock(workflow, 'test');
+  assert.match(tests, /^ {4}if: needs.changes.outputs.full == 'true'$/m);
+  const shard = workflowStep(tests, 'Run shard ${{ matrix.shard }}/${{ matrix.total }}');
+  assert.match(shard, /^ {8}run: pnpm exec vitest run --coverage --shard="\$VITEST_SHARD"$/m);
+}
+test('workflow contracts reject decoys but allow step key reordering', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const tooling = workflowStep(jobBlock(workflow, 'lint-format'), 'Test workflow tooling');
+  const guard = "        if: needs.changes.outputs.full == 'true'\n";
+  const reordered = tooling.replace(guard, '') + '\n' + guard.trimEnd();
+  assertWorkflowContracts(workflow.replace(tooling, reordered));
+  const broken = tooling.replace('run: pnpm run test:workflow', 'run: echo disabled');
+  const decoy = `\n  decoy:\n    steps:\n      - name: Test workflow tooling\n${tooling}`;
+  assert.throws(() => assertWorkflowContracts(workflow.replace(tooling, broken) + decoy));
+  const shard = workflowStep(
+    jobBlock(workflow, 'test'),
+    'Run shard ${{ matrix.shard }}/${{ matrix.total }}'
+  );
+  assert.throws(() =>
+    assertWorkflowContracts(
+      workflow.replace(shard, shard.replace('pnpm exec vitest run', 'echo disabled'))
+    )
+  );
+});
+test('incomplete plans and invalid job contracts retain the full suite', () => {
+  const valid = classifyPaths([helper]);
+  const invalid = [
+    { full: true, paths: [helper] },
+    { ...valid, jobs: undefined },
+    { ...valid, jobs: [] },
+    { ...valid, jobs: valid.jobs.filter((job) => job !== 'security') },
+    { ...valid, jobs: [...valid.jobs, 'unknown-job'] },
+    { ...valid, previewRequired: undefined },
+    { ...valid, previewRequired: 'true' },
+  ];
+  for (const plan of invalid) {
+    assert.deepEqual(
+      selectWorkflowTests(all, {
+        WORKFLOW_TEST_EVENT: 'pull_request',
+        WORKFLOW_TEST_PLAN: JSON.stringify(plan),
+      }),
+      all
+    );
+  }
 });

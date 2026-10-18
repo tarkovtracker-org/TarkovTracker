@@ -1,4 +1,5 @@
 import { readdirSync } from 'node:fs';
+import { isValidPlan } from './validation-plan.mjs';
 const changelogPaths = new Set(['app/utils/changelog.ts', 'app/utils/__tests__/changelog.test.ts']);
 const retainedTests = [
   'scripts/workflow-tests/release-commit.mjs',
@@ -22,7 +23,7 @@ function readPlan(value) {
   }
 }
 function validPaths(plan) {
-  return plan?.full === true && Array.isArray(plan.paths);
+  return isValidPlan(plan) && plan.full && Array.isArray(plan.paths);
 }
 function changelogOnly(plan) {
   if (!validPaths(plan)) return false;
