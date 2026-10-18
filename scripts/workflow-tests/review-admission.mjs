@@ -250,14 +250,55 @@ test('sensitive paths require human head-bound approval plus independent review'
 test('renamed paths, large patches and hidden credential operations remain sensitive', () => {
   for (const change of [
     { previous_filename: 'app/pages/account.vue' },
-    { changes: 201 },
+    { changes: 501 },
     { patch: '+localStorage.setItem()' },
     { patch: '+fetch(url)' },
+    { filename: 'app/composables/useThing.ts', patch: '+const t = process.env.TOKEN' },
+    { filename: 'app/stores/useProgressStore.ts' },
+    { filename: 'app/utils/guard.ts', patch: '-if (!session) throw new Error()' },
+    { filename: 'app/server/api/thing.get.ts' },
+    { filename: 'app/plugins/thing.client.ts' },
   ]) {
     const f = fixture();
     Object.assign(f.files[0], change);
-    assert.throws(() => admissionDecision(f));
+    assert.throws(() => admissionDecision(f), JSON.stringify(change));
   }
+});
+test('ordinary app code, changed-line scanning and review-only volume stay low risk', () => {
+  for (const files of [
+    [{ filename: 'app/composables/useNeededItems.ts', changes: 15, patch: '-a\n+b' }],
+    [
+      {
+        filename: 'app/utils/statusTones.ts',
+        changes: 66,
+        patch: '+// https://www.w3.org/TR/css-color-4/',
+      },
+    ],
+    [{ filename: 'app/types/theme.ts', changes: 1, patch: '+tone: string' }],
+    [{ filename: 'DESIGN.md', changes: 5, patch: '+See https://example.com' }],
+    [
+      {
+        filename: 'app/features/tasks/TaskCard.vue',
+        changes: 2,
+        patch: ' localStorage.getItem(k)\n+const x = 1',
+      },
+    ],
+    [
+      { filename: 'app/components/ui/StatusTabBar.vue', changes: 300, patch: '+<div />' },
+      {
+        filename: 'app/components/ui/__tests__/StatusTabBar.test.ts',
+        changes: 400,
+        patch: '+it()',
+      },
+    ],
+  ]) {
+    assert.equal(classifyRisk(files).sensitive, false, files[0].filename);
+  }
+  assert.equal(
+    classifyRisk([{ filename: 'app/components/A.vue', changes: 501, patch: '+<div />' }]).sensitive,
+    true
+  );
+  assert.equal(classifyRisk([{ filename: 'AGENTS.md', changes: 1, patch: '+x' }]).sensitive, true);
 });
 test('explicit sensitive command authenticates permission and immutable SHA', () => {
   const f = fixture();

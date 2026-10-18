@@ -138,8 +138,11 @@ publisher and API errors still fail the run. A hold found after a receipt output
 fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
 status, a successful run and an approving receipt.
 
-Small ordinary changes, translations and verified safe dependency/version metadata changes may
-enter after bot review. Sensitive and unclassified changes require an exact-head approving review
+Ordinary changes, translations and verified safe dependency/version metadata changes may
+enter after bot review. Ordinary means files under `app/{components,pages,features,layouts,assets,
+composables,utils,types,stores}/`, docs, locales or tests, outside sensitive paths, whose changed
+(added or removed) lines avoid credential, session, storage and network patterns, with at most 500
+changed lines outside docs, locales and tests. Sensitive and unclassified changes require an exact-head approving review
 from an independent write collaborator, or a write collaborator's single-line command:
 
 ```text
