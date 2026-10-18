@@ -20,7 +20,7 @@ jobs:
   retention:
     if: github.ref == 'refs/heads/main'
     name: Retain ephemeral queue previews
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: preview
     permissions:

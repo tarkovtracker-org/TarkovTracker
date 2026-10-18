@@ -11,9 +11,17 @@ env:
 jobs:
   enqueue:
     name: Enqueue reviewed version PR
+    # Coarse intake only: admissions for ordinary PR branches cannot enqueue a generated version
+    # PR, so they never reach the serialized queue. The controller still authenticates every
+    # retained source run and receipt.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.repository.full_name == github.repository
+      github.event.workflow_run.repository.full_name == github.repository &&
+      (github.event.workflow_run.path != '.github/workflows/review-admission.yml' ||
+      contains(github.event.workflow_run.display_title, 'wip/release-') ||
+      contains(github.event.workflow_run.display_title, 'gh-readonly-queue/') ||
+      endsWith(github.event.workflow_run.display_title, ' unscoped') ||
+      !startsWith(github.event.workflow_run.display_title, 'Review Admission '))
     concurrency:
       group: release-promotion-queue
       queue: max

@@ -1,4 +1,9 @@
 name: Review Admission
+# Display-only candidate locator. Release Promotion Queue uses it as a coarse prefilter so
+# ordinary PR admissions allocate no promotion runner; it is never evidence. Events without a
+# branch (comments, dispatch) stay `unscoped` and keep waking promotion. Provider-suite signals
+# run on main, so their branch cannot identify the candidate; keep those unscoped too.
+run-name: Review Admission ${{ github.event.pull_request.head.ref || (github.event.workflow_run.event == 'check_suite' && 'unscoped') || github.event.workflow_run.head_branch || 'unscoped' }}
 # Only trusted events publish. Candidate review/queue events use the separate read-only signal.
 on:
   pull_request_target:
@@ -32,7 +37,7 @@ jobs:
       contains(github.event.comment.body, '<!-- final_review_risk_coverage:') ||
       contains(github.event.changes.body.from, '<!-- recent_review_start') ||
       contains(github.event.changes.body.from, '<!-- final_review_risk_coverage:'))))))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
       actions: read
@@ -64,7 +69,7 @@ jobs:
       group: review-admission-publication
       queue: max
       cancel-in-progress: false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: review-admission

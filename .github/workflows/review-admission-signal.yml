@@ -10,6 +10,12 @@ on:
   check_suite:
     types: [completed]
 permissions: {}
+# Review bursts (one review plus its inline comments) collapse to the newest signal per PR. A
+# cancelled signal never wakes the controller, and the surviving one makes it reread the live PR,
+# so dropping intermediate signals loses no evidence. Queue and provider-suite signals stay unique.
+concurrency:
+  group: review-admission-signal-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: true
 jobs:
   signal:
     name: Admission signal
@@ -19,7 +25,7 @@ jobs:
       contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group"]'), github.event_name) ||
       (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id) &&
       !startsWith(github.event.check_suite.head_branch, 'gh-readonly-queue/'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       # A locator is never review evidence: the trusted controller authenticates the
@@ -38,5 +44,9 @@ jobs:
           path: signal.json
           if-no-files-found: error
           retention-days: 1
+      # Debounce window: later events for the same PR cancel this run before it can complete.
+      - name: Coalesce review burst
+        if: github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment'
+        run: sleep 45
       - name: Notify trusted admission controller
         run: 'true'

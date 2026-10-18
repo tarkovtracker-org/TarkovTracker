@@ -33,18 +33,20 @@ function allows(filename, job, github) {
     'github',
     'contains',
     'startsWith',
+    'endsWith',
+    'fromJSON',
     `return Boolean(${expression});`
   );
+  const text = (value) => String(value ?? '').toLowerCase();
   return evaluate(
     github,
     (value, needle) =>
-      String(value ?? '')
-        .toLowerCase()
-        .includes(needle.toLowerCase()),
-    (value, prefix) =>
-      String(value ?? '')
-        .toLowerCase()
-        .startsWith(prefix.toLowerCase())
+      Array.isArray(value)
+        ? value.some((item) => text(item) === text(needle))
+        : text(value).includes(text(needle)),
+    (value, prefix) => text(value).startsWith(text(prefix)),
+    (value, suffix) => text(value).endsWith(text(suffix)),
+    JSON.parse
   );
 }
 function comment(body, from = '', user = { id: 1, type: 'User' }) {
@@ -119,4 +121,112 @@ test('only relevant release-promotion jobs enter the serialized queue', () => {
   const foreign = event('workflow_run');
   foreign.event.workflow_run.repository.full_name = 'other/repo';
   assert.equal(allows('release-promotion-queue', 'enqueue', foreign), false);
+});
+function sourceRun(path, fields = {}) {
+  const github = event('workflow_run');
+  Object.assign(github.event.workflow_run, { path: `.github/workflows/${path}.yml`, ...fields });
+  return github;
+}
+test('ordinary PR admissions never wake the release promotion queue', () => {
+  const admission = (title) =>
+    allows(
+      'release-promotion-queue',
+      'enqueue',
+      sourceRun('review-admission', { display_title: title })
+    );
+  for (const title of [
+    'Review Admission feat/dashboard-up-next',
+    'Review Admission main',
+    'Review Admission fix/release-notes',
+  ])
+    assert.equal(admission(title), false, title);
+  for (const title of [
+    'Review Admission wip/release-1.2.3-123-1',
+    'Review Admission gh-readonly-queue/main/pr-7-abcdef',
+    'Review Admission unscoped',
+    // Runs created before the run-name locator keep the old always-wake behavior.
+    'Review Admission',
+    'chore(release): 1.2.3',
+  ])
+    assert.equal(admission(title), true, title);
+  for (const event of ['schedule', 'workflow_dispatch', 'workflow_run'])
+    assert.equal(
+      allows('release-promotion-queue', 'enqueue', sourceRun('release', { event })),
+      true
+    );
+});
+/** Evaluate the actual display locator and feed its title into promotion intake. */
+function admissionTitle(payload = {}) {
+  const workflow = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const expression = workflow.match(/^run-name: Review Admission \$\{\{ (.+) \}\}$/m);
+  assert.ok(expression, 'admission workflow has no display locator');
+  const github = event('workflow_run', { pull_request: { head: { ref: '' } }, ...payload });
+  return `Review Admission ${new Function('github', `return (${expression[1]});`)(github)}`;
+}
+test('provider-suite admissions retain promotion wakeups from the default branch', () => {
+  const title = admissionTitle({ workflow_run: { event: 'check_suite', head_branch: 'main' } });
+  assert.equal(title, 'Review Admission unscoped');
+  assert.equal(
+    allows(
+      'release-promotion-queue',
+      'enqueue',
+      sourceRun('review-admission', { display_title: title })
+    ),
+    true
+  );
+});
+test('the admission locator preserves candidate branches and unscoped events', () => {
+  for (const [payload, branch] of [
+    [{ pull_request: { head: { ref: 'wip/release-1.2.3' } } }, 'wip/release-1.2.3'],
+    [{ pull_request: { head: { ref: 'feat/dashboard' } } }, 'feat/dashboard'],
+    [
+      { workflow_run: { event: 'pull_request_review', head_branch: 'wip/release-1.2.3' } },
+      'wip/release-1.2.3',
+    ],
+    [
+      { workflow_run: { event: 'pull_request_review_comment', head_branch: 'feat/dashboard' } },
+      'feat/dashboard',
+    ],
+    [
+      { workflow_run: { event: 'merge_group', head_branch: 'gh-readonly-queue/main/pr-7-abcdef' } },
+      'gh-readonly-queue/main/pr-7-abcdef',
+    ],
+    [{}, 'unscoped'],
+  ])
+    assert.equal(admissionTitle(payload), `Review Admission ${branch}`);
+});
+const controlSources = [
+  ['ci', 'pull_request', true],
+  ['ci', 'merge_group', true],
+  ['ci', 'push', false],
+  ['ci', 'workflow_dispatch', false],
+  ['ci', 'schedule', false],
+  ['preview-state', 'workflow_dispatch', true],
+  ['preview-state', 'workflow_run', false],
+  ['preview-state', 'schedule', false],
+  ['preview-state', 'pull_request_target', false],
+  ['preview', 'workflow_dispatch', true],
+  ['review-admission', 'workflow_run', true],
+  ['review-admission', 'issue_comment', true],
+  ['review-admission', 'pull_request_target', true],
+];
+test('control-panel intake skips source runs that resolve to no pull request', () => {
+  for (const [path, event, expected] of controlSources) {
+    const github = sourceRun(path, { event, conclusion: 'success' });
+    assert.equal(allows('pr-controls', 'targets', github), expected, `${path}/${event}`);
+  }
+});
+test('review bursts collapse to one admission signal per pull request', () => {
+  const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');
+  assert.match(
+    signal,
+    /^concurrency:\n {2}group: review-admission-signal-\$\{\{ github\.event\.pull_request\.number && format\('pr-\{0\}', github\.event\.pull_request\.number\) \|\| format\('run-\{0\}', github\.run_id\) \}\}\n {2}cancel-in-progress: true$/m
+  );
+  const job = jobBlock(signal, 'signal');
+  const debounce = job.indexOf('Coalesce review burst');
+  assert.ok(debounce > 0 && debounce < job.indexOf('Notify trusted admission controller'));
+  assert.match(
+    job,
+    /if: github\.event_name == 'pull_request_review' \|\| github\.event_name == 'pull_request_review_comment'\n {8}run: sleep 45/
+  );
 });

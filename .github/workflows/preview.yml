@@ -50,7 +50,7 @@ env:
 jobs:
   plan:
     name: Plan preview
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: read
@@ -105,7 +105,7 @@ jobs:
     name: Deploy preview
     needs: plan
     if: needs.plan.outputs.action == 'deploy'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # A live maintainer /preview command authorizes the PR through `preview`, including forks.
     # Forks without that opt-in use `preview-fork`, with manual review or an admin override.
@@ -212,7 +212,7 @@ jobs:
   smoke:
     name: Preview smoke tests
     needs: [plan, deploy]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -247,7 +247,7 @@ jobs:
     name: Publish preview result
     needs: [plan, deploy, smoke]
     if: always() && needs.plan.outputs.action != 'ignore'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       actions: read

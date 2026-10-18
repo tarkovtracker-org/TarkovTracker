@@ -35,7 +35,7 @@ test('tool errors cannot pass the lint wrapper', () => {
   assert.match(result.stderr.toString(), /ENOENT/);
 });
 test('normalization preserves other syntax errors for the native validator', () => {
-  const source = readFileSync(path, 'utf8').replace('runs-on: ubuntu-latest', 'unknown-key: true');
+  const source = readFileSync(path, 'utf8').replace('runs-on: ubuntu-24.04', 'unknown-key: true');
   const normalized = normalizeQueueWorkflow(source, path);
   assert.match(normalized, /unknown-key: true/);
   assert.equal(normalized, source.replace('  queue: max', ''));
