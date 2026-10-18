@@ -184,6 +184,14 @@ jobs:
         run: pnpm run test:deno
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard="$VITEST_SHARD"
+      - name: Upload blob report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -203,6 +211,33 @@ jobs:
           files: ./test-report.junit.xml
           flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
+  # Shards skip thresholds; merging their blob reports applies the vitest.config.ts thresholds.
+  coverage:
+    needs: [changes, test]
+    if: needs.changes.outputs.full == 'true'
+    name: Coverage thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-project
+      - name: Download blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+      - name: Merge shards and enforce thresholds
+        run: pnpm exec vitest run --merge-reports --coverage
+      - name: Upload merged coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-final
+          path: coverage/coverage-final.json
+          if-no-files-found: error
+          retention-days: 30
   validate:
     needs: changes
     # Translation-only pull requests keep the reduced test selection but still build a preview.
@@ -325,6 +360,7 @@ jobs:
         lint-format,
         typecheck,
         test,
+        coverage,
         validate,
         supabase-db,
         systems-drift,

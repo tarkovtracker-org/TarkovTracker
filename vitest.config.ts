@@ -4,7 +4,10 @@ import { configDefaults } from 'vitest/config';
 const versionedApi = process.env.TARKOV_VERSIONED_API_DIRECTORY;
 const logLevel = process.env.NUXT_PUBLIC_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
-const ciReporters = isSharded ? ['default', 'junit', 'github-actions'] : ['default', 'junit'];
+const isMergingReports = process.argv.some((arg) => arg.startsWith('--merge-reports'));
+const ciReporters = isSharded
+  ? ['default', 'junit', 'github-actions', 'blob']
+  : ['default', 'junit'];
 export default defineVitestConfig({
   resolve: {
     alias: {
@@ -49,10 +52,12 @@ export default defineVitestConfig({
     watch: false,
     // Locally, Vitest picks `agent` under coding agents (failures only) and `default` otherwise.
     reporters: process.env.CI ? ciReporters : undefined,
-    outputFile: 'test-report.junit.xml',
+    outputFile: { junit: 'test-report.junit.xml' },
     passWithNoTests: false,
     coverage: {
-      provider: 'v8',
+      ...(isMergingReports
+        ? { provider: 'custom', customProviderModule: './scripts/ci/vitest-merged-coverage.mjs' }
+        : { provider: 'v8' }),
       reportsDirectory: './coverage',
       reporter: ['text', 'json', 'json-summary', 'lcov', 'cobertura'],
       include: isSharded ? undefined : ['app/**/*.{ts,vue}'],
@@ -67,7 +72,8 @@ export default defineVitestConfig({
         'workers/**',
       ],
       // Shards report only imported files so Codecov can merge them without
-      // zero-filled duplicates. Unsharded runs retain the full app denominator.
+      // zero-filled duplicates. Unsharded and --merge-reports runs use the full
+      // app denominator and enforce these thresholds.
       ...(isSharded
         ? {}
         : {

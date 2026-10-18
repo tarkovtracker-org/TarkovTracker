@@ -98,6 +98,7 @@ test('only explicit documentation and translation paths receive reduced validati
       'lint-format',
       'typecheck',
       'test',
+      'coverage',
       'validate',
       'supabase-db',
       'systems-drift',

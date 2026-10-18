@@ -7,6 +7,7 @@ export const fullJobs = [
   'lint-format',
   'typecheck',
   'test',
+  'coverage',
   'validate',
   'supabase-db',
   'systems-drift',
