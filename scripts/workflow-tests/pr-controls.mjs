@@ -1616,6 +1616,7 @@ test('final publication rereads PR identity after awaited request permission che
   ]) {
     const f = fixture();
     await prepare(f);
+    f.github.rest.pulls.get = async () => ({ data: structuredClone(f.pull) });
     const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
     let changed = false;
     f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
@@ -1664,4 +1665,26 @@ test('publication drift cannot undo an already requested fail-closed revocation'
   );
   assert.deepEqual([f.comments, f.dispatches], [[], []]);
   assert.equal(await currentAdminAttestation(f.github, repo, 1, head), null);
+});
+test('final publication rejects head changes during request permission checks', async () => {
+  const f = fixture();
+  await prepare(f);
+  f.github.rest.pulls.get = async () => ({ data: structuredClone(f.pull) });
+  const permission = f.github.rest.repos.getCollaboratorPermissionLevel;
+  f.github.rest.repos.getCollaboratorPermissionLevel = async (...args) => {
+    const result = await permission(...args);
+    f.pull.head.sha = 'd'.repeat(40);
+    return result;
+  };
+  await assert.rejects(
+    publishControls({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      artifactId: 88,
+      evidenceDirectory: EVIDENCE_DIRECTORY,
+    }),
+    /The PR head changed while saving control evidence\./
+  );
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
 });
