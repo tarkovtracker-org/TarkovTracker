@@ -501,7 +501,7 @@ describe('Tarkov API handlers', () => {
       'tasks-objectives-json-v4-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('rejects missing objective overlay provenance before admitting a cache entry', async () => {
@@ -545,7 +545,7 @@ describe('Tarkov API handlers', () => {
       'tasks-rewards-json-v2-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('returns last successful cache purge timestamp from audit log', async () => {

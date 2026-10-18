@@ -60,8 +60,11 @@ describe('objective catalog cache admission', () => {
       const fetch = vi.fn(async () => new Response(JSON.stringify(overlay)));
       vi.stubGlobal('fetch', fetch);
       const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
-      const payload = await handler({ context: {} } as H3Event);
-      expect(payload.data.tasks.map((task) => task.id)).toEqual(['upstream-task', 'overlay-task']);
+      const payload = await (await handler({ context: {} } as H3Event)).json();
+      expect(payload.data.tasks.map((task: { id: string }) => task.id)).toEqual([
+        'upstream-task',
+        'overlay-task',
+      ]);
       expect(payload.dataOverlay).toMatchObject({ version: 'catalog-test', sha256: 'catalog-sha' });
       expect(fetch).toHaveBeenCalledWith(
         'https://raw.githubusercontent.com/example/private/main/overlay.json',
@@ -100,7 +103,7 @@ describe('objective catalog cache admission', () => {
       },
     } as unknown as H3Event;
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
-    expect(await handler(event)).toEqual(good);
+    expect(await (await handler(event)).json()).toEqual(good);
     await Promise.all(background);
     expect(puts).not.toHaveBeenCalled();
     expect(setHeaders).toHaveBeenCalledWith(
