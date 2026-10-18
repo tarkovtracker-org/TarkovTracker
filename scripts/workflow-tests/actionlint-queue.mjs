@@ -73,7 +73,7 @@ test('admission extension rejects workflow/global, foreign-job, duplicate or mal
   ])
     assert.throws(() => normalizeQueueWorkflow(source, admissionPath));
 });
-test('release promotion serialization is supported only in the eligible enqueue job', () => {
+test('release promotion serialization is supported only in the success-gated enqueue job', () => {
   const filename = '.github/workflows/release-promotion-queue.yml';
   const source = readFileSync(filename, 'utf8');
   assert.equal(normalizeQueueWorkflow(source, filename), source.replace('      queue: max', ''));
@@ -84,7 +84,10 @@ test('release promotion serialization is supported only in the eligible enqueue 
     source.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
     `concurrency:\n  group: other\n${source}`,
   ])
-    assert.throws(() => normalizeQueueWorkflow(changed, filename));
+    assert.throws(
+      () => normalizeQueueWorkflow(changed, filename),
+      /(?:Invalid|Ambiguous) serialized job concurrency/
+    );
 });
 test('preview extension accepts only the exact queue-profile conditional group', () => {
   const filename = '.github/workflows/preview.yml';

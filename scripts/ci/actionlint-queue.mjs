@@ -61,7 +61,8 @@ function matchingBlock(source, pattern) {
 }
 function requireSingleConcurrency(source, filename) {
   const occurrences = source.match(/^[ \t]*concurrency:/gm) ?? [];
-  if (occurrences.length !== 1) throw new Error(`Ambiguous admission job concurrency: ${filename}`);
+  if (occurrences.length !== 1)
+    throw new Error(`Ambiguous serialized job concurrency: ${filename}`);
 }
 /** Run unchanged native checks, extending only the strictly validated serialization blocks. */
 function lintWorkflow(binary, filename) {
