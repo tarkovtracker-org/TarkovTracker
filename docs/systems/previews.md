@@ -72,9 +72,14 @@ PR update → CI (selected validation + security + preview build + manifest + ar
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
-          → smoke tests on the unique deployment URL (5-minute startup window)
+          → shared readiness on the unique deployment URL (5-minute startup window)
+          → smoke tests across two file-level workers; existing serial groups stay ordered
           → freshness recheck → Preview Result success [preview <digest12> v<profile>]
 ```
+
+The smoke runner finishes shared readiness before starting two browser workers. Files may overlap;
+tests within each file keep their existing order and intentional serial groups. Each test retains
+its own browser context, and Access sessions remain scoped to the preview origin and process.
 
 ### Result contract
 

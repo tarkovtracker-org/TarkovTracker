@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
 // Browser smoke tests for an Actions-owned Cloudflare Pages preview. They run without Cloudflare
 // deployment credentials against the unique deployment URL supplied by the controller.
@@ -6,8 +7,10 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.smoke\.mjs$/,
+  // Files may overlap; tests within each file retain their existing order and serial groups.
   fullyParallel: false,
-  workers: 1,
+  workers: 2,
+  globalSetup: fileURLToPath(new URL('./setup.mjs', import.meta.url)),
   retries: 0,
   timeout: 120_000,
   expect: { timeout: 30_000 },
