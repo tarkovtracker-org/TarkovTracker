@@ -1824,8 +1824,15 @@ function issuerFixture() {
   };
   return { args, calls, metadataCalls, masked, responses, repository };
 }
-test('publisher uses authenticated metadata when anonymous bot lookup is denied', async () => {
+test('publisher uses authenticated metadata when anonymous bot lookup is denied', async (t) => {
   const f = issuerFixture();
+  const timeout = AbortSignal.timeout;
+  const deadlines = new WeakMap();
+  t.mock.method(AbortSignal, 'timeout', (milliseconds) => {
+    const signal = timeout(milliseconds);
+    deadlines.set(signal, milliseconds);
+    return signal;
+  });
   const fetchImpl = f.args.fetchImpl;
   f.args.fetchImpl = async (url, options) => {
     if (new URL(url).pathname.startsWith('/users/'))
@@ -1833,7 +1840,9 @@ test('publisher uses authenticated metadata when anonymous bot lookup is denied'
     return fetchImpl(url, options);
   };
   const github = await createReviewPublisher(f.args);
-  assert.deepEqual(f.metadataCalls, [{ username: 'isolated-admission[bot]' }]);
+  assert.equal(f.metadataCalls.length, 1);
+  assert.equal(f.metadataCalls[0].username, 'isolated-admission[bot]');
+  assert.equal(deadlines.get(f.metadataCalls[0].request?.signal), 15000);
   assert.deepEqual(github.reviewAdmissionIssuer, appIds);
   assert.ok(f.calls.every((call) => call.options.headers.Authorization));
 });

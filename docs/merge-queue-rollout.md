@@ -322,7 +322,8 @@ manifest is [`.github/review-admission-app-manifest.json`](../.github/review-adm
   minting a short-lived statuses-only token. Candidate jobs never receive that key/token;
   CI, release and queue consumers receive only the public IDs.
 - Bot identity is read through the workflow's existing authenticated metadata client, avoiding
-  the anonymous API quota. The fixed bot ID/type and App/installation/token scope checks still
+  the anonymous API quota and retaining a 15-second request deadline.
+  The fixed bot ID/type and App/installation/token scope checks still
   fail closed. Request and HTTP failures report the method/path and available HTTP status and
   validated request ID/rate-limit/retry headers; response bodies, credentials and raw client
   errors are omitted. JSON parse failures retain their generic invalid-response message.

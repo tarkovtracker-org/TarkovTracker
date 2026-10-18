@@ -171,7 +171,10 @@ async function verifiedApp(fetchImpl, config, token, github) {
 }
 async function publisherBot(github, username) {
   try {
-    const { data } = await github.rest.users.getByUsername({ username });
+    const { data } = await github.rest.users.getByUsername({
+      username,
+      request: { signal: AbortSignal.timeout(15000) },
+    });
     return data;
   } catch (error) {
     throw new Error(
