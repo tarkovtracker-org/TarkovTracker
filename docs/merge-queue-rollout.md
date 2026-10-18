@@ -140,7 +140,8 @@ status, a successful run and an approving receipt.
 
 Ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Ordinary paths include `app/{components,pages,features,layouts,assets}/`,
-docs, root Markdown, locales and supported test paths, with sensitive paths always taking precedence.
+docs, root Markdown, locales and supported test paths. Sensitive paths always take precedence,
+including `AGENTS.md`, `CLAUDE.md`, `SECURITY.md` and `code_review.md` policy controls.
 Docs, root Markdown and locales skip patch-pattern scanning; other ordinary files must avoid
 credential, session, storage and network patterns in the complete diff hunk, including unchanged
 context. Fetch references, typed wrappers and absolute URLs remain sensitive. Generic helpers under

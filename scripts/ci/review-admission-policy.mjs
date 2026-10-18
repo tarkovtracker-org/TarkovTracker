@@ -28,7 +28,7 @@ function requirePolicy(condition, message) {
   if (!condition) throw new AdmissionHeld(message);
 }
 const SENSITIVE_PATH =
-  /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|SECURITY)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
+  /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|code_review)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
 const LOW_RISK_PATH =
   /^(?:docs\/|[^/]+\.md$|app\/locales\/|app\/(?:components|pages|features|layouts|assets)\/|(?:app|scripts)\/.*(?:\.test\.[cm]?[jt]s|\.spec\.[cm]?[jt]s)$|scripts\/workflow-tests\/)/;
 const SENSITIVE_PATCH =

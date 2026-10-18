@@ -238,6 +238,9 @@ test('sensitive paths require human head-bound approval plus independent review'
     'scripts/ops/prod-db.mjs',
     'nuxt.config.ts',
     'workers/contract-tests/client.ts',
+    'CLAUDE.md',
+    'app/features/CLAUDE.md',
+    'code_review.md',
     'unknown/file.js',
   ]) {
     const f = fixture();
