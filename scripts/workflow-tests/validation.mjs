@@ -10,7 +10,6 @@ import {
   collectChanges,
   aggregateResults,
   fullJobs,
-  optionalJobs,
 } from '../ci/validation-plan.mjs';
 import { gitExecutable } from '../ci/validation-tools.mjs';
 const cli = resolve('scripts/ci/validate-changes.mjs');
@@ -99,6 +98,7 @@ test('only explicit documentation and translation paths receive reduced validati
       'lint-format',
       'typecheck',
       'test',
+      'coverage',
       'validate',
       'supabase-db',
       'systems-drift',
@@ -248,7 +248,7 @@ function assertCoverageOutcomes(plan) {
   const mismatched = ['success', 'failure', 'cancelled', 'skipped', undefined].filter(
     (result) => result !== expected
   );
-  // Older candidate workflows without the job keep passing during the compatibility window.
+  // Full validation requires coverage success; reduced validation requires it to skip.
   assert.deepEqual(aggregateResults(plan, needs), []);
   assert.deepEqual(aggregateResults(plan, { ...needs, coverage: { result: expected } }), []);
   for (const result of mismatched) {
@@ -256,8 +256,7 @@ function assertCoverageOutcomes(plan) {
     assert.deepEqual(errors, [`coverage: expected ${expected}, received ${String(result)}`]);
   }
 }
-test('compatibility window: the coverage gate may be absent, but a planned or reported outcome must match', () => {
-  assert.deepEqual(optionalJobs, ['coverage']);
+test('activated coverage gate is required for full plans and reports each failure once', () => {
   const reduced = classifyPaths(['README.md']);
   assertCoverageOutcomes(reduced);
   // Like any planned job, a reduced plan that lists coverage requires it to run and succeed.
@@ -270,18 +269,15 @@ test('compatibility window: the coverage gate may be absent, but a planned or re
   );
   const plan = classifyPaths(['app/a.ts']);
   assertCoverageOutcomes(plan);
-  // A newer candidate plan may already list the job; the trusted aggregate accepts it but then
-  // requires it to report success.
-  const planned = { ...plan, jobs: [...plan.jobs, 'coverage'] };
   const needs = passingNeeds(plan);
-  assert.deepEqual(aggregateResults(planned, { ...needs, coverage: { result: 'success' } }), []);
-  assert.deepEqual(aggregateResults(planned, needs), [
+  delete needs.coverage;
+  assert.deepEqual(aggregateResults(plan, needs), [
     'coverage: expected success, received undefined',
   ]);
-  for (const result of ['failure', 'cancelled', 'skipped'])
-    assert.deepEqual(aggregateResults(planned, { ...needs, coverage: { result } }), [
-      `coverage: expected success, received ${result}`,
-    ]);
+  const withoutCoverage = { ...plan, jobs: plan.jobs.filter((job) => job !== 'coverage') };
+  assert.deepEqual(aggregateResults(withoutCoverage, needs), [
+    'Missing or invalid validation plan',
+  ]);
 });
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));
