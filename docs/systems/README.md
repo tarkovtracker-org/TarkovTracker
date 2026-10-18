@@ -36,6 +36,8 @@ and have an agent verify the answer against the code.
 | [`ci-and-release.md`](./ci-and-release.md)                 | Test execution, CI validation selection, Fallow snapshots, release publication    |
 | [`previews.md`](./previews.md)                             | Actions-owned Cloudflare previews and the `Preview Result` gate                   |
 
+The [Season Planner](./season-planner.md) documents local Kord Breach modifier plans.
+
 ## When this doc is wrong
 
 If you read something here that does not match the code, the disagreement is a bug — either in the
