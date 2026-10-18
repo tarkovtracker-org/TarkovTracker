@@ -15,6 +15,7 @@ const { safeDependencyManifests, dependencyEligibility } =
   await import('../ci/review-admission-dependencies.mjs');
 const { releaseAssetsEligibility, safeReleaseManifest, requireReleaseSource } =
   await import('../ci/review-admission-release.mjs');
+const { readCodeRabbitComments } = await import('../ci/review-admission-coderabbit.mjs');
 const { AdmissionPending, admissionDecision, classifyRisk } =
   await import('../ci/review-admission-policy.mjs');
 const { createReviewPublisher, publisherConfig, requireReceiptIssuer } =
@@ -1545,9 +1546,10 @@ test('original admission assertions reject reintroduced review, thread and sensi
 });
 async function admissionMutation(original, mutation) {
   assert.ok(original.includes(mutation.before), mutation.before);
-  const source = original.replace(mutation.before, mutation.after);
-  const mutant = await import(
-    `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  const mutant = await importMutationSource(
+    'review-admission-policy.mjs',
+    mutation.before,
+    mutation.after
   );
   const f = fixture();
   mutation.change(f);
@@ -2520,5 +2522,383 @@ test('a locator storage error fails the scoped admission statuses instead of lea
     if (previous === undefined) delete process.env.RUNNER_TEMP;
     else process.env.RUNNER_TEMP = previous;
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+// Sanitized verbatim completion/coverage sections from CodeRabbit comment 6241906527 on #1224.
+const codeRabbitComment = JSON.parse(
+  readFileSync(new URL('./fixtures/coderabbit-clean-comment.json', import.meta.url), 'utf8')
+);
+function commentReviewFixture() {
+  const f = fixture();
+  f.reviews = [];
+  f.comments = [
+    {
+      ...codeRabbitComment,
+      body: codeRabbitComment.body.replaceAll('97ee413a714f39e94ee8aaba7e22c8c86e70e5c3', head),
+    },
+  ];
+  return f;
+}
+test('captured CodeRabbit issue-comment completion admits only its exact reviewed head', () => {
+  const f = commentReviewFixture();
+  assert.deepEqual(admissionDecision(f).review, {
+    provider: 'CodeRabbit',
+    reviewId: codeRabbitComment.id,
+    commit: head,
+    kind: 'issue-comment',
+  });
+});
+test('CodeRabbit comment identity, completion and unambiguous coverage fail closed', () => {
+  const mutations = [
+    (c) => {
+      c.user = { ...c.user, id: 55 };
+    },
+    (c) => {
+      c.user = { ...c.user, type: 'User' };
+    },
+    (c) => {
+      c.user = { ...c.user, login: 'imposter[bot]' };
+    },
+    (c) => {
+      c.id = 0;
+    },
+    (c) => {
+      c.updated_at = null;
+    },
+    (c) => {
+      c.created_at = 'invalid';
+    },
+    (c) => {
+      c.updated_at = '2020-01-01T00:00:00Z';
+    },
+    (c) => {
+      c.body = c.body.replaceAll(head, base);
+    },
+    (c) => {
+      c.body = c.body.replace('"sourceCommitId":"' + head + '"', '"sourceCommitId":"' + base + '"');
+    },
+    (c) => {
+      c.body = c.body.replace(
+        '"coveredCommitId":"' + head + '"',
+        '"coveredCommitId":"' + base + '"'
+      );
+    },
+    (c) => {
+      c.body = c.body.replace('"kind":"reviewed"', '"kind":"inherited"');
+    },
+    (c) => {
+      c.body = c.body.replace('"kind":"reviewed"', '"kind":"reviewed","kind":"reviewed"');
+    },
+    (c) => {
+      c.body = c.body.replace('final_review_risk_coverage:{', 'final_review_risk_coverage:broken{');
+    },
+    (c) => {
+      c.body = c.body.replace('<!-- recent_review_end -->', '');
+    },
+    (c) => {
+      c.body = c.body.replace('<!-- final_review_risk_end -->', '');
+    },
+    (c) => {
+      c.body += '\n' + c.body;
+    },
+    (c) => {
+      c.body = c.body
+        .split('\n')
+        .map((line) => '> ' + line)
+        .join('\n');
+    },
+    (c) => {
+      c.body = '```\n' + c.body + '\n```';
+    },
+    (c) => {
+      c.body = c.body.replace(
+        'No actionable comments were generated in the recent review. 🎉',
+        'Review in progress'
+      );
+    },
+    (c) => {
+      c.body = c.body.replace('⚪ Minimal', '🔴 High');
+    },
+    (c) => {
+      c.body += '\n**Actionable comments posted: 1**';
+    },
+    (c) => {
+      c.body += '\nOutside diff range comments: 1';
+    },
+    (c) => {
+      c.body += '\nReview skipped';
+    },
+    (c) => {
+      c.body += '\n1 issue found in another file.';
+    },
+    (c) => {
+      c.body += '\nReview incomplete';
+    },
+    (c) => {
+      c.body = c.body.replace(
+        '**Merge Risk:** **⚪ Minimal**',
+        '**Merge Risk:** **🔴 High**\n**Merge Risk:** **⚪ Minimal**'
+      );
+    },
+  ];
+  mutations.push(
+    (c) => {
+      c.body += '\n<!-- review_in_progress_start -->';
+    },
+    (c) => {
+      c.body = c.body.replace('final_review_risk_coverage:', 'unsupported_coverage:');
+    }
+  );
+  for (const fence of ['```', '  ```', '~~~']) {
+    mutations.push((c) => {
+      c.body = fence + '\n' + c.body + '\n' + fence;
+    });
+    mutations.push((c) => {
+      c.body = fence + '\n' + c.body;
+    });
+  }
+  mutations.push((c) => {
+    c.body += '\nOutside diff range comments (1)';
+  });
+  for (const mutate of mutations) {
+    const f = commentReviewFixture();
+    mutate(f.comments[0]);
+    assert.throws(
+      () => admissionDecision(f),
+      /Completed exact-head independent review/,
+      String(mutate)
+    );
+  }
+  const f = commentReviewFixture();
+  f.comments.push(structuredClone(f.comments[0]));
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.comments[1].body = '<!-- recent_review_start -->\nReview in progress';
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+});
+test('CodeRabbit comment completion cannot bypass findings, review checks or sensitive approval', () => {
+  const f = commentReviewFixture();
+  f.threads = [{ isResolved: false, isOutdated: false }];
+  assert.throws(() => admissionDecision(f), /Unresolved review findings/);
+  f.threads = [];
+  f.reviews = [human('CHANGES_REQUESTED')];
+  assert.throws(() => admissionDecision(f), /Changes requested/);
+  f.reviews = [
+    {
+      ...fixture().reviews[0],
+      user: { id: 136622811, type: 'Bot' },
+      body: '**Actionable comments posted: 1**',
+    },
+  ];
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.reviews = [];
+  f.checks = [{ app: { id: 347564 }, head_sha: head, status: 'in_progress', conclusion: null }];
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  f.checks = [];
+  f.files[0].filename = 'scripts/ci/review-admission-policy.mjs';
+  assert.throws(() => admissionDecision(f), /exact-head collaborator approval/);
+  f.comments.push({
+    user: { login: 'maintainer', type: 'User' },
+    id: 20,
+    body: `/approve-sensitive ${head}`,
+  });
+  assert.equal(admissionDecision(f).risk, 'sensitive');
+});
+test('only authenticated CodeRabbit completion lifecycle events additionally wake admission', async () => {
+  for (const action of ['created', 'edited', 'deleted']) {
+    const payload = {
+      action,
+      issue: { pull_request: {} },
+      comment: structuredClone(codeRabbitComment),
+    };
+    assert.equal(await filterAdmission({ context: { eventName: 'issue_comment', payload } }), true);
+    payload.comment.body = 'Completion removed';
+    payload.changes = { body: { from: codeRabbitComment.body } };
+    assert.equal(await filterAdmission({ context: { eventName: 'issue_comment', payload } }), true);
+    payload.comment.user.id = 55;
+    assert.equal(
+      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      false
+    );
+    payload.comment.user = { ...codeRabbitComment.user };
+    delete payload.changes;
+    assert.equal(
+      await filterAdmission({ context: { eventName: 'issue_comment', payload } }),
+      false
+    );
+  }
+});
+test('comment evidence reaches the receipt and a withdrawn completion revokes publication', async () => {
+  await withReceiptDirectory(async () => {
+    const f = publishingFixture();
+    Object.assign(f.f, commentReviewFixture());
+    const originalGraphql = f.github.graphql;
+    f.github.graphql = async (query, variables) =>
+      query.includes('... on IssueComment')
+        ? { node: graphComment(f.f.comments.find((comment) => comment.node_id === variables.id)) }
+        : originalGraphql(query, variables);
+    const receipt = await evaluateAdmission({
+      github: f.github,
+      context: f.context,
+      number: 1,
+      source: base,
+    });
+    assert.equal(receipt.review.kind, 'issue-comment');
+    assert.equal(receipt.review.reviewId, codeRabbitComment.id);
+    f.context.payload = { pull_request: { number: 1 } };
+    f.f.artifacts = [{ name: `review-admission-${head}`, expired: false }];
+    f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+    await publishReviewAdmission({ github: f.github, context: f.context, sha: head });
+    assert.equal(f.statuses.at(-1).state, 'success');
+    f.f.comments = [];
+    await assert.rejects(
+      publishReviewAdmission({ github: f.github, context: f.context, sha: head }),
+      /Completed exact-head independent review/
+    );
+    assert.equal(f.statuses.at(-1).state, 'failure');
+  });
+});
+test('CodeRabbit review rejects foreign or missing edit provenance', () => {
+  for (const change of [
+    { lastEditedAt: undefined },
+    { lastEditedAt: 'invalid', editor: null },
+    { lastEditedAt: '2026-10-17T22:55:26Z', editor: { __typename: 'User', login: 'maintainer' } },
+    {
+      lastEditedAt: '2026-10-17T22:55:26Z',
+      editor: { __typename: 'Bot', databaseId: 55, login: 'coderabbitai' },
+    },
+    { lastEditedAt: null, editor: { __typename: 'User', login: 'maintainer' } },
+  ]) {
+    const f = commentReviewFixture();
+    Object.assign(f.comments[0], change);
+    assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  }
+});
+test('CodeRabbit positive counts with leading zeroes and full-body risk contradictions reject', () => {
+  for (const extra of [
+    '**Actionable comments posted: 01**',
+    'Outside diff range comments: 001',
+    '01 issues found in another file',
+    '**Merge Risk:** **🔴 High**',
+    'Merge Risk: High',
+    '<summary><strong>Merge Risk:</strong> <strong>🔴 High</strong></summary>',
+  ]) {
+    const f = commentReviewFixture();
+    f.comments[0].body += '\n' + extra;
+    assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
+  }
+});
+test('CodeRabbit captured completion also accepts CRLF line endings', () => {
+  const f = commentReviewFixture();
+  f.comments[0].body = f.comments[0].body.replaceAll('\n', '\r\n');
+  assert.equal(admissionDecision(f).review.kind, 'issue-comment');
+});
+function graphComment(comment = codeRabbitComment) {
+  return {
+    __typename: 'IssueComment',
+    id: comment.node_id,
+    databaseId: comment.id,
+    fullDatabaseId: String(comment.id),
+    author: { __typename: 'Bot', databaseId: 136622811, login: 'coderabbitai' },
+    editor: comment.editor,
+    lastEditedAt: comment.lastEditedAt,
+    body: comment.body,
+    createdAt: comment.created_at,
+    updatedAt: comment.updated_at,
+  };
+}
+test('CodeRabbit snapshot binds body and actor provenance in the same GraphQL response', async () => {
+  const f = commentReviewFixture();
+  const snapshot = graphComment(f.comments[0]);
+  const github = {
+    graphql: async (_query, variables) => {
+      assert.equal(variables.id, codeRabbitComment.node_id);
+      return { node: snapshot };
+    },
+  };
+  // The REST body differs; only the fresh GraphQL body may authorize this head.
+  f.comments[0].body = f.comments[0].body.replaceAll(head, base);
+  const comments = await readCodeRabbitComments(github, f.comments);
+  assert.equal(admissionDecision({ ...f, comments }).approved, true);
+  snapshot.body += '\n**Actionable comments posted: 01**';
+  f.comments[0].body = comments[0].body;
+  const changed = await readCodeRabbitComments(github, f.comments);
+  assert.throws(
+    () => admissionDecision({ ...f, comments: changed }),
+    /Completed exact-head independent review/
+  );
+});
+test('CodeRabbit snapshots reject missing identity, foreign author/editor and missing provenance', async () => {
+  for (const change of [
+    { id: 'different-node' },
+    { fullDatabaseId: '55' },
+    { __typename: 'Issue' },
+    { author: { __typename: 'Bot', databaseId: 55, login: 'coderabbitai' } },
+    { author: { __typename: 'User', databaseId: 136622811, login: 'coderabbitai' } },
+    { editor: null },
+    { editor: { __typename: 'User', login: 'maintainer' } },
+    { lastEditedAt: undefined },
+    { lastEditedAt: null, editor: undefined },
+  ]) {
+    const f = commentReviewFixture();
+    const github = {
+      graphql: async () => ({ node: { ...graphComment(f.comments[0]), ...change } }),
+    };
+    await assert.rejects(async () => {
+      const comments = await readCodeRabbitComments(github, f.comments);
+      admissionDecision({ ...f, comments });
+    });
+  }
+  const f = commentReviewFixture();
+  const missing = { graphql: async () => ({ node: null }) };
+  await assert.rejects(readCodeRabbitComments(missing, f.comments), /snapshot identity/);
+  const unedited = {
+    graphql: async () => ({
+      node: { ...graphComment(f.comments[0]), lastEditedAt: null, editor: null },
+    }),
+  };
+  const comments = await readCodeRabbitComments(unedited, f.comments);
+  assert.equal(admissionDecision({ ...f, comments }).approved, true);
+});
+test('CodeRabbit full comment IDs preserve safe REST numbers beyond GraphQL Int range', async () => {
+  const f = commentReviewFixture();
+  const snapshot = {
+    ...graphComment(f.comments[0]),
+    databaseId: null,
+    fullDatabaseId: String(f.comments[0].id),
+  };
+  const github = {
+    graphql: async (query) => {
+      assert.match(query, /id fullDatabaseId body/);
+      assert.doesNotMatch(query, /id databaseId body/);
+      return { node: snapshot };
+    },
+  };
+  const comments = await readCodeRabbitComments(github, f.comments);
+  const review = admissionDecision({ ...f, comments }).review;
+  assert.equal(review.reviewId, 6241906527);
+  assert.equal(typeof review.reviewId, 'number');
+});
+test('CodeRabbit full comment IDs reject mismatched, absent and unsafe identifiers', async () => {
+  for (const fullId of [
+    undefined,
+    null,
+    '',
+    6241906527,
+    '55',
+    '06241906527',
+    '6241906527.0',
+    '9007199254740993',
+  ]) {
+    const f = commentReviewFixture();
+    const github = {
+      graphql: async () => ({ node: { ...graphComment(f.comments[0]), fullDatabaseId: fullId } }),
+    };
+    await assert.rejects(readCodeRabbitComments(github, f.comments), /snapshot identity/);
+  }
+  for (const restId of [undefined, null, 0, -1, 1.5, '6241906527', Number.MAX_SAFE_INTEGER + 1]) {
+    const f = commentReviewFixture();
+    f.comments[0].id = restId;
+    const github = { graphql: async () => ({ node: graphComment(f.comments[0]) }) };
+    await assert.rejects(readCodeRabbitComments(github, f.comments), /snapshot identity/);
   }
 });

@@ -1,0 +1,18 @@
+{
+  "id": 6241906527,
+  "user": {
+    "id": 136622811,
+    "login": "coderabbitai[bot]",
+    "type": "Bot"
+  },
+  "created_at": "2026-10-17T22:04:02Z",
+  "updated_at": "2026-10-17T22:55:26Z",
+  "body": "<!-- recent_review_start -->\n\nNo actionable comments were generated in the recent review. 🎉\n\n<details>\n<summary><strong>ℹ️ Recent review info</strong></summary>\n<dl>\n<dd>\n\n<details>\n<summary><strong>⚙️ Run configuration</strong></summary>\n<dl>\n<dd>\n\n- **Configuration used**: Repository: tarkovtracker-org/TarkovTracker/.coderabbit.yaml\n- **Review profile**: CHILL\n- **Plan**: Essentials\n- **Run ID**: `5e1fbfa1-3877-4946-9af6-eca5dd7d1c63`\n\n</dd>\n</dl>\n</details>\n\n<details>\n<summary><strong>📥 Commits</strong></summary>\n<dl>\n<dd>\n\nReviewing files that changed from the base of the PR and between 64dbf758ff29a120b90796fe1466d396e9b4225b and 97ee413a714f39e94ee8aaba7e22c8c86e70e5c3.\n\n</dd>\n</dl>\n</details>\n\n<details>\n<summary><strong>📒 Files selected for processing: 3</strong></summary>\n<dl>\n<dd>\n\n* `app/components/ui/StatusTabBar.vue`\n* `app/components/ui/__tests__/StatusTabBar.test.ts`\n* `app/features/neededitems/__tests__/NeededItemsFilterBarTabs.test.ts`\n\n</dd>\n</dl>\n</details>\n\n**Included review availability:** This review used your included allowance. 3 included reviews remain after this review. Your included PR review attempts over the past 7 days set your current allowance at 5 reviews per hour.\n\n</dd>\n</dl>\n</details>\n\n\n\n\n\n<!-- recent_review_end -->\n<!-- final_review_risk_start -->\n<!-- final_review_risk_label\n**Merge Risk:** **⚪ Minimal** · up to `97ee4`\n-->\n<!-- final_review_risk_coverage:{\"sourceCommitId\":\"97ee413a714f39e94ee8aaba7e22c8c86e70e5c3\",\"coveredCommitId\":\"97ee413a714f39e94ee8aaba7e22c8c86e70e5c3\",\"kind\":\"reviewed\"} -->\n\nThe selected status tab stays keyboard-focusable and keeps its pressed state. Only redundant clicks on it are ignored. No remaining merge-blocking risk was found in the reviewed changes.\n<!-- final_review_risk_end -->",
+  "node_id": "IC_kwDOQX9_7s8AAAABdAvvXw",
+  "lastEditedAt": "2026-10-17T22:55:26Z",
+  "editor": {
+    "__typename": "Bot",
+    "login": "coderabbitai",
+    "databaseId": 136622811
+  }
+}

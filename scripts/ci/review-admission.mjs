@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { currentAdminAttestation } from './pr-control-state.mjs';
 import {
   activeQueueGroup,
   allPages,
@@ -12,7 +13,7 @@ import {
   trustedActors,
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
-import { currentAdminAttestation } from './pr-control-state.mjs';
+import { codeRabbitCommentEvent, readCodeRabbitComments } from './review-admission-coderabbit.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import {
@@ -38,10 +39,11 @@ async function evidence(github, repo, pr) {
     ...repo,
     pull_number: pr.number,
   });
-  const comments = await allPages(github, github.rest.issues.listComments, {
+  const listedComments = await allPages(github, github.rest.issues.listComments, {
     ...repo,
     issue_number: pr.number,
   });
+  const comments = await readCodeRabbitComments(github, listedComments);
   const checks = await allPages(github, github.rest.checks.listForRef, {
     ...repo,
     ref: pr.head.sha,
@@ -454,8 +456,11 @@ async function evaluateQueuedScope(github, context, core, scope, source) {
 function sensitiveCommand(body) {
   return typeof body === 'string' && body.trimStart().startsWith('/approve-sensitive ');
 }
-export function relevantComment(payload) {
+function approvalComment(payload) {
   return [payload.comment?.body, payload.changes?.body?.from].some(sensitiveCommand);
+}
+export function relevantComment(payload) {
+  return [approvalComment(payload), codeRabbitCommentEvent(payload)].some(Boolean);
 }
 function relevantPrComment(payload) {
   return Boolean(payload.issue?.pull_request) && relevantComment(payload);

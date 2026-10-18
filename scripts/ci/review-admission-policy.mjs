@@ -1,3 +1,4 @@
+import { codeRabbitCommentReview } from './review-admission-coderabbit.mjs';
 // This policy is loaded from trusted main, never from a candidate checkout.
 export const CONTEXT = 'Review Admission';
 export const SHA = /^[0-9a-f]{40}$/;
@@ -137,9 +138,25 @@ function completedProvider(reviews, checks, head, provider) {
     return null;
   return { provider: provider.name, reviewId: review.id, commit: head };
 }
-function verifiedProvider(reviews, checks, head) {
-  return PROVIDERS.map((provider) => completedProvider(reviews, checks, head, provider)).find(
-    Boolean
+function verifiedProvider(reviews, checks, head, comments) {
+  const review = PROVIDERS.map((provider) =>
+    completedProvider(reviews, checks, head, provider)
+  ).find(Boolean);
+  if (review) return review;
+  const provider = PROVIDERS[0];
+  if (!providerChecks(checks, provider, head)) return null;
+  if (conflictingCodeRabbitReview(reviews, head, provider)) return null;
+  return codeRabbitCommentReview(comments, head);
+}
+function conflictingCodeRabbitReview(reviews, head, provider) {
+  return reviews.some((review) =>
+    [
+      review.user?.id === provider.botId,
+      review.user?.type === 'Bot',
+      review.commit_id === head,
+      Boolean(review.body?.trim()),
+      !zeroOutsideFindings(review, provider),
+    ].every(Boolean)
   );
 }
 function approvedHuman(review, head, authorId, trusted) {
@@ -189,7 +206,7 @@ function approvalId(human, approval) {
 function reviewedHead(input, latest) {
   const { pr, checks, trusted, reviews } = input;
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
-  const provider = verifiedProvider(reviews, checks, pr.head.sha);
+  const provider = verifiedProvider(reviews, checks, pr.head.sha, input.comments);
   requirePolicy(
     Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
     'Completed exact-head independent review is required.'
