@@ -18,7 +18,12 @@ import {
   requestPreviewDispatch,
 } from './github-api.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
-import { QueueValidationError, queueRevision, requireQueueCi } from './merge-queue.mjs';
+import {
+  QueueValidationError,
+  queueRevision,
+  requireQueueCi,
+  queueRequiresPreview,
+} from './merge-queue.mjs';
 import {
   MANIFEST_FILE,
   PREVIEW_PROFILE_VERSION,
@@ -610,6 +615,11 @@ async function evaluateQueue({ github, context, state, workspace }) {
   state.candidate.queueBaseSha = revision.baseSha;
   state.candidate.queueTreeSha = revision.treeSha;
   await queueProof(() => requireQueueCi(github, context, state.run));
+  if (!(await queueRequiresPreview(github, context, state.candidate, revision))) {
+    const decision = { ...decisionBase(state), ...notApplicable() };
+    await requireFreshDecision(github, context, decision);
+    return decision;
+  }
   state.previewAuthorization = 'queue';
   return deployDecision({ github, context, state, workspace });
 }

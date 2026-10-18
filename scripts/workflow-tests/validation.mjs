@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   classifyPaths,
+  classifyQueuePaths,
   parseNameStatus,
   collectChanges,
   aggregateResults,
@@ -320,4 +321,114 @@ test('local classifier includes committed, staged, unstaged and untracked paths;
   assert.equal(explain('--mode', 'ci', '--shadow').proposed.full, false);
   assert.equal(explain('--mode', 'ci', '--bad-option').full, true);
   assert.equal(explain('--mode', 'full').full, true);
+});
+test('queue reductions accept only inert documentation and keep the security aggregate', () => {
+  for (const paths of [
+    ['README.md'],
+    ['docs/added.md', 'docs/deleted.markdown'],
+    parseNameStatus('R100\0docs/old.md\0docs/new.md\0'),
+  ]) {
+    const plan = classifyQueuePaths(paths);
+    assert.equal(plan.full, false);
+    assert.equal(plan.previewRequired, false);
+    assert.deepEqual(plan.jobs, reducedDocsJobs);
+    assert.deepEqual(aggregateResults(plan, passingNeeds(plan)), []);
+    assertSelectedJobFailures(plan, passingNeeds(plan));
+  }
+  for (const paths of [
+    [],
+    Array.from({ length: 300 }, (_, i) => `docs/${i}.md`),
+    ['AGENTS.md'],
+    ['docs/AGENTS.md'],
+    ['.github/CONTRIBUTING.md'],
+    ['DESIGN.md'],
+    ['docs/config.json'],
+    ['docs/a.md', 'app/a.ts'],
+    ['docs/a.md', 'app/locales/fr.json'],
+    ['scripts/tool.mjs'],
+    ['scripts/preview/README.md'],
+    ['.github/workflows/ci.yml'],
+    ['pnpm-lock.yaml'],
+    ['nuxt.config.ts'],
+    ['public/guide.md'],
+    parseNameStatus('R100\0app/a.ts\0docs/a.md\0'),
+  ]) {
+    const plan = classifyQueuePaths(paths);
+    assert.equal(plan.full, true, paths.join());
+    assert.equal(plan.previewRequired, true, paths.join());
+    assert.deepEqual(plan.jobs, fullJobs);
+  }
+});
+function queueGit(t) {
+  const cwd = mkdtempSync(join(tmpdir(), 'queue-docs-git-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const git = (...args) => execFileSync(gitExecutable(), args, { cwd, encoding: 'utf8' }).trim();
+  git('init', '-q');
+  git('config', 'user.email', 'test@example.invalid');
+  git('config', 'user.name', 'Test');
+  mkdirSync(join(cwd, 'docs'));
+  writeFileSync(join(cwd, 'README.md'), 'base');
+  writeFileSync(join(cwd, 'docs/removed.md'), 'removed');
+  writeFileSync(join(cwd, 'app.ts'), 'code');
+  git('add', '.');
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'base');
+  return { cwd, git, base: git('rev-parse', 'HEAD') };
+}
+function queueCli(f, head, extra = []) {
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cli, '--mode', 'ci', '--explain', '--queue', '--base', f.base, '--head', head, ...extra],
+      {
+        cwd: f.cwd,
+        encoding: 'utf8',
+        env: { ...process.env, GITHUB_OUTPUT: '' },
+      }
+    )
+  );
+}
+test('queue CLI uses the complete exact parent delta, supports additions/deletions and fails closed on stale evidence', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'docs/added.md'), 'added');
+  f.git('rm', '-q', 'docs/removed.md');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'docs integration');
+  const head = f.git('rev-parse', 'HEAD');
+  assert.deepEqual(
+    collectChanges({ cwd: f.cwd, base: f.base, head, local: false, queue: true }).paths.sort(),
+    ['docs/added.md', 'docs/removed.md']
+  );
+  const plan = queueCli(f, head);
+  assert.equal(plan.full, false);
+  assert.equal(plan.previewRequired, false);
+  assert.equal(plan.base, f.base);
+  assert.equal(plan.head, head);
+  // Negative control: the previous forced-full queue invocation still selects every job/build.
+  assert.equal(queueCli(f, head, ['--full']).full, true);
+  assert.equal(queueCli(f, head, ['--full']).previewRequired, true);
+  assert.equal(queueCli(f, 'missing').full, true);
+  assert.equal(queueCli(f, 'HEAD').full, true);
+  f.git('checkout', '--detach', '-q', f.base);
+  assert.equal(queueCli(f, head).full, true, 'stale checkout must not skip validation');
+});
+test('queue CLI retains mixed candidates and rejects a comparison that hides earlier integration changes', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'app.ts'), 'changed');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'code integration');
+  const middle = f.git('rev-parse', 'HEAD');
+  writeFileSync(join(f.cwd, 'docs/a.md'), 'docs');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'later docs');
+  const head = f.git('rev-parse', 'HEAD');
+  assert.equal(queueCli(f, head).full, true, 'non-parent base cannot hide mixed queue work');
+  assert.equal(
+    classifyQueuePaths(collectChanges({ cwd: f.cwd, base: f.base, head, local: false }).paths).full,
+    true
+  );
+  assert.equal(
+    collectChanges({ cwd: f.cwd, base: f.base, head, queue: true }).error.length > 0,
+    true
+  );
+  assert.equal(queueCli({ ...f, base: middle }, head).full, false);
 });

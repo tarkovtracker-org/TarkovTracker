@@ -155,7 +155,7 @@ test('path selection applies to pull requests only; pushes, forks and Deno check
   const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
   // Shadow mode ended once the rollout evidence in docs/workflow-automation.md was captured.
   assert.doesNotMatch(classify, /--shadow/);
-  assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
+  assert.match(classify, /elif \[ "\$EVENT_NAME" != "pull_request" \]; then\n\s+args\+=\(--full\)/);
   assert.match(ci, /args\+=\(--full\)/);
   assert.match(ci, /vitest run --coverage --shard=/);
   assert.match(ci, /run: pnpm run test:deno$/m);

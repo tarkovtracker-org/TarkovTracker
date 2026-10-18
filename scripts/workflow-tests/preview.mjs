@@ -2726,3 +2726,73 @@ test('dispatched PR previews reject matching trees with invalid ordered parents 
     }
   }
 });
+function queueDocsComparison() {
+  return {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    total_commits: 1,
+    base_commit: { sha: BASE },
+    merge_base_commit: { sha: BASE },
+    commits: [{ sha: HEAD, parents: [{ sha: BASE }] }],
+    files: [{ filename: 'docs/guide.md', status: 'modified' }],
+  };
+}
+test('proven docs-only queue publishes the required result without build artifacts, dispatch, deployment or smoke', async (t) => {
+  const f = queueFixture(t);
+  f.state.artifacts = [];
+  f.github.rest.repos.compareCommits = async () => ({ data: queueDocsComparison() });
+  f.github.rest.actions.downloadArtifact = () => {
+    throw new Error('docs must not download a build');
+  };
+  const args = {
+    github: f.github,
+    context: workflowRunContext(f.state.run),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  const decision = await planPreview(args);
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.state, 'success');
+  assert.match(decision.description, /Not applicable/);
+  assert.equal(decision.headSha, HEAD);
+  assert.equal(decision.baseSha, BASE);
+  assert.equal(f.state.dispatches.length, 0);
+  assert.equal(f.state.statuses.at(-1).sha, HEAD);
+  assert.equal(
+    await publishResult({ ...args, decision, outcomes: { deploy: 'skipped', smoke: 'skipped' } }),
+    'success'
+  );
+});
+test('docs-only queue cannot publish success after ref, base or CI attempt changes during comparison', async (t) => {
+  for (const change of [
+    (f) => {
+      f.state.queueSha = MERGE;
+    },
+    (f) => {
+      f.state.mainSha = MERGE;
+    },
+    (f) => {
+      f.state.run = { ...f.state.run, run_attempt: 2 };
+    },
+  ]) {
+    const f = queueFixture(t);
+    f.github.rest.repos.compareCommits = async () => {
+      change(f);
+      return { data: queueDocsComparison() };
+    };
+    await assert.rejects(
+      planPreview({
+        github: f.github,
+        context: workflowRunContext(f.state.run),
+        core: fakeCore(),
+        workspace: tempDir(t),
+      })
+    );
+    assert.equal(f.state.dispatches.length, 0);
+    assert.equal(
+      f.state.statuses.some((x) => x.state === 'success'),
+      false
+    );
+  }
+});
