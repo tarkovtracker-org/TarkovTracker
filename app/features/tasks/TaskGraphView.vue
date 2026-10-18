@@ -28,7 +28,10 @@
   // Traders shows the same selected trader as a list, so it is the narrow-screen alternative.
   const tradersViewLink = computed(() => ({
     path: TASK_ROUTE_PATHS.traders,
-    query: searchQuery.value ? { q: searchQuery.value } : {},
+    query: {
+      trader: getTaskTraderView.value,
+      ...(searchQuery.value ? { q: searchQuery.value } : {}),
+    },
   }));
   const focusedTaskId = ref<string | null>(null);
   const isFocusChainIsolated = ref(false);

@@ -23,9 +23,10 @@ including a search still being debounced into the URL; sort, trader and map come
 preferences, and so does status everywhere except Graph, which always shows every status without
 overwriting the saved one. Graph also drops the sort control, since its layout follows dependencies.
 The Graph canvas needs the `lg` breakpoint (1024px). Below it the Graph tab stays in the header with a
-monitor icon and a screen-reader note, and `/tasks/graph` replaces the toolbar and canvas with an
-explanation that links to Traders (same trader, search kept). Below `sm` the tabs drop their icons so
-all four fit on one row at 333px. The sidebar keeps one Tasks entry,
+monitor icon and a screen-reader note. The narrow `/tasks/graph` route hides the mounted toolbar
+and replaces the canvas with an explanation that links to Traders (selected trader and search
+carried in the URL). Below `sm` the tabs hide their primary icons while Graph keeps its monitor hint,
+so all four fit on one row at 333px. The sidebar keeps one Tasks entry,
 highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).

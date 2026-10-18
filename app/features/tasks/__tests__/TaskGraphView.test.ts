@@ -15,7 +15,10 @@ vi.mock('@/composables/useTaskGraphData', () => ({
   useTaskGraphData: () => ({ nodes: ref([]), edges: ref([]) }),
 }));
 vi.mock('@/stores/usePreferences', () => ({
-  usePreferencesStore: () => ({ getTaskTraderView: 'prapor', setTaskPrimaryView: vi.fn() }),
+  usePreferencesStore: () => ({
+    getTaskTraderView: '54cb57776803fa99248b456e',
+    setTaskPrimaryView: vi.fn(),
+  }),
 }));
 vi.mock('pinia', async (importOriginal) => ({
   ...(await importOriginal<typeof import('pinia')>()),
@@ -57,14 +60,20 @@ describe('TaskGraphView narrow screens', () => {
     expect(heading.text()).toBe('page.tasks.graph.narrow_title');
     expect(notice.text()).toContain('page.tasks.graph.narrow_description:{"width":1024}');
   });
-  it('offers the Traders view as the alternative and keeps the search', () => {
-    searchQuery.value = 'mole';
-    const link = mountGraph().get('[data-testid="task-graph-narrow-traders-link"]');
-    expect(JSON.parse(link.attributes('data-to') ?? '')).toEqual({
-      path: '/tasks/traders',
-      query: { q: 'mole' },
-    });
-  });
+  it.each(['', 'mole'])(
+    'keeps the selected non-first trader and search %j in the Traders link',
+    (search) => {
+      searchQuery.value = search;
+      const link = mountGraph().get('[data-testid="task-graph-narrow-traders-link"]');
+      expect(JSON.parse(link.attributes('data-to') ?? '')).toEqual({
+        path: '/tasks/traders',
+        query: {
+          trader: '54cb57776803fa99248b456e',
+          ...(search ? { q: search } : {}),
+        },
+      });
+    }
+  );
   it('replaces the notice once the window reaches the lg breakpoint', () => {
     isLgAndUp.value = true;
     expect(mountGraph().find('[data-testid="task-graph-narrow"]').exists()).toBe(false);
