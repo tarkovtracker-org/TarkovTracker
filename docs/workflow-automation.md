@@ -309,6 +309,20 @@ wrong line and leaves the finding unsuppressed. A suppression is a reviewable de
 formality. Existing suppressions are grandfathered; remove them opportunistically when already
 editing that function rather than as unrelated cleanup in someone else's change.
 
+#### Blank-line scanner tests
+
+`pnpm run test:blank-lines` runs exact-output scanner fixtures in-process and the CLI
+contract tests, with dedicated V8 coverage for `scripts/checks/blank-lines/`. The
+configuration is `scripts/checks/blank-lines.vitest.config.mjs`; CI enforces its
+coverage floors in Lint & Format on full validation. This keeps tooling coverage
+separate from the application thresholds, which exclude `scripts/`.
+
+The CLI owns file discovery, exclusions, symlink handling and writes. The pure
+`stripBlankLines(source, filePath, options)` dispatcher selects the language scanner;
+`{ typescript: null }` explicitly exercises the conservative JavaScript fallback.
+Preserve exact output, removal counts, newline endings and idempotence when changing
+scanners. Retain CLI smoke tests for the `LINT_BLANK_LINES_FORCE_FALLBACK` flag.
+
 #### Codebase metrics
 
 `pnpm run metrics` prints a JSON snapshot of the working tree: lines and files for runtime code,

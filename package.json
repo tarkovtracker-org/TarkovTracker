@@ -121,7 +121,8 @@
     "test:workflow": "node scripts/ci/run-workflow-tests.mjs",
     "check:progress-contracts": "node scripts/checks/progress-contracts.mjs",
     "verify:api-parity": "node scripts/checks/api-parity.mjs",
-    "bench:precomputed-response": "node scripts/checks/precomputed-response-benchmark.mjs"
+    "bench:precomputed-response": "node scripts/checks/precomputed-response-benchmark.mjs",
+    "test:blank-lines": "vitest run --config scripts/checks/blank-lines.vitest.config.mjs --coverage"
   },
   "type": "module",
   "lint-staged": {

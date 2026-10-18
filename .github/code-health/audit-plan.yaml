@@ -631,18 +631,32 @@ queue:
     notes: null
   - id: CH-026
     area: Blank-line lint tooling
-    paths: [scripts/checks/lint-blank-lines.mjs, scripts/checks/lint-blank-lines.test.mjs]
-    status: queued
+    paths: [scripts/checks/lint-blank-lines*.mjs, scripts/checks/blank-lines/**]
+    status: in_progress
     priority: P2
     dependencies: []
-    last_reviewed_commit: null
+    last_reviewed_commit: 98d4e73affbf5216124f459362b8f3a60bdee372
     findings_summary: >-
       getProtectedRanges cyclomatic 83 / cognitive 152 / 260 lines; stripBlankLines 49; getShellHeredocs 41;
       getYamlPlainScalarLines 40; test runFixtures 63 / 464 lines. Dev tooling, but it gates every commit.
-    metrics_before: { getProtectedRanges_cyclomatic: 83 }
-    metrics_after: null
+    metrics_before:
+      {
+        getProtectedRanges_cyclomatic: 83,
+        functions_over_threshold: 296,
+        crap_over_threshold: 233,
+        max_crap: 6972,
+        runtime_loc: 115345,
+      }
+    metrics_after:
+      {
+        max_scanner_cyclomatic: 4,
+        functions_over_threshold: 284,
+        crap_over_threshold: 221,
+        max_crap: 930,
+        runtime_loc: 115345,
+      }
     pr: null
-    notes: Fixture-driven tests exist; decompose per language scanner.
+    notes: Per-language scanners extracted; 78 exact-output and CLI tests, dedicated coverage gate, mutation checks and baseline differential checks pass. PR review pending.
   - id: CH-027
     area: API gateway handlers + router
     paths:

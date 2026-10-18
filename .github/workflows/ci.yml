@@ -109,6 +109,9 @@ jobs:
       - name: Validate locales
         if: needs.changes.outputs.i18n == 'true'
         run: pnpm run i18n:check
+      - name: Test blank-line scanners with coverage
+        if: needs.changes.outputs.full == 'true'
+        run: pnpm run test:blank-lines
       - name: Test workflow tooling
         if: needs.changes.outputs.full == 'true'
         env:

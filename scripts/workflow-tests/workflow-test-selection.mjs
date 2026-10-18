@@ -75,6 +75,12 @@ test('release consumers and required aggregate jobs remain covered', () => {
   assertWorkflowContracts(readFileSync('.github/workflows/ci.yml', 'utf8'));
 });
 function assertWorkflowContracts(workflow) {
+  const scanners = workflowStep(
+    jobBlock(workflow, 'lint-format'),
+    'Test blank-line scanners with coverage'
+  );
+  assert.match(scanners, /^ {8}if: needs.changes.outputs.full == 'true'$/m);
+  assert.match(scanners, /^ {8}run: pnpm run test:blank-lines$/m);
   const tooling = workflowStep(jobBlock(workflow, 'lint-format'), 'Test workflow tooling');
   assert.match(tooling, /^ {8}if: needs.changes.outputs.full == 'true'$/m);
   assert.match(tooling, /^ {10}WORKFLOW_TEST_PLAN: \$\{\{ needs.changes.outputs.plan \}\}$/m);
@@ -124,4 +130,9 @@ test('incomplete plans and invalid job contracts retain the full suite', () => {
       all
     );
   }
+});
+test('scanner coverage remains required on full validation', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const broken = workflow.replace('run: pnpm run test:blank-lines', 'run: echo disabled');
+  assert.throws(() => assertWorkflowContracts(broken));
 });
