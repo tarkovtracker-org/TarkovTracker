@@ -67,11 +67,58 @@ export async function controlTargets({ github, context }) {
 // Scheduling only: uncertainty retains the protected publisher, which still revalidates in-lock.
 export async function publicationTargets({ github, context, numbers, core }) {
   if (!passiveSchedulingContext(context)) return numbers;
+  const controller = new AbortController();
+  let timer;
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      core?.notice('Panel preflight deadline reached; retaining unfinished targets.');
+      resolve(true);
+    }, 30000);
+  });
+  const client = preflightClient(github, controller.signal);
+  try {
+    return await retainPublicationTargets(
+      client,
+      { context, numbers, core },
+      controller.signal,
+      deadline
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function retainPublicationTargets(github, { context, numbers, core }, signal, deadline) {
   const retained = [];
-  for (const number of numbers) {
-    if (await passivePublicationNeeded(github, context, number, core)) retained.push(number);
+  for (const [index, number] of numbers.entries()) {
+    if (signal.aborted) return [...retained, ...numbers.slice(index)];
+    const needed = passivePublicationNeeded(github, context, number, core);
+    if (await Promise.race([needed, deadline])) retained.push(number);
   }
   return retained;
+}
+function preflightClient(github, signal) {
+  const rest = Object.fromEntries(
+    Object.entries(github.rest).map(([scope, methods]) => [
+      scope,
+      Object.fromEntries(
+        Object.entries(methods).map(([name, request]) => [name, abortableRequest(request, signal)])
+      ),
+    ])
+  );
+  return {
+    ...github,
+    rest,
+    graphql: abortableRequest(github.graphql, signal),
+    paginate: abortableRequest(github.paginate, signal),
+  };
+}
+function abortableRequest(request, signal) {
+  return Object.assign((...args) => {
+    signal.throwIfAborted();
+    const params = args.pop();
+    return request(...args, { ...params, request: { ...params?.request, signal } });
+  }, request);
 }
 function passiveSchedulingContext(context) {
   return [

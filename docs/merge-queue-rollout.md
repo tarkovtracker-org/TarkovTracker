@@ -236,7 +236,11 @@ credentials. The existing target-selection runner now performs an additional rea
 before admitting a panel to publication. It verifies the App-pinned journal, live panel, current
 head/base, grant role, preview intent and gate presentation twice. Only a verified unchanged panel
 with a stable pointer/head/base can skip the protected job. Missing, corrupt or changing evidence
-retains publication; the protected publisher still rereads and revalidates everything in-lock.
+retains publication. The passive preflight has one 30-second deadline shared by REST, GraphQL
+and paginated requests. Expiry aborts in-flight requests and retains the unfinished targets;
+completed decisions remain unchanged. The deadline is cleared after completion, and its request
+client is separate from the protected publisher. The protected publisher still rereads and
+revalidates everything in-lock.
 The selector receives only read permissions and public issuer IDs, never the App private key.
 
 Checkbox edits, structured dispatches, `synchronize` events and controls reruns bypass the preflight

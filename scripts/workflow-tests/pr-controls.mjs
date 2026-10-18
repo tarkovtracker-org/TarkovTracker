@@ -1688,3 +1688,104 @@ test('final publication rejects head changes during request permission checks', 
   );
   assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
 });
+test('preflight deadline aborts a slow request and retains unfinished targets', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const get = f.github.rest.pulls.get;
+  const reads = [];
+  let signal;
+  let cancelled = false;
+  let entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  f.github.rest.pulls.get = (params) => {
+    reads.push(params.pull_number);
+    if (params.pull_number !== 2) return get(params);
+    signal = params.request?.signal;
+    entered();
+    if (!signal) throw new Error('Missing request cancellation signal.');
+    return new Promise((resolve, reject) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          cancelled = true;
+          reject(signal.reason);
+        },
+        { once: true }
+      );
+    });
+  };
+  const pending = publicationTargets({ github: f.github, context: f.context, numbers: [1, 2, 3] });
+  await started;
+  t.mock.timers.tick(30000);
+  assert.deepEqual(await pending, [2, 3]);
+  assert.equal(signal?.aborted, true);
+  assert.equal(cancelled, true);
+  assert.deepEqual(reads, [1, 1, 2]);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
+test('preflight shares its deadline across REST, GraphQL and pagination without altering the publisher', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const observed = new Map();
+  const record = (kind, params) => {
+    assert.ok(params.request.signal instanceof AbortSignal);
+    observed.set(kind, params.request.signal);
+  };
+  const get = f.github.rest.actions.getWorkflowRun;
+  f.github.rest.actions.getWorkflowRun = (params) => {
+    record('rest', params);
+    return get(params);
+  };
+  const graphql = f.github.graphql;
+  f.github.graphql = (query, params) => {
+    record('graphql', params);
+    return graphql(query, params);
+  };
+  const paginate = f.github.paginate;
+  const endpoint = f.github.rest.repos.listCommitStatusesForRef;
+  endpoint.endpoint = { marker: 'pagination metadata' };
+  let metadataObserved = false;
+  f.github.paginate = (method, params) => {
+    record('paginate', params);
+    if (method.endpoint === endpoint.endpoint) metadataObserved = true;
+    return paginate(method, params);
+  };
+  assert.deepEqual(await eligible(f), []);
+  assert.deepEqual([...observed.keys()].sort(), ['graphql', 'paginate', 'rest']);
+  assert.equal(new Set(observed.values()).size, 1);
+  t.mock.timers.tick(30000);
+  assert.equal(observed.get('rest').aborted, false);
+  assert.equal(f.github.rest.repos.listCommitStatusesForRef, endpoint);
+  assert.equal(metadataObserved, true);
+});
+test('preflight deadline returns even when transport delays cancellation and stops later reads', async (t) => {
+  const f = await passiveFixture();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let signal;
+  let release;
+  let reads = 0;
+  f.github.rest.actions.getWorkflowRun = (params) => {
+    signal = params.request?.signal;
+    return new Promise((resolve) => {
+      release = () => resolve({ data: f.run });
+    });
+  };
+  f.github.rest.pulls.get = async () => {
+    reads++;
+    return { data: f.pull };
+  };
+  const pending = eligible(f);
+  t.mock.timers.tick(30000);
+  const outcome = await Promise.race([
+    pending,
+    new Promise((resolve) => setImmediate(() => resolve('deadline did not release selection'))),
+  ]);
+  release();
+  await new Promise(setImmediate);
+  assert.deepEqual(outcome, [1]);
+  assert.equal(signal.aborted, true);
+  assert.equal(reads, 0);
+  assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+});
