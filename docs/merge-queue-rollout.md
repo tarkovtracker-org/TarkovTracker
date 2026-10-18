@@ -6,14 +6,16 @@ Owner: [CI and release](systems/ci-and-release.md). Preview security remains own
 ## Candidate validation
 
 CI handles `merge_group: checks_requested` using the exact event base and checked-out integration
-head. A complete single-parent delta containing only inert documentation uses the existing reduced
-classifier: formatting, systems drift and security remain required, while app build/tests are
-skipped. Agent policy files, GitHub configuration, mixed changes and uncertain evidence stay full.
+head. The new docs-only queue reduction reuses the existing path classifier. A complete
+single-parent delta containing only inert documentation keeps formatting, systems drift and
+security required, while skipping app build and tests. Agent policy files, GitHub configuration, mixed changes and uncertain evidence stay full.
 The trusted Preview State controller independently verifies the same live queue revision and a
 complete base/head comparison before publishing `Preview Result: success` as not applicable,
 without expecting a build artifact. A capped comparison, stale revision or changed CI attempt
 cannot establish that exemption. All other integrations retain full validation and the anonymous
 credential-isolated preview deployment/smoke pipeline after that exact CI attempt succeeds.
+The reduction has local replay/regression coverage; live docs-only queue skips remain a rollout
+verification item after authorized merge.
 
 The preview status targets the queue commit, not any member PR head. Before planning, upload and
 success publication, the controller verifies the same-repository `gh-readonly-queue/main/` ref,

@@ -182,9 +182,20 @@ test('trusted queue preview uses the full authenticated integration comparison, 
     comparison(
       Array.from({ length: 300 }, (_, i) => ({ filename: `docs/${i}.md`, status: 'added' }))
     ),
-    { ...comparison(docs), commits: [{ sha: tree }] },
+    { ...comparison(docs), commits: [{ sha: tree, parents: [{ sha: base }] }] },
     { ...comparison(docs), base_commit: { sha: tree } },
     { ...comparison(docs), merge_base_commit: { sha: tree } },
+    { ...comparison(docs), status: 'diverged' },
+    { ...comparison(docs), ahead_by: 2 },
+    { ...comparison(docs), behind_by: 1 },
+    { ...comparison(docs), commits: [] },
+    { ...comparison(docs), commits: [...comparison(docs).commits, ...comparison(docs).commits] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [] }] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [{ sha: tree }] }] },
+    { ...comparison(docs), commits: [{ sha: head, parents: [{ sha: base }, { sha: tree }] }] },
+    { ...comparison(docs), commits: [null] },
+    comparison([null]),
+    null,
     { ...comparison(docs), total_commits: 2 },
     { ...comparison(docs), files: undefined },
   ];
@@ -193,5 +204,17 @@ test('trusted queue preview uses the full authenticated integration comparison, 
   f.github.rest.repos.compareCommits = async () => {
     throw new Error('comparison unavailable');
   };
-  assert.equal(await queueRequiresPreview(f.github, f.context, f.candidate, revision), true);
+  await assert.rejects(
+    queueRequiresPreview(f.github, f.context, f.candidate, revision),
+    /comparison unavailable/
+  );
+  for (const status of [404, 422]) {
+    f.github.rest.repos.compareCommits = async () => {
+      throw Object.assign(new Error('missing comparison'), { status });
+    };
+    await assert.rejects(
+      queueRequiresPreview(f.github, f.context, f.candidate, revision),
+      /Queue comparison is no longer available/
+    );
+  }
 });

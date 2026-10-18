@@ -615,13 +615,19 @@ async function evaluateQueue({ github, context, state, workspace }) {
   state.candidate.queueBaseSha = revision.baseSha;
   state.candidate.queueTreeSha = revision.treeSha;
   await queueProof(() => requireQueueCi(github, context, state.run));
-  if (!(await queueRequiresPreview(github, context, state.candidate, revision))) {
-    const decision = { ...decisionBase(state), ...notApplicable() };
-    await requireFreshDecision(github, context, decision);
-    return decision;
-  }
+  const previewRequired = await queueProof(() =>
+    queueRequiresPreview(github, context, state.candidate, revision)
+  );
+  if (!previewRequired) return queueDocumentationDecision(github, context, state);
   state.previewAuthorization = 'queue';
   return deployDecision({ github, context, state, workspace });
+}
+async function queueDocumentationDecision(github, context, state) {
+  const decision = { ...decisionBase(state), ...notApplicable() };
+  const errors = await freshnessErrors(github, context, decision);
+  if (errors.length)
+    throw ignore(`Queue documentation candidate is obsolete: ${errors.join('; ')}`);
+  return decision;
 }
 function requestBinding(inputs) {
   return Number(inputs?.request_comment_id) || null;

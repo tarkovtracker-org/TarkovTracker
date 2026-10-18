@@ -88,11 +88,11 @@ function comparisonRange(data, baseSha) {
 }
 function comparisonParent(parents, baseSha) {
   if (!Array.isArray(parents) || parents.length !== 1) return false;
-  return parents[0].sha === baseSha;
+  return parents[0]?.sha === baseSha;
 }
 function comparisonHead(commits, headSha, baseSha) {
   if (!Array.isArray(commits) || commits.length !== 1) return false;
-  const commit = commits[0];
+  const commit = commits[0] ?? {};
   return [commit.sha === headSha, comparisonParent(commit.parents, baseSha)].every(Boolean);
 }
 function exactQueueComparison(data, candidate, revision) {
@@ -105,11 +105,10 @@ function comparisonName(path) {
   return typeof path === 'string' && path.length > 0;
 }
 function comparisonFilePaths(file) {
-  const paths = ['renamed', 'copied'].includes(file.status)
-    ? [file.filename, file.previous_filename]
-    : [file.filename];
+  const { status, filename, previous_filename } = file ?? {};
+  const paths = ['renamed', 'copied'].includes(status) ? [filename, previous_filename] : [filename];
   return [
-    ['added', 'modified', 'removed', 'renamed', 'copied'].includes(file.status),
+    ['added', 'modified', 'removed', 'renamed', 'copied'].includes(status),
     paths.every(comparisonName),
   ].every(Boolean)
     ? paths
@@ -121,6 +120,12 @@ function comparisonPaths(files) {
   const paths = files.map(comparisonFilePaths);
   return paths.includes(null) ? [] : paths.flat();
 }
+function comparisonRequiresPreview(data, candidate, revision) {
+  const paths = exactQueueComparison(data ?? {}, candidate, revision)
+    ? comparisonPaths(data.files)
+    : [];
+  return classifyQueuePaths(paths).previewRequired;
+}
 export async function queueRequiresPreview(github, context, candidate, revision) {
   try {
     const { data } = await github.rest.repos.compareCommits({
@@ -130,11 +135,12 @@ export async function queueRequiresPreview(github, context, candidate, revision)
       per_page: 100,
       page: 1,
     });
-    const paths = exactQueueComparison(data, candidate, revision)
-      ? comparisonPaths(data.files)
-      : [];
-    return classifyQueuePaths(paths).previewRequired;
-  } catch {
-    return true;
+    return comparisonRequiresPreview(data, candidate, revision);
+  } catch (error) {
+    if ([404, 422].includes(error.status))
+      throw new QueueValidationError(
+        'Queue comparison is no longer available; wait for a fresh queue run.'
+      );
+    throw error;
   }
 }

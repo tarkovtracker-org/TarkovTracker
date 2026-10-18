@@ -548,6 +548,12 @@ function repoEndpoints(state) {
       },
     },
     repos: {
+      compareCommits: async () => ({
+        data: {
+          ...queueDocsComparison(),
+          files: state.files.map((file) => ({ status: 'modified', ...file })),
+        },
+      }),
       getCollaboratorPermissionLevel: async () => ({ data: { role_name: state.requesterRole } }),
       listPullRequestsAssociatedWithCommit: 'associated',
       listCommitStatusesForRef: 'statuses',
@@ -2765,30 +2771,61 @@ test('proven docs-only queue publishes the required result without build artifac
   );
 });
 test('docs-only queue cannot publish success after ref, base or CI attempt changes during comparison', async (t) => {
-  for (const change of [
-    (f) => {
-      f.state.queueSha = MERGE;
-    },
-    (f) => {
-      f.state.mainSha = MERGE;
-    },
-    (f) => {
-      f.state.run = { ...f.state.run, run_attempt: 2 };
-    },
+  for (const [change, reason] of [
+    [
+      (f) => {
+        f.state.queueSha = MERGE;
+      },
+      /Queue revision moved/,
+    ],
+    [
+      (f) => {
+        f.state.mainSha = MERGE;
+      },
+      /Queue base is no longer current main/,
+    ],
+    [
+      (f) => {
+        f.state.run = { ...f.state.run, run_attempt: 2 };
+      },
+      /CI run attempt superseded/,
+    ],
   ]) {
     const f = queueFixture(t);
     f.github.rest.repos.compareCommits = async () => {
       change(f);
       return { data: queueDocsComparison() };
     };
-    await assert.rejects(
-      planPreview({
-        github: f.github,
-        context: workflowRunContext(f.state.run),
-        core: fakeCore(),
-        workspace: tempDir(t),
-      })
-    );
+    const decision = await planPreview({
+      github: f.github,
+      context: workflowRunContext(f.state.run),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.equal(decision.action, 'ignore');
+    assert.match(decision.description, reason);
+    assert.equal(f.state.dispatches.length, 0);
+    assert.equal(f.state.statuses.length, 0);
+  }
+});
+test('queue comparison errors preserve structured obsolete failures and propagate API outages', async (t) => {
+  for (const status of [404, 422, 503]) {
+    const f = queueFixture(t);
+    f.github.rest.repos.compareCommits = async () => {
+      throw Object.assign(new Error('comparison service unavailable'), { status });
+    };
+    const pending = planPreview({
+      github: f.github,
+      context: workflowRunContext(f.state.run),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    if (status === 503) await assert.rejects(pending, /comparison service unavailable/);
+    else {
+      const decision = await pending;
+      assert.equal(decision.action, 'fail');
+      assert.match(decision.description, /Queue comparison is no longer available/);
+    }
     assert.equal(f.state.dispatches.length, 0);
     assert.equal(
       f.state.statuses.some((x) => x.state === 'success'),
