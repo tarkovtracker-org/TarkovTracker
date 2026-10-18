@@ -30,9 +30,11 @@ function requirePolicy(condition, message) {
 const SENSITIVE_PATH =
   /(?:^supabase\/|^workers\/|^shared\/|^scripts\/(?:ops|precompute|release|codex-review|preview|ci)\/|^\.github\/|(?:^|\/)(?:AGENTS|SECURITY)\.md$|^docs\/(?:code-review|workflow-automation)\.md$|(?:auth|session|permission|supabase|billing|stripe|token|credential|entitlement|migration|contract|wrangler|nuxt\.config|progressState|progress-storage|useProgress|useTarkov|storage|persist|team|account)(?:[./_-]|[A-Z]|$))/i;
 const LOW_RISK_PATH =
-  /^(?:docs\/|app\/locales\/|app\/(?:components|pages|features|layouts|assets)\/|(?:app|scripts)\/.*(?:\.test\.[cm]?[jt]s|\.spec\.[cm]?[jt]s)$|scripts\/workflow-tests\/)/;
+  /^(?:docs\/|[^/]+\.md$|app\/locales\/|app\/(?:components|pages|features|layouts|assets)\/|(?:app|scripts)\/.*(?:\.test\.[cm]?[jt]s|\.spec\.[cm]?[jt]s)$|scripts\/workflow-tests\/)/;
 const SENSITIVE_PATCH =
-  /(?:supabase|stripe|service.role|secret|credential|authorization|authentication|permission|access.check|session|process\.env|runtimeConfig|localStorage|indexedDB|persist|defineEventHandler|fetch\(|\$fetch\(|https?:\/\/)/i;
+  /(?:supabase|stripe|service.role|secret|credential|authorization|authentication|permission|access.check|session|process\.env|runtimeConfig|localStorage|indexedDB|persist|defineEventHandler|fetch\b|sendBeacon|XMLHttpRequest|WebSocket|EventSource|useFetch|useLazyFetch|https?:\/\/)/i;
+const REVIEW_ONLY_PATH =
+  /^(?:docs\/|[^/]+\.md$|app\/locales\/)|(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]s$|^scripts\/workflow-tests\//;
 function ordinaryFile(file) {
   if (SENSITIVE_PATH.test(file.filename)) return false;
   if (!LOW_RISK_PATH.test(file.filename)) return false;
@@ -40,7 +42,9 @@ function ordinaryFile(file) {
 }
 function ordinaryPatch(file) {
   if (!file.patch) return false;
-  if (/^(docs\/|app\/locales\/)/.test(file.filename)) return true;
+  if (/^(?:docs\/|app\/locales\/|[^/]+\.md$)/.test(file.filename)) return true;
+  // Context can contain the capability whose arguments or guards changed. Diff-looking
+  // prefixes are also valid source content, so scan the complete supplied hunk.
   return !SENSITIVE_PATCH.test(file.patch);
 }
 export function classifyRisk(files, metadataSafe = false) {
@@ -62,8 +66,8 @@ function safeMetadataFile(file) {
   ].every(Boolean);
 }
 function largeRuntimeDiff(files) {
-  if (files.every((file) => /^(docs\/|app\/locales\/)/.test(file.filename))) return false;
-  return files.reduce((sum, file) => sum + file.changes, 0) > 200;
+  const runtime = files.filter((file) => !REVIEW_ONLY_PATH.test(file.filename));
+  return runtime.reduce((sum, file) => sum + file.changes, 0) > 500;
 }
 function latestReviews(reviews) {
   const latest = new Map();

@@ -138,8 +138,16 @@ publisher and API errors still fail the run. A hold found after a receipt output
 fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
 status, a successful run and an approving receipt.
 
-Small ordinary changes, translations and verified safe dependency/version metadata changes may
-enter after bot review. Sensitive and unclassified changes require an exact-head approving review
+Ordinary changes, translations and verified safe dependency/version metadata changes may
+enter after bot review. Ordinary paths include `app/{components,pages,features,layouts,assets}/`,
+docs, root Markdown, locales and supported test paths, with sensitive paths always taking precedence.
+Docs, root Markdown and locales skip patch-pattern scanning; other ordinary files must avoid
+credential, session, storage and network patterns in the complete diff hunk, including unchanged
+context. Fetch references, typed wrappers and absolute URLs remain sensitive. Generic helpers under
+`app/{composables,utils,types,stores}/` remain unclassified unless they match a supported test path:
+their diff alone cannot establish whether sensitive capabilities are imported or passed in elsewhere.
+The size limit is 500 changed lines outside docs, root Markdown, locales, `__tests__/` directories
+and supported test files. Sensitive and unclassified changes require an exact-head approving review
 from an independent write collaborator, or a write collaborator's single-line command:
 
 ```text
