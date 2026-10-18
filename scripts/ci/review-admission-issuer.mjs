@@ -107,14 +107,38 @@ async function appApi(fetchImpl, method, path, token, body) {
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    throw new Error('Review publisher API request failed.');
+    throw new Error(apiFailure(method, path));
   }
-  requireEvidence(response.ok, `Review publisher API returned HTTP ${response.status}.`);
+  requireEvidence(response.ok, apiFailure(method, path, response.status, response.headers));
   try {
     return await response.json();
   } catch {
     throw new Error('Review publisher API response is invalid.');
   }
+}
+function apiFailure(method, path, status, headers) {
+  const validStatus = Number.isInteger(status) && status >= 100 && status <= 599;
+  const outcome = validStatus ? `returned HTTP ${status}` : 'request failed';
+  return `Review publisher API ${method} ${path} ${outcome}${providerDiagnostics(headers)}.`;
+}
+function providerDiagnostics(headers) {
+  const fields = [
+    ['x-github-request-id', /^[A-Fa-f0-9:]{1,100}$/],
+    ['x-ratelimit-limit', /^\d{1,12}$/],
+    ['x-ratelimit-remaining', /^\d{1,12}$/],
+    ['x-ratelimit-reset', /^\d{1,12}$/],
+    ['retry-after', /^\d{1,12}$/],
+  ];
+  const details = fields.flatMap(([name, pattern]) => {
+    const value = diagnosticHeader(headers, name);
+    return typeof value === 'string' && pattern.test(value) ? [`${name}=${value}`] : [];
+  });
+  return details.length ? ` (${details.join('; ')})` : '';
+}
+function diagnosticHeader(headers, name) {
+  if (!headers) return undefined;
+  if (typeof headers.get === 'function') return headers.get(name);
+  return headers[name];
 }
 function statusesOnly(permissions) {
   requireEvidence(permissions.statuses === 'write', 'App needs commit-status write permission.');
@@ -134,16 +158,34 @@ function requireMetadataPermission(permissions) {
     'Review publisher metadata permission is invalid.'
   );
 }
-async function verifiedApp(fetchImpl, config, token) {
+async function verifiedApp(fetchImpl, config, token, github) {
   const app = await appApi(fetchImpl, 'GET', '/app', token);
   requireEvidence(app.id === config.appId, 'Review publisher App ID mismatch.');
   requireEvidence(/^[a-z0-9-]+$/.test(app.slug), 'Review publisher App slug is invalid.');
   statusesOnly(app.permissions);
-  const bot = await appApi(fetchImpl, 'GET', `/users/${encodeURIComponent(`${app.slug}[bot]`)}`);
+  const bot = await publisherBot(github, `${app.slug}[bot]`);
   requireEvidence(
     bot.id === config.botId && bot.type === 'Bot',
     'Review publisher bot identity mismatch.'
   );
+}
+async function publisherBot(github, username) {
+  try {
+    const { data } = await github.rest.users.getByUsername({
+      username,
+      request: { signal: AbortSignal.timeout(15000) },
+    });
+    return data;
+  } catch (error) {
+    throw new Error(
+      apiFailure(
+        'GET',
+        `/users/${encodeURIComponent(username)}`,
+        error?.status,
+        error?.response?.headers
+      )
+    );
+  }
 }
 function installationIdentity(data, config, repo) {
   requireEvidence(
@@ -292,7 +334,7 @@ export async function createReviewPublisher({
   );
   mask(core, pem);
   const token = jwt(config, pem, core);
-  await verifiedApp(fetchImpl, config, token);
+  await verifiedApp(fetchImpl, config, token, github);
   await verifiedInstallation(fetchImpl, config, context.repo, token);
   const repository = await repositoryIdentity(github, context.repo);
   const access = await restrictedToken(fetchImpl, config, repository, token, core);

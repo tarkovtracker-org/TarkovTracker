@@ -1791,12 +1791,19 @@ function issuerFixture() {
     [`/repos/example/repo/statuses/${head}`]: { id: 1 },
   };
   const calls = [];
+  const metadataCalls = [];
   const masked = [];
   const args = {
     github: {
       graphql: async () => 'retained',
       paginate: async () => 'retained',
       rest: {
+        users: {
+          getByUsername: async (params) => {
+            metadataCalls.push(params);
+            return { data: responses['/users/isolated-admission%5Bbot%5D'] };
+          },
+        },
         repos: {
           get: async () => ({ data: repository }),
           createCommitStatus: async () =>
@@ -1815,8 +1822,100 @@ function issuerFixture() {
       return { ok: true, json: async () => responses[new URL(url).pathname] };
     },
   };
-  return { args, calls, masked, responses, repository };
+  return { args, calls, metadataCalls, masked, responses, repository };
 }
+test('publisher uses authenticated metadata when anonymous bot lookup is denied', async (t) => {
+  const f = issuerFixture();
+  const timeout = AbortSignal.timeout;
+  const deadlines = new WeakMap();
+  t.mock.method(AbortSignal, 'timeout', (milliseconds) => {
+    const signal = timeout(milliseconds);
+    deadlines.set(signal, milliseconds);
+    return signal;
+  });
+  const fetchImpl = f.args.fetchImpl;
+  f.args.fetchImpl = async (url, options) => {
+    if (new URL(url).pathname.startsWith('/users/'))
+      return { ok: false, status: 403, headers: new Headers({ 'x-ratelimit-remaining': '0' }) };
+    return fetchImpl(url, options);
+  };
+  const github = await createReviewPublisher(f.args);
+  assert.equal(f.metadataCalls.length, 1);
+  assert.equal(f.metadataCalls[0].username, 'isolated-admission[bot]');
+  assert.equal(deadlines.get(f.metadataCalls[0].request?.signal), 15000);
+  assert.deepEqual(github.reviewAdmissionIssuer, appIds);
+  assert.ok(f.calls.every((call) => call.options.headers.Authorization));
+});
+test('publisher bot lookup fails closed without anonymous fallback or retry and retains safe diagnostics', async () => {
+  for (const status of [403, 404, 429, undefined]) {
+    const f = issuerFixture();
+    f.args.github.rest.users.getByUsername = async (params) => {
+      f.metadataCalls.push(params);
+      throw Object.assign(new Error(f.args.env.REVIEW_ADMISSION_PRIVATE_KEY), {
+        status,
+        response: {
+          headers: {
+            'x-github-request-id': 'ABCD:1234:5678',
+            'x-ratelimit-limit': '5000',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': '1792323600',
+            'retry-after': '60',
+            authorization: 'synthetic-private-installation-token',
+          },
+          data: { message: f.args.env.REVIEW_ADMISSION_PRIVATE_KEY },
+        },
+      });
+    };
+    await assert.rejects(createReviewPublisher(f.args), (error) => {
+      assert.match(error.message, /Review publisher API GET \/users\/isolated-admission%5Bbot%5D/);
+      if (status) assert.ok(error.message.includes(`HTTP ${status}`));
+      else assert.match(error.message, /request failed/);
+      for (const detail of [
+        'x-github-request-id=ABCD:1234:5678',
+        'x-ratelimit-limit=5000',
+        'x-ratelimit-remaining=0',
+        'x-ratelimit-reset=1792323600',
+        'retry-after=60',
+      ])
+        assert.ok(error.message.includes(detail));
+      assert.ok(!error.message.includes(f.args.env.REVIEW_ADMISSION_PRIVATE_KEY));
+      assert.ok(!error.message.includes('synthetic-private-installation-token'));
+      assert.equal(error.cause, undefined);
+      return true;
+    });
+    assert.equal(f.metadataCalls.length, 1);
+    assert.ok(!f.calls.some((call) => call.path.endsWith('/access_tokens')));
+    assert.ok(!f.calls.some((call) => call.path.startsWith('/users/')));
+  }
+});
+test('publisher HTTP diagnostics whitelist bounded provider metadata and omit unsafe values', async () => {
+  for (const unsafe of [false, true]) {
+    const f = issuerFixture();
+    const secret = f.args.env.REVIEW_ADMISSION_PRIVATE_KEY;
+    f.args.fetchImpl = async () => ({
+      ok: false,
+      status: 403,
+      headers: {
+        get: (name) =>
+          ({
+            'x-github-request-id': unsafe ? secret : 'ABCD:1234',
+            'x-ratelimit-remaining': unsafe ? secret : '0',
+            'retry-after': unsafe ? '9'.repeat(100) : '60',
+            authorization: secret,
+          })[name],
+      },
+      json: () => assert.fail('Publisher must not read arbitrary error bodies.'),
+    });
+    await assert.rejects(createReviewPublisher(f.args), (error) => {
+      assert.match(error.message, /Review publisher API GET \/app returned HTTP 403/);
+      assert.ok(!error.message.includes(secret));
+      assert.equal(error.message.includes('x-ratelimit-remaining=0'), !unsafe);
+      assert.equal(error.message.includes('retry-after=60'), !unsafe);
+      assert.ok(error.message.length < 300);
+      return true;
+    });
+  }
+});
 test('dedicated App publisher validates identity, mints scoped token and only replaces status writer', async () => {
   const f = issuerFixture();
   const github = await createReviewPublisher(f.args);
@@ -1873,6 +1972,9 @@ test('App publisher rejects wrong identities, installation, repository and exces
     },
     (f) => {
       f.responses['/users/isolated-admission%5Bbot%5D'].id = 1;
+    },
+    (f) => {
+      f.responses['/users/isolated-admission%5Bbot%5D'].type = 'User';
     },
     (f) => {
       f.responses['/app/installations/987656'].id = 1;

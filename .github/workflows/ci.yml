@@ -111,6 +111,9 @@ jobs:
         run: pnpm run i18n:check
       - name: Test workflow tooling
         if: needs.changes.outputs.full == 'true'
+        env:
+          WORKFLOW_TEST_PLAN: ${{ needs.changes.outputs.plan }}
+          WORKFLOW_TEST_EVENT: ${{ github.event_name }}
         run: pnpm run test:workflow
       - name: Lint GitHub Actions workflows
         if: needs.changes.outputs.workflows == 'true'

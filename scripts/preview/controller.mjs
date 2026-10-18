@@ -379,7 +379,11 @@ function expectedManifest(context, candidate, pull, run) {
 function claimErrors(manifest, expected) {
   return Object.entries(expected)
     .filter(([key, value]) => manifest[key] !== value)
-    .map(([key, value]) => `${key}: manifest ${String(manifest[key])}, expected ${String(value)}`);
+    .map(([key, value]) => {
+      const recovery =
+        key === 'runAttempt' ? '. Push a new commit to rebuild the preview artifact.' : '';
+      return `${key}: manifest ${String(manifest[key])}, expected ${String(value)}${recovery}`;
+    });
 }
 /** Compare every manifest claim with live GitHub state and the recomputed content digest. */
 export function verifyManifest(manifest, expected, digest) {
