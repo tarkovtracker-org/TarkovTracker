@@ -1,3 +1,4 @@
+import { BackupImportError } from '@/utils/backup/errors';
 import {
   MAX_BACKUP_SIZE,
   MAX_RECOVERY_ARCHIVE_SIZE,
@@ -29,11 +30,6 @@ export type BackupCommand =
   | { op: 'select'; index: number }
   | { op: 'read' };
 export type BackupReply = { summary: BackupSummary } | { tokens: BackupToken[]; done: boolean };
-export class BackupImportError extends Error {
-  constructor(message: string) {
-    super(message.slice(0, 512));
-  }
-}
 const fail = (message: string): never => {
   throw new BackupImportError(message);
 };

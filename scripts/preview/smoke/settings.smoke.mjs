@@ -118,6 +118,18 @@ test('Recovery files parse in a worker and remain preview-only until confirmatio
     File.prototype.text = () => {
       throw new Error('Backup file read on UI thread');
     };
+    // Hold the first worker open request so cancellation/focus checks are deterministic.
+    const NativeWorker = Worker;
+    let holdOpen = true;
+    window.Worker = class extends NativeWorker {
+      postMessage(message, ...rest) {
+        if (holdOpen && message.command.op === 'open') {
+          holdOpen = false;
+          return;
+        }
+        return super.postMessage(message, ...rest);
+      }
+    };
   });
   const mode = {
     level: 42,
@@ -141,12 +153,18 @@ test('Recovery files parse in a worker and remain preview-only until confirmatio
     JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
   );
   const input = page.locator('#backup-restore input[type="file"]');
-  await input.setInputFiles({
-    name: 'recovery.json',
-    mimeType: 'application/json',
-    buffer: archive,
-  });
   const panel = page.getByRole('tabpanel', { name: 'Backup & Restore' });
+  const reading = panel.getByTestId('backup-reading-status');
+  await expect(reading).toBeAttached();
+  const upload = { name: 'recovery.json', mimeType: 'application/json', buffer: archive };
+  await input.setInputFiles(upload);
+  await expect(reading).toHaveText('Reading backup…');
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(
+    panel.getByRole('button', { name: 'Import TarkovTracker Backup', exact: true })
+  ).toBeFocused();
+  await expect(reading).toBeEmpty();
+  await input.setInputFiles(upload);
   await expect(panel.getByRole('button', { name: 'Confirm Import', exact: true })).toBeVisible();
   await expect(panel).toContainText('42 (USEC)');
   await expect(

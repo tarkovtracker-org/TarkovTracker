@@ -31,7 +31,7 @@ import {
   MAX_RECOVERY_ARCHIVE_SIZE,
   MAX_RECOVERY_OLDER_ENTRIES,
   DEBUG_EXPORT_FORMAT,
-  isPlainObject,
+  isBackupObject,
   validateBackup,
   selectOlderTabRaw,
   parseRecoveryProgress,
@@ -216,7 +216,7 @@ async function sanitizePreferencesForDebug(
   state: PersistedPreferencesState
 ): Promise<PersistedPreferencesState> {
   const sanitizedState = cloneStateSnapshot(state);
-  const rawTeamHide = isPlainObject(sanitizedState.teamHide) ? sanitizedState.teamHide : {};
+  const rawTeamHide = isBackupObject(sanitizedState.teamHide) ? sanitizedState.teamHide : {};
   const teamHideEntries = await Promise.all(
     Object.entries(rawTeamHide).map(async ([teamId, hidden]) => {
       const fingerprint = await fingerprintValue(teamId);
@@ -236,8 +236,8 @@ async function sanitizePreferencesForDebug(
   }
   sanitizedState.taskFilterPresets = await Promise.all(
     rawTaskFilterPresets.map(async (preset, index): Promise<TaskFilterPreset> => {
-      const sanitizedPreset = isPlainObject(preset) ? preset : null;
-      const sanitizedSettings = isPlainObject(sanitizedPreset?.settings)
+      const sanitizedPreset = isBackupObject(preset) ? preset : null;
+      const sanitizedSettings = isBackupObject(sanitizedPreset?.settings)
         ? sanitizedPreset.settings
         : {};
       return {
@@ -261,7 +261,7 @@ async function sanitizePreferencesForDebug(
   return sanitizedState;
 }
 function normalizePreferencesForDebug(value: unknown): PersistedPreferencesState {
-  if (!isPlainObject(value)) {
+  if (!isBackupObject(value)) {
     throw new Error('Persisted preferences state must be an object');
   }
   return getPersistedPreferencesState(value);
@@ -272,7 +272,7 @@ function sanitizeProgressForDebug(data: UserProgressData): UserProgressData {
   return sanitizedData;
 }
 async function sanitizeTarkovStateForDebug(state: unknown): Promise<UserState> {
-  if (!isPlainObject(state)) {
+  if (!isBackupObject(state)) {
     throw new Error('Persisted progress state must be an object');
   }
   const clonedState = sanitizeOwnedUserState(migrateToGameModeStructure(cloneStateSnapshot(state)));
@@ -609,8 +609,12 @@ export function useDataBackup(): UseDataBackupReturn {
     selectedRecoveryArchiveEntry.value = reply.summary.selected;
     importState.value = 'preview';
   }
+  function releaseFailedWorker(): void {
+    if (importClient?.closed) resetImport();
+  }
   function handleImportFailure(error: unknown): void {
     if (error instanceof BackupImportCancelled) return;
+    releaseFailedWorker();
     importState.value = 'error';
     const message = error instanceof Error ? error.message : 'Failed to read backup file';
     importError.value = message.startsWith('settings.') ? t(message) : message;
@@ -695,16 +699,22 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  async function readOlderTabRecord() {
+    try {
+      return await readCommittedProgressAuthority();
+    } catch (error) {
+      logger.error('[DataBackup] Older-copy read failed:', error);
+      throw new Error(t('settings.data_management.older_edit_read_failed'), { cause: error });
+    }
+  }
   async function reviewOlderTabProgress(index: number): Promise<void> {
     resetImport();
-    const owner = $supabase.user.id ?? null;
+    const generation = importGeneration;
+    const owner = currentImportOwner();
+    importState.value = 'parsing';
     try {
-      const record = await readCommittedProgressAuthority().catch((error) => {
-        logger.error('[DataBackup] Older-copy read failed:', error);
-        throw new Error(t('settings.data_management.older_edit_read_failed'));
-      });
-      if (owner !== ($supabase.user.id ?? null))
-        throw new Error(t('settings.data_management.import_owner_changed'));
+      const record = await readOlderTabRecord();
+      if (!workerResultIsCurrent(generation, owner)) return;
       const copies = ownedLegacyUpdates(record, owner);
       applyResolvedRecovery(
         parseRecoveryProgress(
@@ -712,11 +722,7 @@ export function useDataBackup(): UseDataBackupReturn {
         )
       );
     } catch (error) {
-      importState.value = 'error';
-      importError.value =
-        error instanceof Error
-          ? error.message
-          : t('settings.data_management.older_edit_read_failed');
+      failCurrentImport(error, generation, owner);
     }
   }
   async function exportDeviceProgressRecovery(): Promise<void> {

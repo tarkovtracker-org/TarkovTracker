@@ -1,3 +1,4 @@
+import { BACKUP_IMPORT_ERROR } from '@/utils/backup/errors';
 import { createBackupReceiver } from '@/utils/backup/transfer';
 import type { BackupCommand, BackupReply, SelectedBackup } from '@/utils/backup/importSession';
 export class BackupImportCancelled extends Error {}
@@ -6,13 +7,13 @@ export function createBackupImportClient() {
     type: 'module',
   });
   let sequence = 0;
-  let disposed = false;
+  let closedError: Error | undefined;
   const pending = new Map<
     number,
     { resolve: (reply: BackupReply) => void; reject: (error: Error) => void }
   >();
   function cancel(error: Error = new BackupImportCancelled()) {
-    disposed = true;
+    closedError = error;
     worker.terminate();
     for (const request of pending.values()) request.reject(error);
     pending.clear();
@@ -26,17 +27,17 @@ export function createBackupImportClient() {
     if (data.error) request.reject(new Error(data.error));
     else request.resolve(data.reply);
   };
-  worker.onerror = () => cancel(new Error('Failed to read backup file'));
-  worker.onmessageerror = () => cancel(new Error('Failed to read backup file'));
+  worker.onerror = () => cancel(new Error(BACKUP_IMPORT_ERROR));
+  worker.onmessageerror = () => cancel(new Error(BACKUP_IMPORT_ERROR));
   function request(command: BackupCommand): Promise<BackupReply> {
-    if (disposed) return Promise.reject(new BackupImportCancelled());
+    if (closedError) return Promise.reject(closedError);
     return new Promise((resolve, reject) => {
       const id = ++sequence;
       pending.set(id, { resolve, reject });
       try {
         worker.postMessage({ id, command });
       } catch {
-        cancel(new Error('Failed to read backup file'));
+        cancel(new Error(BACKUP_IMPORT_ERROR));
       }
     });
   }
@@ -49,5 +50,12 @@ export function createBackupImportClient() {
       if (reply.done) return receiver.value() as SelectedBackup;
     }
   }
-  return { request, read, cancel };
+  return {
+    request,
+    read,
+    cancel,
+    get closed() {
+      return closedError !== undefined;
+    },
+  };
 }

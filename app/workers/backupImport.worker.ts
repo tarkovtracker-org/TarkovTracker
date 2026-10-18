@@ -1,9 +1,7 @@
-import {
-  createBackupImportSession,
-  BackupImportError,
-  type BackupCommand,
-} from '@/utils/backup/importSession';
+import { backupWorkerError } from '@/utils/backup/errors';
+import { createBackupImportSession, type BackupCommand } from '@/utils/backup/importSession';
 const run = createBackupImportSession();
+// Dedicated worker messages arrive through its private creator port, not Window.postMessage.
 // DOM and worker lib globals overlap; use the small endpoint contract instead of loading both libs.
 const endpoint = globalThis as unknown as {
   onmessage: (event: MessageEvent<{ id: number; command: BackupCommand }>) => void;
@@ -15,7 +13,7 @@ endpoint.onmessage = async ({ data: { id, command } }) => {
   } catch (error) {
     endpoint.postMessage({
       id,
-      error: error instanceof BackupImportError ? error.message : 'Failed to read backup file',
+      error: backupWorkerError(error),
     });
   }
 };

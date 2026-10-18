@@ -1,7 +1,7 @@
 import { migrateToGameModeStructure, type UserProgressData } from '@/stores/progressState';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { sanitizeOwnedProgressData, sanitizeOwnedUserState } from '@/utils/progressSanitizers';
-import { parseUserScopedStorage, isOwnedProgressRecovery } from '@/utils/userScopedStorage';
+import { parseUserScopedStorage, isOwnedProgressRecovery } from '@/utils/storage/envelope';
 export const BACKUP_FORMAT = 'tarkovtracker-backup' as const;
 export const MAX_BACKUP_SIZE = 5 * 1024 * 1024;
 // Current, original, captured recovery and one pending copy: 20 Mi characters
@@ -76,13 +76,13 @@ const ALLOWED_PROGRESS_KEYS = new Set([
   'taskAvailability',
 ]);
 const VALID_FACTIONS = new Set<Faction>(['USEC', 'BEAR']);
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isBackupObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function sanitizeProgressData(
   raw: unknown
 ): { ok: true; data: UserProgressData } | { ok: false; error: string } {
-  if (!isPlainObject(raw)) {
+  if (!isBackupObject(raw)) {
     return { ok: false, error: 'Progress data must be an object' };
   }
   if (!VALID_FACTIONS.has(raw.pmcFaction as Faction)) {
@@ -100,7 +100,7 @@ function sanitizeProgressData(
     'taskAvailability',
   ] as const;
   for (const field of dictFields) {
-    if (raw[field] !== undefined && !isPlainObject(raw[field])) {
+    if (raw[field] !== undefined && !isBackupObject(raw[field])) {
       return { ok: false, error: `Field "${field}" must be an object` };
     }
   }
@@ -200,7 +200,7 @@ export function validateBackup(json: unknown):
       };
     }
   | { ok: false; error: string } {
-  if (!isPlainObject(json)) {
+  if (!isBackupObject(json)) {
     return { ok: false, error: 'Invalid file format — expected a JSON object' };
   }
   const validationError = [
@@ -253,7 +253,7 @@ function normalizeOlderTabSource(source: Record<string, unknown>): Record<string
 }
 function buildOlderTabBackup(raw: string): TarkovTrackerExport {
   const source: unknown = parseOlderTabRaw(raw);
-  if (!isPlainObject(source)) throw new Error('Invalid older edit');
+  if (!isBackupObject(source)) throw new Error('Invalid older edit');
   const candidate = {
     ...normalizeOlderTabSource(source),
     _format: BACKUP_FORMAT,
@@ -312,11 +312,11 @@ function resolveCollectedArchiveEntries(
 }
 export function isDeviceRecoveryArchiveV1(json: unknown): boolean {
   return (
-    isPlainObject(json) && json._format === 'tarkovtracker-device-progress' && json._version === 1
+    isBackupObject(json) && json._format === 'tarkovtracker-device-progress' && json._version === 1
   );
 }
 export function resolveRecoveryArchive(json: unknown, owner: string | null): RecoveryArchiveResult {
-  if (!isPlainObject(json) || json._format !== 'tarkovtracker-device-progress')
+  if (!isBackupObject(json) || json._format !== 'tarkovtracker-device-progress')
     return { ok: true, value: json };
   if (json._version !== 1) return { ok: false, error: 'invalid_device_archive' };
   return collectRecoveryArchiveEntries(json, owner);

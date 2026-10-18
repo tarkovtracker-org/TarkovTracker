@@ -175,18 +175,19 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 
 Backup file imports parse and validate in a disposable browser worker, including the nested
 raw recovery entries and ownership checks. The ordinary backup ceiling remains 5 MiB; version-1
-device recovery archives may be up to 128 MiB with at most 64 older entries. Large ordinary
-files are rejected in the worker after format detection, without parsing their contents on the
-UI thread. If the worker cannot start or fails, import reports an error; there is no synchronous
-fallback.
+device recovery archives may be up to 128 MiB with at most 64 older entries. Files above
+128 MiB are rejected before starting a worker or reading bytes. Ordinary files between 5 and
+128 MiB are format-detected and rejected inside the worker, without parsing on the UI thread.
+If the worker cannot start or fails, import reports an error; there is no synchronous fallback.
 
 The worker retains the archive and returns only entry labels and a compact preview. Explicit
 confirmation pulls the selected normalized snapshot in batches of at most 64 tokens and fewer
 than 16,384 string code units, with one outstanding batch at a time. Unselected archive entries
 and raw recovery strings never return to the UI thread. No progress is applied before the full
 selected snapshot is received and the preview owner is checked again. Cancellation, replacement
-file selection and scope disposal terminate the worker and invalidate pending results. Recovery
-archives remain bound to the selecting account; ordinary backups retain their portable import
+file selection and scope disposal terminate the worker and invalidate pending results.
+Retained-copy reads share the same import generation, so late successes or failures cannot
+replace a newer file preview or restore a cancelled preview. Recovery archives remain bound to the selecting account; ordinary backups retain their portable import
 behavior, with the displayed preview bound to its receiving account. Original archive bytes and
 retained device recovery copies are not rewritten or discarded by import.
 

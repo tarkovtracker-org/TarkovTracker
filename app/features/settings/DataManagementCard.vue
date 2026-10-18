@@ -818,6 +818,7 @@
               color="neutral"
               variant="soft"
               :data-testid="`older-tab-review-${index}`"
+              :disabled="backupImportState === 'parsing'"
               @click="reviewOlderTabProgress(index - 1)"
             >
               {{ $t('settings.data_management.review_older_edit', { index }) }}
@@ -922,6 +923,7 @@
                   </div>
                 </div>
                 <UButton
+                  ref="backupImportButtonRef"
                   icon="i-mdi-file-upload-outline"
                   block
                   :ui="{
@@ -935,19 +937,16 @@
               </div>
             </div>
           </template>
-          <div
-            v-if="backupImportState === 'parsing'"
-            class="flex items-center gap-3"
-            role="status"
-            aria-live="polite"
-          >
-            <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" aria-hidden="true" />
-            <p class="text-surface-300 text-sm">
-              {{ $t('settings.data_management.reading_backup') }}
-            </p>
-            <UButton variant="soft" color="neutral" @click="resetBackupPreview">
-              {{ $t('common.cancel') }}
-            </UButton>
+          <div class="flex items-center gap-3">
+            <output data-testid="backup-reading-status" class="text-surface-300 text-sm">
+              {{ backupReadingLabel }}
+            </output>
+            <template v-if="backupImportState === 'parsing'">
+              <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" aria-hidden="true" />
+              <UButton variant="soft" color="neutral" @click="cancelBackupParsing">
+                {{ $t('common.cancel') }}
+              </UButton>
+            </template>
           </div>
           <div v-if="recoveryArchiveEntries.length" class="space-y-2">
             <p class="text-surface-400 text-sm">
@@ -1238,13 +1237,22 @@
     confirmBackupImport,
     resetImport: resetBackupImport,
   } = dataManagementSession.backup;
+  const backupReadingLabel = computed(() =>
+    backupImportState.value === 'parsing' ? t('settings.data_management.reading_backup') : ''
+  );
   const confirmRecoveryCleanup = ref(false);
   const recoveryCleanupRunning = ref(false);
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
+  const backupImportButtonRef = ref<{ $el?: HTMLElement } | null>(null);
   const importTarget = ref<GameMode | 'all'>('all');
   function resetBackupPreview() {
     importTarget.value = 'all';
     resetBackupImport();
+  }
+  function cancelBackupParsing() {
+    resetBackupPreview();
+    // Cancellation unmounts the focused control; return to the file picker.
+    void nextTick(() => backupImportButtonRef.value?.$el?.focus());
   }
   async function handleExportProgress() {
     try {
