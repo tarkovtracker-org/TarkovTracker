@@ -313,3 +313,23 @@ test('release permission key order does not change dispatch authorization', () =
   assert.notEqual(reordered, workflow, 'permission reordering must apply');
   assertReleaseWorkflowBoundaries(ci, reordered);
 });
+function assertOptionalNotifications(release) {
+  const recover = workflowStep(release, 'Recover interrupted version publication');
+  const notify = workflowStep(release, 'Notify released pull requests');
+  assert.doesNotMatch(recover, /continue-on-error/);
+  assert.match(notify, /^ {8}if: steps\.recover\.outcome == 'success'$/m);
+  assert.match(notify, /^ {8}continue-on-error: true$/m);
+  assert.ok(release.indexOf(recover) < release.indexOf(notify));
+}
+test('post-publication PR notifications cannot fail a completed release', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assertOptionalNotifications(release);
+  for (const [before, after] of [
+    ['        continue-on-error: true\n', ''],
+    ["if: steps.recover.outcome == 'success'", "if: steps.eligible.outputs.recovery == 'true'"],
+  ]) {
+    const mutated = release.replace(before, after);
+    assert.notEqual(mutated, release);
+    assert.throws(() => assertOptionalNotifications(mutated));
+  }
+});

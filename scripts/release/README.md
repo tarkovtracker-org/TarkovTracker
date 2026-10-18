@@ -4,16 +4,17 @@ Release automation. [`.releaserc.json`](../../.releaserc.json) loads the plugins
 [`release.yml`](../../.github/workflows/release.yml) runs the gate and recovery. See the releases
 section of [`docs/workflow-automation.md`](../../docs/workflow-automation.md).
 
-| File                     | What it does                                                                       | Run by               |
-| ------------------------ | ---------------------------------------------------------------------------------- | -------------------- |
-| `release-scope.mjs`      | Which commit scopes are internal and excluded from releases and notes.             | `.releaserc.json`    |
-| `release-commit.mjs`     | semantic-release plugin that prepares the version commit.                          | `.releaserc.json`    |
-| `release-commit.sh`      | Stages that commit with CI/preview and opens its immutable version PR.             | `release-commit.mjs` |
-| `release-gate.mjs`       | Gates scheduled publication seven days after any stable release; permits dispatch. | `release.yml`        |
-| `release-recovery.mjs`   | Resumes a release that stopped partway, using published release assets.            | `release.yml`        |
-| `release-highlights.mjs` | Builds player-facing highlights from each PR's `## Release note` section.          | `release-scope.mjs`  |
-| `release-note-state.mjs` | In-process proof that the prepare step succeeded before notes are written.         | `release-commit.mjs` |
-| `*.test.mjs`             | Vitest unit and integration tests for the files above.                             | `pnpm run test`      |
+| File                        | What it does                                                                       | Run by               |
+| --------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
+| `release-scope.mjs`         | Which commit scopes are internal and excluded from releases and notes.             | `.releaserc.json`    |
+| `release-commit.mjs`        | semantic-release plugin that prepares the version commit.                          | `.releaserc.json`    |
+| `release-commit.sh`         | Stages that commit with CI/preview and opens its immutable version PR.             | `release-commit.mjs` |
+| `release-gate.mjs`          | Gates scheduled publication seven days after any stable release; permits dispatch. | `release.yml`        |
+| `release-recovery.mjs`      | Resumes a release that stopped partway, using published release assets.            | `release.yml`        |
+| `release-notifications.mjs` | Comments on and labels each merged PR once its stable release is published.        | `release.yml`        |
+| `release-highlights.mjs`    | Builds player-facing highlights from each PR's `## Release note` section.          | `release-scope.mjs`  |
+| `release-note-state.mjs`    | In-process proof that the prepare step succeeded before notes are written.         | `release-commit.mjs` |
+| `*.test.mjs`                | Vitest unit and integration tests for the files above.                             | `pnpm run test`      |
 
 ## Queue promotion
 
