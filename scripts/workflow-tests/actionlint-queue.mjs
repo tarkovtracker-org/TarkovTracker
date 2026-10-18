@@ -73,6 +73,22 @@ test('admission extension rejects workflow/global, foreign-job, duplicate or mal
   ])
     assert.throws(() => normalizeQueueWorkflow(source, admissionPath));
 });
+test('the extracted controls publisher retains strict queue validation and the caller stays native', () => {
+  const filename = '.github/workflows/pr-controls-publish.yml';
+  const source = readFileSync(filename, 'utf8');
+  assert.equal(normalizeQueueWorkflow(source, filename), source.replace('      queue: max', ''));
+  const callerPath = '.github/workflows/pr-controls.yml';
+  const caller = readFileSync(callerPath, 'utf8');
+  assert.equal(normalizeQueueWorkflow(caller, callerPath), caller);
+  for (const changed of [
+    source.replace('  controls:', '  other:'),
+    source.replace('group: review-admission-publication', 'group: other'),
+    source.replace('queue: max', 'queue: single'),
+    source.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
+    `concurrency:\n  group: other\n${source}`,
+  ])
+    assert.throws(() => normalizeQueueWorkflow(changed, filename));
+});
 test('release promotion serialization is supported only in the success-gated enqueue job', () => {
   const filename = '.github/workflows/release-promotion-queue.yml';
   const source = readFileSync(filename, 'utf8');
