@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
@@ -48,6 +49,32 @@ test('comments cannot satisfy the daily catch-up schedule requirement', () => {
   assert.throws(() =>
     assertDailyReleaseSchedule(release.replace("- cron: '0 15 * * *'", "# cron: '0 15 * * *'"))
   );
+});
+test('the trusted release snapshot includes loadable admission dependencies', (t) => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+  const step = workflowStep(jobBlock(workflow, 'release'), 'Check validated commit before setup');
+  const script = step.split('script: |\n')[1];
+  assert.ok(script, 'release bootstrap script is missing');
+  const boundary = script.indexOf('const gatePath =');
+  assert.ok(boundary > 0, 'release bootstrap boundary is missing');
+  const bootstrap = script.slice(0, boundary);
+  const directory = mkdtempSync(join(tmpdir(), 'release-admission-snapshot-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      `(async () => {
+        ${bootstrap}
+        await import(pathToFileURL(process.env.RUNNER_TEMP + '/ci/review-admission-binding.mjs'));
+      })().catch((error) => { console.error(error); process.exitCode = 1; });`,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_WORKSPACE: process.cwd(), RUNNER_TEMP: directory },
+    }
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 test('release stages a version-only reviewed PR without pushing main or waiting for its merge', (t) => {
   const f = releaseFixture(t);
