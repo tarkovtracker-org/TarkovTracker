@@ -23,7 +23,9 @@ function harness(
   };
   vi.stubGlobal('caches', options.cache === false ? undefined : { default: cache });
   const fetcher = vi.fn(async () => payload);
-  const precomputedStore = { get: vi.fn<(key: string, type: 'json') => Promise<unknown>>() };
+  const precomputedStore = {
+    get: vi.fn<(key: string, type: 'json' | 'text') => Promise<unknown>>(),
+  };
   const background: Promise<unknown>[] = [];
   const app = createApp();
   app.use(
@@ -235,12 +237,14 @@ describe('edgeCache final response mode through H3', () => {
   });
   it('preserves precompute validation and precedence when response mode is requested', async () => {
     const h = harness({ precomputed: true });
-    h.precomputedStore.get.mockResolvedValue({
-      version: 2,
-      storedAt: Date.now(),
-      payload,
-      overlay: { version: '1.2', sha256: 'abc123' },
-    });
+    h.precomputedStore.get.mockResolvedValue(
+      JSON.stringify({
+        version: 2,
+        storedAt: Date.now(),
+        payload,
+        overlay: { version: '1.2', sha256: 'abc123' },
+      })
+    );
     const response = await h.request();
     expect(response.headers.get('x-cache-status')).toBe('PRECOMPUTE');
     expect(await response.json()).toEqual(payload);
@@ -249,16 +253,50 @@ describe('edgeCache final response mode through H3', () => {
   });
   it('falls back from mismatched precompute provenance to cache', async () => {
     const h = harness({ precomputed: true });
-    h.precomputedStore.get.mockResolvedValue({
-      version: 2,
-      storedAt: Date.now(),
-      payload,
-      overlay: { version: 'wrong', sha256: 'abc123' },
-    });
+    h.precomputedStore.get.mockResolvedValue(
+      JSON.stringify({
+        version: 2,
+        storedAt: Date.now(),
+        payload,
+        overlay: { version: 'wrong', sha256: 'abc123' },
+      })
+    );
     h.cache.match.mockResolvedValueOnce(new Response(JSON.stringify(payload)));
     expect((await h.request()).headers.get('x-cache-status')).toBe('HIT');
     expect(h.fetcher).not.toHaveBeenCalled();
   });
+  it.each(['missing', 'failure'])(
+    'falls back after a warm precompute %s without serving its memo',
+    async (kind) => {
+      const h = harness({ precomputed: true });
+      h.precomputedStore.get.mockResolvedValue(
+        JSON.stringify({
+          version: 2,
+          storedAt: Date.now(),
+          payload,
+          overlay: { version: '1.2', sha256: 'abc123' },
+        })
+      );
+      const warm = await h.request();
+      expect(warm.headers.get('x-cache-status')).toBe('PRECOMPUTE');
+      await warm.text();
+      if (kind === 'missing') h.precomputedStore.get.mockResolvedValue(null);
+      else h.precomputedStore.get.mockRejectedValue(new Error('KV offline'));
+      const fallbackPayload = {
+        ...payload,
+        data: { items: [{ id: 'fallback', name: 'Fallback' }] },
+        dataOverlay: { ...payload.dataOverlay, sha256: 'fallback-sha' },
+      };
+      h.fetcher.mockResolvedValue(fallbackPayload);
+      const fallback = await h.request();
+      expect(fallback.headers.get('x-cache-status')).toBe('MISS');
+      expect(fallback.headers.get('x-overlay-sha256')).toBe('fallback-sha');
+      expect(await fallback.json()).toEqual(fallbackPayload);
+      expect(h.precomputedStore.get).toHaveBeenCalledTimes(2);
+      expect(h.fetcher).toHaveBeenCalledOnce();
+      await Promise.all(h.background);
+    }
+  );
   it.each([502, 503])('preserves sanitized %s errors', async (status) => {
     const h = harness();
     h.fetcher.mockRejectedValue(
