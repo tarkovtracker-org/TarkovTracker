@@ -204,7 +204,7 @@ describe('NeededItemsFilterBar', () => {
   it('normalizes object sort selections before emitting updates', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
-      props: createDefaultProps(),
+      props: { ...createDefaultProps(), sortDirection: 'asc' as const },
       global: createDefaultGlobal(),
     });
     await wrapper.find('[data-testid="sort-select"]').trigger('click');
@@ -256,7 +256,10 @@ describe('NeededItemsFilterBar', () => {
       props: {
         ...createDefaultProps(),
         modelValue: 'hideout' as const,
+        firFilter: 'fir' as const,
         hideOwned: true,
+        hideTeamItems: true,
+        hideNonFirSpecialEquipment: true,
         kappaOnly: true,
       },
       global: createDefaultGlobal(),

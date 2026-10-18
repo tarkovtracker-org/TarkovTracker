@@ -59,6 +59,7 @@ vi.mock('@/stores/useTarkov', () => ({
     getCurrentGameMode: () => mockCounts.currentGameMode.value,
     isTaskComplete: () => false,
     isHideoutModuleComplete: () => false,
+    isHideoutPartComplete: () => mockCounts.hideoutCount >= 2,
     setObjectiveCount: mockSetObjectiveCount,
     setHideoutPartCount: mockSetHideoutPartCount,
     setHideoutPartComplete: mockSetHideoutPartComplete,
@@ -81,6 +82,7 @@ describe('NeededItemGroupedModal', () => {
     link: 'https://tarkov.dev/item/salewa',
   };
   const mockTaskObjective = {
+    needType: 'taskObjective',
     id: 'obj-1',
     taskId: 'task-1',
     objectiveId: 'obj-1',
@@ -88,6 +90,7 @@ describe('NeededItemGroupedModal', () => {
     foundInRaid: true,
   } as unknown as NeededItemTaskObjective;
   const mockHideoutModule = {
+    needType: 'hideoutModule',
     id: 'module-1',
     hideoutModule: {
       id: 'module-1',
@@ -111,6 +114,7 @@ describe('NeededItemGroupedModal', () => {
         },
         stubs: {
           UBadge: { template: '<span><slot /></span>' },
+          AppTooltip: { template: '<span><slot /></span>' },
           UModal: {
             props: ['open'],
             template: '<div v-if="open"><slot name="content" /></div>',
@@ -146,25 +150,37 @@ describe('NeededItemGroupedModal', () => {
         },
       },
     });
+  const findCountButtons = (wrapper: ReturnType<typeof createWrapper>) =>
+    wrapper.findAll('button[aria-label="needed_items.aria.click_to_enter_value"]');
+  const findToggleButtons = (wrapper: ReturnType<typeof createWrapper>, label: string) =>
+    wrapper.findAll(`button[aria-label="needed_items.aria.${label}"]`);
   it('renders task objective and hideout counts with theme-aware text classes', () => {
     mockCounts.objectiveCount = 1;
     mockCounts.hideoutCount = 1;
     const wrapper = createWrapper();
-    const countBadges = wrapper.findAll('.font-semibold.border-x');
-    expect(countBadges.length).toBeGreaterThanOrEqual(2);
-    expect(countBadges[0]!.classes()).toContain('light:text-surface-50');
-    expect(countBadges[1]!.classes()).toContain('light:text-surface-50');
+    const countButtons = findCountButtons(wrapper);
+    expect(countButtons.map((button) => button.text())).toEqual(['1/3', '1/2']);
+    expect(countButtons[0]!.classes()).toContain('light:text-surface-50');
+    expect(countButtons[1]!.classes()).toContain('light:text-surface-50');
     const closeBtn = wrapper.find('button[aria-label="common.close"]');
     expect(closeBtn.classes()).toContain('light:hover:text-surface-50');
   });
-  it('renders completed count classes when objective and hideout counts meet requirement', () => {
+  it('marks objective and hideout rows complete when counts meet requirement', () => {
     mockCounts.objectiveCount = 3;
     mockCounts.hideoutCount = 2;
     const wrapper = createWrapper();
-    const countBadges = wrapper.findAll('.font-semibold.border-x');
-    expect(countBadges.length).toBeGreaterThanOrEqual(2);
-    expect(countBadges[0]!.classes()).toContain('text-success-400');
-    expect(countBadges[1]!.classes()).toContain('text-success-400');
+    const toggles = findToggleButtons(wrapper, 'mark_as_incomplete');
+    expect(toggles).toHaveLength(2);
+    expect(toggles[0]!.classes()).toContain('bg-success-600');
+    expect(toggles[1]!.classes()).toContain('bg-success-600');
+    expect(findToggleButtons(wrapper, 'mark_as_complete')).toHaveLength(0);
+  });
+  it('uncompletes a hideout part when its toggle drops below the requirement', async () => {
+    mockCounts.hideoutCount = 2;
+    const wrapper = createWrapper();
+    await findToggleButtons(wrapper, 'mark_as_incomplete').at(-1)!.trigger('click');
+    expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 1);
+    expect(mockSetHideoutPartUncomplete).toHaveBeenCalledWith('module-1');
   });
   it('calls store setters when clicking objective increment button', async () => {
     mockCounts.objectiveCount = 1;
@@ -229,6 +245,11 @@ describe('NeededItemGroupedModal', () => {
     const findButton = (label: string) =>
       wrapper.findAll('button').find((button) => button.text().includes(label))!;
     expect(wrapper.emitted('update:open')).toContainEqual([false]);
+    expect(
+      wrapper
+        .get('button[aria-label*="needed_items.aria.increase_hideout_count"]')
+        .attributes('disabled')
+    ).toBeDefined();
     expect(findButton('needed_items.smart_fill').attributes('disabled')).toBeDefined();
     expect(findButton('common.reset').attributes('disabled')).toBeDefined();
   });

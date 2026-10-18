@@ -2,7 +2,9 @@
   <UModal
     :open="open"
     :title="itemInfo.name"
-    :description="$t('needed_items.progress_format', { current: currentTotal, total: totalNeeded })"
+    :description="
+      $t('needed_items.progress_format', { current: totals.current, total: totals.needed })
+    "
     :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
     scrollable
     @update:open="$emit('update:open', $event)"
@@ -32,7 +34,7 @@
             <div class="text-surface-400 text-sm">
               {{ $t('needed_items.total') }}
               <span :class="isComplete ? 'text-success-400' : 'text-primary-400'" class="font-bold">
-                {{ currentTotal }}/{{ totalNeeded }}
+                {{ formatNumber(totals.current) }}/{{ formatNumber(totals.needed) }}
               </span>
             </div>
           </div>
@@ -51,9 +53,9 @@
               {{ $t('needed_items.collected_items') }}
             </h4>
             <NeededItemGroupedInputControls
-              :fir-needed="totalFirNeeded"
+              :fir-needed="totals.firNeeded"
               :fir-current="firInput"
-              :non-fir-needed="totalNonFirNeeded"
+              :non-fir-needed="totals.nonFirNeeded"
               :non-fir-current="nonFirInput"
               @update:fir="firInput = $event"
               @update:non-fir="nonFirInput = $event"
@@ -113,44 +115,26 @@
                   >
                     {{ obj.foundInRaid ? $t('common.fir') : $t('needed_items.non') }}
                   </span>
-                  <div class="bg-surface-700 flex items-center rounded border border-white/20">
-                    <button
-                      type="button"
-                      :disabled="!isTargetGameModeActive"
-                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
-                      :aria-label="
-                        t('needed_items.aria.decrease_objective_count', {
-                          task_name: getTaskName(obj.taskId),
-                        })
-                      "
-                      @click="decreaseObjective(obj)"
-                    >
-                      <UIcon name="i-mdi-minus" class="h-3 w-3" />
-                    </button>
-                    <span
-                      class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
-                      :class="
-                        getObjectiveCount(obj) >= obj.count
-                          ? 'text-success-400'
-                          : 'light:text-surface-50 text-white'
-                      "
-                    >
-                      {{ getObjectiveCount(obj) }}/{{ obj.count }}
-                    </span>
-                    <button
-                      type="button"
-                      :disabled="!isTargetGameModeActive"
-                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
-                      :aria-label="
-                        t('needed_items.aria.increase_objective_count', {
-                          task_name: getTaskName(obj.taskId),
-                        })
-                      "
-                      @click="increaseObjective(obj)"
-                    >
-                      <UIcon name="i-mdi-plus" class="h-3 w-3" />
-                    </button>
-                  </div>
+                  <ItemCountControls
+                    size="sm"
+                    :current-count="progress.storedCountOf(obj)"
+                    :needed-count="obj.count"
+                    :disabled="!isTargetGameModeActive"
+                    :decrease-label="
+                      t('needed_items.aria.decrease_objective_count', {
+                        task_name: getTaskName(obj.taskId),
+                      })
+                    "
+                    :increase-label="
+                      t('needed_items.aria.increase_objective_count', {
+                        task_name: getTaskName(obj.taskId),
+                      })
+                    "
+                    @decrease="mutate(() => progress.decrease(obj))"
+                    @increase="mutate(() => progress.increase(obj))"
+                    @toggle="mutate(() => progress.toggle(obj))"
+                    @set-count="(count) => mutate(() => progress.setCount(obj, count))"
+                  />
                 </div>
               </div>
             </div>
@@ -197,44 +181,26 @@
                   >
                     {{ mod.foundInRaid ? $t('common.fir') : $t('needed_items.non') }}
                   </span>
-                  <div class="bg-surface-700 flex items-center rounded border border-white/20">
-                    <button
-                      type="button"
-                      :disabled="!isTargetGameModeActive"
-                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
-                      :aria-label="
-                        t('needed_items.aria.decrease_hideout_count', {
-                          station_name: getStationName(mod),
-                        })
-                      "
-                      @click="decreaseHideout(mod)"
-                    >
-                      <UIcon name="i-mdi-minus" class="h-3 w-3" />
-                    </button>
-                    <span
-                      class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
-                      :class="
-                        getHideoutCount(mod) >= mod.count
-                          ? 'text-success-400'
-                          : 'light:text-surface-50 text-white'
-                      "
-                    >
-                      {{ getHideoutCount(mod) }}/{{ mod.count }}
-                    </span>
-                    <button
-                      type="button"
-                      :disabled="!isTargetGameModeActive"
-                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
-                      :aria-label="
-                        t('needed_items.aria.increase_hideout_count', {
-                          station_name: getStationName(mod),
-                        })
-                      "
-                      @click="increaseHideout(mod)"
-                    >
-                      <UIcon name="i-mdi-plus" class="h-3 w-3" />
-                    </button>
-                  </div>
+                  <ItemCountControls
+                    size="sm"
+                    :current-count="progress.storedCountOf(mod)"
+                    :needed-count="mod.count"
+                    :disabled="!isTargetGameModeActive"
+                    :decrease-label="
+                      t('needed_items.aria.decrease_hideout_count', {
+                        station_name: getStationName(mod),
+                      })
+                    "
+                    :increase-label="
+                      t('needed_items.aria.increase_hideout_count', {
+                        station_name: getStationName(mod),
+                      })
+                    "
+                    @decrease="mutate(() => progress.decrease(mod))"
+                    @increase="mutate(() => progress.increase(mod))"
+                    @toggle="mutate(() => progress.toggle(mod))"
+                    @set-count="(count) => mutate(() => progress.setCount(mod, count))"
+                  />
                 </div>
               </div>
             </div>
@@ -245,9 +211,12 @@
   </UModal>
 </template>
 <script setup lang="ts">
+  import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import NeededItemGroupedInputControls from '@/features/neededitems/NeededItemGroupedInputControls.vue';
+  import { useNeededItemProgress } from '@/features/neededitems/useNeededItemProgress';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import type {
     GroupedItemInfo,
@@ -276,6 +245,8 @@
   }>();
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const progress = useNeededItemProgress();
+  const formatNumber = useLocaleNumberFormatter();
   const {
     distributeItems,
     applyDistribution,
@@ -318,50 +289,33 @@
   };
   const acceptedItemsFor = (obj: NeededItemTaskObjective): TarkovItem[] =>
     obj.acceptedItems?.length ? obj.acceptedItems : [];
-  const getObjectiveCount = (obj: NeededItemTaskObjective) =>
-    tarkovStore.getObjectiveCount(obj.id) ?? 0;
-  const getHideoutCount = (mod: NeededItemHideoutModule) =>
-    tarkovStore.getHideoutPartCount(mod.id) ?? 0;
-  const totalFirNeeded = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value) {
-      if (obj.foundInRaid) total += obj.count;
-    }
-    for (const mod of hideoutModulesList.value) {
-      if (mod.foundInRaid) total += mod.count;
-    }
-    return total;
-  });
-  const totalNonFirNeeded = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value) {
-      if (!obj.foundInRaid) total += obj.count;
-    }
-    for (const mod of hideoutModulesList.value) {
-      if (!mod.foundInRaid) total += mod.count;
-    }
-    return total;
-  });
-  const currentFirTotal = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value) {
-      if (obj.foundInRaid) total += Math.min(getObjectiveCount(obj), obj.count);
-    }
-    for (const mod of hideoutModulesList.value) {
-      if (mod.foundInRaid) total += Math.min(getHideoutCount(mod), mod.count);
-    }
-    return total;
-  });
-  const currentNonFirTotal = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value) {
-      if (!obj.foundInRaid) total += Math.min(getObjectiveCount(obj), obj.count);
-    }
-    for (const mod of hideoutModulesList.value) {
-      if (!mod.foundInRaid) total += Math.min(getHideoutCount(mod), mod.count);
-    }
-    return total;
-  });
+  type NeedTotals = {
+    needed: number;
+    current: number;
+    firNeeded: number;
+    nonFirNeeded: number;
+    firCurrent: number;
+    nonFirCurrent: number;
+  };
+  const addNeed = (totals: NeedTotals, need: NeededItemTaskObjective | NeededItemHideoutModule) => {
+    const current = Math.min(progress.storedCountOf(need), need.count);
+    const source = need.foundInRaid ? 'fir' : 'nonFir';
+    totals.needed += need.count;
+    totals.current += current;
+    totals[`${source}Needed`] += need.count;
+    totals[`${source}Current`] += current;
+    return totals;
+  };
+  const totals = computed(() =>
+    [...taskObjectivesList.value, ...hideoutModulesList.value].reduce(addNeed, {
+      needed: 0,
+      current: 0,
+      firNeeded: 0,
+      nonFirNeeded: 0,
+      firCurrent: 0,
+      nonFirCurrent: 0,
+    })
+  );
   const firInput = ref(0);
   const nonFirInput = ref(0);
   watch(
@@ -379,29 +333,16 @@
         targetGameMode.value = tarkovStore.getCurrentGameMode();
         taskObjectivesList.value = [...props.taskObjectives];
         hideoutModulesList.value = [...props.hideoutModules];
-        firInput.value = currentFirTotal.value;
-        nonFirInput.value = currentNonFirTotal.value;
+        firInput.value = totals.value.firCurrent;
+        nonFirInput.value = totals.value.nonFirCurrent;
       }
     },
     { immediate: true }
   );
-  const totalNeeded = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value) total += obj.count;
-    for (const mod of hideoutModulesList.value) total += mod.count;
-    return total;
-  });
-  const currentTotal = computed(() => {
-    let total = 0;
-    for (const obj of taskObjectivesList.value)
-      total += Math.min(getObjectiveCount(obj), obj.count);
-    for (const mod of hideoutModulesList.value) total += Math.min(getHideoutCount(mod), mod.count);
-    return total;
-  });
   const canSmartFill = computed(
     () => isTargetGameModeActive.value && (firInput.value > 0 || nonFirInput.value > 0)
   );
-  const isComplete = computed(() => currentTotal.value >= totalNeeded.value);
+  const isComplete = computed(() => totals.value.current >= totals.value.needed);
   const handleSmartFill = () => {
     if (!canMutateTargetGameMode()) return;
     try {
@@ -436,37 +377,7 @@
       });
     }
   };
-  const increaseObjective = (obj: NeededItemTaskObjective) => {
-    if (!canMutateTargetGameMode()) return;
-    const current = getObjectiveCount(obj);
-    const newCount = Math.min(current + 1, obj.count);
-    tarkovStore.setObjectiveCount(obj.id, newCount);
-  };
-  const decreaseObjective = (obj: NeededItemTaskObjective) => {
-    if (!canMutateTargetGameMode()) return;
-    const current = getObjectiveCount(obj);
-    if (current <= 0) return;
-    const newCount = Math.max(current - 1, 0);
-    tarkovStore.setObjectiveCount(obj.id, newCount);
-  };
-  const increaseHideout = (mod: NeededItemHideoutModule) => {
-    if (!canMutateTargetGameMode()) return;
-    const current = getHideoutCount(mod);
-    if (current >= mod.count) return;
-    const newCount = current + 1;
-    tarkovStore.setHideoutPartCount(mod.id, newCount);
-    if (newCount >= mod.count) {
-      tarkovStore.setHideoutPartComplete(mod.id);
-    }
-  };
-  const decreaseHideout = (mod: NeededItemHideoutModule) => {
-    if (!canMutateTargetGameMode()) return;
-    const current = getHideoutCount(mod);
-    if (current <= 0) return;
-    const newCount = current - 1;
-    tarkovStore.setHideoutPartCount(mod.id, newCount);
-    if (current >= mod.count && newCount < mod.count) {
-      tarkovStore.setHideoutPartUncomplete(mod.id);
-    }
+  const mutate = (action: () => void) => {
+    if (canMutateTargetGameMode()) action();
   };
 </script>
