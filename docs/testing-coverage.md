@@ -48,6 +48,12 @@ this section with new tables; update the config instead.
 
 ## Gates
 
+Each blank-line scanner module has separate coverage floors in
+`scripts/checks/blank-lines.vitest.config.mjs`. Run `pnpm run test:blank-lines`;
+CI also runs it in Lint & Format. These floors do not change the application
+coverage denominator or thresholds below. Scanner behavior and CI wiring are
+documented in [workflow automation](./workflow-automation.md#blank-line-scanner-tests).
+
 Unsharded Vitest requires 65% lines, 63% statements, 60% functions and 50%
 branches. These rounded floors preserve the measured pre-change baseline;
 per-module floors additionally protect the newly covered small logic modules
