@@ -21,7 +21,11 @@ tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trade
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without
-overwriting the saved one. The sidebar keeps one Tasks entry,
+overwriting the saved one. Graph also drops the sort control, since its layout follows dependencies.
+The Graph canvas needs the `lg` breakpoint (1024px). Below it the Graph tab stays in the header with a
+monitor icon and a screen-reader note, and `/tasks/graph` replaces the toolbar and canvas with an
+explanation that links to Traders (same trader, search kept). Below `sm` the tabs drop their icons so
+all four fit on one row at 333px. The sidebar keeps one Tasks entry,
 highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).
