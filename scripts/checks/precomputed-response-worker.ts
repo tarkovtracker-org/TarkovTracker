@@ -30,7 +30,7 @@ async function runIterations(mode: string, env: LocalEnv, iterations: number): P
   return body;
 }
 function boundedIterations(raw: string | null): number {
-  const value = Number(raw ?? 1);
+  const value = Number(raw?.trim() || '1');
   if (!Number.isFinite(value)) return 1;
   return Math.max(0, Math.min(30, Math.floor(value)));
 }

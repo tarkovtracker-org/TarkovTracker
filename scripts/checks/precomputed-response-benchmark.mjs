@@ -90,6 +90,9 @@ try {
     assert.equal(result.sha256, expected.sha256);
   }
   for (const [input, count] of [
+    ['', 1],
+    ['%20', 1],
+    ['0', 0],
     ['-2', 0],
     ['2.9', 2],
     ['NaN', 1],
