@@ -135,6 +135,14 @@ test('scanner coverage remains required on full validation', () => {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
   assert.match(packageJson.scripts['test:blank-lines'], /(?:^|\s)--coverage(?:\s|$)/);
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const broken = workflow.replace('run: pnpm run test:blank-lines', 'run: echo disabled');
-  assert.throws(() => assertWorkflowContracts(broken));
+  const job = jobBlock(workflow, 'lint-format');
+  const step = workflowStep(job, 'Test blank-line scanners with coverage');
+  const brokenCommand = step.replace('run: pnpm run test:blank-lines', 'run: echo disabled');
+  assert.throws(() =>
+    assertWorkflowContracts(workflow.replace(job, job.replace(step, brokenCommand)))
+  );
+  const brokenGuard = step.replace("        if: needs.changes.outputs.full == 'true'\n", '');
+  assert.throws(() =>
+    assertWorkflowContracts(workflow.replace(job, job.replace(step, brokenGuard)))
+  );
 });

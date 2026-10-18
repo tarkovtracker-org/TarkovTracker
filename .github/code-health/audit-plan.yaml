@@ -661,7 +661,7 @@ queue:
         runtime_loc: 115345,
       }
     pr: 1285
-    notes: Scanners extracted with 99 regression and CLI cases, a dedicated coverage gate, mutation checks and baseline differential checks. Data-preservation regressions cover JavaScript comments/templates, fallback division and explicit YAML indentation. Live CI and review state is on PR 1285; exact-head collaborator approval is required before merge.
+    notes: Scanners extracted with 112 regression and CLI cases, a per-module coverage gate, mutation checks and baseline differential checks. Data-preservation regressions cover JavaScript comments/templates, fallback division and explicit YAML indentation. Live CI and review state is on PR 1285; exact-head collaborator approval is required before merge.
   - id: CH-027
     area: API gateway handlers + router
     paths:

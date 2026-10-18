@@ -40,13 +40,10 @@ const endsScalar = (indent, scalar) => {
   if (indent <= scalar.indent) return true;
   return scalar.contentIndent !== null && indent < scalar.contentIndent;
 };
-const protectLeadingLines = (start, end, protectedLines) => {
-  for (let index = start; index < end; index += 1) protectedLines.add(index);
-};
 const protectBlankLine = (lines, index, scalar, protectedLines) => {
   if (protectsBlank(lines, index, scalar)) protectedLines.add(index);
 };
-const protectScalarLine = (lines, index, start, scalar, protectedLines) => {
+const protectScalarLine = (lines, index, scalar, protectedLines) => {
   const line = lines[index];
   if (isBlank(line)) {
     protectBlankLine(lines, index, scalar, protectedLines);
@@ -56,14 +53,13 @@ const protectScalarLine = (lines, index, start, scalar, protectedLines) => {
   if (endsScalar(indent, scalar)) return false;
   if (scalar.contentIndent === null) {
     scalar.contentIndent = indent;
-    protectLeadingLines(start, index, protectedLines);
   }
   protectedLines.add(index);
   return true;
 };
 const protectScalar = (lines, index, scalar, protectedLines) => {
   for (let next = index + 1; next < lines.length; next += 1) {
-    if (!protectScalarLine(lines, next, index + 1, scalar, protectedLines)) break;
+    if (!protectScalarLine(lines, next, scalar, protectedLines)) break;
   }
 };
 export const getYamlBlockLines = (lines) => {

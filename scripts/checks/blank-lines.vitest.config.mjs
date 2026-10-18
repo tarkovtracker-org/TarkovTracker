@@ -9,7 +9,7 @@ export default defineConfig({
       include: ['scripts/checks/blank-lines/*.mjs'],
       reportsDirectory: 'coverage/blank-lines',
       reporter: ['text', 'json'],
-      thresholds: { lines: 90, statements: 90, functions: 95, branches: 85 },
+      thresholds: { perFile: true, lines: 90, statements: 90, functions: 95, branches: 85 },
     },
   },
 });

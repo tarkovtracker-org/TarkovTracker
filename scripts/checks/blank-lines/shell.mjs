@@ -6,6 +6,10 @@ import {
   endsWithContinuation,
   rangeProtector,
 } from './shared.mjs';
+const scanShellOpening = (line, cursor) => {
+  if (consumeShellPrefix(line, cursor)) return;
+  if (line[cursor.index] === '`') cursor.quote = '`';
+};
 const openGroup = (cursor) => {
   if (cursor.start === -1) cursor.start = cursor.index;
   cursor.depth += 1;
@@ -80,7 +84,7 @@ const appendContinuation = (continuedLine, line) =>
   continuedLine === null ? line : continuedLine + line;
 export const createShellProtector = (source, lines) => {
   const inRange = rangeProtector(getShellRanges(source));
-  const text = createTextProtector(true);
+  const text = createTextProtector(scanShellOpening);
   let heredocs = [];
   let continuedLine = null;
   return {

@@ -313,9 +313,9 @@ editing that function rather than as unrelated cleanup in someone else's change.
 
 `pnpm run test:blank-lines` runs exact-output scanner fixtures in-process and the CLI
 contract tests, with dedicated V8 coverage for `scripts/checks/blank-lines/`. The
-configuration is `scripts/checks/blank-lines.vitest.config.mjs`; CI enforces its
-coverage floors in Lint & Format on full validation. This keeps tooling coverage
-separate from the application thresholds, which exclude `scripts/`.
+configuration is `scripts/checks/blank-lines.vitest.config.mjs`; CI enforces the
+[per-module tooling coverage floors](./testing-coverage.md#gates) in Lint & Format
+on full validation, separately from application coverage.
 
 The CLI owns file discovery, exclusions, symlink handling and writes. The pure
 `stripBlankLines(source, filePath, options)` dispatcher selects the language scanner;
