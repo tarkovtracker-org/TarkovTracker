@@ -130,7 +130,6 @@ test('shared readiness completes before two smoke files overlap', { timeout: 300
     rmSync(report, { recursive: true, force: true });
   }
 });
-
 test('shared readiness rejects missing and insecure preview targets', async () => {
   const original = process.env.PREVIEW_URL;
   try {

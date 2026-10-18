@@ -80,6 +80,8 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 The smoke runner finishes shared readiness before starting two browser workers. Files may overlap;
 tests within each file keep their existing order and intentional serial groups. Each test retains
 its own browser context, and Access sessions remain scoped to the preview origin and process.
+Setup and each worker obtain their own session through the existing native HTTPS exchange. The
+reusable service token never enters the instrumented browser or API client.
 
 ### Result contract
 
