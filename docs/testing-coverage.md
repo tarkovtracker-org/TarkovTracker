@@ -61,7 +61,10 @@ The `Coverage thresholds` job merges them with `vitest run --merge-reports
 Result` when one fails. Merging uses `scripts/ci/vitest-merged-coverage.mjs`
 to apply the `include` filter, zero-fill application files no test imports,
 and sum shard hits per file, so CI reports the same denominator and per-file
-numbers as the local unsharded run. Shards also upload imported-file lcov to
+numbers as the local unsharded run, except for
+`app/server/routes/profile/[...path].get.ts`: Vitest treats the covered path as
+a glob ignore pattern and zero-fills it again locally (16/17 statements); the
+merged provider preserves its real coverage (16/16 statements). Shards also upload imported-file lcov to
 Codecov, which applies a 65% absolute line floor alongside the automatic
 project/patch comparisons; Codecov does not count unimported files, so its
 percentage is higher than the gated one. Forks that skip uploads retain the
