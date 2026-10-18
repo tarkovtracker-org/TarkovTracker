@@ -1566,3 +1566,35 @@ function assertPublisherEnvironment(job) {
   assert.match(environment, /^ {6}name: review-admission$/m);
   assert.match(environment, /^ {6}deployment: false$/m);
 }
+test('final in-lock publication rejects base and lifecycle changes after receipt preparation', async () => {
+  for (const change of [
+    (f) => {
+      f.pull.base.sha = 'e'.repeat(40);
+    },
+    (f) => {
+      f.pull.base.ref = 'release';
+    },
+    (f) => {
+      f.pull.draft = true;
+    },
+    (f) => {
+      f.pull.state = 'closed';
+    },
+  ]) {
+    const f = fixture();
+    f.context.eventName = 'pull_request_target';
+    f.context.payload.action = 'edited';
+    await prepare(f);
+    change(f);
+    await assert.rejects(
+      publishControls({
+        github: f.github,
+        context: f.context,
+        number: 1,
+        artifactId: 88,
+        evidenceDirectory: EVIDENCE_DIRECTORY,
+      })
+    );
+    assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
+  }
+});

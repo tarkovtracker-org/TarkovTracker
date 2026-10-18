@@ -421,6 +421,7 @@ export async function publishControls({
     pull.head.sha === state.headSha,
     'The PR head changed while saving control evidence.'
   );
+  requireCurrentPanelPull(pull, state, context.repo);
   await revalidateRequest(github, context, state, previous, pull);
   requireEvidence(
     Number.isSafeInteger(artifactId) && artifactId > 0,
@@ -443,6 +444,17 @@ export async function publishControls({
   await recheckAfterInvalidation(github, context, previous, state, number);
   requireEvidence(state.operationResult?.status !== 'rejected', state.result);
   await executeAcceptedRequest(github, context, state, number, pull);
+}
+function requireCurrentPanelPull(pull, state, repo) {
+  requirePrIdentity(pull, repo);
+  requireEvidence(
+    [
+      pull.base.sha === state.presentation.baseSha,
+      pull.base.ref === state.presentation.baseRef,
+      (pull.draft ? 'draft' : pull.state) === state.presentation.state,
+    ].every(Boolean),
+    'The PR base or lifecycle changed while saving control evidence.'
+  );
 }
 async function executeAcceptedRequest(github, context, state, number, pull) {
   if (!state.request) return;
