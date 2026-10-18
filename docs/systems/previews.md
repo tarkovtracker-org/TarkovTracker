@@ -104,6 +104,26 @@ repeated before deployment and final success. An hourly state-only reconciliatio
 with no result, or whose latest result is pending only because the test merge was not ready, once
 GitHub has computed the test merge; other pending reasons are left alone.
 
+### Recovering after a failed-only CI rerun
+
+A failed-only CI rerun can reuse a successful build job from an earlier attempt. Its
+`pages-preview` manifest still names that earlier attempt, so Preview Result rejects it with
+`runAttempt: manifest 1, expected 2` even when the rerun's CI Result succeeds. This is the
+exact-attempt artifact check working as designed; retrying only the preview controller cannot
+rebuild the artifact.
+
+Push a new commit to the candidate branch to start a fresh CI run; an intentional empty commit
+is sufficient when no source change is needed. The new run gets its own rebuilt preview artifact
+and matching manifest. Wait for CI Result and the normal automatic preview on an open, ready
+same-repository PR. Stopped previews need a fresh maintainer `/preview` or the enable control.
+Forks need a live maintainer opt-in or approval through `preview-fork`; a CI run grants neither.
+
+Do not rely on **Re-run all jobs** for recovery with the current fixed artifact name: GitHub can
+retain same-name artifacts across reruns ([artifact client contract](https://github.com/actions/toolkit/blob/main/packages/artifact/src/internal/client.ts)),
+and `findPreviewArtifact` rejects that ambiguity. Do not delete or overwrite retained evidence,
+edit the manifest, reuse an older artifact, or relax attempt verification. A changed head or base
+still needs current revision evidence.
+
 ### Invariants
 
 - Candidate builds receive no deployment credentials. The controller never checks out, installs,

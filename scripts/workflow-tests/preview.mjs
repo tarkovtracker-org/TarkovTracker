@@ -1406,7 +1406,15 @@ test('head movement, base movement, stale attempts and superseded runs cannot de
     run: { run_attempt: 2 },
   });
   assert.equal(staleAttempt.decision.action, 'fail');
-  assert.match(staleAttempt.decision.description, /runAttempt/);
+  assert.match(staleAttempt.decision.description, /runAttempt: manifest 1, expected 2/);
+  assert.match(staleAttempt.decision.description, /Push a new commit/);
+  assert.deepEqual(staleAttempt.state.dispatches, []);
+  assert.ok(staleAttempt.state.statuses.every((status) => status.state !== 'success'));
+  const rebuiltAttempt = await plan(t, workflowRunContext(runFixture({ run_attempt: 2 })), {
+    run: { run_attempt: 2 },
+    manifest: { runAttempt: 2 },
+  });
+  assert.equal(rebuiltAttempt.decision.action, 'request');
   const closed = await plan(t, workflowRunContext(), { pull: pullFixture({ state: 'closed' }) });
   assert.equal(closed.decision.action, 'ignore');
   const retargeted = await plan(t, workflowRunContext(), {
