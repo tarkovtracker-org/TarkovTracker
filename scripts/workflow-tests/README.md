@@ -19,3 +19,13 @@ fails locally. Run with `pnpm run test:workflow`.
 | `preview*.mjs`            | The `preview/` pipeline and its workflows.                                         |
 | `finalization-shadow.mjs` | `preview/finalization-shadow.mjs`.                                                 |
 | `helpers/`                | Shared fixtures: temp repos, workflow block parsing, ZIP building.                 |
+
+CI supplies its existing validation plan to `scripts/ci/run-workflow-tests.mjs`. Only pull requests
+whose complete diff contains `app/utils/changelog.ts` and/or its unit test select the release
+commit contract tests and selection regressions. The helper is consumed by
+`scripts/release/release-highlights.test.mjs` and `scripts/release/release-scope.test.mjs`; those
+Vitest tests, the application tests, all required CI jobs and the aggregate remain unchanged.
+This is a deliberately narrow dependency boundary, not a general affected-test graph. Update it
+when adding consumers. Workflow, tooling, configuration, mixed or unknown paths, malformed or
+missing plans, main pushes and merge groups run the full Node suite. Local `pnpm run test:workflow`
+also defaults to the full suite; clearing the two `WORKFLOW_TEST_*` variables is the rollback.
