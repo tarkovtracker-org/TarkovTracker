@@ -5,8 +5,8 @@ const consumeBlockComment = (line, cursor) => {
     cursor.index += 1;
   }
 };
-const scanCharacter = (line, cursor, scanOpening) => {
-  if (cursor.quote) return consumeQuote(line, cursor);
+const scanCharacter = (line, cursor, scanOpening, consumeQuoted) => {
+  if (cursor.quote) return consumeQuoted(line, cursor);
   if (cursor.blockComment) return consumeBlockComment(line, cursor);
   scanOpening(line, cursor);
 };
@@ -19,13 +19,16 @@ const scanTextOpening = (line, cursor) => {
     cursor.quote = character;
   }
 };
-export const createTextProtector = (scanOpening = scanTextOpening) => {
+export const createTextProtector = (
+  scanOpening = scanTextOpening,
+  consumeQuoted = consumeQuote
+) => {
   const cursor = { blockComment: false, index: 0, quote: null };
   return {
     protects: () => cursor.blockComment || Boolean(cursor.quote),
     scan(line) {
       for (cursor.index = 0; cursor.index < line.length; cursor.index += 1) {
-        scanCharacter(line, cursor, scanOpening);
+        scanCharacter(line, cursor, scanOpening, consumeQuoted);
       }
     },
   };

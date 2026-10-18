@@ -607,6 +607,45 @@ const fixtures = [
     source: 'message: "first \\" quote\n\n  second"\nnext: value\n\n',
     expected: 'message: "first \\" quote\n\n  second"\nnext: value\n',
   },
+  {
+    name: 'fallback-keyword-member',
+    extension: 'js',
+    fallback: true,
+    source: 'const value = obj.in/`first/part\n\nsecond`/2;\n\nnext();\n',
+    expected: 'const value = obj.in/`first/part\n\nsecond`/2;\nnext();\n',
+  },
+  {
+    name: 'fallback-optional-keyword-member',
+    extension: 'js',
+    fallback: true,
+    source: 'const value = obj?.return/`first/part\n\nsecond`/2;\n\nnext();\n',
+    expected: 'const value = obj?.return/`first/part\n\nsecond`/2;\nnext();\n',
+  },
+  {
+    name: 'fallback-commented-keyword-member',
+    extension: 'js',
+    fallback: true,
+    source: 'const value = obj. /* property */ in/`first/part\n\nsecond`/2;\n\nnext();\n',
+    expected: 'const value = obj. /* property */ in/`first/part\n\nsecond`/2;\nnext();\n',
+  },
+  {
+    name: 'shell-single-backslash',
+    extension: 'sh',
+    source: "printf '%s' 'a\\'\n\necho done\n",
+    expected: "printf '%s' 'a\\'\necho done\n",
+  },
+  {
+    name: 'shell-group-single-backslash',
+    extension: 'sh',
+    source: "value=$(printf '%s' 'a\\')\n\necho done\n",
+    expected: "value=$(printf '%s' 'a\\')\necho done\n",
+  },
+  {
+    name: 'shell-ansi-single-quote',
+    extension: 'sh',
+    source: "printf '%s' $'first\\'quoted\n\nsecond'\n\necho done\n",
+    expected: "printf '%s' $'first\\'quoted\n\nsecond'\necho done\n",
+  },
 ];
 describe('blank-line language scanners', () => {
   it.each(fixtures)('$name', ({ name, source, extension, fallback, expected }) => {

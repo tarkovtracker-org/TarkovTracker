@@ -1,7 +1,7 @@
 import { createTextProtector } from './other.mjs';
 import { getShellHeredocs } from './shell-heredoc.mjs';
 import {
-  consumeQuote,
+  consumeShellQuote,
   consumeShellPrefix,
   endsWithContinuation,
   rangeProtector,
@@ -60,7 +60,7 @@ const scanGroupClosing = (source, cursor, ranges) => {
   if (closingGroups.has(character)) closeGroup(cursor, ranges);
 };
 const scanGroupCharacter = (source, cursor, ranges) => {
-  if (cursor.quote) consumeQuote(source, cursor);
+  if (cursor.quote) consumeShellQuote(source, cursor);
   else if (!consumeShellPrefix(source, cursor)) scanGroupMarker(source, cursor, ranges);
 };
 const scanGroupMarker = (source, cursor, ranges) => {
@@ -84,7 +84,7 @@ const appendContinuation = (continuedLine, line) =>
   continuedLine === null ? line : continuedLine + line;
 export const createShellProtector = (source, lines) => {
   const inRange = rangeProtector(getShellRanges(source));
-  const text = createTextProtector(scanShellOpening);
+  const text = createTextProtector(scanShellOpening, consumeShellQuote);
   let heredocs = [];
   let continuedLine = null;
   return {

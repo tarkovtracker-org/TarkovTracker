@@ -123,10 +123,13 @@ const readPunctuation = (source, cursor) => {
   if (token === ')') return cursor.parentheses.pop() ? ';' : ')';
   return token;
 };
+const classifyIdentifier = (token, previousToken) => (previousToken === '.' ? 'value' : token);
 const recordToken = (source, cursor) => {
   if (/\s/.test(source[cursor.index])) return;
   const token = readToken(source, cursor.index);
-  cursor.previousToken = token ?? readPunctuation(source, cursor);
+  cursor.previousToken = token
+    ? classifyIdentifier(token, cursor.previousToken)
+    : readPunctuation(source, cursor);
   if (token) cursor.index += token.length - 1;
 };
 const consumeRegex = (source, cursor) => {

@@ -6,6 +6,10 @@ export const consumeQuote = (source, cursor) => {
   if (source[cursor.index] === '\\') cursor.index += 1;
   else if (source[cursor.index] === cursor.quote) cursor.quote = null;
 };
+export const consumeShellQuote = (source, cursor) => {
+  if (cursor.quote !== "'" || cursor.ansiQuote) return consumeQuote(source, cursor);
+  if (source[cursor.index] === "'") cursor.quote = null;
+};
 export const skipLineComment = (source, index) => {
   while (index < source.length && source[index] !== '\n') index += 1;
   return index;
@@ -15,8 +19,10 @@ export const consumeShellPrefix = (source, cursor) => {
   if (isShellComment(source, cursor.index)) {
     cursor.index = skipLineComment(source, cursor.index);
   } else if (character === '\\') cursor.index += 1;
-  else if (isQuote(character)) cursor.quote = character;
-  else return false;
+  else if (isQuote(character)) {
+    cursor.quote = character;
+    cursor.ansiQuote = source[cursor.index - 1] === '$';
+  } else return false;
   return true;
 };
 export const endsWithContinuation = (line) => {
