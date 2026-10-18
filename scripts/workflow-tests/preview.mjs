@@ -1407,7 +1407,7 @@ test('head movement, base movement, stale attempts and superseded runs cannot de
   });
   assert.equal(staleAttempt.decision.action, 'fail');
   assert.match(staleAttempt.decision.description, /runAttempt: manifest 1, expected 2/);
-  assert.match(staleAttempt.decision.description, /Re-run all CI jobs/);
+  assert.match(staleAttempt.decision.description, /Push a new commit/);
   assert.deepEqual(staleAttempt.state.dispatches, []);
   assert.ok(staleAttempt.state.statuses.every((status) => status.state !== 'success'));
   const rebuiltAttempt = await plan(t, workflowRunContext(runFixture({ run_attempt: 2 })), {
