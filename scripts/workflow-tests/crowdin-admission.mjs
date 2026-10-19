@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { crowdinEligibility } from '../ci/review-admission-crowdin.mjs';
-import { admissionDecision } from '../ci/review-admission-policy.mjs';
+import { admissionDecision, crowdinCandidate } from '../ci/review-admission-policy.mjs';
+import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const source = 'c'.repeat(40);
@@ -360,18 +361,26 @@ test('Crowdin policy keeps unresolved review threads, changes requested and subs
   ];
   assert.throws(() => admissionDecision(comment), /Substantive provider findings/);
 });
-test('Crowdin provenance is uploaded only after existing token-free translation validation', () => {
-  const workflow = readFileSync('.github/workflows/crowdin.yml', 'utf8');
-  assert.ok(
-    workflow.indexOf('name: Validate translations') <
-      workflow.indexOf('name: Record validated Crowdin provenance')
-  );
-  assert.ok(
-    workflow.indexOf('name: Upload validated Crowdin provenance') <
-      workflow.indexOf('name: Merge validated translations')
-  );
+function assertProvenanceWorkflow(workflow) {
+  const sync = jobBlock(workflow, 'sync');
+  const validate = workflowStep(sync, 'Validate translations');
+  const record = workflowStep(sync, 'Record validated Crowdin provenance');
+  const upload = workflowStep(sync, 'Upload validated Crowdin provenance');
+  const merge = workflowStep(sync, 'Merge validated translations');
+  assert.ok(sync.indexOf(validate) < sync.indexOf(record));
+  assert.ok(sync.indexOf(record) < sync.indexOf(upload));
+  assert.ok(sync.indexOf(upload) < sync.indexOf(merge));
   for (const command of ['format:check', 'i18n:check', 'systems:check'])
-    assert.ok(workflow.includes(`pnpm run ${command}`));
+    assert.ok(validate.includes(`pnpm run ${command}`));
+  assert.match(upload, /name: crowdin-validated-/);
+}
+test('Crowdin provenance follows the actual token-free validation step, never unrelated decoys', () => {
+  const workflow = readFileSync('.github/workflows/crowdin.yml', 'utf8');
+  assertProvenanceWorkflow(workflow);
+  const removed = workflow.replace('pnpm run i18n:check', 'echo missing validation');
+  assert.throws(() =>
+    assertProvenanceWorkflow(removed + '\n  decoy:\n    steps:\n      - run: pnpm run i18n:check\n')
+  );
 });
 test('oversized locale inventories and duplicate immutable tree entries cannot exempt review', async () => {
   const large = fixture();
@@ -403,4 +412,82 @@ test('unvalidated Crowdin heads explain the missing provenance and retain the no
     },
   ];
   assert.equal(admissionDecision(normal).review.provider, 'human');
+});
+test('Crowdin retains the existing bounded trusted merge path and permission boundary', () => {
+  const workflow = readFileSync('.github/workflows/crowdin.yml', 'utf8');
+  const gate = readFileSync('scripts/ci/crowdin-pr.sh', 'utf8');
+  const shared = readFileSync('scripts/ci/github-ci-gate.sh', 'utf8');
+  assert.match(workflow, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
+  assert.doesNotMatch(workflow, /workflow_run:|handoff/);
+  assert.match(shared, /attempt <= 120/);
+  assert.match(shared, /inputs\[pull_request\]=\$number/);
+  assert.match(shared, /"\$sha" "\$number" "\$admission_run"/);
+  assert.match(gate, /wait_for_review_admission "\$PR_NUMBER" "\$HEAD_SHA"/);
+  assert.match(gate, /enqueue_reviewed_pr "\$PR_NUMBER" "\$HEAD_SHA"/);
+});
+test('only the supported non-English locale inventory can use the exemption', async () => {
+  const codes = [...readFileSync('app/utils/locales.ts', 'utf8').matchAll(/'([a-z]{2})'/g)]
+    .map((match) => match[1])
+    .filter((code) => code !== 'en');
+  assert.equal(codes.length, 12);
+  for (const code of codes) {
+    const f = fixture();
+    f.files[0].filename = `app/locales/${code}.json`;
+    assert.equal(crowdinCandidate(f.pr, f.files), true, code);
+  }
+  for (const code of ['en', 'en-GB', 'en_US', 'EN', 'xx', 'fr-extra']) {
+    const f = fixture();
+    f.files[0].filename = `app/locales/${code}.json`;
+    assert.equal(await crowdinEligibility(f.github, f.pr, f.files), null, code);
+  }
+});
+test('dismissed or superseded findings clear while findings from a second provider still block', async () => {
+  const f = fixture();
+  const proof = await crowdinEligibility(f.github, f.pr, f.files);
+  const issue = {
+    id: 5,
+    state: 'COMMENTED',
+    commit_id: head,
+    submitted_at: '2026-10-19T00:00:00Z',
+    user: { id: 191113872, type: 'Bot' },
+    body: '**1 issue found**',
+  };
+  const dismissed = input(f, proof);
+  dismissed.reviews = [{ ...issue, state: 'DISMISSED' }];
+  assert.equal(admissionDecision(dismissed).approved, true);
+  const clean = {
+    ...issue,
+    id: 6,
+    body: '<!-- cubic:review-summary:start -->**0 issues found**<!-- cubic:review-summary:end -->',
+  };
+  const refreshed = input(f, proof);
+  refreshed.reviews = [issue, clean];
+  assert.equal(admissionDecision(refreshed).approved, true);
+  refreshed.reviews.push({
+    ...issue,
+    id: 7,
+    user: { id: 136622811, type: 'Bot' },
+    body: '**Actionable comments posted: 1**',
+  });
+  assert.throws(() => admissionDecision(refreshed), /Substantive provider findings/);
+});
+test('skipped or unfinished optional reviews do not reinstate a review requirement for verified Crowdin', async () => {
+  const f = fixture();
+  const proof = await crowdinEligibility(f.github, f.pr, f.files);
+  for (const state of ['Review skipped', 'Review in progress', 'Rate limit exceeded']) {
+    const candidate = input(f, proof);
+    candidate.comments = [
+      {
+        id: 6,
+        node_id: 'I_6',
+        user: { id: 136622811, type: 'Bot', login: 'coderabbitai[bot]' },
+        created_at: '2026-10-19T00:00:00Z',
+        updated_at: '2026-10-19T00:00:00Z',
+        lastEditedAt: null,
+        editor: null,
+        body: `<!-- final_review_risk_coverage:{"sourceCommitId":"${head}","coveredCommitId":"${head}","kind":"reviewed"} -->\n${state}`,
+      },
+    ];
+    assert.equal(admissionDecision(candidate).review.kind, 'review-exempt');
+  }
 });

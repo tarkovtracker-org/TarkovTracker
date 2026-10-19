@@ -145,8 +145,8 @@ wait_for_mergeability() {
     sleep 3
   done
 }
-# Complete the immutable CI/preview validation before requesting a review publication.
-validate_merge_candidate() {
+# Recheck the validated candidate and atomically guard the PR head during squash merge.
+merge() {
   [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN is required to merge translations."
   require_sha "${HEAD_SHA:-}"
   require_sha "${BASE_SHA:-}"
@@ -160,49 +160,6 @@ validate_merge_candidate() {
   check_revision "$pr"
   # Preview Result targets the validated head; GitHub may regenerate the test merge at merge time.
   wait_for_preview_result "$HEAD_SHA"
-}
-# Queue-mode sync hands off once; later review and preview events resume promotion.
-handoff() {
-  require_main_ci_policy
-  if [[ "$MAIN_MERGE_MODE" == strict ]]; then
-    merge
-    return
-  fi
-  validate_merge_candidate
-  require_main_ci_policy
-  [[ "$MAIN_MERGE_MODE" != strict ]] || fail "Main merge policy changed during validation."
-  local admission_run
-  admission_run="$(gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/review-admission.yml/dispatches" \
-    -H "X-GitHub-Api-Version: 2022-11-28" -f ref=main \
-    -f "inputs[pull_request]=$PR_NUMBER" -F return_run_details=true --jq ".workflow_run_id")"
-  [[ "$admission_run" =~ ^[1-9][0-9]*$ ]] || fail "Admission dispatch returned no authenticated run ID."
-  echo "::notice::Validated translations await exact-head review admission (run $admission_run); Crowdin Promotion resumes on a valid receipt."
-}
-# No candidate code executes here. Re-prove the entire Git tree diff and every existing gate.
-promote() {
-  [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN is required to promote translations."
-  require_sha "${HEAD_SHA:-}"
-  require_sha "${BASE_SHA:-}"
-  require_main_ci_policy
-  [[ "$MAIN_MERGE_MODE" != strict ]] || fail "Crowdin continuation requires the reviewed native queue."
-  local pr
-  pr="$(read_pr)"
-  check_identity "$pr"
-  check_revision "$pr"
-  DIFF_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
-  require_sha "$DIFF_BASE_SHA"
-  check_translation_tree
-  wait_for_validated_ci_and_preview "$HEAD_SHA"
-  node "$(dirname "${BASH_SOURCE[0]}")/review-admission-cli.mjs" "$GITHUB_REPOSITORY" "$HEAD_SHA" "$PR_NUMBER"
-  wait_for_mergeability
-  require_main_ci_policy
-  [[ "$MAIN_MERGE_MODE" != strict ]] || fail "Main merge policy changed before queue submission."
-  enqueue_reviewed_pr "$PR_NUMBER" "$HEAD_SHA"
-}
-# Recheck the validated candidate and atomically guard the PR head during squash merge.
-merge() {
-  validate_merge_candidate
-  local pr
   require_main_ci_policy
   if [[ "$MAIN_MERGE_MODE" != strict ]]; then
     wait_for_review_admission "$PR_NUMBER" "$HEAD_SHA"
@@ -235,7 +192,5 @@ case "${1:-}" in
   update) update ;;
   prepare) prepare ;;
   merge) merge ;;
-  handoff) handoff ;;
-  promote) promote ;;
-  *) fail "Usage: crowdin-pr.sh update|prepare|merge|handoff|promote" ;;
+  *) fail "Usage: crowdin-pr.sh update|prepare|merge" ;;
 esac

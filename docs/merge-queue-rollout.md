@@ -513,18 +513,7 @@ deployment even though the panel ID stays the same. Enables require live maintai
 an accepted Stop remains a revocation barrier after role loss. These controls affect PR previews;
 required merge-group previews and explicitly authorized manual previews retain their own rules.
 
-### Crowdin review continuation
-
-Crowdin Sync validates the complete immutable translation-only diff and explicitly dispatches
-candidate CI and preview. In queue mode it requests one trusted Review Admission publication,
-then reports a pending handoff instead of waiting for a reviewer inside the sync job.
-`Crowdin Promotion` resumes on completed main-owned Review Admission or Preview workflows.
-Those events are wakeups, not approval: the controller rereads the single ready same-repository
-`locales` PR, authenticates its current head-owned admission receipt, checks the entire Git diff
-(with rename detection disabled), and rechecks CI, preview deployment evidence and main policy
-before guarded native enqueue. It executes no candidate code and does not dispatch additional
-CI, previews, review requests or admission publications. Missing gates hold the head until a
-later completion event; API failures remain visible in the job log.
+### Crowdin translation admission
 
 Verified Crowdin translation PRs are exempt from requesting independent review. This exemption
 requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
@@ -535,12 +524,26 @@ review. The policy additionally requires a head-owned validation receipt uploade
 repository's main-owned Crowdin Sync workflow after format, i18n and systems checks. The publisher
 authenticates the service-owned artifact/run/path/event/repository, exact run attempt and source on
 trusted main history; titles, labels and author display names cannot grant the exemption. A live
-sync may supply its already-uploaded validation receipt before its final handoff finishes.
+sync may supply its already-uploaded validation receipt before its final merge step finishes.
 
 The admission receipt records `crowdin-policy` / `review-exempt`, rather than claiming that a
 review occurred. Open review threads, changes requested and authenticated substantive provider
 findings remain blockers. CI, syntax/placeholders/key checks, preview, sensitive-change policy,
-current-head fences and native queue integration are unchanged. A changed head needs a new trusted
-Crowdin validation receipt; historical PRs are not grandfathered. There are no provider requests or
-billing/configuration changes. To roll back the continuation, disable `Crowdin Promotion`; removing
-the scoped `crowdinExemption` admission route restores the ordinary independent-review requirement.
+current-head fences and native queue integration are unchanged. Other candidates retain the
+existing provider, independent collaborator review or valid exact-head admin-attestation routes.
+A changed head needs a new trusted Crowdin validation receipt; historical PRs are not grandfathered.
+There are no provider requests or billing/configuration changes.
+
+Crowdin Sync retains its existing main-only schedule/manual orchestration and token permissions.
+After uploading validation provenance, its existing merge step dispatches candidate CI and preview,
+requests one protected Review Admission publication, authenticates that accepted dispatch and its
+exact-head receipt, then performs the normal guarded native enqueue. The admission wait remains
+bounded to ten minutes and fails closed on terminal errors; CI and preview keep their existing
+bounds. No additional privileged trigger, promotion workflow or scanner exception is needed.
+
+If findings, changed revisions or infrastructure failures hold a sync after its bounded wait,
+resolve the cause and rerun Crowdin Sync on main, or let its existing schedule try again. This does
+not promise an immediate enqueue when a finding is resolved after the job has ended. A rerun may
+download fresh translations, so fix material locale wording in Crowdin upstream as well. To roll
+back the review exemption, remove the narrow `crowdinExemption` admission route; ordinary review
+requirements resume without changing queue rules, publisher permissions or credentials.
