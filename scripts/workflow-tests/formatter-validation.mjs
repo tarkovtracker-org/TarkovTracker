@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { gitExecutable } from '../ci/validation-tools.mjs';
 import { formatterOnlyChange, verifiedFormatterChange } from '../ci/formatter-validation.mjs';
 import {
+  collectChanges,
   aggregateResults,
   classifyPaths,
   classifyQueuePaths,
@@ -129,6 +135,8 @@ test('mixed changes, runtime/build dependencies, metadata surprises and uncertai
   const before = input('3.9.9');
   const after = input('3.9.10');
   const mutations = [
+    (x) => ({ ...x, lock: x.lock.replace('importers:\n', 'importers:\nimporters:\n') }),
+    (x) => ({ ...x, lock: x.lock.replace('packages:\n', 'packages:\npackages:\n') }),
     (x) => ({ ...x, manifest: x.manifest.replace('3.5.0', '3.5.1') }),
     (x) => ({ ...x, manifest: x.manifest.replace('^3.8.1', '^3.9.0') }),
     (x) => ({ ...x, lock: x.lock.replace('version: 3.5.0', 'version: 3.5.1') }),
@@ -223,4 +231,55 @@ test('queue formatter exemption still requires complete current-base single-pare
     status: 'modified',
   }));
   assert.equal(await run(), true);
+});
+test('a divergent current-base lock update cannot create a CI/controller profile mismatch', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'tt-formatter-base-'));
+  const git = (...args) =>
+    execFileSync(gitExecutable(), ['-c', 'commit.gpgsign=false', ...args], {
+      cwd,
+      encoding: 'utf8',
+    }).trim();
+  const write = (data) => {
+    writeFileSync(join(cwd, 'package.json'), data.manifest);
+    writeFileSync(join(cwd, 'pnpm-lock.yaml'), data.lock);
+    git('add', '.');
+    git('commit', '-qm', 'fixture');
+    return git('rev-parse', 'HEAD');
+  };
+  const ranged = (version) => {
+    const data = input(version);
+    return {
+      manifest: data.manifest.replace('"vue":"3.5.0"', '"vue":"^3.5.0"'),
+      lock: data.lock.replace('specifier: 3.5.0', 'specifier: ^3.5.0'),
+    };
+  };
+  try {
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.name', 'Fixture');
+    git('config', 'user.email', 'fixture@example.invalid');
+    const original = ranged('3.9.9');
+    const originalSha = write(original);
+    git('checkout', '-qb', 'candidate');
+    const candidate = ranged('3.9.10');
+    const headSha = write(candidate);
+    git('checkout', '-q', 'main');
+    const currentBase = {
+      ...original,
+      lock: original.lock
+        .replace('version: 3.5.0', 'version: 3.5.1')
+        .replaceAll('vue@3.5.0', 'vue@3.5.1'),
+    };
+    const baseSha = write(currentBase);
+    assert.equal(git('merge-base', baseSha, headSha), originalSha);
+    assert.equal(formatterOnlyChange(original, candidate), true);
+    assert.equal(formatterOnlyChange(currentBase, candidate), false);
+    const changes = collectChanges({ cwd, base: baseSha, head: headSha, local: false });
+    assert.deepEqual(changes.paths, ['pnpm-lock.yaml']);
+    assert.equal(changes.formatterOnly, false);
+    const plan = classifyPaths(changes.paths, { formatterOnly: changes.formatterOnly });
+    assert.equal(plan.full, true);
+    assert.equal(plan.previewRequired, true);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });

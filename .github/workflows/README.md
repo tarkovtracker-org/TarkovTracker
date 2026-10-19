@@ -12,9 +12,15 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 - `Validation plan` — classifies the diff. Pull requests that touch only root/`docs/`/`.github/`
   Markdown or Crowdin-owned `app/locales/*.json` translations run the reduced set (`Lint & Format`
-  formatting, i18n when locales change, `Systems drift check`); anything else — including the
-  source locale `app/locales/en.json` — every push, and every dispatch run the full set. Unreadable
-  diffs fail closed to full validation.
+  formatting, i18n when locales change, `Systems drift check`, `Security`). A lockfile-only Prettier
+  refresh can select the narrowly verified formatter profile: complete immutable manifests stay
+  identical, only the formatter leaf and its existing plugin peer binding change, and all runtime/
+  build dependency records stay unchanged. It retains lint, formatting, scanner coverage, every
+  workflow test, systems drift, security and admission; app/DB/Worker/build jobs can skip. CI and
+  trusted preview verification use the current base SHA, not just the PR merge base. Manifest,
+  plugin, mixed or uncertain changes — including the source locale `app/locales/en.json` — every
+  push, and every dispatch run the full set. Unreadable evidence fails closed to full validation.
+  See [narrow formatter validation](../../docs/workflow-automation.md#narrow-formatter-validation).
 - `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
 - `Lint & Format` — ESLint + Prettier, i18n, Node workflow fixtures, and (for non-Markdown
   automation paths and unreadable diffs) checksum-verified `actionlint` plus `zizmor`
@@ -23,7 +29,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only and skip thresholds; Codecov merges their lcov uploads.
 - `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds. Uploads `coverage-final` for metrics.
-- `Validate` — Production Nuxt build (all pull requests, forks included) + artifact upload (main branch only)
+- `Validate` — Nuxt build for full or preview-required validation, including forks; preview builds export a validated artifact and main builds export the production artifact
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
 - `Workers` - Verify immutable frontend contracts pins, then fetch the exact tagged API source,
@@ -202,7 +208,8 @@ introduce a new pinned SHA.
 
 ## Merge checks
 
-Dependabot PRs always change manifests, so they receive full CI. Main merges only through the
+Dependabot PRs receive full CI unless complete immutable evidence proves the narrow lockfile-only
+Prettier profile above. A bot author or tooling label alone never selects reduced validation. Main merges only through the
 native merge queue; its required checks and the strict-freshness rollback are owned by
 [merge queue rollout](../../docs/merge-queue-rollout.md#current-state). The preview controller reports success without deployment for verified change sets with no
 deployable paths; preview-required changes stay pending until an explicit validated deployment passes.

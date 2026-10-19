@@ -128,6 +128,9 @@ function completeLockText(text) {
     !text.includes('\r'),
     text.endsWith('\n'),
     text.startsWith("lockfileVersion: '9.0'\n"),
+    // Reject duplicate section headers before the bounded section extraction.
+    [...text.matchAll(/^importers:$/gm)].length === 1,
+    [...text.matchAll(/^packages:$/gm)].length === 1,
     [...text.matchAll(/^snapshots:$/gm)].length === 1,
   ].every(Boolean);
 }

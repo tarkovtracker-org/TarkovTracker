@@ -38,7 +38,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        # PRs select by path; queues reduce only proven inert docs. Pushes and dispatches stay full.
+        # PRs select by path/proof; queues reduce only inert docs or verified formatter locks.
+        # Pushes and dispatches stay full.
         # Rollback: re-add the shadow flag of scripts/ci/validate-changes.mjs to force every job and
         # invert the shadow-flag assertion in scripts/workflow-tests/workflows.mjs in the same change.
         run: |

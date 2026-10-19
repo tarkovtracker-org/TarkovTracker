@@ -1213,7 +1213,7 @@ pnpm run lint:fix
 ### Narrow formatter validation
 
 A lockfile-only Prettier patch/minor resolution refresh can select the formatter profile.
-The classifier reads complete immutable base/head `package.json` and `pnpm-lock.yaml` files:
+The classifier reads complete immutable current-base/head `package.json` and `pnpm-lock.yaml` files:
 the manifest must be byte-identical, a single root importer must keep Prettier and its existing
 Tailwind formatter plugin in dev dependencies, and only the Prettier leaf version/integrity and
 that unchanged plugin's Prettier peer binding may differ. All other lockfile bytes, including

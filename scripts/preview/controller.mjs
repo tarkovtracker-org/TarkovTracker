@@ -634,7 +634,7 @@ async function queueDocumentationDecision(github, context, state) {
   const decision = { ...decisionBase(state), ...notApplicable() };
   const errors = await freshnessErrors(github, context, decision);
   if (errors.length)
-    throw ignore(`Queue documentation candidate is obsolete: ${errors.join('; ')}`);
+    throw ignore(`Non-deployable queue candidate is obsolete: ${errors.join('; ')}`);
   return decision;
 }
 function requestBinding(inputs) {

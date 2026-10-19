@@ -127,7 +127,7 @@ export function classifyPaths(paths, { forceFull = false, reason, formatterOnly 
     paths,
   };
 }
-// Queue reductions are narrower than ordinary PR reductions: only existing inert documentation.
+// Queue reductions are narrower: inert documentation or an independently proven formatter lock.
 // Agent policy files and all GitHub configuration retain full queue validation.
 function queueDocumentationPath(path) {
   if (typeof path !== 'string' || path.startsWith('.github/')) return false;
@@ -209,7 +209,7 @@ export function collectChanges({
       paths: [...new Set(paths)],
       baseSha,
       headSha,
-      formatterOnly: localFormatterProof(git, mergeBase, headSha, paths, local),
+      formatterOnly: localFormatterProof(git, baseSha, headSha, paths, local),
     };
   } catch {
     return {
