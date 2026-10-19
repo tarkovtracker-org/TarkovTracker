@@ -107,10 +107,10 @@ const taskStatus = (id: string, context: PoolTaskContext): PoolStatus => {
 const taskRank = (task: PoolTask): number => (task.current ? 5 : STATUS_ORDER[task.status]);
 const poolTask = (id: string, context: PoolTaskContext): PoolTask | undefined => {
   const task = context.taskById(id);
-  if (!task?.name) return undefined;
+  if (!task) return undefined;
   return {
     id,
-    name: task.name,
+    name: task.name || id,
     status: taskStatus(id, context),
     current: id === context.currentTaskId,
   };

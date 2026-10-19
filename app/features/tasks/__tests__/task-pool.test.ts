@@ -90,4 +90,20 @@ describe('task pool presentation', () => {
     expect(groups.at(-1)?.tasks[0]).toMatchObject({ id: 'target', current: true });
     expect(groups.find((g) => g.key === 'opposite')?.tasks[0]?.status).toBe('unavailable');
   });
+  it('retains unnamed contributors and complete group membership', () => {
+    const groups = poolContributorGroups(
+      { type: 'taskGroupCompletions', groups: [{ anyOf: ['a', 'b'] }] },
+      {
+        currentTaskId: 'target',
+        taskById: (id) => ({ id }),
+        completion: () => undefined,
+        available: () => false,
+        unavailable: () => false,
+      }
+    );
+    expect(groups[0]?.tasks.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: 'a', name: 'a' },
+      { id: 'b', name: 'b' },
+    ]);
+  });
 });

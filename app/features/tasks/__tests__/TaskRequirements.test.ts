@@ -13,7 +13,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 }));
 const row = (label: string, met = false, extra: Partial<TaskRequirementRow> = {}) =>
   ({ kind: 'task', met, label, ...extra }) satisfies TaskRequirementRow;
-const global = { stubs: { UIcon: true, RouterLink: { template: '<a><slot /></a>' } } };
+const global = {
+  stubs: { UIcon: true, RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+};
 const mountRequirements = (rows: TaskRequirementRow[], variant: 'blocking' | 'summary') =>
   variant === 'blocking'
     ? mount(TaskRequirementChips, { props: { rows }, global })
@@ -128,6 +130,9 @@ describe('task requirement components', () => {
     expect(wrapper.text()).toContain('page.tasks.requirements.pool_confirmed');
     expect(wrapper.get('[data-testid="task-pool-caveat"]').text()).toContain('pool_caveat');
     expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('First task');
+    expect(wrapper.get('[data-testid="task-pool-details"] a').attributes('href')).toBe(
+      '/tasks?task=a'
+    );
     const toggle = wrapper.findAll('button')[1]!;
     expect(toggle.attributes('aria-controls')).toBe('task-requirements-target-pool');
     await toggle.trigger('click');

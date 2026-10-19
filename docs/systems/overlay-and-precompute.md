@@ -325,7 +325,7 @@ flowchart LR
 - The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
   `PRECOMPUTED_ENVELOPE_VERSION = 2`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v4-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - EFT import has exactly three additional English keys, built by `buildTaskImportKey(mode)`:
   `tasks-import-json-v1-en-regular`, `tasks-import-json-v1-en-pve`, and
@@ -406,7 +406,9 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
-Task-core pool descriptions use the shared `json-v4` cache version in the browser and runtime/precompute keys. Registry `pool` metadata is informational; unresolved mappings never become derived counters. Consumer support must deploy before the producer publishes new optional entry fields.
+Task-core pool descriptions are optional additions to the existing `json-v3` payload, so this
+feature retains current cache keys. Older cached payloads continue to show generic pool instructions.
+Registry `pool` metadata is informational; unresolved mappings never become derived counters.
 
 A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
 [canonical task progression](./tasks.md#canonical-task-progression)). A malformed or mode-nested registry
@@ -415,20 +417,28 @@ Only a complete, unfiltered, failure-free run updates `overlay-precompute-manife
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
 
-Release order: reviewed producer changes first land on `main`, then publish the overlay and
-dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to its verified SHA
-for all 48 supported language/mode combinations. Check the matching manifest before advancing the
-existing browser cache-purge marker and purging corrected edge entries through the established
-operator workflow. When changing the consumer contract, split producer and consumer changes into
-separate releases whenever preseeding is required: land the compatible producer first, seed the new
-versioned keys, then promote the consumer. Old app revisions keep reading their old keys.
-The reviewed runner must seed all three new import keys before promoting a consumer that uses
+For pool descriptions, use this release order:
+
+1. Deploy the compatible tracker consumer while the overlay still omits `pool`. No new KV keys need
+   preseeding, and current cached payloads remain usable.
+2. Publish the reviewed overlay with pool identities only after that consumer is live. Older strict
+   consumers reject the new registry fields.
+3. Dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to the published SHA
+   and no language/mode filters. Verify all 48 refreshed core entries and the matching complete
+   manifest, then use the existing cache-purge marker/operator workflow for browser and edge caches.
+4. Run `pnpm run verify:overlay` after refresh and require current served provenance and pool-bearing
+   task payloads before claiming the named requirements are live.
+
+For incompatible consumer contract changes, split producer and consumer changes into separate
+releases whenever preseeding is required: land a compatible producer first, seed the new versioned
+keys, then promote the consumer. Old app revisions keep reading their old keys.
+For import-contract changes, the reviewed runner must seed all three new import keys before promoting a consumer that uses
 them; a successful older core-only run or its 48-row manifest does not establish import readiness.
 Inspect the runner's `imports` results as well as the core manifest. Missing core keys still have
 the existing live fallback, but that is not proof of production readiness for cold colos. Missing
 import keys fail closed, so promotion requires explicit successful seeding.
 
-Hold the consumer PR in draft until an approved `workflow_dispatch` on `main` succeeds with
+For changes introducing a new whole-import snapshot contract, hold the consumer PR in draft until an approved `workflow_dispatch` on `main` succeeds with
 `lang=en`, no mode filter, and `expectedOverlaySha` set to the verified overlay SHA. That dispatch
 runs the reviewed producer already on `main` and writes three English core keys and three whole
 import keys. Read back each import envelope from the existing production namespace and verify its
