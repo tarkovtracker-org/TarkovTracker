@@ -25,7 +25,10 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('@/stores/useProgress', () => ({
   useProgressStore: () => ({
-    taskEvaluations: { a: { self: { available: true } } },
+    taskEvaluations: {
+      a: { self: { available: true } },
+      b: { self: { available: false, blockers: [{ type: 'faction' }] } },
+    },
   }),
 }));
 vi.mock('vue-i18n', async (original) => ({
@@ -57,6 +60,15 @@ describe('pool requirement rows', () => {
   beforeEach(() => {
     state.completions = {};
     state.confirmations = {};
+  });
+  it("uses each contributor's own gates and marks wrong-faction work unavailable", () => {
+    const row = useTaskPoolRequirements(() => ({ id: 'target' }))(gate(), false);
+    expect(
+      row.pool?.groups.flatMap((group) => group.tasks).map(({ id, status }) => ({ id, status }))
+    ).toEqual([
+      { id: 'a', status: 'available' },
+      { id: 'b', status: 'unavailable' },
+    ]);
   });
   it('shows a named requirement and actual tracked count even when it is met', () => {
     state.completions = { a: { complete: true }, b: { complete: true } };
