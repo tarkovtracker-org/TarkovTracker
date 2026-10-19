@@ -110,7 +110,7 @@ export async function crowdinEligibility(github, pr, files) {
   const repo = { owner, repo: repoName };
   if (!(await immutableTranslations(github, repo, pr, files))) return null;
   const name = `crowdin-validated-${pr.number}-${pr.head.sha}`;
-  const artifacts = await github.paginate(github.rest.actions.listArtifacts, {
+  const artifacts = await github.paginate('GET /repos/{owner}/{repo}/actions/artifacts', {
     ...repo,
     name,
     per_page: 100,

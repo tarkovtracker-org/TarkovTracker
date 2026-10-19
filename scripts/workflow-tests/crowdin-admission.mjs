@@ -84,7 +84,7 @@ function fixture() {
   f.github = {
     paginate: async (endpoint, params) => {
       f.calls.push({ endpoint, params });
-      assert.equal(endpoint, 'listArtifacts');
+      assert.equal(endpoint, 'GET /repos/{owner}/{repo}/actions/artifacts');
       assert.equal(params.name, `crowdin-validated-${pr.number}-${pr.head.sha}`);
       return f.artifacts;
     },
@@ -109,7 +109,6 @@ function fixture() {
         },
       },
       actions: {
-        listArtifacts: 'listArtifacts',
         getWorkflowRun: async ({ run_id }) => {
           assert.equal(run_id, 77);
           return { data: f.run };
