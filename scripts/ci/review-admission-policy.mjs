@@ -1,7 +1,67 @@
-import { codeRabbitCommentReview } from './review-admission-coderabbit.mjs';
+import {
+  codeRabbitCommentReview,
+  codeRabbitOutstandingFindings,
+} from './review-admission-coderabbit.mjs';
 // This policy is loaded from trusted main, never from a candidate checkout.
 export const CONTEXT = 'Review Admission';
 export const SHA = /^[0-9a-f]{40}$/;
+export const CROWDIN_REPOSITORY = Object.freeze({
+  full_name: 'tarkovtracker-org/TarkovTracker',
+  id: 1098874862,
+});
+export function isCrowdinRepository(repository) {
+  return [
+    repository?.full_name === CROWDIN_REPOSITORY.full_name,
+    repository?.id === CROWDIN_REPOSITORY.id,
+  ].every(Boolean);
+}
+// Deliberately pinned: new locale codes require an explicit review of exemption scope.
+const CROWDIN_TRANSLATIONS = new Set(
+  ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'uk', 'zh'].map(
+    (code) => `app/locales/${code}.json`
+  )
+);
+function translationFile(file) {
+  return [
+    CROWDIN_TRANSLATIONS.has(file.filename),
+    ['added', 'modified'].includes(file.status),
+    !file.previous_filename,
+    SHA.test(file.sha ?? ''),
+  ].every(Boolean);
+}
+function completeFiles(pr, files) {
+  if (!Array.isArray(files)) return false;
+  return [
+    files.length > 0,
+    files.length <= 300,
+    files.length === pr.changed_files,
+    new Set(files.map((file) => file.filename)).size === files.length,
+    files.every(translationFile),
+  ].every(Boolean);
+}
+function sourceBranch(branch, ref) {
+  if (!branch) return false;
+  return [isCrowdinRepository(branch.repo), branch.ref === ref, SHA.test(branch.sha)].every(
+    Boolean
+  );
+}
+function botAuthor(user) {
+  if (!user) return false;
+  return [user.id === 41898282, user.type === 'Bot', user.login === 'github-actions[bot]'].every(
+    Boolean
+  );
+}
+/** Bot names, titles and labels alone never select the exemption. */
+export function crowdinCandidate(pr, files) {
+  return [
+    pr.state === 'open',
+    pr.draft === false,
+    botAuthor(pr.user),
+    sourceBranch(pr.head, 'locales'),
+    sourceBranch(pr.base, 'main'),
+    completeFiles(pr, files),
+  ].every(Boolean);
+}
 export const INDEPENDENT_REVIEW_REQUIRED = 'Completed exact-head independent review is required.';
 const PROVIDERS = Object.freeze([
   {
@@ -210,13 +270,73 @@ function approvalId(human, approval) {
 }
 function reviewedHead(input, latest) {
   const { pr, checks, trusted, reviews } = input;
+  requireCrowdinFindingsResolved(input);
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
-  const provider = verifiedProvider(reviews, checks, pr.head.sha, input.comments);
+  const provider =
+    verifiedProvider(reviews, checks, pr.head.sha, input.comments) ?? crowdinExemption(input);
   requirePolicy(
     Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
-    INDEPENDENT_REVIEW_REQUIRED
+    reviewRequirement(input)
   );
   return { human, provider };
+}
+function reviewRequirement(input) {
+  return crowdinCandidate(input.pr, input.files)
+    ? 'Trusted Crowdin validation for this exact head is required; rerun Crowdin Sync on main.'
+    : INDEPENDENT_REVIEW_REQUIRED;
+}
+function outstandingProviderFinding(review, head) {
+  const provider = PROVIDERS.find((item) => item.botId === review.user?.id);
+  if (!provider) return false;
+  return [
+    review.user.type === 'Bot',
+    review.commit_id === head,
+    Boolean(review.submitted_at),
+    ['APPROVED', 'COMMENTED'].includes(review.state),
+    /(?:Actionable comments posted|Outside diff range comments)\s*[:(]\s*\*{0,2}0*[1-9]\d*|\b0*[1-9]\d* (?:issues?|findings?) (?:found|remain)\b/i.test(
+      review.body ?? ''
+    ),
+  ].every(Boolean);
+}
+function currentCrowdinProof(proof, head) {
+  if (!proof) return false;
+  return [
+    proof.commit === head,
+    proof.provider === 'crowdin-policy',
+    proof.kind === 'review-exempt',
+  ].every(Boolean);
+}
+function crowdinExemption(input) {
+  if (!crowdinCandidate(input.pr, input.files)) return null;
+  const proof = input.crowdinSafe;
+  if (!currentCrowdinProof(proof, input.pr.head.sha)) return null;
+  return proof;
+}
+function latestCleanProviderReview(reviews, checks, head, provider) {
+  if (!providerChecks(checks, provider, head)) return null;
+  return reviews.findLast((review) =>
+    [providerReview(review, provider, head), zeroOutsideFindings(review, provider)].every(Boolean)
+  );
+}
+function providerStillHasFindings(input, provider) {
+  const own = input.reviews
+    .filter((review) => review.user?.id === provider.botId)
+    .toSorted((a, b) => a.id - b.id);
+  const finding = own.findLast((review) => outstandingProviderFinding(review, input.pr.head.sha));
+  if (!finding) return false;
+  const clean = latestCleanProviderReview(own, input.checks, input.pr.head.sha, provider);
+  return !clean || clean.id <= finding.id;
+}
+function requireCrowdinFindingsResolved(input) {
+  if (!crowdinCandidate(input.pr, input.files)) return;
+  requirePolicy(
+    !PROVIDERS.some((provider) => providerStillHasFindings(input, provider)),
+    'Substantive provider findings remain.'
+  );
+  requirePolicy(
+    !codeRabbitOutstandingFindings(input.comments, input.pr.head.sha),
+    'Substantive provider findings remain.'
+  );
 }
 function positiveReviewId(value) {
   return [Number.isSafeInteger(value), value > 0].every(Boolean);

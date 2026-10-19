@@ -512,3 +512,44 @@ comment ID and that grant’s control run ID, so Stop/re-enable cannot resurrect
 deployment even though the panel ID stays the same. Enables require live maintain/admin access;
 an accepted Stop remains a revocation barrier after role loss. These controls affect PR previews;
 required merge-group previews and explicitly authorized manual previews retain their own rules.
+
+### Crowdin translation admission
+
+In `queue`/`strict-queue` mode, verified Crowdin translation PRs are exempt from requesting
+independent review through Review Admission. This admission exemption
+requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
+GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to supported non-English locales, and an immutable
+GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
+modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
+review. The policy additionally requires a head-owned validation receipt uploaded by this
+repository's main-owned Crowdin Sync workflow after format, i18n and systems checks. The publisher
+authenticates the service-owned artifact/run/path/event/repository, exact run attempt and source on
+trusted main history; titles, labels and author display names cannot grant the exemption. A live
+sync may supply its already-uploaded validation receipt before its final merge step finishes.
+
+The admission receipt records `crowdin-policy` / `review-exempt`, rather than claiming that a
+review occurred. Open review threads, changes requested and authenticated substantive provider
+findings remain blockers. CI, syntax/placeholders/key checks, preview, sensitive-change policy,
+current-head fences and native queue integration are unchanged. Other candidates retain the
+existing provider, independent collaborator review or valid exact-head admin-attestation routes.
+Unchanged locales need not appear in the changed-file inventory. A changed head needs a new trusted Crowdin validation receipt; historical PRs are not grandfathered.
+There are no provider requests or billing/configuration changes.
+
+Crowdin Sync retains its existing main-only schedule/manual orchestration and token permissions.
+After uploading validation provenance, its existing merge step dispatches candidate CI and preview,
+in `queue`/`strict-queue` mode requests one protected Review Admission publication, authenticates
+that accepted dispatch and its exact-head receipt, then performs normal guarded native enqueue.
+Legacy `strict` mode is unchanged: its merge step uses the broader flat non-English JSON scope, does not
+wait for Review Admission, and retains guarded `gh pr merge --match-head-commit` plus post-merge main-CI
+dispatch. It does not enforce or attest the new queue-admission exemption described above; it must
+not be used as its commissioning path. Unsupported locales in queue modes retain normal review. The admission helper allows at most 120 pending polls with five-second sleeps,
+plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
+bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
+limits. No additional privileged trigger, promotion workflow or scanner exception is needed.
+
+If findings, changed revisions or infrastructure failures hold a sync after its bounded wait,
+resolve the cause and rerun Crowdin Sync on main, or let its existing schedule try again. This does
+not promise an immediate enqueue when a finding is resolved after the job has ended. A rerun may
+download fresh translations, so fix material locale wording in Crowdin upstream as well. To roll
+back the review exemption, remove the narrow `crowdinExemption` admission route; ordinary review
+requirements resume without changing queue rules, publisher permissions or credentials.
