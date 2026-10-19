@@ -27,8 +27,12 @@ describe('resolveSupportBanner', () => {
     expect(resolveSupportBanner(input())).toBe('new');
   });
   it('treats enough completed tasks as engagement on a new account', () => {
-    expect(resolveSupportBanner(input({ createdAt: daysAgo(1), completedTasks: 20 }))).toBe('new');
-    expect(resolveSupportBanner(input({ createdAt: daysAgo(1), completedTasks: 19 }))).toBeNull();
+    expect(resolveSupportBanner(input({ createdAt: daysAgo(1), completedTasks: 5 }))).toBe('new');
+    expect(resolveSupportBanner(input({ createdAt: daysAgo(1), completedTasks: 4 }))).toBeNull();
+  });
+  it('shows once the account is a week old', () => {
+    expect(resolveSupportBanner(input({ createdAt: daysAgo(7) }))).toBe('new');
+    expect(resolveSupportBanner(input({ createdAt: daysAgo(6) }))).toBeNull();
   });
   it('stays hidden without a parseable account age or enough progress', () => {
     expect(resolveSupportBanner(input({ createdAt: null }))).toBeNull();
@@ -48,9 +52,9 @@ describe('resolveSupportBanner', () => {
     const lapsed = supporterRow({ status: 'cancelled', expiresAt: daysAgo(10) });
     expect(resolveSupportBanner(input({ supporter: lapsed }))).toBe('returning');
   });
-  it('stays dismissed for 45 days, then returns', () => {
-    expect(resolveSupportBanner(input({ dismissedAt: daysAgo(44) }))).toBeNull();
-    expect(resolveSupportBanner(input({ dismissedAt: daysAgo(45) }))).toBe('new');
+  it('stays dismissed for 30 days, then returns', () => {
+    expect(resolveSupportBanner(input({ dismissedAt: daysAgo(29) }))).toBeNull();
+    expect(resolveSupportBanner(input({ dismissedAt: daysAgo(30) }))).toBe('new');
     expect(resolveSupportBanner(input({ dismissedAt: 'garbage' }))).toBe('new');
   });
 });
