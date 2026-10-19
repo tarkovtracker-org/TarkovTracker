@@ -167,6 +167,8 @@ test('trusted queue preview uses the full authenticated integration comparison, 
     [{ filename: 'docs/a.md', status: 'added' }],
     [{ filename: 'docs/deleted.md', status: 'removed' }],
     [{ filename: 'docs/new.md', previous_filename: 'docs/old.md', status: 'renamed' }],
+    [{ filename: '.github/workflows/crowdin.yml', status: 'modified' }],
+    [{ filename: 'scripts/ci/review-admission.mjs', status: 'modified' }],
   ]) {
     data = comparison(files);
     assert.equal(await queueRequiresPreview(f.github, f.context, f.candidate, revision), false);
@@ -176,6 +178,16 @@ test('trusted queue preview uses the full authenticated integration comparison, 
     comparison([]),
     comparison([...docs, { filename: 'app/a.ts', status: 'modified' }]),
     comparison([{ filename: 'docs/a.md', previous_filename: 'app/a.ts', status: 'renamed' }]),
+    comparison([
+      { filename: 'docs/a.md', previous_filename: '.github/workflows/ci.yml', status: 'copied' },
+    ]),
+    comparison([
+      {
+        filename: '.github/workflows/crowdin.yml',
+        previous_filename: '.github/workflows/preview.yml',
+        status: 'renamed',
+      },
+    ]),
     comparison([{ filename: '.github/workflows/ci.yml', status: 'modified' }]),
     comparison([{ filename: 'docs/new.md', status: 'renamed' }]),
     comparison([{ filename: 'docs/a.md', status: 'unknown' }]),

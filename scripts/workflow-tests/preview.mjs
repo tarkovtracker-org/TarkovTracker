@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
+import { controlContext } from '../ci/pr-control-policy.mjs';
 import { extractZip, listZipEntries, zipEntryErrors } from '../preview/archive.mjs';
 import { resolveProfileOutputs } from '../preview/build-profile.mjs';
+import { previewControlRecord } from '../preview/control-intents.mjs';
 import {
   ENVIRONMENTS,
   planPreview,
@@ -31,9 +33,8 @@ import {
   resolveBuildProfile,
 } from '../preview/profile.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
-import { previewControlRecord } from '../preview/control-intents.mjs';
-import { controlContext } from '../ci/pr-control-policy.mjs';
 import { countApiCalls } from './helpers/api-count.mjs';
+import { toolingPaths } from './helpers/queue-preview-scope.mjs';
 import { buildZip } from './helpers/zip.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
@@ -1336,11 +1337,11 @@ test('drafts, non-deployable scope and production runs never deploy', async (t) 
   assert.equal(docs.decision.action, 'skip');
   assert.equal(docs.decision.state, 'success');
   assert.match(docs.decision.description, /Not applicable/);
-  // Repository automation and tooling changes never reach the deployed app either.
+  // Locale-sync automation and admission tooling do not build or deploy Pages.
   const automation = await plan(t, workflowRunContext(), {
     files: [
-      { filename: '.github/workflows/ci.yml' },
-      { filename: 'scripts/ci/validate-changes.mjs' },
+      { filename: '.github/workflows/crowdin.yml' },
+      { filename: 'scripts/ci/review-admission.mjs' },
     ],
   });
   assert.equal(automation.decision.action, 'skip');
@@ -2745,76 +2746,88 @@ function queueDocsComparison() {
     files: [{ filename: 'docs/guide.md', status: 'modified' }],
   };
 }
-test('proven docs-only queue publishes the required result without build artifacts, dispatch, deployment or smoke', async (t) => {
-  const f = queueFixture(t);
-  f.state.artifacts = [];
-  let comparisons = 0;
-  f.github.rest.repos.compareCommits = async (params) => {
-    assert.deepEqual(params, { ...REPO, base: BASE, head: HEAD, per_page: 100, page: 1 });
-    comparisons++;
-    return { data: queueDocsComparison() };
-  };
-  f.github.rest.actions.downloadArtifact = () => {
-    throw new Error('docs must not download a build');
-  };
-  const args = {
-    github: f.github,
-    context: workflowRunContext(f.state.run),
-    core: fakeCore(),
-    workspace: tempDir(t),
-  };
-  const decision = await planPreview(args);
-  assert.equal(comparisons, 1);
-  assert.equal(decision.action, 'skip');
-  assert.equal(decision.state, 'success');
-  assert.match(decision.description, /Not applicable/);
-  assert.equal(decision.headSha, HEAD);
-  assert.equal(decision.baseSha, BASE);
-  assert.equal(f.state.dispatches.length, 0);
-  assert.equal(f.state.statuses.at(-1).sha, HEAD);
-  assert.equal(
-    await publishResult({ ...args, decision, outcomes: { deploy: 'skipped', smoke: 'skipped' } }),
-    'success'
-  );
-});
-test('docs-only queue cannot publish success after ref, base or CI attempt changes during comparison', async (t) => {
-  for (const [change, reason] of [
-    [
-      (f) => {
-        f.state.queueSha = MERGE;
-      },
-      /Queue revision moved/,
-    ],
-    [
-      (f) => {
-        f.state.mainSha = MERGE;
-      },
-      /Queue base is no longer current main/,
-    ],
-    [
-      (f) => {
-        f.state.run = { ...f.state.run, run_attempt: 2 };
-      },
-      /CI run attempt superseded/,
-    ],
-  ]) {
+for (const paths of [['docs/guide.md'], toolingPaths])
+  test(`proven non-deployable queue (${paths.length} files) publishes the required result without deployment`, async (t) => {
     const f = queueFixture(t);
-    f.github.rest.repos.compareCommits = async () => {
-      change(f);
-      return { data: queueDocsComparison() };
+    f.state.artifacts = [];
+    let comparisons = 0;
+    f.github.rest.repos.compareCommits = async (params) => {
+      assert.deepEqual(params, { ...REPO, base: BASE, head: HEAD, per_page: 100, page: 1 });
+      comparisons++;
+      return {
+        data: {
+          ...queueDocsComparison(),
+          files: paths.map((filename) => ({ filename, status: 'modified' })),
+        },
+      };
     };
-    const decision = await planPreview({
+    f.github.rest.actions.downloadArtifact = () => {
+      throw new Error('docs must not download a build');
+    };
+    const args = {
       github: f.github,
       context: workflowRunContext(f.state.run),
       core: fakeCore(),
       workspace: tempDir(t),
-    });
-    assert.equal(decision.action, 'ignore');
-    assert.match(decision.description, reason);
+    };
+    const decision = await planPreview(args);
+    assert.equal(comparisons, 1);
+    assert.equal(decision.action, 'skip');
+    assert.equal(decision.state, 'success');
+    assert.match(decision.description, /Not applicable/);
+    assert.equal(decision.headSha, HEAD);
+    assert.equal(decision.baseSha, BASE);
     assert.equal(f.state.dispatches.length, 0);
-    assert.equal(f.state.statuses.length, 0);
-  }
-});
+    assert.equal(f.state.statuses.at(-1).sha, HEAD);
+    assert.equal(
+      await publishResult({ ...args, decision, outcomes: { deploy: 'skipped', smoke: 'skipped' } }),
+      'success'
+    );
+  });
+for (const paths of [['docs/guide.md'], toolingPaths])
+  test(`non-deployable queue (${paths.length} files) cannot publish success after ref, base or CI attempt changes`, async (t) => {
+    for (const [change, reason] of [
+      [
+        (f) => {
+          f.state.queueSha = MERGE;
+        },
+        /Queue revision moved/,
+      ],
+      [
+        (f) => {
+          f.state.mainSha = MERGE;
+        },
+        /Queue base is no longer current main/,
+      ],
+      [
+        (f) => {
+          f.state.run = { ...f.state.run, run_attempt: 2 };
+        },
+        /CI run attempt superseded/,
+      ],
+    ]) {
+      const f = queueFixture(t);
+      f.github.rest.repos.compareCommits = async () => {
+        change(f);
+        return {
+          data: {
+            ...queueDocsComparison(),
+            files: paths.map((filename) => ({ filename, status: 'modified' })),
+          },
+        };
+      };
+      const decision = await planPreview({
+        github: f.github,
+        context: workflowRunContext(f.state.run),
+        core: fakeCore(),
+        workspace: tempDir(t),
+      });
+      assert.equal(decision.action, 'ignore');
+      assert.match(decision.description, reason);
+      assert.equal(f.state.dispatches.length, 0);
+      assert.equal(f.state.statuses.length, 0);
+    }
+  });
 test('queue comparison errors preserve structured obsolete failures and propagate API outages', async (t) => {
   for (const status of [404, 422, 503]) {
     const f = queueFixture(t);

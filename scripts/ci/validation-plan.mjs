@@ -57,11 +57,12 @@ function touchesWorkflows(paths) {
   return paths.length === 0 || paths.some(isAutomationPath);
 }
 // The preview decision is independent of the full/reduced test split: it asks whether the change
-// can reach what Cloudflare Pages serves. Documentation, GitHub configuration, repository scripts,
+// can reach what Cloudflare Pages serves. Documentation, non-deployment configuration, repository tooling,
 // and tests are never build inputs (`pnpm run build` is only `nuxt build`, and `nuxt.config.ts`
 // imports nothing from these locations), so a change set made only of them needs no deployable
 // preview; the controller then publishes `Preview Result: success` as not applicable instead of
-// requiring a deployment. The one exception is the preview pipeline under `scripts/preview/`:
+// requiring a deployment. Build setup and deployment workflows stay preview-required too.
+// The preview pipeline under `scripts/preview/` is also never inert:
 // the candidate's profile and manifest steps run inside `Validate`, so deploying the candidate is
 // what proves that path end to end. Everything else requires one: the app, `public/`, `shared/`,
 // Supabase, Workers, build and dependency configuration, Markdown under `public/`, any unknown
@@ -86,7 +87,14 @@ const inertRootFiles = new Set([
 /** Never inert: `public/` is what Pages serves, and the preview pipeline produces the artifact
  * a deployment verifies — its candidate-side profile and manifest steps run inside `Validate`. */
 function deployablePath(path) {
-  return path.startsWith('public/') || path.startsWith('scripts/preview/');
+  const prefixes = ['public/', 'scripts/preview/', 'scripts/setup/', '.github/actions/'];
+  return prefixes.some((prefix) => path.startsWith(prefix)) || deploymentWorkflowPath(path);
+}
+function deploymentWorkflowPath(path) {
+  if (!path.startsWith('.github/workflows/') || markdownPath(path)) return false;
+  // Crowdin synchronizes locale PRs; it does not build or deploy Pages. Every other workflow,
+  // including new/unknown workflow files, stays conservative rather than exempting all YAML.
+  return path !== '.github/workflows/crowdin.yml';
 }
 function markdownPath(path) {
   return /\.(?:md|markdown)$/i.test(path);
@@ -135,10 +143,17 @@ function queueDocumentationPath(path) {
   return [pathCategory(path) === 'docs', inertPath(path)].every(Boolean);
 }
 export function classifyQueuePaths(paths, options = {}) {
-  return classifyPaths(paths, {
+  const forceFull = options.forceFull || paths.length >= 300;
+  const plan = classifyPaths(paths, {
     ...options,
-    forceFull: options.forceFull || paths.length >= 300 || !queueReducedPaths(paths, options),
+    forceFull: forceFull || !queueReducedPaths(paths, options),
   });
+  // Queue policy may force every CI job without making inert tooling a Pages build input.
+  // Keep explicit full runs and uncertain/capped comparisons preview-required.
+  return {
+    ...plan,
+    previewRequired: classifyPaths(paths, { ...options, forceFull }).previewRequired,
+  };
 }
 function queueReducedPaths(paths, options) {
   if (options.formatterOnly && formatterPaths(paths)) return true;

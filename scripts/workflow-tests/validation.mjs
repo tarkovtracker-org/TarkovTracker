@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { test } from 'node:test';
 import {
   classifyPaths,
   classifyQueuePaths,
@@ -13,6 +13,7 @@ import {
   fullJobs,
 } from '../ci/validation-plan.mjs';
 import { gitExecutable } from '../ci/validation-tools.mjs';
+import { toolingPaths } from './helpers/queue-preview-scope.mjs';
 const cli = resolve('scripts/ci/validate-changes.mjs');
 const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
 const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
@@ -130,14 +131,14 @@ test('only change sets that cannot reach the deployed app skip the preview', () 
   }
   // Full validation without a preview: automation, tooling, and tests that never ship.
   for (const paths of [
-    ['.github/workflows/ci.yml'],
+    ['.github/workflows/crowdin.yml'],
     ['scripts/workflow-tests/dispatched-status.mjs'],
     ['scripts/ci/README.md'],
     ['docs/eft-log-reference/audit_2026-08-29_signatures.json'],
     ['tests/test-setup.ts'],
     ['.coderabbit.yaml'],
     ['supabase/README.md'],
-    ['README.md', '.github/workflows/ci.yml'],
+    ['README.md', '.github/workflows/crowdin.yml'],
   ]) {
     const plan = classifyPaths(paths);
     assert.equal(plan.previewRequired, false, paths.join());
@@ -335,29 +336,33 @@ test('queue reductions accept only inert documentation and keep the security agg
     assert.deepEqual(aggregateResults(plan, passingNeeds(plan)), []);
     assertSelectedJobFailures(plan, passingNeeds(plan));
   }
-  for (const paths of [
-    [],
-    Array.from({ length: 300 }, (_, i) => `docs/${i}.md`),
-    ['AGENTS.md'],
-    ['docs/AGENTS.md'],
-    ['.github/CONTRIBUTING.md'],
-    ['DESIGN.md'],
-    ['docs/config.json'],
-    ['docs/a.md', 'app/a.ts'],
-    ['docs/a.md', 'app/locales/fr.json'],
-    ['scripts/tool.mjs'],
-    ['scripts/preview/README.md'],
-    ['.github/workflows/ci.yml'],
-    ['pnpm-lock.yaml'],
-    ['nuxt.config.ts'],
-    ['public/guide.md'],
-    parseNameStatus('R100\0app/a.ts\0docs/a.md\0'),
+  for (const [paths, previewRequired] of [
+    [[], true],
+    [Array.from({ length: 300 }, (_, i) => `docs/${i}.md`), true],
+    [['AGENTS.md'], false],
+    [['docs/AGENTS.md'], false],
+    [['.github/CONTRIBUTING.md'], false],
+    [['DESIGN.md'], true],
+    [['docs/config.json'], false],
+    [['docs/a.md', 'app/a.ts'], true],
+    [['docs/a.md', 'app/locales/fr.json'], true],
+    [['scripts/tool.mjs'], false],
+    [['scripts/preview/README.md'], true],
+    [['.github/workflows/ci.yml'], true],
+    [['pnpm-lock.yaml'], true],
+    [['nuxt.config.ts'], true],
+    [['public/guide.md'], true],
+    [parseNameStatus('R100\0app/a.ts\0docs/a.md\0'), true],
   ]) {
     const plan = classifyQueuePaths(paths);
     assert.equal(plan.full, true, paths.join());
-    assert.equal(plan.previewRequired, true, paths.join());
+    assert.equal(plan.previewRequired, previewRequired, paths.join());
     assert.deepEqual(plan.jobs, fullJobs);
   }
+  assert.equal(
+    classifyQueuePaths(Array.from({ length: 299 }, (_, i) => `docs/${i}.md`)).previewRequired,
+    false
+  );
 });
 function queueGit(t) {
   const cwd = mkdtempSync(join(tmpdir(), 'queue-docs-git-'));
@@ -431,4 +436,41 @@ test('queue CLI retains mixed candidates and rejects a comparison that hides ear
     true
   );
   assert.equal(queueCli({ ...f, base: middle }, head).full, false);
+});
+test('queue full CI does not force a deployment for the exact PR 1316 tooling inventory', () => {
+  const plan = classifyQueuePaths(toolingPaths);
+  assert.equal(plan.previewRequired, false);
+  assert.equal(plan.full, true);
+  assert.equal(plan.workflows, true);
+  assert.deepEqual(plan.jobs, fullJobs);
+  assert.deepEqual(aggregateResults(plan, passingNeeds(plan)), []);
+  assertSelectedJobFailures(plan, passingNeeds(plan));
+  assert.equal(classifyQueuePaths(toolingPaths, { forceFull: true }).previewRequired, true);
+});
+test('both classifiers retain previews for deployment automation and uncertain or mixed scopes', () => {
+  for (const path of [
+    '.github/workflows/ci.yml',
+    '.github/workflows/preview.yml',
+    '.github/workflows/preview-state.yml',
+    '.github/workflows/release.yml',
+    '.github/workflows/unknown.yml',
+    '.github/actions/setup-project/action.yml',
+    'scripts/setup/ensure-pnpm.sh',
+    'scripts/preview/profile.mjs',
+    'scripts/preview/README.md',
+    'app/locales/fr.json',
+    'public/guide.md',
+    'shared/runtime.ts',
+    'package.json',
+    'nuxt.config.ts',
+    'unknown',
+    '../docs/a.md',
+  ]) {
+    for (const classify of [classifyPaths, classifyQueuePaths]) {
+      assert.equal(classify([path]).previewRequired, true, path);
+      assert.equal(classify([...toolingPaths, path]).previewRequired, true, path);
+    }
+  }
+  for (const paths of [[], Array.from({ length: 300 }, (_, i) => `docs/${i}.md`)])
+    assert.equal(classifyQueuePaths(paths).previewRequired, true);
 });
