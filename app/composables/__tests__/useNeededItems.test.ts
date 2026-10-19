@@ -160,6 +160,7 @@ const createProgressStore = () => ({
 });
 const createPreferencesStore = () => ({
   getHideNonKappaTasks: false,
+  getHiddenTaskIds: [] as string[],
   getShowLightkeeperTasks: true,
   getShowNonSpecialTasks: true,
   getNeededItemsViewMode: 'grid',
@@ -341,6 +342,20 @@ describe('useNeededItems', () => {
         .map((item) => (item as NeededItemTaskObjective).taskId);
       expect(taskIds).not.toContain('task-1');
       expect(taskIds).toContain('task-kappa');
+    });
+    it('excludes incomplete hidden task objectives but keeps completed ones', async () => {
+      const { neededItems } = await setup({
+        preferencesStore: { getHiddenTaskIds: ['task-1', 'task-2'] },
+      });
+      const taskIds = neededItems.allItems.value
+        .filter((item) => item.needType === 'taskObjective')
+        .map((item) => (item as NeededItemTaskObjective).taskId);
+      expect(taskIds).not.toContain('task-1');
+      expect(taskIds).toContain('task-2');
+      expect(taskIds).toContain('task-kappa');
+      expect(neededItems.allItems.value.some((item) => item.needType === 'hideoutModule')).toBe(
+        true
+      );
     });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();

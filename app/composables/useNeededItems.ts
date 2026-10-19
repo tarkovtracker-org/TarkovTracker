@@ -165,6 +165,11 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return visibleIds;
   });
+  const hiddenTaskIds = computed(() => new Set(preferencesStore.getHiddenTaskIds));
+  // Hidden tasks keep their completed objectives, like the task list's Completed view.
+  const isHiddenTaskNeed = (need: NeededItemTaskObjective): boolean =>
+    hiddenTaskIds.value.has(need.taskId) &&
+    progressStore.tasksCompletions?.[need.taskId]?.['self'] !== true;
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
@@ -284,7 +289,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       let key: string;
       let itemId: string | undefined;
       if (need.needType === 'taskObjective') {
-        if (taskTypeOptions.excludedTaskIds.has(need.taskId)) {
+        if (taskTypeOptions.excludedTaskIds.has(need.taskId) || isHiddenTaskNeed(need)) {
           continue;
         }
         const taskPrestigeLevel = taskTypeOptions.prestigeTaskMap.get(need.taskId);
