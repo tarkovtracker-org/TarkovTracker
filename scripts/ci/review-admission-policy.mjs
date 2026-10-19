@@ -2,6 +2,7 @@ import { codeRabbitCommentReview } from './review-admission-coderabbit.mjs';
 // This policy is loaded from trusted main, never from a candidate checkout.
 export const CONTEXT = 'Review Admission';
 export const SHA = /^[0-9a-f]{40}$/;
+export const INDEPENDENT_REVIEW_REQUIRED = 'Completed exact-head independent review is required.';
 const PROVIDERS = Object.freeze([
   {
     name: 'CodeRabbit',
@@ -213,7 +214,7 @@ function reviewedHead(input, latest) {
   const provider = verifiedProvider(reviews, checks, pr.head.sha, input.comments);
   requirePolicy(
     Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
-    'Completed exact-head independent review is required.'
+    INDEPENDENT_REVIEW_REQUIRED
   );
   return { human, provider };
 }

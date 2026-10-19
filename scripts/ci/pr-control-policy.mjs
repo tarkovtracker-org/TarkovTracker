@@ -1,5 +1,5 @@
 // Shared validation for the checkbox panel and the structured Actions entry point.
-import { requireEvidence, SHA } from './review-admission-policy.mjs';
+import { INDEPENDENT_REVIEW_REQUIRED, requireEvidence, SHA } from './review-admission-policy.mjs';
 export const CONTROL_MARKER = '<!-- tarkovtracker:pr-controls:v1 -->';
 export const CONTROL_ANCHOR = '44d4462c3db34b60e7cca69450405c922af15f56';
 export const CONTROL_WRITE_LIMIT = 900;
@@ -150,6 +150,6 @@ function needsReviewFallback(checks) {
   const admission = checks['Review Admission'];
   return [
     admission?.state === 'failure',
-    admission?.description === 'Completed exact-head independent review is required.',
+    admission?.description === INDEPENDENT_REVIEW_REQUIRED,
   ].every(Boolean);
 }
