@@ -16,9 +16,9 @@ independently classifies the complete exact integration comparison using the sam
 then publishes `Preview Result: success` as not applicable without expecting a build artifact.
 Build/dependency inputs, application/assets/locales, `scripts/preview/**`, setup scripts and shared
 actions still require previews. Workflow files other than Crowdin's locale sync also retain
-previews, including unknown/new workflows; there is no blanket workflow exemption. Mixed or
-unknown paths, malformed/capped comparisons and explicit full runs cannot establish a preview
-exemption. Stale revisions and changed CI attempts cannot publish success. Deployable integrations
+previews, including unknown/new workflows; there is no blanket workflow exemption. A mix
+containing any deployable path, unknown paths, malformed/capped comparisons and explicit full
+runs cannot establish a preview exemption. All-inert mixes can still skip deployment. Stale revisions and changed CI attempts cannot publish success. Deployable integrations
 retain the anonymous credential-isolated preview deployment/smoke pipeline after their exact CI
 attempt succeeds. Live queue N/A validation remains a rollout item after authorized merge.
 
