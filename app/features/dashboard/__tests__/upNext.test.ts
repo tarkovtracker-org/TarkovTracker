@@ -24,6 +24,7 @@ const context = (
   overrides: Partial<UpNextContext> = {}
 ): UpNextContext => ({
   evaluation: (id) => evaluations[id],
+  eligibleTaskIds: new Set(Object.keys(evaluations)),
   isObjectiveComplete: () => false,
   unlockTraders: new Map(),
   ...overrides,
@@ -52,7 +53,7 @@ describe('opensCount', () => {
       );
     const before = evaluate({});
     const after = evaluate({ parent: { complete: true } });
-    const count = opensCount(parent, (id) => before[id]?.self);
+    const count = opensCount(parent, (id) => before[id]?.self, new Set(['child']));
     expect(after.child?.self?.available).toBe(
       before.child?.self?.available === true || opens === 1
     );
@@ -66,11 +67,15 @@ describe('opensCount', () => {
       c: blocked(...waitsOn('parent').blockers, { type: 'player_level', required: 40 }),
       d: { available: true, blockers: [] },
     };
-    expect(opensCount(parent, context(evaluations).evaluation)).toBe(1);
+    expect(opensCount(parent, context(evaluations).evaluation, new Set(['a', 'b', 'c', 'd']))).toBe(
+      1
+    );
   });
   it('falls back to successors when children are missing', () => {
     const parent = task('parent', { successors: ['a'] });
-    expect(opensCount(parent, context({ a: waitsOn('parent') }).evaluation)).toBe(1);
+    expect(opensCount(parent, context({ a: waitsOn('parent') }).evaluation, new Set(['a']))).toBe(
+      1
+    );
   });
 });
 describe('lockedTraderUnlockTaskIds', () => {

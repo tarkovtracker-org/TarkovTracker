@@ -62,6 +62,7 @@ const createTarkovStore = (
 interface SetupOptions {
   excludedTaskIds?: string[];
   objectivesHydrated?: boolean;
+  prestigeTaskMap?: Map<string, number>;
   preferencesStore?: ReturnType<typeof createPreferencesStore>;
   progressStore?: ReturnType<typeof createProgressStore>;
   tasks?: Task[];
@@ -76,7 +77,7 @@ const setup = async (options: SetupOptions = {}) => {
   const tarkovStore = options.tarkovStore ?? createTarkovStore();
   const metadataStore = {
     getExcludedTaskIdsForEdition: () => new Set(options.excludedTaskIds ?? []),
-    prestigeTaskMap: new Map<string, number>(),
+    prestigeTaskMap: options.prestigeTaskMap ?? new Map<string, number>(),
     sortedTraders: traders,
     tasks,
     tasksObjectivesHydrated: options.objectivesHydrated ?? true,
@@ -184,6 +185,48 @@ describe('useDashboardUpNext', () => {
     expect(upNext.items.value.map((item) => item.taskId)).toEqual(['task-impact', 'task-close']);
     expect(upNext.items.value[0]).toMatchObject({ reason: 'opens', opens: 2 });
     expect(upNext.items.value[1]?.reason).toBe('almost-done');
+  });
+  it.each([
+    { gate: 'edition', excludedTaskIds: ['child'], prestigeTaskMap: new Map<string, number>() },
+    { gate: 'prestige', excludedTaskIds: [], prestigeTaskMap: new Map([['child', 1]]) },
+    { gate: 'faction', excludedTaskIds: [], prestigeTaskMap: new Map<string, number>() },
+  ])('excludes $gate-ineligible follow-ups from counts and ranking', async (options) => {
+    const tasks: Task[] = [
+      { id: 'parent', name: 'Parent', children: ['child'], kappaRequired: true },
+      {
+        id: 'child',
+        name: 'Child',
+        factionName: options.gate === 'faction' ? 'BEAR' : 'Any',
+        taskRequirements: [{ task: { id: 'parent' } }],
+      },
+    ];
+    const excluded = await setup({ ...options, tasks });
+    expect(excluded.items.value).toHaveLength(1);
+    expect(excluded.items.value[0]).toMatchObject({
+      taskId: 'parent',
+      opens: 0,
+      reason: 'kappa',
+      score: 94,
+    });
+    const eligible = await setup({ tasks: tasks.map((task) => ({ ...task, factionName: 'Any' })) });
+    expect(eligible.items.value[0]).toMatchObject({
+      taskId: 'parent',
+      opens: 1,
+      reason: 'opens',
+      score: 214,
+    });
+  });
+  it('counts eligible follow-ups even when dashboard preferences hide them', async () => {
+    const tasks: Task[] = [
+      { id: 'parent', name: 'Parent', children: ['child'], lightkeeperRequired: true },
+      { id: 'child', name: 'Child', taskRequirements: [{ task: { id: 'parent' } }] },
+    ];
+    const preferencesStore = createPreferencesStore({
+      getHideNonKappaTasks: true,
+      getShowNonSpecialTasks: false,
+    });
+    const upNext = await setup({ tasks, preferencesStore });
+    expect(upNext.items.value[0]).toMatchObject({ taskId: 'parent', opens: 1, reason: 'opens' });
   });
   it('flags reward-based trader unlock tasks while the trader is still locked', async () => {
     const tasks: Task[] = [

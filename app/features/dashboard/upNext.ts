@@ -32,6 +32,7 @@ export interface UpNextItem {
 export type EvaluationLookup = (taskId: string) => TaskAvailabilityResult | undefined;
 export interface UpNextContext {
   evaluation: EvaluationLookup;
+  eligibleTaskIds: ReadonlySet<string>;
   isObjectiveComplete: (objectiveId: string) => boolean;
   unlockTraders: ReadonlyMap<string, string>;
 }
@@ -69,8 +70,14 @@ const onlyWaitsOn = (taskId: string, result: TaskAvailabilityResult | undefined)
   return requirements.length > 0 && requirements.every((req) => opensOnCompletion(taskId, req));
 };
 /** Follow-up tasks whose only remaining gate is completing `task`. */
-export const opensCount = (task: Task, evaluation: EvaluationLookup): number =>
-  directChildren(task).filter((childId) => onlyWaitsOn(task.id, evaluation(childId))).length;
+export const opensCount = (
+  task: Task,
+  evaluation: EvaluationLookup,
+  eligibleTaskIds: ReadonlySet<string>
+): number =>
+  directChildren(task).filter(
+    (childId) => eligibleTaskIds.has(childId) && onlyWaitsOn(task.id, evaluation(childId))
+  ).length;
 /** Unlock task id -> trader name, for traders none of whose unlock tasks are complete yet. */
 export const lockedTraderUnlockTaskIds = (
   traders: TraderUnlockSource[],
@@ -102,7 +109,7 @@ const progressScore = (progress: UpNextProgress): number =>
   Math.round((progress.completed / progress.total) * 100) +
   Math.max(0, 30 - progress.remaining * 6);
 const buildItem = (task: Task, context: UpNextContext): UpNextItem => {
-  const opens = opensCount(task, context.evaluation);
+  const opens = opensCount(task, context.evaluation, context.eligibleTaskIds);
   const traderName = context.unlockTraders.get(task.id);
   const progress = taskProgress(task, context.isObjectiveComplete);
   return {

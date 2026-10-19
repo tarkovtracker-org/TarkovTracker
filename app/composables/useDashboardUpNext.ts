@@ -66,9 +66,13 @@ function useUpNextTaskSets({
     ).length;
   });
   const hasTrackable = computed(() => filteredTasks.value.some(isTrackable));
-  return { available, hasTrackable, hiddenAvailableCount, pending };
+  const eligibleTaskIds = computed(() => new Set(eligibleTasks.value.map((task) => task.id)));
+  return { available, eligibleTaskIds, hasTrackable, hiddenAvailableCount, pending };
 }
-function useUpNextContext({ metadataStore, progressStore, tarkovStore }: Stores) {
+function useUpNextContext(
+  { metadataStore, progressStore, tarkovStore }: Stores,
+  eligibleTaskIds: ComputedRef<ReadonlySet<string>>
+) {
   const currentMode = computed(() => tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP);
   const unlockTraders = computed(() => {
     const rewards = rewardTraderUnlockTasks(metadataStore.tasks ?? []);
@@ -85,6 +89,7 @@ function useUpNextContext({ metadataStore, progressStore, tarkovStore }: Stores)
     return lockedTraderUnlockTaskIds(traders, (id) => tarkovStore.isTaskComplete(id));
   });
   return computed<UpNextContext>(() => ({
+    eligibleTaskIds: eligibleTaskIds.value,
     evaluation: (id) => progressStore.taskEvaluations?.[id]?.self,
     isObjectiveComplete: (id) => tarkovStore.isTaskObjectiveComplete(id),
     unlockTraders: unlockTraders.value,
@@ -103,8 +108,9 @@ export function useDashboardUpNext(): {
     tarkovStore: useTarkovStore(),
   };
   const { hasDashboardFiltersActive: filtersActive } = useDashboardFilters(stores.preferencesStore);
-  const { available, hasTrackable, hiddenAvailableCount, pending } = useUpNextTaskSets(stores);
-  const context = useUpNextContext(stores);
+  const { available, eligibleTaskIds, hasTrackable, hiddenAvailableCount, pending } =
+    useUpNextTaskSets(stores);
+  const context = useUpNextContext(stores, eligibleTaskIds);
   const state = computed<UpNextState>(() => {
     if (available.value.length) return 'actionable';
     if (filtersActive.value && hiddenAvailableCount.value > 0) return 'filtered';

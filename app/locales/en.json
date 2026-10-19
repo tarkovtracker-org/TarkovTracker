@@ -845,14 +845,17 @@
       "status_tabs_label": "Task status",
       "primary_views": {
         "aria_label": "Task views",
-        "graph": "Graph"
+        "graph": "Graph",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "Showing dependency chain for {taskName}",
         "isolate_chain": "Isolate chain",
         "show_context": "Show context",
         "no_tasks": "No tasks found for this trader.",
-        "mobile_unavailable": "Graph view is best experienced on a wider screen.",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "Legend",
         "flow_start": "Start (no prereqs)",
         "flow_end": "End (no follow-ups)",
@@ -1007,9 +1010,7 @@
       "questcard": {
         "pin_task": "Pin task",
         "unpin_task": "Unpin task",
-        "level": "Level: {count}",
         "wiki": "Wiki page",
-        "locked_before": "Tasks Before: {count}",
         "unlocks_next": "Unlocks next",
         "copy_task_link": "Copy Task Link",
         "copy_key_name": "Copy Key Name",
@@ -1190,7 +1191,7 @@
     "needed_items": {
       "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
-      "items": "items",
+      "items_count": "{count} item | {count} items",
       "unique_items_count": "{unique} unique ({total} total)",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
@@ -2489,7 +2490,6 @@
     "smart_fill": "Smart Fill",
     "unknown_task": "Unknown Task",
     "unknown_station": "Unknown Station",
-    "lvl": "Lvl",
     "needed": "needed",
     "view_details_for": "View details for {name}",
     "locked_before": "{count} before",
@@ -2498,6 +2498,14 @@
     "collected": "Collected",
     "mark_collected": "Mark as collected",
     "handed_over": "Handed over",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "Enter item count",
       "decrease_count": "Decrease count",

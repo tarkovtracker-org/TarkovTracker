@@ -1,6 +1,6 @@
-// The reusable service token is sent by the trusted runner exactly once per origin, to exchange
-// it for Access's host-scoped, expiring CF_Authorization session. Browser and API smoke traffic
-// carries only that session, never the service token itself.
+// Each process exchanges the reusable service token natively for Access's host-scoped,
+// expiring CF_Authorization session. Browser and API smoke traffic carries only that session,
+// never the service token itself. The cache below is intentionally process-local.
 const ACCESS_SESSION_COOKIE = 'CF_Authorization';
 const sessions = new Map();
 export function previewAccessHeaders(env = process.env) {

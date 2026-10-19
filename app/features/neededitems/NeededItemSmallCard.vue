@@ -42,10 +42,8 @@
                   craftable-icon-base-class="h-4 w-4 opacity-90"
                   :craftable-icon-class="craftableIconClass"
                   :kappa-required="isKappaRequired"
-                  :kappa-title="$t('needed_items.task_kappa_req')"
                   kappa-icon-class="h-4 w-4 text-kappa"
                   :lightkeeper-required="isLightkeeperRequired"
-                  :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                   lightkeeper-icon-class="h-4 w-4 text-lightkeeper"
                   @craft="goToCraftStation"
                 />
@@ -143,17 +141,13 @@
             <div
               class="text-surface-400 flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-t border-white/5 pt-1.5 text-[clamp(0.625rem,1.8vw,0.75rem)]"
             >
-              <span
-                v-if="levelRequired > 0 && levelRequired > playerLevel"
-                class="flex items-center gap-1"
-              >
-                <UIcon name="i-mdi-account" class="h-3.5 w-3.5" />
-                {{ $t('common.lvl_level', { level: levelRequired }) }}
-              </span>
-              <span v-if="lockedBefore > 0" class="flex items-center gap-1">
-                <UIcon name="i-mdi-lock-outline" class="h-3.5 w-3.5" />
-                {{ $t('needed_items.locked_before', { count: lockedBefore }) }}
-              </span>
+              <RequirementInfo
+                class="justify-center"
+                :level-required="levelRequired"
+                :locked-before="lockedBefore"
+                :player-level="playerLevel"
+                icon-class="h-3.5 w-3.5"
+              />
             </div>
             <div v-if="!isSingleItem" class="mt-auto flex items-center justify-center pt-2">
               <template v-if="!selfCompletedNeed">
@@ -206,6 +200,7 @@
     createDefaultNeededItemContext,
     neededItemKey,
   } from '@/features/neededitems/neededitem-keys';
+  import RequirementInfo from '@/features/neededitems/RequirementInfo.vue';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';

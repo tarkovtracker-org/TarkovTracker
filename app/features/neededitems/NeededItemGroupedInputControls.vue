@@ -8,6 +8,7 @@
       <div class="flex items-center gap-2">
         <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
           <button
+            type="button"
             :disabled="isFirDecreaseDisabled"
             :class="[
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
@@ -38,6 +39,7 @@
             />
             <button
               v-else
+              type="button"
               class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
               @click="startFirEdit"
             >
@@ -45,6 +47,7 @@
             </button>
           </div>
           <button
+            type="button"
             :disabled="isFirIncreaseDisabled"
             :class="[
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
@@ -71,6 +74,7 @@
       <div class="flex items-center gap-2">
         <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
           <button
+            type="button"
             :disabled="isNonFirDecreaseDisabled"
             :class="[
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
@@ -101,6 +105,7 @@
             />
             <button
               v-else
+              type="button"
               class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
               @click="startNonFirEdit"
             >
@@ -108,6 +113,7 @@
             </button>
           </div>
           <button
+            type="button"
             :disabled="isNonFirIncreaseDisabled"
             :class="[
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
