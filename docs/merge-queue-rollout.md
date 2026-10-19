@@ -300,6 +300,14 @@ publication lock, runner time and avoided publisher API work. Verify that an int
 operation and current-head/revocation checks still succeed; preserve the existing CI and deployed
 preview gates. Candidate CI never receives the protected publisher credential.
 
+When a bot PR (for example Dependabot) has green CI/preview but admission reports
+`Completed exact-head independent review is required.`, the controls panel offers the existing
+fallback: ask a non-author write collaborator for an approving review of the displayed commit,
+or obtain an explicit admin attestation through the existing controls. Skipped, rate-limited,
+and "no reviewable files" provider results do not count as completed review. Do not repeatedly
+request reviews to bypass included limits. The panel only explains these routes; it grants
+nothing. A changed head needs fresh review or attestation, and sensitive approval stays separate.
+
 An **admin review attestation** is an explicit alternative to completed provider/non-author human
 review, including when the admin authored the PR. It applies to one exact commit and does not
 assert that an independent reviewer completed a review. It never resolves findings, dismisses
