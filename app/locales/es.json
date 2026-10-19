@@ -736,12 +736,12 @@
         }
       },
       "support_banner": {
-        "new_title": "Mantén TarkovTracker gratis para todos",
-        "new_body": "Apoyar nunca es obligatorio, pero es lo que mantiene el proyecto en marcha y actualizado, sin muros de pago ni anuncios para nadie.",
-        "new_cta": "Hazte supporter",
-        "returning_title": "Gracias por haber apoyado TarkovTracker",
-        "returning_body": "El apoyo siempre es opcional. Es lo que mantiene el tracker en marcha, actualizado y sin muros de pago ni anuncios para todos.",
-        "returning_cta": "Volver a apoyar"
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "Apoya TarkovTracker",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
