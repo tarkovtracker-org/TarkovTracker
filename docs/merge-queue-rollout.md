@@ -235,7 +235,7 @@ deployment lifecycle are described in [previews](systems/previews.md#queue-previ
 Native queue previews serialize with retention using `queue: max`. Ordinary and fork previews
 keep their own per-CI-run lock, so fork approval waits do not block the shared queue lifecycle.
 The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
-60-minute response bound. Only proven inert docs integrations use the reduced validation and
+60-minute response bound. Only proven inert docs integrations and narrowly verified lockfile-only Prettier refreshes use the reduced validation and
 not-applicable preview described above; other integrations keep full CI and a deployed preview.
 
 ### Review and preview controls

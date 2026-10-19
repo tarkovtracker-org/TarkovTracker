@@ -79,10 +79,10 @@ function assertWorkflowContracts(workflow) {
     jobBlock(workflow, 'lint-format'),
     'Test blank-line scanners with coverage'
   );
-  assert.match(scanners, /^ {8}if: needs.changes.outputs.full == 'true'$/m);
+  assert.match(scanners, /^ {8}if: needs.changes.outputs.tooling == 'true'$/m);
   assert.match(scanners, /^ {8}run: pnpm run test:blank-lines$/m);
   const tooling = workflowStep(jobBlock(workflow, 'lint-format'), 'Test workflow tooling');
-  assert.match(tooling, /^ {8}if: needs.changes.outputs.full == 'true'$/m);
+  assert.match(tooling, /^ {8}if: needs.changes.outputs.tooling == 'true'$/m);
   assert.match(tooling, /^ {10}WORKFLOW_TEST_PLAN: \$\{\{ needs.changes.outputs.plan \}\}$/m);
   assert.match(tooling, /^ {10}WORKFLOW_TEST_EVENT: \$\{\{ github.event_name \}\}$/m);
   assert.match(tooling, /^ {8}run: pnpm run test:workflow$/m);
@@ -94,7 +94,7 @@ function assertWorkflowContracts(workflow) {
 test('workflow contracts reject decoys but allow step key reordering', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   const tooling = workflowStep(jobBlock(workflow, 'lint-format'), 'Test workflow tooling');
-  const guard = "        if: needs.changes.outputs.full == 'true'\n";
+  const guard = "        if: needs.changes.outputs.tooling == 'true'\n";
   const reordered = tooling.replace(guard, '') + '\n' + guard.trimEnd();
   assertWorkflowContracts(workflow.replace(tooling, reordered));
   const broken = tooling.replace('run: pnpm run test:workflow', 'run: echo disabled');
@@ -141,8 +141,21 @@ test('scanner coverage remains required on full validation', () => {
   assert.throws(() =>
     assertWorkflowContracts(workflow.replace(job, job.replace(step, brokenCommand)))
   );
-  const brokenGuard = step.replace("        if: needs.changes.outputs.full == 'true'\n", '');
+  const brokenGuard = step.replace("        if: needs.changes.outputs.tooling == 'true'\n", '');
   assert.throws(() =>
     assertWorkflowContracts(workflow.replace(job, job.replace(step, brokenGuard)))
   );
+});
+test('verified formatter profile retains every workflow-tooling regression', () => {
+  const plan = classifyPaths(['pnpm-lock.yaml'], { formatterOnly: true });
+  assert.equal(plan.full, false);
+  assert.equal(plan.formatter, true);
+  assert.deepEqual(
+    selectWorkflowTests(all, {
+      WORKFLOW_TEST_EVENT: 'pull_request',
+      WORKFLOW_TEST_PLAN: JSON.stringify(plan),
+    }),
+    all
+  );
+  assertWorkflowContracts(readFileSync('.github/workflows/ci.yml', 'utf8'));
 });
