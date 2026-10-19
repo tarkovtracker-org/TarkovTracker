@@ -18,38 +18,6 @@
       />
     </AppTooltip>
     <TaskMapVisibilityToggles :task-id="task.id" />
-    <AppTooltip
-      v-for="req in traderRequirements"
-      :key="req.id"
-      :text="
-        t('page.tasks.questcard.trader_requirement_badge', {
-          trader: req.trader.name,
-          kind: t(
-            `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
-          ),
-          comparison: req.compareMethod,
-          value: req.value,
-        })
-      "
-    >
-      <UBadge
-        size="xs"
-        :color="req.met ? 'success' : 'error'"
-        variant="soft"
-        class="shrink-0 cursor-help text-[11px]"
-      >
-        {{
-          t('page.tasks.questcard.trader_requirement_badge', {
-            trader: req.trader.name,
-            kind: t(
-              `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
-            ),
-            comparison: req.compareMethod,
-            value: req.value,
-          })
-        }}
-      </UBadge>
-    </AppTooltip>
     <AppTooltip :text="locationTooltip">
       <UBadge
         size="xs"
@@ -162,14 +130,11 @@
 </template>
 <script setup lang="ts">
   import TaskMapVisibilityToggles from '@/features/tasks/TaskMapVisibilityToggles.vue';
-  import type { Task, NormalizedTraderRequirement } from '@/types/tarkov';
+  import type { Task } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
     isPinned: boolean;
     isOurFaction: boolean;
-    traderRequirements: Array<
-      Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }> & { met: boolean }
-    >;
     locationTooltip: string;
     isFailed: boolean;
     isInvalid: boolean;

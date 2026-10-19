@@ -33,7 +33,7 @@ describe('canonical blocker text', () => {
   it.each([
     [[], 'completed'],
     [['Complete', 'Failed'], 'completed or failed'],
-    [['Accepted'], 'active or accepted'],
+    [['Accepted'], 'accepted'],
     [['Failed'], 'failed'],
   ])('shows the accepted statuses %j', (status, expected) => {
     const text = useTaskBlockerText()({
@@ -50,5 +50,33 @@ describe('canonical blocker text', () => {
         chapterIds: ['story'],
       })
     ).toContain('Prior quest (failed), or progress one of these story chapters: Story route');
+  });
+  it.each([
+    [
+      { type: 'player_level', current: 12, required: 15, compareMethod: '>=' },
+      'Requires player level 15+ (you: 12).',
+    ],
+    [
+      {
+        type: 'trader_reputation',
+        trader: { id: 'fence', name: 'Fence' },
+        current: 0.1,
+        required: 0.2,
+        compareMethod: '>=',
+      },
+      'Requires Fence reputation 0.20+ (you: 0.10).',
+    ],
+    [
+      { type: 'prestige', current: 0, required: 1, compareMethod: '=' },
+      'Requires Prestige 1 (current: 0).',
+    ],
+    [
+      { type: 'task_counter', current: 3, required: 5, compareMethod: '>=' },
+      'Requires 5+ completed tasks from this trader loyalty tier (completed: 3).',
+    ],
+  ] as const)('phrases %o comparisons in plain language', (blocker, expected) => {
+    const text = useTaskBlockerText()(blocker);
+    expect(text).toContain(expected);
+    expect(text).not.toMatch(/[<>]=?|!=/);
   });
 });
