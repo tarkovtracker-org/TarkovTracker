@@ -1,5 +1,5 @@
 <template>
-  <div v-if="state !== 'none'" class="ml-1 flex shrink-0 items-center gap-1.5">
+  <div v-if="state !== 'none' || showInlineFail" class="ml-1 flex shrink-0 items-center gap-1.5">
     <UButton
       v-if="state === 'locked'"
       :size="size"
