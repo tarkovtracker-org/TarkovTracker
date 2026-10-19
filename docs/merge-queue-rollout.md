@@ -517,7 +517,7 @@ required merge-group previews and explicitly authorized manual previews retain t
 
 Verified Crowdin translation PRs are exempt from requesting independent review. This exemption
 requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
-GitHub Actions bot ID/type/login, a complete unique non-English locale inventory, and an immutable
+GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to supported non-English locales, and an immutable
 GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
 modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
 review. The policy additionally requires a head-owned validation receipt uploaded by this
@@ -531,15 +531,18 @@ review occurred. Open review threads, changes requested and authenticated substa
 findings remain blockers. CI, syntax/placeholders/key checks, preview, sensitive-change policy,
 current-head fences and native queue integration are unchanged. Other candidates retain the
 existing provider, independent collaborator review or valid exact-head admin-attestation routes.
-A changed head needs a new trusted Crowdin validation receipt; historical PRs are not grandfathered.
+Unchanged locales need not appear in the changed-file inventory. A changed head needs a new trusted Crowdin validation receipt; historical PRs are not grandfathered.
 There are no provider requests or billing/configuration changes.
 
 Crowdin Sync retains its existing main-only schedule/manual orchestration and token permissions.
 After uploading validation provenance, its existing merge step dispatches candidate CI and preview,
-requests one protected Review Admission publication, authenticates that accepted dispatch and its
-exact-head receipt, then performs the normal guarded native enqueue. The admission wait remains
-bounded to ten minutes and fails closed on terminal errors; CI and preview keep their existing
-bounds. No additional privileged trigger, promotion workflow or scanner exception is needed.
+in `queue`/`strict-queue` mode requests one protected Review Admission publication, authenticates
+that accepted dispatch and its exact-head receipt, then performs normal guarded native enqueue.
+Legacy `strict` mode retains the guarded `gh pr merge --match-head-commit` path and post-merge
+main-CI dispatch. The admission helper allows at most 120 pending polls with five-second sleeps,
+plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
+bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
+limits. No additional privileged trigger, promotion workflow or scanner exception is needed.
 
 If findings, changed revisions or infrastructure failures hold a sync after its bounded wait,
 resolve the cause and rerun Crowdin Sync on main, or let its existing schedule try again. This does

@@ -491,3 +491,34 @@ test('skipped or unfinished optional reviews do not reinstate a review requireme
     assert.equal(admissionDecision(candidate).review.kind, 'review-exempt');
   }
 });
+test('complete inventory means all changed files, not every supported locale on every PR', () => {
+  const f = fixture();
+  const codes = ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'uk', 'zh'];
+  f.files = codes.map((code) => ({ ...f.files[0], filename: `app/locales/${code}.json` }));
+  f.pr.changed_files = 12;
+  assert.equal(crowdinCandidate(f.pr, f.files), true);
+  assert.equal(crowdinCandidate(f.pr, f.files.slice(1)), false);
+  f.pr.changed_files = 11;
+  assert.equal(crowdinCandidate(f.pr, f.files.slice(1)), true);
+});
+test('arbitrary later provider comments cannot erase an unresolved exact-head finding', async () => {
+  const f = fixture();
+  const proof = await crowdinEligibility(f.github, f.pr, f.files);
+  const finding = {
+    id: 5,
+    state: 'COMMENTED',
+    commit_id: head,
+    submitted_at: '2026-10-19T00:00:00Z',
+    user: { id: 191113872, type: 'Bot' },
+    body: '**1 issue found**',
+  };
+  for (const body of [
+    'Acknowledged',
+    'Review skipped',
+    '<!-- cubic:review-summary:start -->Review incomplete<!-- cubic:review-summary:end -->',
+  ]) {
+    const candidate = input(f, proof);
+    candidate.reviews = [finding, { ...finding, id: 6, body }];
+    assert.throws(() => admissionDecision(candidate), /Substantive provider findings/);
+  }
+});

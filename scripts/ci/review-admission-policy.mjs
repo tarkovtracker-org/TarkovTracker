@@ -312,23 +312,25 @@ function crowdinExemption(input) {
   if (!currentCrowdinProof(proof, input.pr.head.sha)) return null;
   return proof;
 }
-function currentProviderReviews(reviews, head) {
-  return PROVIDERS.map((provider) =>
-    reviews.findLast((review) =>
-      [
-        review.user?.id === provider.botId,
-        review.commit_id === head,
-        Boolean(review.submitted_at),
-      ].every(Boolean)
-    )
-  ).filter(Boolean);
+function latestCleanProviderReview(reviews, checks, head, provider) {
+  if (!providerChecks(checks, provider, head)) return null;
+  return reviews.findLast((review) =>
+    [providerReview(review, provider, head), zeroOutsideFindings(review, provider)].every(Boolean)
+  );
+}
+function providerStillHasFindings(input, provider) {
+  const own = input.reviews
+    .filter((review) => review.user?.id === provider.botId)
+    .toSorted((a, b) => a.id - b.id);
+  const finding = own.findLast((review) => outstandingProviderFinding(review, input.pr.head.sha));
+  if (!finding) return false;
+  const clean = latestCleanProviderReview(own, input.checks, input.pr.head.sha, provider);
+  return !clean || clean.id <= finding.id;
 }
 function requireCrowdinFindingsResolved(input) {
   if (!crowdinCandidate(input.pr, input.files)) return;
   requirePolicy(
-    !currentProviderReviews(input.reviews, input.pr.head.sha).some((review) =>
-      outstandingProviderFinding(review, input.pr.head.sha)
-    ),
+    !PROVIDERS.some((provider) => providerStillHasFindings(input, provider)),
     'Substantive provider findings remain.'
   );
   requirePolicy(
