@@ -1,0 +1,80 @@
+name: Crowdin Promotion
+# Completion events are wakeups only. Live exact-head receipts authorize queue submission.
+on:
+  workflow_run:
+    workflows: [Review Admission, Preview]
+    types: [completed]
+    branches: [main]
+permissions: {}
+concurrency:
+  group: crowdin-promotion
+  cancel-in-progress: false
+jobs:
+  promote:
+    if: >-
+      github.repository == 'tarkovtracker-org/TarkovTracker' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('[".github/workflows/review-admission.yml", ".github/workflows/preview.yml"]'), github.event.workflow_run.path)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
+      GATE_WAIT_ATTEMPTS: '1'
+    steps:
+      - name: Checkout trusted promotion policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve reviewed Crowdin head
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          prs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:locales&base=main&per_page=100")"
+          candidate="$(jq -rs --arg repo "$GITHUB_REPOSITORY" '
+            [.[][] | select(.state == "open" and .draft == false and
+              .base.ref == "main" and .base.repo.full_name == $repo and
+              .head.ref == "locales" and .head.repo.full_name == $repo)]
+            | if length == 1 then .[0] else empty end' <<< "$prs")"
+          if [ -z "$candidate" ]; then
+            echo "::notice::No single ready same-repository Crowdin PR."
+            exit 0
+          fi
+          number="$(jq -r '.number' <<< "$candidate")"
+          head="$(jq -r '.head.sha' <<< "$candidate")"
+          # Missing/failed review stays pending without dispatching a review, CI or preview.
+          # The CLI authenticates the dedicated publisher, attempt, source and uploaded receipt.
+          if ! node scripts/ci/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$head" "$number"; then
+            echo "::notice::Crowdin head has no valid admission receipt; awaiting independent review or resolved findings."
+            exit 0
+          fi
+          echo "pr_number=$number" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head" >> "$GITHUB_OUTPUT"
+      - name: Revalidate complete translation diff and enqueue
+        if: steps.candidate.outputs.pr_number != ''
+        env:
+          PR_NUMBER: ${{ steps.candidate.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Retain the main checkout. Fetch immutable objects only; never execute PR source.
+          git fetch origin "$HEAD_SHA"
+          [ "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA" ]
+          BASE_SHA="$(git rev-parse HEAD)"
+          export BASE_SHA
+          bash scripts/ci/crowdin-pr.sh promote

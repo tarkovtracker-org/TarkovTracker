@@ -512,3 +512,24 @@ comment ID and that grant’s control run ID, so Stop/re-enable cannot resurrect
 deployment even though the panel ID stays the same. Enables require live maintain/admin access;
 an accepted Stop remains a revocation barrier after role loss. These controls affect PR previews;
 required merge-group previews and explicitly authorized manual previews retain their own rules.
+
+### Crowdin review continuation
+
+Crowdin Sync validates the complete immutable translation-only diff and explicitly dispatches
+candidate CI and preview. In queue mode it requests one trusted Review Admission publication,
+then reports a pending handoff instead of waiting for a reviewer inside the sync job.
+`Crowdin Promotion` resumes on completed main-owned Review Admission or Preview workflows.
+Those events are wakeups, not approval: the controller rereads the single ready same-repository
+`locales` PR, authenticates its current head-owned admission receipt, checks the entire Git diff
+(with rename detection disabled), and rechecks CI, preview deployment evidence and main policy
+before guarded native enqueue. It executes no candidate code and does not dispatch additional
+CI, previews, review requests or admission publications. Missing gates hold the head until a
+later completion event; API failures remain visible in the job log.
+
+Translations still require substantive independent review. The committed CodeRabbit title and
+locale path exclusions mean its skipped Crowdin review cannot satisfy admission. An eligible
+completed provider review or independent collaborator review is required; the continuation never
+waives this requirement or records an admin attestation. Selecting an unattended translation
+review provider or changing its exclusions is a separate policy decision. To roll back the
+continuation, disable `Crowdin Promotion`; existing queue and publisher protections remain active,
+and a reviewed translation PR can still be submitted with the trusted enqueue helper.

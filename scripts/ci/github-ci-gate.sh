@@ -72,7 +72,12 @@ require_main_revision() {
   [[ "$current" == "$expected" ]] || { echo 'Main changed after validation.' >&2; return 1; }
 }
 # Automated gate waits are bounded to 60 minutes (360 polls at 10 seconds).
-readonly GATE_WAIT_ATTEMPTS=360
+# Trusted completion controllers use a single read; ordinary merge callers retain bounded waits.
+readonly GATE_WAIT_ATTEMPTS="${GATE_WAIT_ATTEMPTS:-360}"
+[[ "$GATE_WAIT_ATTEMPTS" =~ ^[1-9][0-9]*$ && "$GATE_WAIT_ATTEMPTS" -le 360 ]] || {
+  echo 'Gate wait attempts must be between 1 and 360.' >&2
+  return 1
+}
 # Await successful GitHub Actions CI on one exact head; terminal failures never retry.
 wait_for_ci_result() {
   local sha="$1" attempt checks result

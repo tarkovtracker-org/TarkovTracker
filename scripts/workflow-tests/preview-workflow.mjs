@@ -249,7 +249,8 @@ test('the Validate job builds once through the profile step and uploads a previe
 });
 test('shared gate scripts wait for both authoritative gates with a 60-minute bound', () => {
   const gate = read('scripts/ci/github-ci-gate.sh');
-  assert.match(gate, /readonly GATE_WAIT_ATTEMPTS=360/);
+  assert.match(gate, /readonly GATE_WAIT_ATTEMPTS="\$\{GATE_WAIT_ATTEMPTS:-360\}"/);
+  assert.match(gate, /GATE_WAIT_ATTEMPTS" -le 360/);
   assert.match(gate, /wait_for_preview_result\(\)/);
   assert.match(gate, /select\(\.context == "Preview Result"\)/);
   // The staged gate authenticates the reported success against run-owned state: exact-SHA

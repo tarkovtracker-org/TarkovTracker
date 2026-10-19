@@ -321,7 +321,7 @@ function assertWorkflowBoundaries(workflow) {
   assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
   assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
   assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
-  assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
+  assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" handoff/);
   const validation = workflowStep(sync, 'Validate translations');
   assert.doesNotMatch(validation, /GH_TOKEN|secrets\./);
   for (const check of ['format:check', 'i18n:check', 'systems:check'])
@@ -632,4 +632,85 @@ test('Crowdin requests admission before inspecting mergeability blocked on the m
   assert.ok(f.events().some((event) => event.type === 'admission-success'));
   assert.ok(f.events().some((event) => event.type === 'merge'));
   assert.ok(!f.events().some((event) => event.type === 'dispatch' && event.ref === 'main'));
+});
+test('queue handoff requests admission once without polling, enqueueing or requesting a provider', (t) => {
+  const f = fixture(t);
+  const queue = { RULES: JSON.stringify(queueRules()), ADMISSION_FAIL: 'true' };
+  passed(f.run('prepare', queue));
+  passed(f.run('handoff', queue));
+  assert.equal(f.events().filter((event) => event.type === 'admission-dispatch').length, 1);
+  assert.ok(!f.events().some((event) => ['admission', 'enqueue'].includes(event.type)));
+  assert.ok(!f.calls().some((args) => args.includes('comment')));
+});
+test('continuation reuses receipts without dispatches and rejects missing review and changed heads', (t) => {
+  const f = fixture(t);
+  const queue = {
+    RULES: JSON.stringify(queueRules()),
+    MERGE_OUTCOME: 'OPEN',
+    GATE_WAIT_ATTEMPTS: '1',
+  };
+  passed(f.run('prepare', queue));
+  rejected(f.run('promote', { ...queue, ADMISSION_FAIL: 'true' }), /Review Admission denied/);
+  assert.ok(!f.events().some((event) => event.type === 'enqueue'));
+  passed(f.run('promote', queue));
+  assert.equal(f.events().filter((event) => event.type === 'enqueue').length, 1);
+  assert.ok(
+    !f
+      .events()
+      .some((event) => ['dispatch', 'admission-dispatch', 'preview-dispatch'].includes(event.type))
+  );
+  rejected(
+    f.run('promote', { ...queue, ACTUAL_HEAD: 'b'.repeat(40) }),
+    /identity or readiness changed/
+  );
+});
+test('continuation independently checks the full tree, CI, preview and queue policy', (t) => {
+  const queue = { RULES: JSON.stringify(queueRules()), GATE_WAIT_ATTEMPTS: '1' };
+  const executable = fixture(t, { 'scripts/evil.mjs': 'untrusted' });
+  rejected(executable.run('promote', queue), /non-translation path/);
+  const f = fixture(t);
+  rejected(f.run('promote'), /requires the reviewed native queue/);
+  rejected(
+    f.run('promote', { ...queue, CHECK_CONCLUSION: 'failure' }),
+    /CI Result did not succeed/
+  );
+  rejected(
+    f.run('promote', { ...queue, PREVIEW_STATE: 'failure' }),
+    /Preview Result did not succeed/
+  );
+  rejected(
+    f.run('promote', { ...queue, CONTROLLER_REPO: 'foreign/repo' }),
+    /not a trusted preview/
+  );
+  assert.ok(!f.events().some((event) => event.type === 'enqueue'));
+});
+test('promotion completion events never select executable candidate source or dispatch work', () => {
+  const workflow = read('.github/workflows/crowdin-promotion.yml');
+  assert.match(workflowEvent(workflow, 'workflow_run'), /workflows: \[Review Admission, Preview\]/);
+  const promote = jobBlock(workflow, 'promote');
+  assert.match(promote, /head_repository.full_name == github.repository/);
+  assert.match(promote, /review-admission\.yml/);
+  assert.match(workflowStep(promote, 'Checkout trusted promotion policy'), /ref: main/);
+  assert.match(workflowStep(promote, 'Resolve reviewed Crowdin head'), /review-admission-cli\.mjs/);
+  const enqueue = workflowStep(promote, 'Revalidate complete translation diff and enqueue');
+  assert.match(enqueue, /crowdin-pr\.sh promote/);
+  assert.doesNotMatch(promote, /workflow run|pnpm|npm install|secrets\.(?!GITHUB_TOKEN)/);
+  assert.match(permissionsBlock(promote), /^ {6}actions: read$/m);
+  assert.match(permissionsBlock(promote), /^ {6}contents: read$/m);
+  assert.match(permissionsBlock(promote), /^ {6}pull-requests: write$/m);
+});
+test('continuation reads pending gates once and never keeps a runner waiting for review', (t) => {
+  const f = fixture(t);
+  const queue = { RULES: JSON.stringify(queueRules()), GATE_WAIT_ATTEMPTS: '1' };
+  rejected(
+    f.run('promote', { ...queue, CHECK_STATUS: 'queued' }),
+    /Timed out waiting for CI Result/
+  );
+  assert.equal(f.events().filter((event) => event.type === 'ci-result').length, 1);
+  rejected(
+    f.run('promote', { ...queue, PREVIEW_STATE: 'pending' }),
+    /Timed out waiting for Preview Result/
+  );
+  assert.equal(f.events().filter((event) => event.type === 'preview-result').length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'enqueue'));
 });

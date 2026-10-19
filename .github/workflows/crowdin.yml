@@ -107,4 +107,4 @@ jobs:
           PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
           HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
           BASE_SHA: ${{ steps.candidate.outputs.base_sha }}
-        run: bash "$RUNNER_TEMP/crowdin-pr.sh" merge
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" handoff
