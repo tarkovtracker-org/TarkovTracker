@@ -10,7 +10,9 @@
       <template #actions>
         <TaskTeamFilter />
         <TaskFiltersPopover />
+        <!-- The graph lays tasks out by dependency, so sorting only applies to list views. -->
         <SortControl
+          v-if="!isGraphView"
           v-model="taskSortMode"
           :items="sortOptions"
           :label="t('page.tasks.sort.aria_label')"
@@ -53,7 +55,7 @@
           <span
             :class="[
               'light:text-surface-50 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
-              mapOption.count > 0 ? 'bg-pve-500' : 'bg-surface-600',
+              mapOption.countClass,
             ]"
           >
             {{ mapOption.count }}
@@ -294,11 +296,15 @@
   // Map selection
   const mapOptions = computed(() => {
     const counts = mapTaskCounts.value;
-    return maps.value.map((map) => ({
-      label: map.name,
-      value: map.id,
-      count: counts[map.id] ?? 0,
-    }));
+    return maps.value.map((map) => {
+      const count = counts[map.id] ?? 0;
+      return {
+        label: map.name,
+        value: map.id,
+        count,
+        countClass: count > 0 ? 'bg-pve-500' : 'bg-surface-600',
+      };
+    });
   });
   const onMapSelect = (selected: { label: string; value: string }) => {
     if (selected?.value && preferencesStore.getTaskMapView !== selected.value) {

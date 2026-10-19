@@ -21,7 +21,13 @@ tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trade
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without
-overwriting the saved one. The sidebar keeps one Tasks entry,
+overwriting the saved one. Graph also drops the sort control, since its layout follows dependencies.
+The Graph canvas needs the `lg` breakpoint (1024px). Below it the Graph tab stays in the header with a
+monitor icon and a screen-reader note. The narrow `/tasks/graph` route hides the mounted toolbar
+and replaces the canvas with an explanation that links to Traders (selected trader, saved status,
+sort mode, sort direction and search carried in the URL). Below `sm` the tabs hide their primary
+icons while Graph keeps its monitor hint,
+so all four fit on one row at 333px. The sidebar keeps one Tasks entry,
 highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).
@@ -244,6 +250,12 @@ Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) 
 `finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
 opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
 locked on the dashboard also locks its tasks.
+
+Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
+current profile's edition, prestige and faction eligibility. Ineligible children contribute no
+“Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
+do not remove an otherwise eligible follow-up from that count.
+
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
