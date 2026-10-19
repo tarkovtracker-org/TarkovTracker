@@ -38,9 +38,7 @@
                   :craftable-title="craftableTitle"
                   :craftable-icon-class="craftableIconClass"
                   :kappa-required="isKappaRequired"
-                  :kappa-title="$t('needed_items.task_kappa_req')"
                   :lightkeeper-required="isLightkeeperRequired"
-                  :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                   @craft="goToCraftStation"
                 />
               </span>
@@ -59,7 +57,10 @@
                     </span>
                   </span>
                 </template>
-                <template v-else-if="props.need.needType == 'hideoutModule'">
+                <span
+                  v-else-if="props.need.needType == 'hideoutModule'"
+                  class="flex items-center gap-1"
+                >
                   <StationLink
                     v-if="relatedStation"
                     :station="relatedStation"
@@ -68,7 +69,10 @@
                   <span v-else class="text-surface-300 text-sm">
                     {{ $t('needed_items.unknown_station') }}
                   </span>
-                </template>
+                  <span class="text-surface-300 text-sm">
+                    {{ $t('common.lvl_level', { level: props.need.hideoutModule.level }) }}
+                  </span>
+                </span>
               </span>
             </span>
           </div>
@@ -128,10 +132,8 @@
                           craftable-icon-base-class="ml-1 h-4 w-4"
                           :craftable-icon-class="craftableIconClass"
                           :kappa-required="isKappaRequired"
-                          :kappa-title="$t('needed_items.task_kappa_req')"
                           kappa-icon-class="ml-1 h-4 w-4 text-kappa"
                           :lightkeeper-required="isLightkeeperRequired"
-                          :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                           lightkeeper-icon-class="ml-1 h-4 w-4 text-lightkeeper"
                           @craft="goToCraftStation"
                         />
@@ -151,43 +153,31 @@
                               {{ $t(itemStatusKey) }}
                             </span>
                           </span>
-                          <RequirementInfo
-                            :need-type="props.need.needType"
-                            :level-required="levelRequired"
-                            :locked-before="lockedBefore"
-                            :player-level="tarkovStore.playerLevel()"
-                          />
                         </template>
                         <template v-else-if="props.need.needType == 'hideoutModule'">
-                          <div class="mt-1 mb-1 flex justify-center">
-                            <div class="text-center">
-                              <template v-if="relatedStation">
-                                <StationLink
-                                  :station="relatedStation"
-                                  :module-id="props.need.hideoutModule.id"
-                                  class="justify-center"
-                                />
-                              </template>
-                              <template v-else>
-                                <span class="text-surface-300 text-sm">
-                                  {{ $t('needed_items.unknown_station') }}
-                                </span>
-                              </template>
-                            </div>
-                            <div class="ml-1">
-                              {{ props.need.hideoutModule.level }}
-                            </div>
+                          <div class="mt-1 mb-1 flex items-center justify-center gap-1">
+                            <StationLink
+                              v-if="relatedStation"
+                              :station="relatedStation"
+                              :module-id="props.need.hideoutModule.id"
+                              class="justify-center"
+                            />
+                            <span v-else class="text-surface-300 text-sm">
+                              {{ $t('needed_items.unknown_station') }}
+                            </span>
+                            <span class="text-surface-300 text-sm">
+                              {{
+                                $t('common.lvl_level', { level: props.need.hideoutModule.level })
+                              }}
+                            </span>
                           </div>
-                          <RequirementInfo
-                            :need-type="props.need.needType"
-                            :level-required="levelRequired"
-                            :locked-before="lockedBefore"
-                            :player-level="tarkovStore.playerLevel()"
-                            :related-station="relatedStation"
-                            :hideout-level="props.need.hideoutModule.level"
-                            :hideout-module-id="props.need.hideoutModule.id"
-                          />
                         </template>
+                        <RequirementInfo
+                          class="mt-1 justify-center text-sm"
+                          :level-required="levelRequired"
+                          :locked-before="lockedBefore"
+                          :player-level="tarkovStore.playerLevel()"
+                        />
                       </div>
                       <!-- Item count actions -->
                       <div
@@ -259,27 +249,12 @@
               </UModal>
             </div>
             <div v-else class="flex flex-row">
-              <div v-if="mdAndUp" class="mr-2 flex justify-between self-center">
-                <template v-if="props.need.needType == 'taskObjective'">
-                  <RequirementInfo
-                    :need-type="props.need.needType"
-                    :level-required="levelRequired"
-                    :locked-before="lockedBefore"
-                    :player-level="tarkovStore.playerLevel()"
-                  />
-                </template>
-                <template v-else-if="props.need.needType == 'hideoutModule'">
-                  <RequirementInfo
-                    :need-type="props.need.needType"
-                    :level-required="levelRequired"
-                    :locked-before="lockedBefore"
-                    :player-level="tarkovStore.playerLevel()"
-                    :related-station="relatedStation"
-                    :hideout-level="props.need.hideoutModule.level"
-                    :hideout-module-id="props.need.hideoutModule.id"
-                  />
-                </template>
-              </div>
+              <RequirementInfo
+                class="mr-2 self-center text-sm"
+                :level-required="levelRequired"
+                :locked-before="lockedBefore"
+                :player-level="tarkovStore.playerLevel()"
+              />
               <div v-if="!selfCompletedNeed" class="mr-2 flex items-center gap-3 self-center">
                 <template v-if="!isSingleItem">
                   <ItemCountControls
@@ -369,7 +344,7 @@
     }
   );
   // Use shared breakpoints to avoid duplicate listeners
-  const { belowMd, mdAndUp } = useSharedBreakpoints();
+  const { belowMd } = useSharedBreakpoints();
   const tarkovStore = useTarkovStore();
   const formatNumber = useLocaleNumberFormatter();
   const smallDialog = ref(false);

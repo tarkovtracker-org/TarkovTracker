@@ -1184,7 +1184,7 @@
     "needed_items": {
       "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
-      "items": "items",
+      "items_count": "{count} item | {count} items",
       "unique_items_count": "{unique} unique ({total} total)",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
@@ -2483,7 +2483,6 @@
     "smart_fill": "Smart Fill",
     "unknown_task": "Unknown Task",
     "unknown_station": "Unknown Station",
-    "lvl": "Lvl",
     "needed": "needed",
     "view_details_for": "View details for {name}",
     "locked_before": "{count} before",
@@ -2492,6 +2491,14 @@
     "collected": "Collected",
     "mark_collected": "Mark as collected",
     "handed_over": "Handed over",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "Enter item count",
       "decrease_count": "Decrease count",

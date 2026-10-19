@@ -37,6 +37,7 @@
             </div>
           </div>
           <button
+            type="button"
             class="text-surface-400 light:hover:text-surface-50 hover:text-white"
             :aria-label="$t('common.close')"
             @click="$emit('update:open', false)"
@@ -114,6 +115,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
+                      type="button"
                       :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
@@ -136,6 +138,7 @@
                       {{ getObjectiveCount(obj) }}/{{ obj.count }}
                     </span>
                     <button
+                      type="button"
                       :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
@@ -184,7 +187,7 @@
                     </span>
                   </router-link>
                   <span class="text-surface-400 text-xs">
-                    {{ $t('needed_items.lvl') }} {{ mod.hideoutModule.level }}
+                    {{ $t('common.lvl_level', { level: mod.hideoutModule.level }) }}
                   </span>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
@@ -196,6 +199,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
+                      type="button"
                       :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
@@ -218,6 +222,7 @@
                       {{ getHideoutCount(mod) }}/{{ mod.count }}
                     </span>
                     <button
+                      type="button"
                       :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
