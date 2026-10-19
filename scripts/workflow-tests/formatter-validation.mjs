@@ -17,12 +17,12 @@ import { queueRequiresPreview } from '../preview/merge-queue.mjs';
 const base = 'a'.repeat(40);
 const head = 'b'.repeat(40);
 const repo = { owner: 'example', repo: 'repo' };
-function input(version) {
+function input(version, specifier = '^3.8.1') {
   return {
     manifest: JSON.stringify({
       dependencies: { vue: '3.5.0' },
       devDependencies: {
-        prettier: '^3.8.1',
+        prettier: specifier,
         'prettier-plugin-tailwindcss': '^0.8.0',
       },
     }),
@@ -37,7 +37,7 @@ importers:
         version: 3.5.0
     devDependencies:
       prettier:
-        specifier: ^3.8.1
+        specifier: ${specifier}
         version: ${version}
       prettier-plugin-tailwindcss:
         specifier: ^0.8.0
@@ -130,6 +130,10 @@ test('only complete leaf Prettier changes select formatter CI and independently 
     assert.equal(classify([...paths, 'app/task.vue'], { formatterOnly }).full, true);
     assert.equal(classify(paths).full, true);
   }
+});
+test('a specifier naming the old resolution still normalises only the resolved version', () => {
+  assert.equal(formatterOnlyChange(input('3.9.9', '^3.9.9'), input('3.9.10', '^3.9.9')), true);
+  assert.equal(formatterOnlyChange(input('3.9.9', '^3.9.9'), input('3.9.10', '^3.9.10')), false);
 });
 test('mixed changes, runtime/build dependencies, metadata surprises and uncertain evidence stay full', async () => {
   const before = input('3.9.9');

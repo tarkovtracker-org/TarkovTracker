@@ -44,7 +44,7 @@ function normaliseFormatterLock(text) {
   if (!completeLockText(text)) throw new Error('Unreadable lockfile');
   const { version, importer } = formatterImporter(text);
   const escaped = version.replaceAll('.', '\\.');
-  let result = text.replace(importer, importer.replace(version, '#FORMATTER#'));
+  let result = text.replace(importer, importer.replace(/version: \S+$/, 'version: #FORMATTER#'));
   result = replaceOnce(
     result,
     new RegExp(`^(        version: [0-9.]+\\(prettier@)${escaped}(\\))$`, 'gm'),
