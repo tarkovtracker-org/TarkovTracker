@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { previewGet, protectPreviewBrowser } from './access.mjs';
 import { MANIFEST_FILE, PAGES_DOMAIN } from '../profile.mjs';
-import { isForbiddenRequest, previewOrigin, requiredEnv, waitForDeployment } from './readiness.mjs';
+import { isForbiddenRequest, previewOrigin, requiredEnv } from './readiness.mjs';
 const origin = previewOrigin();
 const expectedHeadSha = requiredEnv('EXPECTED_HEAD_SHA');
 const expectedDigest = requiredEnv('EXPECTED_DIGEST');
 const expectedBranch = requiredEnv('EXPECTED_PREVIEW_BRANCH');
 test.describe.configure({ mode: 'serial' });
-test.beforeAll(async () => {
-  test.setTimeout(6 * 60 * 1000);
-  await waitForDeployment(origin);
-});
 test.beforeEach(async ({ page, request }) => {
   await protectPreviewBrowser(page, request, origin);
 });
