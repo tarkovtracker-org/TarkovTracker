@@ -12,6 +12,8 @@ The app-bar search (`app/features/omnibar/AppSearch.vue`) replaced the page sear
 Needed Items (Resources keeps its own). There, typing writes the page's `q` (debounced 150 ms, with `router.replace`) and its dropdown
 offers jump results for the other entities; elsewhere the dropdown jumps to tasks, items, or hideout
 stations. Opening a `?task=` link clears `q` first so the linked task is not filtered out.
+Task deep-link cleanup retains the selected status filter when removing `task` from the URL, so
+the focused task remains visible after route preferences synchronize.
 
 ## Task views
 
@@ -136,8 +138,6 @@ matching mode, the server attaches `taskPool` with that identity, verification, 
 derivation when every contributor exists. This display metadata never creates a counter or an
 additional trader-loyalty gate. Entries without pool metadata retain their existing counter behavior.
 Both `counter` and `taskPool` are excluded from in-game confirmation signatures.
-Task deep-link cleanup retains the selected status filter when removing `task` from the URL, so
-the focused task remains visible after route preferences synchronize.
 
 Cards and dashboard blockers share an instruction such as "Complete at least 3 LL2 tasks for
 Mechanic". Cards show actual tracked progress and an expandable contributor list, with available
