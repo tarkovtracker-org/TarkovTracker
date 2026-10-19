@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col divide-y divide-white/5">
-    <div v-for="row in rows" :key="row.key" class="py-2">
+    <div v-for="row in rows" :key="row.key" class="py-1">
       <TaskObjectiveItemGroup
         v-if="row.kind === 'itemGroup'"
         :title="row.title"
@@ -10,8 +10,8 @@
       />
       <TaskObjective v-else :objective="row.objective" />
     </div>
-    <div v-if="irrelevantCount > 0" class="flex w-full items-center p-1 opacity-50">
-      <UIcon name="i-mdi-eye-off" class="mr-1 h-4 w-4" />
+    <div v-if="irrelevantCount > 0" class="flex w-full items-center gap-2 py-1 text-xs opacity-50">
+      <UIcon name="i-mdi-eye-off" class="h-4 w-4 shrink-0" />
       <i18n-t
         keypath="page.tasks.questcard.objectives_hidden"
         :plural="irrelevantCount"

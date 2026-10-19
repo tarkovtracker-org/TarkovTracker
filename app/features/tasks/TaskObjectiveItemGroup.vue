@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-2">
+  <div class="space-y-1.5">
     <div class="grid grid-cols-[16px_1fr] items-start gap-2">
       <UIcon :name="`i-${iconName}`" aria-hidden="true" class="text-surface-400 mt-0.5 h-4 w-4" />
       <div class="min-w-0">
@@ -11,7 +11,7 @@
         </div>
       </div>
     </div>
-    <div class="space-y-1.5 pl-6">
+    <div class="-mr-1.5 space-y-1.5 pl-6">
       <div
         v-for="row in consolidatedRows"
         :id="getRowObjectiveIds(row)[0] ? `objective-${getRowObjectiveIds(row)[0]}` : undefined"

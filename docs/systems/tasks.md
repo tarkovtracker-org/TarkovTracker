@@ -69,10 +69,13 @@ own collapse toggle. The drawer holds only the availability requirements. The le
 
 ## Hidden tasks
 
-Any task card's context menu can hide the task from task lists (`useTaskHiding`, stored in the
+The eye button in a task card's header (or its right-click menu) hides the task from task lists (`useTaskHiding`, stored in the
 synced `hiddenTaskIds` preference / `user_preferences.hidden_task_ids`). Hiding is view-only: it
 never completes, fails or unlocks anything, so a hidden task still gates its successors. A toast
-offers Undo, and the card menu offers Unhide.
+offers Undo, and the same button unhides it. On the Maps view the card also shows a map-marker
+button (`TaskMapVisibilityToggles`) for the separate map-view-only hidden state
+(`mapHiddenTaskIds`, keyed by task ID, so it applies on every map); it uses a distinct icon so it
+is not confused with the eye.
 
 - All, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
   (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
@@ -213,8 +216,8 @@ rejected before they can prevent JSONB persistence.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
 bypass an explicit known unmet account value, malformed requirements, or independent
-level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
-menu clears just the in-game confirmation. Mark available either makes the task available or changes
+level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The lock-reset button in
+the card's Requirements header clears just the in-game confirmation. Mark available either makes the task available or changes
 nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
 malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
 device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
