@@ -70,7 +70,9 @@ own collapse toggle. The drawer holds only the availability requirements. The le
 The eye button in a task card's header (or its right-click menu) hides the task from task lists (`useTaskHiding`, stored in the
 synced `hiddenTaskIds` preference / `user_preferences.hidden_task_ids`). Hiding is view-only: it
 never completes, fails or unlocks anything, so a hidden task still gates its successors. A toast
-offers Undo, and the same button unhides it.
+offers Undo, and the same button unhides it. On the Maps view the card also shows a map-marker
+button (`TaskMapVisibilityToggles`) that hides the quest from the current map only; it uses a
+distinct icon so it is not confused with the eye.
 
 - All, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
   (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
