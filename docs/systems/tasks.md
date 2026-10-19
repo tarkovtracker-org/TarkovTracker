@@ -12,6 +12,8 @@ The app-bar search (`app/features/omnibar/AppSearch.vue`) replaced the page sear
 Needed Items (Resources keeps its own). There, typing writes the page's `q` (debounced 150 ms, with `router.replace`) and its dropdown
 offers jump results for the other entities; elsewhere the dropdown jumps to tasks, items, or hideout
 stations. Opening a `?task=` link clears `q` first so the linked task is not filtered out.
+Task deep-link cleanup retains the selected status filter when removing `task` from the URL, so
+the focused task remains visible after route preferences synchronize.
 
 ## Task views
 
