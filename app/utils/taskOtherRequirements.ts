@@ -136,7 +136,9 @@ export const otherRequirementsSignature = (task: Task): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
   if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
   const confirmable = requirements.filter(isConfirmable);
-  return confirmable.length ? JSON.stringify(confirmable.map(withoutProgressionMetadata)) : undefined;
+  return confirmable.length
+    ? JSON.stringify(confirmable.map(withoutProgressionMetadata))
+    : undefined;
 };
 /** Story objectives a task's overlay gates name, for Mark available to record. */
 export const storyObjectiveRequirements = (task: Task) =>
