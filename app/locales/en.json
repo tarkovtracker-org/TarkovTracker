@@ -676,12 +676,12 @@
         "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
-        "new_cta": "Support TarkovTracker",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
+        "new_cta": "Become a supporter",
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {

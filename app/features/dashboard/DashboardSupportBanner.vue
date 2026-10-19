@@ -1,23 +1,31 @@
 <template>
   <div v-if="variant" class="mb-3" data-testid="dashboard-support-banner">
-    <div class="panel px-3 py-2">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex min-w-0 items-start gap-2 text-sm">
-          <UIcon name="i-mdi-heart" class="text-success-400 mt-0.5 h-4 w-4 shrink-0" />
-          <p class="text-surface-300 min-w-0">
-            <span class="light:text-surface-50 font-semibold text-white">
+    <div
+      class="border-success-500/40 border-l-success-500 bg-success-500/10 light:border-success-600/40 light:border-l-success-600 light:bg-success-100 rounded-lg border border-l-4 px-3 py-3"
+    >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex min-w-0 items-start gap-3 text-sm sm:items-center">
+          <div
+            class="bg-success-500/20 light:bg-success-200 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          >
+            <UIcon name="i-mdi-heart" class="text-success-400 light:text-success-700 h-5 w-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="light:text-surface-50 text-base font-semibold text-white">
               {{ t(`page.dashboard.support_banner.${variant}_title`) }}
-            </span>
-            {{ t(`page.dashboard.support_banner.${variant}_body`) }}
-          </p>
+            </p>
+            <p class="text-surface-300 light:text-surface-200">
+              {{ t(`page.dashboard.support_banner.${variant}_body`) }}
+            </p>
+          </div>
         </div>
         <div class="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
           <UButton
-            size="xs"
+            size="sm"
             color="success"
-            variant="soft"
+            variant="solid"
             to="/supporter"
-            icon="i-mdi-heart-outline"
+            icon="i-mdi-heart"
             @click="trackEvent('support_banner_click', { variant })"
           >
             {{ t(`page.dashboard.support_banner.${variant}_cta`) }}

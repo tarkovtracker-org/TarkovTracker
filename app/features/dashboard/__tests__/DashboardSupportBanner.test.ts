@@ -70,7 +70,7 @@ describe('DashboardSupportBanner', () => {
   it('shows the banner when the dismissal window expires without another state change', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-07T12:00:00Z'));
-    const dismissed = new Date(Date.now() - 45 * 86_400_000 + 1000).toISOString();
+    const dismissed = new Date(Date.now() - 30 * 86_400_000 + 1000).toISOString();
     localStorage.setItem(STORAGE_KEYS.supportBannerDismissedAt, dismissed);
     const wrapper = await mountBanner();
     expect(wrapper.find('[data-testid="dashboard-support-banner"]').exists()).toBe(false);

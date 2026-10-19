@@ -737,12 +737,12 @@
         }
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
-        "new_cta": "支持 TarkovTracker",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "new_title": "让 TarkovTracker 对所有人保持免费",
+        "new_body": "支持从来不是必须的，但正是它让项目持续运行和更新，对所有人都没有付费墙和广告。",
+        "new_cta": "成为支持者",
+        "returning_title": "感谢你曾经支持 TarkovTracker",
+        "returning_body": "支持始终是自愿的。正是它让追踪器持续运行、更新，并对所有人保持无付费墙、无广告。",
+        "returning_cta": "再次支持"
       }
     },
     "changelog": {
