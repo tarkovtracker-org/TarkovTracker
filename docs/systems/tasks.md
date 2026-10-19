@@ -77,8 +77,10 @@ offers Undo, and the card menu offers Unhide.
 - Completed and Failed list hidden tasks normally, as does any search, so every hidden task stays
   findable. A deep-linked task is never hidden (`getListHiddenTaskIds` in
   `app/features/tasks/hiddenTasks.ts`).
-- Hidden tasks draw no map markers and leave the All, Available and Locked status and trader
-  counts; Completed and Failed counts still include them (`useTaskCounts`).
+- The map shows exactly what the list shows: a hidden task draws no markers and leaves the
+  completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
+  deep link). Hidden tasks leave the All, Available and Locked status and trader counts;
+  Completed and Failed counts still include them (`useTaskCounts`).
 - Needed Items still counts objectives of hidden tasks.
 
 ## Canonical task progression

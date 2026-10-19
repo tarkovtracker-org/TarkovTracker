@@ -759,11 +759,13 @@
     }
     isMapPanelExpanded.value = !isMapPanelExpanded.value;
   };
+  // Set from the deep-link pin below; the map shows exactly the tasks the list shows.
+  const mapFocusTaskId = ref<string | null>(null);
   const userHiddenMapTaskIds = computed(() =>
     getListHiddenTaskIds(getHiddenTaskIds.value, {
       searchActive: isSearchActive.value,
       secondaryView: effectiveTaskSecondaryView.value,
-      focusTaskId: null,
+      focusTaskId: mapFocusTaskId.value,
     })
   );
   const sourceMapTasks = computed(() =>
@@ -1114,6 +1116,7 @@
     searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
+    excludedTaskIds: userHiddenMapTaskIds,
     calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
       calculateFilteredTasksForOptions(
         taskList,
@@ -1139,6 +1142,13 @@
     filteredTasks,
     leafletMapRef,
   });
+  watch(
+    () => pinnedTask.value?.id ?? null,
+    (taskId) => {
+      mapFocusTaskId.value = taskId;
+    },
+    { immediate: true, flush: 'sync' }
+  );
   const handleTrackedTaskProgressInteraction = (
     taskId: string,
     interaction: DashboardFocusProgressInteraction

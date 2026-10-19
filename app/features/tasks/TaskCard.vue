@@ -270,14 +270,6 @@
     <ContextMenu ref="taskContextMenu">
       <template #default="{ close }">
         <ContextMenuItem
-          icon="i-mdi-link-variant"
-          :label="t('page.tasks.questcard.copy_task_link')"
-          @click="
-            copyTaskLink();
-            close();
-          "
-        />
-        <ContextMenuItem
           data-testid="task-hide-toggle"
           :icon="isHidden ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'"
           :label="
@@ -285,6 +277,14 @@
           "
           @click="
             toggleHidden();
+            close();
+          "
+        />
+        <ContextMenuItem
+          icon="i-mdi-link-variant"
+          :label="t('page.tasks.questcard.copy_task_link')"
+          @click="
+            copyTaskLink();
             close();
           "
         />

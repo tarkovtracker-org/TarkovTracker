@@ -24,7 +24,11 @@ export function useTaskHiding(task: () => Pick<Task, 'id' | 'name'>) {
           label: t('page.tasks.questcard.undo'),
           color: 'neutral',
           variant: 'outline',
-          onClick: () => preferencesStore.toggleHiddenTask(id),
+          onClick: () => {
+            if (preferencesStore.getHiddenTaskIds.includes(id) === hiding) {
+              preferencesStore.toggleHiddenTask(id);
+            }
+          },
         },
       ],
     });

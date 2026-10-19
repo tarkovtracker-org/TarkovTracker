@@ -1609,6 +1609,17 @@ describe('usePreferencesStore', () => {
         sanitizePersistedPreferencesState({ hiddenTaskIds: 'x' as never }).hiddenTaskIds
       ).toEqual([]);
     });
+    it('sanitizes hidden task ids restored through replacePersistedState', () => {
+      const store = usePreferencesStore();
+      store.replacePersistedState({
+        hiddenTaskIds: ['task-1', 'task-1', '', null],
+      } as unknown as Parameters<typeof store.replacePersistedState>[0]);
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      store.replacePersistedState({
+        hiddenTaskIds: 'x',
+      } as unknown as Parameters<typeof store.replacePersistedState>[0]);
+      expect(store.hiddenTaskIds).toEqual([]);
+    });
   });
   describe('Actions - Skills', () => {
     it('should set skill sort mode', () => {
