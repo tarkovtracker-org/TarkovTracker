@@ -58,6 +58,23 @@ describe('task requirement components', () => {
     expect(wrapper.get('[data-testid="task-requirement-chip"]').text()).toContain('· you: 1');
     expect(wrapper.findAll('p')).toHaveLength(1);
   });
+  it('shows hints only while their requirement chips are visible', async () => {
+    const wrapper = mountRequirements(
+      [
+        row('A', false, { hint: 'Visible conflict' }),
+        row('B', false, { hint: 'Visible conflict' }),
+        row('C'),
+        row('D', false, { hint: 'Hidden conflict' }),
+      ],
+      'blocking'
+    );
+    const hints = () => wrapper.findAll('p').map((hint) => hint.text());
+    expect(hints()).toEqual(['Visible conflict']);
+    await wrapper.get('button').trigger('click');
+    expect(hints()).toEqual(['Visible conflict', 'Hidden conflict']);
+    await wrapper.get('button').trigger('click');
+    expect(hints()).toEqual(['Visible conflict']);
+  });
   it('lists every requirement with its met state once expanded', async () => {
     const wrapper = mountRequirements(
       [

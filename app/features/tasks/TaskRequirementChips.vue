@@ -76,6 +76,6 @@
       : '';
   });
   const hints = computed(() => [
-    ...new Set(props.rows.map((row) => row.hint).filter((hint): hint is string => !!hint)),
+    ...new Set(chips.value.map((row) => row.hint).filter((hint): hint is string => !!hint)),
   ]);
 </script>
