@@ -18,7 +18,7 @@ describe('NeededItemCollectButton', () => {
     );
     await button.trigger('click');
     expect(wrapper.emitted('toggle')).toEqual([[]]);
-    await wrapper.setProps({ collected: !collected, size: 'md' });
+    await wrapper.setProps({ collected: !collected });
     expect(button.attributes('aria-pressed')).toBe(String(!collected));
     expect(button.attributes('aria-label')).toBe(
       collected ? 'needed_items.mark_collected' : 'needed_items.collected'

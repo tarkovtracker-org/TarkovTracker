@@ -128,6 +128,25 @@ describe('ItemCountControls inline edit', () => {
     expect(wrapper.emitted('setCount')).toBeUndefined();
     expect(wrapper.text()).toContain('5/10');
   });
+  it.each(['blur', 'Enter'] as const)(
+    'discards an edit when disabled before %s',
+    async (commit) => {
+      const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
+      const input = await startEditing(wrapper);
+      await input.setValue('8');
+      await wrapper.setProps({ disabled: true });
+      expect(wrapper.find('input').exists()).toBe(false);
+      expect(
+        wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)
+      ).toBe(true);
+      await wrapper.setProps({ disabled: false });
+      if (commit === 'blur') await input.trigger('blur');
+      else await input.trigger('keydown', { key: commit });
+      expect(emittedCounts(wrapper)).toEqual([]);
+      await editAndCommit(wrapper, '4');
+      expect(emittedCounts(wrapper)).toEqual([4]);
+    }
+  );
   it('keeps the input bounded by min/max attributes', async () => {
     const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
     const input = await startEditing(wrapper);

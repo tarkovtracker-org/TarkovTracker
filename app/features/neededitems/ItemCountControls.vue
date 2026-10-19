@@ -141,4 +141,11 @@
       onUpdate: (count) => emit('setCount', count),
       externalChangeBehavior: 'cancel',
     });
+  watch(
+    () => props.disabled,
+    (disabled) => {
+      if (disabled) cancelEdit();
+    },
+    { flush: 'sync' }
+  );
 </script>

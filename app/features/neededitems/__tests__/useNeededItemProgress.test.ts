@@ -80,6 +80,12 @@ describe('useNeededItemProgress', () => {
     expect(store.setHideoutPartUncomplete).not.toHaveBeenCalled();
     expect(store.setObjectiveCount).not.toHaveBeenCalled();
   });
+  it('marks over-filled hideout parts complete', () => {
+    useNeededItemProgress().setCount(part, 3);
+    expect(store.setHideoutPartCount).toHaveBeenCalledWith('part-1', 3);
+    expect(store.setHideoutPartComplete).toHaveBeenCalledWith('part-1');
+    expect(store.setHideoutPartUncomplete).not.toHaveBeenCalled();
+  });
   it('uncompletes a hideout part when its count drops below the requirement', () => {
     store.counts['part-1'] = 2;
     store.completeParts.add('part-1');
