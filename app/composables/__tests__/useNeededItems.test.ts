@@ -142,6 +142,7 @@ const createProgressStore = () => ({
     'task-2': { self: true },
     'task-kappa': { self: false },
   },
+  tasksFailed: {} as Record<string, Record<string, boolean>>,
   invalidTasks: {
     'task-1': { self: false },
     'task-2': { self: false },
@@ -356,6 +357,17 @@ describe('useNeededItems', () => {
       expect(neededItems.allItems.value.some((item) => item.needType === 'hideoutModule')).toBe(
         true
       );
+    });
+    it('excludes hidden failed task objectives even though failed tasks carry completion', async () => {
+      const { neededItems } = await setup({
+        preferencesStore: { getHiddenTaskIds: ['task-2'] },
+        progressStore: { tasksFailed: { 'task-2': { self: true } } },
+      });
+      const taskIds = neededItems.allItems.value
+        .filter((item) => item.needType === 'taskObjective')
+        .map((item) => (item as NeededItemTaskObjective).taskId);
+      expect(taskIds).not.toContain('task-2');
+      expect(taskIds).toContain('task-1');
     });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();

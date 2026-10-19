@@ -167,9 +167,12 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   });
   const hiddenTaskIds = computed(() => new Set(preferencesStore.getHiddenTaskIds));
   // Hidden tasks keep their completed objectives, like the task list's Completed view.
+  // Failed tasks also carry the completion flag, so they stay hidden.
+  const isTaskSucceeded = (taskId: string): boolean =>
+    progressStore.tasksCompletions?.[taskId]?.['self'] === true &&
+    progressStore.tasksFailed?.[taskId]?.['self'] !== true;
   const isHiddenTaskNeed = (need: NeededItemTaskObjective): boolean =>
-    hiddenTaskIds.value.has(need.taskId) &&
-    progressStore.tasksCompletions?.[need.taskId]?.['self'] !== true;
+    hiddenTaskIds.value.has(need.taskId) && !isTaskSucceeded(need.taskId);
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
