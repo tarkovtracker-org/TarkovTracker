@@ -426,10 +426,14 @@
     });
   const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
-  const requestedPool = ref<{ id: string }>();
+  const requestedPool = shallowRef<{ id: string }>();
   const showRequirementPool = (id: string) => {
     if (!taskExpanded.value) toggleTaskVisibility();
-    requestedPool.value = { id };
+    const request = { id };
+    requestedPool.value = request;
+    nextTick(() => {
+      if (requestedPool.value === request) requestedPool.value = undefined;
+    });
   };
   const shouldAutoCollapseObjectives = computed(() => {
     return isComplete.value && preferencesStore.getHideCompletedTaskObjectives;

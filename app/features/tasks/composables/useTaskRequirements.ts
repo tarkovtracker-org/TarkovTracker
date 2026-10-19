@@ -101,7 +101,9 @@ export const useTaskRequirements = (task: () => Task) => {
   const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => {
     const requirement = normalizeOtherRequirements(task().otherRequirements).find(
       (requirement) =>
-        requirement.type === 'globalVariable' && requirement.id === blocker.requirementId
+        requirement.type === 'globalVariable' &&
+        requirement.id === blocker.requirementId &&
+        (requirement.counter || requirement.taskPool)
     );
     return [
       requirement?.type === 'globalVariable'

@@ -79,7 +79,7 @@ export const poolProgressLabel = (
   source: 'tracked' | 'account' = 'tracked'
 ): string => {
   if (current === undefined) return t('page.tasks.requirements.pool_unverified');
-  const value = method === '>=' ? `${current}/${required}` : String(current);
+  const value = (method ?? '>=') === '>=' ? `${current}/${required}` : String(current);
   return t(`page.tasks.requirements.pool_${source}`, { value });
 };
 export const poolBlockerLabel = (

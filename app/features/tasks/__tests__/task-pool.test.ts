@@ -43,6 +43,7 @@ describe('task pool presentation', () => {
   });
   it('distinguishes tracked, account and unknown values without clamping progress', () => {
     expect(poolProgressLabel(t, 5, 3, '>=')).toBe('5/3 tracked');
+    expect(poolProgressLabel(t, 2, 3, undefined)).toBe('2/3 tracked');
     expect(poolProgressLabel(t, 2, 3, '>=', 'account')).toBe('2/3 in game');
     expect(poolProgressLabel(t, undefined, 3, '>=')).toBe('Progress unverified');
     expect(poolProgressLabel(t, 2, 3, '==' as RequirementComparison)).toBe('2 tracked');
