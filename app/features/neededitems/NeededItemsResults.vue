@@ -1,20 +1,11 @@
 <template>
   <div :class="viewMode === 'list' && !groupByItem ? undefined : 'p-2'">
-    <div
+    <NeededItemsGroupedGrid
       v-if="groupByItem"
-      class="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-    >
-      <NeededItemGroupedCard
-        v-for="(group, index) in groupedItems"
-        :key="group.item.id"
-        :grouped-item="group"
-        :task-objectives="objectivesByItemId.get(group.item.id)?.taskObjectives ?? []"
-        :hideout-modules="objectivesByItemId.get(group.item.id)?.hideoutModules ?? []"
-        :active-filter="activeFilter"
-        :data-index="index"
-        class="content-visibility-auto-220 h-full"
-      />
-    </div>
+      :active-filter="activeFilter"
+      :grouped-items="groupedItems"
+      :objectives-by-item-id="objectivesByItemId"
+    />
     <template v-else-if="viewMode === 'list'">
       <div
         v-for="(item, index) in items"
@@ -50,8 +41,12 @@
 </template>
 <script setup lang="ts">
   import NeededItem from '@/features/neededitems/NeededItem.vue';
-  import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';
+  import NeededItemsGroupedGrid from '@/features/neededitems/NeededItemsGroupedGrid.vue';
   import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-constants';
+  import type {
+    NeededItemsCardStyle,
+    NeededItemsViewMode,
+  } from '@/features/neededitems/neededItemsFilterNormalization';
   import type {
     GroupedNeededItem,
     NeededItemHideoutModule,
@@ -59,8 +54,8 @@
   } from '@/types/tarkov';
   defineProps<{
     groupByItem: boolean;
-    viewMode: 'list' | 'grid';
-    cardStyle: 'compact' | 'expanded';
+    viewMode: NeededItemsViewMode;
+    cardStyle: NeededItemsCardStyle;
     activeFilter: NeededItemsFilterType;
     groupedItems: GroupedNeededItem[];
     items: (NeededItemTaskObjective | NeededItemHideoutModule)[];

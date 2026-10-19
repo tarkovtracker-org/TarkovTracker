@@ -13,8 +13,8 @@ export const DEFAULT_INITIAL_RENDER_COUNT = 12;
  *
  * Usage formula at runtime:
  *   viewAdjusted = viewMode === 'grid' ? DEFAULT_INITIAL_RENDER_COUNT * SCREEN_SIZE_MULTIPLIERS.gridView : DEFAULT_INITIAL_RENDER_COUNT
- *   finalCount = Math.round(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.xs) // when xs screen
- *   finalCount = Math.round(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.belowMd) // when belowMd screen
+ *   finalCount = Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.xs) // when xs screen
+ *   finalCount = Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.belowMd) // when belowMd screen
  *
  * Note: DEFAULT_INITIAL_RENDER_COUNT (currently 12) is the base value used in these calculations.
  * Only one screen size multiplier (xs or belowMd) is applied per calculation.

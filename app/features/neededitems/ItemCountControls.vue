@@ -1,12 +1,13 @@
 <template>
   <div class="flex items-center gap-0.5">
     <div class="bg-surface-700 flex items-center rounded-lg border border-white/20 shadow-sm">
-      <AppTooltip :text="$t('needed_items.aria.decrease_count')">
+      <AppTooltip :text="decreaseText">
         <button
           type="button"
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-l-lg transition-colors hover:text-white"
+          :disabled="disabled"
+          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-l-lg transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           :class="sizeClasses.button"
-          :aria-label="$t('needed_items.aria.decrease_count')"
+          :aria-label="decreaseText"
           @click="$emit('decrease')"
         >
           <UIcon name="i-mdi-minus" :class="sizeClasses.icon" />
@@ -35,7 +36,8 @@
           <AppTooltip :text="$t('needed_items.aria.click_to_enter_value')">
             <button
               type="button"
-              class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white transition-colors"
+              :disabled="disabled"
+              class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               :class="sizeClasses.text"
               :aria-label="$t('needed_items.aria.click_to_enter_value')"
               @click="startEdit"
@@ -45,12 +47,13 @@
           </AppTooltip>
         </template>
       </div>
-      <AppTooltip :text="$t('needed_items.aria.increase_count')">
+      <AppTooltip :text="increaseText">
         <button
           type="button"
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-r-lg transition-colors hover:text-white"
+          :disabled="disabled"
+          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-r-lg transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           :class="sizeClasses.button"
-          :aria-label="$t('needed_items.aria.increase_count')"
+          :aria-label="increaseText"
           @click="$emit('increase')"
         >
           <UIcon name="i-mdi-plus" :class="sizeClasses.icon" />
@@ -60,12 +63,13 @@
     <AppTooltip :text="toggleLabel">
       <button
         type="button"
-        class="flex items-center justify-center rounded-lg border transition-colors"
+        :disabled="disabled"
+        class="flex items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         :aria-label="toggleLabel"
         :class="[
           sizeClasses.button,
           isComplete
-            ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
+            ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
             : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white',
         ]"
         @click="$emit('toggle')"
@@ -109,8 +113,11 @@
       currentCount: number;
       neededCount: number;
       size?: ItemCountControlsSize;
+      disabled?: boolean;
+      decreaseLabel?: string;
+      increaseLabel?: string;
     }>(),
-    { size: 'responsive' }
+    { size: 'responsive', disabled: false, decreaseLabel: undefined, increaseLabel: undefined }
   );
   const emit = defineEmits<{
     decrease: [];
@@ -118,6 +125,8 @@
     toggle: [];
     setCount: [count: number];
   }>();
+  const decreaseText = computed(() => props.decreaseLabel ?? t('needed_items.aria.decrease_count'));
+  const increaseText = computed(() => props.increaseLabel ?? t('needed_items.aria.increase_count'));
   const sizeClasses = computed(() => SIZE_CLASSES[props.size]);
   const isComplete = computed(() => props.currentCount >= props.neededCount);
   const toggleLabel = computed(() =>
@@ -132,4 +141,11 @@
       onUpdate: (count) => emit('setCount', count),
       externalChangeBehavior: 'cancel',
     });
+  watch(
+    () => props.disabled,
+    (disabled) => {
+      if (disabled) cancelEdit();
+    },
+    { flush: 'sync' }
+  );
 </script>

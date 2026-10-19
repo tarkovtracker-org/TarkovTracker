@@ -8,9 +8,7 @@
     @keydown.enter="handleCardClick"
     @keydown.space.prevent="handleCardClick"
   >
-    <!-- Top section: Image + Name side by side -->
     <div class="flex items-center gap-3 p-3">
-      <!-- Item image -->
       <div class="bg-surface-900 relative h-16 w-16 shrink-0 overflow-hidden rounded">
         <GameItem
           :src="groupedItem.item.image512pxLink || groupedItem.item.iconLink"
@@ -26,7 +24,6 @@
           class="h-full w-full"
         />
       </div>
-      <!-- Item name + Total -->
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-start gap-1">
           <div class="line-clamp-2 min-w-0 text-sm leading-tight font-semibold">
@@ -49,160 +46,48 @@
         </div>
       </div>
     </div>
-    <!-- Breakdown grid -->
     <div
       class="gap-px border-t border-white/10 bg-white/5 text-xs"
-      :class="activeFilter === 'tasks' || activeFilter === 'hideout' ? '' : 'grid grid-cols-2'"
+      :class="sections.length > 1 ? 'grid grid-cols-2' : ''"
     >
-      <!-- Tasks section -->
-      <div v-if="activeFilter !== 'hideout'" class="bg-surface-800 p-2">
-        <div
-          v-if="activeFilter === 'all' || activeFilter === 'completed'"
-          class="text-surface-400 mb-1.5 flex items-center gap-1"
-        >
-          <UIcon name="i-mdi-clipboard-list" class="h-3.5 w-3.5" />
-          <span class="font-medium">{{ $t('common.tasks') }}</span>
+      <div v-for="section in sections" :key="section.key" class="bg-surface-800 p-2">
+        <div v-if="sections.length > 1" class="text-surface-400 mb-1.5 flex items-center gap-1">
+          <UIcon :name="section.icon" class="h-3.5 w-3.5" />
+          <span class="font-medium">{{ $t(section.label) }}</span>
         </div>
         <div class="flex gap-3">
-          <div v-if="groupedItem.taskFir > 0" class="flex items-center gap-1">
-            <AppTooltip :text="$t('common.found_in_raid_required')">
+          <div v-for="count in section.counts" :key="count.key" class="flex items-center gap-1">
+            <AppTooltip :text="$t(count.tooltip)">
               <UIcon
-                name="i-mdi-checkbox-marked-circle-outline"
+                :name="count.icon"
                 class="h-3 w-3"
-                :class="
-                  groupedItem.taskFirCurrent >= groupedItem.taskFir
-                    ? 'text-success-400'
-                    : 'light:text-surface-50 text-white'
-                "
+                :class="countClass(count.current, count.needed)"
               />
             </AppTooltip>
-            <span
-              class="font-semibold"
-              :class="
-                groupedItem.taskFirCurrent >= groupedItem.taskFir
-                  ? 'text-success-400'
-                  : 'light:text-surface-50 text-white'
-              "
-            >
-              {{ groupedItem.taskFirCurrent }}/{{ groupedItem.taskFir }}
+            <span class="font-semibold" :class="countClass(count.current, count.needed)">
+              {{ formatNumber(count.current) }}/{{ formatNumber(count.needed) }}
             </span>
           </div>
-          <div v-if="groupedItem.taskNonFir > 0" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-checkbox-blank-circle-outline"
-              class="h-3 w-3"
-              :class="
-                groupedItem.taskNonFirCurrent >= groupedItem.taskNonFir
-                  ? 'text-success-400'
-                  : 'text-surface-400'
-              "
-            />
-            <span
-              class="font-semibold"
-              :class="
-                groupedItem.taskNonFirCurrent >= groupedItem.taskNonFir
-                  ? 'text-success-400'
-                  : 'light:text-surface-50 text-white'
-              "
-            >
-              {{ groupedItem.taskNonFirCurrent }}/{{ groupedItem.taskNonFir }}
-            </span>
-          </div>
-          <span
-            v-if="groupedItem.taskFir === 0 && groupedItem.taskNonFir === 0"
-            class="text-surface-500"
-          >
-            -
-          </span>
-        </div>
-      </div>
-      <!-- Hideout section -->
-      <div v-if="activeFilter !== 'tasks'" class="bg-surface-800 p-2">
-        <div
-          v-if="activeFilter === 'all' || activeFilter === 'completed'"
-          class="text-surface-400 mb-1.5 flex items-center gap-1"
-        >
-          <UIcon name="i-mdi-home" class="h-3.5 w-3.5" />
-          <span class="font-medium">{{ $t('common.hideout') }}</span>
-        </div>
-        <div class="flex gap-3">
-          <div v-if="groupedItem.hideoutFir > 0" class="flex items-center gap-1">
-            <AppTooltip :text="$t('common.found_in_raid_required')">
-              <UIcon
-                name="i-mdi-checkbox-marked-circle-outline"
-                class="h-3 w-3"
-                :class="
-                  groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
-                    ? 'text-success-400'
-                    : 'light:text-surface-50 text-white'
-                "
-              />
-            </AppTooltip>
-            <span
-              class="font-semibold"
-              :class="
-                groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
-                  ? 'text-success-400'
-                  : 'light:text-surface-50 text-white'
-              "
-            >
-              {{ groupedItem.hideoutFirCurrent }}/{{ groupedItem.hideoutFir }}
-            </span>
-          </div>
-          <div v-if="groupedItem.hideoutNonFir > 0" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-checkbox-blank-circle-outline"
-              class="h-3 w-3"
-              :class="
-                groupedItem.hideoutNonFirCurrent >= groupedItem.hideoutNonFir
-                  ? 'text-success-400'
-                  : 'text-surface-400'
-              "
-            />
-            <span
-              class="font-semibold"
-              :class="
-                groupedItem.hideoutNonFirCurrent >= groupedItem.hideoutNonFir
-                  ? 'text-success-400'
-                  : 'light:text-surface-50 text-white'
-              "
-            >
-              {{ groupedItem.hideoutNonFirCurrent }}/{{ groupedItem.hideoutNonFir }}
-            </span>
-          </div>
-          <span
-            v-if="groupedItem.hideoutFir === 0 && groupedItem.hideoutNonFir === 0"
-            class="text-surface-500"
-          >
-            -
-          </span>
+          <span v-if="section.counts.length === 0" class="text-surface-500">-</span>
         </div>
       </div>
     </div>
-    <NeededItemGroupedModal
-      v-model:open="showModal"
-      :item-info="groupedItem.item"
-      :task-objectives="taskObjectives"
-      :hideout-modules="hideoutModules"
-    />
   </div>
 </template>
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
-  import type {
-    GroupedNeededItem,
-    NeededItemHideoutModule,
-    NeededItemTaskObjective,
-  } from '@/types/tarkov';
-  const props = defineProps<{
-    groupedItem: GroupedNeededItem;
-    taskObjectives: NeededItemTaskObjective[];
-    hideoutModules: NeededItemHideoutModule[];
-    activeFilter?: 'all' | 'tasks' | 'hideout' | 'completed';
-  }>();
+  import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-constants';
+  import type { GroupedNeededItem } from '@/types/tarkov';
+  const props = withDefaults(
+    defineProps<{
+      groupedItem: GroupedNeededItem;
+      activeFilter?: NeededItemsFilterType;
+    }>(),
+    { activeFilter: 'all' }
+  );
+  const emit = defineEmits<{ open: [itemId: string] }>();
   const formatNumber = useLocaleNumberFormatter();
-  const showModal = ref(false);
   const handleCardClick = (event: MouseEvent | KeyboardEvent) => {
     const target = event.target instanceof Element ? event.target : null;
     const currentTarget = event.currentTarget instanceof Element ? event.currentTarget : null;
@@ -215,7 +100,7 @@
     if ('key' in event && (event.key === ' ' || event.key === 'Enter')) {
       event.preventDefault();
     }
-    showModal.value = true;
+    emit('open', props.groupedItem.item.id);
   };
   const itemId = computed(() => props.groupedItem.item.id);
   const isComplete = computed(() => {
@@ -223,4 +108,51 @@
   });
   const { isCraftable, craftableIconClass, craftableTitle, goToCraftStation } =
     useCraftableItem(itemId);
+  const countClass = (current: number, needed: number) =>
+    current >= needed ? 'text-success-400' : 'light:text-surface-50 text-white';
+  const sourceCounts = (fir: number, firCurrent: number, nonFir: number, nonFirCurrent: number) =>
+    [
+      {
+        key: 'fir',
+        icon: 'i-mdi-checkbox-marked-circle-outline',
+        tooltip: 'common.found_in_raid_required',
+        needed: fir,
+        current: firCurrent,
+      },
+      {
+        key: 'nonFir',
+        icon: 'i-mdi-checkbox-blank-circle-outline',
+        tooltip: 'needed_items.non_fir',
+        needed: nonFir,
+        current: nonFirCurrent,
+      },
+    ].filter((count) => count.needed > 0);
+  const sections = computed(() => {
+    const item = props.groupedItem;
+    const all = [
+      {
+        key: 'tasks',
+        icon: 'i-mdi-clipboard-list',
+        label: 'common.tasks',
+        counts: sourceCounts(
+          item.taskFir,
+          item.taskFirCurrent,
+          item.taskNonFir,
+          item.taskNonFirCurrent
+        ),
+      },
+      {
+        key: 'hideout',
+        icon: 'i-mdi-home',
+        label: 'common.hideout',
+        counts: sourceCounts(
+          item.hideoutFir,
+          item.hideoutFirCurrent,
+          item.hideoutNonFir,
+          item.hideoutNonFirCurrent
+        ),
+      },
+    ];
+    return all.filter((section) => [section.key, 'all', 'completed'].includes(props.activeFilter));
+  });
 </script>

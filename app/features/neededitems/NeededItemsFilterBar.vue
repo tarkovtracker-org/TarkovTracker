@@ -10,19 +10,14 @@
           {{ countLabel }}
         </UBadge>
         <NeededItemsFiltersPopover
-          :fir-filter="firFilter"
-          :hide-owned="hideOwned"
-          :hide-team-items="hideTeamItems"
-          :hide-non-fir-special-equipment="hideNonFirSpecialEquipment"
-          :kappa-only="kappaOnly"
+          v-model:fir-filter="firFilter"
+          v-model:hide-owned="hideOwned"
+          v-model:hide-team-items="hideTeamItems"
+          v-model:hide-non-fir-special-equipment="hideNonFirSpecialEquipment"
+          v-model:kappa-only="kappaOnly"
           :active-count="activeFilters.length"
           :can-reset="hasSavedFilters"
           :is-kappa-disabled="isKappaDisabled"
-          @update:fir-filter="emit('update:firFilter', $event)"
-          @update:hide-owned="emit('update:hideOwned', $event)"
-          @update:hide-team-items="emit('update:hideTeamItems', $event)"
-          @update:hide-non-fir-special-equipment="emit('update:hideNonFirSpecialEquipment', $event)"
-          @update:kappa-only="emit('update:kappaOnly', $event)"
           @reset="clearAllFilters"
         />
         <SortControl
@@ -36,12 +31,9 @@
         />
         <div aria-hidden="true" class="hidden h-6 w-px bg-white/10 sm:block" />
         <NeededItemsViewModeToggle
-          :view-mode="viewMode"
-          :group-by-item="groupByItem"
-          :card-style="cardStyle"
-          @update:view-mode="emit('update:viewMode', $event)"
-          @update:group-by-item="emit('update:groupByItem', $event)"
-          @update:card-style="emit('update:cardStyle', $event)"
+          v-model:view-mode="viewMode"
+          v-model:group-by-item="groupByItem"
+          v-model:card-style="cardStyle"
         />
       </template>
     </StatusTabBar>
@@ -59,55 +51,48 @@
   import NeededItemsFiltersPopover from '@/features/neededitems/NeededItemsFiltersPopover.vue';
   import NeededItemsViewModeToggle from '@/features/neededitems/NeededItemsViewModeToggle.vue';
   import type { FilterTab } from '@/composables/useNeededItems';
+  import type {
+    NeededItemsFilterType,
+    NeededItemsFirFilter,
+    NeededItemsSortBy,
+    NeededItemsSortDirection,
+  } from '@/features/neededitems/neededitems-constants';
+  import type {
+    NeededItemsCardStyle,
+    NeededItemsViewMode,
+  } from '@/features/neededitems/neededItemsFilterNormalization';
   import type { ActiveFilter } from '@/types/filters';
-  type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
-  type ViewMode = 'list' | 'grid';
-  type FirFilter = 'all' | 'fir' | 'non-fir';
-  type SortBy = 'priority' | 'name' | 'category' | 'count';
-  type SortDirection = 'asc' | 'desc';
-  type CardStyle = 'compact' | 'expanded';
   const props = defineProps<{
-    modelValue: FilterType;
-    viewMode: ViewMode;
     filterTabs: FilterTab[];
     totalCount: number;
     ungroupedCount: number;
-    firFilter: FirFilter;
-    groupByItem: boolean;
-    hideTeamItems: boolean;
-    hideNonFirSpecialEquipment: boolean;
-    kappaOnly: boolean;
-    sortBy: SortBy;
-    sortDirection: SortDirection;
-    hideOwned: boolean;
-    cardStyle: CardStyle;
   }>();
-  const emit = defineEmits<{
-    'update:modelValue': [value: FilterType];
-    'update:viewMode': [value: ViewMode];
-    'update:firFilter': [value: FirFilter];
-    'update:groupByItem': [value: boolean];
-    'update:hideTeamItems': [value: boolean];
-    'update:hideNonFirSpecialEquipment': [value: boolean];
-    'update:kappaOnly': [value: boolean];
-    'update:sortBy': [value: SortBy];
-    'update:sortDirection': [value: SortDirection];
-    'update:hideOwned': [value: boolean];
-    'update:cardStyle': [value: CardStyle];
-  }>();
+  const filterType = defineModel<NeededItemsFilterType>({ required: true });
+  const viewMode = defineModel<NeededItemsViewMode>('viewMode', { required: true });
+  const firFilter = defineModel<NeededItemsFirFilter>('firFilter', { required: true });
+  const groupByItem = defineModel<boolean>('groupByItem', { required: true });
+  const hideTeamItems = defineModel<boolean>('hideTeamItems', { required: true });
+  const hideNonFirSpecialEquipment = defineModel<boolean>('hideNonFirSpecialEquipment', {
+    required: true,
+  });
+  const kappaOnly = defineModel<boolean>('kappaOnly', { required: true });
+  const sortBy = defineModel<NeededItemsSortBy>('sortBy', { required: true });
+  const sortDirection = defineModel<NeededItemsSortDirection>('sortDirection', { required: true });
+  const hideOwned = defineModel<boolean>('hideOwned', { required: true });
+  const cardStyle = defineModel<NeededItemsCardStyle>('cardStyle', { required: true });
   const { t } = useI18n({ useScope: 'global' });
   const activeFilter = computed({
-    get: () => props.modelValue,
+    get: () => filterType.value,
     set: (value: unknown) => {
-      emit('update:modelValue', normalizeNeededItemsFilterType(value));
+      filterType.value = normalizeNeededItemsFilterType(value);
     },
   });
   // Completed only gets a tab once something is done, or while it is the picked filter.
   const isTabShown = (tab: FilterTab) =>
-    tab.value !== 'completed' || tab.count > 0 || tab.value === props.modelValue;
+    tab.value !== 'completed' || tab.count > 0 || tab.value === filterType.value;
   const visibleFilterTabs = computed(() => props.filterTabs.filter(isTabShown));
   const countLabel = computed(() =>
-    props.groupByItem && props.ungroupedCount !== props.totalCount
+    groupByItem.value && props.ungroupedCount !== props.totalCount
       ? t('page.needed_items.unique_items_count', {
           unique: props.totalCount,
           total: props.ungroupedCount,
@@ -115,7 +100,7 @@
       : t('page.needed_items.items_count', { count: props.totalCount }, props.totalCount)
   );
   // Kappa only narrows task needs, so it does nothing on the Hideout tab.
-  const isKappaDisabled = computed(() => props.modelValue === 'hideout');
+  const isKappaDisabled = computed(() => filterType.value === 'hideout');
   interface FilterChipDescriptor {
     key: string;
     isActive: () => boolean;
@@ -125,33 +110,33 @@
   const filterChipDescriptors: FilterChipDescriptor[] = [
     {
       key: 'fir',
-      isActive: () => props.firFilter !== 'all',
-      labelKey: () => `page.needed_items.filters.chips.${props.firFilter.replace('-', '_')}`,
-      clear: () => emit('update:firFilter', 'all'),
+      isActive: () => firFilter.value !== 'all',
+      labelKey: () => `page.needed_items.filters.chips.${firFilter.value.replace('-', '_')}`,
+      clear: () => (firFilter.value = 'all'),
     },
     {
       key: 'hide_owned',
-      isActive: () => props.hideOwned,
+      isActive: () => hideOwned.value,
       labelKey: () => 'page.needed_items.filters.chips.hide_owned',
-      clear: () => emit('update:hideOwned', false),
+      clear: () => (hideOwned.value = false),
     },
     {
       key: 'hide_team',
-      isActive: () => props.hideTeamItems,
+      isActive: () => hideTeamItems.value,
       labelKey: () => 'page.needed_items.filters.chips.hide_team',
-      clear: () => emit('update:hideTeamItems', false),
+      clear: () => (hideTeamItems.value = false),
     },
     {
       key: 'hide_special_equipment',
-      isActive: () => props.hideNonFirSpecialEquipment,
+      isActive: () => hideNonFirSpecialEquipment.value,
       labelKey: () => 'page.needed_items.filters.chips.hide_special_equipment',
-      clear: () => emit('update:hideNonFirSpecialEquipment', false),
+      clear: () => (hideNonFirSpecialEquipment.value = false),
     },
     {
       key: 'kappa_only',
-      isActive: () => props.kappaOnly && !isKappaDisabled.value,
+      isActive: () => kappaOnly.value && !isKappaDisabled.value,
       labelKey: () => 'page.needed_items.filters.chips.kappa_only',
-      clear: () => emit('update:kappaOnly', false),
+      clear: () => (kappaOnly.value = false),
     },
   ];
   const activeFilters = computed<ActiveFilter[]>(() =>
@@ -165,7 +150,7 @@
   );
   // Reset clears every saved filter, including Kappa only while it is idle on the Hideout tab.
   const hasSavedFilters = computed(
-    () => activeFilters.value.length > 0 || (props.kappaOnly && isKappaDisabled.value)
+    () => activeFilters.value.length > 0 || (kappaOnly.value && isKappaDisabled.value)
   );
   const clearAllFilters = () => {
     filterChipDescriptors.forEach((descriptor) => descriptor.clear());
@@ -173,44 +158,42 @@
   const sortOptions = computed(() => [
     {
       label: t('common.priority'),
-      value: 'priority' as SortBy,
+      value: 'priority' as NeededItemsSortBy,
       icon: 'i-mdi-alert-circle-outline',
     },
     {
       label: t('page.needed_items.sort.name'),
-      value: 'name' as SortBy,
+      value: 'name' as NeededItemsSortBy,
       icon: 'i-mdi-format-title',
     },
     {
       label: t('page.needed_items.sort.category'),
-      value: 'category' as SortBy,
+      value: 'category' as NeededItemsSortBy,
       icon: 'i-mdi-shape-outline',
     },
     {
       label: t('page.needed_items.sort.count'),
-      value: 'count' as SortBy,
+      value: 'count' as NeededItemsSortBy,
       icon: 'i-mdi-counter',
     },
   ]);
   const selectedSortBy = computed({
-    get: () => props.sortBy,
+    get: () => sortBy.value,
     set: (value: unknown) => {
       setSort(value);
     },
   });
   const setSort = (value: unknown) => {
     const normalizedSortBy = normalizeNeededItemsSortBy(value);
-    if (props.sortBy === normalizedSortBy) {
-      emit('update:sortDirection', props.sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      emit('update:sortBy', normalizedSortBy);
-      emit(
-        'update:sortDirection',
-        normalizedSortBy === 'priority' || normalizedSortBy === 'count' ? 'desc' : 'asc'
-      );
+    if (sortBy.value === normalizedSortBy) {
+      toggleSortDirection();
+      return;
     }
+    sortBy.value = normalizedSortBy;
+    sortDirection.value =
+      normalizedSortBy === 'priority' || normalizedSortBy === 'count' ? 'desc' : 'asc';
   };
   const toggleSortDirection = () => {
-    emit('update:sortDirection', props.sortDirection === 'asc' ? 'desc' : 'asc');
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
   };
 </script>

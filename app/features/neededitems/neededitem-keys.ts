@@ -15,7 +15,6 @@ export type NeededItemContext = {
   isCraftable: ComputedRef<boolean>;
   isKappaRequired: ComputedRef<boolean>;
   isLightkeeperRequired: ComputedRef<boolean>;
-  isParentCompleted: ComputedRef<boolean>;
   item: ComputedRef<TarkovItem | null>;
   /** All accepted items when the objective allows alternatives (display-only). */
   acceptedItems: ComputedRef<TarkovItem[]>;
@@ -32,7 +31,6 @@ export type NeededItemContext = {
   relatedTask: ComputedRef<Task | null>;
   selfCompletedNeed: ComputedRef<boolean>;
   teamNeeds: ComputedRef<NeededItemTeamNeed[]>;
-  cardStyle: ComputedRef<'compact' | 'expanded'>;
 };
 export const neededItemKey: InjectionKey<NeededItemContext> = Symbol('neededitem');
 export const createDefaultNeededItemContext = (): NeededItemContext => {
@@ -46,7 +44,6 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     isCraftable: asComputed(false),
     isKappaRequired: asComputed(false),
     isLightkeeperRequired: asComputed(false),
-    isParentCompleted: asComputed(false),
     item: asComputed(null),
     acceptedItems: asComputed([]),
     hasAlternativeItems: asComputed(false),
@@ -59,6 +56,5 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     relatedTask: asComputed(null),
     selfCompletedNeed: asComputed(false),
     teamNeeds: asComputed([]),
-    cardStyle: asComputed('expanded'),
   };
 };

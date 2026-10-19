@@ -27,10 +27,13 @@
   </div>
 </template>
 <script setup lang="ts">
-  type ViewMode = 'list' | 'grid';
-  const viewMode = defineModel<ViewMode>('viewMode', { required: true });
+  import type {
+    NeededItemsCardStyle,
+    NeededItemsViewMode,
+  } from '@/features/neededitems/neededItemsFilterNormalization';
+  const viewMode = defineModel<NeededItemsViewMode>('viewMode', { required: true });
   const groupByItem = defineModel<boolean>('groupByItem', { required: true });
-  const cardStyle = defineModel<'compact' | 'expanded'>('cardStyle', { required: true });
+  const cardStyle = defineModel<NeededItemsCardStyle>('cardStyle', { required: true });
   const { t } = useI18n({ useScope: 'global' });
   const isListViewActive = computed(() => !groupByItem.value && viewMode.value === 'list');
   const isGridViewActive = computed(() => !groupByItem.value && viewMode.value === 'grid');
@@ -39,7 +42,7 @@
       ? t('needed_items.switch_to_expanded')
       : t('needed_items.switch_to_compact')
   );
-  const setViewMode = (mode: ViewMode) => {
+  const setViewMode = (mode: NeededItemsViewMode) => {
     groupByItem.value = false;
     viewMode.value = mode;
   };
