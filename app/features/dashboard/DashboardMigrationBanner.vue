@@ -1,36 +1,29 @@
 <template>
-  <div v-if="!dismissed" class="mb-3" data-testid="dashboard-migration-banner">
-    <div class="panel px-3 py-2">
-      <div class="flex items-center justify-between gap-2">
-        <div
-          class="light:text-surface-50 flex min-w-0 items-center gap-2 text-sm font-semibold text-white"
-        >
-          <UIcon name="i-mdi-archive-arrow-up" class="text-warning-400 h-4 w-4 shrink-0" />
-          <span class="truncate">
-            {{ t('page.resources.migration_banner.title', 'Moving from TarkovTracker.io?') }}
-          </span>
-        </div>
-        <div class="flex shrink-0 items-center gap-1.5">
-          <UButton
-            size="xs"
-            color="primary"
-            variant="solid"
-            to="/resources/tarkovtracker_org_vs_io"
-            trailing-icon="i-mdi-arrow-right"
-          >
-            {{ t('page.resources.migration_banner.cta', 'Read the migration guide') }}
-          </UButton>
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            icon="i-mdi-close"
-            :aria-label="t('common.close', 'Close')"
-            @click="dismissed = true"
-          />
-        </div>
-      </div>
-    </div>
+  <div
+    v-if="!dismissed"
+    class="border-warning-500/35 bg-warning-500/10 light:bg-warning-100 inline-flex items-center rounded-full border text-xs"
+    data-testid="dashboard-migration-banner"
+  >
+    <UButton
+      size="xs"
+      color="neutral"
+      variant="link"
+      to="/resources/tarkovtracker_org_vs_io"
+      icon="i-mdi-archive-arrow-up"
+      class="text-warning-300 light:text-warning-800 hover:text-warning-200 py-1 pr-1 pl-2.5"
+      :title="t('page.resources.migration_banner.cta', 'Read the migration guide')"
+    >
+      {{ t('page.resources.migration_banner.chip', 'From .io?') }}
+    </UButton>
+    <UButton
+      size="xs"
+      color="neutral"
+      variant="link"
+      icon="i-mdi-close"
+      class="text-surface-400 hover:text-surface-200 py-1 pr-2 pl-0.5"
+      :aria-label="t('common.close', 'Close')"
+      @click="dismissed = true"
+    />
   </div>
 </template>
 <script setup lang="ts">
