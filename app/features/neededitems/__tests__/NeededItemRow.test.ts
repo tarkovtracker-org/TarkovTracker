@@ -123,6 +123,26 @@ describe('NeededItemRow hidden-for-you needs', () => {
       expect(wrapper.findComponent({ name: 'TeamNeedsDisplay' }).exists()).toBe(true);
     }
   );
+  it.each([false, true])(
+    'keeps teammates when an alternative task completed the objective (mobile: %s)',
+    async (mobile) => {
+      belowMd.value = mobile;
+      const wrapper = mountRow(taskNeed, {
+        ...hiddenContext,
+        selfCompletedNeed: computed(() => true),
+        currentCount: computed(() => 3),
+      });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: 'TeamNeedsDisplay' }).exists()).toBe(true);
+      expect(wrapper.text()).not.toContain('3/3');
+    }
+  );
+  it('names the mobile hidden-for-you control from the hint', async () => {
+    belowMd.value = true;
+    const wrapper = mountRow(taskNeed, hiddenContext);
+    await flushPromises();
+    expect(wrapper.find('[aria-label="hint: Alex (1/3)"]').exists()).toBe(true);
+  });
   it('shows own count controls when the task is not hidden', async () => {
     belowMd.value = false;
     const wrapper = mountRow(taskNeed, { ...hiddenContext, hiddenForSelf: computed(() => false) });

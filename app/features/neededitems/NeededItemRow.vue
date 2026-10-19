@@ -81,6 +81,7 @@
               variant="ghost"
               color="neutral"
               class="m-0 p-0 px-1"
+              :aria-label="hiddenForSelf ? hiddenForSelfHint : undefined"
               @click="isSingleItem && !hiddenForSelf ? $emit('toggleCount') : (smallDialog = true)"
             >
               <template v-if="hiddenForSelf">
@@ -181,7 +182,7 @@
                     </div>
                     <!-- Item count actions -->
                     <div
-                      v-if="!selfCompletedNeed"
+                      v-if="hiddenForSelf || !selfCompletedNeed"
                       class="mx-2 mt-2 mb-2 flex h-full flex-col items-center justify-center self-stretch"
                     >
                       <template v-if="hiddenForSelf" />
@@ -231,7 +232,10 @@
               :locked-before="lockedBefore"
               :player-level="tarkovStore.playerLevel()"
             />
-            <div v-if="!selfCompletedNeed" class="mr-2 flex items-center gap-3 self-center">
+            <div
+              v-if="hiddenForSelf || !selfCompletedNeed"
+              class="mr-2 flex items-center gap-3 self-center"
+            >
               <template v-if="hiddenForSelf" />
               <template v-else-if="!isSingleItem">
                 <ItemCountControls
