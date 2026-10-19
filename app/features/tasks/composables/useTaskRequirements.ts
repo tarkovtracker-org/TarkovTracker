@@ -15,6 +15,7 @@ import {
   type RequirementExpectedStatus,
 } from '@/features/tasks/task-requirement-helpers';
 import { hasStoryUnlockProgress, type TaskBlocker } from '@/stores/taskAvailability';
+import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -252,8 +253,18 @@ export const useTaskRequirements = (task: () => Task) => {
       },
     ];
   };
+  const summaryBlockers = computed(() => {
+    const evaluation = progressStore.taskEvaluations?.[task().id]?.self;
+    if (evaluation && !evaluation.blockers.some((blocker) => TERMINAL_BLOCKERS.has(blocker.type)))
+      return evaluation.blockers;
+    return taskServerGateBlockers(task(), {
+      completions: completions.value,
+      confirmations: progressData.value.taskAvailability,
+      storyChapters: storyProgress.value,
+    });
+  });
   const otherSummary = (): TaskRequirementRow[] =>
-    blockers.value
+    summaryBlockers.value
       .filter((blocker) => !SUMMARY_FROM_TASK_DATA.has(blocker.type))
       .flatMap(otherRows);
   const otherRequirementLabels: {
@@ -277,7 +288,7 @@ export const useTaskRequirements = (task: () => Task) => {
       requirement
     );
   const metOtherSummary = (): TaskRequirementRow[] => {
-    const blocked = new Set(blockers.value.map((blocker) => blocker.requirementId));
+    const blocked = new Set(summaryBlockers.value.map((blocker) => blocker.requirementId));
     return normalizeOtherRequirements(task().otherRequirements)
       .filter(
         (requirement): requirement is KnownOtherRequirement =>

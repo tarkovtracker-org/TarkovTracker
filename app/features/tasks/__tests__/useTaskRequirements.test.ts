@@ -1,0 +1,86 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useTaskRequirements } from '@/features/tasks/composables/useTaskRequirements';
+import { buildTaskEvaluations } from '@/stores/taskAvailability';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import type { TaskAvailabilityTeamData } from '@/stores/taskAvailability';
+import type { Task } from '@/types/tarkov';
+const state = vi.hoisted(() => ({ data: {} as TaskAvailabilityTeamData, missing: false }));
+const task: Task = {
+  id: 'target',
+  otherRequirements: [
+    {
+      type: 'storyObjective',
+      id: 'story',
+      storyChapter: { id: 'chapter' },
+      objective: { id: 'objective' },
+    },
+    { type: 'dialogue', id: 'dialogue', traders: ['trader'] },
+  ],
+};
+vi.mock('@/stores/useTarkov', () => ({
+  useTarkovStore: () => ({
+    $state: { currentGameMode: 'pvp' },
+    getCurrentProgressData: () => ({
+      taskCompletions: state.data.completions,
+      taskAvailability: state.data.confirmations,
+      storyChapters: state.data.storyChapters,
+    }),
+  }),
+}));
+vi.mock('@/stores/useProgress', () => ({
+  useProgressStore: () => ({
+    get taskEvaluations() {
+      return state.missing
+        ? {}
+        : buildTaskEvaluations([task], new Map([['self', state.data]]), {
+            requireTraderLevels: false,
+          });
+    },
+  }),
+}));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({ tasks: [], storyChapters: [] }),
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+describe('task requirement summary server gates', () => {
+  beforeEach(() => {
+    state.missing = false;
+    state.data = { completions: {}, faction: 'USEC', level: 50, mode: 'pvp', traders: {} };
+  });
+  it.each(['complete', 'failed', 'missing'] as const)(
+    'evaluates gates independently of %s availability',
+    (status) => {
+      state.missing = status === 'missing';
+      if (status !== 'missing') state.data.completions.target = { [status]: true, timestamp: 1 };
+      const unmet = useTaskRequirements(() => task);
+      expect(unmet.summary.value.map((row) => row.met)).toEqual([false, false]);
+      expect(unmet.blocking.value).toEqual([]);
+      state.data.confirmations = {
+        target: { requirements: otherRequirementsSignature(task)!, timestamp: 2 },
+      };
+      const confirmedOnly = useTaskRequirements(() => task).summary.value;
+      expect(confirmedOnly.map((row) => row.met)).toEqual([true, false]);
+      expect(confirmedOnly[0]?.label).toBe('page.tasks.requirements.dialogue');
+      state.data.storyChapters = { chapter: { objectives: { objective: { complete: true } } } };
+      state.data.confirmations = {};
+      const storyOnly = useTaskRequirements(() => task).summary.value;
+      expect(storyOnly.map((row) => row.met)).toEqual([true, false]);
+      expect(storyOnly[0]?.label).toBe('page.tasks.requirements.story_objective');
+      state.data.confirmations = {
+        target: { requirements: otherRequirementsSignature(task)!, timestamp: 2 },
+      };
+      expect(useTaskRequirements(() => task).summary.value.map((row) => row.met)).toEqual([
+        true,
+        true,
+      ]);
+    }
+  );
+  it('keeps normal availability blockers for a nonterminal task', () => {
+    const requirements = useTaskRequirements(() => task);
+    expect(requirements.summary.value.map((row) => row.met)).toEqual([false, false]);
+    expect(requirements.blocking.value).toHaveLength(2);
+  });
+});
