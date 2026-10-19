@@ -1,3 +1,4 @@
+import { neededCountOf } from '@/features/neededitems/useNeededItemProgress';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -92,7 +93,9 @@ export function useItemDistribution(): UseItemDistributionReturn {
     return taken + takeFir(pool, needed - taken);
   };
   const takeFor = (need: NeedEntry, pool: ItemPool): number =>
-    need.foundInRaid ? takeFir(pool, need.count) : takeNonFirThenFir(pool, need.count);
+    need.foundInRaid
+      ? takeFir(pool, neededCountOf(need))
+      : takeNonFirThenFir(pool, neededCountOf(need));
   const firFirst = <T extends NeedEntry>(needs: T[]): T[] => [
     ...needs.filter((need) => need.foundInRaid),
     ...needs.filter((need) => !need.foundInRaid),
@@ -120,7 +123,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
       const count = takeFor(need, pool);
       if (count === getObjectiveCurrentCount(need)) continue;
       const type = need.needType === 'taskObjective' ? 'task' : 'hideout';
-      updates.push({ id: need.id, type, count, needed: need.count });
+      updates.push({ id: need.id, type, count, needed: neededCountOf(need) });
     }
     return { updates, remainingFir: pool.fir, remainingNonFir: pool.nonFir };
   }
