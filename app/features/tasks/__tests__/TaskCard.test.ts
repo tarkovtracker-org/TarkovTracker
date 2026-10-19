@@ -82,6 +82,7 @@ vi.mock('@/stores/usePreferences', () => ({
       return preferencesState.hideRewards;
     },
     getPinnedTaskIds: preferencesState.pinnedTaskIds,
+    getHiddenTaskIds: [] as string[],
     getRespectTaskFiltersForImpact: false,
     getShowRequiredLabels: true,
     getTaskCollapseDefault: preferencesState.collapseDefault,
@@ -89,6 +90,7 @@ vi.mock('@/stores/usePreferences', () => ({
     getTaskPrimaryView: preferencesState.primaryView,
     getTaskUserView: 'self',
     togglePinnedTask: vi.fn(),
+    toggleHiddenTask: vi.fn(),
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({

@@ -1006,12 +1006,23 @@
         }
       },
       "pinned_tasks_section": "Pinned Tasks",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "Focused Task",
       "focused_task_description": "Opened from a task link so you can see exactly where to continue.",
       "global_tasks_section": "Global Tasks",
       "questcard": {
         "pin_task": "Pin task",
         "unpin_task": "Unpin task",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "Wiki page",
         "unlocks_next": "Unlocks next",
         "copy_task_link": "Copy Task Link",

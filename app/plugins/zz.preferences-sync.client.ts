@@ -1,4 +1,5 @@
 import { useSupabaseSync, type SupabaseSyncReturn } from '@/composables/supabase/useSupabaseSync';
+import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   clearPendingResetPreferencesSnapshot,
   getPersistedPreferencesState,
@@ -210,6 +211,7 @@ const buildPreferencesSyncPayload = (
           (taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0
         )
       : [],
+    hidden_task_ids: normalizeTaskIdList(preferencesState.hiddenTaskIds),
     task_filter_presets: Array.isArray(preferencesState.taskFilterPresets)
       ? preferencesState.taskFilterPresets
       : [],
