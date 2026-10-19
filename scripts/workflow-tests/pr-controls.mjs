@@ -1789,3 +1789,38 @@ test('preflight deadline returns even when transport delays cancellation and sto
   assert.equal(reads, 0);
   assert.deepEqual([f.pointers, f.comments, f.dispatches], [[], [], []]);
 });
+test('Dependabot #1306 missing-review receipt presents existing exact-head fallback only', () => {
+  const input = {
+    headSha: '603cf12b649ef56cbe519294b0c6f0778136b979',
+    checks: {
+      'CI Result': { state: 'success' },
+      'Preview Result': { state: 'success' },
+      'Review Admission': {
+        state: 'failure',
+        description: 'Completed exact-head independent review is required.',
+      },
+    },
+    state: 'open',
+    result: 'Ready.',
+    revision: 'test',
+  };
+  const panel = renderControlPanel(input);
+  assert.match(panel, /non-author write collaborator/);
+  assert.match(panel, /approve-review/);
+  assert.match(panel, /603cf12b649ef56cbe519294b0c6f0778136b979/);
+  assert.match(panel, /not evidence of independent review/);
+  assert.match(panel, /does not complete review/);
+  assert.equal(input.checks['Review Admission'].state, 'failure');
+  const terminal = renderControlPanel({ ...input, terminal: true });
+  assert.match(terminal, /Admin attestation controls are disabled/);
+  assert.doesNotMatch(terminal, /operation approve-review/);
+  for (const admission of [
+    null,
+    { state: 'pending' },
+    { state: 'success' },
+    { state: 'failure', description: 'Unresolved finding.' },
+  ]) {
+    const other = renderControlPanel({ ...input, checks: { 'Review Admission': admission } });
+    assert.doesNotMatch(other, /non-author write collaborator/);
+  }
+});

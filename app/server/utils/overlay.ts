@@ -25,7 +25,11 @@ import {
 } from './objectiveTypeInferrer';
 import { addFallbackCrafts, addFallbackItems } from './overlayAdditions';
 import { overlayAuthHeaders } from './overlayAuth';
-import { attachCounterDerivations, usableCounterDerivations } from './overlayCounters';
+import {
+  attachCounterDerivations,
+  progressionPools,
+  usableCounterDerivations,
+} from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
@@ -803,7 +807,8 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   if (Array.isArray(result.data.tasks))
     result.data.tasks = attachCounterDerivations(
       result.data.tasks,
-      usableCounterDerivations(overlay, mode)
+      usableCounterDerivations(overlay, mode),
+      progressionPools(overlay, mode)
     );
   return result;
 }

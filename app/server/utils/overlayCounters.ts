@@ -16,7 +16,7 @@ import {
 } from '@/utils/taskCounters';
 import { isPlainObject } from './deepMerge';
 import type { OverlayData } from './overlayTypes';
-import type { TaskCounterDerivation } from '@/types/tarkov';
+import type { TaskCounterDerivation, TaskProgressionPool } from '@/types/tarkov';
 /** Game-rules revisions whose counter mappings this consumer applies. */
 export const SUPPORTED_COUNTER_REVISIONS: ReadonlySet<string> = new Set(['1.1.0']);
 const COUNTER_MODES: ReadonlySet<string> = new Set(['regular', 'pve', 'pvp-season']);
@@ -33,6 +33,7 @@ type CounterEntry = {
   coverage: 'complete' | 'partial';
   derivation: TaskCounterDerivation;
   proof: string[];
+  pool?: Pick<TaskProgressionPool, 'traderId' | 'loyaltyLevel'>;
 };
 type CounterRegistry = Record<string, Record<string, CounterEntry>>;
 const nonEmpty = (value: unknown): value is string =>
@@ -52,10 +53,21 @@ const validDerivation = (value: unknown): boolean =>
   Object.hasOwn(DERIVATION_KEYS, String(value.type)) &&
   hasExactKeys(value, DERIVATION_KEYS[String(value.type)]!) &&
   validContributors(value);
+const validPool = (pool: unknown): boolean =>
+  isPlainObject(pool) &&
+  [
+    hasExactKeys(pool, ['traderId', 'loyaltyLevel']),
+    nonEmpty(pool.traderId),
+    [1, 2, 3, 4].includes(pool.loyaltyLevel as number),
+  ].every(Boolean);
+const validEntryKeys = (entry: Record<string, unknown>): boolean =>
+  Object.hasOwn(entry, 'pool')
+    ? hasExactKeys(entry, [...ENTRY_KEYS, 'pool']) && validPool(entry.pool)
+    : hasExactKeys(entry, ENTRY_KEYS);
 const validEntry = (entry: unknown): boolean =>
   isPlainObject(entry) &&
   [
-    hasExactKeys(entry, ENTRY_KEYS),
+    validEntryKeys(entry),
     nonEmpty(entry.revision),
     ['verified', 'unresolved'].includes(entry.verification as string),
     ['complete', 'partial'].includes(entry.coverage as string),
@@ -90,32 +102,76 @@ export const usableCounterDerivations = (
       .map(([variableId, entry]) => [variableId, entry.derivation])
   );
 };
+/** Informational pools use only supported revisions, including unresolved entries. */
+export const progressionPools = (
+  overlay: Pick<OverlayData, 'progressionCounters'>,
+  mode: string
+): Map<string, TaskProgressionPool> => {
+  const registry = overlay.progressionCounters;
+  if (!validProgressionCounters(registry) || !Object.hasOwn(registry, mode)) return new Map();
+  return new Map(
+    Object.entries(registry[mode]!).flatMap(([id, entry]) =>
+      entry.pool && SUPPORTED_COUNTER_REVISIONS.has(entry.revision)
+        ? [
+            [
+              id,
+              {
+                ...entry.pool,
+                verification: entry.verification,
+                coverage: entry.coverage,
+                derivation: entry.derivation,
+              },
+            ] as [string, TaskProgressionPool],
+          ]
+        : []
+    )
+  );
+};
 type TaskWithGates = { id: string; otherRequirements?: unknown };
 /** A fresh copy, so attached gates never share arrays with the registry or each other. */
 const copyDerivation = (derivation: TaskCounterDerivation): TaskCounterDerivation =>
   derivation.type === 'taskGroupCompletions'
     ? { type: derivation.type, groups: derivation.groups.map(copyCounterGroup) }
     : { type: derivation.type, taskIds: [...derivation.taskIds] };
+const existingDerivation = (
+  derivation: TaskCounterDerivation | undefined,
+  taskIds: ReadonlySet<string>
+): TaskCounterDerivation | undefined =>
+  derivation && counterTaskIds(derivation).every((id) => taskIds.has(id))
+    ? copyDerivation(derivation)
+    : undefined;
+const existingPool = (
+  pool: TaskProgressionPool | undefined,
+  taskIds: ReadonlySet<string>
+): TaskProgressionPool | undefined => {
+  const derivation = existingDerivation(pool?.derivation, taskIds);
+  return pool && derivation ? { ...pool, derivation } : undefined;
+};
 /**
  * The registry is the only source of a derivation: any `counter` already on a gate (for example
  * from a task correction) is replaced, and one is attached only when every contributor exists in
  * the same task list, since a missing contributor could never be completed.
  */
+const isVariableGate = (requirement: unknown): requirement is Record<string, unknown> =>
+  isPlainObject(requirement) && requirement.type === 'globalVariable';
 const withCounter = (
   requirement: unknown,
   derivations: Map<string, TaskCounterDerivation>,
-  taskIds: ReadonlySet<string>
+  taskIds: ReadonlySet<string>,
+  pools: Map<string, TaskProgressionPool>
 ): unknown => {
-  if (!isPlainObject(requirement) || requirement.type !== 'globalVariable') return requirement;
+  if (!isVariableGate(requirement)) return requirement;
   const gate: Record<string, unknown> = { ...requirement };
   delete gate.counter;
-  const derivation = derivations.get(String(gate.variableId));
-  if (!derivation || !counterTaskIds(derivation).every((id) => taskIds.has(id))) return gate;
-  return { ...gate, counter: copyDerivation(derivation) };
+  delete gate.taskPool;
+  const taskPool = existingPool(pools.get(String(gate.variableId)), taskIds);
+  const counter = existingDerivation(derivations.get(String(gate.variableId)), taskIds);
+  return { ...gate, ...(taskPool ? { taskPool } : {}), ...(counter ? { counter } : {}) };
 };
 export const attachCounterDerivations = <T extends TaskWithGates>(
   tasks: T[],
-  derivations: Map<string, TaskCounterDerivation>
+  derivations: Map<string, TaskCounterDerivation>,
+  pools: Map<string, TaskProgressionPool> = new Map()
 ): T[] => {
   const taskIds = new Set(tasks.map((task) => task.id));
   return tasks.map((task) =>
@@ -123,7 +179,7 @@ export const attachCounterDerivations = <T extends TaskWithGates>(
       ? {
           ...task,
           otherRequirements: task.otherRequirements.map((requirement) =>
-            withCounter(requirement, derivations, taskIds)
+            withCounter(requirement, derivations, taskIds, pools)
           ),
         }
       : task

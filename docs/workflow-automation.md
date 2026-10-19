@@ -1209,3 +1209,23 @@ pnpm run lint:fix
 | Semantic Release     | [semantic-release.gitbook.io](https://semantic-release.gitbook.io/semantic-release/)         | GitBook hosted docs       |
 | Dependabot Docs      | [docs.github.com/code-security/dependabot](https://docs.github.com/code-security/dependabot) | Official documentation    |
 | Cloudflare Pages     | [developers.cloudflare.com/pages](https://developers.cloudflare.com/pages/)                  | Cloudflare developer docs |
+
+### Narrow formatter validation
+
+A lockfile-only Prettier patch/minor resolution refresh can select the formatter profile.
+The classifier reads complete immutable current-base/head `package.json` and `pnpm-lock.yaml` files:
+the manifest must be byte-identical, a single root importer must keep Prettier and its existing
+Tailwind formatter plugin in dev dependencies, and only the Prettier leaf version/integrity and
+that unchanged plugin's Prettier peer binding may differ. All other lockfile bytes, including
+runtime/build dependency records, importer edges, package metadata and snapshot edges, stay
+identical. Another formatter consumer, plugin upgrade, manifest update, mixed path, unknown
+shape or incomplete evidence selects full validation. If the app/build starts consuming these
+formatter packages, remove this exemption in that change.
+
+The profile retains application lint, full formatting, blank-line scanner tests, workflow tooling,
+systems drift, security and unchanged review admission. Application type/unit/coverage/build,
+DB and Worker jobs can skip. The trusted main preview controller independently reads the same
+immutable files; it never trusts the candidate's formatter flag. Queue comparisons retain exact
+current-main/single-parent, complete-path, CI-attempt and final freshness checks. Main pushes and
+manual CI dispatches stay full. Roll back by forcing full classification and preview-required;
+no credentials, permissions, protected environments or queue rules change.

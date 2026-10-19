@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { formatterOnlyChange, formatterPaths } from './formatter-validation.mjs';
 import { gitExecutable } from './validation-tools.mjs';
 // `security` (dependency audit, Gitleaks, CodeQL through the reusable workflow) reports on every
 // CI run: pull requests, main pushes, and explicit dispatches all gate on it.
@@ -108,23 +109,25 @@ function requiresPreview(paths, forceFull) {
   if (forceFull || paths.length === 0) return true;
   return !paths.every(inertPath);
 }
-export function classifyPaths(paths, { forceFull = false, reason } = {}) {
+export function classifyPaths(paths, { forceFull = false, reason, formatterOnly = false } = {}) {
   const categories = new Set(paths.map(pathCategory));
-  const full = requiresFullValidation(paths, categories, forceFull);
-  const previewRequired = requiresPreview(paths, forceFull);
+  const formatter = [!forceFull, formatterOnly, formatterPaths(paths)].every(Boolean);
+  const full = [!formatter, requiresFullValidation(paths, categories, forceFull)].every(Boolean);
+  const previewRequired = [!formatter, requiresPreview(paths, forceFull)].every(Boolean);
   return {
     full,
+    formatter,
     docs: categories.has('docs'),
     locales: categories.has('locales'),
     i18n: full || categories.has('locales'),
     workflows: touchesWorkflows(paths),
     previewRequired,
     jobs: selectExpectedJobs(full, previewRequired),
-    reason: reason || defaultReason(full),
+    reason: formatterReason(formatter, reason, full),
     paths,
   };
 }
-// Queue reductions are narrower than ordinary PR reductions: only existing inert documentation.
+// Queue reductions are narrower: inert documentation or an independently proven formatter lock.
 // Agent policy files and all GitHub configuration retain full queue validation.
 function queueDocumentationPath(path) {
   if (typeof path !== 'string' || path.startsWith('.github/')) return false;
@@ -134,8 +137,12 @@ function queueDocumentationPath(path) {
 export function classifyQueuePaths(paths, options = {}) {
   return classifyPaths(paths, {
     ...options,
-    forceFull: options.forceFull || paths.length >= 300 || !paths.every(queueDocumentationPath),
+    forceFull: options.forceFull || paths.length >= 300 || !queueReducedPaths(paths, options),
   });
+}
+function queueReducedPaths(paths, options) {
+  if (options.formatterOnly && formatterPaths(paths)) return true;
+  return paths.every(queueDocumentationPath);
 }
 function queueComparisonBase(git, base, head, baseSha, headSha) {
   if (![base, head].every((sha) => /^[a-f0-9]{40}$/.test(sha)))
@@ -198,13 +205,29 @@ export function collectChanges({
       git('diff', '--name-status', '-z', '--find-renames', mergeBase, headSha, '--')
     );
     collectLocalPaths(git, paths, local && !queue);
-    return { paths: [...new Set(paths)], baseSha, headSha };
+    return {
+      paths: [...new Set(paths)],
+      baseSha,
+      headSha,
+      formatterOnly: localFormatterProof(git, baseSha, headSha, paths, local),
+    };
   } catch {
     return {
       paths: [],
       error: 'Cannot resolve or read complete Git diff; selecting full validation',
     };
   }
+}
+function localFormatterProof(git, base, head, paths, local) {
+  if (local) return false;
+  if (!formatterPaths(paths)) return false;
+  if (git('diff', '--summary', base, head, '--', 'package.json', 'pnpm-lock.yaml').trim())
+    return false;
+  const inputs = (ref) => ({
+    manifest: git('show', `${ref}:package.json`),
+    lock: git('show', `${ref}:pnpm-lock.yaml`),
+  });
+  return formatterOnlyChange(inputs(base), inputs(head));
 }
 function hasPlanShape(plan) {
   return Boolean(plan) && Array.isArray(plan.jobs) && typeof plan.full === 'boolean';
@@ -246,4 +269,10 @@ export function aggregateResults(plan, needs) {
     classifierError(needs),
     unexpectedJobsError(needs),
   ].filter(Boolean);
+}
+function formatterReason(formatter, reason, full) {
+  return (
+    reason ||
+    (formatter ? 'Verified lockfile-only Prettier resolution refresh' : defaultReason(full))
+  );
 }

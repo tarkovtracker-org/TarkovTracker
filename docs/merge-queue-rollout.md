@@ -235,7 +235,7 @@ deployment lifecycle are described in [previews](systems/previews.md#queue-previ
 Native queue previews serialize with retention using `queue: max`. Ordinary and fork previews
 keep their own per-CI-run lock, so fork approval waits do not block the shared queue lifecycle.
 The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
-60-minute response bound. Only proven inert docs integrations use the reduced validation and
+60-minute response bound. Only proven inert docs integrations and narrowly verified lockfile-only Prettier refreshes use the reduced validation and
 not-applicable preview described above; other integrations keep full CI and a deployed preview.
 
 ### Review and preview controls
@@ -299,6 +299,14 @@ burst after the merged workflow activates: compare selector/publisher counts, ti
 publication lock, runner time and avoided publisher API work. Verify that an interleaved legitimate
 operation and current-head/revocation checks still succeed; preserve the existing CI and deployed
 preview gates. Candidate CI never receives the protected publisher credential.
+
+When a bot PR (for example Dependabot) has green CI/preview but admission reports
+`Completed exact-head independent review is required.`, the controls panel offers the existing
+fallback: ask a non-author write collaborator for an approving review of the displayed commit,
+or obtain an explicit admin attestation through the existing controls. Skipped, rate-limited,
+and "no reviewable files" provider results do not count as completed review. Do not repeatedly
+request reviews to bypass included limits. The panel only explains these routes; it grants
+nothing. A changed head needs fresh review or attestation, and sensitive approval stays separate.
 
 An **admin review attestation** is an explicit alternative to completed provider/non-author human
 review, including when the admin authored the PR. It applies to one exact commit and does not

@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { verifiedFormatterChange } from '../ci/formatter-validation.mjs';
 import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import {
@@ -252,7 +253,14 @@ async function checkCiResult(github, context, candidate) {
 async function requiresPreview(github, context, pull) {
   if (!pull) return true;
   const paths = await listPullPaths(github, context.repo, pull.number);
-  return classifyPaths(paths).previewRequired;
+  const formatterOnly = await verifiedFormatterChange(
+    github,
+    context.repo,
+    pull.base.sha,
+    pull.head.sha,
+    paths
+  );
+  return classifyPaths(paths, { formatterOnly }).previewRequired;
 }
 /* ------------------------------------------------------------------------------------------ */
 /* Artifact verification                                                                       */
@@ -626,7 +634,7 @@ async function queueDocumentationDecision(github, context, state) {
   const decision = { ...decisionBase(state), ...notApplicable() };
   const errors = await freshnessErrors(github, context, decision);
   if (errors.length)
-    throw ignore(`Queue documentation candidate is obsolete: ${errors.join('; ')}`);
+    throw ignore(`Non-deployable queue candidate is obsolete: ${errors.join('; ')}`);
   return decision;
 }
 function requestBinding(inputs) {
