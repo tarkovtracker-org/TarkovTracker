@@ -670,6 +670,39 @@ describe('useAppInitialization locale setup', () => {
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
       wrapper.unmount();
     });
+    it.each([false, true])(
+      'reports oversized failures once per session (recovered: %s)',
+      async (recover) => {
+        vi.useFakeTimers();
+        const oversized = new Error('p_modes exceeds the maximum payload size');
+        mockInitializeTarkovSync.mockRejectedValue(oversized);
+        mockSupabaseUser.loggedIn = true;
+        mockSupabaseUser.id = 'user-1';
+        const wrapper = await mountWithComposable();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+        for (const level of [2, 3]) {
+          mockProgressState.pvp.level = level;
+          await vi.advanceTimersByTimeAsync(0);
+        }
+        expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(3);
+        expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+        if (recover) {
+          mockInitializeTarkovSync.mockResolvedValueOnce(undefined);
+          mockProgressState.pvp.level = 4;
+          await vi.advanceTimersByTimeAsync(0);
+          expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledOnce();
+          expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+        }
+        mockSupabaseUser.id = 'user-2';
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mockShowLoadFailed).toHaveBeenCalledTimes(2);
+        mockProgressState.pvp.level = 5;
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mockShowLoadFailed).toHaveBeenCalledTimes(2);
+        wrapper.unmount();
+      }
+    );
     it.each(['logout', 'account switch', 'dispose'])(
       'cancels oversized startup recovery on %s',
       async (transition) => {

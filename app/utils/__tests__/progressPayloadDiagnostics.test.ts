@@ -50,6 +50,17 @@ describe('aggregate progress payload diagnostics', () => {
     reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+  it('caps telemetry across a long sequence of different rejected saves', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    const now = vi.spyOn(Date, 'now');
+    const modes = { pvp: createDefaultOwnedProgressData() };
+    for (let i = 0; i < 35; i++) {
+      now.mockReturnValue(200000 + i * 12000);
+      modes.pvp.level = i + 1;
+      reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
+    }
+    expect(fetch).toHaveBeenCalledTimes(30);
+  });
   it('does not send routine small saves or diagnostics without a configured sink', async () => {
     const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
     const modes = { pvp: createDefaultOwnedProgressData() };

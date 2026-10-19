@@ -83,6 +83,7 @@ export function useAppInitialization() {
   let migrationAttempted = false;
   let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let syncRetryAttempts = 0;
+  let payloadFailureReported = false;
   let stopProgressRecovery: (() => void) | null = null;
   const activityRecordedAt = new Map<string, number>();
   const activityRequests = new Map<string, number>();
@@ -113,6 +114,11 @@ export function useAppInitialization() {
     logger.warn(
       `[useAppInitialization] Initial sync retry ${syncRetryAttempts}/${SYNC_RETRY_MAX_ATTEMPTS} failed`
     );
+  };
+  const reportPayloadFailure = () => {
+    if (payloadFailureReported) return;
+    payloadFailureReported = true;
+    showLoadFailed();
   };
   const scheduleSyncRetry = (expectedUserId?: string, expectedToken?: number) => {
     cancelSyncRetry();
@@ -179,11 +185,12 @@ export function useAppInitialization() {
     resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: userId });
     const payloadTooLarge = isProgressPayloadTooLarge(error);
     publishSyncFailure(userId, payloadTooLarge, expectedUserId, expectedToken);
-    reportSyncFailure();
     if (payloadTooLarge) {
+      reportPayloadFailure();
       recoverAfterProgressChange(userId, expectedToken);
       return;
     }
+    reportSyncFailure();
     scheduleBoundedSyncRetry(expectedUserId, expectedToken);
   };
   /** Manual retry from the save indicator: restart initialization now with a fresh budget. */
@@ -232,6 +239,7 @@ export function useAppInitialization() {
   const resetInitializationState = (loggedIn: boolean) => {
     syncStarted = false;
     migrationAttempted = false;
+    payloadFailureReported = false;
     cancelSyncRetry();
     cancelProgressRecovery();
     syncRetryAttempts = 0;
@@ -335,6 +343,7 @@ export function useAppInitialization() {
       // The replacement session owns syncStarted; stale completions must not clear it.
       if (isStaleInitialization(expectedUserId, expectedToken)) return;
       activityLogStore.migrateLegacyManualEntries();
+      payloadFailureReported = false;
       cancelSyncRetry();
       cancelProgressRecovery();
       syncRetryAttempts = 0;

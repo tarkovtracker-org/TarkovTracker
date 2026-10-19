@@ -31,36 +31,51 @@ const describeModes = (modes: ModeProgressMap) =>
 let sent = 0;
 let lastSentAt = 0;
 let lastRejectedAt = 0;
-/** Aggregate numbers only. No profile keys/values, owner, location, or server error contents. */
-export const reportProgressPayload = (
+const isDiagnosticCandidate = (requestBytes: number, error: unknown): boolean =>
+  requestBytes >= 256 * 1024 || isProgressPayloadTooLarge(error);
+const previousSampleAt = (error: unknown): number =>
+  isProgressPayloadTooLarge(error) ? lastRejectedAt : lastSentAt;
+const canSendDiagnostic = (sink: unknown, previous: number): sink is string =>
+  typeof sink === 'string' && sink.length > 0 && sent < 30 && Date.now() - previous >= 12_000;
+const diagnosticConfig = (error: unknown) => {
+  const config = tryUseNuxtApp()?.$config.public;
+  if (!config) return null;
+  const sink = config.clientLogSinkUrl;
+  if (!canSendDiagnostic(sink, previousSampleAt(error))) return null;
+  return { sink, buildCommit: normalizeBuildCommit(config.buildCommit) };
+};
+const payloadOutcome = (error: unknown): string => {
+  if (isProgressPayloadTooLarge(error)) return 'payload_too_large';
+  return error ? 'failed' : 'accepted';
+};
+const diagnosticBody = (
   modes: ModeProgressMap,
   batch: ModeProgressMap,
-  error: unknown
-): void => {
-  const requestWireBytes = bytes(batch);
-  if (requestWireBytes < 256 * 1024 && !isProgressPayloadTooLarge(error)) return;
-  const config = tryUseNuxtApp()?.$config?.public;
-  const sink = config?.clientLogSinkUrl;
-  const oversized = isProgressPayloadTooLarge(error);
-  const previous = oversized ? lastRejectedAt : lastSentAt;
-  if (typeof sink !== 'string' || !sink || sent >= 30 || Date.now() - previous < 12_000) return;
-  const summary = {
-    buildCommit: normalizeBuildCommit(config?.buildCommit),
-    aggregateWireBytes: bytes(modes),
-    requestWireBytes,
-    modes: describeModes(modes),
-    batchModes: Object.keys(batch),
-    outcome: isProgressPayloadTooLarge(error) ? 'payload_too_large' : error ? 'failed' : 'accepted',
-  };
-  const body = JSON.stringify({
+  error: unknown,
+  buildCommit: string
+) =>
+  JSON.stringify({
     level: 'warn',
     href: null,
     timestamp: new Date().toISOString(),
-    args: ['progress_sync_payload', summary],
+    args: [
+      'progress_sync_payload',
+      {
+        buildCommit,
+        aggregateWireBytes: bytes(modes),
+        requestWireBytes: bytes(batch),
+        modes: describeModes(modes),
+        batchModes: Object.keys(batch),
+        outcome: payloadOutcome(error),
+      },
+    ],
   });
+const recordSample = (error: unknown): void => {
   sent += 1;
-  if (oversized) lastRejectedAt = Date.now();
+  if (isProgressPayloadTooLarge(error)) lastRejectedAt = Date.now();
   else lastSentAt = Date.now();
+};
+const sendDiagnostic = (sink: string, body: string): void => {
   // Diagnostics never affect save acknowledgement, including synchronous transport failures.
   try {
     void fetch(sink, {
@@ -74,4 +89,17 @@ export const reportProgressPayload = (
   } catch {
     /* Some browsers reject a keepalive request synchronously. */
   }
+};
+/** Aggregate numbers only. No profile keys/values, owner, location, or server error contents. */
+export const reportProgressPayload = (
+  modes: ModeProgressMap,
+  batch: ModeProgressMap,
+  error: unknown
+): void => {
+  if (!isDiagnosticCandidate(bytes(batch), error)) return;
+  const config = diagnosticConfig(error);
+  if (!config) return;
+  const body = diagnosticBody(modes, batch, error, config.buildCommit);
+  recordSample(error);
+  sendDiagnostic(config.sink, body);
 };
