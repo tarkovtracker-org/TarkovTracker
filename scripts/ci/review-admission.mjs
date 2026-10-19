@@ -14,6 +14,7 @@ import {
 } from './review-admission-api.mjs';
 import { readAdmissionArchive } from './review-admission-binding.mjs';
 import { codeRabbitCommentEvent, readCodeRabbitComments } from './review-admission-coderabbit.mjs';
+import { crowdinEligibility } from './review-admission-crowdin.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import {
@@ -51,6 +52,7 @@ async function evidence(github, repo, pr) {
   });
   const threads = await reviewThreads(github, repo, pr.number);
   const trusted = await trustedActors(github, repo, reviews, comments);
+  const crowdinSafe = await crowdinEligibility(github, pr, files);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
   const adminAttestation = await currentAdminAttestation(
@@ -67,6 +69,7 @@ async function evidence(github, repo, pr) {
     checks,
     threads,
     trusted,
+    crowdinSafe,
     dependencySafe,
     releaseSafe,
     adminAttestation,
@@ -113,7 +116,7 @@ export async function evaluateAdmission({ github, context, number, group, source
     context,
     statusSha,
     'pending',
-    'Checking exact-head independent review and sensitive approval.'
+    'Checking exact-head review policy and sensitive approval.'
   );
   try {
     return await checkedAdmission({ github, context, pr, group, source, statusSha });
@@ -214,7 +217,9 @@ export async function publishReviewAdmission({ github, context, sha }) {
       context,
       sha,
       'success',
-      `Verified ${decision.review.provider} review; ${decision.risk} risk admission approved.`
+      decision.review.provider === 'crowdin-policy'
+        ? 'Verified Crowdin translation policy exemption; low risk admission approved.'
+        : `Verified ${decision.review.provider} review; ${decision.risk} risk admission approved.`
     );
   } catch (error) {
     await status(github, context, sha, 'failure', error.message);

@@ -526,10 +526,21 @@ before guarded native enqueue. It executes no candidate code and does not dispat
 CI, previews, review requests or admission publications. Missing gates hold the head until a
 later completion event; API failures remain visible in the job log.
 
-Translations still require substantive independent review. The committed CodeRabbit title and
-locale path exclusions mean its skipped Crowdin review cannot satisfy admission. An eligible
-completed provider review or independent collaborator review is required; the continuation never
-waives this requirement or records an admin attestation. Selecting an unattended translation
-review provider or changing its exclusions is a separate policy decision. To roll back the
-continuation, disable `Crowdin Promotion`; existing queue and publisher protections remain active,
-and a reviewed translation PR can still be submitted with the trusted enqueue helper.
+Verified Crowdin translation PRs are exempt from requesting independent review. This exemption
+requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
+GitHub Actions bot ID/type/login, a complete unique non-English locale inventory, and an immutable
+GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
+modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
+review. The policy additionally requires a head-owned validation receipt uploaded by this
+repository's main-owned Crowdin Sync workflow after format, i18n and systems checks. The publisher
+authenticates the service-owned artifact/run/path/event/repository, exact run attempt and source on
+trusted main history; titles, labels and author display names cannot grant the exemption. A live
+sync may supply its already-uploaded validation receipt before its final handoff finishes.
+
+The admission receipt records `crowdin-policy` / `review-exempt`, rather than claiming that a
+review occurred. Open review threads, changes requested and authenticated substantive provider
+findings remain blockers. CI, syntax/placeholders/key checks, preview, sensitive-change policy,
+current-head fences and native queue integration are unchanged. A changed head needs a new trusted
+Crowdin validation receipt; historical PRs are not grandfathered. There are no provider requests or
+billing/configuration changes. To roll back the continuation, disable `Crowdin Promotion`; removing
+the scoped `crowdinExemption` admission route restores the ordinary independent-review requirement.

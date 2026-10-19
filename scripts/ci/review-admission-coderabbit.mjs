@@ -161,3 +161,15 @@ export function codeRabbitCommentReview(comments, head) {
   if (!completed(comment.body.replaceAll('\r\n', '\n'), head)) return null;
   return { provider: 'CodeRabbit', reviewId: comment.id, commit: head, kind: 'issue-comment' };
 }
+// A Crowdin exemption removes the requirement to request review, never existing findings.
+export function codeRabbitOutstandingFindings(comments, head) {
+  return comments.some((comment) =>
+    [
+      authenticated(comment),
+      exactCoverage(comment.body ?? '', head),
+      /(?:Actionable comments posted|Outside diff range comments)\s*[:(]\s*\*{0,2}0*[1-9]\d*|\b0*[1-9]\d* (?:actionable )?(?:issues?|findings?) (?:found|remain)\b/i.test(
+        comment.body ?? ''
+      ),
+    ].every(Boolean)
+  );
+}

@@ -59,7 +59,7 @@ jobs:
           # Missing/failed review stays pending without dispatching a review, CI or preview.
           # The CLI authenticates the dedicated publisher, attempt, source and uploaded receipt.
           if ! node scripts/ci/review-admission-cli.mjs "$GITHUB_REPOSITORY" "$head" "$number"; then
-            echo "::notice::Crowdin head has no valid admission receipt; awaiting independent review or resolved findings."
+            echo "::notice::Crowdin head has no valid admission receipt; awaiting trusted Crowdin provenance or resolved findings."
             exit 0
           fi
           echo "pr_number=$number" >> "$GITHUB_OUTPUT"
