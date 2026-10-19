@@ -1,5 +1,6 @@
 // Queue candidates are temporary integration commits, never PR heads. Reuse the trusted
 // preview uploader only while the exact queue ref and CI attempt remain live.
+import { verifiedFormatterChange } from '../ci/formatter-validation.mjs';
 import { classifyQueuePaths } from '../ci/validation-plan.mjs';
 import { PRODUCTION_BRANCH } from './profile.mjs';
 const SHA = /^[0-9a-f]{40}$/;
@@ -120,11 +121,18 @@ function comparisonPaths(files) {
   const paths = files.map(comparisonFilePaths);
   return paths.includes(null) ? [] : paths.flat();
 }
-function comparisonRequiresPreview(data, candidate, revision) {
+async function comparisonRequiresPreview(github, context, data, candidate, revision) {
   const paths = exactQueueComparison(data ?? {}, candidate, revision)
     ? comparisonPaths(data.files)
     : [];
-  return classifyQueuePaths(paths).previewRequired;
+  const formatterOnly = await verifiedFormatterChange(
+    github,
+    context.repo,
+    revision.baseSha,
+    candidate.headSha,
+    paths
+  );
+  return classifyQueuePaths(paths, { formatterOnly }).previewRequired;
 }
 export async function queueRequiresPreview(github, context, candidate, revision) {
   try {
@@ -135,7 +143,7 @@ export async function queueRequiresPreview(github, context, candidate, revision)
       per_page: 100,
       page: 1,
     });
-    return comparisonRequiresPreview(data, candidate, revision);
+    return await comparisonRequiresPreview(github, context, data, candidate, revision);
   } catch (error) {
     if ([404, 422].includes(error.status))
       throw new QueueValidationError(

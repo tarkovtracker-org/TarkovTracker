@@ -20,6 +20,7 @@ jobs:
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
       full: ${{ steps.plan.outputs.full }}
+      tooling: ${{ steps.plan.outputs.tooling }}
       i18n: ${{ steps.plan.outputs.i18n }}
       workflows: ${{ steps.plan.outputs.workflows }}
       preview: ${{ steps.plan.outputs.preview }}
@@ -37,7 +38,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        # PRs select by path; queues reduce only proven inert docs. Pushes and dispatches stay full.
+        # PRs select by path/proof; queues reduce only inert docs or verified formatter locks.
+        # Pushes and dispatches stay full.
         # Rollback: re-add the shadow flag of scripts/ci/validate-changes.mjs to force every job and
         # invert the shadow-flag assertion in scripts/workflow-tests/workflows.mjs in the same change.
         run: |
@@ -99,11 +101,11 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Lint
-        if: needs.changes.outputs.full == 'true'
+        if: needs.changes.outputs.tooling == 'true'
         run: pnpm run lint
       - name: Format check
         env:
-          FULL_VALIDATION: ${{ needs.changes.outputs.full }}
+          FULL_VALIDATION: ${{ needs.changes.outputs.tooling }}
         run: |
           if [ "$FULL_VALIDATION" = "true" ]; then
             pnpm run format:check:prettier
@@ -114,10 +116,10 @@ jobs:
         if: needs.changes.outputs.i18n == 'true'
         run: pnpm run i18n:check
       - name: Test blank-line scanners with coverage
-        if: needs.changes.outputs.full == 'true'
+        if: needs.changes.outputs.tooling == 'true'
         run: pnpm run test:blank-lines
       - name: Test workflow tooling
-        if: needs.changes.outputs.full == 'true'
+        if: needs.changes.outputs.tooling == 'true'
         env:
           WORKFLOW_TEST_PLAN: ${{ needs.changes.outputs.plan }}
           WORKFLOW_TEST_EVENT: ${{ github.event_name }}

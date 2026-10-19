@@ -26,6 +26,7 @@ if (options.queue && options.mode !== 'ci') malformed = true;
 const changes = collectChanges({ ...options, local: options.mode !== 'ci' });
 const classify = options.queue ? classifyQueuePaths : classifyPaths;
 const proposed = classify(changes.paths, {
+  formatterOnly: changes.formatterOnly,
   forceFull: Boolean(changes.error) || malformed || options.full || options.mode === 'full',
   reason:
     changes.error || (malformed ? 'Malformed arguments; selecting full validation' : undefined),
@@ -39,7 +40,7 @@ console.log(
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\npreview=${plan.previewRequired}\n`
+    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\ntooling=${plan.full || plan.formatter}\npreview=${plan.previewRequired}\n`
   );
 }
 if (options.explain) process.exit(0);
@@ -55,6 +56,13 @@ const commands = plan.full
       ['run', 'systems:check'],
     ]
   : [
+      ...(plan.formatter
+        ? [
+            ['run', 'lint'],
+            ['run', 'test:workflow'],
+            ['run', 'test:blank-lines'],
+          ]
+        : []),
       ['run', 'format:check'],
       ['run', 'systems:check'],
       ...(plan.i18n ? [['run', 'i18n:check']] : []),
