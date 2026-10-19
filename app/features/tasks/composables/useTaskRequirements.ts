@@ -1,4 +1,5 @@
 import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
+import { useTaskPoolRequirements } from '@/features/tasks/composables/useTaskPoolRequirements';
 import {
   formatActionVerbs,
   formatComparison,
@@ -22,6 +23,7 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
+import type { TaskRequirementPool } from '@/features/tasks/task-pool';
 import type {
   NormalizedTraderRequirement,
   RequirementComparison,
@@ -30,7 +32,7 @@ import type {
   TaskRequirement,
 } from '@/types/tarkov';
 export type TaskRequirementKind =
-  'player_level' | 'trader_level' | 'trader_reputation' | 'task' | 'other';
+  'player_level' | 'trader_level' | 'trader_reputation' | 'task' | 'task_pool' | 'other';
 export type TaskRequirementRow = {
   kind: TaskRequirementKind;
   met: boolean;
@@ -38,6 +40,7 @@ export type TaskRequirementRow = {
   progress?: string;
   hint?: string;
   to?: string;
+  pool?: TaskRequirementPool;
 };
 type TraderKind = 'trader_level' | 'trader_reputation';
 type KnownTraderRequirement = Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }>;
@@ -70,6 +73,7 @@ export const useTaskRequirements = (task: () => Task) => {
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
   const blockerText = useTaskBlockerText();
+  const poolRow = useTaskPoolRequirements(task);
   const progressData = computed(() => tarkovStore.getCurrentProgressData());
   const completions = computed(() => progressData.value.taskCompletions ?? {});
   const you = (value: number | string) => t('page.tasks.requirements.you', { value });
@@ -94,9 +98,17 @@ export const useTaskRequirements = (task: () => Task) => {
     }),
     progress: you(formatTraderValue(kind, blocker.current)),
   });
-  const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => [
-    { kind: 'other', met: false, label: blockerText(blocker) },
-  ];
+  const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => {
+    const requirement = normalizeOtherRequirements(task().otherRequirements).find(
+      (requirement) =>
+        requirement.type === 'globalVariable' && requirement.id === blocker.requirementId
+    );
+    return [
+      requirement?.type === 'globalVariable'
+        ? poolRow(requirement, false, blocker)
+        : { kind: 'other', met: false, label: blockerText(blocker) },
+    ];
+  };
   const taskName = (id: string) => metadataStore.getTaskById(id)?.name ?? id;
   const taskState = (id: string) => ({
     completion: completions.value[id],
@@ -278,10 +290,7 @@ export const useTaskRequirements = (task: () => Task) => {
         objective: requirement.objective.name ?? requirement.objective.id,
         chapter: requirement.storyChapter.name ?? requirement.storyChapter.id,
       }),
-    globalVariable: (requirement) =>
-      t('page.tasks.requirements.global_variable', {
-        requirement: formatComparison(t, requirement.compareMethod, requirement.value),
-      }),
+    globalVariable: () => t('page.tasks.requirements.global_variable'),
   };
   const otherRequirementLabel = (requirement: KnownOtherRequirement): string =>
     (otherRequirementLabels[requirement.type] as (value: KnownOtherRequirement) => string)(
@@ -294,11 +303,11 @@ export const useTaskRequirements = (task: () => Task) => {
         (requirement): requirement is KnownOtherRequirement =>
           requirement.type !== 'unknown' && !blocked.has(requirement.id)
       )
-      .map((requirement) => ({
-        kind: 'other',
-        met: true,
-        label: otherRequirementLabel(requirement),
-      }));
+      .map((requirement): TaskRequirementRow =>
+        requirement.type === 'globalVariable'
+          ? poolRow(requirement, true)
+          : { kind: 'other', met: true, label: otherRequirementLabel(requirement) }
+      );
   };
   const summary = computed(() => [
     ...levelSummary(),

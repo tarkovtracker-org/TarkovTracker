@@ -388,9 +388,41 @@ describe('TaskCard appearance and expansion controls', () => {
     const rows = summary.findAll('li').map((item) => item.text());
     expect(rows).toEqual([
       expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
-      expect.stringMatching(/^Met:\s*Server progression 3\+/),
+      expect.stringMatching(/^Met:\s*Additional in-game progression required/),
       expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
     ]);
+    wrapper.unmount();
+  });
+  it('opens pool contributors from a chip even when the task body starts collapsed', async () => {
+    preferencesState.collapseDefault = true;
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'task_counter', requirementId: 'pool-gate', current: 0, required: 1 }],
+        },
+      },
+    };
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: 'Contributor task' }));
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'pool-gate',
+          variableId: 'v',
+          compareMethod: '>=',
+          value: 1,
+          counter: { type: 'distinctTaskCompletions', taskIds: ['contributor'] },
+        },
+      ],
+    });
+    expect(wrapper.find('[data-testid="task-requirements-summary"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="task-requirement-chip"] button').trigger('click');
+    expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('Contributor task');
+    expect(
+      wrapper.get('[data-testid="task-requirements-summary"] button').attributes('aria-expanded')
+    ).toBe('true');
     wrapper.unmount();
   });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {

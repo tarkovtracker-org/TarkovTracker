@@ -6,6 +6,7 @@ vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     tasks: [{ id: 'prior', name: 'Prior quest' }],
     storyChapters: [{ id: 'story', name: 'Story route' }],
+    traders: [{ id: 'mechanic', name: 'Mechanic' }],
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -20,6 +21,22 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('canonical blocker text', () => {
+  it('uses the same named pool instruction for dashboard blockers', () => {
+    expect(
+      useTaskBlockerText()({
+        type: 'global_variable_unknown',
+        required: 3,
+        compareMethod: '>=',
+        taskPool: {
+          traderId: 'mechanic',
+          loyaltyLevel: 2,
+          verification: 'unresolved',
+          coverage: 'partial',
+          derivation: { type: 'distinctTaskCompletions', taskIds: ['a'] },
+        },
+      })
+    ).toBe('Complete at least 3 LL2 tasks for Mechanic · Progress unverified');
+  });
   it('names the trader and exact storyline unlock objective', () => {
     expect(
       useTaskBlockerText()({
@@ -72,7 +89,7 @@ describe('canonical blocker text', () => {
     ],
     [
       { type: 'task_counter', current: 3, required: 5, compareMethod: '>=' },
-      'Requires 5+ completed tasks from this trader loyalty tier (completed: 3).',
+      'Complete at least 5 tasks from the required pool · 3/5 tracked',
     ],
   ] as const)('phrases %o comparisons in plain language', (blocker, expected) => {
     const text = useTaskBlockerText()(blocker);

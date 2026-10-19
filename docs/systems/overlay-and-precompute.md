@@ -325,7 +325,7 @@ flowchart LR
 - The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
   `PRECOMPUTED_ENVELOPE_VERSION = 2`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v4-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - EFT import has exactly three additional English keys, built by `buildTaskImportKey(mode)`:
   `tasks-import-json-v1-en-regular`, `tasks-import-json-v1-en-pve`, and
@@ -406,6 +406,8 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
+Task-core pool descriptions use the shared `json-v4` cache version in the browser and runtime/precompute keys. Registry `pool` metadata is informational; unresolved mappings never become derived counters. Consumer support must deploy before the producer publishes new optional entry fields.
+
 A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
 [canonical task progression](./tasks.md#canonical-task-progression)). A malformed or mode-nested registry
 remains unconsumed and blocks precompute; it is applied nowhere.

@@ -1,3 +1,4 @@
+import { TASKS_CORE_CACHE_VERSION } from '@/utils/taskCatalogCache';
 /**
  * Shared contract for precomputed heavy-route payloads stored in Cloudflare KV.
  *
@@ -13,7 +14,6 @@
  */
 const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
 const PRECOMPUTED_ENVELOPE_VERSION = 2;
-const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
 export type PrecomputedEnvelope<T> = {
   payload: T;
   overlay: { version: string; sha256: string } | null;
@@ -24,7 +24,7 @@ export type PrecomputedKvReader = {
   get: (key: string, type: 'json' | 'text') => Promise<unknown>;
 };
 export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
-  return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;
+  return `tasks-core-${TASKS_CORE_CACHE_VERSION}-${lang}-${gameMode}`;
 }
 const overlayMeta = (payload: unknown) =>
   (payload as { dataOverlay?: { version?: unknown; sha256?: unknown } })?.dataOverlay;
