@@ -18,7 +18,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
   build dependency records stay unchanged. It retains lint, formatting, scanner coverage, every
   workflow test, systems drift, security and admission; app/DB/Worker/build jobs can skip. CI and
   trusted preview verification use the current base SHA, not just the PR merge base. Manifest,
-  plugin, mixed or uncertain changes — including the source locale `app/locales/en.json` — every
+  plugin package upgrades, mixed or uncertain changes — including the source locale `app/locales/en.json` — every
   push, and every dispatch run the full set. Unreadable evidence fails closed to full validation.
   See [narrow formatter validation](../../docs/workflow-automation.md#narrow-formatter-validation).
 - `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
