@@ -4,6 +4,7 @@ import type {
   Task,
   TaskCounterDerivation,
   TaskOtherRequirement,
+  TaskProgressionPool,
   RequirementComparison,
 } from '@/types/tarkov';
 const comparisons = new Set(['>=', '>', '<=', '<', '=', '==', '!=']);
@@ -29,6 +30,30 @@ const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined =>
   isRecord(raw) && Object.hasOwn(counterNormalizers, String(raw.type))
     ? counterNormalizers[String(raw.type)]!(raw)
     : undefined;
+const normalizePool = (raw: unknown): TaskProgressionPool | undefined => {
+  if (!isRecord(raw)) return undefined;
+  const valid = [
+    isId(raw.traderId),
+    [1, 2, 3, 4].includes(raw.loyaltyLevel as number),
+    ['verified', 'unresolved'].includes(String(raw.verification)),
+    ['complete', 'partial'].includes(String(raw.coverage)),
+  ].every(Boolean);
+  const derivation = normalizeCounter(raw.derivation);
+  return valid && derivation
+    ? {
+        traderId: raw.traderId as string,
+        loyaltyLevel: raw.loyaltyLevel as number,
+        verification: raw.verification as TaskProgressionPool['verification'],
+        coverage: raw.coverage as TaskProgressionPool['coverage'],
+        derivation,
+      }
+    : undefined;
+};
+const variableMetadata = (raw: Record<string, unknown>) => {
+  const counter = normalizeCounter(raw.counter);
+  const taskPool = normalizePool(raw.taskPool);
+  return { ...(counter ? { counter } : {}), ...(taskPool ? { taskPool } : {}) };
+};
 const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement => {
   const valid = [
     isId(raw.id),
@@ -44,14 +69,14 @@ const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement =
     compareMethod: raw.compareMethod as RequirementComparison,
     value: raw.value as number,
   };
-  const counter = normalizeCounter(raw.counter);
-  return counter ? { ...requirement, counter } : requirement;
+  return { ...requirement, ...variableMetadata(raw) };
 };
-/** The derivation is tracker metadata, not part of the in-game gate a player confirms. */
-const withoutCounter = (requirement: TaskOtherRequirement): TaskOtherRequirement => {
-  if (requirement.type !== 'globalVariable' || !requirement.counter) return requirement;
+/** Pool identity and derivation are metadata, not part of the in-game gate a player confirms. */
+const withoutProgressionMetadata = (requirement: TaskOtherRequirement): TaskOtherRequirement => {
+  if (requirement.type !== 'globalVariable') return requirement;
   const gate = { ...requirement };
   delete gate.counter;
+  delete gate.taskPool;
   return gate;
 };
 const normalizeDialogue = (raw: Record<string, unknown>): TaskOtherRequirement => {
@@ -111,7 +136,9 @@ export const otherRequirementsSignature = (task: Task): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
   if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
   const confirmable = requirements.filter(isConfirmable);
-  return confirmable.length ? JSON.stringify(confirmable.map(withoutCounter)) : undefined;
+  return confirmable.length
+    ? JSON.stringify(confirmable.map(withoutProgressionMetadata))
+    : undefined;
 };
 /** Story objectives a task's overlay gates name, for Mark available to record. */
 export const storyObjectiveRequirements = (task: Task) =>
