@@ -143,6 +143,8 @@ const createProgressStore = () => ({
     'task-kappa': { self: false },
   },
   tasksFailed: {} as Record<string, Record<string, boolean>>,
+  objectiveCompletions: {} as Record<string, Record<string, boolean>>,
+  teamStores: {} as Record<string, object>,
   invalidTasks: {
     'task-1': { self: false },
     'task-2': { self: false },
