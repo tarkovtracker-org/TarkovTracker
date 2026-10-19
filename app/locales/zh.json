@@ -607,12 +607,11 @@
     "dashboard": {
       "changelog": {
         "title": "更新日志",
-        "show": "显示更新",
-        "hide": "隐藏更新",
         "loading": "正在加载更新...",
         "error": "无法加载更新。",
         "empty": "暂无更新。",
-        "view_all": "查看全部"
+        "view_all": "查看全部",
+        "unread": "新的更新"
       },
       "focus": {
         "title": {
@@ -1551,8 +1550,8 @@
       "suggest_description": "建议将社区工具或指南收录到此页面。",
       "suggest_cta": "建议资源",
       "migration_banner": {
-        "title": "迁移自TarkovTracker.io？",
-        "cta": "阅读迁移指南"
+        "cta": "阅读迁移指南",
+        "chip": "来自 .io？"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org 指南",

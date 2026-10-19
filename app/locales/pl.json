@@ -607,12 +607,11 @@
     "dashboard": {
       "changelog": {
         "title": "Co nowego",
-        "show": "Pokaż aktualizacje",
-        "hide": "Ukryj aktualizacje",
         "loading": "Wczytywanie aktualizacji...",
         "error": "Nie można wczytać aktualizacji.",
         "empty": "Nie ma jeszcze aktualizacji.",
-        "view_all": "Zobacz wszystkie"
+        "view_all": "Zobacz wszystkie",
+        "unread": "Nowe aktualizacje"
       },
       "focus": {
         "title": {
@@ -1551,8 +1550,8 @@
       "suggest_description": "Zgłoś narzędzie społeczności lub przewodnik, który ma zostać dodany do tej strony.",
       "suggest_cta": "Zgłoś zasób",
       "migration_banner": {
-        "title": "Przechodzisz z TarkovTracker.io?",
-        "cta": "Przeczytaj przewodnik migracji"
+        "cta": "Przeczytaj przewodnik migracji",
+        "chip": "Z .io?"
       },
       "categories": {
         "tarkovtracker_guides": "Przewodniki TarkovTracker.org",

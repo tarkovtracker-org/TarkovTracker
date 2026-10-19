@@ -4,9 +4,12 @@
       <div class="mx-auto max-w-350 xl:max-w-400 2xl:max-w-450">
         <slot name="header" />
         <DashboardSupportBanner :completed-tasks="dashboardStats.completedTasks.value" />
-        <DashboardMigrationBanner />
-        <DashboardChangelog />
-        <DashboardProgressSummary />
+        <DashboardProgressSummary>
+          <template #actions>
+            <DashboardMigrationBanner />
+            <DashboardChangelog />
+          </template>
+        </DashboardProgressSummary>
         <DashboardUpNext />
         <div id="dashboard-traders" class="mb-8 scroll-mt-16">
           <div class="mb-4 flex w-full items-center">

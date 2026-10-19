@@ -168,7 +168,7 @@ const defaultGlobalStubs = {
     template: '<div data-testid="dashboard-migration-banner"></div>',
   },
   DashboardProgressSummary: {
-    template: '<div data-testid="dashboard-progress-summary"></div>',
+    template: '<div data-testid="dashboard-progress-summary"><slot name="actions" /></div>',
   },
   DashboardChangelog: {
     template: '<div data-testid="dashboard-changelog"></div>',

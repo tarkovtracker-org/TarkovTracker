@@ -17,8 +17,9 @@ mockNuxtImport('useDashboardStats', () => () => ({
   totalHideoutItems: ref(200),
 }));
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
-const mountSummary = () =>
+const mountSummary = (slots: Record<string, string> = {}) =>
   mount(DashboardProgressSummary, {
+    slots,
     global: {
       mocks: { $t: (key: string) => key },
       stubs: {
@@ -55,5 +56,12 @@ describe('DashboardProgressSummary', () => {
     filtersActive.value = true;
     await nextTick();
     expect(wrapper.find('[data-testid="dashboard-filter-notice"]').exists()).toBe(true);
+  });
+  it('renders dashboard actions inside the same bar only when provided', () => {
+    expect(mountSummary().find('[data-testid="dashboard-summary-actions"]').exists()).toBe(false);
+    const actions = mountSummary({ actions: '<button data-testid="action">x</button>' }).get(
+      '[data-testid="dashboard-summary-actions"]'
+    );
+    expect(actions.find('[data-testid="action"]').exists()).toBe(true);
   });
 });

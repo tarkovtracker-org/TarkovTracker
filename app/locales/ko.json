@@ -607,12 +607,11 @@
     "dashboard": {
       "changelog": {
         "title": "새로운 소식",
-        "show": "업데이트 표시",
-        "hide": "업데이트 숨기기",
         "loading": "업데이트 불러오는 중...",
         "error": "업데이트를 불러올 수 없습니다.",
         "empty": "아직 업데이트가 없습니다.",
-        "view_all": "모두 보기"
+        "view_all": "모두 보기",
+        "unread": "새 업데이트"
       },
       "focus": {
         "title": {
@@ -1551,8 +1550,8 @@
       "suggest_description": "이 페이지에 커뮤니티 도구 또는 가이드를 제안하세요.",
       "suggest_cta": "리소스 제안",
       "migration_banner": {
-        "title": "TarkovTracker.io에서 이전하시나요?",
-        "cta": "이전 가이드 읽기"
+        "cta": "이전 가이드 읽기",
+        "chip": ".io에서 오셨나요?"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org 가이드",

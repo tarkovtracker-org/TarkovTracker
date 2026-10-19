@@ -1,32 +1,43 @@
 <template>
-  <div class="mb-3">
-    <div class="panel px-3 py-2">
-      <div class="flex items-center justify-between gap-2">
-        <div class="light:text-surface-50 flex items-center gap-2 text-sm font-semibold text-white">
-          <UIcon name="i-mdi-history" class="text-primary-400 h-4 w-4" />
-          {{ t('page.dashboard.changelog.title') }}
-        </div>
-        <div class="flex items-center gap-2">
+  <UPopover v-model:open="isOpen" :content="{ align: 'end', sideOffset: 6 }">
+    <UButton
+      size="xs"
+      color="neutral"
+      variant="outline"
+      icon="i-mdi-creation"
+      class="text-surface-100 light:text-surface-50 relative"
+      :aria-controls="PANEL_ID"
+      :aria-expanded="isOpen"
+      data-testid="dashboard-changelog"
+    >
+      {{ t('page.dashboard.changelog.title') }}
+      <span
+        v-if="hasUnread"
+        class="bg-primary-400 absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full"
+        data-testid="dashboard-changelog-unread"
+      >
+        <span class="sr-only">{{ t('page.dashboard.changelog.unread') }}</span>
+      </span>
+    </UButton>
+    <template #content>
+      <div
+        :id="PANEL_ID"
+        class="max-h-[min(32rem,calc(100vh-8rem))] w-96 max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3 text-xs sm:text-sm"
+        data-testid="dashboard-changelog-panel"
+      >
+        <div class="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+          <h2 class="light:text-surface-50 text-sm font-semibold text-white">
+            {{ t('page.dashboard.changelog.title') }}
+          </h2>
           <NuxtLink
             to="/changelog"
-            class="text-primary-400 hover:text-primary-300 text-xs transition-colors"
+            class="text-primary-400 hover:text-primary-300 light:text-primary-800 flex items-center gap-1 text-xs font-medium transition-colors"
+            @click="isOpen = false"
           >
             {{ t('page.dashboard.changelog.view_all') }}
+            <UIcon name="i-mdi-arrow-right" class="h-3.5 w-3.5" aria-hidden="true" />
           </NuxtLink>
-          <span class="text-surface-600">|</span>
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="link"
-            :aria-controls="PANEL_ID"
-            :aria-expanded="isOpen"
-            @click="toggleOpen"
-          >
-            {{ isOpen ? t('page.dashboard.changelog.hide') : t('page.dashboard.changelog.show') }}
-          </UButton>
         </div>
-      </div>
-      <div v-if="isOpen" :id="PANEL_ID" class="mt-2 space-y-3 text-xs sm:text-sm">
         <div v-if="pending" class="text-surface-300 text-xs">
           {{ t('page.dashboard.changelog.loading') }}
         </div>
@@ -41,7 +52,7 @@
         </div>
         <div v-else class="space-y-3">
           <div
-            v-for="(entry, entryIndex) in entries"
+            v-for="(entry, entryIndex) in previewEntries"
             :key="`${entry.date}-${entryIndex}`"
             class="space-y-1"
           >
@@ -57,12 +68,14 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </UPopover>
 </template>
 <script setup lang="ts">
+  import { useStorage } from '@vueuse/core';
   import { cleanText, normalizeCommitMessage, releaseBullets } from '@/utils/changelog';
   import { logger } from '@/utils/logger';
+  import { STORAGE_KEYS } from '@/utils/storageKeys';
   import type { ChangelogBullet, ChangelogItem, ChangelogResponse } from '@/types/changelog';
   const PANEL_ID = 'dashboard-changelog-panel';
   const SERVER_CHANGELOG_KEY = 'dashboard-changelog-server';
@@ -72,6 +85,7 @@
   const GITHUB_CACHE_KEY_PREFIX = 'dashboard-changelog-cache';
   const GITHUB_CACHE_TTL_MS = 15 * 60 * 1000;
   const GITHUB_RATE_LIMIT_LOW_THRESHOLD = 2;
+  const PREVIEW_ENTRY_LIMIT = 3;
   const ENABLE_CLIENT_GITHUB_FALLBACK = false;
   const runtimeConfig = useRuntimeConfig();
   const githubOwner = runtimeConfig.public.githubOwner || 'tarkovtracker-org';
@@ -85,6 +99,25 @@
   const pending = ref(false);
   const error = ref(false);
   const showEmpty = computed(() => !pending.value && !error.value && entries.value.length === 0);
+  const previewEntries = computed(() => entries.value.slice(0, PREVIEW_ENTRY_LIMIT));
+  const lastSeen = useStorage<string>(STORAGE_KEYS.changelogLastSeen, '');
+  const hashText = (text: string): string => {
+    let hash = 5381;
+    for (let i = 0; i < text.length; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0;
+    return (hash >>> 0).toString(36);
+  };
+  const latestEntryKey = computed(() => {
+    const latest = entries.value[0];
+    if (!latest?.date) return '';
+    const content = [latest.label ?? '', ...latest.bullets.map(getBulletText)].join('\n');
+    return `${latest.date}|${hashText(content)}`;
+  });
+  const hasUnread = computed(() => {
+    if (!latestEntryKey.value || latestEntryKey.value === lastSeen.value) return false;
+    const [latestDate = ''] = latestEntryKey.value.split('|');
+    const [seenDate = ''] = lastSeen.value.split('|');
+    return latestDate >= seenDate;
+  });
   const sortByDateDesc = (items: ChangelogItem[]): ChangelogItem[] => {
     return [...items].sort((a, b) => b.date.localeCompare(a.date));
   };
@@ -443,17 +476,22 @@
     error.value = true;
     pending.value = false;
   };
-  const toggleOpen = () => {
-    isOpen.value = !isOpen.value;
-  };
   const retry = async () => {
     hasRequested.value = false;
     await loadChangelog(true);
   };
+  const markSeen = () => {
+    if (isOpen.value && hasUnread.value) lastSeen.value = latestEntryKey.value;
+  };
   watch(isOpen, async (open) => {
     if (open) {
       await loadChangelog();
+      markSeen();
     }
+  });
+  watch(latestEntryKey, markSeen);
+  onMounted(() => {
+    void loadChangelog();
   });
   const formatDate = (date: string): string => {
     if (!date) return '';
