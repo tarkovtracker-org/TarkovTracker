@@ -128,29 +128,42 @@ export function useAppInitialization() {
     }, SYNC_RETRY_DELAY_MS);
     syncRetryAttempts += 1;
   };
-  /** Only progress payload changes can unblock a permanently rejected startup save. */
+  const captureRecoveryProgress = () => {
+    const state = useTarkovStore().$state;
+    return JSON.stringify([
+      state.pvp,
+      state.pve,
+      state.seasonal,
+      state.gameEdition,
+      state.tarkovUid,
+      state.seasonalSeasonNumber,
+    ]);
+  };
+  const scheduleProgressRecovery = (userId: string, token: number, rejected: string) => {
+    cancelSyncRetry();
+    syncRetryTimer = setTimeout(() => {
+      syncRetryTimer = null;
+      if (isStaleInitialization(userId, token)) return;
+      if (captureRecoveryProgress() === rejected) {
+        recoverAfterProgressChange(userId, token);
+        return;
+      }
+      void retrySyncNow(userId, token);
+    }, SYNC_RETRY_DELAY_MS);
+  };
+  /** A burst of edits gets one delayed retry, preserving the latest progress when it fires. */
   const recoverAfterProgressChange = (userId: string, token = authChangeToken) => {
     cancelSyncRetry();
     cancelProgressRecovery();
-    const store = useTarkovStore();
+    const rejected = captureRecoveryProgress();
     stopProgressRecovery = watch(
-      () => {
-        const state = store.$state;
-        return [
-          state.pvp,
-          state.pve,
-          state.seasonal,
-          state.gameEdition,
-          state.tarkovUid,
-          state.seasonalSeasonNumber,
-        ];
-      },
+      captureRecoveryProgress,
       () => {
         stopProgressRecovery = null;
         if (isStaleInitialization(userId, token)) return;
-        void retrySyncNow(userId, token);
+        scheduleProgressRecovery(userId, token, rejected);
       },
-      { deep: true, once: true }
+      { once: true }
     );
   };
   const publishSyncFailure = (

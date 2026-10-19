@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
 const { config } = vi.hoisted(() => ({
   config: {
-    clientLogSinkUrl: '/api/logs/client',
+    progressDiagnosticSinkUrl: '/api/logs/client',
+    clientLogSinkUrl: '',
     buildCommit: 'a'.repeat(40),
   },
 }));
@@ -13,7 +14,8 @@ describe('aggregate progress payload diagnostics', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
-    config.clientLogSinkUrl = '/api/logs/client';
+    config.progressDiagnosticSinkUrl = '/api/logs/client';
+    config.clientLogSinkUrl = '';
   });
   it('reports only fixed aggregate fields, measures UTF-8, and omits identities and location', async () => {
     const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
@@ -61,11 +63,42 @@ describe('aggregate progress payload diagnostics', () => {
     }
     expect(fetch).toHaveBeenCalledTimes(30);
   });
-  it('does not send routine small saves or diagnostics without a configured sink', async () => {
+  it('reserves rejection samples after accepted saves exhaust their own budget', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    const now = vi.spyOn(Date, 'now');
+    const modes = { pvp: createDefaultOwnedProgressData() };
+    modes.pvp.displayName = 'x'.repeat(300000);
+    for (let i = 0; i < 30; i++) {
+      now.mockReturnValue(200000 + i * 12000);
+      reportProgressPayload(modes, modes, null);
+    }
+    expect(fetch).toHaveBeenCalledTimes(30);
+    reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
+    expect(fetch).toHaveBeenCalledTimes(31);
+  });
+  it('does not serialize disabled diagnostics and labels superseded work separately', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    const modes = { pvp: createDefaultOwnedProgressData() };
+    config.progressDiagnosticSinkUrl = '';
+    Object.defineProperty(modes.pvp, 'displayName', {
+      configurable: true,
+      get() {
+        throw new Error('disabled diagnostics must not inspect profile data');
+      },
+    });
+    expect(() => reportProgressPayload(modes, modes, null)).not.toThrow();
+    Object.defineProperty(modes.pvp, 'displayName', { value: 'x'.repeat(300000) });
+    config.progressDiagnosticSinkUrl = '/api/logs/client';
+    reportProgressPayload(modes, modes, { message: 'Progress sync superseded by newer state' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls[0]![1]!.body).toContain('superseded');
+  });
+  it('keeps aggregate collection independent of general browser logs', async () => {
     const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
     const modes = { pvp: createDefaultOwnedProgressData() };
     reportProgressPayload(modes, modes, null);
-    config.clientLogSinkUrl = '';
+    config.progressDiagnosticSinkUrl = '';
+    config.clientLogSinkUrl = '/api/logs/client';
     reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
     expect(fetch).not.toHaveBeenCalled();
   });

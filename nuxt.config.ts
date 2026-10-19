@@ -17,6 +17,7 @@ import { CLIENT_DOCUMENT_ROUTES, PUBLIC_SEO_ROUTES } from './app/utils/routeSeo'
 import {
   GITHUB_IMAGE_DOMAINS,
   resolveClientLogSinkUrl,
+  resolveProgressDiagnosticSinkUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
@@ -203,6 +204,7 @@ export default defineNuxtConfig({
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
+      progressDiagnosticSinkUrl: resolveProgressDiagnosticSinkUrl(process.env),
       turnstileSiteKey: TURNSTILE_SITE_KEY,
       // Tarkov data browser-clearance gate: disabled default. Never flip the flag without
       // the dedicated sitekey/secret/exact-hostname allowlist. The verification endpoint

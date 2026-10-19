@@ -529,13 +529,27 @@ export function useSupabaseSync<
    */
   const defersToReconciledRetry = (): boolean =>
     reconcileRequired && reconcileBeforeRetry !== undefined && retryDelaysMs.length > 0;
-  /** A new edit restarts an exhausted schedule; merges inside a snapshot read do not. */
+  const hasChangedRejectedPayload = (): boolean => {
+    const ownerId = syncOwnerId();
+    if (disposed || !ownerId) return false;
+    const payload = serializeStatePayload(store.$state as TState, ownerId);
+    return payload !== null && payload !== rejectedPayload;
+  };
+  const releaseChangedPayloadFailure = (): boolean => {
+    if (lastFailure !== 'payload_too_large') return true;
+    if (!hasChangedRejectedPayload()) return false;
+    lastFailure = null;
+    return true;
+  };
+  /** Snapshot mutations wait until the outermost read completes before restarting retries. */
+  const restartExhaustedRetry = () => {
+    if (!retriesExhausted || snapshotDepth > 0) return;
+    if (releaseChangedPayloadFailure()) resetRetryBudget();
+  };
+  /** A new edit restarts an exhausted schedule without discarding a known transient cause. */
   const armReconciledRetry = () => {
     debouncedSync.cancel();
-    if (retriesExhausted && snapshotDepth === 0) {
-      lastFailure = null;
-      resetRetryBudget();
-    }
+    restartExhaustedRetry();
     scheduleRetry();
     publishSaveStatus();
   };
@@ -617,6 +631,7 @@ export function useSupabaseSync<
       return await read(captureRemoteMerge());
     } finally {
       snapshotDepth -= 1;
+      if (lastFailure === 'payload_too_large') restartExhaustedRetry();
       schedulePendingSync();
     }
   };

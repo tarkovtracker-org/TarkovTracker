@@ -16,7 +16,10 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { isProgressPayloadTooLarge } from '@/utils/progressPayload';
+import {
+  isProgressPayloadTooLarge,
+  PROGRESS_SYNC_INTERRUPTED as SPLIT_SYNC_INTERRUPTED,
+} from '@/utils/progressPayload';
 import { reportProgressPayload } from '@/utils/progressPayloadDiagnostics';
 import { isRecord, sanitizeTarkovUid } from '@/utils/progressSanitizers';
 import type { UserProgressData, UserState } from '@/stores/progressState';
@@ -124,8 +127,6 @@ const rejectedBatch = (batch: ModeProgressMap, rejected: Map<string, RejectedMod
     if (previous?.wire === JSON.stringify(progress)) return previous;
   }
 };
-/** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
-const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
 type ProgressSyncResult<TError> = {
   error: TError | typeof SPLIT_SYNC_INTERRUPTED;
   tarkovUidConflict?: TarkovUidConflict;

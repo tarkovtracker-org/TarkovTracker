@@ -83,7 +83,8 @@ export const retryCloudSave = async (): Promise<boolean> => {
 };
 /**
  * Without a running sync controller nothing reaches the cloud, so a signed-in session whose
- * initial sync failed must stay visibly pending. `retry` restarts sync initialization.
+ * initial sync failed must stay visibly pending. Transient failures keep an initialization retry;
+ * oversized saves wait for a progress edit instead of manually resending the rejected payload.
  */
 export const markCloudSyncUnavailable = (
   retry: () => Promise<boolean>,

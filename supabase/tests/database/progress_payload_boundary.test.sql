@@ -1,5 +1,5 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(16);
 
 -- Synthetic 24-character game IDs; catalog-sized progress plus generous headroom.
 -- Full histories and confirmations remain within their existing sanitizer limits.
@@ -108,6 +108,10 @@ SELECT throws_ok($q$SELECT public.sync_game_profile_progress((SELECT id FROM pay
   'additional-profile guard rejects one JSONB byte above the boundary');
 SELECT throws_ok($q$SELECT public.sync_user_game_mode_progress('pvp', 1, NULL, '[]', NULL)$q$,
   'P0001', 'p_modes must be a JSON object', 'malformed containers are still rejected');
+
+SELECT throws_ok($q$SELECT public.sync_game_profile_progress((SELECT id FROM payload_profile), 1,
+  '[]', NULL)$q$, 'P0001', 'p_modes must be a JSON object',
+  'additional-profile malformed containers are still rejected');
 
 SELECT * FROM finish();
 ROLLBACK;
