@@ -2,6 +2,51 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Payload size and rejected saves (#960)
+
+Normal, first-sign-in, and repair saves share `sendProgressSync`. Modes differ against an
+acknowledged per-account baseline; unknown modes remain pending. Requests above 256 KiB of
+serialized UTF-8 JSON are split between modes. This is a conservative batching threshold,
+not a PostgreSQL JSONB size calculation. A rejected combined request also falls back to modes.
+
+Both `sync_user_game_mode_progress` and `sync_game_profile_progress` accept at most **1 MiB
+(1,048,576 bytes) of incoming `p_modes` JSONB**, measured before sanitation and merge. The guard
+remains finite: sanitizer-valid maps and identifiers have no universal size bound. Progress maps
+are never truncated to meet it, and splitting a mode into field chunks is unsupported because
+ordinary sync replaces its maps rather than atomically assembling chunks.
+
+`supabase/tests/database/progress_payload_boundary.test.sql` defines the supported stress envelope:
+750 task statuses, 2,200 objectives, 1,000 budgeted confirmations, 500 hideout parts, 100 modules,
+10 traders, 60 skills/offsets, 12 story chapters, 50 API history rows of 20 tasks each, and 50 manual
+history rows at Unicode string limits. Its sanitized single-mode request occupies **922,374 JSONB
+bytes** on local PostgreSQL 17. The previous 512 KiB guard rejects it. The 1 MiB ceiling leaves
+126,202 bytes of headroom, without promising support for arbitrarily inflated maps. Exact-boundary,
+one-byte-over, full-state round-trip, and malformed-container tests cover both RPCs.
+
+The historical `p_modes exceeds the maximum payload size` message remains recognizable during
+mixed deployments. The browser retains a rejected mode's exact wire snapshot for the current
+SDK client/account; identical attempts return that failure without sending it again. Other modes
+can still save and are acknowledged individually; metadata-only requests remain possible while
+progress is blocked. A change to the rejected mode permits another
+attempt. Cached rejections are neither persisted nor logged. Generic sync marks oversized saves
+`payload_too_large`, leaves changes pending, and stops automatic retries of the rejected snapshot.
+A failed startup preserves its session snapshot and restarts initialization after a progress edit;
+auth transitions and teardown cancel that recovery watcher. The indicator offers export and support
+guidance, disables unchanged manual retry, and claims a local copy only after confirmed persistence.
+
+Large requests (at least 256 KiB wire bytes) and size rejections can emit `progress_sync_payload`
+through the configured client log sink. Each sample contains aggregate/request/per-mode **wire**
+bytes, fixed map/history counts, batch modes, outcome, and build commit. It includes no raw profile
+content, map keys, account identifiers, credentials, error details, or page URL. Successful/other
+failure samples and size rejections have separate 12-second sampling intervals so an earlier
+successful batch cannot suppress the first rejection; total samples cap at 30 per page lifetime.
+Telemetry omits browser credentials and referrers. It is best-effort and cannot acknowledge or fail a save.
+
+Release closure requires the application commit and deployed RPC definitions to match this contract,
+then a bounded post-release count of `P0001` size rejections compared with a fresh pre-release window.
+Record window times and deployment revisions in #960; retain aggregate counts only. The historical
+36-error window is not a current baseline. Keep the issue open until readback establishes the result.
+
 ## Save status and recovery
 
 The reliability policy and vocabulary live in `CONTEXT.md`. Local persistence and cloud

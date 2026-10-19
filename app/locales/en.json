@@ -113,6 +113,8 @@
     "local_saved_note": "These changes are saved in this browser.",
     "cloud_also_pending_note": "They have not been saved to the cloud either. Export your progress to keep a copy.",
     "retry_scheduled": "Automatic retry {attempt} of {total} is scheduled.",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "Cause: this device appears to be offline.",
     "cause_rate_limited": "Cause: the cloud service is temporarily limiting saves.",
     "cause_auth": "Cause: your sign-in session could not be verified.",

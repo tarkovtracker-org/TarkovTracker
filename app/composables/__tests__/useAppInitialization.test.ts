@@ -52,6 +52,12 @@ const mockResetTarkovSync = vi.fn();
 const mockPreserveUnsavedSessionProgress = vi.fn();
 const mockMayHoldUnsyncedProgress = vi.fn((_userId: string) => true);
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
+const mockProgressState = reactive({
+  pvp: { level: 1 },
+  pve: {},
+  seasonal: {},
+  currentGameMode: 'pvp',
+});
 const mockActivityLogResetForSession = vi.fn();
 const mockActivityLogMigrateLegacyManualEntries = vi.fn();
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -97,6 +103,7 @@ vi.mock('@/stores/useTarkov', () => ({
     mockResetTarkovStoreForSessionTransition(...args),
   resetTarkovSync: (...args: unknown[]) => mockResetTarkovSync(...args),
   useTarkovStore: () => ({
+    $state: mockProgressState,
     migrateDataIfNeeded: () => mockMigrateDataIfNeeded(),
   }),
 }));
@@ -134,6 +141,9 @@ describe('useAppInitialization locale setup', () => {
         mockMetadataStore.languageCode = localeOverride === 'uk' ? 'en' : localeOverride;
       }
     });
+    mockProgressState.pvp.level = 1;
+    mockProgressState.currentGameMode = 'pvp';
+    mockMayHoldUnsyncedProgress.mockReset().mockReturnValue(true);
     mockInitializeProgressAuthority.mockReset().mockResolvedValue(undefined);
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
@@ -622,6 +632,66 @@ describe('useAppInitialization locale setup', () => {
     afterEach(() => {
       vi.useRealTimers();
     });
+    it('pauses oversized startup saves until progress changes, then preserves edits before retry', async () => {
+      vi.useFakeTimers();
+      const { progressSaveStatus, resetCloudSaveStatus, retryCloudSave } =
+        await import('@/stores/tarkov/progressSaveStatus');
+      resetCloudSaveStatus();
+      mockMayHoldUnsyncedProgress.mockReturnValue(false);
+      mockInitializeTarkovSync.mockRejectedValueOnce(
+        new Error('p_modes exceeds the maximum payload size')
+      );
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(progressSaveStatus.cloud).toMatchObject({
+        state: 'failed',
+        failure: 'payload_too_large',
+      });
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 10);
+      await expect(retryCloudSave()).resolves.toBe(false);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      mockPreferencesStore.localeOverride = 'fr';
+      mockProgressState.currentGameMode = 'pve';
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      mockInitializeTarkovSync.mockImplementationOnce(async () => resetCloudSaveStatus());
+      mockProgressState.pvp.level = 2;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockPreserveUnsavedSessionProgress).toHaveBeenCalledWith('user-1');
+      expect(mockPreserveUnsavedSessionProgress.mock.invocationCallOrder[0]).toBeLessThan(
+        mockInitializeTarkovSync.mock.invocationCallOrder[1]!
+      );
+      expect(progressSaveStatus.cloud.state).toBe('idle');
+      mockProgressState.pvp.level = 3;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
+    it.each(['logout', 'account switch', 'dispose'])(
+      'cancels oversized startup recovery on %s',
+      async (transition) => {
+        vi.useFakeTimers();
+        mockInitializeTarkovSync.mockRejectedValueOnce(
+          new Error('p_modes exceeds the maximum payload size')
+        );
+        mockSupabaseUser.loggedIn = true;
+        mockSupabaseUser.id = 'user-1';
+        const wrapper = await mountWithComposable();
+        await vi.advanceTimersByTimeAsync(0);
+        if (transition === 'dispose') wrapper.unmount();
+        else if (transition === 'logout') mockSupabaseUser.loggedIn = false;
+        else mockSupabaseUser.id = 'user-2';
+        await vi.advanceTimersByTimeAsync(0);
+        const calls = mockInitializeTarkovSync.mock.calls.length;
+        mockProgressState.pvp.level = 2;
+        await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 10);
+        expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(calls);
+        if (transition !== 'dispose') wrapper.unmount();
+      }
+    );
     it('tears down partial sync state and retries within the same session', async () => {
       vi.useFakeTimers();
       mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));

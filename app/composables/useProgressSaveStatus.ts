@@ -26,6 +26,7 @@ const CLOUD_CAUSE_KEYS: Record<CloudSaveFailure, string> = {
   offline: 'progress_save_status.cause_offline',
   rate_limited: 'progress_save_status.cause_rate_limited',
   auth: 'progress_save_status.cause_auth',
+  payload_too_large: 'progress_save_status.cause_payload_too_large',
   unknown: 'progress_save_status.cause_unknown',
 };
 const LOCAL_CAUSE_KEYS: Record<LocalSaveFailure, string> = {
@@ -52,8 +53,18 @@ export function useProgressSaveStatus() {
   const showsQuotaGuidance = computed(
     () => kind.value === 'local_failed' && progressSaveStatus.localFailure === 'quota'
   );
+  const payloadTooLarge = computed(() => progressSaveStatus.cloud.failure === 'payload_too_large');
+  const descriptionKey = computed(() =>
+    kind.value === 'cloud_failed' && payloadTooLarge.value
+      ? 'progress_save_status.cloud_payload_too_large_description'
+      : `progress_save_status.${kind.value}_description`
+  );
   const canRetry = computed(
-    () => cloudPending.value && progressSaveStatus.cloud.state !== 'saving' && !retrying.value
+    () =>
+      cloudPending.value &&
+      !payloadTooLarge.value &&
+      progressSaveStatus.cloud.state !== 'saving' &&
+      !retrying.value
   );
   const retryAttempt = computed(() => progressSaveStatus.cloud.retryAttempt);
   const retryTotal = CLOUD_SAVE_RETRY_DELAYS_MS.length;
@@ -70,6 +81,7 @@ export function useProgressSaveStatus() {
     cloudPending,
     locallySaved,
     causeKey,
+    descriptionKey,
     showsQuotaGuidance,
     canRetry,
     retrying,

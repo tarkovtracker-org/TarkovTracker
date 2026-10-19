@@ -9,7 +9,8 @@ import { logger } from '@/utils/logger';
 export const CLOUD_SAVE_RETRY_DELAYS_MS = [5000, 15000, 60000] as const;
 export type CloudSaveState = 'idle' | 'pending' | 'saving' | 'retry_scheduled' | 'failed';
 type LocalSaveState = 'unknown' | 'pending' | 'saved' | 'failed';
-export type CloudSaveFailure = 'offline' | 'rate_limited' | 'auth' | 'unknown';
+export type CloudSaveFailure =
+  'offline' | 'rate_limited' | 'auth' | 'payload_too_large' | 'unknown';
 export type LocalSaveFailure = 'quota' | 'unavailable' | 'unknown';
 export type CloudSaveStatus = {
   state: CloudSaveState;
@@ -84,9 +85,12 @@ export const retryCloudSave = async (): Promise<boolean> => {
  * Without a running sync controller nothing reaches the cloud, so a signed-in session whose
  * initial sync failed must stay visibly pending. `retry` restarts sync initialization.
  */
-export const markCloudSyncUnavailable = (retry: () => Promise<boolean>): void => {
-  status.cloud = { state: 'failed', failure: 'unknown', retryAttempt: 0, nextRetryAt: null };
-  cloudRetryHandler = retry;
+export const markCloudSyncUnavailable = (
+  retry: () => Promise<boolean>,
+  failure: CloudSaveFailure = 'unknown'
+): void => {
+  status.cloud = { state: 'failed', failure, retryAttempt: 0, nextRetryAt: null };
+  cloudRetryHandler = failure === 'payload_too_large' ? null : retry;
 };
 /** Cloud status belongs to the signed-in session; local status survives sign-out. */
 export const resetCloudSaveStatus = (): void => {

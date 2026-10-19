@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { liveUpdatesDegraded } from '@/stores/tarkov/progressLiveStatus';
 import {
   recordLocalSave,
+  recordLocalSavePending,
   registerCloudRetryHandler,
   resetCloudSaveStatus,
   setCloudSaveStatus,
@@ -127,6 +128,32 @@ describe('ProgressSaveStatusIndicator', () => {
     expect(wrapper.text()).toContain('progress_save_status.cause_offline');
     expect(wrapper.find('[data-testid="progress-save-retry"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="progress-save-export"]').exists()).toBe(true);
+  });
+  it('explains an oversized cloud save, disables retry, and keeps backup export available', async () => {
+    recordLocalSavePending();
+    cloud('failed', { failure: 'payload_too_large' });
+    const handler = vi.fn().mockResolvedValue(false);
+    registerCloudRetryHandler(handler);
+    const wrapper = await mountIndicator();
+    expect(wrapper.get('[data-testid="progress-save-status"]').attributes('data-status')).toBe(
+      'cloud_failed'
+    );
+    expect(wrapper.text()).toContain('progress_save_status.cause_payload_too_large');
+    expect(wrapper.text()).toContain('progress_save_status.cloud_payload_too_large_description');
+    expect(wrapper.text()).not.toContain('progress_save_status.cloud_failed_description');
+    expect(wrapper.text()).not.toContain('progress_save_status.local_saved_note');
+    expect(wrapper.get('[data-testid="progress-save-retry"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[data-testid="progress-save-retry"]').trigger('click');
+    expect(handler).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="progress-save-export"]').trigger('click');
+    await flushPromises();
+    expect(exportProgress).toHaveBeenCalledOnce();
+    cloud('pending');
+    await wrapper.vm.$nextTick();
+    expect(
+      wrapper.get('[data-testid="progress-save-retry"]').attributes('disabled')
+    ).toBeUndefined();
+    wrapper.unmount();
   });
   it('shows the scheduled automatic attempt while retrying', async () => {
     cloud('retry_scheduled', { failure: 'unknown', retryAttempt: 2 });

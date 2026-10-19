@@ -1,0 +1,78 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
+const { config } = vi.hoisted(() => ({
+  config: {
+    clientLogSinkUrl: '/api/logs/client',
+    buildCommit: 'a'.repeat(40),
+  },
+}));
+mockNuxtImport('tryUseNuxtApp', () => () => ({ $config: { public: config } }));
+describe('aggregate progress payload diagnostics', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    config.clientLogSinkUrl = '/api/logs/client';
+  });
+  it('reports only fixed aggregate fields, measures UTF-8, and omits identities and location', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    const progress = createDefaultOwnedProgressData();
+    progress.displayName = 'private-profile';
+    progress.taskObjectives['private-objective'] = { complete: true };
+    progress.manualActivityHistory = [
+      {
+        id: 'private-history',
+        timestamp: 1,
+        type: 'task',
+        action: 'complete',
+        title: '😀'.repeat(70000),
+      },
+    ];
+    const modes = { pvp: progress };
+    reportProgressPayload(modes, modes, null);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [, request] = vi.mocked(fetch).mock.calls[0]!;
+    expect(request).toMatchObject({ credentials: 'omit', referrerPolicy: 'no-referrer' });
+    const body = JSON.parse(request!.body as string);
+    expect(body.href).toBeNull();
+    expect(body.args[1]).toMatchObject({
+      buildCommit: 'a'.repeat(40),
+      requestWireBytes: new TextEncoder().encode(JSON.stringify(modes)).length,
+      outcome: 'accepted',
+      modes: { pvp: { counts: { taskObjectives: 1, manualActivityHistory: 1 } } },
+    });
+    expect(request!.body).not.toMatch(/private-|userId|tarkovUid|displayName/);
+    reportProgressPayload(modes, modes, null);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('does not send routine small saves or diagnostics without a configured sink', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    const modes = { pvp: createDefaultOwnedProgressData() };
+    reportProgressPayload(modes, modes, null);
+    config.clientLogSinkUrl = '';
+    reportProgressPayload(modes, modes, { message: 'p_modes exceeds the maximum payload size' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('reports an undersized-wire server rejection without serializing error details; transport failure is harmless', async () => {
+    const { reportProgressPayload } = await import('@/utils/progressPayloadDiagnostics');
+    vi.mocked(fetch).mockImplementation(() => {
+      throw new TypeError('transport unavailable');
+    });
+    const modes = { pvp: createDefaultOwnedProgressData() };
+    expect(() =>
+      reportProgressPayload(modes, modes, {
+        message: 'p_modes exceeds the maximum payload size',
+        details: 'secret-user',
+      })
+    ).not.toThrow();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = vi.mocked(fetch).mock.calls[0]![1]!.body as string;
+    expect(body).toContain('payload_too_large');
+    expect(body).not.toContain('secret-user');
+  });
+});

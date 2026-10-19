@@ -213,8 +213,8 @@ export const sanitizeStoryChaptersMap = (value: unknown): UserProgressData['stor
 };
 const API_UPDATE_HISTORY_LIMIT = 50;
 // Manual activity entries are cosmetic feed rows that ride along in the synced
-// progress blob. The limit and the string clamps keep the blob well below the
-// sync RPC's 512 KiB payload ceiling even when all three modes are full.
+// progress blob. Limits bound this cosmetic history, not the size of complete
+// modes: progressPersistence handles batching and the RPC guards total JSONB size.
 export const MANUAL_ACTIVITY_HISTORY_LIMIT = 50;
 const MANUAL_ACTIVITY_ID_MAX_LENGTH = 128;
 const MANUAL_ACTIVITY_TITLE_MAX_LENGTH = 200;
