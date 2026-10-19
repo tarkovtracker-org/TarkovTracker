@@ -135,6 +135,13 @@ export type TaskCounterDerivation =
  * member is (faction variants a player can only ever complete one of).
  */
 export type TaskCounterGroup = string[] | { anyOf: string[] };
+export type TaskProgressionPool = {
+  traderId: string;
+  loyaltyLevel: number;
+  verification: 'verified' | 'unresolved';
+  coverage: 'complete' | 'partial';
+  derivation: TaskCounterDerivation;
+};
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';
@@ -143,6 +150,7 @@ export type TaskOtherRequirement =
       compareMethod: RequirementComparison;
       value: number;
       counter?: TaskCounterDerivation;
+      taskPool?: TaskProgressionPool;
     }
   | { type: 'dialogue'; id: string; traders: string[] }
   /** Overlay story gate: met only when the player completed that storyline objective. */

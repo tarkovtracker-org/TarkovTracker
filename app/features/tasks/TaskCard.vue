@@ -74,7 +74,11 @@
           </div>
         </div>
         <!-- Extra Info Strips (padded area) -->
-        <TaskRequirementChips v-if="isLocked" :rows="blockingRequirements" />
+        <TaskRequirementChips
+          v-if="isLocked"
+          :rows="blockingRequirements"
+          @show-pool="showRequirementPool"
+        />
         <div
           v-if="isFailed || isInvalid"
           class="text-xs"
@@ -167,7 +171,11 @@
           :id="`task-content-${task.id}`"
           class="border-surface-700/50 border-t"
         >
-          <TaskRequirementSummary :id="task.id" :rows="requirementSummary">
+          <TaskRequirementSummary
+            :id="task.id"
+            :rows="requirementSummary"
+            :requested-pool="requestedPool"
+          >
             <template #actions>
               <AppTooltip
                 v-if="hasAvailabilityConfirmation"
@@ -415,6 +423,15 @@
   });
   const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
+  const requestedPool = shallowRef<{ id: string }>();
+  const showRequirementPool = (id: string) => {
+    if (!taskExpanded.value) toggleTaskVisibility();
+    const request = { id };
+    requestedPool.value = request;
+    nextTick(() => {
+      if (requestedPool.value === request) requestedPool.value = undefined;
+    });
+  };
   const shouldAutoCollapseObjectives = computed(() => {
     return isComplete.value && preferencesStore.getHideCompletedTaskObjectives;
   });

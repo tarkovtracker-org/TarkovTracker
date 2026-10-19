@@ -129,7 +129,27 @@ groups. An unknown derivation
 type makes the registry malformed, so the tracker must support a type before the overlay publishes
 it. This runs last in `applyOverlay`, so task
 corrections cannot supply a derivation.
-`unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
+`unresolved`/`partial` entries, unsupported revisions and other modes attach no counter.
+
+Registry entries may also carry `pool: { traderId, loyaltyLevel }`. For a supported revision and
+matching mode, the server attaches `taskPool` with that identity, verification, coverage and candidate
+derivation when every contributor exists. This display metadata never creates a counter or an
+additional trader-loyalty gate. Entries without pool metadata retain their existing counter behavior.
+Both `counter` and `taskPool` are excluded from in-game confirmation signatures.
+
+Cards and dashboard blockers share an instruction such as "Complete at least 3 LL2 tasks for
+Mechanic". Cards show actual tracked progress and an expandable contributor list, with available
+incomplete tasks first. Each contributor retains its own availability; the current task is identified
+without being suggested as work to unlock itself. Faction alternatives appear together and earn one
+credit per group. Confirmed in-game availability remains distinct from tracked completions.
+Unresolved pools without an effective account value show "Progress unverified". A known account
+value is displayed as in-game progress. Candidate tasks remain explicitly labeled, and counting
+these candidates cannot clear the gate. Unmapped variables retain generic in-game progression wording.
+Pool descriptions are additive to the existing `json-v3` task-core payload. Keep its cache keys:
+payloads that retain the gate without pool metadata show a generic pool instruction until refreshed.
+Payloads that previously discarded the gate cannot render it until a refreshed catalog restores it. Publish consumer
+support before adding optional pool fields to the overlay, since older consumers reject unknown
+registry entry fields; then refresh precompute and the existing browser/edge caches to expose names.
 
 For a gate carrying `counter`, the evaluator counts that player's completed contributors or
 groups (`task_counter` blocker with current/required on a shortfall). An account without those
@@ -326,21 +346,21 @@ not import quest completions and therefore has no trader/task backfill path.
   leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
   it blocked behind an unknown blocker.
 - `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract, so recording it does not
-  bump the precompute or browser cache versions and adds no new rollout requirement. The
-  `tasks-core-json-v3` operator rollout in the next invariant is unchanged and still applies on its
-  own terms. A payload without the field behaves exactly as it did before, the evaluator
+  bump the precompute or browser cache versions and adds no new rollout requirement. A payload
+  without the field behaves exactly as it did before; the evaluator
   independently blocks a non-list `taskRequirements` from any payload vintage. Successful precompute
   refreshes run every 12 hours, after which edge and browser caches must also refresh. This is not
   a strict 12-hour recovery bound: failed runs can leave older KV entries serving for their seven-day
   TTL. Verify a successful precompute from the deployed fix before claiming production diagnostics
   are active; already-discarded gates cannot be recovered by the evaluator alone.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
-- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
-  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
-  fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
-  merging or promoting the app, an authorized operator must run the precompute workflow from the
-  approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
-  and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
+- Task-core stays on `json-v3` for optional pool descriptions; player progress and IndexedDB schema
+  8 are unchanged. Deploy the compatible consumer with the current overlay first. After publishing
+  pool metadata, run trusted-main precompute without language/mode filters and verify all 48
+  refreshed entries and their overlay provenance before purging corrected edge/browser metadata.
+  This avoids exposing empty versioned KV keys during Pages' automatic deployment. Incompatible
+  contract changes still require the separate compatible-producer/preseed/consumer rollout in
+  [overlay release verification](./overlay-and-precompute.md#release-verification).
 
 ## Map objective visibility and required items
 

@@ -19,6 +19,7 @@ import type {
   RequirementComparison,
   StoryChapter,
   Task,
+  TaskProgressionPool,
   TaskRequirement,
   TaskRequirementDiagnostic,
 } from '@/types/tarkov';
@@ -59,6 +60,7 @@ export type TaskBlocker = {
     | 'disabled';
   requirementId?: string;
   variableId?: string;
+  taskPool?: TaskProgressionPool;
   current?: number;
   required?: number;
   compareMethod?: RequirementComparison;
