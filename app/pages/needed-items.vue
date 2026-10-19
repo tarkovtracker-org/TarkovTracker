@@ -17,7 +17,7 @@
           v-model:card-style="cardStyle"
           :filter-tabs="filterTabsWithCounts"
           :total-count="displayItems.length"
-          :ungrouped-count="filteredItems.length"
+          :ungrouped-count="groupedNeedCount"
         />
         <UCard class="bg-contentbackground border border-white/5">
           <div
@@ -171,6 +171,7 @@
     cardStyle,
     filteredItems,
     groupedItems,
+    groupedNeedCount,
     displayItems,
     objectivesByItemId,
     filterTabsWithCounts,

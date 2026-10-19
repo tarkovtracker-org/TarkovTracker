@@ -11,6 +11,10 @@ export type NeededItemContext = {
   craftableTitle: ComputedRef<string>;
   currentCount: ComputedRef<number>;
   goToCraftStation: () => Promise<void>;
+  /** True when the user hid the task and the need is shown only for teammates. */
+  hiddenForSelf: ComputedRef<boolean>;
+  /** Explains a hidden-for-you need and names the teammates who still need it. */
+  hiddenForSelfHint: ComputedRef<string>;
   imageItem: ComputedRef<NeededItemImageItem>;
   isCraftable: ComputedRef<boolean>;
   isKappaRequired: ComputedRef<boolean>;
@@ -40,6 +44,8 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     craftableTitle: asComputed('Craftable'),
     currentCount: asComputed(0),
     goToCraftStation: async () => {},
+    hiddenForSelf: asComputed(false),
+    hiddenForSelfHint: asComputed(''),
     imageItem: asComputed(null),
     isCraftable: asComputed(false),
     isKappaRequired: asComputed(false),

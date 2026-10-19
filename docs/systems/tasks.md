@@ -83,7 +83,19 @@ offers Undo, and the card menu offers Unhide.
   completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
   deep link). Hidden tasks leave the All, Available and Locked status and trader counts;
   Completed and Failed counts still include them (`useTaskCounts`).
-- Needed Items still counts objectives of hidden tasks.
+- Needed Items drops the user's own objectives of hidden tasks from every tab and count until the
+  task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
+  personal: a hidden task's objective stays while a teammate still needs it (the same pending
+  teammates `NeededItem` shows, unless team items are hidden), so the team can still supply it.
+  That objective is tagged `hiddenForSelf` and its card or row shows "Hidden for you" in place
+  of the user's own count, progress and controls. Row and expanded card list the teammates; the
+  compact card shows their count, and every style's tooltip (and screen-reader text) names who
+  still needs it (`hiddenForSelfHint`). It adds nothing to tab counts, Group by item totals or
+  Smart Fill targets (`countsForSelf`); Group by item shows only the user's own totals, so it
+  leaves these needs out, and its "unique (total)" count uses `groupedNeedCount`. Hide owned
+  ignores the user's own count for these needs, since a teammate still lacks the item.
+  Hideout requirements and the dashboard's overall item progress are unaffected
+  (`useNeededItems` `allItems`).
 
 ## Canonical task progression
 

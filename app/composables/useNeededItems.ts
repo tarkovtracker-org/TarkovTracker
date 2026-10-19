@@ -65,6 +65,8 @@ export interface UseNeededItemsReturn {
   allItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   filteredItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   groupedItems: ComputedRef<GroupedNeededItem[]>;
+  /** Needs folded into `groupedItems`, the "total" of the Group by item count. */
+  groupedNeedCount: ComputedRef<number>;
   displayItems: ComputedRef<
     GroupedNeededItem[] | (NeededItemTaskObjective | NeededItemHideoutModule)[]
   >;
@@ -165,6 +167,38 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return visibleIds;
   });
+  const hiddenTaskIds = computed(() => new Set(preferencesStore.getHiddenTaskIds));
+  // Hidden tasks keep their completed objectives, like the task list's Completed view.
+  // Failed tasks also carry the completion flag, so they stay hidden.
+  const isTaskSucceeded = (taskId: string): boolean =>
+    progressStore.tasksCompletions?.[taskId]?.['self'] === true &&
+    progressStore.tasksFailed?.[taskId]?.['self'] !== true;
+  // Mirrors NeededItem's team needs: teammates ride on the user's objective record.
+  const showsTeamNeeds = (need: NeededItemTaskObjective): boolean =>
+    !preferencesStore.itemsTeamAllHidden &&
+    !(preferencesStore.itemsTeamNonFIRHidden && !need.foundInRaid);
+  const hasPendingTeammate = (need: NeededItemTaskObjective): boolean => {
+    const objectiveCompletions =
+      progressStore.objectiveCompletions?.[need.sourceObjectiveId ?? need.id] ?? {};
+    const taskCompletions = progressStore.tasksCompletions?.[need.taskId] ?? {};
+    return Object.entries(objectiveCompletions).some(
+      ([user, completed]) =>
+        user !== 'self' &&
+        !completed &&
+        !taskCompletions[user] &&
+        !!progressStore.teamStores?.[user]
+    );
+  };
+  const isHiddenForSelf = (need: NeededItemTaskObjective, progressTeamId: string): boolean =>
+    progressTeamId === 'self' &&
+    hiddenTaskIds.value.has(need.taskId) &&
+    !isTaskSucceeded(need.taskId);
+  // Hiding is personal: a hidden task's objective stays while a teammate still needs it.
+  const neededByTeammate = (need: NeededItemTaskObjective): boolean =>
+    showsTeamNeeds(need) && hasPendingTeammate(need);
+  // Objectives kept only for teammates add nothing to the user's own counts or targets.
+  const countsForSelf = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean =>
+    need.needType !== 'taskObjective' || need.hiddenForSelf !== true;
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
@@ -283,6 +317,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     for (const need of combined) {
       let key: string;
       let itemId: string | undefined;
+      let hiddenForSelf = false;
       if (need.needType === 'taskObjective') {
         if (taskTypeOptions.excludedTaskIds.has(need.taskId)) {
           continue;
@@ -300,7 +335,11 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         if (task && task.factionName !== 'Any' && task.factionName !== taskFaction) {
           continue;
         }
-        if (progressStore.invalidTasks?.[need.taskId]?.[progressTeamId] === true) {
+        hiddenForSelf = isHiddenForSelf(need, progressTeamId);
+        if (
+          progressStore.invalidTasks?.[need.taskId]?.[progressTeamId] === true ||
+          (hiddenForSelf && !neededByTeammate(need))
+        ) {
           continue;
         }
         if (task && !visibleTaskIds.value.has(task.id)) {
@@ -329,7 +368,11 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         const newCount = (existing.count ?? 0) + normalizedCount;
         aggregated.set(key, { ...existing, count: newCount });
       } else {
-        aggregated.set(key, { ...need, count: normalizedCount });
+        aggregated.set(key, {
+          ...need,
+          count: normalizedCount,
+          ...(hiddenForSelf && { hiddenForSelf }),
+        });
       }
     }
     const result = Array.from(aggregated.values());
@@ -354,7 +397,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   };
   const filterTabsWithCounts = computed((): FilterTab[] => {
     const counts = { tasks: 0, hideout: 0, completed: 0, incomplete: 0 };
-    for (const item of allItems.value) {
+    for (const item of allItems.value.filter(countsForSelf)) {
       const completed = isParentCompleted(item);
       if (completed) {
         counts.completed++;
@@ -416,6 +459,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const passesOwnershipFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
+    // A teammate-only need is listed because a teammate still lacks it, so the
+    // user's own count does not make it owned.
+    if (!countsForSelf(item)) return true;
     const count = item.count ?? 1;
     const currentCount =
       item.needType === 'taskObjective'
@@ -603,7 +649,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     );
     return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
   };
-  const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(filteredItems.value));
+  const selfFilteredItems = computed(() => filteredItems.value.filter(countsForSelf));
+  const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(selfFilteredItems.value));
+  // Needs folded into the Group by item groups; teammate-only needs are not among them.
+  const groupedNeedCount = computed(() => groupedNeeds.value.length);
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
@@ -686,7 +735,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       .filter(passesSpecialEquipmentFilter)
       .filter(passesKappaToggleFilter)
       .filter(passesTeamToggleFilter)
-      .filter(passesSearchFilter);
+      .filter(passesSearchFilter)
+      .filter(countsForSelf);
     const map = new Map<
       string,
       {
@@ -694,7 +744,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         hideoutModules: NeededItemHideoutModule[];
       }
     >();
-    for (const { need, target } of resolveGroupedNeeds(modalNeeds, filteredItems.value)) {
+    for (const { need, target } of resolveGroupedNeeds(modalNeeds, selfFilteredItems.value)) {
       const itemId = target.id;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
@@ -736,6 +786,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     allItems,
     filteredItems,
     groupedItems,
+    groupedNeedCount,
     displayItems,
     objectivesByItemId,
     filterTabsWithCounts,

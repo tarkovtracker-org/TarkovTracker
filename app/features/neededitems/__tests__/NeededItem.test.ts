@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computed, defineComponent, inject, nextTick, reactive } from 'vue';
+import { computed, defineComponent, inject, nextTick, reactive, ref } from 'vue';
 import { neededItemKey } from '@/features/neededitems/neededitem-keys';
 import NeededItem from '@/features/neededitems/NeededItem.vue';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
@@ -42,6 +42,7 @@ vi.mock('@/stores/useProgress', () => ({
     objectiveCompletions: { objective: { self: false, friend: false, done: true } },
     tasksCompletions: { task: { friend: false } },
     modulePartCompletions: { part: { friend: false } },
+    getDisplayName: (user: string) => `name-${user}`,
     teamStores: { friend: { getObjectiveCount: () => 1, getHideoutPartCount: () => 2 } },
   }),
 }));
@@ -61,6 +62,14 @@ vi.mock('@/stores/useMetadata', () => ({
     alternativeTasks: {},
   }),
 }));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    locale: ref('en'),
+    t: (key: string, params?: Record<string, unknown>) =>
+      `${key}${params ? JSON.stringify(params) : ''}`,
+  }),
+}));
 vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => ({}) }));
 vi.mock('@/composables/useCraftableItem', () => ({
   useCraftableItem: () => ({ isCraftable: computed(() => false) }),
@@ -74,7 +83,7 @@ const Probe = defineComponent({
     return { context: inject(neededItemKey)! };
   },
   template: `<div>
-    <output>{{ context.currentCount.value }}/{{ context.neededCount.value }}|{{ context.selfCompletedNeed.value }}|{{ context.item.value?.id }}|{{ context.relatedTask.value?.name }}|{{ context.relatedStation.value?.name }}|{{ context.lockedBefore.value }}|{{ context.levelRequired.value }}|{{ context.isKappaRequired.value }}|{{ context.isLightkeeperRequired.value }}|{{ JSON.stringify(context.teamNeeds.value) }}</output>
+    <output>{{ context.currentCount.value }}/{{ context.neededCount.value }}|{{ context.selfCompletedNeed.value }}|{{ context.item.value?.id }}|{{ context.relatedTask.value?.name }}|{{ context.relatedStation.value?.name }}|{{ context.lockedBefore.value }}|{{ context.levelRequired.value }}|{{ context.isKappaRequired.value }}|{{ context.isLightkeeperRequired.value }}|{{ JSON.stringify(context.teamNeeds.value) }}|hidden:{{ context.hiddenForSelf.value }}|hint:{{ context.hiddenForSelfHint.value }}</output>
     <button @click="$emit('increase-count')">increase</button>
     <button @click="$emit('decrease-count')">decrease</button>
     <button @click="$emit('toggle-count')">toggle</button>
@@ -146,6 +155,17 @@ describe('NeededItem progress wiring', () => {
       expect(wrapper.get('output').text()).toContain('1/3|false');
     }
   );
+  it('provides hiddenForSelf from the need Needed Items kept for teammates', async () => {
+    const hidden = render({ ...taskNeed, hiddenForSelf: true }, 'card');
+    const shown = render(taskNeed, 'card');
+    await flushPromises();
+    expect(hidden.get('output').text()).toContain('hidden:true');
+    expect(hidden.get('output').text()).toContain(
+      'hint:needed_items.hidden_for_you_hint{"teammates":"name-friend (1/'
+    );
+    expect(shown.get('output').text()).toContain('hidden:false|hint:');
+    expect(shown.get('output').text()).not.toContain('hidden_for_you_hint');
+  });
   it.each(['card', 'row'] as const)(
     'synchronizes %s hideout collection and completion',
     async (style) => {

@@ -612,6 +612,12 @@ export interface NeededItemTaskObjective extends NeededItemBase {
    * as `objectiveCompletions`, while `id` stays the progress key.
    */
   sourceObjectiveId?: string;
+  /**
+   * Set by Needed Items when the user hid the task but a teammate still needs
+   * the objective: the card shows only teammates' needs and adds nothing to
+   * the user's own counts or Smart Fill targets.
+   */
+  hiddenForSelf?: boolean;
 }
 export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';
