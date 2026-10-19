@@ -101,6 +101,7 @@ test('build profiles keep production for main and use anonymous settings elsewhe
     'GA_MEASUREMENT_ID',
     'CLARITY_PROJECT_ID',
     'NUXT_PUBLIC_CLIENT_LOG_SINK_URL',
+    'NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL',
     'NUXT_LOG_SINK_URL',
     'STRIPE_SECRET_KEY',
     'STRIPE_PRICE_SCAV_MONTHLY',

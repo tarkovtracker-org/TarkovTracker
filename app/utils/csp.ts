@@ -1,6 +1,7 @@
 export type ContentSecurityPolicyOptions = {
   allowUnsafeInlineScripts?: boolean;
   clientLogSinkUrl?: string;
+  progressDiagnosticSinkUrl?: string;
   clarityInstrumentationKey?: string;
   gaMeasurementId?: string;
   supabaseUrl?: string;
@@ -93,6 +94,7 @@ export const getConnectSrcSources = (options: ContentSecurityPolicyOptions = {})
     'https://*.supabase.co',
     'wss://*.supabase.co',
     getCspOrigin(options.clientLogSinkUrl),
+    getCspOrigin(options.progressDiagnosticSinkUrl),
     getCspOrigin(options.supabaseUrl),
     getWebSocketCspOrigin(options.supabaseUrl),
   ]);

@@ -17,6 +17,7 @@ import { CLIENT_DOCUMENT_ROUTES, PUBLIC_SEO_ROUTES } from './app/utils/routeSeo'
 import {
   GITHUB_IMAGE_DOMAINS,
   resolveClientLogSinkUrl,
+  resolveProgressDiagnosticSinkUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
@@ -43,6 +44,7 @@ const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 
 const appVersion = packageJson.version ?? 'dev';
 const buildCommit = resolveBuildCommit(process.env);
 const clientLogSinkUrl = resolveClientLogSinkUrl(process.env);
+const progressDiagnosticSinkUrl = resolveProgressDiagnosticSinkUrl(process.env);
 const isNonProduction = process.env.NODE_ENV !== 'production';
 const CONFIGURED_NITRO_PRESET = process.env.NITRO_PRESET;
 const NITRO_PRESET = resolveNitroPreset(CONFIGURED_NITRO_PRESET);
@@ -104,6 +106,7 @@ if (
 const TARKOV_ACCESS_SITE_KEY = (process.env.NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY ?? '').trim();
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
+  progressDiagnosticSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
@@ -203,6 +206,7 @@ export default defineNuxtConfig({
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
+      progressDiagnosticSinkUrl,
       turnstileSiteKey: TURNSTILE_SITE_KEY,
       // Tarkov data browser-clearance gate: disabled default. Never flip the flag without
       // the dedicated sitekey/secret/exact-hostname allowlist. The verification endpoint

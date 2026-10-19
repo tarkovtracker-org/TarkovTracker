@@ -592,6 +592,25 @@ describe('useSupabaseSync', () => {
       expect(sync.saveStatus.value.state).toBe('idle');
       sync.cleanup();
     });
+    it.each([
+      [new TypeError('Failed to fetch'), 'offline'],
+      [new Error('Not authenticated'), 'auth'],
+    ])('retains the exhausted failure cause after a new edit: %s', async (error, cause) => {
+      upsert.mockResolvedValue({ error });
+      const { store, sync } = await createRetryingSync(
+        vi.fn(),
+        vi.fn(async () => {})
+      );
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0] + RETRY_DELAYS[1]);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: cause });
+      store.$state.count = 2;
+      store.notifySubscriber();
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', failure: cause });
+      sync.cleanup();
+    });
     it('restarts a reconciled schedule when an edit follows exhaustion', async () => {
       upsert.mockResolvedValue({ error: { message: 'boom' } });
       const reconcile = vi.fn(async () => {});

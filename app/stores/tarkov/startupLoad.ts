@@ -34,6 +34,7 @@ import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { isProgressPayloadTooLarge } from '@/utils/progressPayload';
 import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeGameEdition,
@@ -378,6 +379,7 @@ const upload = async (ctx: StartupLoadContext, state: UserState, failure: string
   const { error, tarkovUidConflict } = await syncProgressState(ctx.client, ctx.userId, state);
   ensureCurrent(ctx);
   if (tarkovUidConflict) state.tarkovUid = tarkovUidConflict.storedUid;
+  if (isProgressPayloadTooLarge(error)) throw new Error(error.message);
   if (error) logger.error(failure, error);
   return !error;
 };

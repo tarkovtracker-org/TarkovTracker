@@ -280,10 +280,10 @@ SELECT throws_ok(
       %L::JSONB,
       0::SMALLINT
     )$$,
-    jsonb_build_object('pvp', jsonb_build_object('displayName', repeat('x', 600000)))
+    jsonb_build_object('pvp', jsonb_build_object('displayName', repeat('x', 1100000)))
   ),
   'p_modes exceeds the maximum payload size',
-  'the sync RPC rejects payloads over the 512 KiB cap'
+  'the sync RPC rejects payloads over the 1 MiB cap'
 );
 RESET ROLE;
 -- Seed the bucket at the limit directly so this assertion does not depend on how

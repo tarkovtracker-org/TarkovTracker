@@ -19,7 +19,7 @@
     <template #content>
       <div class="w-80 space-y-3 p-4 text-sm">
         <p class="font-semibold" :class="presentation.titleClass">{{ label }}</p>
-        <p class="text-surface-300">{{ t(`progress_save_status.${kind}_description`) }}</p>
+        <p class="text-surface-300">{{ t(descriptionKey) }}</p>
         <p v-if="localNoteKey" class="text-surface-300">{{ t(localNoteKey) }}</p>
         <p v-if="kind === 'cloud_retrying'" class="text-surface-400">
           {{
@@ -105,6 +105,7 @@
     cloudPending,
     locallySaved,
     causeKey,
+    descriptionKey,
     showsQuotaGuidance,
     canRetry,
     retrying,

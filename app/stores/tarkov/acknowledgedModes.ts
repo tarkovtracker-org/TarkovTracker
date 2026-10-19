@@ -19,7 +19,7 @@ type RemoteProgressUpdate = {
 /**
  * Per-mode progress the server is known to hold for one account: loaded at startup or
  * acknowledged by a sync. A sync sends only modes that differ, so unchanged modes are never
- * re-uploaded and the payload stays within the server's size cap.
+ * re-uploaded. Large requests are batched separately; a single mode may still exceed the cap.
  */
 let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};

@@ -605,14 +605,15 @@ Placement is enabled for both environments through the top-level `[placement]` b
 
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                                         | Description                                              | Required |
-| ------------------------------------------------ | -------------------------------------------------------- | -------- |
-| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
-| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
-| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
-| `NUXT_PUBLIC_LOG_LEVEL`                          | Client log level (debug, info, warn, error)              | No       |
-| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
-| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
+| Variable                                         | Description                                                                                         | Required |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------- | -------- |
+| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync                                                       | Yes¹     |
+| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync                                                          | Yes¹     |
+| `NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL`       | Optional aggregate progress byte/count collector; independent of general logs (disabled by default) | No       |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default)                                            | No       |
+| `NUXT_PUBLIC_LOG_LEVEL`                          | Client log level (debug, info, warn, error)                                                         | No       |
+| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports                                             | No²      |
+| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import                                                   | No       |
 
 > **¹ Required in production.** These shared names are consumed by Nuxt, Pages, Workers, and Edge
 > Functions. Without Supabase configuration, auth, sync, realtime, and team features are unavailable;

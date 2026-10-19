@@ -19,6 +19,7 @@ import {
   useTarkovStore,
 } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+import { isProgressPayloadTooLarge } from '@/utils/progressPayload';
 interface AccountActivityResponse {
   recorded: boolean;
 }
@@ -82,6 +83,8 @@ export function useAppInitialization() {
   let migrationAttempted = false;
   let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let syncRetryAttempts = 0;
+  let payloadFailureReported = false;
+  let stopProgressRecovery: (() => void) | null = null;
   const activityRecordedAt = new Map<string, number>();
   const activityRequests = new Map<string, number>();
   let disposed = false;
@@ -93,9 +96,14 @@ export function useAppInitialization() {
       syncRetryTimer = null;
     }
   };
+  const cancelProgressRecovery = () => {
+    stopProgressRecovery?.();
+    stopProgressRecovery = null;
+  };
   // True when a guarded initialization step would act on a stale session or a
   // superseded auth change, matching the guards inside each step.
   const isStaleInitialization = (expectedUserId?: string, expectedToken?: number) =>
+    disposed ||
     (expectedUserId !== undefined && getAuthenticatedUserId() !== expectedUserId) ||
     (expectedToken !== undefined && expectedToken !== authChangeToken);
   const reportSyncFailure = () => {
@@ -107,6 +115,11 @@ export function useAppInitialization() {
       `[useAppInitialization] Initial sync retry ${syncRetryAttempts}/${SYNC_RETRY_MAX_ATTEMPTS} failed`
     );
   };
+  const reportPayloadFailure = () => {
+    if (payloadFailureReported) return;
+    payloadFailureReported = true;
+    showLoadFailed();
+  };
   const scheduleSyncRetry = (expectedUserId?: string, expectedToken?: number) => {
     cancelSyncRetry();
     syncRetryTimer = setTimeout(() => {
@@ -115,7 +128,66 @@ export function useAppInitialization() {
     }, SYNC_RETRY_DELAY_MS);
     syncRetryAttempts += 1;
   };
-  const handleSyncFailure = (expectedUserId?: string, expectedToken?: number) => {
+  const captureRecoveryProgress = () => {
+    const state = useTarkovStore().$state;
+    return JSON.stringify([
+      state.pvp,
+      state.pve,
+      state.seasonal,
+      state.gameEdition,
+      state.tarkovUid,
+      state.seasonalSeasonNumber,
+    ]);
+  };
+  const scheduleProgressRecovery = (userId: string, token: number, rejected: string) => {
+    cancelSyncRetry();
+    syncRetryTimer = setTimeout(() => {
+      syncRetryTimer = null;
+      if (isStaleInitialization(userId, token)) return;
+      if (captureRecoveryProgress() === rejected) {
+        recoverAfterProgressChange(userId, token);
+        return;
+      }
+      void retrySyncNow(userId, token);
+    }, SYNC_RETRY_DELAY_MS);
+  };
+  /** A burst of edits gets one delayed retry, preserving the latest progress when it fires. */
+  const recoverAfterProgressChange = (userId: string, token = authChangeToken) => {
+    cancelSyncRetry();
+    cancelProgressRecovery();
+    const rejected = captureRecoveryProgress();
+    stopProgressRecovery = watch(
+      captureRecoveryProgress,
+      () => {
+        stopProgressRecovery = null;
+        if (isStaleInitialization(userId, token)) return;
+        scheduleProgressRecovery(userId, token, rejected);
+      },
+      { once: true }
+    );
+  };
+  const publishSyncFailure = (
+    userId: string,
+    payloadTooLarge: boolean,
+    expectedUserId?: string,
+    expectedToken?: number
+  ) => {
+    // A payload rejection proves a save was attempted, even during first-sign-in or repair.
+    if (payloadTooLarge || mayHoldUnsyncedProgress(userId)) {
+      markCloudSyncUnavailable(
+        () => retrySyncNow(expectedUserId, expectedToken),
+        payloadTooLarge ? 'payload_too_large' : 'unknown'
+      );
+    }
+  };
+  const scheduleBoundedSyncRetry = (expectedUserId?: string, expectedToken?: number) => {
+    if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
+      showLoadFailed();
+      return;
+    }
+    scheduleSyncRetry(expectedUserId, expectedToken);
+  };
+  const handleSyncFailure = (error: unknown, expectedUserId?: string, expectedToken?: number) => {
     const userId = getAuthenticatedUserId();
     if (isStaleInitialization(expectedUserId, expectedToken) || !userId) return;
     // A failure after the sync controller or realtime listener was created
@@ -124,20 +196,20 @@ export function useAppInitialization() {
     // disconnect cross-device updates. Tear the machinery down so the retry
     // starts from a clean slate.
     resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: userId });
-    // A failed load is not a failed save unless local progress may be waiting for the cloud.
-    if (mayHoldUnsyncedProgress(userId)) {
-      markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));
-    }
-    reportSyncFailure();
-    if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
-      showLoadFailed();
+    const payloadTooLarge = isProgressPayloadTooLarge(error);
+    publishSyncFailure(userId, payloadTooLarge, expectedUserId, expectedToken);
+    if (payloadTooLarge) {
+      reportPayloadFailure();
+      recoverAfterProgressChange(userId, expectedToken);
       return;
     }
-    scheduleSyncRetry(expectedUserId, expectedToken);
+    reportSyncFailure();
+    scheduleBoundedSyncRetry(expectedUserId, expectedToken);
   };
   /** Manual retry from the save indicator: restart initialization now with a fresh budget. */
   const retrySyncNow = async (expectedUserId?: string, expectedToken?: number) => {
     cancelSyncRetry();
+    cancelProgressRecovery();
     syncRetryAttempts = 0;
     await retryAuthenticatedInitialization(expectedUserId, expectedToken);
     return !hasPendingCloudChanges();
@@ -165,6 +237,7 @@ export function useAppInitialization() {
     await recordAccountActivityIfNeeded(expectedUserId, expectedToken);
   };
   onScopeDispose(cancelSyncRetry);
+  onScopeDispose(cancelProgressRecovery);
   const resetTarkovState = async (reason: string, previousUserId: string | null = null) => {
     try {
       const transition = resetTarkovStoreForSessionTransition(previousUserId, reason);
@@ -179,7 +252,9 @@ export function useAppInitialization() {
   const resetInitializationState = (loggedIn: boolean) => {
     syncStarted = false;
     migrationAttempted = false;
+    payloadFailureReported = false;
     cancelSyncRetry();
+    cancelProgressRecovery();
     syncRetryAttempts = 0;
     supporterLoadedForUserId = null;
     supporter.reset();
@@ -281,14 +356,16 @@ export function useAppInitialization() {
       // The replacement session owns syncStarted; stale completions must not clear it.
       if (isStaleInitialization(expectedUserId, expectedToken)) return;
       activityLogStore.migrateLegacyManualEntries();
+      payloadFailureReported = false;
       cancelSyncRetry();
+      cancelProgressRecovery();
       syncRetryAttempts = 0;
     } catch (error) {
       // Cancel silently rather than reporting failure or resetting a newer session.
       if (isStaleInitialization(expectedUserId, expectedToken)) return;
       syncStarted = false;
       logger.error('[useAppInitialization] Error initializing Supabase sync:', error);
-      handleSyncFailure(expectedUserId, expectedToken);
+      handleSyncFailure(error, expectedUserId, expectedToken);
     }
   };
   const runMigrationIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
