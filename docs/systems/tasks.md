@@ -136,6 +136,8 @@ matching mode, the server attaches `taskPool` with that identity, verification, 
 derivation when every contributor exists. This display metadata never creates a counter or an
 additional trader-loyalty gate. Entries without pool metadata retain their existing counter behavior.
 Both `counter` and `taskPool` are excluded from in-game confirmation signatures.
+Task deep-link cleanup retains the selected status filter when removing `task` from the URL, so
+the focused task remains visible after route preferences synchronize.
 
 Cards and dashboard blockers share an instruction such as "Complete at least 3 LL2 tasks for
 Mechanic". Cards show actual tracked progress and an expandable contributor list, with available
