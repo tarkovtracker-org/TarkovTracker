@@ -6,7 +6,7 @@
       :class="[
         size === 'md' ? 'h-10 w-10' : 'h-8 w-8',
         collected
-          ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
+          ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
           : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white',
       ]"
       :aria-label="label"

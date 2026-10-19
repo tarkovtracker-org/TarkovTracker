@@ -69,7 +69,7 @@
         :class="[
           sizeClasses.button,
           isComplete
-            ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
+            ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
             : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white',
         ]"
         @click="$emit('toggle')"
