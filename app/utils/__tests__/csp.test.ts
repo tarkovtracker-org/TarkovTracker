@@ -33,6 +33,22 @@ describe('nuxt.config CSP', () => {
     expect(connectSources).not.toContain('https://logs.example.com/v1/collect');
     expect(connectSources).not.toContain('https://db.example.com/auth/v1');
   });
+  it('allows only the configured aggregate collector origin without enabling general logs', () => {
+    const csp = buildAppContentSecurityPolicy({
+      progressDiagnosticSinkUrl: 'https://progress.example.com/v1/collect',
+    });
+    expect(getDirectiveSources(csp, 'connect-src')).toContain('https://progress.example.com');
+    expect(getDirectiveSources(csp, 'connect-src')).not.toContain(
+      'https://progress.example.com/v1/collect'
+    );
+    expect(getConnectSrcSources()).not.toContain('https://progress.example.com');
+  });
+  it.each(['', '/api/logs/client', 'invalid', 'javascript:alert(1)'])(
+    'does not broaden connection sources for a relative or invalid collector: %s',
+    (progressDiagnosticSinkUrl) => {
+      expect(getConnectSrcSources({ progressDiagnosticSinkUrl })).toEqual(getConnectSrcSources());
+    }
+  );
   it('limits insecure websocket origins to local http backends', () => {
     const remoteSources = getConnectSrcSources({
       supabaseUrl: 'http://db.example.com/auth/v1',

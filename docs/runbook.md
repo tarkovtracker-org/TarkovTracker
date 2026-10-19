@@ -76,9 +76,9 @@ See the canonical map for `NUXT_LOG_SINK_URL`, `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`
 `NUXT_SHARED_PROFILE_CACHE_TTL_MS`. Operational note: set the browser log sink at build time to
 `/api/logs/client` only when the edge/WAF rate limit for that path is enabled, or use an external
 collector URL. `NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL` separately enables only aggregate progress
-metrics; it has the same edge-protection prerequisite. Keep general browser log forwarding disabled
-when enabling these metrics alone. Verify delivery to the approved retention/query destination
-after rebuilding the application.
+metrics; when targeting `/api/logs/client`, it has the same edge-protection prerequisite. Keep general
+browser log forwarding disabled when enabling these metrics alone. Verify delivery to the approved
+retention/query destination after rebuilding the application.
 
 ## Pre-Deploy Validation
 
