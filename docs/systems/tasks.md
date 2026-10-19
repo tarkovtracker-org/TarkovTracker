@@ -85,7 +85,12 @@ offers Undo, and the card menu offers Unhide.
   task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
   personal: a hidden task's objective stays while a teammate still needs it (the same pending
   teammates `NeededItem` shows, unless team items are hidden), so the team can still supply it.
-  Hideout requirements and the dashboard's overall item progress are unaffected (`useNeededItems`
+  That objective is tagged `hiddenForSelf` and its card or row shows "Hidden for you" in place
+  of the user's own count, progress and controls. Row and expanded card list the teammates; the
+  compact card shows their count, and every style's tooltip (and screen-reader text) names who
+  still needs it (`hiddenForSelfHint`). It adds nothing to tab counts, Group by item totals or
+  Smart Fill targets (`countsForSelf`); Group by item shows only the user's own totals, so it
+  leaves these needs out. Hideout requirements and the dashboard's overall item progress are unaffected (`useNeededItems`
   `allItems`).
 
 ## Canonical task progression

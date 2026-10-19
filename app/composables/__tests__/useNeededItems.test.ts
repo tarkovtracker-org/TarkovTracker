@@ -409,6 +409,31 @@ describe('useNeededItems', () => {
       });
       expect(taskObjectiveIds(teammateDone.allItems.value)).not.toContain('obj-1');
     });
+    it("keeps a teammate-only objective out of the user's counts and Smart Fill targets", async () => {
+      const teamProgress = {
+        preferencesStore: { getHiddenTaskIds: ['task-1'] },
+        progressStore: {
+          objectiveCompletions: { 'obj-1': { self: false, 'team-1': false } },
+          teamStores: { 'team-1': {} },
+        },
+      };
+      const { neededItems } = await setup(teamProgress);
+      const { neededItems: dropped } = await setup({
+        ...teamProgress,
+        progressStore: { ...teamProgress.progressStore, teamStores: {} },
+      });
+      const findNeed = (items: (NeededItemTaskObjective | NeededItemHideoutModule)[], id: string) =>
+        items.find((item) => item.needType === 'taskObjective' && item.id === id) as
+          NeededItemTaskObjective | undefined;
+      expect(findNeed(neededItems.allItems.value, 'obj-1')?.hiddenForSelf).toBe(true);
+      expect(findNeed(neededItems.allItems.value, 'obj-3')?.hiddenForSelf).toBeUndefined();
+      expect(findNeed(neededItems.filteredItems.value, 'obj-1')).toBeDefined();
+      expect(findNeed(dropped.allItems.value, 'obj-1')).toBeUndefined();
+      expect(neededItems.filterTabsWithCounts.value).toEqual(dropped.filterTabsWithCounts.value);
+      expect(neededItems.groupedItems.value).toEqual(dropped.groupedItems.value);
+      const boltObjectives = neededItems.objectivesByItemId.value.get('item-bolts');
+      expect(boltObjectives?.taskObjectives.map((need) => need.id)).not.toContain('obj-1');
+    });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();
       const taskIds = neededItems.allItems.value

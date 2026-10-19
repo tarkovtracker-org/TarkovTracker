@@ -48,7 +48,12 @@
                   {{ $t('needed_items.unknown_task') }}
                 </span>
                 <span class="mt-1 flex">
-                  <NeededItemStatusPill :handed-over="isHandedOver" :collected="isCollected" />
+                  <NeededItemStatusPill
+                    :handed-over="isHandedOver"
+                    :collected="isCollected"
+                    :hidden-for-self="hiddenForSelf"
+                    :hint="hiddenForSelfHint"
+                  />
                 </span>
               </template>
               <span
@@ -76,9 +81,12 @@
               variant="ghost"
               color="neutral"
               class="m-0 p-0 px-1"
-              @click="isSingleItem ? $emit('toggleCount') : (smallDialog = true)"
+              @click="isSingleItem && !hiddenForSelf ? $emit('toggleCount') : (smallDialog = true)"
             >
-              <template v-if="isSingleItem">
+              <template v-if="hiddenForSelf">
+                <UIcon name="i-mdi-account-group" class="text-surface-300 h-5 w-5" />
+              </template>
+              <template v-else-if="isSingleItem">
                 <UIcon
                   name="i-mdi-check-circle"
                   class="h-5 w-5"
@@ -143,6 +151,8 @@
                           <NeededItemStatusPill
                             :handed-over="isHandedOver"
                             :collected="isCollected"
+                            :hidden-for-self="hiddenForSelf"
+                            :hint="hiddenForSelfHint"
                           />
                         </span>
                       </template>
@@ -174,7 +184,8 @@
                       v-if="!selfCompletedNeed"
                       class="mx-2 mt-2 mb-2 flex h-full flex-col items-center justify-center self-stretch"
                     >
-                      <template v-if="!isSingleItem">
+                      <template v-if="hiddenForSelf" />
+                      <template v-else-if="!isSingleItem">
                         <ItemCountControls
                           :current-count="currentCount"
                           :needed-count="neededCount"
@@ -221,7 +232,8 @@
               :player-level="tarkovStore.playerLevel()"
             />
             <div v-if="!selfCompletedNeed" class="mr-2 flex items-center gap-3 self-center">
-              <template v-if="!isSingleItem">
+              <template v-if="hiddenForSelf" />
+              <template v-else-if="!isSingleItem">
                 <ItemCountControls
                   :current-count="currentCount"
                   :needed-count="neededCount"
@@ -308,6 +320,8 @@
     levelRequired,
     item,
     teamNeeds,
+    hiddenForSelf,
+    hiddenForSelfHint,
     imageItem,
     acceptedItems,
     hasAlternativeItems,
@@ -324,7 +338,10 @@
     initialVisible: props.initiallyVisible,
   });
   const itemRowClasses = computed(() =>
-    neededItemSurfaceClass(selfCompletedNeed.value || isCollected.value, 'l')
+    neededItemSurfaceClass(
+      !hiddenForSelf.value && (selfCompletedNeed.value || isCollected.value),
+      'l'
+    )
   );
   const rarityBorderClass = computed(() =>
     neededItemBorderClass(imageItem.value?.backgroundColor, props.need.needType)

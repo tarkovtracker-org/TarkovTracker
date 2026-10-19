@@ -2539,6 +2539,8 @@
     "any_of_items_short": "Any {count}",
     "view_accepted_items": "View all {count} accepted items",
     "not_collected": "Not collected",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "Click to collect",
     "click_to_uncollect": "Click to uncollect",
     "modal": {
