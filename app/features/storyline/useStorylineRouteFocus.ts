@@ -46,5 +46,8 @@ export function useStorylineRouteFocus(chapterCount: Ref<number>) {
   watch([() => route.query.chapter, () => route.query.objective, chapterCount], focusFromRoute, {
     immediate: true,
   });
+  watch(chapterCount, (count) => {
+    if (count === 0) clearFocus();
+  });
   onBeforeUnmount(clearFocus);
 }
