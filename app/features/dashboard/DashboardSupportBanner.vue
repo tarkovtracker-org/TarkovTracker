@@ -6,7 +6,7 @@
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 items-start gap-3 text-sm sm:items-center">
           <div
-            class="bg-success-500/20 light:bg-success-200 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            class="bg-success-500/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
           >
             <UIcon name="i-mdi-heart" class="text-success-400 light:text-success-700 h-5 w-5" />
           </div>

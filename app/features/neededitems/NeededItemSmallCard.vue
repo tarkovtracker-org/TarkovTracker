@@ -1,5 +1,5 @@
 <template>
-  <AppTooltip :text="isCollectable ? collectActionLabel : ''">
+  <AppTooltip :text="cardTooltip">
     <div
       class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-full flex-col rounded-lg border-l-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       :class="[
@@ -21,7 +21,18 @@
               class="flex items-center gap-1.5 rounded-br-lg px-2.5 py-1 text-sm font-bold shadow-lg backdrop-blur-sm"
               :class="itemCountTagClasses"
             >
-              {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
+              <template v-if="hiddenForSelf">
+                <UIcon name="i-mdi-eye-off" class="h-4 w-4" aria-hidden="true" />
+                {{ t('needed_items.hidden_for_you') }}
+                <span v-if="teamNeeds.length > 0" class="flex items-center gap-0.5">
+                  <UIcon name="i-mdi-account-group" class="h-4 w-4" aria-hidden="true" />
+                  {{ formatNumber(teamNeeds.length) }}
+                </span>
+                <span class="sr-only">{{ hiddenForSelfHint }}</span>
+              </template>
+              <template v-else>
+                {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
+              </template>
               <ItemIndicators
                 :found-in-raid="props.need.foundInRaid ?? false"
                 fir-icon-class="h-4 w-4"
@@ -79,7 +90,7 @@
             </div>
           </div>
           <div
-            v-if="cardStyle === 'compact' && !isSingleItem && !selfCompletedNeed"
+            v-if="cardStyle === 'compact' && !isSingleItem && !selfCompletedNeed && !hiddenForSelf"
             class="bg-surface-900/70 absolute inset-x-0 bottom-0 z-20 flex justify-center p-1"
             @click.stop
           >
@@ -128,7 +139,14 @@
               icon-class="h-3.5 w-3.5"
             />
           </div>
-          <div v-if="!isSingleItem" class="mt-auto flex items-center justify-center pt-2">
+          <div v-if="hiddenForSelf" class="mt-auto flex items-center justify-center pt-2">
+            <TeamNeedsDisplay
+              v-if="teamNeeds.length > 0"
+              :team-needs="teamNeeds"
+              :needed-count="neededCount"
+            />
+          </div>
+          <div v-else-if="!isSingleItem" class="mt-auto flex items-center justify-center pt-2">
             <template v-if="!selfCompletedNeed">
               <ItemCountControls
                 :current-count="currentCount"
@@ -179,6 +197,7 @@
     neededItemSurfaceClass,
   } from '@/features/neededitems/neededItemStateClasses';
   import RequirementInfo from '@/features/neededitems/RequirementInfo.vue';
+  import TeamNeedsDisplay from '@/features/neededitems/TeamNeedsDisplay.vue';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemsCardStyle } from '@/features/neededitems/neededItemsFilterNormalization';
@@ -220,14 +239,18 @@
     hasAlternativeItems,
     isCyclingItems,
     setCyclingPaused,
+    teamNeeds,
+    hiddenForSelf,
+    hiddenForSelfHint,
   } = inject(neededItemKey, createDefaultNeededItemContext());
   const hasItem = computed(() => Boolean(item.value));
   const isSingleItem = computed(() => neededCount.value === 1);
   const isComplete = computed(
-    () => selfCompletedNeed.value || currentCount.value >= neededCount.value
+    () =>
+      !hiddenForSelf.value && (selfCompletedNeed.value || currentCount.value >= neededCount.value)
   );
   const isCollectable = computed(
-    () => hasItem.value && isSingleItem.value && !selfCompletedNeed.value
+    () => hasItem.value && isSingleItem.value && !selfCompletedNeed.value && !hiddenForSelf.value
   );
   const acceptedItemsOpen = ref(false);
   watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
@@ -236,6 +259,10 @@
   const collectActionLabel = computed(() =>
     isCollected.value ? t('needed_items.click_to_uncollect') : t('needed_items.click_to_collect')
   );
+  const cardTooltip = computed(() => {
+    if (hiddenForSelf.value) return hiddenForSelfHint.value;
+    return isCollectable.value ? collectActionLabel.value : '';
+  });
   const cardAriaLabel = computed(() => {
     const itemName = item.value?.name || t('common.item');
     const status = isCollected.value

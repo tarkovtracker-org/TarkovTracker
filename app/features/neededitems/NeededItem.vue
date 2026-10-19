@@ -37,6 +37,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemsCardStyle } from '@/features/neededitems/neededItemsFilterNormalization';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   const props = withDefaults(
@@ -206,12 +207,26 @@
     );
     return collectTeamNeeds(users, (store) => store.getHideoutPartCount?.(need.id));
   };
+  const hiddenForSelf = computed(
+    () => props.need.needType === 'taskObjective' && props.need.hiddenForSelf === true
+  );
   const teamNeeds = computed(() => {
     if (teamNeedsHiddenRules.some((isHidden) => isHidden())) return [];
     return props.need.needType === 'taskObjective'
       ? objectiveTeamNeeds(props.need)
       : hideoutTeamNeeds(props.need);
   });
+  const { t } = useI18n({ useScope: 'global' });
+  const formatNumber = useLocaleNumberFormatter();
+  const formatTeamNeed = ({ user, count }: NeededItemTeamNeed) =>
+    `${progressStore.getDisplayName(user)} (${formatNumber(count)}/${formatNumber(neededCount.value)})`;
+  const hiddenForSelfHint = computed(() =>
+    hiddenForSelf.value
+      ? t('needed_items.hidden_for_you_hint', {
+          teammates: teamNeeds.value.map(formatTeamNeed).join(', '),
+        })
+      : ''
+  );
   provide(neededItemKey, {
     item,
     relatedTask,
@@ -224,6 +239,8 @@
     neededCount,
     levelRequired,
     teamNeeds,
+    hiddenForSelf,
+    hiddenForSelfHint,
     imageItem,
     acceptedItems,
     hasAlternativeItems,
