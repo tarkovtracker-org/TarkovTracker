@@ -81,9 +81,11 @@ offers Undo, and the card menu offers Unhide.
   completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
   deep link). Hidden tasks leave the All, Available and Locked status and trader counts;
   Completed and Failed counts still include them (`useTaskCounts`).
-- Needed Items drops objectives of hidden tasks from every tab and count until the task is
-  completed; completed (not failed) hidden tasks stay on the Completed tab. Hideout requirements and the
-  dashboard's overall item progress are unaffected (`useNeededItems` `allItems`).
+- Needed Items drops the user's own objectives of hidden tasks from every tab and count until the
+  task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
+  personal: teammates' needs for a hidden task stay visible so the team can still supply them.
+  Hideout requirements and the dashboard's overall item progress are unaffected (`useNeededItems`
+  `allItems`).
 
 ## Canonical task progression
 

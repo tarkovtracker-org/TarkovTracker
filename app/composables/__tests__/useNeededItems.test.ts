@@ -369,6 +369,16 @@ describe('useNeededItems', () => {
       expect(taskIds).not.toContain('task-2');
       expect(taskIds).toContain('task-1');
     });
+    it("keeps teammates' needs for a task the user hid", async () => {
+      const { neededItems } = await setup({
+        includeTeamItems: true,
+        preferencesStore: { getHiddenTaskIds: ['task-team'] },
+      });
+      const teamNeeds = neededItems.allItems.value.filter(
+        (item) => item.needType === 'taskObjective' && item.teamId === 'team-1'
+      );
+      expect(teamNeeds).toHaveLength(1);
+    });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();
       const taskIds = neededItems.allItems.value
