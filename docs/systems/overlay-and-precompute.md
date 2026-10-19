@@ -407,7 +407,8 @@ combination before its KV write. Previous entries survive failed combinations. E
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
 Task-core pool descriptions are optional additions to the existing `json-v3` payload, so this
-feature retains current cache keys. Older cached payloads continue to show generic pool instructions.
+feature retains current cache keys. Older cached payloads that retain the gate continue to show
+generic progression instructions; a payload that discarded the gate needs a refreshed catalog.
 Registry `pool` metadata is informational; unresolved mappings never become derived counters.
 
 A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
@@ -426,8 +427,19 @@ For pool descriptions, use this release order:
 3. Dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to the published SHA
    and no language/mode filters. Verify all 48 refreshed core entries and the matching complete
    manifest, then use the existing cache-purge marker/operator workflow for browser and edge caches.
-4. Run `pnpm run verify:overlay` after refresh and require current served provenance and pool-bearing
-   task payloads before claiming the named requirements are live.
+4. Run `pnpm run verify:overlay` after refresh and require all 48 rows to report current provenance.
+   This command checks provenance, not pool content. Separately inspect the served task-core payload
+   in each mode: require a known mapped global-variable gate to carry `taskPool.traderId`,
+   `taskPool.loyaltyLevel`, and its candidate derivation. For example, inspect Scout’s Mechanic LL2
+   gate. Confirm that verified, complete entries also retain `counter`, while unresolved entries
+   omit it. After cache purge, open the task in the deployed UI and verify its named instruction
+   and contributor disclosure before claiming the feature is live.
+
+To roll back to a tracker revision whose registry validator rejects `pool`, first publish an overlay
+without the optional identities while the compatible consumer remains deployed. Refresh and verify
+the same payloads and caches, then roll back the consumer. A frontend-only display fix can keep the
+compatible validator and current metadata. Do not roll back the strict validator while the published
+registry still carries `pool`.
 
 For incompatible consumer contract changes, split producer and consumer changes into separate
 releases whenever preseeding is required: land a compatible producer first, seed the new versioned

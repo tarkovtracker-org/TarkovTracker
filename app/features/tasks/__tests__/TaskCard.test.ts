@@ -413,6 +413,40 @@ describe('TaskCard appearance and expansion controls', () => {
     );
     wrapper.unmount();
   });
+  it('shows unresolved-pool confirmation guidance before opening contributors', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'global_variable_unknown', requirementId: 'pool-gate' }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'pool-gate',
+          variableId: 'v',
+          compareMethod: '>=',
+          value: 3,
+          taskPool: {
+            traderId: 'mechanic',
+            loyaltyLevel: 2,
+            verification: 'unresolved',
+            coverage: 'partial',
+            derivation: { type: 'distinctTaskCompletions', taskIds: ['contributor'] },
+          },
+        },
+      ],
+    });
+    expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="task-requirements-blocking"]').text()).toContain(
+      'If this task is already available in-game, use Mark available.'
+    );
+    wrapper.unmount();
+  });
   it('opens pool contributors from a chip even when the task body starts collapsed', async () => {
     preferencesState.collapseDefault = true;
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };

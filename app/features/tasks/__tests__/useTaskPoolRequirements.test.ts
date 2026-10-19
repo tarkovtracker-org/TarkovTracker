@@ -92,9 +92,11 @@ describe('pool requirement rows', () => {
   it('honors unknown or known account blockers instead of falling back to tracked completions', () => {
     state.completions = { a: { complete: true }, b: { complete: true } };
     const row = useTaskPoolRequirements(() => ({ id: 'target' }));
-    expect(row(gate(), false, { type: 'global_variable_unknown' }).progress).toBe(
-      'Progress unverified'
-    );
+    expect(row(gate(), false, { type: 'global_variable_unknown' })).toMatchObject({
+      progress: 'Progress unverified',
+      hint: 'If this task is already available in-game, use Mark available. This does not complete any pool tasks.',
+    });
+    expect(row(gate(), false, { type: 'global_variable', current: 0 }).hint).toBeUndefined();
     expect(row(gate(), false, { type: 'global_variable', current: 0 }).progress).toBe(
       '0/2 in game'
     );

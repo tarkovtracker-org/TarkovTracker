@@ -96,6 +96,10 @@ export const useTaskPoolRequirements = (task: () => Task) => {
         requirement.value
       ),
       progress: rowProgress(requirement, blocker),
+      hint:
+        blocker?.type === 'global_variable_unknown'
+          ? t('page.tasks.requirements.pool_confirmation_hint')
+          : undefined,
       pool: poolDetails(requirement, counter, met),
     };
   };

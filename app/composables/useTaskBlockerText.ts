@@ -82,7 +82,11 @@ export const useTaskBlockerText = () => {
       blocker.compareMethod,
       blocker.type === 'global_variable' ? 'account' : 'tracked'
     );
-    return `${label} · ${current}`;
+    const hint =
+      blocker.type === 'global_variable_unknown'
+        ? t('page.tasks.requirements.pool_confirmation_hint')
+        : undefined;
+    return [label, current, hint].filter(Boolean).join(' · ');
   };
   const hasPool = (blocker: TaskBlocker) => blocker.type === 'task_counter' || !!blocker.taskPool;
   return (blocker: TaskBlocker): string =>

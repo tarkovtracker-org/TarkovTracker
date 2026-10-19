@@ -128,7 +128,8 @@ Unresolved pools without an effective account value show "Progress unverified". 
 value is displayed as in-game progress. Candidate tasks remain explicitly labeled, and counting
 these candidates cannot clear the gate. Unmapped variables retain generic in-game progression wording.
 Pool descriptions are additive to the existing `json-v3` task-core payload. Keep its cache keys:
-old payloads remain valid and show the generic pool instruction until refreshed. Publish consumer
+payloads that retain the gate without pool metadata show a generic pool instruction until refreshed.
+Payloads that previously discarded the gate cannot render it until a refreshed catalog restores it. Publish consumer
 support before adding optional pool fields to the overlay, since older consumers reject unknown
 registry entry fields; then refresh precompute and the existing browser/edge caches to expose names.
 

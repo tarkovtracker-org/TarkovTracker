@@ -35,7 +35,9 @@ describe('canonical blocker text', () => {
           derivation: { type: 'distinctTaskCompletions', taskIds: ['a'] },
         },
       })
-    ).toBe('Complete at least 3 LL2 tasks for Mechanic · Progress unverified');
+    ).toBe(
+      'Complete at least 3 LL2 tasks for Mechanic · Progress unverified · If this task is already available in-game, use Mark available. This does not complete any pool tasks.'
+    );
   });
   it('names the trader and exact storyline unlock objective', () => {
     expect(
