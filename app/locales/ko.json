@@ -737,12 +737,12 @@
         }
       },
       "support_banner": {
-        "new_title": "모두를 위해 TarkovTracker를 무료로 유지해 주세요",
-        "new_body": "후원은 필수가 아니지만, 누구에게도 유료 장벽이나 광고 없이 프로젝트가 운영되고 업데이트되는 원동력입니다.",
-        "new_cta": "후원자 되기",
-        "returning_title": "이전에 TarkovTracker를 후원해 주셔서 감사합니다",
-        "returning_body": "후원은 언제나 선택 사항입니다. 모두를 위해 트래커가 유료 장벽과 광고 없이 운영되고 업데이트되는 원동력입니다.",
-        "returning_cta": "다시 후원하기"
+        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
+        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_cta": "TarkovTracker 후원",
+        "returning_title": "Thanks for supporting TarkovTracker before.",
+        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
+        "returning_cta": "Renew support"
       }
     },
     "changelog": {
