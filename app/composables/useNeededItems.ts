@@ -166,16 +166,34 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     return visibleIds;
   });
   const hiddenTaskIds = computed(() => new Set(preferencesStore.getHiddenTaskIds));
-  // Hiding only drops the user's own needs; teammates' needs for the task stay visible.
   // Hidden tasks keep their completed objectives, like the task list's Completed view.
   // Failed tasks also carry the completion flag, so they stay hidden.
   const isTaskSucceeded = (taskId: string): boolean =>
     progressStore.tasksCompletions?.[taskId]?.['self'] === true &&
     progressStore.tasksFailed?.[taskId]?.['self'] !== true;
+  // Mirrors NeededItem's team needs: teammates ride on the user's objective record.
+  const showsTeamNeeds = (need: NeededItemTaskObjective): boolean =>
+    !preferencesStore.itemsTeamAllHidden &&
+    !(preferencesStore.itemsTeamNonFIRHidden && !need.foundInRaid);
+  const hasPendingTeammate = (need: NeededItemTaskObjective): boolean => {
+    const objectiveCompletions =
+      progressStore.objectiveCompletions?.[need.sourceObjectiveId ?? need.id] ?? {};
+    const taskCompletions = progressStore.tasksCompletions?.[need.taskId] ?? {};
+    return Object.entries(objectiveCompletions).some(
+      ([user, completed]) =>
+        user !== 'self' &&
+        !completed &&
+        !taskCompletions[user] &&
+        !!progressStore.teamStores?.[user]
+    );
+  };
+  // Hiding is personal: a hidden task's objective stays while a teammate still needs it.
+  const neededByTeammate = (need: NeededItemTaskObjective, progressTeamId: string): boolean =>
+    progressTeamId !== 'self' || (showsTeamNeeds(need) && hasPendingTeammate(need));
   const isHiddenTaskNeed = (need: NeededItemTaskObjective, progressTeamId: string): boolean =>
-    progressTeamId === 'self' &&
     hiddenTaskIds.value.has(need.taskId) &&
-    !isTaskSucceeded(need.taskId);
+    !isTaskSucceeded(need.taskId) &&
+    !neededByTeammate(need, progressTeamId);
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);

@@ -186,6 +186,7 @@ const createPreferencesStore = () => ({
   setNeededItemsCardStyle: vi.fn(),
   itemsTeamAllHidden: false,
   setItemsTeamHideAll: vi.fn(),
+  itemsTeamNonFIRHidden: false,
   getHideoutRequireStationLevels: true,
   getHideoutRequireSkillLevels: true,
   getHideoutRequireTraderLoyalty: true,
@@ -378,6 +379,33 @@ describe('useNeededItems', () => {
         (item) => item.needType === 'taskObjective' && item.teamId === 'team-1'
       );
       expect(teamNeeds).toHaveLength(1);
+    });
+    it('keeps a hidden task objective while a teammate still needs it', async () => {
+      const teamProgress = {
+        preferencesStore: { getHiddenTaskIds: ['task-1'] },
+        progressStore: {
+          objectiveCompletions: { 'obj-1': { self: false, 'team-1': false } },
+          teamStores: { 'team-1': {} },
+        },
+      };
+      const taskObjectiveIds = (items: { needType: string; id: string }[]) =>
+        items.filter((item) => item.needType === 'taskObjective').map((item) => item.id);
+      const { neededItems } = await setup(teamProgress);
+      expect(taskObjectiveIds(neededItems.allItems.value)).toContain('obj-1');
+      expect(taskObjectiveIds(neededItems.allItems.value)).not.toContain('obj-2');
+      const { neededItems: teamHidden } = await setup({
+        ...teamProgress,
+        preferencesStore: { ...teamProgress.preferencesStore, itemsTeamAllHidden: true },
+      });
+      expect(taskObjectiveIds(teamHidden.allItems.value)).not.toContain('obj-1');
+      const { neededItems: teammateDone } = await setup({
+        ...teamProgress,
+        progressStore: {
+          ...teamProgress.progressStore,
+          objectiveCompletions: { 'obj-1': { self: false, 'team-1': true } },
+        },
+      });
+      expect(taskObjectiveIds(teammateDone.allItems.value)).not.toContain('obj-1');
     });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();
