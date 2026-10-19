@@ -1,5 +1,5 @@
 // Shared validation for the checkbox panel and the structured Actions entry point.
-import { requireEvidence, SHA } from './review-admission-policy.mjs';
+import { INDEPENDENT_REVIEW_REQUIRED, requireEvidence, SHA } from './review-admission-policy.mjs';
 export const CONTROL_MARKER = '<!-- tarkovtracker:pr-controls:v1 -->';
 export const CONTROL_ANCHOR = '44d4462c3db34b60e7cca69450405c922af15f56';
 export const CONTROL_WRITE_LIMIT = 900;
@@ -114,6 +114,7 @@ export function renderControlPanel({
       statusLine(label, checks[label])
     ),
     '',
+    ...reviewFallback(headSha, checks, terminal),
     ...panelActions(terminal),
     '',
     `**Last result:** ${result}`,
@@ -131,4 +132,24 @@ function panelGuidance(terminal) {
   return terminal
     ? 'Controls are disabled for this PR. Use provider/human review, /preview, /preview stop, or the existing manual preview workflow.'
     : 'Checkboxes reset after processing. Agents use the structured PR Controls workflow.';
+}
+function reviewFallback(headSha, checks, terminal) {
+  if (!needsReviewFallback(checks)) return [];
+  const alternative = terminal
+    ? 'Admin attestation controls are disabled for this PR.'
+    : 'Alternatively, a repository admin may explicitly attest to this commit using the review checkbox below (or PR Controls with operation approve-review and this exact expected_head).';
+  return [
+    `**Review needed for \`${headSha}\`:** Ask a non-author write collaborator to review this commit and submit an approving PR review.`,
+    'A provider check that says review skipped, rate limited, or no reviewable files does not complete review; repeated requests do not bypass provider limits.',
+    alternative,
+    'An admin attestation is a separate explicit alternative, not evidence of independent review. Findings, changes requested, and separate sensitive-change approval still apply. A new head needs fresh review or attestation.',
+    '',
+  ];
+}
+function needsReviewFallback(checks) {
+  const admission = checks['Review Admission'];
+  return [
+    admission?.state === 'failure',
+    admission?.description === INDEPENDENT_REVIEW_REQUIRED,
+  ].every(Boolean);
 }
