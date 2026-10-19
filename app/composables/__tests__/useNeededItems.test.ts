@@ -431,8 +431,31 @@ describe('useNeededItems', () => {
       expect(findNeed(dropped.allItems.value, 'obj-1')).toBeUndefined();
       expect(neededItems.filterTabsWithCounts.value).toEqual(dropped.filterTabsWithCounts.value);
       expect(neededItems.groupedItems.value).toEqual(dropped.groupedItems.value);
+      expect(neededItems.groupedNeedCount.value).toBe(dropped.groupedNeedCount.value);
+      expect(neededItems.groupedNeedCount.value).toBeLessThan(
+        neededItems.filteredItems.value.length
+      );
       const boltObjectives = neededItems.objectivesByItemId.value.get('item-bolts');
       expect(boltObjectives?.taskObjectives.map((need) => need.id)).not.toContain('obj-1');
+    });
+    it("keeps a teammate-only objective under Hide owned when the user's own count is met", async () => {
+      const ownsObj1 = {
+        preferencesStore: { getNeededItemsHideOwned: true },
+        progressStore: {
+          objectiveCompletions: { 'obj-1': { self: false, 'team-1': false } },
+          teamStores: { 'team-1': {} },
+        },
+        tarkovStore: { getObjectiveCount: (id: string) => (id === 'obj-1' ? 5 : 0) },
+      };
+      const hasObj1 = (items: (NeededItemTaskObjective | NeededItemHideoutModule)[]) =>
+        items.some((item) => item.needType === 'taskObjective' && item.id === 'obj-1');
+      const { neededItems: visibleTask } = await setup(ownsObj1);
+      expect(hasObj1(visibleTask.filteredItems.value)).toBe(false);
+      const { neededItems: hiddenTask } = await setup({
+        ...ownsObj1,
+        preferencesStore: { ...ownsObj1.preferencesStore, getHiddenTaskIds: ['task-1'] },
+      });
+      expect(hasObj1(hiddenTask.filteredItems.value)).toBe(true);
     });
     it('includes all items regardless of completion status', async () => {
       const { neededItems } = await setup();

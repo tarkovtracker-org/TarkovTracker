@@ -90,8 +90,10 @@ offers Undo, and the card menu offers Unhide.
   compact card shows their count, and every style's tooltip (and screen-reader text) names who
   still needs it (`hiddenForSelfHint`). It adds nothing to tab counts, Group by item totals or
   Smart Fill targets (`countsForSelf`); Group by item shows only the user's own totals, so it
-  leaves these needs out. Hideout requirements and the dashboard's overall item progress are unaffected (`useNeededItems`
-  `allItems`).
+  leaves these needs out, and its "unique (total)" count uses `groupedNeedCount`. Hide owned
+  ignores the user's own count for these needs, since a teammate still lacks the item.
+  Hideout requirements and the dashboard's overall item progress are unaffected
+  (`useNeededItems` `allItems`).
 
 ## Canonical task progression
 

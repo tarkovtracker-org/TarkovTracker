@@ -65,6 +65,8 @@ export interface UseNeededItemsReturn {
   allItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   filteredItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   groupedItems: ComputedRef<GroupedNeededItem[]>;
+  /** Needs folded into `groupedItems`, the "total" of the Group by item count. */
+  groupedNeedCount: ComputedRef<number>;
   displayItems: ComputedRef<
     GroupedNeededItem[] | (NeededItemTaskObjective | NeededItemHideoutModule)[]
   >;
@@ -457,6 +459,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const passesOwnershipFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
+    // A teammate-only need is listed because a teammate still lacks it, so the
+    // user's own count does not make it owned.
+    if (!countsForSelf(item)) return true;
     const count = item.count ?? 1;
     const currentCount =
       item.needType === 'taskObjective'
@@ -646,6 +651,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   };
   const selfFilteredItems = computed(() => filteredItems.value.filter(countsForSelf));
   const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(selfFilteredItems.value));
+  // Needs folded into the Group by item groups; teammate-only needs are not among them.
+  const groupedNeedCount = computed(() => groupedNeeds.value.length);
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
@@ -779,6 +786,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     allItems,
     filteredItems,
     groupedItems,
+    groupedNeedCount,
     displayItems,
     objectivesByItemId,
     filterTabsWithCounts,
