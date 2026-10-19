@@ -149,7 +149,7 @@ const TaskCardActionsStub = {
   props: ['showFail'],
   emits: ['markFailed'],
   template:
-    '<div data-testid="task-card-actions" :data-show-fail="String(!!showFail)"><button data-testid="task-card-fail-stub" @click="$emit(\'markFailed\')" /></div>',
+    '<div data-testid="task-card-actions" :data-show-fail="String(!!showFail)"><button v-if="showFail" data-testid="task-card-fail-stub" @click="$emit(\'markFailed\')" /></div>',
 };
 const TaskCardBackgroundStub = {
   template: '<div data-testid="task-card-background" />',
@@ -273,6 +273,7 @@ describe('TaskCard appearance and expansion controls', () => {
   it('offers the inline fail action only when manual failing is enabled', async () => {
     const off = await mountTaskCard();
     expect(off.get('[data-testid="task-card-actions"]').attributes('data-show-fail')).toBe('false');
+    expect(off.find('[data-testid="task-card-fail-stub"]').exists()).toBe(false);
     off.unmount();
     preferencesState.manualFail = true;
     const wrapper = await mountTaskCard();
@@ -280,6 +281,15 @@ describe('TaskCard appearance and expansion controls', () => {
       'true'
     );
     expect(wrapper.text()).toContain(en.page.tasks.questcard.mark_failed);
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    vi.stubGlobal('confirm', confirm);
+    const fail = wrapper.get('[data-testid="task-card-fail-stub"]');
+    await fail.trigger('click');
+    expect(useTaskActionsMock.markTaskFailed).not.toHaveBeenCalled();
+    await fail.trigger('click');
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(useTaskActionsMock.markTaskFailed).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
     wrapper.unmount();
   });
   it('renders no overflow menu button', async () => {

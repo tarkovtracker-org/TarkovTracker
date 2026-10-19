@@ -117,11 +117,10 @@
           size="xs"
           variant="ghost"
           :color="isHidden ? 'primary' : 'neutral'"
-          :icon="isHidden ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'"
+          :icon="isHidden ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
           class="shrink-0"
           data-testid="task-card-hide"
           :aria-label="hideLabel"
-          :aria-pressed="isHidden"
           @click.stop="emit('toggleHide')"
         />
       </AppTooltip>

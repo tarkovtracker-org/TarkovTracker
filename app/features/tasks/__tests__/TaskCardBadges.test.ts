@@ -46,18 +46,20 @@ describe('TaskCardBadges', () => {
     const wrapper = mountBadges();
     const hide = wrapper.get('[data-testid="task-card-hide"]');
     expect(hide.attributes('aria-label')).toBe('page.tasks.questcard.hide_task');
-    expect(hide.attributes('aria-pressed')).toBe('false');
+    expect(hide.attributes('aria-pressed')).toBeUndefined();
+    expect(hide.attributes('icon')).toBe('i-mdi-eye-outline');
     await hide.trigger('click');
     await wrapper.get('[data-testid="task-card-copy-link"]').trigger('click');
     expect(wrapper.emitted('toggleHide')).toHaveLength(1);
     expect(wrapper.emitted('copyLink')).toHaveLength(1);
-    expect(wrapper.find('[aria-label="common.more"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label^="common.more"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('labels the hide button as unhide when the task is hidden', () => {
     const hide = mountBadges({ isHidden: true }).get('[data-testid="task-card-hide"]');
     expect(hide.attributes('aria-label')).toBe('page.tasks.questcard.unhide_task');
-    expect(hide.attributes('aria-pressed')).toBe('true');
+    expect(hide.attributes('aria-pressed')).toBeUndefined();
+    expect(hide.attributes('icon')).toBe('i-mdi-eye-off-outline');
   });
   it('shows header progress only when asked to', () => {
     expect(
