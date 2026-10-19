@@ -73,6 +73,23 @@ describe('DashboardChangelog', () => {
       (await mountChangelog()).find('[data-testid="dashboard-changelog-unread"]').exists()
     ).toBe(true);
   });
+  it('shows the dot again when a second entry on the newest date changes', async () => {
+    items.value = [
+      { date: '2026-10-18', label: 'v2', bullets: ['Release'] },
+      { date: '2026-10-18', bullets: ['First commit'] },
+    ];
+    const first = await mountChangelog();
+    await first.get('[data-testid="trigger"]').trigger('click');
+    await flushPromises();
+    first.unmount();
+    items.value = [
+      { date: '2026-10-18', label: 'v2', bullets: ['Release'] },
+      { date: '2026-10-18', bullets: ['First commit', 'Second commit'] },
+    ];
+    expect(
+      (await mountChangelog()).find('[data-testid="dashboard-changelog-unread"]').exists()
+    ).toBe(true);
+  });
   it('does not flag an older entry when the feed falls back to stale data', async () => {
     items.value = [{ date: '2026-10-01', bullets: ['Older'] }];
     localStorage.setItem(STORAGE_KEYS.changelogLastSeen, '2026-10-18|seen');

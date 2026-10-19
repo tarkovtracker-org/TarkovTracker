@@ -29,6 +29,7 @@
     <NuxtLink
       to="/profile"
       class="text-primary-400 hover:text-primary-300 light:text-primary-800 flex items-center gap-1 font-medium transition-colors hover:underline"
+      :class="{ 'ml-auto': !$slots.actions }"
     >
       {{ $t('page.dashboard.progress.view_full_progress') }}
       <UIcon name="i-mdi-arrow-right" class="h-4 w-4" aria-hidden="true" />

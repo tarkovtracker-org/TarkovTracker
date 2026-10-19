@@ -58,10 +58,14 @@ describe('DashboardProgressSummary', () => {
     expect(wrapper.find('[data-testid="dashboard-filter-notice"]').exists()).toBe(true);
   });
   it('renders dashboard actions inside the same bar only when provided', () => {
-    expect(mountSummary().find('[data-testid="dashboard-summary-actions"]').exists()).toBe(false);
-    const actions = mountSummary({ actions: '<button data-testid="action">x</button>' }).get(
-      '[data-testid="dashboard-summary-actions"]'
+    const bare = mountSummary();
+    expect(bare.find('[data-testid="dashboard-summary-actions"]').exists()).toBe(false);
+    expect(bare.get('[data-testid="profile-link"]').classes()).toContain('ml-auto');
+    const withActions = mountSummary({ actions: '<button data-testid="action">x</button>' });
+    const actions = withActions.get(
+      '[data-testid="dashboard-progress-summary"] > [data-testid="dashboard-summary-actions"]'
     );
     expect(actions.find('[data-testid="action"]').exists()).toBe(true);
+    expect(withActions.get('[data-testid="profile-link"]').classes()).not.toContain('ml-auto');
   });
 });

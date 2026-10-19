@@ -107,10 +107,15 @@
     return (hash >>> 0).toString(36);
   };
   const latestEntryKey = computed(() => {
-    const latest = entries.value[0];
-    if (!latest?.date) return '';
-    const content = [latest.label ?? '', ...latest.bullets.map(getBulletText)].join('\n');
-    return `${latest.date}|${hashText(content)}`;
+    const latestDate = entries.value[0]?.date;
+    if (!latestDate) return '';
+    // Hash every entry on the newest date: the feed can return a release and a commit group
+    // for the same day, and additions to either must re-light the dot.
+    const content = entries.value
+      .filter((entry) => entry.date === latestDate)
+      .flatMap((entry) => [entry.label ?? '', ...entry.bullets.map(getBulletText)])
+      .join('\n');
+    return `${latestDate}|${hashText(content)}`;
   });
   const hasUnread = computed(() => {
     if (!latestEntryKey.value || latestEntryKey.value === lastSeen.value) return false;
