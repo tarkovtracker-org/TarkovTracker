@@ -24,6 +24,7 @@
             size="sm"
             color="success"
             variant="solid"
+            class="text-surface-950 light:text-surface-50"
             to="/supporter"
             icon="i-mdi-heart"
             @click="trackEvent('support_banner_click', { variant })"
