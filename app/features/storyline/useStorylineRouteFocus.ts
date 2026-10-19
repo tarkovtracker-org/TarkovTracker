@@ -2,7 +2,7 @@ import { storylineObjectiveInputId } from '@/features/storyline/objectiveInputId
 import { getQueryString } from '@/utils/routeHelpers';
 import type { Ref } from '#imports';
 const FOCUS_CLASSES = ['ring-2', 'ring-primary-500', 'ring-offset-2', 'ring-offset-surface-950'];
-const FOCUS_DURATION_MS = 2500;
+const DISMISS_EVENTS = ['pointerdown', 'keydown'] as const;
 const objectiveElement = (chapterId: string, objectiveId: string | undefined) => {
   if (!objectiveId) return null;
   const input = document.getElementById(storylineObjectiveInputId(chapterId, objectiveId));
@@ -17,17 +17,15 @@ const highlight = (element: HTMLElement) => {
 };
 /**
  * Deep links such as `/storyline?chapter=tour&objective=<id>` (used by locked trader cards)
- * scroll to and briefly highlight the objective, then drop the query.
+ * scroll to and highlight the objective until the user interacts, then drop the query.
  */
 export function useStorylineRouteFocus(chapterCount: Ref<number>) {
   const route = useRoute();
   const router = useRouter();
-  let timeout: ReturnType<typeof setTimeout> | null = null;
   let focused: HTMLElement | null = null;
   const clearFocus = () => {
-    if (timeout) clearTimeout(timeout);
+    for (const event of DISMISS_EVENTS) window.removeEventListener(event, clearFocus, true);
     focused?.classList.remove(...FOCUS_CLASSES);
-    timeout = null;
     focused = null;
   };
   const focusFromRoute = async () => {
@@ -39,7 +37,7 @@ export function useStorylineRouteFocus(chapterCount: Ref<number>) {
     clearFocus();
     highlight(target);
     focused = target;
-    timeout = setTimeout(clearFocus, FOCUS_DURATION_MS);
+    for (const event of DISMISS_EVENTS) window.addEventListener(event, clearFocus, true);
     const nextQuery = { ...route.query };
     delete nextQuery.chapter;
     delete nextQuery.objective;

@@ -112,9 +112,11 @@ describe('task requirement summary server gates', () => {
       },
       { type: 'trader_unlock', trader, taskId: 'task' },
     ];
-    expect(useTaskRequirements(() => task).blocking.value.map((row) => row.to)).toEqual([
-      '/storyline?chapter=tour&objective=talk%20ref',
-      undefined,
-    ]);
+    const requirements = useTaskRequirements(() => task);
+    const links = ['/storyline?chapter=tour&objective=talk%20ref', undefined];
+    expect(requirements.blocking.value.map((row) => row.to)).toEqual(links);
+    expect(requirements.summary.value.filter((row) => !row.met).map((row) => row.to)).toEqual(
+      links
+    );
   });
 });

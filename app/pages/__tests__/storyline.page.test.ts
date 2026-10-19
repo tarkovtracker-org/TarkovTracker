@@ -328,7 +328,9 @@ describe('storyline page', () => {
     const scrollIntoView = vi.fn();
     const originalScrollIntoView = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scrollIntoView;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     onTestFinished(() => {
+      vi.useRealTimers();
       Element.prototype.scrollIntoView = originalScrollIntoView;
       wrapper.unmount();
     });
@@ -352,8 +354,12 @@ describe('storyline page', () => {
       },
     });
     await vi.waitFor(() => expect(router.replace).toHaveBeenCalled());
-    expect(wrapper.get('[data-testid="objective-row"]').classes()).toContain('ring-2');
+    vi.advanceTimersByTime(60_000);
+    const row = wrapper.get('[data-testid="objective-row"]');
+    expect(row.classes()).toContain('ring-2');
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event('keydown'));
+    expect(row.classes()).not.toContain('ring-2');
     expect(router.replace).toHaveBeenCalledWith({
       hash: '',
       path: '/storyline',
