@@ -282,14 +282,18 @@ describe('TaskCard appearance and expansion controls', () => {
     );
     expect(wrapper.text()).toContain(en.page.tasks.questcard.mark_failed);
     const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
-    vi.stubGlobal('confirm', confirm);
-    const fail = wrapper.get('[data-testid="task-card-fail-stub"]');
-    await fail.trigger('click');
-    expect(useTaskActionsMock.markTaskFailed).not.toHaveBeenCalled();
-    await fail.trigger('click');
-    expect(confirm).toHaveBeenCalledTimes(2);
-    expect(useTaskActionsMock.markTaskFailed).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
+    const originalConfirm = window.confirm;
+    window.confirm = confirm;
+    try {
+      const fail = wrapper.get('[data-testid="task-card-fail-stub"]');
+      await fail.trigger('click');
+      expect(useTaskActionsMock.markTaskFailed).not.toHaveBeenCalled();
+      await fail.trigger('click');
+      expect(confirm).toHaveBeenCalledTimes(2);
+      expect(useTaskActionsMock.markTaskFailed).toHaveBeenCalledTimes(1);
+    } finally {
+      window.confirm = originalConfirm;
+    }
     wrapper.unmount();
   });
   it('renders no overflow menu button', async () => {
