@@ -550,6 +550,7 @@ export type Database = {
           created_at: string | null
           dashboard_notice_dismissed: boolean
           enable_manual_task_fail: boolean | null
+          hidden_task_ids: Json | null
           hide_completed_map_objectives: boolean | null
           hide_completed_task_objectives: boolean | null
           hide_global_tasks: boolean | null
@@ -623,6 +624,7 @@ export type Database = {
           created_at?: string | null
           dashboard_notice_dismissed?: boolean
           enable_manual_task_fail?: boolean | null
+          hidden_task_ids?: Json | null
           hide_completed_map_objectives?: boolean | null
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null
@@ -696,6 +698,7 @@ export type Database = {
           created_at?: string | null
           dashboard_notice_dismissed?: boolean
           enable_manual_task_fail?: boolean | null
+          hidden_task_ids?: Json | null
           hide_completed_map_objectives?: boolean | null
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null

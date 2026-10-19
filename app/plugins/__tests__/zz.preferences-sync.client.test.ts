@@ -295,6 +295,7 @@ describe('preferences sync plugin', () => {
       neededitemsStyle: 'legacy',
       profileSharePvpPublic: true,
       profileSharePvePublic: true,
+      hiddenTaskIds: ['task-1', 'task-1', ''],
     });
     vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
     const from = vi.fn(() => ({
@@ -325,6 +326,7 @@ describe('preferences sync plugin', () => {
       expect(payload).not.toHaveProperty(column);
     expect(payload).not.toHaveProperty('profile_share_pvp_public');
     expect(payload).not.toHaveProperty('profile_share_pve_public');
+    expect(payload.hidden_task_ids).toEqual(['task-1']);
     expect(payload.user_id).toBe('user-1');
   });
   it('hydrates a select-star row that omits retired preference columns', async () => {

@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sanitizePersistedPreferencesState } from '@/stores/preferences/sanitizers';
 import {
   clearPendingResetPreferencesSnapshot,
   getPersistedPreferencesState,
@@ -1565,6 +1566,48 @@ describe('usePreferencesStore', () => {
       store.$patch({ mapHiddenTaskIds: undefined });
       store.toggleMapHiddenTask('task-1');
       expect(store.mapHiddenTaskIds).toEqual(['task-1']);
+    });
+  });
+  describe('Actions - Hidden tasks', () => {
+    it('defaults to no hidden tasks', () => {
+      const store = usePreferencesStore();
+      expect(store.getHiddenTaskIds).toEqual([]);
+    });
+    it('toggles a task in and out of the hidden list without touching map visibility', () => {
+      const store = usePreferencesStore();
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      expect(store.mapHiddenTaskIds).toEqual([]);
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual([]);
+    });
+    it('unhides selected tasks or everything', () => {
+      const store = usePreferencesStore();
+      store.toggleHiddenTask('task-1');
+      store.toggleHiddenTask('task-2');
+      store.toggleHiddenTask('task-3');
+      store.unhideTasks(['task-1', 'task-2']);
+      expect(store.hiddenTaskIds).toEqual(['task-3']);
+      store.unhideTasks();
+      expect(store.hiddenTaskIds).toEqual([]);
+    });
+    it('handles a nullish or malformed persisted list', () => {
+      const store = usePreferencesStore();
+      store.$patch({ hiddenTaskIds: undefined });
+      expect(store.getHiddenTaskIds).toEqual([]);
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      store.$patch({ hiddenTaskIds: ['task-1', 'task-1', '', 7] as unknown as string[] });
+      expect(store.getHiddenTaskIds).toEqual(['task-1']);
+    });
+    it('sanitizes persisted hidden task ids', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        hiddenTaskIds: ['task-1', 'task-1', '', null] as unknown as string[],
+      });
+      expect(sanitized.hiddenTaskIds).toEqual(['task-1']);
+      expect(
+        sanitizePersistedPreferencesState({ hiddenTaskIds: 'x' as never }).hiddenTaskIds
+      ).toEqual([]);
     });
   });
   describe('Actions - Skills', () => {

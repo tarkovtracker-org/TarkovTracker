@@ -175,6 +175,7 @@ export const clonePreferencesSnapshot = <T>(value: T): T => {
 const sanitizeMapTaskVisibilityIds = (state: PersistedPreferencesStateWithLegacy): void => {
   if ('mapHiddenTaskIds' in state)
     state.mapHiddenTaskIds = normalizeTaskIdList(state.mapHiddenTaskIds);
+  if ('hiddenTaskIds' in state) state.hiddenTaskIds = normalizeTaskIdList(state.hiddenTaskIds);
 };
 export const sanitizePersistedPreferencesState = (
   persistedState: PersistedPreferencesStateWithLegacy = {}

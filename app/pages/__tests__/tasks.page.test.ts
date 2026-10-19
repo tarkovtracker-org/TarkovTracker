@@ -67,6 +67,8 @@ const preferencesStoreMock = {
   getPinnedTaskIds: [] as string[],
   getHideCompletedMapObjectives: false,
   getMapHiddenTaskIds: [] as string[],
+  getHiddenTaskIds: [] as string[],
+  unhideTasks: vi.fn(),
   mapTeamAllHidden: false,
   togglePinnedTask: vi.fn(),
   clearMapTaskVisibility: vi.fn(),
@@ -385,6 +387,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getPinnedTaskIds = [];
     preferencesStoreMock.getHideCompletedMapObjectives = false;
     preferencesStoreMock.getMapHiddenTaskIds = [];
+    preferencesStoreMock.getHiddenTaskIds = [];
     preferencesStoreMock.clearMapTaskVisibility.mockReset();
     preferencesStoreMock.mapTeamAllHidden = false;
     preferencesStoreMock.setHideCompletedMapObjectives.mockReset();
@@ -1027,6 +1030,37 @@ describe('tasks page', () => {
     expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
     await section.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
     expect(preferencesStoreMock.clearMapTaskVisibility).toHaveBeenCalledWith(['task-hidden']);
+  });
+  it('moves user-hidden tasks into their own section and off the map', async () => {
+    const shownTask = createDefaultTask({
+      id: 'task-shown',
+      name: 'Shown Task',
+      objectives: [createMapObjective({ id: 'obj-shown', taskId: 'task-shown' })],
+    });
+    const hiddenTask = createDefaultTask({
+      id: 'task-hidden',
+      name: 'Hidden Task',
+      objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+    });
+    visibleTasksRef.value = [shownTask, hiddenTask];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getHiddenTaskIds = ['task-hidden'];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = {
+      'task-shown': { self: true },
+      'task-hidden': { self: true },
+    };
+    await mountPage();
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-shown']);
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(false);
+    const section = wrapper.find('[data-testid="user-hidden-tasks-section"]');
+    expect(section.exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    await section.find('[data-testid="user-hidden-tasks-toggle"]').trigger('click');
+    expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    await section.find('[data-testid="user-hidden-tasks-show-all"]').trigger('click');
+    expect(preferencesStoreMock.unhideTasks).toHaveBeenCalledWith(['task-hidden']);
   });
   it('keeps teammate objective markers when self already completed the same task objective', async () => {
     const task = createDefaultTask({

@@ -278,6 +278,17 @@
           "
         />
         <ContextMenuItem
+          data-testid="task-hide-toggle"
+          :icon="isHidden ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'"
+          :label="
+            isHidden ? t('page.tasks.questcard.unhide_task') : t('page.tasks.questcard.hide_task')
+          "
+          @click="
+            toggleHidden();
+            close();
+          "
+        />
+        <ContextMenuItem
           icon="i-mdi-alert-circle-outline"
           :label="t('page.tasks.questcard.report_data_issue')"
           @click="
@@ -338,6 +349,7 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
   import { useTaskCardExpansion } from '@/features/tasks/composables/useTaskCardExpansion';
+  import { useTaskHiding } from '@/features/tasks/composables/useTaskHiding';
   import { useTaskRequirements } from '@/features/tasks/composables/useTaskRequirements';
   import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
@@ -691,6 +703,7 @@
   );
   const isPinned = computed(() => preferencesStore.getPinnedTaskIds.includes(props.task.id));
   const togglePin = () => preferencesStore.togglePinnedTask(props.task.id);
+  const { isHidden, toggleHidden } = useTaskHiding(() => props.task);
   /**
    * Action button state for cleaner template logic.
    * Returns which action button(s) should be shown.

@@ -65,6 +65,22 @@ keeping upstream order within each group, so it has no sort setting. Maxed cards
 own collapse toggle. The drawer holds only the availability requirements. The legacy
 `hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
 
+## Hidden tasks
+
+Any task card's context menu can hide the task from task lists (`useTaskHiding`, stored in the
+synced `hiddenTaskIds` preference / `user_preferences.hidden_task_ids`). Hiding is view-only: it
+never completes, fails or unlocks anything, so a hidden task still gates its successors. A toast
+offers Undo, and the card menu offers Unhide.
+
+- All, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
+  (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
+- Completed and Failed list hidden tasks normally, as does any search, so every hidden task stays
+  findable. A deep-linked task is never hidden (`getListHiddenTaskIds` in
+  `app/features/tasks/hiddenTasks.ts`).
+- Hidden tasks draw no map markers and leave the All, Available and Locked status and trader
+  counts; Completed and Failed counts still include them (`useTaskCounts`).
+- Needed Items still counts objectives of hidden tasks.
+
 ## Canonical task progression
 
 ### Server-side start requirements

@@ -6,6 +6,7 @@ import { isAllUsersView } from '@/types/taskFilter';
 import { perfEnd, perfStart } from '@/utils/perf';
 import type { Task } from '@/types/tarkov';
 import type { TaskSecondaryView } from '@/types/taskFilter';
+const HIDDEN_TASK_COUNTED_VIEWS: ReadonlySet<TaskSecondaryView> = new Set(['completed', 'failed']);
 export function useTaskCounts() {
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
@@ -41,6 +42,7 @@ export function useTaskCounts() {
     const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
+    const hiddenTaskIds = new Set(preferencesStore.getHiddenTaskIds);
     for (const task of taskList) {
       if (excludedTaskIds.has(task.id)) continue;
       if (prestigeTaskMap.has(task.id)) {
@@ -67,7 +69,8 @@ export function useTaskCounts() {
           return taskFaction === 'Any' || taskFaction === teamFaction;
         });
         if (relevantTeamIds.length === 0) continue;
-        counts.all++;
+        const isHidden = hiddenTaskIds.has(task.id);
+        if (!isHidden) counts.all++;
         const isFailedForAny = relevantTeamIds.some(
           (teamId) => progressStore.tasksFailed?.[task.id]?.[teamId] === true
         );
@@ -87,6 +90,8 @@ export function useTaskCounts() {
           counts.failed++;
         } else if (isCompletedByAll) {
           counts.completed++;
+        } else if (isHidden) {
+          continue;
         } else if (isAvailableForAny && !isTaskInvalid(task.id, 'all', visibleTeamIds)) {
           counts.available++;
         } else if (!isTaskInvalid(task.id, 'all', visibleTeamIds)) {
@@ -96,7 +101,8 @@ export function useTaskCounts() {
         const taskFaction = task.factionName;
         const userFaction = progressStore.playerFaction[userView];
         if (taskFaction !== 'Any' && taskFaction !== userFaction) continue;
-        counts.all++;
+        const isHidden = hiddenTaskIds.has(task.id);
+        if (!isHidden) counts.all++;
         const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
         const isCompleted = progressStore.tasksCompletions?.[task.id]?.[userView] === true;
         const isFailed = progressStore.tasksFailed?.[task.id]?.[userView] === true;
@@ -104,6 +110,8 @@ export function useTaskCounts() {
           counts.failed++;
         } else if (isCompleted) {
           counts.completed++;
+        } else if (isHidden) {
+          continue;
         } else if (isUnlocked && !isTaskInvalid(task.id, userView)) {
           counts.available++;
         } else if (!isTaskInvalid(task.id, userView)) {
@@ -136,6 +144,7 @@ export function useTaskCounts() {
     const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
+    const hiddenTaskIds = new Set(preferencesStore.getHiddenTaskIds);
     const isAvailableStatus = (status: {
       isUnlocked: boolean;
       isCompleted: boolean;
@@ -163,6 +172,7 @@ export function useTaskCounts() {
       const traderId = task.trader?.id;
       if (!traderId) continue;
       if (!counts[traderId]) counts[traderId] = 0;
+      if (hiddenTaskIds.has(task.id) && !HIDDEN_TASK_COUNTED_VIEWS.has(secondaryView)) continue;
       const taskFaction = task.factionName;
       if (isAllUsers) {
         const relevantTeamIds = visibleTeamIds.filter((teamId) => {

@@ -7,9 +7,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (key: string) => key,
   }),
 }));
-const mountSection = () =>
+const mountSection = (props: { variant?: 'map' | 'list' } = {}) =>
   mount(MapHiddenTasksSection, {
-    props: { count: 2 },
+    props: { count: 2, ...props },
     slots: { default: '<div class="hidden-card" />' },
     global: {
       stubs: {
@@ -36,6 +36,14 @@ describe('MapHiddenTasksSection', () => {
   it('emits show-all', async () => {
     const wrapper = mountSection();
     await wrapper.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
+    expect(wrapper.emitted('show-all')).toHaveLength(1);
+  });
+  it('uses the user-hidden copy and test ids for the list variant', async () => {
+    const wrapper = mountSection({ variant: 'list' });
+    expect(wrapper.find('[data-testid="user-hidden-tasks-section"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('page.tasks.hidden_tasks.section_title');
+    await wrapper.find('[data-testid="user-hidden-tasks-show-all"]').trigger('click');
     expect(wrapper.emitted('show-all')).toHaveLength(1);
   });
 });

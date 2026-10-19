@@ -190,6 +190,20 @@
             </div>
             <div v-else ref="taskListRef" data-testid="task-list">
               <MapHiddenTasksSection
+                v-if="userHiddenListTasks.length > 0"
+                variant="list"
+                :count="userHiddenListTasks.length"
+                @show-all="unhideListedTasks"
+              >
+                <div
+                  v-for="task in userHiddenListTasks"
+                  :key="`user-hidden-${task.id}`"
+                  :class="taskCardGapClass"
+                >
+                  <TaskCard :task="task" @on-task-action="handleTaskAction" />
+                </div>
+              </MapHiddenTasksSection>
+              <MapHiddenTasksSection
                 v-if="hiddenListTasks.length > 0"
                 :count="hiddenListTasks.length"
                 @show-all="showHiddenListTasks"
@@ -557,6 +571,7 @@
     useTaskSearchQuery,
   } from '@/features/tasks/composables/useTaskSearchQuery';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
+  import { getListHiddenTaskIds } from '@/features/tasks/hiddenTasks';
   import MapHiddenTasksSection from '@/features/tasks/MapHiddenTasksSection.vue';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
   import {
@@ -607,6 +622,7 @@
     getHideGlobalTasks,
     getHideCompletedMapObjectives,
     getPinnedTaskIds,
+    getHiddenTaskIds,
   } = storeToRefs(preferencesStore);
   const metadataStore = useMetadataStore();
   const { tasks, loading: tasksLoading } = storeToRefs(metadataStore);
@@ -743,8 +759,17 @@
     }
     isMapPanelExpanded.value = !isMapPanelExpanded.value;
   };
+  const userHiddenMapTaskIds = computed(() =>
+    getListHiddenTaskIds(getHiddenTaskIds.value, {
+      searchActive: isSearchActive.value,
+      secondaryView: effectiveTaskSecondaryView.value,
+      focusTaskId: null,
+    })
+  );
   const sourceMapTasks = computed(() =>
-    isSearchActive.value ? filteredTasks.value : visibleTasks.value
+    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(
+      (task) => !userHiddenMapTaskIds.value.has(task.id)
+    )
   );
   const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds } =
     useMapObjectiveMarks({
@@ -1135,12 +1160,30 @@
     const hidden = getHiddenMapTaskIds(mapTaskIds.value, hiddenTaskIds.value);
     return new Set(hidden.filter((taskId) => taskId !== pinnedTask.value?.id));
   });
+  // Quests the user hid from task lists sit in their own collapsed section; hiding is view-only.
+  const userHiddenListTaskIds = computed(() =>
+    getListHiddenTaskIds(getHiddenTaskIds.value, {
+      searchActive: isSearchActive.value,
+      secondaryView: effectiveTaskSecondaryView.value,
+      focusTaskId: pinnedTask.value?.id ?? null,
+    })
+  );
   const listedTasks = computed(() =>
-    filteredTasks.value.filter((task) => !hiddenListTaskIds.value.has(task.id))
+    filteredTasks.value.filter(
+      (task) => !hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
+    )
   );
   const hiddenListTasks = computed(() =>
-    filteredTasks.value.filter((task) => hiddenListTaskIds.value.has(task.id))
+    filteredTasks.value.filter(
+      (task) => hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
+    )
   );
+  const userHiddenListTasks = computed(() =>
+    filteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
+  );
+  const unhideListedTasks = () => {
+    preferencesStore.unhideTasks(userHiddenListTasks.value.map((task) => task.id));
+  };
   const showHiddenListTasks = () => {
     preferencesStore.clearMapTaskVisibility([...hiddenListTaskIds.value]);
   };
