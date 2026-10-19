@@ -607,11 +607,12 @@
     "dashboard": {
       "changelog": {
         "title": "Nouveautés",
+        "show": "Afficher les mises à jour",
+        "hide": "Masquer les mises à jour",
         "loading": "Chargement des mises à jour...",
         "error": "Impossible de charger les mises à jour.",
         "empty": "Aucune mise à jour pour le moment.",
-        "view_all": "Voir tout",
-        "unread": "Nouvelles mises à jour"
+        "view_all": "Voir tout"
       },
       "focus": {
         "title": {
@@ -1550,8 +1551,8 @@
       "suggest_description": "Suggérer un outil ou un guide communautaire pour l'inclusion sur cette page.",
       "suggest_cta": "Suggérer une ressource",
       "migration_banner": {
-        "cta": "Lire le guide de migration",
-        "chip": "Vous venez de .io ?"
+        "title": "Vous vous déplacez de TarkovTracker.io ?",
+        "cta": "Lire le guide de migration"
       },
       "categories": {
         "tarkovtracker_guides": "Guides TarkovTracker.org",

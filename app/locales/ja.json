@@ -607,11 +607,12 @@
     "dashboard": {
       "changelog": {
         "title": "新着情報",
+        "show": "アップデートを表示",
+        "hide": "アップデートを非表示",
         "loading": "アップデートを読み込んでいます...",
         "error": "アップデートを読み込めませんでした。",
         "empty": "まだアップデートはありません。",
-        "view_all": "すべて表示",
-        "unread": "新しい更新"
+        "view_all": "すべて表示"
       },
       "focus": {
         "title": {
@@ -1550,8 +1551,8 @@
       "suggest_description": "このページへの掲載を提案するコミュニティツールやガイド isnt",
       "suggest_cta": "リソースを提案",
       "migration_banner": {
-        "cta": "移行ガイドを読む",
-        "chip": ".io から移行？"
+        "title": "TarkovTracker.ioから移行しますか？",
+        "cta": "移行ガイドを読む"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.orgガイド",

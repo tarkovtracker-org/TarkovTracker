@@ -607,11 +607,12 @@
     "dashboard": {
       "changelog": {
         "title": "Co je nového",
+        "show": "Zobrazit aktualizace",
+        "hide": "Skrýt aktualizace",
         "loading": "Načítání aktualizací...",
         "error": "Nelze načíst aktualizace.",
         "empty": "Zatím žádné aktualizace.",
-        "view_all": "Zobrazit vše",
-        "unread": "Nové aktualizace"
+        "view_all": "Zobrazit vše"
       },
       "focus": {
         "title": {
@@ -1550,8 +1551,8 @@
       "suggest_description": "Navrhněte komunitní nástroj nebo příručku pro zahrnutí na tuto stránku.",
       "suggest_cta": "Navrhnout zdroj",
       "migration_banner": {
-        "cta": "Přečtěte si návod k migraci",
-        "chip": "Z .io?"
+        "title": "Přesouvání z TarkovTracker.io?",
+        "cta": "Přečtěte si návod k migraci"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org návody",
