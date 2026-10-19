@@ -65,6 +65,8 @@ const groupStatusesByTask = (requirements: TaskRequirement[]): Map<string, Statu
     });
   return groups;
 };
+const storyObjectiveLink = (chapterId: string, objectiveId: string) =>
+  `/storyline?chapter=${encodeURIComponent(chapterId)}&objective=${encodeURIComponent(objectiveId)}`;
 const formatTraderValue = (kind: TraderKind, value: number | undefined): string =>
   kind === 'trader_reputation' ? formatReputation(value) : String(value ?? 0);
 export const useTaskRequirements = (task: () => Task) => {
@@ -105,10 +107,18 @@ export const useTaskRequirements = (task: () => Task) => {
         requirement.id === blocker.requirementId &&
         (requirement.counter || requirement.taskPool)
     );
+    if (requirement?.type === 'globalVariable') return [poolRow(requirement, false, blocker)];
+    const chapterId = blocker.chapterIds?.[0];
     return [
-      requirement?.type === 'globalVariable'
-        ? poolRow(requirement, false, blocker)
-        : { kind: 'other', met: false, label: blockerText(blocker) },
+      {
+        kind: 'other',
+        met: false,
+        label: blockerText(blocker),
+        to:
+          chapterId && blocker.objective
+            ? storyObjectiveLink(chapterId, blocker.objective.id)
+            : undefined,
+      },
     ];
   };
   const taskName = (id: string) => metadataStore.getTaskById(id)?.name ?? id;
@@ -305,11 +315,18 @@ export const useTaskRequirements = (task: () => Task) => {
         (requirement): requirement is KnownOtherRequirement =>
           requirement.type !== 'unknown' && !blocked.has(requirement.id)
       )
-      .map((requirement): TaskRequirementRow =>
-        requirement.type === 'globalVariable'
-          ? poolRow(requirement, true)
-          : { kind: 'other', met: true, label: otherRequirementLabel(requirement) }
-      );
+      .map((requirement): TaskRequirementRow => {
+        if (requirement.type === 'globalVariable') return poolRow(requirement, true);
+        return {
+          kind: 'other',
+          met: true,
+          label: otherRequirementLabel(requirement),
+          to:
+            requirement.type === 'storyObjective'
+              ? storyObjectiveLink(requirement.storyChapter.id, requirement.objective.id)
+              : undefined,
+        };
+      });
   };
   const summary = computed(() => [
     ...levelSummary(),
