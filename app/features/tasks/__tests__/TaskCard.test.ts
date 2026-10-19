@@ -17,6 +17,7 @@ const taskState = reactive({
 const preferencesState = reactive({
   collapseDefault: false,
   hideRewards: false,
+  manualFail: false,
   primaryView: 'all',
   pinnedTaskIds: [] as string[],
 });
@@ -68,7 +69,6 @@ const useTaskCardLinksMock = {
   copyTaskLink: vi.fn(),
   openItemOnTarkovDev: vi.fn(),
   openItemOnWiki: vi.fn(),
-  openTaskDataIssue: vi.fn(),
   setSelectedItem: vi.fn(),
 };
 vi.mock('@/stores/useMetadata', () => ({
@@ -76,7 +76,9 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
-    getEnableManualTaskFail: false,
+    get getEnableManualTaskFail() {
+      return preferencesState.manualFail;
+    },
     getHideCompletedTaskObjectives: false,
     get getHideTaskRewards() {
       return preferencesState.hideRewards;
@@ -144,7 +146,10 @@ const TaskCardBadgesStub = {
   props: ['task'],
 };
 const TaskCardActionsStub = {
-  template: '<div data-testid="task-card-actions" />',
+  props: ['showFail'],
+  emits: ['markFailed'],
+  template:
+    '<div data-testid="task-card-actions" :data-show-fail="String(!!showFail)"><button data-testid="task-card-fail-stub" @click="$emit(\'markFailed\')" /></div>',
 };
 const TaskCardBackgroundStub = {
   template: '<div data-testid="task-card-background" />',
@@ -203,6 +208,7 @@ describe('TaskCard appearance and expansion controls', () => {
     taskState.failed = false;
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
+    preferencesState.manualFail = false;
     preferencesState.primaryView = 'all';
     preferencesState.pinnedTaskIds = [];
     progressStoreMock.taskEvaluations = {};
@@ -237,6 +243,50 @@ describe('TaskCard appearance and expansion controls', () => {
     await reset!.trigger('click');
     expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
     expect(tarkovStoreMock.setObjectiveCount).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('shows the inline clear-confirmation control only for confirmed tasks', async () => {
+    const gated: Partial<Task> = {
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+    };
+    const unconfirmed = await mountTaskCard(gated);
+    expect(unconfirmed.find('[data-testid="task-clear-availability"]').exists()).toBe(false);
+    unconfirmed.unmount();
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      taskAvailability: {
+        'task-1': {
+          requirements: otherRequirementsSignature({ id: 'task-1', ...gated } as Task)!,
+          timestamp: 10,
+        },
+      },
+    });
+    const wrapper = await mountTaskCard(gated);
+    const clear = wrapper.get('[data-testid="task-clear-availability"]');
+    expect(clear.attributes('aria-label')).toBe(
+      en.page.tasks.questcard.clear_availability_confirmation
+    );
+    await clear.trigger('click');
+    expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
+    wrapper.unmount();
+  });
+  it('offers the inline fail action only when manual failing is enabled', async () => {
+    const off = await mountTaskCard();
+    expect(off.get('[data-testid="task-card-actions"]').attributes('data-show-fail')).toBe('false');
+    off.unmount();
+    preferencesState.manualFail = true;
+    const wrapper = await mountTaskCard();
+    expect(wrapper.get('[data-testid="task-card-actions"]').attributes('data-show-fail')).toBe(
+      'true'
+    );
+    expect(wrapper.text()).toContain(en.page.tasks.questcard.mark_failed);
+    wrapper.unmount();
+  });
+  it('renders no overflow menu button', async () => {
+    const wrapper = await mountTaskCard();
+    expect(wrapper.find('[aria-label="More"]').exists()).toBe(false);
+    expect(wrapper.find('[icon="i-mdi-dots-horizontal"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Report data issue');
     wrapper.unmount();
   });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {

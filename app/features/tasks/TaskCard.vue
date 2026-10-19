@@ -5,7 +5,7 @@
     class="card relative divide-none overflow-hidden shadow-md ring-0"
     :class="[taskClasses, accentClasses, 'rounded-md']"
     :ui="{ body: 'p-0 sm:p-0 flex flex-col h-full', footer: 'p-0 sm:p-0 border-t-0' }"
-    @contextmenu.prevent="openOverflowMenu"
+    @contextmenu.prevent="openTaskContextMenu"
   >
     <TaskCardBackground
       :is-complete="isComplete"
@@ -19,26 +19,13 @@
     >
       <!-- 1) Identity + Header (Padded) -->
       <div data-testid="task-card-header" class="flex flex-col" :class="compactClasses.header">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <div class="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
-            <TaskCardHeader :task="task" class="min-w-0" />
-            <UButton
-              v-if="isOurFaction"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              class="shrink-0 sm:hidden"
-              :aria-label="t('common.more', 'More')"
-              @click.stop="openOverflowMenu"
-            >
-              <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
-            </UButton>
-          </div>
+        <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+          <TaskCardHeader :task="task" class="min-w-0 sm:flex-1" />
           <div class="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end">
             <TaskCardBadges
               :task="task"
               :is-pinned="isPinned"
-              :is-our-faction="isOurFaction"
+              :is-hidden="isHidden"
               :location-tooltip="locationTooltip"
               :is-failed="isFailed"
               :is-invalid="isInvalid"
@@ -46,18 +33,22 @@
               :exclusive-edition-badge="exclusiveEditionBadge"
               :progress-completed="taskProgressCompleted"
               :progress-total="taskProgressTotal"
+              :show-progress="!taskExpanded"
               @toggle-pin="togglePin"
-              @open-menu="openOverflowMenu"
+              @toggle-hide="toggleHidden"
+              @copy-link="copyTaskLink"
             >
               <template #actions>
                 <TaskCardActions
                   :state="actionButtonState"
                   :size="actionButtonSize"
                   :is-failed="isFailed"
+                  :show-fail="canMarkFailed"
                   @complete="markTaskComplete"
                   @uncomplete="markTaskUncomplete"
                   @available="markTaskAvailable"
                   @failed="markTaskFailed"
+                  @mark-failed="confirmMarkFailed"
                 />
               </template>
             </TaskCardBadges>
@@ -176,49 +167,52 @@
           :id="`task-content-${task.id}`"
           class="border-surface-700/50 border-t"
         >
-          <TaskRequirementSummary :id="task.id" :rows="requirementSummary" />
-          <div class="flex items-center justify-between rounded-sm transition-colors select-none">
-            <button
-              type="button"
-              class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex min-w-0 flex-1 cursor-pointer items-center justify-between rounded-sm text-left transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="compactClasses.objectivesToggle"
-              :aria-expanded="objectivesVisible"
-              :aria-controls="`objectives-content-${task.id}`"
-              @click="toggleObjectivesVisibility"
-            >
-              <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-                {{ t('common.objectives', 'Objectives') }}
-              </div>
-              <UIcon
-                name="i-mdi-chevron-down"
-                aria-hidden="true"
-                class="pointer-events-none h-4 w-4 transition-transform duration-200"
-                :class="{ 'rotate-180': objectivesVisible }"
-              />
-            </button>
-            <AppTooltip
-              v-if="taskItemObjectives.length > 0"
-              :text="resetItemCountsDisabledReason"
-              :disabled="!resetItemCountsDisabledReason"
-            >
-              <span class="inline-flex">
+          <TaskRequirementSummary :id="task.id" :rows="requirementSummary">
+            <template #actions>
+              <AppTooltip
+                v-if="hasAvailabilityConfirmation"
+                :text="t('page.tasks.questcard.clear_availability_confirmation')"
+              >
                 <UButton
                   size="xs"
                   color="neutral"
-                  variant="soft"
-                  class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
-                  :disabled="!canResetTaskItemCounts"
-                  :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
-                  @click.stop="confirmResetTaskItemCounts"
-                >
-                  <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
-                  <span class="hidden sm:inline">
-                    {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
-                  </span>
-                </UButton>
-              </span>
-            </AppTooltip>
-          </div>
+                  variant="ghost"
+                  icon="i-mdi-lock-reset"
+                  data-testid="task-clear-availability"
+                  :aria-label="t('page.tasks.questcard.clear_availability_confirmation')"
+                  @click.stop="tarkovStore.clearTaskAvailability(task.id)"
+                />
+              </AppTooltip>
+            </template>
+          </TaskRequirementSummary>
+          <TaskCardSectionHeader
+            :label="t('common.objectives', 'Objectives')"
+            :meta="objectivesMeta"
+            :expanded="objectivesVisible"
+            :controls="`objectives-content-${task.id}`"
+            test-id="task-objectives-header"
+            @toggle="toggleObjectivesVisibility"
+          >
+            <template #actions>
+              <AppTooltip
+                v-if="taskItemObjectives.length > 0"
+                :text="resetItemCountsDisabledReason || resetItemCountsLabel"
+              >
+                <span class="inline-flex">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-mdi-restore"
+                    data-testid="task-reset-item-counts"
+                    :disabled="!canResetTaskItemCounts"
+                    :aria-label="resetItemCountsLabel"
+                    @click.stop="confirmResetTaskItemCounts"
+                  />
+                </span>
+              </AppTooltip>
+            </template>
+          </TaskCardSectionHeader>
           <Transition
             :css="false"
             @before-enter="onObjectivesBeforeEnter"
@@ -230,7 +224,7 @@
             <div
               v-if="objectivesVisible"
               :id="`objectives-content-${task.id}`"
-              :class="['space-y-1.5', compactClasses.objectivesBody]"
+              :class="compactClasses.objectivesBody"
             >
               <QuestObjectivesSkeleton
                 v-if="showObjectivesSkeleton"
@@ -266,7 +260,7 @@
         @item-context-menu="openItemContextMenu"
       />
     </template>
-    <!-- Overflow / Context Menu -->
+    <!-- Context Menu -->
     <ContextMenu ref="taskContextMenu">
       <template #default="{ close }">
         <ContextMenuItem
@@ -289,14 +283,6 @@
           "
         />
         <ContextMenuItem
-          icon="i-mdi-alert-circle-outline"
-          :label="t('page.tasks.questcard.report_data_issue')"
-          @click="
-            openTaskDataIssue();
-            close();
-          "
-        />
-        <ContextMenuItem
           v-if="hasAvailabilityConfirmation"
           icon="i-mdi-lock-reset"
           :label="t('page.tasks.questcard.clear_availability_confirmation')"
@@ -306,7 +292,7 @@
           "
         />
         <ContextMenuItem
-          v-if="preferencesStore.getEnableManualTaskFail && isOurFaction && !isFailed"
+          v-if="canMarkFailed"
           icon="i-mdi-close-circle"
           :label="t('page.tasks.questcard.mark_failed')"
           @click="
@@ -369,6 +355,7 @@
     resolveTaskObjectives,
   } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
+  import TaskCardSectionHeader from '@/features/tasks/TaskCardSectionHeader.vue';
   import TaskRequirementChips from '@/features/tasks/TaskRequirementChips.vue';
   import TaskRequirementSummary from '@/features/tasks/TaskRequirementSummary.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -423,11 +410,9 @@
   const isGlobalTask = computed(() => isGlobalTaskFn(props.task));
   const taskContextMenu = ref<ContextMenuRef | null>(null);
   const itemContextMenu = ref<ContextMenuRef | null>(null);
-  const { copyTaskLink, openTaskDataIssue, setSelectedItem, openItemOnTarkovDev, openItemOnWiki } =
-    useTaskCardLinks({
-      task: () => props.task,
-      objectives: () => taskObjectives.value,
-    });
+  const { copyTaskLink, setSelectedItem, openItemOnTarkovDev, openItemOnWiki } = useTaskCardLinks({
+    task: () => props.task,
+  });
   const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
   const shouldAutoCollapseObjectives = computed(() => {
@@ -566,9 +551,8 @@
     return '';
   });
   const compactClasses = computed(() => ({
-    header: 'gap-2 px-3 py-2',
-    objectivesToggle: 'px-3 py-1.5',
-    objectivesBody: 'px-3 pt-1 pb-2',
+    header: 'gap-1.5 px-3 py-2',
+    objectivesBody: 'px-3 pb-1.5',
   }));
   const neededBy = computed(() => props.task.neededBy ?? []);
   const showNeededBy = computed(
@@ -704,6 +688,9 @@
   const isPinned = computed(() => preferencesStore.getPinnedTaskIds.includes(props.task.id));
   const togglePin = () => preferencesStore.togglePinnedTask(props.task.id);
   const { isHidden, toggleHidden } = useTaskHiding(() => props.task);
+  const canMarkFailed = computed(
+    () => preferencesStore.getEnableManualTaskFail && isOurFaction.value && !isFailed.value
+  );
   /**
    * Action button state for cleaner template logic.
    * Returns which action button(s) should be shown.
@@ -753,6 +740,9 @@
   const canResetTaskItemCounts = computed(() => {
     return hasResettableItemObjectiveProgress.value && !isComplete.value && !isFailed.value;
   });
+  const resetItemCountsLabel = computed(() =>
+    t('page.tasks.questcard.reset_item_counts', 'Reset item counts')
+  );
   const resetItemCountsDisabledReason = computed(() => {
     if (isComplete.value && !isFailed.value) {
       return t(
@@ -784,6 +774,9 @@
       ).length
   );
   const taskProgressTotal = computed(() => nonOptionalTaskObjectives.value.length);
+  const objectivesMeta = computed(() =>
+    taskProgressTotal.value > 0 ? `${taskProgressCompleted.value}/${taskProgressTotal.value}` : ''
+  );
   /**
    * Consolidated objective categorization - single pass through objectives array.
    * Categorizes objectives into relevant, irrelevant, and uncompleted irrelevant.
@@ -816,7 +809,7 @@
       otherRequirementsSignature(props.task)
     );
   });
-  const openOverflowMenu = (event: MouseEvent) => {
+  const openTaskContextMenu = (event: MouseEvent) => {
     taskContextMenu.value?.open(event);
   };
   const openItemContextMenu = (

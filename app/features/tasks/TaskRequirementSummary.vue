@@ -1,31 +1,22 @@
 <template>
   <div v-if="rows.length" data-testid="task-requirements-summary">
-    <button
-      type="button"
-      class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex w-full cursor-pointer items-center justify-between rounded-sm px-3 py-1.5 text-left transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      :aria-expanded="expanded"
-      :aria-controls="listId"
-      @click="expanded = !expanded"
+    <TaskCardSectionHeader
+      :label="t('page.tasks.requirements.title')"
+      :meta="t('page.tasks.requirements.met_count', { met: metCount, total: rows.length })"
+      :expanded="expanded"
+      :controls="listId"
+      @toggle="expanded = !expanded"
     >
-      <span class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-        {{ t('page.tasks.requirements.title') }}
-        <span class="text-surface-500 ml-1 font-normal tracking-normal normal-case">
-          {{ t('page.tasks.requirements.met_count', { met: metCount, total: rows.length }) }}
-        </span>
-      </span>
-      <UIcon
-        name="i-mdi-chevron-down"
-        aria-hidden="true"
-        class="pointer-events-none h-4 w-4 transition-transform duration-200"
-        :class="{ 'rotate-180': expanded }"
-      />
-    </button>
-    <ul v-if="expanded" :id="listId" class="flex flex-col gap-1 px-3 pt-1 pb-2 text-xs">
-      <li v-for="item in items" :key="item.key" class="flex items-start gap-1.5">
+      <template #actions>
+        <slot name="actions" />
+      </template>
+    </TaskCardSectionHeader>
+    <ul v-if="expanded" :id="listId" class="flex flex-col gap-1 px-3 pb-1.5 text-xs">
+      <li v-for="item in items" :key="item.key" class="flex items-start gap-2">
         <UIcon
           :name="item.icon"
           aria-hidden="true"
-          class="mt-0.5 h-3.5 w-3.5 shrink-0"
+          class="h-4 w-4 shrink-0"
           :class="item.iconClass"
         />
         <span class="sr-only">{{ item.status }}:</span>
@@ -41,6 +32,7 @@
 </template>
 <script setup lang="ts">
   import { RouterLink } from 'vue-router';
+  import TaskCardSectionHeader from '@/features/tasks/TaskCardSectionHeader.vue';
   import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
   const props = defineProps<{ rows: TaskRequirementRow[]; id: string }>();
   const { t } = useI18n({ useScope: 'global' });
