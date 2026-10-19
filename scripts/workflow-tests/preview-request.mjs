@@ -623,11 +623,11 @@ test('documentation-only commands accept persistent intent without deploying the
   assert.match(message, /Automatic previews enabled/);
   assert.match(message, /This revision does not require a preview/);
 });
-test('automation-only commands report that the revision needs no preview either', async () => {
+test('locale-sync and admission tooling commands report that the revision needs no preview', async () => {
   const f = fixture({
     files: [
-      { filename: '.github/workflows/ci.yml' },
-      { filename: 'scripts/ci/validate-changes.mjs' },
+      { filename: '.github/workflows/crowdin.yml' },
+      { filename: 'scripts/ci/review-admission.mjs' },
     ],
   });
   const result = await requestPreviewFromComment(f);

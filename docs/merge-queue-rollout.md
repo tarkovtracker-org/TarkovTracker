@@ -9,13 +9,18 @@ CI handles `merge_group: checks_requested` using the exact event base and checke
 head. The new docs-only queue reduction reuses the existing path classifier. A complete
 single-parent delta containing only inert documentation keeps formatting, systems drift and
 security required, while skipping app build and tests. Agent policy files, GitHub configuration, mixed changes and uncertain evidence stay full.
-The trusted Preview State controller independently verifies the same live queue revision and a
-complete base/head comparison before publishing `Preview Result: success` as not applicable,
-without expecting a build artifact. A capped comparison, stale revision or changed CI attempt
-cannot establish that exemption. All other integrations retain full validation and the anonymous
-credential-isolated preview deployment/smoke pipeline after that exact CI attempt succeeds.
-The reduction has local replay/regression coverage; live docs-only queue skips remain a rollout
-verification item after authorized merge.
+Deployment necessity is independent of full CI selection. Admission tooling, tests and the
+Crowdin locale-sync workflow can keep every queue CI/security job while skipping deployment;
+PR #1316's seven-file inventory is a regression fixture. The trusted Preview State controller
+independently classifies the complete exact integration comparison using the same central rules,
+then publishes `Preview Result: success` as not applicable without expecting a build artifact.
+Build/dependency inputs, application/assets/locales, `scripts/preview/**`, setup scripts and shared
+actions still require previews. Workflow files other than Crowdin's locale sync also retain
+previews, including unknown/new workflows; there is no blanket workflow exemption. Mixed or
+unknown paths, malformed/capped comparisons and explicit full runs cannot establish a preview
+exemption. Stale revisions and changed CI attempts cannot publish success. Deployable integrations
+retain the anonymous credential-isolated preview deployment/smoke pipeline after their exact CI
+attempt succeeds. Live queue N/A validation remains a rollout item after authorized merge.
 
 The preview status targets the queue commit, not any member PR head. Before planning, upload and
 success publication, the controller verifies the same-repository `gh-readonly-queue/main/` ref,

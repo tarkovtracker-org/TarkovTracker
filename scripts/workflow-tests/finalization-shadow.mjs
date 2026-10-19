@@ -77,6 +77,7 @@ test('opt-in finalization selects only deployable revisions', () => {
     ['supabase/migrations/example.sql'],
     ['workers/api-gateway/src/index.ts'],
     ['pnpm-lock.yaml'],
+    ['.github/workflows/ci.yml'],
     ['README.md', 'app/components/Task.vue'],
     [],
   ]) {
@@ -91,7 +92,7 @@ test('opt-in finalization selects only deployable revisions', () => {
   );
   assert.equal(
     validateShadowEvidence(
-      evidence(['.github/workflows/ci.yml', 'scripts/ci/validate-changes.mjs'])
+      evidence(['.github/workflows/crowdin.yml', 'scripts/ci/review-admission.mjs'])
     ).previewRequired,
     false
   );
