@@ -300,15 +300,13 @@
                 :is-hiding="getHideCompletedMapObjectives"
                 @toggle="toggleMapTaskVisibilityFilter"
               />
-              <div>
-                <div
-                  v-for="task in mapSpecificTasksInSlice"
-                  :key="`task-${task.id}`"
-                  :class="taskCardGapClass"
-                >
-                  <TaskCard :task="task" @on-task-action="handleTaskAction" />
-                </div>
-              </div>
+              <TraderTaskSections
+                :tasks="mapSpecificTasksInSlice"
+                :grouped="shouldGroupTraderTasks"
+                :section-gap-class="taskSectionGapClass"
+                :card-gap-class="taskCardGapClass"
+                @on-task-action="handleTaskAction"
+              />
               <div v-if="globalTasksInSlice.length > 0" class="mt-2" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
@@ -586,6 +584,11 @@
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
   import TaskSearchScopeHint from '@/features/tasks/TaskSearchScopeHint.vue';
+  import {
+    hasTraderTaskGroups,
+    orderTasksByTraderSection,
+  } from '@/features/tasks/traderTaskGroups';
+  import TraderTaskSections from '@/features/tasks/TraderTaskSections.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -1178,10 +1181,23 @@
       focusTaskId: pinnedTask.value?.id ?? null,
     })
   );
-  const listedTasks = computed(() =>
+  const unorderedListedTasks = computed(() =>
     filteredTasks.value.filter(
       (task) => !hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
     )
+  );
+  // The trader view mirrors the in-game Loyalty Level / Essential Tasks sections when the overlay
+  // supplies groups; otherwise it stays one sorted list. Search can span traders, so it stays flat.
+  const shouldGroupTraderTasks = computed(
+    () =>
+      getTaskPrimaryView.value === 'traders' &&
+      !isSearchActive.value &&
+      hasTraderTaskGroups(unorderedListedTasks.value)
+  );
+  const listedTasks = computed(() =>
+    shouldGroupTraderTasks.value
+      ? orderTasksByTraderSection(unorderedListedTasks.value)
+      : unorderedListedTasks.value
   );
   const hiddenListTasks = computed(() =>
     filteredTasks.value.filter(

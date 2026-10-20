@@ -1017,6 +1017,13 @@
       "focused_task_section": "Focused Task",
       "focused_task_description": "Opened from a task link so you can see exactly where to continue.",
       "global_tasks_section": "Global Tasks",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "Pin task",
         "unpin_task": "Unpin task",

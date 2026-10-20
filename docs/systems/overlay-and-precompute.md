@@ -414,6 +414,11 @@ Registry `pool` metadata is informational; unresolved mappings never become deri
 A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
 [canonical task progression](./tasks.md#canonical-task-progression)). A malformed or mode-nested registry
 remains unconsumed and blocks precompute; it is applied nowhere.
+A root `traderTaskGroups` registry (mode, then task id, then `0` Essential Tasks or `1`-`4`
+Loyalty Level N) that passes `validTraderTaskGroups` is consumed the same way and attached last as
+each task's `traderTaskGroup`, with no cross-mode fallback. The trader task view uses it only to
+section the list; it is never a gate. It is another optional `json-v3` field, so it follows the pool
+release order below: ship this consumer before the overlay publishes the section.
 Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.

@@ -31,6 +31,7 @@ import {
   usableCounterDerivations,
 } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
+import { attachTraderTaskGroups } from './overlayTaskGroups';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
 import type { OverlayData, OverlayLocaleData as LocaleOverlayData } from './overlayTypes';
@@ -810,5 +811,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       usableCounterDerivations(overlay, mode),
       progressionPools(overlay, mode)
     );
+  if (Array.isArray(result.data.tasks))
+    result.data.tasks = attachTraderTaskGroups(result.data.tasks, overlay, mode);
   return result;
 }

@@ -291,6 +291,8 @@ export interface RequiredKeyGroup {
   optional?: boolean;
   anyOf?: boolean;
 }
+/** The client's `tierAccessory`: 0 is "Essential Tasks", 1-4 are "Loyalty Level 1-4". */
+export type TraderTaskGroup = 0 | 1 | 2 | 3 | 4;
 export interface Task {
   id: string;
   tarkovDataId?: number;
@@ -304,6 +306,8 @@ export interface Task {
   taskRequirements?: TaskRequirement[];
   otherRequirements?: TaskOtherRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
+  /** In-game trader task-list group from the overlay; absent when unknown. Never a gate. */
+  traderTaskGroup?: TraderTaskGroup;
   minPlayerLevel?: number;
   requiredPrestige?: TaskPrestigeReference;
   /**
