@@ -10,8 +10,10 @@ const task = (id: string, traderTaskGroup?: TraderTaskGroup): Task =>
 describe('trader task sections', () => {
   const tasks = [
     task('essential-a', 0),
+    task('ll4-a', 4),
     task('unknown'),
     task('ll2-a', 2),
+    task('ll3-a', 3),
     task('ll1-a', 1),
     task('essential-b', 0),
     task('ll1-b', 1),
@@ -25,6 +27,8 @@ describe('trader task sections', () => {
     ).toEqual([
       ['ll1', ['ll1-a', 'll1-b']],
       ['ll2', ['ll2-a']],
+      ['ll3', ['ll3-a']],
+      ['ll4', ['ll4-a']],
       ['essential', ['essential-a', 'essential-b']],
       ['other', ['unknown']],
     ]);
@@ -34,9 +38,24 @@ describe('trader task sections', () => {
       'll1-a',
       'll1-b',
       'll2-a',
+      'll3-a',
+      'll4-a',
       'essential-a',
       'essential-b',
       'unknown',
+    ]);
+  });
+  it('keeps pinned tasks first so pagination cannot drop them', () => {
+    const pinned = new Set(['unknown', 'll4-a']);
+    expect(orderTasksByTraderSection(tasks, pinned).map((entry) => entry.id)).toEqual([
+      'll4-a',
+      'unknown',
+      'll1-a',
+      'll1-b',
+      'll2-a',
+      'll3-a',
+      'essential-a',
+      'essential-b',
     ]);
   });
   it('sections only when at least one task has a known group', () => {

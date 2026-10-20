@@ -1196,7 +1196,7 @@
   );
   const listedTasks = computed(() =>
     shouldGroupTraderTasks.value
-      ? orderTasksByTraderSection(unorderedListedTasks.value)
+      ? orderTasksByTraderSection(unorderedListedTasks.value, new Set(getPinnedTaskIds.value))
       : unorderedListedTasks.value
   );
   const hiddenListTasks = computed(() =>

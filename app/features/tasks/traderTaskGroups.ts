@@ -24,6 +24,16 @@ export const groupTasksByTraderSection = (tasks: Task[]): TraderTaskSectionGroup
     section,
     tasks: tasks.filter((task) => traderTaskSection(task) === section),
   })).filter((group) => group.tasks.length > 0);
-/** Section order first, so incremental rendering fills one section before the next. */
-export const orderTasksByTraderSection = (tasks: Task[]): Task[] =>
-  groupTasksByTraderSection(tasks).flatMap((group) => group.tasks);
+/**
+ * Section order, so incremental rendering fills one section before the next. Pinned tasks stay
+ * first, as filtering ordered them, so pagination never pushes one out of the pinned section.
+ */
+export const orderTasksByTraderSection = (
+  tasks: Task[],
+  pinnedIds: ReadonlySet<string> = new Set()
+): Task[] => [
+  ...tasks.filter((task) => pinnedIds.has(task.id)),
+  ...groupTasksByTraderSection(tasks.filter((task) => !pinnedIds.has(task.id))).flatMap(
+    (group) => group.tasks
+  ),
+];
