@@ -8,7 +8,7 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 - Relevant checks: `pnpm run supabase:check` (local database replay) for migration or SQL changes.
   Edge Functions run on Deno; their `supabase/functions/_shared/*.deno.test.ts` tests are not
   covered by root Vitest.
-- Independent-review triggers: root `AGENTS.md` → Workflow and review.
+- Review and merge class: root `AGENTS.md` → Workflow and review.
 
 ## Functions and grants
 

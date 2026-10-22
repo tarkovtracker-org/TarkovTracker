@@ -14,8 +14,9 @@ Repo-specific review policy loaded by the `review-production` skill and by CodeR
 ## Validation Commands
 
 Use the validation and review requirements in the root `AGENTS.md` and the commands in
-`package.json`. A READY verdict requires applicable validation and any independent review the root
-policy requires. Unavailable checks or reviews remain incomplete, not passing. Do not rerun checks
+`package.json`. A READY verdict requires applicable validation. Provider reviews are best-effort: an
+unavailable or rate-limited reviewer is noted, not awaited. Unavailable required checks remain
+incomplete, not passing. Do not rerun checks
 for unchanged validated inputs. After a base update, verify the reviewed diff and assess changed
 base code for integration risks; rerun affected validation even when the merge had no conflicts.
 
