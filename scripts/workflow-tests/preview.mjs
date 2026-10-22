@@ -1386,6 +1386,21 @@ test('running, failed and unsuccessful CI evidence map to pending or failure', a
   });
   assert.equal(decision.action, 'fail');
   assert.match(decision.description, /CI Result concluded failure/);
+  for (const check of [
+    { status: 'in_progress', conclusion: null },
+    { status: 'completed', conclusion: null },
+  ]) {
+    const unfinished = fakeGithub(t);
+    Object.assign(unfinished.state.check, check);
+    const waiting = await planPreview({
+      github: unfinished.github,
+      context: workflowRunContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.equal(waiting.action, 'wait');
+    assert.match(waiting.description, /CI Result is still running/);
+  }
 });
 test('head movement, base movement, stale attempts and superseded runs cannot deploy', async (t) => {
   const moved = await plan(t, workflowRunContext(), {
@@ -2114,6 +2129,17 @@ test('hourly reconciliation repairs only missing head statuses', async (t) => {
   fake.state.previewStatuses = [{ id: 10, context: 'Preview Result', state: 'pending' }];
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
+  fake.state.previewStatuses = [
+    {
+      id: 11,
+      context: 'Preview Result',
+      state: 'pending',
+      description: 'CI Result is still running.',
+    },
+  ];
+  await reconcileMissingPreviewStatuses({ ...options, workspace: tempDir(t) });
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+  fake.state.statuses.length = 0;
   fake.state.previewStatuses = [];
   fake.state.pull = pullFixture({ merge_commit_sha: null });
   await reconcileMissingPreviewStatuses(options);
