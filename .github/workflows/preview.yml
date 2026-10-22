@@ -228,8 +228,9 @@ jobs:
         run: |
           for attempt in 1 2 3; do
             timeout -k 15 210 pnpm exec playwright install --with-deps chromium && exit 0
-            echo "::warning::Browser install attempt $attempt failed or stalled; retrying."
+            [ "$attempt" -lt 3 ] && echo "::warning::Browser install attempt $attempt failed or stalled; retrying."
           done
+          echo "::error::Browser install failed after 3 attempts."
           exit 1
       - name: Run smoke tests against the unique deployment URL
         env:
