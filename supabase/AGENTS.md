@@ -17,6 +17,11 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 - New `postgres` functions have no default `PUBLIC` EXECUTE in any schema and no default client
   EXECUTE outside platform-owned `storage`; grant every calling role explicitly
   (`docs/runbook.md#function-execute-defaults`).
+- Client-callable security-definer bodies live in `private`; `public` exposes them only through
+  same-signature `SECURITY INVOKER` wrappers. Wrappers run as the caller, so these bodies keep
+  `authenticated` and `service_role` `EXECUTE` (never `PUBLIC` or `anon`).
+  `supabase/tests/database/client_definer_rpcs.test.sql` mirrors advisor lints 0028/0029; fix new
+  findings instead of suppressing them.
 
 ## Migrations
 
