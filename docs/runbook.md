@@ -790,16 +790,26 @@ function ACLs are unchanged; `supabase_admin` defaults are platform-owned and un
 
 Every role that calls a new function must be granted EXECUTE explicitly in its migration:
 client roles, `service_role` outside `public`, and the roles whose RLS policies call it.
-Readback after rollout: the [default-ACL query](#platform-owned-public-relation-defaults) with
-`defaclobjtype = 'f'` must show a global `postgres` entry without `PUBLIC`, and a `public` entry
-without `anon` or `authenticated`.
+Readback after rollout: the global `postgres` entry must omit `PUBLIC`, and its `public` entry
+must omit `anon` and `authenticated`. Supabase's `storage` entry keeps client grants; the repo
+creates no `storage` functions.
+
+```sql
+SELECT CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
+       d.defaclacl
+FROM pg_catalog.pg_default_acl d
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+WHERE d.defaclobjtype = 'f' AND d.defaclrole = 'postgres'::regrole
+ORDER BY scope;
+```
 
 **Accepted advisor findings (lint 0029)**
 
 `authenticated_security_definer_function_executable` intentionally fires for these client RPCs.
 Each derives the caller from `auth.uid()` (no user-id argument), validates input, limits writes to
-the caller's rows, pins `search_path = ''` and is revoked from `anon`; their tables are closed to
-client roles. Suppress them in the dashboard advisor; re-review when a new one appears.
+the caller's rows, pins `search_path = ''` and is revoked from `anon`. Direct client table access
+stays limited by RLS and owner policies. Suppress them in the dashboard advisor; re-review when a
+new one appears.
 
 - `add_game_profile`, `update_game_profile`, `delete_game_profile`, `list_game_profiles`,
   `get_game_profile_progress`, `sync_game_profile_progress` (owner and supporter checks)
