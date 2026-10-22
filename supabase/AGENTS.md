@@ -14,6 +14,9 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 
 - Security-definer and service-role-only functions revoke `EXECUTE` from `PUBLIC`, `anon`, and
   `authenticated`, granting `service_role` explicitly where required.
+- Client-callable security-definer bodies live in `private`; `public` exposes them only through
+  same-signature `SECURITY INVOKER` wrappers. `client_definer_rpcs.test.sql` mirrors advisor lints
+  0028/0029; fix new findings instead of suppressing them.
 
 ## Migrations
 
