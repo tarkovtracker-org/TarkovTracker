@@ -15,7 +15,8 @@ import { pathToFileURL } from 'node:url';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
-const EXCLUDE_ITEM = /^\s+-\s+(['"]?)(.+?)\1\s*$/;
+const EXCLUDE_ITEM = /^\s*-\s+(['"]?)(.+?)\1\s*(?:#.*)?$/;
+const SKIPPABLE = /^\s*(?:#.*)?$/;
 const TITLE = 'Release-age exceptions';
 const parseVersion = (version) => {
   const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(String(version).trim());
@@ -51,13 +52,19 @@ export const inAdvisoryRange = (version, range) =>
   range.trim() !== '' &&
   range.split(',').every((clause) => clauseMatches(version, clause));
 /** Reads `minimumReleaseAge` (minutes) and its exclude list from pnpm-workspace.yaml text. */
-export function parseWorkspacePolicy(text) {
-  const lines = text.split(/\r?\n/);
-  const age = /^minimumReleaseAge:\s*(\d+)\s*$/m.exec(text);
-  const start = lines.findIndex((line) => /^minimumReleaseAgeExclude:\s*$/.test(line));
+const isListLine = (line) => EXCLUDE_ITEM.test(line) || SKIPPABLE.test(line);
+const excludeBlock = (lines) => {
+  const start = lines.findIndex((line) => /^minimumReleaseAgeExclude:\s*(?:#.*)?$/.test(line));
   const following = start < 0 ? [] : lines.slice(start + 1);
-  const end = following.findIndex((line) => !EXCLUDE_ITEM.test(line));
-  const items = following.slice(0, end < 0 ? undefined : end);
+  const end = following.findIndex((line) => !isListLine(line));
+  return following.slice(0, end < 0 ? undefined : end).filter((line) => EXCLUDE_ITEM.test(line));
+};
+export function parseWorkspacePolicy(text) {
+  const items = excludeBlock(text.split(/\r?\n/));
+  if (items.length === 0 && /^minimumReleaseAgeExclude:/m.test(text)) {
+    throw new Error('minimumReleaseAgeExclude must be a non-empty block list this check can read');
+  }
+  const age = /^minimumReleaseAge:\s*(\d+)\s*(?:#.*)?$/m.exec(text);
   return {
     minutes: age ? Number(age[1]) : undefined,
     excludes: items.map((line) => EXCLUDE_ITEM.exec(line)[2]),

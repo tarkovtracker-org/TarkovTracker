@@ -65,6 +65,19 @@ describe('version helpers', () => {
       excludes: ['nuxt@4.6.2', '@nuxt/kit@4.6.2'],
     });
   });
+  it('keeps reading excludes across comments and unindented items', () => {
+    const text =
+      'minimumReleaseAge: 10080 # 7 days\nminimumReleaseAgeExclude:\n  # GHSA fix\n  - nuxt@4.6.2\n\n- @nuxt/kit@4.6.2 # companion\nother: 1\n';
+    expect(parseWorkspacePolicy(text)).toEqual({
+      minutes: 10080,
+      excludes: ['nuxt@4.6.2', '@nuxt/kit@4.6.2'],
+    });
+  });
+  it('fails closed on an exclude list it cannot read', () => {
+    expect(() => parseWorkspacePolicy('minimumReleaseAgeExclude: [nuxt@4.6.2]\n')).toThrow(
+      'block list'
+    );
+  });
 });
 describe('evaluateExceptions', () => {
   it('accepts an advisory fix and its same-release companion', () => {
