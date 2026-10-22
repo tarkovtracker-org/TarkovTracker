@@ -713,7 +713,7 @@ gh api --method POST \
     {
       "type": "restrict_action_events",
       "parameters": {
-        "allowed_events": ["pull_request_target", "workflow_run", "schedule"]
+        "allowed_events": ["pull_request_target", "workflow_run", "schedule", "workflow_dispatch"]
       }
     }
   ]
@@ -723,7 +723,8 @@ JSON
 
 The `restrict_action_events` allowlist is exhaustive for this workflow and does not permit
 `pull_request_target` anywhere else in the repository; the default public-repository block still
-applies to every other workflow.
+applies to every other workflow. `workflow_dispatch` must stay in the list: without it every
+`preview-enable` and reconciliation dispatch ends in `startup_failure`.
 
 **Jobs:** `Refresh preview state` handles automatic events in one job that publishes status and
 can request a separate Preview run when the PR is opted in or auto-merge is enabled.
