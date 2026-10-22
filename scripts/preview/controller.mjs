@@ -239,12 +239,12 @@ async function ciEvidence(github, context, candidate) {
     return ciResultCheck(github, context.repo, candidate.headSha);
   return latestStatus(github, context.repo, candidate.headSha, 'CI Result');
 }
-function evidenceState(evidence) {
-  if ('status' in evidence && evidence.status !== 'completed') return 'pending';
-  return evidence.conclusion ?? evidence.state ?? null;
+function evidenceState({ status = 'completed', conclusion, state }) {
+  if (status !== 'completed') return 'pending';
+  return conclusion ?? state;
 }
 function assertEvidenceComplete(state) {
-  if (state === null || state === 'pending') throw pending(`${CI_RESULT_PENDING}.`);
+  if (state == null || state === 'pending') throw pending(`${CI_RESULT_PENDING}.`);
   if (state !== 'success') throw failure(`CI Result concluded ${state}.`);
 }
 async function checkCiResult(github, context, candidate) {
