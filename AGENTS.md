@@ -91,19 +91,20 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
   (omit `--request` to check status); never post raw `@codex review`, repost, or run it locally.
   It is optional: an unavailable or usage-limited Codex is noted, not awaited.
-- When no provider review covers the exact head, an agent with merge authority self-admits after
-  its own review and green CI with an admin attestation
+- When no provider review covers the exact head, an agent with merge authority and repo admin
+  access self-admits after its own review and green CI with an admin attestation
   (`docs/merge-queue-rollout.md#review-and-preview-controls`, operation `approve-review`), plus
-  `/approve-sensitive <head>` alone in a comment for sensitive changes. Repeat both after any new
-  head. Auth, migrations, RLS and concurrency changes take this route; verify them with
+  `/approve-sensitive <40-char head SHA>` alone in a comment for sensitive changes. Without admin
+  access, a non-author write collaborator's exact-head approval still admits. Repeat both after
+  any new head. Auth, migrations, RLS and concurrency changes take this route; verify them with
   `pnpm run supabase:check` or the owning tests instead of waiting for a human.
 - Merge class: a green PR may merge without asking unless it is high-risk. High-risk (needs the
   user's explicit "merge" naming it): destructive or data-losing migrations (drops, type
   narrowing, bulk rewrites); production data scripts, backfills or migration repair; billing,
   payments or entitlements; secrets or credentials; DNS, hosting or Worker trigger config;
   weakening a security control, check, or ruleset; breaking public API or data-format contracts;
-  and major upgrades of auth, database or billing dependencies. Otherwise merge; report high-risk
-  PRs `READY` with the reason.
+  and major (or `0.x` cross-minor) upgrades of auth, database or billing dependencies. Otherwise
+  merge; report high-risk PRs `READY` with the reason.
 - The PR body lists the validation commands and results.
 - Review risk areas and severity live in `docs/code-review.md`.
 

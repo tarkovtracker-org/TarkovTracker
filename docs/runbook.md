@@ -1261,7 +1261,8 @@ blocking reports. The result is evidence-only and must be assessed before a migr
 The implementing agent may collect and assess this evidence; human review is not mandatory.
 Document migration semantics, deployed function dependencies/contracts and permissions, rolling
 compatibility, lock acquisition and timeout/rollback strategy, together with any provider review
-that was available (`AGENTS.md`). It does not execute the migration. If the parser sees dynamic SQL,
+that was available; Review Admission still needs exact-head admission and sensitive approval
+(`AGENTS.md`). It does not execute the migration. If the parser sees dynamic SQL,
 unsupported statements, quoted identifiers, malformed literals or comments, multiple statements, or
 any unclassified syntax, it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
 treats an unrecognized migration as safe. An incomplete report requires a documented assessment of
