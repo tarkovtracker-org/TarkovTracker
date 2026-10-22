@@ -65,6 +65,7 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
+# Exact name@version excludes only, each justified by scripts/checks/release-age-exceptions.mjs.
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - nuxt@4.6.2
