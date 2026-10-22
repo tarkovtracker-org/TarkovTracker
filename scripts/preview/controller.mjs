@@ -43,6 +43,7 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 // fallback can re-evaluate them; other pending reasons are left alone.
 const MERGE_PENDING = 'GitHub has not finished computing';
 const CI_RESULT_PENDING = 'CI Result is still running';
+const CI_RESULT_MISSING = 'Waiting for CI Result on this revision';
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -248,7 +249,7 @@ function assertEvidenceComplete(state) {
 }
 async function checkCiResult(github, context, candidate) {
   const evidence = await ciEvidence(github, context, candidate);
-  if (!evidence) throw pending('Waiting for CI Result on this revision.');
+  if (!evidence) throw pending(`${CI_RESULT_MISSING}.`);
   assertEvidenceComplete(evidenceState(evidence));
 }
 async function requiresPreview(github, context, pull) {
@@ -971,7 +972,9 @@ function awaitingRetry(status) {
   const description = String(status.description);
   return (
     status.state === 'pending' &&
-    [MERGE_PENDING, CI_RESULT_PENDING].some((prefix) => description.startsWith(prefix))
+    [MERGE_PENDING, CI_RESULT_PENDING, CI_RESULT_MISSING].some((prefix) =>
+      description.startsWith(prefix)
+    )
   );
 }
 /** Refresh a head with no result, or one left pending on a test merge or CI Result read. */

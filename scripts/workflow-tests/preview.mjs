@@ -2129,17 +2129,6 @@ test('hourly reconciliation repairs only missing head statuses', async (t) => {
   fake.state.previewStatuses = [{ id: 10, context: 'Preview Result', state: 'pending' }];
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
-  fake.state.previewStatuses = [
-    {
-      id: 11,
-      context: 'Preview Result',
-      state: 'pending',
-      description: 'CI Result is still running.',
-    },
-  ];
-  await reconcileMissingPreviewStatuses({ ...options, workspace: tempDir(t) });
-  assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
-  fake.state.statuses.length = 0;
   fake.state.previewStatuses = [];
   fake.state.pull = pullFixture({ merge_commit_sha: null });
   await reconcileMissingPreviewStatuses(options);
@@ -2205,6 +2194,30 @@ test('hourly reconciliation re-evaluates a head left pending on an unready test 
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
 });
+for (const description of [
+  'CI Result is still running.',
+  'Waiting for CI Result on this revision.',
+]) {
+  test(`hourly reconciliation re-evaluates a head left pending on "${description}"`, async (t) => {
+    const fake = fakeGithub(t, {
+      previewStatuses: [{ id: 10, context: 'Preview Result', state: 'pending', description }],
+    });
+    await reconcileMissingPreviewStatuses({
+      github: fake.github,
+      context: scheduleContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+    assert.match(fake.state.statuses[0].description, /Preview enabled: requested/);
+    assert.deepEqual(fake.state.dispatches[0].inputs, {
+      run_id: '900',
+      queue: 'false',
+      authorization: 'readiness',
+      ci_attempt: '1',
+    });
+  });
+}
 test('trusted hourly recovery preserves standing command binding and readiness exclusions', async (t) => {
   const enabled = fakeGithub(t, { comments: [previewRequestComment()] });
   const refresh = async (fake) =>
