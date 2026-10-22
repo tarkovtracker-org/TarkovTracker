@@ -123,4 +123,18 @@ GRANT EXECUTE ON FUNCTION
   public.update_game_profile(uuid, text, text)
 TO authenticated, service_role;
 
+GRANT EXECUTE ON FUNCTION
+  private.add_game_profile(text, text),
+  private.archive_prestige_run_and_reset_progress(
+    text, integer, integer, jsonb, jsonb, timestamptz, text, integer, bigint, jsonb, jsonb
+  ),
+  private.delete_game_profile(uuid),
+  private.get_game_profile_progress(uuid),
+  private.list_game_profiles(),
+  private.set_game_mode_profile_visibility(text, smallint, boolean),
+  private.sync_game_profile_progress(uuid, integer, jsonb, smallint),
+  private.sync_user_game_mode_progress(text, integer, bigint, jsonb, smallint),
+  private.update_game_profile(uuid, text, text)
+TO authenticated, service_role;
+
 COMMIT;
