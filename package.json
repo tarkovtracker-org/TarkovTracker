@@ -118,6 +118,7 @@
     "test:deno": "deno test --config supabase/functions/deno.json --frozen --allow-read=app/server/api/tarkov supabase/functions/_shared/*.deno.test.ts supabase/functions/admin-cache-purge/cache-targets.deno.test.ts",
     "validate:changes": "node scripts/ci/validate-changes.mjs",
     "audit:dependencies": "node scripts/checks/audit-dependencies.mjs",
+    "audit:release-age": "node scripts/checks/release-age-exceptions.mjs",
     "test:workflow": "node scripts/ci/run-workflow-tests.mjs",
     "check:progress-contracts": "node scripts/checks/progress-contracts.mjs",
     "verify:api-parity": "node scripts/checks/api-parity.mjs",
