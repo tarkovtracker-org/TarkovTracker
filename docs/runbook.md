@@ -803,19 +803,6 @@ WHERE d.defaclobjtype = 'f' AND d.defaclrole = 'postgres'::regrole
 ORDER BY scope;
 ```
 
-**Accepted advisor findings (lint 0029)**
-
-`authenticated_security_definer_function_executable` intentionally fires for these client RPCs.
-Each derives the caller from `auth.uid()` (no user-id argument), validates input, limits writes to
-the caller's rows, pins `search_path = ''` and is revoked from `anon`. Direct client table access
-stays limited by RLS and owner policies. Suppress them in the dashboard advisor; re-review when a
-new one appears.
-
-- `add_game_profile`, `update_game_profile`, `delete_game_profile`, `list_game_profiles`,
-  `get_game_profile_progress`, `sync_game_profile_progress` (owner and supporter checks)
-- `sync_user_game_mode_progress`, `archive_prestige_run_and_reset_progress`,
-  `set_game_mode_profile_visibility`
-
 ### Progress transfer and freshness rollout
 
 For `20260906174817_suppress_unchanged_progress_writes.sql` and
