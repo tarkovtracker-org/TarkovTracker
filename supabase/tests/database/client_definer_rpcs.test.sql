@@ -65,13 +65,15 @@ FROM client_definer_rpc;
 SELECT is(
   (
     SELECT ROW(
+      has_function_privilege('authenticated', p.oid, 'EXECUTE'),
+      has_function_privilege('service_role', p.oid, 'EXECUTE'),
       has_function_privilege('anon', p.oid, 'EXECUTE'),
       EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0)
     )::TEXT
     FROM pg_proc p WHERE p.oid = to_regprocedure('private.' || identity)
   ),
-  ROW(false, false)::TEXT,
-  'private.' || identity || ' has no anon or PUBLIC EXECUTE'
+  ROW(true, true, false, false)::TEXT,
+  'private.' || identity || ' is executable by authenticated and service_role, not anon or PUBLIC'
 )
 FROM client_definer_rpc;
 
