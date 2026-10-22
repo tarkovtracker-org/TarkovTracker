@@ -65,5 +65,11 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
-patchedDependencies:
-  '@nuxt/devtools@3.4.1': patches/@nuxt__devtools@3.4.1.patch
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - nuxt@4.6.2
+  - '@nuxt/kit@4.6.2'
+  - '@nuxt/schema@4.6.2'
+  - '@nuxt/nitro-server@4.6.2'
+  - '@nuxt/vite-builder@4.6.2'
+  - '@nuxt/vite-server@4.6.2'
