@@ -50,6 +50,10 @@ describe('version helpers', () => {
     expect(compareVersions('4.6.2', '4.6.10')).toBe(-1);
     expect(compareVersions('4.6.2-rc.1', '4.6.2')).toBe(-1);
     expect(compareVersions('4.6.2', '4.6.2')).toBe(0);
+    expect(compareVersions('1.0.0-A', '1.0.0-a')).toBe(-1);
+    expect(compareVersions('1.0.0-alpha.2', '1.0.0-alpha.10')).toBe(-1);
+    expect(compareVersions('1.0.0-alpha.1', '1.0.0-alpha.beta')).toBe(-1);
+    expect(compareVersions('1.0.0-alpha', '1.0.0-alpha.1')).toBe(-1);
   });
   it('matches GitHub advisory ranges', () => {
     expect(inAdvisoryRange('4.6.1', '>= 4.0.0, < 4.6.2')).toBe(true);
@@ -192,9 +196,25 @@ describe('evaluateExceptions screening', () => {
     ]);
     expect(verdict.warnings).toEqual([expect.stringContaining('past the release-age window')]);
   });
-  it('fails excludes without a release-age policy', () => {
-    expect(
-      evaluateExceptions({ minutes: undefined, excludes: ['nuxt@4.6.2'] }, lookup, NOW).failures
-    ).toEqual([expect.stringContaining('not set')]);
+  it('fails a missing or shortened release-age policy, with or without excludes', () => {
+    for (const minutes of [undefined, 1, 10079]) {
+      expect(evaluateExceptions({ minutes, excludes: [] }, lookup, NOW).failures).toEqual([
+        expect.stringContaining('must be at least 10080 minutes'),
+      ]);
+    }
+  });
+  it('fails vetting when the previous publisher cannot be established', () => {
+    const anonymous = release({ _npmUser: undefined });
+    for (const versions of [
+      { '4.6.2': [2, release()] },
+      { '4.6.1': [20, anonymous], '4.6.2': [2, anonymous] },
+    ]) {
+      const verdict = evaluateExceptions(
+        policy('nuxt@4.6.2'),
+        { nuxt: pkg(packument('nuxt', versions), lookup.nuxt.advisories) },
+        NOW
+      );
+      expect(verdict.failures).toEqual([expect.stringContaining('(previous release)')]);
+    }
   });
 });

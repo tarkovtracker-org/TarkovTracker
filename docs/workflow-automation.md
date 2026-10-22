@@ -975,10 +975,11 @@ Automated via Dependabot (`.github/dependabot.yml`):
     days yet; plus siblings built from the same repository (per npm provenance) at the same
     version and published within a day (e.g. `@nuxt/kit` with `nuxt`). A fix that ages past the
     window still anchors its siblings until they age too.
-  - **Vetting, every entry:** npm provenance, the previous release's publisher, and no new
-    install scripts.
-  - **Waits:** everything else, including feature bumps that ride along with a fix and name
-    patterns (`@scope/*`), which fail. Entries past the window warn so they are removed.
+  - **Vetting, every entry still inside the window:** npm provenance, the same publisher as the
+    previous release (fails closed when either is unknown), and no new install scripts.
+  - **Waits:** everything else, including releases of other packages that ride along with a fix
+    and name patterns (`@scope/*`), which fail. Entries past the window warn so they are removed.
+  - **Floor:** the check fails if `minimumReleaseAge` is unset or below 10080 minutes.
   - To land a fix early, add the exact entries, run `node scripts/checks/release-age-exceptions.mjs`,
     then `pnpm install`.
 - Grouped minor/patch updates for low-risk tooling families

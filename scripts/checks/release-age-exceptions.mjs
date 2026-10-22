@@ -10,21 +10,34 @@ import { pathToFileURL } from 'node:url';
 // - companion: built from the same repository (per npm provenance) at the same version as an
 //   advisory-fix entry, published within a day of it (monorepo siblings such as @nuxt/kit with
 //   nuxt). A fix that has aged past the window still anchors its companions.
-// Every entry must also carry npm provenance, come from the previous release's publisher, and add
-// no install scripts. Name patterns and unjustified entries fail; entries that have aged past the
+// Every entry still inside the window must also carry npm provenance, come from the previous
+// release's publisher, and add no install scripts. The window itself may not drop below 7 days. Name patterns and unjustified entries fail; entries that have aged past the
 // window warn so they are removed.
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const TITLE = 'Release-age exceptions';
+const MIN_POLICY_MINUTES = 7 * 24 * 60;
 const parseVersion = (version) => {
   const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(String(version).trim());
   return match ? { parts: match.slice(1, 4).map(Number), pre: match[4] ?? '' } : undefined;
 };
 const releaseRank = (pre) => (pre ? 0 : 1);
-const comparePre = (a, b) =>
-  Math.sign(releaseRank(a) - releaseRank(b)) ||
-  Math.sign(a.localeCompare(b, undefined, { numeric: true }));
+const identifierRank = (id) => (/^\d+$/.test(id) ? 0 : 1);
+const asciiOrder = (a, b) => (a < b ? -1 : Number(a > b));
+// SemVer: numeric identifiers compare numerically and sort before alphanumeric ones (ASCII order).
+const compareIdentifier = (a, b) =>
+  Math.sign(identifierRank(a) - identifierRank(b)) ||
+  (identifierRank(a) === 0 ? Math.sign(Number(a) - Number(b)) : asciiOrder(a, b));
+const comparePreIds = (a, b) => {
+  const left = a.split('.');
+  const right = b.split('.');
+  const order = left
+    .map((id, index) => (index < right.length ? compareIdentifier(id, right[index]) : 1))
+    .find(Boolean);
+  return order ?? Math.sign(left.length - right.length);
+};
+const comparePre = (a, b) => Math.sign(releaseRank(a) - releaseRank(b)) || comparePreIds(a, b);
 export function compareVersions(left, right) {
   const a = parseVersion(left);
   const b = parseVersion(right);
@@ -81,10 +94,14 @@ const installScripts = (manifest) =>
 const publisherOf = (manifest) => manifest?._npmUser?.name;
 const provenanceFailures = (manifest) =>
   manifest.dist?.attestations ? [] : ['has no npm provenance attestation'];
+const publisherLabel = (manifest) => publisherOf(manifest) ?? 'an unknown publisher';
+// Fails closed: no previous release or no publisher identity cannot prove continuity.
 const publisherFailures = (manifest, prior) =>
-  !prior || publisherOf(prior) === publisherOf(manifest)
+  publisherOf(manifest) && publisherOf(manifest) === publisherOf(prior)
     ? []
-    : [`was published by ${publisherOf(manifest)}, not ${publisherOf(prior)} (previous release)`];
+    : [
+        `was published by ${publisherLabel(manifest)}, not ${publisherLabel(prior)} (previous release)`,
+      ];
 const scriptFailures = (manifest, prior) => {
   const added = installScripts(manifest).filter((name) => !installScripts(prior).includes(name));
   return added.length > 0 ? [`adds install scripts: ${added.join(', ')}`] : [];
@@ -200,8 +217,10 @@ const merge = (outcomes) => ({
  * `now` is the evaluation time in milliseconds.
  */
 export function evaluateExceptions({ minutes, excludes }, lookup, now) {
-  if (excludes.length > 0 && !(minutes > 0)) {
-    return merge([{ failures: ['minimumReleaseAge is not set; excludes have nothing to bypass'] }]);
+  if (!(minutes >= MIN_POLICY_MINUTES)) {
+    return merge([
+      { failures: [`minimumReleaseAge must be at least ${MIN_POLICY_MINUTES} minutes (7 days)`] },
+    ]);
   }
   const windowMs = minutes * 60 * 1000;
   const described = excludes.map((raw) => describeEntry(raw, lookup));
