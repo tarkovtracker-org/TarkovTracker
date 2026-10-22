@@ -239,9 +239,8 @@ async function ciEvidence(github, context, candidate) {
     return ciResultCheck(github, context.repo, candidate.headSha);
   return latestStatus(github, context.repo, candidate.headSha, 'CI Result');
 }
-function evidenceState({ status = 'completed', conclusion, state }) {
-  if (status !== 'completed') return 'pending';
-  return conclusion ?? state;
+function evidenceState(evidence) {
+  return evidence.conclusion ?? evidence.state;
 }
 function assertEvidenceComplete(state) {
   if (state == null || state === 'pending') throw pending(`${CI_RESULT_PENDING}.`);
