@@ -260,7 +260,7 @@ still needs current revision evidence.
   integration for `main` and is unchanged.
 - The public repository's `pull_request_target` use is confined to `preview-state.yml` by a
   repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
-  `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
+  `workflow_run`, `schedule`, and `workflow_dispatch` for that workflow path. GitHub enforces its default
   public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
   external state; `docs/workflow-automation.md` records how to recreate it.
 
