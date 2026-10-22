@@ -779,6 +779,30 @@ without grant option. Sequence defaults were outside #1134's table/view hardenin
 unchanged by this documentation-only PR. This follow-up checks defaults, not application-table
 grants, feature behavior or the full migration ledger.
 
+### Function EXECUTE defaults
+
+`20261022090000_revoke_postgres_client_function_defaults.sql` makes new `postgres`-created
+functions closed by default. PostgreSQL grants function EXECUTE to `PUBLIC` globally, and a
+schema-scoped revoke cannot cancel a global default, so the migration revokes `PUBLIC` globally
+for `postgres` (every schema, including `private` and `pg_temp`) and revokes Supabase's
+`anon`/`authenticated` grants in `public`. `service_role` keeps its `public` default. Existing
+function ACLs are unchanged; `supabase_admin` defaults are platform-owned and unchanged.
+
+Every role that calls a new function must be granted EXECUTE explicitly in its migration:
+client roles, `service_role` outside `public`, and the roles whose RLS policies call it.
+Readback after rollout: the global `postgres` entry must omit `PUBLIC`, and its `public` entry
+must omit `anon` and `authenticated`. Supabase's `storage` entry keeps client grants; the repo
+creates no `storage` functions.
+
+```sql
+SELECT CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
+       d.defaclacl
+FROM pg_catalog.pg_default_acl d
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+WHERE d.defaclobjtype = 'f' AND d.defaclrole = 'postgres'::regrole
+ORDER BY scope;
+```
+
 ### Progress transfer and freshness rollout
 
 For `20260906174817_suppress_unchanged_progress_writes.sql` and
