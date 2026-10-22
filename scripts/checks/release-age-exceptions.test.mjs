@@ -183,6 +183,19 @@ describe('evaluateExceptions screening', () => {
       'nuxt@4.6.2 adds install scripts: postinstall',
     ]);
   });
+  it('vets against the release published before the entry, not a later backport', () => {
+    const backported = packument('nuxt', {
+      '4.6.1': [20, release()],
+      '4.6.2': [2, release()],
+      '3.21.9': [1, release({ _npmUser: { name: 'someone' } })],
+    });
+    const verdict = evaluateExceptions(
+      policy('nuxt@4.6.2'),
+      { nuxt: pkg(backported, lookup.nuxt.advisories) },
+      NOW
+    );
+    expect(verdict.failures).toEqual([]);
+  });
   it('fails patterns and unverifiable entries, warns on matured ones', () => {
     const old = packument('nuxt', { '4.6.1': [30, release()], '4.6.2': [8, release()] });
     const verdict = evaluateExceptions(

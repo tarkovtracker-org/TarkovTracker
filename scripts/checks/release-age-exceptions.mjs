@@ -85,10 +85,16 @@ const normalizeRepository = (url) =>
   String(url ?? '')
     .replace(/\.git$/, '')
     .toLowerCase();
+const publishedAt = (packument, version) => Date.parse(packument.time[version] ?? '');
+// The latest lower version published before this one; later backports are not its baseline.
 const previousVersion = (packument, version) =>
   Object.keys(packument.versions)
-    .filter((candidate) => packument.time[candidate] && compareVersions(candidate, version) < 0)
-    .sort((a, b) => Date.parse(packument.time[b]) - Date.parse(packument.time[a]))[0];
+    .filter(
+      (candidate) =>
+        compareVersions(candidate, version) < 0 &&
+        publishedAt(packument, candidate) < publishedAt(packument, version)
+    )
+    .sort((a, b) => publishedAt(packument, b) - publishedAt(packument, a))[0];
 const installScripts = (manifest) =>
   INSTALL_SCRIPTS.filter((script) => typeof manifest?.scripts?.[script] === 'string');
 const publisherOf = (manifest) => manifest?._npmUser?.name;
