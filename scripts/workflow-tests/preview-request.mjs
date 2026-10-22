@@ -551,6 +551,30 @@ test('a comment added between REST and GraphQL snapshots fails closed', async ()
   });
   await assert.rejects(readPreviewRequest(github, REPO, 42), /inconsistent .* snapshots/);
 });
+test('a comment added between snapshots is re-read before failing closed', async () => {
+  const github = authorizationFixture([comment(1)]);
+  const graphql = github.graphql;
+  let calls = 0;
+  github.graphql = async (...args) => {
+    calls += 1;
+    if (calls > 1) return graphql(...args);
+    return {
+      repository: {
+        pullRequest: {
+          comments: {
+            nodes: [
+              { fullDatabaseId: '1', lastEditedAt: null },
+              { fullDatabaseId: '2', lastEditedAt: null },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      },
+    };
+  };
+  assert.equal((await readPreviewRequest(github, REPO, 42)).enabled, true);
+  assert.equal(calls, 2);
+});
 test('all comment pages are considered so a later stop revokes an older grant', async () => {
   const comments = [comment(1), ...Array.from({ length: 101 }, (_, i) => comment(i + 2, 'hello'))];
   comments.push(comment(104, '/preview stop'));
