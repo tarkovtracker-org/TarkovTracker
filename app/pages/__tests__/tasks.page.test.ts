@@ -225,7 +225,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 // Each task view has its own route; keep the mocked route on the view the test picks.
-const TASK_VIEW_PATHS: Record<string, string> = { maps: '/tasks/maps', graph: '/tasks/graph' };
+const TASK_VIEW_PATHS: Record<string, string> = {
+  maps: '/tasks/maps',
+  traders: '/tasks/traders',
+  graph: '/tasks/graph',
+};
 mockNuxtImport('useRoute', (original) => () => {
   const route = original();
   return {
@@ -973,6 +977,46 @@ describe('tasks page', () => {
     isGlobalTaskMock.mockImplementation((task: Task) => task.id === 'task-global');
     await mountPage();
     expect(wrapper.text()).not.toContain('page.tasks.global_tasks_section');
+  });
+  it('sections the trader view like the in-game task list', async () => {
+    visibleTasksRef.value = [
+      { ...mapTask, id: 'task-essential', traderTaskGroup: 0 },
+      { ...mapTask, id: 'task-unknown' },
+      { ...mapTask, id: 'task-ll2', traderTaskGroup: 2 },
+      { ...mapTask, id: 'task-ll1', traderTaskGroup: 1 },
+    ];
+    preferencesStoreMock.getTaskPrimaryView = 'traders';
+    await mountPage();
+    expect(
+      wrapper
+        .findAll('[data-testid^="trader-task-section-"]')
+        .map((section: { attributes: (name: string) => string }) =>
+          section.attributes('data-testid')
+        )
+    ).toEqual([
+      'trader-task-section-ll1',
+      'trader-task-section-ll2',
+      'trader-task-section-essential',
+      'trader-task-section-other',
+    ]);
+    expect(
+      wrapper
+        .findAll('[data-testid="task-card"]')
+        .map((item: { text: () => string }) => item.text())
+    ).toEqual(['task-ll1', 'task-ll2', 'task-essential', 'task-unknown']);
+  });
+  it('keeps the trader view flat when no task has a known group', async () => {
+    visibleTasksRef.value = [mapTask, globalTask];
+    preferencesStoreMock.getTaskPrimaryView = 'traders';
+    await mountPage();
+    expect(wrapper.find('[data-testid^="trader-task-section-"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(2);
+  });
+  it('does not section grouped tasks outside the trader view', async () => {
+    visibleTasksRef.value = [{ ...mapTask, traderTaskGroup: 0 }];
+    preferencesStoreMock.getTaskPrimaryView = 'all';
+    await mountPage();
+    expect(wrapper.find('[data-testid^="trader-task-section-"]').exists()).toBe(false);
   });
   it('keeps global accent for pinned global tasks in map view', async () => {
     visibleTasksRef.value = [globalTask];
