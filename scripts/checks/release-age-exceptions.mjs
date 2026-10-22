@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 // `minimumReleaseAge` in pnpm-workspace.yaml holds every new version back for 7 days. A version
 // may skip the wait only through an exact `name@version` entry in `minimumReleaseAgeExclude`
@@ -7,16 +7,15 @@ import { pathToFileURL } from 'node:url';
 //   same major line at or below the entry, the entry is outside every vulnerable range, and no
 //   patched version in that line has already aged past the window (so a mature fix is not
 //   skipped over);
-// - companion: same repository and same version as an advisory-fix entry, published within a day
-//   of it (monorepo siblings such as @nuxt/kit with nuxt).
+// - companion: built from the same repository (per npm provenance) at the same version as an
+//   advisory-fix entry, published within a day of it (monorepo siblings such as @nuxt/kit with
+//   nuxt). A fix that has aged past the window still anchors its companions.
 // Every entry must also carry npm provenance, come from the previous release's publisher, and add
 // no install scripts. Name patterns and unjustified entries fail; entries that have aged past the
 // window warn so they are removed.
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
-const EXCLUDE_ITEM = /^\s*-\s+(['"]?)(.+?)\1\s*(?:#.*)?$/;
-const SKIPPABLE = /^\s*(?:#.*)?$/;
 const TITLE = 'Release-age exceptions';
 const parseVersion = (version) => {
   const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(String(version).trim());
@@ -51,23 +50,14 @@ export const inAdvisoryRange = (version, range) =>
   typeof range === 'string' &&
   range.trim() !== '' &&
   range.split(',').every((clause) => clauseMatches(version, clause));
-/** Reads `minimumReleaseAge` (minutes) and its exclude list from pnpm-workspace.yaml text. */
-const isListLine = (line) => EXCLUDE_ITEM.test(line) || SKIPPABLE.test(line);
-const excludeBlock = (lines) => {
-  const start = lines.findIndex((line) => /^minimumReleaseAgeExclude:\s*(?:#.*)?$/.test(line));
-  const following = start < 0 ? [] : lines.slice(start + 1);
-  const end = following.findIndex((line) => !isListLine(line));
-  return following.slice(0, end < 0 ? undefined : end).filter((line) => EXCLUDE_ITEM.test(line));
-};
-export function parseWorkspacePolicy(text) {
-  const items = excludeBlock(text.split(/\r?\n/));
-  if (items.length === 0 && /^minimumReleaseAgeExclude:/m.test(text)) {
-    throw new Error('minimumReleaseAgeExclude must be a non-empty block list this check can read');
-  }
-  const age = /^minimumReleaseAge:\s*(\d+)\s*(?:#.*)?$/m.exec(text);
+const parseSetting = (json) => (json.trim() === '' ? undefined : JSON.parse(json));
+/** Policy from `pnpm config get <key> --json` output, which pnpm prints empty for unset keys. */
+export function policyFromConfig(ageJson, excludesJson) {
+  const minutes = parseSetting(ageJson);
+  const excludes = parseSetting(excludesJson) ?? [];
   return {
-    minutes: age ? Number(age[1]) : undefined,
-    excludes: items.map((line) => EXCLUDE_ITEM.exec(line)[2]),
+    minutes: typeof minutes === 'number' ? minutes : undefined,
+    excludes: [excludes].flat().map(String),
   };
 }
 /** Splits `name@version` (scoped or not); anything else is a pattern without a version. */
@@ -78,15 +68,10 @@ export function parseEntry(entry) {
     ? { name: entry.slice(0, at), version }
     : { name: entry, version: undefined };
 }
-const normalizeRepository = (repository) => {
-  const url = typeof repository === 'string' ? repository : repository?.url;
-  return String(url ?? '')
-    .replace(/^git\+/, '')
-    .replace(/^git:\/\//, 'https://')
-    .replace(/^github:/, 'https://github.com/')
+const normalizeRepository = (url) =>
+  String(url ?? '')
     .replace(/\.git$/, '')
     .toLowerCase();
-};
 const previousVersion = (packument, version) =>
   Object.keys(packument.versions)
     .filter((candidate) => packument.time[candidate] && compareVersions(candidate, version) < 0)
@@ -145,13 +130,24 @@ const justifiesEarly = (packument, version, cutoff) => (advisory) => {
 /** The advisory that justifies `version` skipping the release-age window, if any. */
 export const advisoryFix = (advisories, packument, version, cutoff) =>
   advisories.find(justifiesEarly(packument, version, cutoff))?.ghsa_id;
-const UNKNOWN = { packument: { name: '', versions: {}, time: {} }, advisories: [] };
+const UNKNOWN = {
+  packument: { name: '', versions: {}, time: {} },
+  advisories: [],
+  provenance: {},
+};
 const describeEntry = (raw, lookup) => {
   const { name, version } = parseEntry(raw);
-  const { packument, advisories } = lookup[name] ?? UNKNOWN;
-  return { raw, version, packument, advisories, published: Date.parse(packument.time[version]) };
+  const { packument, advisories, provenance } = { ...UNKNOWN, ...lookup[name] };
+  return {
+    raw,
+    version,
+    packument,
+    advisories,
+    repository: normalizeRepository(provenance[version]),
+    published: Date.parse(packument.time[version]),
+  };
 };
-const RULES = [
+const VERIFY_RULES = [
   (entry) =>
     entry.version
       ? undefined
@@ -160,6 +156,8 @@ const RULES = [
     entry.packument.versions[entry.version] && !Number.isNaN(entry.published)
       ? undefined
       : { failures: [`${entry.raw} could not be verified against the registry`] },
+];
+const ADMIT_RULES = [
   (entry, cutoff) =>
     entry.published > cutoff
       ? undefined
@@ -169,24 +167,19 @@ const RULES = [
     return failures.length > 0 ? { failures } : undefined;
   },
 ];
-const screen = (entry, cutoff) =>
-  RULES.reduce((outcome, rule) => outcome ?? rule(entry, cutoff), undefined) ?? {
-    candidate: entry,
-  };
-const withAdvisory = (cutoff) => (entry) => ({
-  ...entry,
-  ghsa: advisoryFix(entry.advisories, entry.packument, entry.version, cutoff),
-});
-const repositoryOf = (entry) =>
-  normalizeRepository(entry.packument.versions[entry.version].repository);
+const firstOutcome = (rules, entry, cutoff) =>
+  rules.reduce((outcome, rule) => outcome ?? rule(entry, cutoff), undefined);
+const fixAt = (entry, cutoff) =>
+  advisoryFix(entry.advisories, entry.packument, entry.version, cutoff);
 const isCompanion = (entry, fix) =>
   fix.version === entry.version &&
-  repositoryOf(entry) !== '' &&
-  repositoryOf(fix) === repositoryOf(entry) &&
+  entry.repository !== '' &&
+  fix.repository === entry.repository &&
   Math.abs(fix.published - entry.published) <= DAY_MS;
-const justify = (fixes) => (entry) => {
-  if (entry.ghsa) return { justified: [{ entry: entry.raw, reason: entry.ghsa }] };
-  const anchor = fixes.find((fix) => isCompanion(entry, fix));
+const justify = (anchors, cutoff) => (entry) => {
+  const ghsa = fixAt(entry, cutoff);
+  if (ghsa) return { justified: [{ entry: entry.raw, reason: ghsa }] };
+  const anchor = anchors.find((fix) => fix.raw !== entry.raw && isCompanion(entry, fix));
   return anchor
     ? { justified: [{ entry: entry.raw, reason: `companion of ${anchor.raw}` }] }
     : {
@@ -203,17 +196,23 @@ const merge = (outcomes) => ({
 });
 /**
  * Pure verdict for the exclude list. `lookup` maps each entry name to
- * `{ packument, advisories }`, `now` is the evaluation time in milliseconds.
+ * `{ packument, advisories, provenance }` (provenance: version -> source repository URL),
+ * `now` is the evaluation time in milliseconds.
  */
 export function evaluateExceptions({ minutes, excludes }, lookup, now) {
   if (excludes.length > 0 && !(minutes > 0)) {
     return merge([{ failures: ['minimumReleaseAge is not set; excludes have nothing to bypass'] }]);
   }
-  const cutoff = now - minutes * 60 * 1000;
-  const screened = excludes.map((raw) => screen(describeEntry(raw, lookup), cutoff));
-  const candidates = collect(screened, 'candidate').map(withAdvisory(cutoff));
-  const fixes = candidates.filter((entry) => entry.ghsa);
-  return merge([...screened, ...candidates.map(justify(fixes))]);
+  const windowMs = minutes * 60 * 1000;
+  const described = excludes.map((raw) => describeEntry(raw, lookup));
+  const verifyOutcomes = described.map((entry) => firstOutcome(VERIFY_RULES, entry));
+  const verified = described.filter((_, index) => !verifyOutcomes[index]);
+  const anchors = verified.filter((entry) => fixAt(entry, entry.published - windowMs));
+  const admitted = verified.map(
+    (entry) =>
+      firstOutcome(ADMIT_RULES, entry, now - windowMs) ?? justify(anchors, now - windowMs)(entry)
+  );
+  return merge([...verifyOutcomes.filter(Boolean), ...admitted]);
 }
 async function fetchJson(url, headers = {}) {
   const response = await fetch(url, { headers });
@@ -224,31 +223,64 @@ const ADVISORY_HEADERS = {
   Accept: 'application/vnd.github+json',
   ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
 };
-async function fetchPackage(name) {
+const PROVENANCE_PREDICATE = 'https://slsa.dev/provenance/v1';
+const sourceRepository = (attestations) => {
+  const slsa = attestations.find((item) => item.predicateType === PROVENANCE_PREDICATE);
+  const payload = slsa?.bundle?.dsseEnvelope?.payload;
+  const statement = payload ? JSON.parse(Buffer.from(payload, 'base64').toString('utf8')) : {};
+  return statement.predicate?.buildDefinition?.externalParameters?.workflow?.repository;
+};
+// The registry verifies the Sigstore bundle at publish time; an unreadable one counts as none.
+async function fetchProvenance(name, version) {
+  const url = `https://registry.npmjs.org/-/npm/v1/attestations/${name}@${version}`;
+  const body = await fetchJson(url).catch(() => ({ attestations: [] }));
+  return [version, sourceRepository(body.attestations ?? [])];
+}
+async function fetchPackage([name, versions]) {
   const query = new URLSearchParams({
     ecosystem: 'npm',
     affects: name,
     type: 'reviewed',
     per_page: '100',
   });
-  const packument = await fetchJson(`https://registry.npmjs.org/${name.replace('/', '%2F')}`);
+  const packument = await fetchJson(`https://registry.npmjs.org/${name.replaceAll('/', '%2F')}`);
   const advisories = await fetchJson(
     `https://api.github.com/advisories?${query}`,
     ADVISORY_HEADERS
   );
-  return [name, { packument: { versions: {}, time: {}, ...packument }, advisories }];
+  const provenance = await Promise.all(versions.map((version) => fetchProvenance(name, version)));
+  return [
+    name,
+    {
+      packument: { versions: {}, time: {}, ...packument },
+      advisories,
+      provenance: Object.fromEntries(provenance),
+    },
+  ];
 }
-async function loadLookup(names) {
-  const settled = await Promise.allSettled(names.map(fetchPackage));
+const versionsByName = (excludes) => {
+  const entries = excludes.map(parseEntry).filter(({ version }) => version);
+  const names = [...new Set(entries.map(({ name }) => name))];
+  return names.map((name) => [
+    name,
+    entries.filter((entry) => entry.name === name).map(({ version }) => version),
+  ]);
+};
+async function loadLookup(excludes) {
+  const settled = await Promise.allSettled(versionsByName(excludes).map(fetchPackage));
   for (const { reason } of settled.filter(({ status }) => status === 'rejected')) {
     console.log(`::warning title=${TITLE}::${reason.message}`);
   }
   return Object.fromEntries(settled.filter(({ value }) => value).map(({ value }) => value));
 }
+const pnpmConfig = (key) =>
+  execFileSync('pnpm', ['config', 'get', key, '--json'], { encoding: 'utf8' });
 async function main() {
-  const policy = parseWorkspacePolicy(readFileSync('pnpm-workspace.yaml', 'utf8'));
-  const names = [...new Set(policy.excludes.map((entry) => parseEntry(entry).name))];
-  const lookup = await loadLookup(names);
+  const policy = policyFromConfig(
+    pnpmConfig('minimumReleaseAge'),
+    pnpmConfig('minimumReleaseAgeExclude')
+  );
+  const lookup = await loadLookup(policy.excludes);
   const { failures, warnings, justified } = evaluateExceptions(policy, lookup, Date.now());
   const lines = [
     ...justified.map(({ entry, reason }) => `${entry}: ${reason}`),

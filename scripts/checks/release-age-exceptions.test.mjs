@@ -4,14 +4,13 @@ import {
   evaluateExceptions,
   inAdvisoryRange,
   parseEntry,
-  parseWorkspacePolicy,
+  policyFromConfig,
 } from './release-age-exceptions.mjs';
 const NOW = Date.parse('2026-10-22T00:00:00Z');
 const daysAgo = (days) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
 const release = (overrides = {}) => ({
   _npmUser: { name: 'GitHub Actions' },
   dist: { attestations: { url: 'x' } },
-  repository: { url: 'git+https://github.com/nuxt/nuxt.git' },
   ...overrides,
 });
 const packument = (name, versions) => ({
@@ -35,10 +34,16 @@ const advisory = (name, range, patched) => ({
 });
 const nuxt = packument('nuxt', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
 const kit = packument('@nuxt/kit', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
+const NUXT_REPO = 'https://github.com/nuxt/nuxt';
+const pkg = (pk, advisories = [], repository = NUXT_REPO) => ({
+  packument: pk,
+  advisories,
+  provenance: Object.fromEntries(Object.keys(pk.versions).map((version) => [version, repository])),
+});
 const policy = (...excludes) => ({ minutes: 10080, excludes });
 const lookup = {
-  nuxt: { packument: nuxt, advisories: [advisory('nuxt', '>= 4.0.0, < 4.6.2', '4.6.2')] },
-  '@nuxt/kit': { packument: kit, advisories: [] },
+  nuxt: pkg(nuxt, [advisory('nuxt', '>= 4.0.0, < 4.6.2', '4.6.2')]),
+  '@nuxt/kit': pkg(kit, []),
 };
 describe('version helpers', () => {
   it('orders releases and prereleases', () => {
@@ -57,26 +62,16 @@ describe('version helpers', () => {
     expect(parseEntry('nuxt')).toEqual({ name: 'nuxt', version: undefined });
     expect(parseEntry('nuxt@4.6.1 || 4.6.2').version).toBeUndefined();
   });
-  it('reads the workspace policy', () => {
-    const text =
-      "minimumReleaseAge: 10080\nminimumReleaseAgeExclude:\n  - nuxt@4.6.2\n  - '@nuxt/kit@4.6.2'\nother: 1\n";
-    expect(parseWorkspacePolicy(text)).toEqual({
+  it('reads pnpm config output, including unset keys', () => {
+    expect(policyFromConfig('10080\n', '["nuxt@4.6.2","@nuxt/*"]\n')).toEqual({
       minutes: 10080,
-      excludes: ['nuxt@4.6.2', '@nuxt/kit@4.6.2'],
+      excludes: ['nuxt@4.6.2', '@nuxt/*'],
     });
-  });
-  it('keeps reading excludes across comments and unindented items', () => {
-    const text =
-      'minimumReleaseAge: 10080 # 7 days\nminimumReleaseAgeExclude:\n  # GHSA fix\n  - nuxt@4.6.2\n\n- @nuxt/kit@4.6.2 # companion\nother: 1\n';
-    expect(parseWorkspacePolicy(text)).toEqual({
-      minutes: 10080,
-      excludes: ['nuxt@4.6.2', '@nuxt/kit@4.6.2'],
+    expect(policyFromConfig('', '')).toEqual({ minutes: undefined, excludes: [] });
+    expect(policyFromConfig('"10080"', '"nuxt@4.6.2"')).toEqual({
+      minutes: undefined,
+      excludes: ['nuxt@4.6.2'],
     });
-  });
-  it('fails closed on an exclude list it cannot read', () => {
-    expect(() => parseWorkspacePolicy('minimumReleaseAgeExclude: [nuxt@4.6.2]\n')).toThrow(
-      'block list'
-    );
   });
 });
 describe('evaluateExceptions', () => {
@@ -92,10 +87,43 @@ describe('evaluateExceptions', () => {
     const drifted = packument('@nuxt/kit', { '4.6.1': [20, release()], '4.6.3': [2, release()] });
     const verdict = evaluateExceptions(
       policy('nuxt@4.6.2', '@nuxt/kit@4.6.3'),
-      { ...lookup, '@nuxt/kit': { packument: drifted, advisories: [] } },
+      { ...lookup, '@nuxt/kit': pkg(drifted, []) },
       NOW
     );
     expect(verdict.failures).toEqual([expect.stringContaining('@nuxt/kit@4.6.3 fixes no open')]);
+  });
+  it('rejects a companion whose provenance names another repository', () => {
+    const verdict = evaluateExceptions(
+      policy('nuxt@4.6.2', '@nuxt/kit@4.6.2'),
+      { ...lookup, '@nuxt/kit': pkg(kit, [], 'https://github.com/attacker/kit') },
+      NOW
+    );
+    expect(verdict.failures).toEqual([expect.stringContaining('@nuxt/kit@4.6.2 fixes no open')]);
+  });
+  it('rejects a companion without provenance', () => {
+    const verdict = evaluateExceptions(
+      policy('nuxt@4.6.2', '@nuxt/kit@4.6.2'),
+      {
+        nuxt: { packument: nuxt, advisories: lookup.nuxt.advisories },
+        '@nuxt/kit': { packument: kit, advisories: [] },
+      },
+      NOW
+    );
+    expect(verdict.failures).toEqual([expect.stringContaining('@nuxt/kit@4.6.2 fixes no open')]);
+  });
+  it('keeps a fix that aged past the window as its companions anchor', () => {
+    const agedFix = packument('nuxt', { '4.6.1': [20, release()], '4.6.2': [7.1, release()] });
+    const lateKit = packument('@nuxt/kit', { '4.6.1': [20, release()], '4.6.2': [6.9, release()] });
+    const verdict = evaluateExceptions(
+      policy('nuxt@4.6.2', '@nuxt/kit@4.6.2'),
+      { nuxt: pkg(agedFix, lookup.nuxt.advisories), '@nuxt/kit': pkg(lateKit) },
+      NOW
+    );
+    expect(verdict.failures).toEqual([]);
+    expect(verdict.warnings).toEqual([expect.stringContaining('nuxt@4.6.2 is past')]);
+    expect(verdict.justified).toEqual([
+      { entry: '@nuxt/kit@4.6.2', reason: 'companion of nuxt@4.6.2' },
+    ]);
   });
   it('rejects a young version that fixes no advisory', () => {
     const verdict = evaluateExceptions(policy('@nuxt/kit@4.6.2'), lookup, NOW);
@@ -111,7 +139,7 @@ describe('evaluateExceptions advisory matching', () => {
     });
     const verdict = evaluateExceptions(
       policy('nuxt@4.6.3'),
-      { nuxt: { packument: mature, advisories: lookup.nuxt.advisories } },
+      { nuxt: pkg(mature, lookup.nuxt.advisories) },
       NOW
     );
     expect(verdict.failures).toEqual([expect.stringContaining('fixes no open advisory')]);
@@ -119,13 +147,13 @@ describe('evaluateExceptions advisory matching', () => {
   it('rejects a version still inside a vulnerable range or in another major line', () => {
     const verdict = evaluateExceptions(
       policy('nuxt@4.6.2'),
-      { nuxt: { packument: nuxt, advisories: [advisory('nuxt', '>= 3.0.0, < 3.21.4', '3.21.4')] } },
+      { nuxt: pkg(nuxt, [advisory('nuxt', '>= 3.0.0, < 3.21.4', '3.21.4')]) },
       NOW
     );
     expect(verdict.failures).toEqual([expect.stringContaining('fixes no open advisory')]);
     const still = evaluateExceptions(
       policy('nuxt@4.6.2'),
-      { nuxt: { packument: nuxt, advisories: [advisory('nuxt', '<= 4.6.2', '4.6.0')] } },
+      { nuxt: pkg(nuxt, [advisory('nuxt', '<= 4.6.2', '4.6.0')]) },
       NOW
     );
     expect(still.failures).toEqual([expect.stringContaining('fixes no open advisory')]);
@@ -142,7 +170,7 @@ describe('evaluateExceptions screening', () => {
     });
     const verdict = evaluateExceptions(
       policy('nuxt@4.6.2'),
-      { nuxt: { packument: risky, advisories: lookup.nuxt.advisories } },
+      { nuxt: pkg(risky, lookup.nuxt.advisories) },
       NOW
     );
     expect(verdict.failures).toEqual([
@@ -155,7 +183,7 @@ describe('evaluateExceptions screening', () => {
     const old = packument('nuxt', { '4.6.1': [30, release()], '4.6.2': [8, release()] });
     const verdict = evaluateExceptions(
       policy('@nuxt/*', 'missing@1.0.0', 'nuxt@4.6.2'),
-      { nuxt: { packument: old, advisories: [] } },
+      { nuxt: pkg(old, []) },
       NOW
     );
     expect(verdict.failures).toEqual([

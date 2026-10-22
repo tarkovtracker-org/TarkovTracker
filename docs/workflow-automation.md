@@ -972,8 +972,9 @@ Automated via Dependabot (`.github/dependabot.yml`):
   `scripts/checks/release-age-exceptions.mjs` (blocking, in `security-scan`) justifies:
   - **Early:** a version at or above a reviewed GitHub advisory's first patched version in the same
     major line, outside every vulnerable range, when no patched version in that line has aged 7
-    days yet; plus same-repository, same-version siblings published within a day (e.g. `@nuxt/kit`
-    with `nuxt`).
+    days yet; plus siblings built from the same repository (per npm provenance) at the same
+    version and published within a day (e.g. `@nuxt/kit` with `nuxt`). A fix that ages past the
+    window still anchors its siblings until they age too.
   - **Vetting, every entry:** npm provenance, the previous release's publisher, and no new
     install scripts.
   - **Waits:** everything else, including feature bumps that ride along with a fix and name
