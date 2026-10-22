@@ -319,14 +319,32 @@ function retainedForBinding(comment, boundCommentId) {
     (comment.id > boundCommentId && previewCommand(comment.body) === false)
   );
 }
+const COMMENT_SNAPSHOT_ATTEMPTS = 3;
+/** A comment posted between the two reads is ordinary activity, so re-read before failing closed. */
+async function matchingCommentSnapshots(github, repo, pullRequest) {
+  for (let attempt = 1; ; attempt += 1) {
+    const comments = await github.paginate(github.rest.issues.listComments, {
+      ...repo,
+      issue_number: pullRequest,
+      per_page: 100,
+    });
+    const editTimes = await readCommentEditTimes(github, repo, pullRequest);
+    if (attempt === COMMENT_SNAPSHOT_ATTEMPTS || snapshotsMatch(comments, editTimes)) {
+      assertMatchingCommentSnapshots(comments, editTimes);
+      return { comments, editTimes };
+    }
+  }
+}
+function snapshotsMatch(comments, editTimes) {
+  try {
+    assertMatchingCommentSnapshots(comments, editTimes);
+    return true;
+  } catch {
+    return false;
+  }
+}
 async function commentEvidence(github, repo, pullRequest, enabledAt) {
-  const comments = await github.paginate(github.rest.issues.listComments, {
-    ...repo,
-    issue_number: pullRequest,
-    per_page: 100,
-  });
-  const editTimes = await readCommentEditTimes(github, repo, pullRequest);
-  assertMatchingCommentSnapshots(comments, editTimes);
+  const { comments, editTimes } = await matchingCommentSnapshots(github, repo, pullRequest);
   const originalCommands = comments
     .filter((comment) => originalCommand(comment, enabledAt, editTimes))
     .toSorted((a, b) => b.id - a.id);

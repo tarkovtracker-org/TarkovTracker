@@ -108,8 +108,9 @@ when both commits have the current base and head as parents and identical trees.
 build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
 and its base is current main, including when the change set has no deployable paths. The comparison is
 repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
-with no result, or whose latest result is pending only because the test merge was not ready, once
-GitHub has computed the test merge; other pending reasons are left alone.
+with no result, or whose latest result is pending only because the test merge was not ready or the
+CI Result read was missing or unfinished, once GitHub has computed the test merge; other pending reasons are
+left alone. A `CI Result` check without a completed conclusion stays pending instead of failing.
 
 ### Recovering after a failed-only CI rerun
 

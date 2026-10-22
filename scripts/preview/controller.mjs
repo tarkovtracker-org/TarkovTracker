@@ -39,9 +39,11 @@ import { readPreviewRequest, previewGrant } from './request-authorization.mjs';
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
-// Every "test merge not ready" pending reason starts with this prefix so the hourly fallback can
-// re-evaluate it once GitHub computes the merge; other pending reasons are left alone.
+// "Test merge not ready" and unfinished CI Result reasons start with these prefixes so the hourly
+// fallback can re-evaluate them; other pending reasons are left alone.
 const MERGE_PENDING = 'GitHub has not finished computing';
+const CI_RESULT_PENDING = 'CI Result is still running';
+const CI_RESULT_MISSING = 'Waiting for CI Result on this revision';
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -242,12 +244,12 @@ function evidenceState(evidence) {
   return evidence.conclusion ?? evidence.state;
 }
 function assertEvidenceComplete(state) {
-  if (state === null || state === 'pending') throw pending('CI Result is still running.');
+  if (state == null || state === 'pending') throw pending(`${CI_RESULT_PENDING}.`);
   if (state !== 'success') throw failure(`CI Result concluded ${state}.`);
 }
 async function checkCiResult(github, context, candidate) {
   const evidence = await ciEvidence(github, context, candidate);
-  if (!evidence) throw pending('Waiting for CI Result on this revision.');
+  if (!evidence) throw pending(`${CI_RESULT_MISSING}.`);
   assertEvidenceComplete(evidenceState(evidence));
 }
 async function requiresPreview(github, context, pull) {
@@ -966,15 +968,21 @@ function refreshContext(context, pull) {
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
 }
-function awaitingTestMerge(status) {
-  return status.state === 'pending' && String(status.description).startsWith(MERGE_PENDING);
+function awaitingRetry(status) {
+  const description = String(status.description);
+  return (
+    status.state === 'pending' &&
+    [MERGE_PENDING, CI_RESULT_PENDING, CI_RESULT_MISSING].some((prefix) =>
+      description.startsWith(prefix)
+    )
+  );
 }
-/** Refresh a head with no result, or one left pending only because the test merge was not ready. */
+/** Refresh a head with no result, or one left pending on a test merge or CI Result read. */
 async function needsPreviewRefresh(github, context, pull) {
   if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return false;
   const statuses = await allStatuses(github, context.repo, pull.head.sha, 'Preview Result');
   const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
-  return !latest || awaitingTestMerge(latest);
+  return !latest || awaitingRetry(latest);
 }
 async function refreshMissingPull(github, context, core, workspace, item) {
   const pull = await getPull(github, context.repo, item.number);

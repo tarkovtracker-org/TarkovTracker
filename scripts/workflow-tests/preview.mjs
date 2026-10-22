@@ -1386,6 +1386,21 @@ test('running, failed and unsuccessful CI evidence map to pending or failure', a
   });
   assert.equal(decision.action, 'fail');
   assert.match(decision.description, /CI Result concluded failure/);
+  for (const check of [
+    { status: 'in_progress', conclusion: null },
+    { status: 'completed', conclusion: null },
+  ]) {
+    const unfinished = fakeGithub(t);
+    Object.assign(unfinished.state.check, check);
+    const waiting = await planPreview({
+      github: unfinished.github,
+      context: workflowRunContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.equal(waiting.action, 'wait');
+    assert.match(waiting.description, /CI Result is still running/);
+  }
 });
 test('head movement, base movement, stale attempts and superseded runs cannot deploy', async (t) => {
   const moved = await plan(t, workflowRunContext(), {
@@ -2179,6 +2194,30 @@ test('hourly reconciliation re-evaluates a head left pending on an unready test 
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
 });
+for (const description of [
+  'CI Result is still running.',
+  'Waiting for CI Result on this revision.',
+]) {
+  test(`hourly reconciliation re-evaluates a head left pending on "${description}"`, async (t) => {
+    const fake = fakeGithub(t, {
+      previewStatuses: [{ id: 10, context: 'Preview Result', state: 'pending', description }],
+    });
+    await reconcileMissingPreviewStatuses({
+      github: fake.github,
+      context: scheduleContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+    assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+    assert.match(fake.state.statuses[0].description, /Preview enabled: requested/);
+    assert.deepEqual(fake.state.dispatches[0].inputs, {
+      run_id: '900',
+      queue: 'false',
+      authorization: 'readiness',
+      ci_attempt: '1',
+    });
+  });
+}
 test('trusted hourly recovery preserves standing command binding and readiness exclusions', async (t) => {
   const enabled = fakeGithub(t, { comments: [previewRequestComment()] });
   const refresh = async (fake) =>
