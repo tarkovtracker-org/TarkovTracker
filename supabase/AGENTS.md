@@ -14,6 +14,8 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 
 - Security-definer and service-role-only functions revoke `EXECUTE` from `PUBLIC`, `anon`, and
   `authenticated`, granting `service_role` explicitly where required.
+- New `postgres` functions have no default client or `PUBLIC` EXECUTE in any schema; grant every
+  calling role explicitly (`docs/runbook.md#function-execute-defaults`).
 
 ## Migrations
 

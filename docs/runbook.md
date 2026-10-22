@@ -779,6 +779,33 @@ without grant option. Sequence defaults were outside #1134's table/view hardenin
 unchanged by this documentation-only PR. This follow-up checks defaults, not application-table
 grants, feature behavior or the full migration ledger.
 
+### Function EXECUTE defaults
+
+`20261022090000_revoke_postgres_client_function_defaults.sql` makes new `postgres`-created
+functions closed by default. PostgreSQL grants function EXECUTE to `PUBLIC` globally, and a
+schema-scoped revoke cannot cancel a global default, so the migration revokes `PUBLIC` globally
+for `postgres` (every schema, including `private` and `pg_temp`) and revokes Supabase's
+`anon`/`authenticated` grants in `public`. `service_role` keeps its `public` default. Existing
+function ACLs are unchanged; `supabase_admin` defaults are platform-owned and unchanged.
+
+Every role that calls a new function must be granted EXECUTE explicitly in its migration:
+client roles, `service_role` outside `public`, and the roles whose RLS policies call it.
+Readback after rollout: the [default-ACL query](#platform-owned-public-relation-defaults) with
+`defaclobjtype = 'f'` must show a global `postgres` entry without `PUBLIC`, and a `public` entry
+without `anon` or `authenticated`.
+
+**Accepted advisor findings (lint 0029)**
+
+`authenticated_security_definer_function_executable` intentionally fires for these client RPCs.
+Each derives the caller from `auth.uid()` (no user-id argument), validates input, limits writes to
+the caller's rows, pins `search_path = ''` and is revoked from `anon`; their tables are closed to
+client roles. Suppress them in the dashboard advisor; re-review when a new one appears.
+
+- `add_game_profile`, `update_game_profile`, `delete_game_profile`, `list_game_profiles`,
+  `get_game_profile_progress`, `sync_game_profile_progress` (owner and supporter checks)
+- `sync_user_game_mode_progress`, `archive_prestige_run_and_reset_progress`,
+  `set_game_mode_profile_visibility`
+
 ### Progress transfer and freshness rollout
 
 For `20260906174817_suppress_unchanged_progress_writes.sql` and
