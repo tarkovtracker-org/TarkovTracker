@@ -226,8 +226,12 @@ jobs:
       - name: Install pinned browser
         timeout-minutes: 12
         run: |
-          echo 'DPkg::Lock::Timeout "180";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout >/dev/null
+          echo 'DPkg::Lock::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout >/dev/null
           for attempt in 1 2 3; do
+            if [ "$attempt" -gt 1 ]; then
+              timeout 180 sh -c 'while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done' \
+                || echo "::warning::dpkg lock still held after 180s."
+            fi
             timeout -k 15 210 pnpm exec playwright install --with-deps chromium && exit 0
             [ "$attempt" -lt 3 ] && echo "::warning::Browser install attempt $attempt failed or stalled; retrying."
           done
