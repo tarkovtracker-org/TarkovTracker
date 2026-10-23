@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "ダークテーマに切り替える"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "進行状況の保存状態: {status}",
     "cloud_pending_label": "進行状況をクラウドに保存しています",
     "cloud_retrying_label": "クラウドセーブ再試行中",
@@ -111,6 +113,8 @@
     "local_saved_note": "これらの変更はこのブラウザに保存されます。",
     "cloud_also_pending_note": "クラウドにも保存されていません。コピーを保存するために進行状況をエクスポートしてください。",
     "retry_scheduled": "{attempt} の {total} の自動再試行が予定されています。",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Changes remain pending, and you can keep tracking. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "原因: このデバイスはオフラインのようです。",
     "cause_rate_limited": "原因: クラウドサービスは一時的に保存を制限しています。",
     "cause_auth": "原因: サインインセッションが確認できませんでした。",
@@ -124,6 +128,12 @@
     "export_button": "進行状況をエクスポート",
     "export_hint": "保存に失敗した場合でも、現在の進行状況をバックアップファイルとしてエクスポートします。"
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "保存されていない変更でサインアウトしますか？",
     "risk": "最新の進捗状況の変更は、このブラウザまたはクラウドに保存されません。今すぐサインアウトすると、それらは失われます。",
@@ -133,13 +143,8 @@
     "retry_succeeded": "変更内容はクラウドに保存されました。安全にサインアウトできます。"
   },
   "omnibar": {
-    "title": "検索",
-    "description": "タスク、必要アイテム、ハイドアウト施設を検索",
-    "trigger_label": "タスク、アイテム、トレーダーなどを検索…",
-    "open_aria": "グローバル検索を開く",
     "aria_label": "グローバル検索",
     "placeholder": "タスク、必要アイテム、ハイドアウトなどを検索…",
-    "hint_min_chars": "検索するには2文字以上を入力してください...",
     "no_results": "\"{query}\"の検索結果が見つかりません",
     "group_tasks": "タスク / クエスト",
     "group_hideout": "ハイドアウト施設"
@@ -371,6 +376,16 @@
     "delete_archived_run": "アーカイブされたランを削除",
     "validation_error": "検証エラー",
     "got_it": "了解"
+  },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "フィルターをクリア",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "ヘルプ",
@@ -607,117 +622,40 @@
     "dashboard": {
       "changelog": {
         "title": "新着情報",
-        "show": "アップデートを表示",
-        "hide": "アップデートを非表示",
         "loading": "アップデートを読み込んでいます...",
         "error": "アップデートを読み込めませんでした。",
         "empty": "まだアップデートはありません。",
-        "view_all": "すべて表示"
+        "view_all": "すべて表示",
+        "unread": "New updates"
       },
-      "focus": {
-        "title": {
-          "default": "次に何をすべきか?",
-          "multiple": "今後取るべきいくつかの有効なステップ",
-          "blocked": "今のところ、準備ができているものはありません",
-          "complete": "すべきことはありません"
-        },
-        "heading": {
-          "start": "{task} を開始",
-          "continue": "{task} を続ける",
-          "finish": "{task} を完了",
-          "review_filters": "タスクフィルタを確認",
-          "closest_unlock": "最も近いロック解除: {task}",
-          "caught_up": "目に見える作業はすべて完了しました"
-        },
-        "summary": {
-          "unlock_trader": "{task} は {trader} のロック解除に必要な手順です。",
-          "impact": "{task}は、現在のキューの中で、下流での見返りが最も大きいタスクです。",
-          "close": "{task} は、利用可能な候補の中で最も近いものの1つです。",
-          "kappa": "{task}は、現時点であなたにとって最も明確なkappaへの一歩です。",
-          "lightkeeper": "{task}は、現時点であなたにとって最も明確なLightkeeperへの一歩です。",
-          "default": "{task} は、ダッシュボード上で最も明確かつ即効性のある成果です。",
-          "filter_hidden_one": "現在のフィルター設定により、1件の利用可能なタスクが表示されていません。",
-          "filter_hidden_other": "現在のフィルターにより、{count}件の利用可能なタスクが非表示になっています。",
-          "blocked_requirement": "{task} は、その前提条件によってブロックされています。",
-          "complete": "このダッシュボードの範囲内で、表示されているタスクはすべて完了しました。"
-        },
-        "stat": {
-          "why": "他の選択肢より優れた点",
-          "status": "ステータス",
-          "secondary": "その他の良い選択肢",
-          "secondary_actionable": "メインのプランが合わない場合は、これらをご利用ください。",
-          "secondary_blocked": "これらは、キュー内で次に解放される予定のコンテンツです。",
-          "secondary_empty": "現時点で、これが最も明確な次のステップです。"
-        },
+      "up_next": {
+        "title": "次に取るべき最善の策",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
-          "unlock_trader": "{trader} をアンロック",
-          "impact_one": "後続タスクが1件アンロック",
-          "impact_other": "後続タスクが{count}件アンロック",
-          "close": "コンプリートに最も近いものの一つ",
-          "kappa": "Kappaが進行",
-          "lightkeeper": "Lightkeeperが進行",
-          "trader": "{trader}が進行",
-          "filters": "現在のフィルターによって、実行可能なタスクが見えなくなっています",
-          "complete": "すべてが完了しました",
-          "default": "目に見える進展"
-        },
-        "proof": {
-          "unlock_trader_one": "最優先のアンロック対象: 目標1件達成で{trader}をアンロックします。",
-          "unlock_trader_other": "最優先のアンロック対象: 目標{count}件達成で{trader}をアンロックします。",
-          "impact_one": "最大報酬: 後続タスクが1件アンロックされます。",
-          "impact_other": "最大報酬: 後続タスクが{count}件アンロックされます。",
-          "close_one": "達成目前: 残り目標は1件です。",
-          "close_other": "達成目前: 残り目標は{count}件です。",
-          "ready_one": "最適な選択肢: 残り目標は1件です。",
-          "ready_other": "最適な選択肢: 残り目標は{count}件です。",
-          "ready_zero": "最適な選択肢: 引き渡しの用意ができています。",
-          "kappa_one": "最適な特殊チェーン進行: 残り目標1件でKappaが進行します。",
-          "kappa_other": "最適な特殊チェーン進行: 残り目標{count}件でKappaが進行します。",
-          "lightkeeper_one": "最適な特殊チェーン進行: 残り目標1件でLightkeeper が進行します。",
-          "lightkeeper_other": "最適な特殊チェーン進行: 残り目標{count}件でLightkeeper が進行します。",
-          "filters_one": "表示可能なタスクなし: 利用可能なタスク1件がフィルターで非表示です。",
-          "filters_other": "表示可能なタスクなし: 利用可能なタスク{count}件がフィルターで非表示です。",
-          "complete": "このダッシュボードスコープには表示されるタスクは残っていません。"
-        },
-        "status": {
-          "ready_one": "準備完了。目標が1件残っています。",
-          "ready_other": "準備完了。目標が{count}件残っています。",
-          "ready_no_objectives": "準備完了。",
-          "filters": "タスクフィルターを調整して、非表示のオプションを表示しましょう。",
-          "complete": "進行を妨げる条件なし。表示されている未完了タスクはありません。"
-        },
-        "badge": {
-          "based_on_filters": "現在のフィルターに基づく",
-          "hidden_available_one": "フィルターで利用可能なタスクが1件非表示",
-          "hidden_available_other": "フィルターで利用可能なタスクが{count}件非表示"
-        },
-        "cta": {
-          "open_task": "タスクを開く",
-          "open_tasks": "タスクリストを開く"
+          "unlock_trader": "Unlocks {trader}",
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "ライトキーパー",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "準備完了"
         }
       },
       "progress": {
-        "title": "進捗の分析",
-        "items": "タスクアイテム",
         "hideout_items": "ハイドアウトアイテム",
         "filtered_status_active": "タスクの設定でフィルター",
-        "filtered_status_inactive": "すべてのタスクタイプの使用",
-        "filtered_warning_tooltip": "これらの統計情報は、タスクフィルタの設定(Kappa、Lightkeeper、非特別なタスク)に従います。"
-      },
-      "progress_card": {
-        "view_details": "{label} の詳細を表示",
-        "progress_label": "{label} の進捗状況"
-      },
-      "milestones": {
-        "title": "マイルストーン",
-        "halfway": "道半ば",
-        "veteran": "ほぼ完了",
-        "kappa": {
-          "subtitle": "コンテナ取得済み"
-        },
-        "lightkeeper": {
-          "subtitle": "トレーダーアンロック済み"
-        }
+        "filtered_warning_tooltip": "これらの統計情報は、タスクフィルタの設定(Kappa、Lightkeeper、非特別なタスク)に従います。",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "トレーダーの進捗状況",
@@ -729,20 +667,20 @@
         "set_loyalty_level": "ロイヤルティレベル {level}に設定",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav カルマ",
-        "unlock_required": "アンロック必要条件:",
-        "locked_summary": "{count} トレーダーがロック中",
         "sort": {
           "aria_label": "トレーダーのソート",
           "direction_aria_label": "並び順を切り替え"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
         "new_cta": "TarkovTracker をサポート",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {
@@ -763,7 +701,10 @@
     "storyline": {
       "subtitle": "Tarkovのストーリーチャプターの進行状況を確認できます。",
       "chapters_complete": "チャプター完了",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "開発中",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "WIP",
       "wip_description": "この機能は現在、開発が進められている段階です。データの整理を進めていくにつれ、コンテンツや機能は徐々に拡充・改善されていきます。ご理解のほど、よろしくお願いいたします。",
       "no_data": "ストーリーラインチャプターのデータがありません。",
@@ -778,6 +719,7 @@
       "quest_route_evidence_pending": "進行手順はまだ登録されていません。",
       "quest_route_conflict": "複数のルートが完了済みと表示されていますが、ゲーム内で実際に可能なのは1つだけです。",
       "quest_route_progress": "{completed}/{total} 手順",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "保存済みの目標マーク1件が現在のストーリーデータと一致しません。再確認が必要です。",
       "stale_progress_other": "保存済みの目標マーク{count}件が現在のストーリーデータと一致しません。再確認が必要です。",
       "route_choice": "ルート選択",
@@ -786,16 +728,16 @@
       "route_blocked_by": "進行を妨げている目標：{objectives}",
       "route_decision": "選択 {index}",
       "route_choose_one": "一つ選択",
-      "route_required_steps": "必要な手順",
       "route_optional_steps": "オプションの手順",
       "route_selected_hint": "このルートはアクティブです。",
       "route_switch_hint": "ルートを切り替えるには、最初に選択したルートのチェックを外します。",
-      "route_unlocks_here": "ここでロックを解除",
       "route_unlocks_chapter": "チャプターロック解除",
       "route_unlocks_estimated": "推定時間",
       "route_unlock_map": "マップ: {name}",
       "route_unlock_trader": "トレーダー: {name}",
-      "route_unlock_reward": "報酬: {name}"
+      "route_unlock_reward": "報酬: {name}",
+      "timeline_objective": "目標",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "KappaコンテナとLightkeeperクエストに向けて進捗状況を追跡します。",
@@ -901,15 +843,20 @@
       "billing_yearly_interval": "年"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
-        "graph": "グラフ"
+        "aria_label": "Task views",
+        "graph": "グラフ",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "{taskName} の依存関係チェーンを表示中",
         "isolate_chain": "チェーンを分離する",
         "show_context": "コンテキストを表示",
         "no_tasks": "このトレーダーにタスクが見つかりません。",
-        "mobile_unavailable": "グラフ表示は、画面が広いほど見やすくなります。",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "凡例",
         "flow_start": "開始（前提なし）",
         "flow_end": "終了 (後続なし)",
@@ -924,9 +871,38 @@
       "user_views": {
         "yourself": "自分"
       },
-      "search": {
-        "placeholder": "検索...",
-        "aria_label": "タスクを検索"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "レギュラー",
+          "kappa": "Kappa",
+          "lightkeeper": "ライトキーパー"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "デフォルト順",
@@ -936,53 +912,39 @@
         "trader": "トレーダー順",
         "teammates": "チームメイトが利用可能",
         "xp": "XP報酬",
-        "ascending": "昇順",
-        "descending": "降順",
         "aria_label": "タスクの並べ替え",
         "progression": "進捗状況"
       },
       "settings": {
         "title": "タスクの設定",
-        "tabs": {
-          "filters": "タスク フィルター",
-          "filter_bar": "フィルター バー",
-          "advanced": "高度"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "報酬：",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "どのタスクが表示されるかを制御します。",
-          "regular_tasks": "通常タスク",
-          "kappa_required": "Kappa 必須",
-          "lightkeeper_required": "LightKeeper 必須",
-          "team_shared_only": "チーム共有のみ",
-          "has_required_keys": "カギが必要なタスクのみ",
-          "show_global_tasks": "マップにグローバルタスクを表示する",
-          "impact_respects_filters": "影響範囲にタスクフィルターを反映",
-          "hide_completed_map_objectives": "マップ完了のタスクを非表示"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "タスクカードの見た目を調整します。",
-          "required_labels": "\"必須\" ラベル",
-          "experience_rewards": "獲得経験値",
-          "next_tasks": "次のタスク",
-          "previous_tasks": "前のタスク",
-          "collapse_completed_objectives": "完了したタスクの目標を折りたたむ"
-        },
-        "filter_bar": {
-          "hint": "タスクのステータスフィルターをオンまたはオフに切り替えて、表示するタスクを制御します。",
-          "all_filter": "すべてのタスクを表示",
-          "all_filter_hint": "ステータスに関係なくすべてのタスクを表示します。",
-          "available_filter": "利用可能なタスクのみ表示",
-          "available_filter_hint": "今すぐ開始できるタスクは、レベルと前提条件に基づいています。",
-          "locked_filter": "ロックされているタスクを表示",
-          "locked_filter_hint": "レベル、トレーダーの評判、または前提条件となるタスクによってロックされているタスク。",
-          "completed_filter": "完了タスクを表示",
-          "completed_filter_hint": "あなたがすでに完了したタスク。",
-          "failed_filter": "失敗したタスクを表示",
-          "failed_filter_hint": "条件を満たさなかったために失敗したタスク。"
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "失敗した操作を手動で行う",
-          "failed_tasks_label": "失敗したタスク",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "失敗したタスクを修復",
           "repair_failed_confirm": "現在の失敗条件に当てはまらない失敗フラグを解除し、失敗タスクを修復しますか？",
           "repair_failed_done": "{count}件のタスクの失敗状態を解除しました。",
@@ -992,6 +954,13 @@
       },
       "no_tasks_found": "タスクが見つかりません。フィルターを変更するか、レベルを更新してください。",
       "no_tasks_found_description": "利用可能なタスクを表示するには、フィルターまたはレベル条件を変更してください。",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "タスクを読み込み中",
       "map": {
         "resize_handle": "マップの高さを調整",
@@ -1036,24 +1005,34 @@
         }
       },
       "pinned_tasks_section": "ピン留めされたタスク",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "フォーカスされたタスク",
       "focused_task_description": "タスクのリンクから開いたため、次に進むべき場所が正確にわかります。",
       "global_tasks_section": "グローバルタスク",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "タスクをピン留めする",
         "unpin_task": "タスクのピン留めを解除",
-        "level": "Level: {count}",
-        "level_badge": "Lv {count}",
-        "fence_rep_badge": "Fence {rep}",
-        "fence_rep_tooltip": "Fenceの評判が{rep}必要",
-        "trader_level_tooltip": "{trader}のロイヤルティレベル{level}が必要",
-        "trader_level_badge": "{trader} LL{level}",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "Wikiページ",
-        "locked_before": "前提タスク: {count}",
         "unlocks_next": "次にアンロック",
         "copy_task_link": "タスクのリンクをコピー",
         "copy_key_name": "鍵の名前をコピー",
-        "report_data_issue": "データの問題を報告",
         "tarkov_dev_logo": "Tarkov.dev logo",
         "view_task_on_wiki": "Wikiで {name} を表示",
         "hand_over": "引き渡す",
@@ -1100,13 +1079,8 @@
         "requirement_status_active": "進行中／受注済み",
         "requirement_status_available": "受注可能",
         "requirement_status_not_started": "未開始",
-        "requires_must_be": "が{status}である必要があります",
         "requires_currently": "現在、 {status}",
-        "requires_tooltip_action": "このタスクを解放するには、{name}を{action}してください",
         "requires_tooltip_conflict": "{name}は現在{current}ですが、{expected}である必要があります。このタスクは永久にロックされている可能性があります",
-        "requires_progress": "前提条件{total}件中{completed}件完了",
-        "requires_progress_tooltip": "次: {tasks}",
-        "requires_progress_tooltip_overflow": "次: {tasks}、その他{count}件",
         "objectives_hidden": "このマップにない目標が{count}件（未完了{uncompleted}件）",
         "needed_by": "必要なタスク: {names}",
         "unlocks_next_tooltip": "このタスクを完了すると受注可能になるタスク数",
@@ -1126,7 +1100,6 @@
         "find_fir": "レイド内で見つける",
         "items_count": "{count}個のアイテム",
         "kappa_tooltip": "このクエストはKappaセキュアコンテナの入手に必要です",
-        "level_badge_tooltip": "このクエストの解放にはプレイヤーレベル{level}以上が必要です",
         "lightkeeper_tooltip": "このクエストはLightkeeperの解放に必要です",
         "alternatives_tooltip": "このクエストには代替選択肢が{count}件あります。いずれか1つを完了すれば十分です",
         "alternatives_badge": "代替{count}件",
@@ -1136,24 +1109,21 @@
         "previous_tasks": "前のタスク:",
         "progress": "進捗状況 {completed}/{total}",
         "rewards": "報酬：",
-        "unlocks_count": "{count} アンロック",
-        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
-        "loyalty_level": "LL",
-        "reputation": "信頼度"
+        "unlocks_count": "{count} アンロック"
       },
       "blockers": {
-        "player_level": "プレイヤーレベル{comparison}{required}が必要（現在: {current}）",
-        "trader_level": "{trader}のロイヤリティレベル{comparison}{required}が必要（現在: {current}）",
-        "trader_reputation": "{trader}の信頼度{comparison}{required}が必要（現在: {current}）",
+        "player_level_required": "Requires player level {requirement} (you: {current}).",
+        "trader_level_required": "Requires {trader} loyalty level {requirement} (you: {current}).",
+        "trader_reputation_required": "Requires {trader} reputation {requirement} (you: {current}).",
         "prerequisite": "次のタスクを必要なステータスにする必要があります: {tasks}",
         "story_route": "{tasks}の必要なタスクステータスを満たすか、次のストーリーチャプターのいずれかを進行してください: {chapters}",
         "failed_branch": "失敗したタスクが原因でブロックされています: {task}",
         "faction": "{faction}のキャラクターが利用可能です。",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "{task}を完了して{trader}を解放する。",
         "prestige": "プレステージ{required}が必要（現在: {current}）",
-        "global_variable": "サーバーの進行値 {comparison} {required} が必要です (現在: {current}).",
-        "global_variable_unknown": "サーバーの進行状況 {comparison} {required}が必要です。現在の値はトラッカーでは使用できません。 このタスクがゲーム内で利用可能な場合にのみマークを使用します。カウンタータスクは完了とマークされません。",
-        "task_counter": "このトレーダーのロイヤリティレベルで、{comparison} {required}件の完了済みタスクが必要です（現在: {current}件）。このタスクがゲーム内ですでに利用可能な場合は、「利用可能としてマーク」を使用してください。",
+        "global_variable_required": "Additional in-game progression required.",
+        "global_variable_unknown_required": "Additional in-game progression required. Use Mark available only if this task is available in-game.",
         "dialogue": "ゲーム内トレーダーの会話が必要です。このタスクがゲーム内で利用可能であることを確認した後にのみ利用可能なマークを使用してください。",
         "story_objective": "ストーリーの目標 \"{objective}\" ({chapter}) を完了します。",
         "unknown": "条件データが利用できないか、サポートされていません。利用可能かどうか確認できません。",
@@ -1167,16 +1137,67 @@
         "status_active": "進行中または受注済み",
         "status_unknown": "不明なステータス",
         "status_or": " または "
+      },
+      "requirements": {
+        "title": "Requirements",
+        "met_count": "{met} of {total} met",
+        "show_more": "あと＋{count}",
+        "show_less": "表示を減らす",
+        "comparison_at_least": "{value}+",
+        "comparison_above": "above {value}",
+        "comparison_at_most": "{value} or lower",
+        "comparison_below": "below {value}",
+        "comparison_exactly": "exactly {value}",
+        "comparison_not_equal": "not {value}",
+        "player_level": "Level {requirement}",
+        "trader_level": "{trader} loyalty {requirement}",
+        "trader_reputation": "{trader} reputation {requirement}",
+        "task": "{action} {task}",
+        "you": "you: {value}",
+        "story_alternative": "Or progress a story chapter: {chapters}",
+        "met": "Met",
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Additional in-game progression required",
+        "named_pool_one": "Complete {requirement} LL{level} task for {trader}",
+        "named_pool_other": "Complete {requirement} LL{level} tasks for {trader}",
+        "task_pool_one": "Complete {requirement} task from the required pool",
+        "task_pool_other": "Complete {requirement} tasks from the required pool",
+        "task_count_at_least": "at least {value}",
+        "task_count_above": "more than {value}",
+        "task_count_at_most": "at most {value}",
+        "task_count_below": "fewer than {value}",
+        "task_count_exactly": "exactly {value}",
+        "task_count_not_equal": "a number other than {value}",
+        "pool_tracked": "{value} tracked",
+        "pool_account": "{value} in game",
+        "pool_unverified": "Progress unverified",
+        "pool_show_tasks": "Show tasks",
+        "pool_hide_tasks": "Hide tasks",
+        "pool_tasks": "Tasks that count",
+        "pool_candidates": "Candidate tasks",
+        "pool_explanation": "Only tasks in this pool count. Reaching the trader loyalty level is a separate requirement.",
+        "pool_candidate_explanation": "This requirement belongs to the trader's LL task pool. The tasks below are possible contributors.",
+        "pool_caveat": "The counting rules for this pool are unverified. These tasks may contribute; their completions cannot confirm this requirement.",
+        "pool_confirmation_hint": "If this task is already available in-game, use Mark available. This does not complete any pool tasks.",
+        "pool_confirmed": "Confirmed in game",
+        "pool_any_of": "Any one task counts once",
+        "pool_credit_earned": "1 credit earned",
+        "pool_all_of": "Complete all tasks in this group for one credit",
+        "pool_current_task": "This task",
+        "pool_status_available": "利用可能",
+        "pool_status_locked": "ロック中",
+        "pool_status_completed": "完了済",
+        "pool_status_failed": "失敗",
+        "pool_status_unavailable": "Unavailable"
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "ハイドアウトデータを読み込み中",
       "station_link_label": "{name} へ移動",
       "no_stations_found": "施設が見つかりません。フィルターを変更してください。",
-      "collapse_completed": "完了した施設を折りたたむ",
-      "sort": {
-        "ready_first": "建設可能な施設を先に表示する"
-      },
       "prereq_filters": {
         "title": "利用条件",
         "station_levels": "施設レベル条件",
@@ -1209,23 +1230,49 @@
           "mark_incomplete": "未完了にする",
           "set_custom_amount": "カスタム数量を設定:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "タスクとハイドアウトのデータを読み込み中",
-      "search_placeholder": "アイテム、タスク、ハイドアウト施設を検索…",
-      "items": "アイテム",
+      "items_count": "{count} item | {count} items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "検索条件に一致するアイテムはありませんでした。",
       "error": "必要なアイテムを読み込めません。",
       "filters": {
-        "label": "フィルター",
-        "non_fir": "NON-FIR",
-        "hide_owned": "所持済みを非表示",
-        "hide_non_fir_special_equipment_title": "レイド内発見（FIR）不要の特殊装備（MS2000マーカー、Wi-Fiカメラなど）を非表示",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Kappaタスクに必要なアイテムのみ表示",
-        "kappa_only_disabled_tooltip": "Kappaフィルターはタスクにのみ適用されます。",
-        "hide_team_needs": "チームの必要アイテムを非表示"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "Non-FIR"
+        },
+        "hide": {
+          "title": "非表示",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "タスク",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "並び替え",
@@ -1238,10 +1285,7 @@
         "grid": "グリッド表示",
         "combined": "結合表示"
       },
-      "teammates_needed": "チームメイトはこれを必要としています",
-      "settings": {
-        "title": "必須アイテム設定"
-      }
+      "teammates_needed": "チームメイトはこれを必要としています"
     },
     "settings": {
       "card": {
@@ -1302,6 +1346,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "チームメンバーを招待し、表示するチームの進行状況を選択して、一緒に進捗を管理できます。",
       "invite": {
         "title": "招待リンク",
@@ -1551,8 +1600,8 @@
       "suggest_description": "このページへの掲載を提案するコミュニティツールやガイド isnt",
       "suggest_cta": "リソースを提案",
       "migration_banner": {
-        "title": "TarkovTracker.ioから移行しますか？",
-        "cta": "移行ガイドを読む"
+        "cta": "移行ガイドを読む",
+        "chip": "From .io?"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.orgガイド",
@@ -1790,14 +1839,10 @@
     "profile": "プロフィール",
     "section_navigation": "ナビゲーション",
     "account_menu": "アカウントメニュー",
-    "mode_auto": "自動",
-    "auto_level_enabled": "自動レベル計算が有効です",
-    "level_display_auto": "レベル{level}（自動計算有効）",
     "level_display_editable": "レベル{level}。クリックまたはEnterキーを押して編集",
     "increment_level": "レベルを上げる",
     "decrement_level": "レベルを下げる",
-    "xp_progress": "XP進捗",
-    "xp_settings_link": "XPとレベルの設定を表示"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2003,6 +2048,7 @@
       "switch_mode_fetch_failed": "ゲームモードは切り替わりましたが、データを更新できませんでした。もう一度お試しください"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "PvPの進捗をリセットしてもよろしいですか？",
       "reset_pvp_warning": "タスク、隠れ家、レベルを含むすべてのPvP進捗が完全に削除されます。PvEデータには影響しません。",
       "reset_pve_confirmation": "PvEの進捗をリセットしてもよろしいですか？",
@@ -2068,7 +2114,29 @@
       "prestige_history_duration": "ランの所要時間",
       "prestige_history_days_value": "{days}日",
       "prestige_history_compare_title": "前回のランとの比較",
-      "prestige_history_compare_subtitle": "現在のプレステージ{from}とプレステージ{to}の比較"
+      "prestige_history_compare_subtitle": "現在のプレステージ{from}とプレステージ{to}の比較",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode}プレステージ完了",
@@ -2234,6 +2302,20 @@
       "active_mode": "有効",
       "game_edition_hint": "利用可能なコンテンツに合わせて追跡できるよう、お持ちのゲーム版を選択してください。"
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "スキル管理",
       "explanation": "クエスト報酬は自動計算されます。合計スキルレベルを入力してオフセットを調整してください。",
@@ -2270,19 +2352,6 @@
       "warn_system_omnibar": "警告：ブラウザやOSのシステムショートカット（例：Ctrl+T、Ctrl+W、Alt+Tab）と競合する可能性があります。",
       "warn_system_undo": "警告：ブラウザやOSのシステムショートカット（例：Ctrl+W、Ctrl+T、Alt+Tab）と競合する可能性があります。"
     },
-    "experience": {
-      "title": "経験値とレベル",
-      "auto_level_title": "自動レベル計算",
-      "auto_level_description": "有効にすると、合計XPに基づいてレベルが自動計算されます。無効にすると、XPの計算とは別に手動でレベルを設定できます。",
-      "current_level": "現在のレベル",
-      "set_total_xp": "合計XPを設定",
-      "manual_hint": "実際の合計XPを入力すると、オフセットが自動的に調整されます。",
-      "xp_amount": "{amount} XP",
-      "xp_to_next": "次レベルまで{amount}",
-      "reset_offset": "XPオフセットをリセット",
-      "xp_progress_aria": "次のレベルまでの経験値の進捗",
-      "xp_progress_value": "次のレベルまでの進捗：{percent}%"
-    },
     "danger_zone": {
       "confirm_instruction": "すべてのデータをリセットするには、{word}と入力してください：",
       "confirm_word": "削除"
@@ -2308,6 +2377,21 @@
       "version_filter_label": "ログバージョンを含める",
       "version_filter_hint": "デフォルトでは最新のメジャーバージョンが選択されます。復元するキャラクターとワイプのログのみを含めてください。",
       "version_filter_tooltip": "バージョンはアカウント変更、ワイプ、プレステージのリセットを識別できません。インポート前に適切なセッションフォルダーを選択してください。シーズナルイベントは、アクティブなシーズン期間内である必要があります。",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "完了済",
+        "started": "Started / active",
+        "failed": "失敗"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "不明なバージョン",
       "source_file": "選択ファイル",
       "selected_files": "選択されたファイル",
@@ -2342,6 +2426,7 @@
       "cleared_logs_toast_title": "古いログが削除された可能性があります",
       "cleared_logs_toast_description": "ログのインポートでは、Logsフォルダーに残っているクエスト履歴のみを読み取れます。削除済みセッションは復元できません。",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "ZIPアーカイブが不完全であるか、不正なログエントリが含まれています。進行状況はインポートされていません。",
         "budget_exceeded": "選択されたログは安全なインポート予算を超えています。最近のセッション数を減らすか、関連するログファイルのみを抽出してください。進行状況はインポートされませんでした。",
         "record_too_large": "{path}内の個々のログレコードが、安全に解析できるサイズを超えています。進行状況はインポートされていません。このログ形式について報告してください。",
@@ -2353,6 +2438,8 @@
         "parse_failed": "EFTログの解析に失敗しました。",
         "task_metadata_not_loaded": "タスクメタデータがまだ読み込まれていません。再読み込みして、もう一度お試しください。",
         "invalid_mode": "有効なインポート先のゲームモードを選択してください。",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "これらのログには、現在のシーズン外または有効な日付がないイベントが含まれています。シーズンPvPにインポートする前に、現在のcjulienのセッションを選択してください。"
       },
       "failed_tasks": "一致した失敗クエスト：{count}件",
@@ -2404,6 +2491,7 @@
         "rate_limited": "インポート試行回数が多すぎます。約{minutes}分待ってから、もう一度お試しください。",
         "verification_failed": "本人確認に失敗しました。ページを再読み込みして、もう一度お試しください。",
         "fetch_failed": "Tarkov.devのプロフィールを取得できません。Tarkov.devでプロフィールを開いてから、もう一度お試しください。",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "この Tarkovプロファイルはすでに別のTarkovTracker アカウントにリンクされているため、ここにリンクされていません。 インポートされた進行状況は保存されました。他のアカウントからリンクを解除し、再度インポートしてください。",
         "save_failed": "プロファイルはこのデバイスでインポートされましたが、まだアカウントに保存できませんでした。 接続を確認してください。同期されるまでインポートはこのデバイスのままです。"
       }
@@ -2450,7 +2538,6 @@
     "smart_fill": "スマート補充",
     "unknown_task": "不明なタスク",
     "unknown_station": "不明なステーション",
-    "lvl": "レベル",
     "needed": "必要",
     "view_details_for": "{name}の詳細を表示",
     "locked_before": "{count}より前",
@@ -2459,6 +2546,14 @@
     "collected": "獲得済み",
     "mark_collected": "獲得済みとしてマーク",
     "handed_over": "引き渡し済み",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "アイテム数を入力",
       "decrease_count": "数を減らす",
@@ -2479,6 +2574,8 @@
     "any_of_items_short": "{count}個のうちいずれか",
     "view_accepted_items": "受理済みのアイテム{count}個をすべて表示",
     "not_collected": "未獲得",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "クリックして獲得",
     "click_to_uncollect": "クリックして獲得を解除",
     "modal": {
@@ -2562,6 +2659,18 @@
       "tasks": {
         "title": "Tarkovのクエストトラッカー · TarkovTracker.org",
         "description": "Tarkovのクエスト、目標、報酬、前提条件を、PvP・PvE・シーズナルモードごとに管理できます。"
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "Tarkovの隠れ家トラッカー · TarkovTracker.org",

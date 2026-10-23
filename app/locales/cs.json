@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "Přepnout na tmavý motiv"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "Stav uložení: {status}",
     "cloud_pending_label": "Ukládání pokroku do cloudu",
     "cloud_retrying_label": "Cloudové ukládání se opakuje",
@@ -111,6 +113,8 @@
     "local_saved_note": "Tyto změny jsou uloženy v tomto prohlížeči.",
     "cloud_also_pending_note": "Ani nebyly uloženy do cloudu. Exportujte svůj postup pro uchovávání kopie.",
     "retry_scheduled": "Automatické opakování {attempt} z {total} je naplánováno.",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Changes remain pending, and you can keep tracking. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "Příčina: toto zařízení se zdá být offline.",
     "cause_rate_limited": "Příčina: služba oblačnosti dočasně omezuje úspory.",
     "cause_auth": "Příčina: vaše přihlašovací relace nemohla být ověřena.",
@@ -124,6 +128,12 @@
     "export_button": "Exportovat pokrok",
     "export_hint": "Exportovat aktuální postup stahování jako záložní soubor, i když se uložení nezdařilo."
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "Odhlásit se s neuloženými změnami?",
     "risk": "Vaše poslední změny postupu nejsou uloženy v tomto prohlížeči nebo v cloudu. Pokud se nyní odhlásíte, budou ztraceny.",
@@ -133,13 +143,8 @@
     "retry_succeeded": "Vaše změny byly uloženy do cloudu. Můžete se bezpečně odhlásit."
   },
   "omnibar": {
-    "title": "Hledat",
-    "description": "Hledat úkoly, potřebné předměty a stanice ve skrytí",
-    "trigger_label": "Hledat...",
-    "open_aria": "Otevřít globální vyhledávání",
     "aria_label": "Globální vyhledávání",
     "placeholder": "Hledat úkoly, potřebné předměty, skrytí...",
-    "hint_min_chars": "Zadejte alespoň 2 znaky pro vyhledávání...",
     "no_results": "Pro \"{query}\" nebyly nalezeny žádné výsledky.",
     "group_tasks": "Úkoly / mise",
     "group_hideout": "Stanice ve skrytí"
@@ -371,6 +376,16 @@
     "delete_archived_run": "Odstranit archivovaný běh",
     "validation_error": "Chyba ověření",
     "got_it": "Rozumím"
+  },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "Zrušit filtry",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "Nápověda",
@@ -607,117 +622,40 @@
     "dashboard": {
       "changelog": {
         "title": "Co je nového",
-        "show": "Zobrazit aktualizace",
-        "hide": "Skrýt aktualizace",
         "loading": "Načítání aktualizací...",
         "error": "Nelze načíst aktualizace.",
         "empty": "Zatím žádné aktualizace.",
-        "view_all": "Zobrazit vše"
+        "view_all": "Zobrazit vše",
+        "unread": "New updates"
       },
-      "focus": {
-        "title": {
-          "default": "Co mám dělat dál?",
-          "multiple": "Několik dobrých dalších kroků",
-          "blocked": "V tuto chvíli není nic připraveno",
-          "complete": "Byl jsi zachycen"
-        },
-        "heading": {
-          "start": "Začít {task}",
-          "continue": "Pokračovat v úkolu {task}",
-          "finish": "Dokončit {task}",
-          "review_filters": "Zkontrolovat filtry úkolů",
-          "closest_unlock": "Nejvíce odemknutí: {task}",
-          "caught_up": "Všechno viditelné je hotovo"
-        },
-        "summary": {
-          "unlock_trader": "{task} je krok pro odemknutí {trader}.",
-          "impact": "{task} má největší po sobě následující výplatu ve vaší aktuální frontě.",
-          "close": "{task} je jedním z vašich nejbližších dokončených úkolů.",
-          "kappa": "{task} je právě váš nejčistší krok Kappa.",
-          "lightkeeper": "{task} je tvůj nejčistší krok Lightkeeper.",
-          "default": "{task} je nejčistší výhra na vaší nástěnce.",
-          "filter_hidden_one": "Váš aktuální filtr skryje 1 dostupný úkol.",
-          "filter_hidden_other": "Vaše aktuální filtry skrývají {count} dostupné úkoly.",
-          "blocked_requirement": "{task} je zablokován svými požadavky.",
-          "complete": "Dokončili jste každý viditelný úkol v rámci tohoto rozsahu řídicího panelu."
-        },
-        "stat": {
-          "why": "Proč zvítězila",
-          "status": "Stav",
-          "secondary": "Další dobré možnosti",
-          "secondary_actionable": "Použijte je, pokud primární plán není vhodný.",
-          "secondary_blocked": "Toto jsou další nejbližší odemknutí ve vaší frontě.",
-          "secondary_empty": "To je právě teď nejjasnější další krok."
-        },
+      "up_next": {
+        "title": "Nejlepší další krok",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
-          "unlock_trader": "Odemkne {trader}",
-          "impact_one": "Otevře 1 navazující úkol",
-          "impact_other": "Otevře sledované úkoly {count}",
-          "close": "Jedno z vašich nejbližších dokončených",
-          "kappa": "Pokročilá Kappa",
-          "lightkeeper": "Zásuvka",
-          "trader": "Zálohy {trader}",
-          "filters": "Aktuální filtry skrývají životaschopné úkoly",
-          "complete": "Všechno viditelné je kompletní",
-          "default": "Okamžitý pokrok"
-        },
-        "proof": {
-          "unlock_trader_one": "Nejvyšší priorita odemknutí: odemkne {trader} s 1 zbývajícím cílem.",
-          "unlock_trader_other": "Nejvyšší priorita odemknutí: odemkne {trader} s cíli {count}.",
-          "impact_one": "Nejvyšší výplata: otevře 1 následný úkol.",
-          "impact_other": "Nejvyšší výplata: otevře {count} návazné úkoly.",
-          "close_one": "Nejrychleji dostupný: zbývá pouze 1 cíl.",
-          "close_other": "Nejrychleji dostupný: zbývá pouze {count} cílů.",
-          "ready_one": "Nejlepší k dispozici: zbývá 1 cíl.",
-          "ready_other": "Nejlepší k dispozici: Zbývá {count} cílů.",
-          "ready_zero": "Nejlepší k dispozici: připravte se k zapnutí nyní.",
-          "kappa_one": "Nejlepší vývoj speciálního řetězce: Kappa pokračuje s 1 cílem.",
-          "kappa_other": "Nejlepší postup speciálního řetězce: Zbývá pokrok Kappa s cíli {count}.",
-          "lightkeeper_one": "Nejlepší vývoj speciálního řetězce: Zbývá Lightkeeper s 1 cílem.",
-          "lightkeeper_other": "Zbývá nejlepší vývoj speciálního řetězce: Zbývá Lightkeeper s cíli {count}.",
-          "filters_one": "Žádné viditelné možnosti: ve vašich filtrech je skryt 1 dostupný úkol.",
-          "filters_other": "Žádné viditelné možnosti: {count} dostupné úkoly jsou skryty vašimi filtry.",
-          "complete": "V tomto rozsahu hlavního panelu nezůstává žádná viditelná díla."
-        },
-        "status": {
-          "ready_one": "Nyní je připraveno. Zbývá 1 cíl.",
-          "ready_other": "Nyní je připraveno. Zbývá {count} cílů.",
-          "ready_no_objectives": "Připraveno nyní.",
-          "filters": "Upravte své filtry úkolů, abyste odhalili skryté možnosti.",
-          "complete": "Žádné blokování. Nic viditelné není vráceno."
-        },
-        "badge": {
-          "based_on_filters": "Na základě aktuálních filtrů",
-          "hidden_available_one": "Filtry skrývají 1 dostupný úkol",
-          "hidden_available_other": "Filtry skrývají {count} dostupné úkoly"
-        },
-        "cta": {
-          "open_task": "Otevřít úkol",
-          "open_tasks": "Otevřít seznam úkolů"
+          "unlock_trader": "Unlocks {trader}",
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Držák blesku",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "Připraveno"
         }
       },
       "progress": {
-        "title": "Rozdělení postupu",
-        "items": "Položky úkolu",
         "hideout_items": "Skrývající předměty",
         "filtered_status_active": "Filtrováno podle nastavení úloh",
-        "filtered_status_inactive": "Použití všech typů úkolů",
-        "filtered_warning_tooltip": "Tyto statistiky sledují vaše nastavení filtru úloh (Kappa, Lightkeeper, i jiné než speciální úkoly)."
-      },
-      "progress_card": {
-        "view_details": "Zobrazit podrobnosti pro {label}",
-        "progress_label": "Průběh {label}"
-      },
-      "milestones": {
-        "title": "Milestones",
-        "halfway": "V polovině cesty",
-        "veteran": "Téměř hotovo",
-        "kappa": {
-          "subtitle": "Získaný kontejner"
-        },
-        "lightkeeper": {
-          "subtitle": "Odemknutí obchodníka"
-        }
+        "filtered_warning_tooltip": "Tyto statistiky sledují vaše nastavení filtru úloh (Kappa, Lightkeeper, i jiné než speciální úkoly).",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "Pokrok obchodníka",
@@ -729,20 +667,20 @@
         "set_loyalty_level": "Nastavte věrnostní úroveň {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav Karma",
-        "unlock_required": "Vyžadováno odemknutí:",
-        "locked_summary": "Počet uzamčených obchodníků: {count}",
         "sort": {
           "aria_label": "Řadit obchodníky",
           "direction_aria_label": "Přepnout směr řazení"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
         "new_cta": "Podpořit TarkovTracker",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {
@@ -763,7 +701,10 @@
     "storyline": {
       "subtitle": "Sledujte svůj pokrok prostřednictvím kapitol Tarkov příběhů.",
       "chapters_complete": "kapitoly kompletní",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "Probíhá práce",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "WIP",
       "wip_description": "Tato funkce je stále vytvářena. Obsah a funkce budou rozšiřovány a upravovány v průběhu času, jak budeme pokračovat v organizaci dat. Díky za trpělivost!",
       "no_data": "Nejsou k dispozici žádné údaje kapitoly storylinu.",
@@ -778,6 +719,7 @@
       "quest_route_evidence_pending": "Zatím nebyly zachyceny žádné kroky",
       "quest_route_conflict": "Více než jedna trasa čte jako dokončená; pouze jedna je ve hře možná.",
       "quest_route_progress": "{completed}/{total} kroky",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "1 uložená objektivní známka se již neshoduje s aktuálními daty příběhu a vyžaduje překontrolu.",
       "stale_progress_other": "{count} Uložené objekty již neodpovídají aktuálním datům příběhu a je třeba je znovu zkontrolovat.",
       "route_choice": "Volba trasy",
@@ -786,16 +728,16 @@
       "route_blocked_by": "Zablokováno: {objectives}",
       "route_decision": "Rozhodnutí {index}",
       "route_choose_one": "Vyberte jednu",
-      "route_required_steps": "Požadované kroky",
       "route_optional_steps": "Volitelné kroky",
       "route_selected_hint": "Tato trasa je aktivní.",
       "route_switch_hint": "Chcete-li přepnout trasy, zrušte zaškrtnutí vybrané trasy.",
-      "route_unlocks_here": "Odemkne zde",
       "route_unlocks_chapter": "Obuv se zevní podešví z kaučuku nebo plastů",
       "route_unlocks_estimated": "Odhadované načasování",
       "route_unlock_map": "Mapa: {name}",
       "route_unlock_trader": "Obchodník: {name}",
-      "route_unlock_reward": "Odměna: {name}"
+      "route_unlock_reward": "Odměna: {name}",
+      "timeline_objective": "Cíl",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "Sledujte svůj postup ke kontejneru Kappa a úkolům Lightkeeper.",
@@ -901,15 +843,20 @@
       "billing_yearly_interval": "rok"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
-        "graph": "Graf"
+        "aria_label": "Task views",
+        "graph": "Graf",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "Zobrazuji řetězec závislosti pro {taskName}",
         "isolate_chain": "Izolovaný řetězec",
         "show_context": "Zobrazit kontext",
         "no_tasks": "Pro tohoto obchodníka nebyly nalezeny žádné úkoly.",
-        "mobile_unavailable": "Graf má nejlepší zkušenosti na širší obrazovce.",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "Legenda",
         "flow_start": "Spustit (bez prereqs)",
         "flow_end": "Konec (bez následných kroků)",
@@ -924,9 +871,38 @@
       "user_views": {
         "yourself": "Sám"
       },
-      "search": {
-        "placeholder": "Hledat...",
-        "aria_label": "Hledat úkoly"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "Běžný",
+          "kappa": "Kappa",
+          "lightkeeper": "Držák blesku"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "Výchozí objednávka",
@@ -936,53 +912,39 @@
         "trader": "Příkaz obchodníka",
         "teammates": "K dispozici pro týmové spolupracovníky",
         "xp": "XP Odměna",
-        "ascending": "Vzestupně",
-        "descending": "sestupně",
         "aria_label": "Třídit úkoly",
         "progression": "Pokrok"
       },
       "settings": {
         "title": "Nastavení úkolu",
-        "tabs": {
-          "filters": "Filtry úkolů",
-          "filter_bar": "Filtrovat lištu",
-          "advanced": "Rozšířené"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "Odměny",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "Kontrola, které úkoly se zobrazují.",
-          "regular_tasks": "Běžné úkoly",
-          "kappa_required": "Vyžadována Kappa",
-          "lightkeeper_required": "Vyžadován maják",
-          "team_shared_only": "Pouze sdílený tým",
-          "has_required_keys": "Pouze úkoly s klíči",
-          "show_global_tasks": "Zobrazit globální úkoly na mapě",
-          "impact_respects_filters": "Filtry úloh při určování dopadu",
-          "hide_completed_map_objectives": "Skrýt vyplněné mapové úkoly"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "Vyladit vzhled karet úkolů.",
-          "required_labels": "Štítky \"Povinné\"",
-          "experience_rewards": "Zkušenosti odměn",
-          "next_tasks": "Další úkoly",
-          "previous_tasks": "Předchozí úkoly",
-          "collapse_completed_objectives": "Sbalit cíle při dokončených úkolech"
-        },
-        "filter_bar": {
-          "hint": "Zvolte, zda zobrazit nebo schovat stavové filtry.",
-          "all_filter": "Všechny filtry",
-          "all_filter_hint": "Zobrazit všechny úkoly bez ohledu na stav.",
-          "available_filter": "Dostupný filtr",
-          "available_filter_hint": "Úkoly, které můžete na základě své úrovně a splněných podmínek začít ihned.",
-          "locked_filter": "Uzamčený filtr",
-          "locked_filter_hint": "Úkoly zablokované úrovní, reputací u obchodníka nebo předchozími úkoly.",
-          "completed_filter": "Dokončený filtr",
-          "completed_filter_hint": "Úkoly, které jste již dokončili.",
-          "failed_filter": "Filtr selhal",
-          "failed_filter_hint": "Úkoly, které selhaly kvůli nesplněným podmínkám."
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "Manuální neúspěšná akce",
-          "failed_tasks_label": "Neúspěšné úkoly",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "Oprava selhala",
           "repair_failed_confirm": "Oprava selhala odstraněním neúspěšných příznaků, které nejsou podporovány aktuálními podmínkami selhání?",
           "repair_failed_done": "U úloh {count} se stav nezdařil.",
@@ -992,6 +954,13 @@
       },
       "no_tasks_found": "Nebyly nalezeny žádné úkoly. Zkuste změnit filtry nebo aktualizovat úroveň.",
       "no_tasks_found_description": "Upravte své filtry nebo požadavky na úroveň pro zobrazení dostupných úkolů.",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "Načítání úkolů",
       "map": {
         "resize_handle": "Změnit velikost výšky mapy",
@@ -1036,24 +1005,34 @@
         }
       },
       "pinned_tasks_section": "Připnuté úkoly",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "Zaměřený úkol",
       "focused_task_description": "Otevřeno z odkazu úlohy, abyste přesně viděli, kde chcete pokračovat.",
       "global_tasks_section": "Globální úkoly",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "Připnout úkol",
         "unpin_task": "Unpin task",
-        "level": "Úrovně: {count}",
-        "level_badge": "Lv {count}",
-        "fence_rep_badge": "Plot {rep}",
-        "fence_rep_tooltip": "Vyžaduje reputaci {rep}",
-        "trader_level_tooltip": "Vyžaduje {trader} úroveň věrnosti {level}",
-        "trader_level_badge": "{trader} LL{level}",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "Wiki stránka",
-        "locked_before": "Opravit úkoly: {count}",
         "unlocks_next": "Odemkne další",
         "copy_task_link": "Kopírovat odkaz na úkol",
         "copy_key_name": "Kopírovat název klíče",
-        "report_data_issue": "Nahlásit problém s daty",
         "tarkov_dev_logo": "Tarkov.dev logo",
         "view_task_on_wiki": "Zobrazit {name} na Wiki",
         "hand_over": "bubble raider",
@@ -1100,13 +1079,8 @@
         "requirement_status_active": "aktivní/přijaté",
         "requirement_status_available": "k dispozici",
         "requirement_status_not_started": "není spuštěno",
-        "requires_must_be": "musí být {status}",
         "requires_currently": "aktuálně {status}",
-        "requires_tooltip_action": "{action} \"{name}\" k odemčení tohoto úkolu",
         "requires_tooltip_conflict": "\"{name}\" je {current} , ale potřebuje {expected} — tento úkol může být trvale uzamčen",
-        "requires_progress": "{completed} z {total} dokončených předpokladů",
-        "requires_progress_tooltip": "Další: {tasks}",
-        "requires_progress_tooltip_overflow": "Další: {tasks}a {count} další",
         "objectives_hidden": "{count} cíle nejsou na této mapě ({uncompleted} nedokončeno)",
         "needed_by": "Potřebuje: {names}",
         "unlocks_next_tooltip": "Počet úkolů, které budou dostupné po dokončení tohoto úkolu",
@@ -1126,7 +1100,6 @@
         "find_fir": "Najít v razii",
         "items_count": "{count} položky",
         "kappa_tooltip": "Tento úkol je vyžadován pro získání zabezpečené kontejneru Kappa",
-        "level_badge_tooltip": "Pro odemknutí tohoto úkolu je vyžadována minimální úroveň {level}",
         "lightkeeper_tooltip": "Tento úkol je vyžadován k odemčení obchodníka Lightkeeper",
         "alternatives_tooltip": "Tento úkol má alternativní možnosti ({count}) – dokončit stačí pouze jednu",
         "alternatives_badge": "{count} alternativ",
@@ -1136,24 +1109,21 @@
         "previous_tasks": "Předchozí úkol(y):",
         "progress": "Postup {completed}/{total}",
         "rewards": "Odměny",
-        "unlocks_count": "Odemkne {count}",
-        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
-        "loyalty_level": "LL",
-        "reputation": "Odpověď"
+        "unlocks_count": "Odemkne {count}"
       },
       "blockers": {
-        "player_level": "Úroveň hráče {comparison} {required} je vyžadována (aktuální: {current}).",
-        "trader_level": "{trader} Věrnostní úroveň {comparison} {required} vyžadována (aktuální: {current}).",
-        "trader_reputation": "{trader} reputace {comparison} {required} vyžadována (aktuální: {current}).",
+        "player_level_required": "Requires player level {requirement} (you: {current}).",
+        "trader_level_required": "Requires {trader} loyalty level {requirement} (you: {current}).",
+        "trader_reputation_required": "Requires {trader} reputation {requirement} (you: {current}).",
         "prerequisite": "Seznamte se s požadovanými stavy úkolů: {tasks}.",
         "story_route": "Seznamte se s požadovanými stavy úkolu pro {tasks}nebo postupujte v jedné z kapitol příběhu: {chapters}.",
         "failed_branch": "Zablokováno selháním úkolu: {task}.",
         "faction": "K dispozici na {faction} znaků.",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "Odemknout {trader} dokončením {task}.",
         "prestige": "Vyžaduje Prestige {required} (aktuální: {current}).",
-        "global_variable": "Hodnota postupu serveru {comparison} {required} je vyžadována (aktuální: {current}).",
-        "global_variable_unknown": "Vyžaduje vývoj serveru {comparison} {required}. Vaše aktuální hodnota není k dispozici pro tracker. Použít označení k dispozici pouze v případě, že je tento úkol dostupný ve hře; žádné čítače nebudou označeny jako úplné.",
-        "task_counter": "Vyžaduje {comparison} {required} dokončených úkolů od tohoto obchodníka úrovně věrnosti (dokončeno: {current}). Pokud je tento úkol již k dispozici ve hře, použijte známku dostupnou.",
+        "global_variable_required": "Additional in-game progression required.",
+        "global_variable_unknown_required": "Additional in-game progression required. Use Mark available only if this task is available in-game.",
         "dialogue": "Vyžaduje konverzaci obchodníka ve hře. Použijte známku k dispozici až po potvrzení tohoto úkolu ve hře.",
         "story_objective": "Dokončete cíl příběhu \"{objective}\" ({chapter}).",
         "unknown": "Data požadavků jsou nedostupná nebo nepodporovaná. Dostupnost nemůže být potvrzena.",
@@ -1167,16 +1137,67 @@
         "status_active": "aktivní nebo přijaté",
         "status_unknown": "neznámý stav",
         "status_or": " nebo "
+      },
+      "requirements": {
+        "title": "Requirements",
+        "met_count": "{met} of {total} met",
+        "show_more": "+{count} další",
+        "show_less": "Zobrazit méně",
+        "comparison_at_least": "{value}+",
+        "comparison_above": "above {value}",
+        "comparison_at_most": "{value} or lower",
+        "comparison_below": "below {value}",
+        "comparison_exactly": "exactly {value}",
+        "comparison_not_equal": "not {value}",
+        "player_level": "Level {requirement}",
+        "trader_level": "{trader} loyalty {requirement}",
+        "trader_reputation": "{trader} reputation {requirement}",
+        "task": "{action} {task}",
+        "you": "you: {value}",
+        "story_alternative": "Or progress a story chapter: {chapters}",
+        "met": "Met",
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Additional in-game progression required",
+        "named_pool_one": "Complete {requirement} LL{level} task for {trader}",
+        "named_pool_other": "Complete {requirement} LL{level} tasks for {trader}",
+        "task_pool_one": "Complete {requirement} task from the required pool",
+        "task_pool_other": "Complete {requirement} tasks from the required pool",
+        "task_count_at_least": "at least {value}",
+        "task_count_above": "more than {value}",
+        "task_count_at_most": "at most {value}",
+        "task_count_below": "fewer than {value}",
+        "task_count_exactly": "exactly {value}",
+        "task_count_not_equal": "a number other than {value}",
+        "pool_tracked": "{value} tracked",
+        "pool_account": "{value} in game",
+        "pool_unverified": "Progress unverified",
+        "pool_show_tasks": "Show tasks",
+        "pool_hide_tasks": "Hide tasks",
+        "pool_tasks": "Tasks that count",
+        "pool_candidates": "Candidate tasks",
+        "pool_explanation": "Only tasks in this pool count. Reaching the trader loyalty level is a separate requirement.",
+        "pool_candidate_explanation": "This requirement belongs to the trader's LL task pool. The tasks below are possible contributors.",
+        "pool_caveat": "The counting rules for this pool are unverified. These tasks may contribute; their completions cannot confirm this requirement.",
+        "pool_confirmation_hint": "If this task is already available in-game, use Mark available. This does not complete any pool tasks.",
+        "pool_confirmed": "Confirmed in game",
+        "pool_any_of": "Any one task counts once",
+        "pool_credit_earned": "1 credit earned",
+        "pool_all_of": "Complete all tasks in this group for one credit",
+        "pool_current_task": "This task",
+        "pool_status_available": "Dostupné",
+        "pool_status_locked": "Uzamčeno",
+        "pool_status_completed": "Dokončeno",
+        "pool_status_failed": "Selhalo",
+        "pool_status_unavailable": "Unavailable"
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "Načítání dat skrytí",
       "station_link_label": "Přejít na {name}",
       "no_stations_found": "Nebyly nalezeny žádné stanice. Zkuste změnit filtry.",
-      "collapse_completed": "Sbalit dokončené stanice",
-      "sort": {
-        "ready_first": "Řadit připraveno k první sestavení"
-      },
       "prereq_filters": {
         "title": "Požadavky na dostupnost",
         "station_levels": "Vyžadovat úrovně stanice",
@@ -1209,23 +1230,49 @@
           "mark_incomplete": "Označit jako nedokončené",
           "set_custom_amount": "Nastavit vlastní množství:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "Načítání úkolů a skrytých dat",
-      "search_placeholder": "Hledat položky, úkoly nebo skrývací stanice...",
-      "items": "položky",
+      "items_count": "{count} item | {count} items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "Hledání neodpovídají žádné položky.",
       "error": "Nelze načíst potřebné položky.",
       "filters": {
-        "label": "Filtry",
-        "non_fir": "NON-FIR",
-        "hide_owned": "ZOBRAZIT VLASTNÍK",
-        "hide_non_fir_special_equipment_title": "Skrýt speciální zařízení jiné než FIR (např. značky MS2000, Wi-Fi kamery)",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Zobrazit pouze položky potřebné pro úkoly Kappa",
-        "kappa_only_disabled_tooltip": "Filtr Kappa se vztahuje pouze na úkoly.",
-        "hide_team_needs": "SKRÝT TEAM NEEDS"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "Non-FIR"
+        },
+        "hide": {
+          "title": "Skrýt",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "Úkoly",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "Seřadit",
@@ -1238,10 +1285,7 @@
         "grid": "Zobrazení mřížky",
         "combined": "Kombinovaný pohled"
       },
-      "teammates_needed": "Partneři toto potřebují",
-      "settings": {
-        "title": "Nastavení požadovaných položek"
-      }
+      "teammates_needed": "Partneři toto potřebují"
     },
     "settings": {
       "card": {
@@ -1302,6 +1346,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "Pozvěte týmové spoluhráče, zvolte, jaký tým postupuje a sledujte společně.",
       "invite": {
         "title": "Odkaz na pozvání",
@@ -1551,8 +1600,8 @@
       "suggest_description": "Navrhněte komunitní nástroj nebo příručku pro zahrnutí na tuto stránku.",
       "suggest_cta": "Navrhnout zdroj",
       "migration_banner": {
-        "title": "Přesouvání z TarkovTracker.io?",
-        "cta": "Přečtěte si návod k migraci"
+        "cta": "Přečtěte si návod k migraci",
+        "chip": "From .io?"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org návody",
@@ -1790,14 +1839,10 @@
     "profile": "Profil",
     "section_navigation": "Navigation",
     "account_menu": "Menu účtu",
-    "mode_auto": "Automaticky",
-    "auto_level_enabled": "Automatický výpočet úrovně je povolen",
-    "level_display_auto": "Úroveň {level} (automatický výpočet povolen)",
     "level_display_editable": "Úroveň {level}, klikněte nebo stiskněte Enter pro úpravu",
     "increment_level": "Zvýšit úroveň",
     "decrement_level": "Snížit úroveň",
-    "xp_progress": "Postup XP",
-    "xp_settings_link": "Zobrazit nastavení XP a úrovně"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2003,6 +2048,7 @@
       "switch_mode_fetch_failed": "Herní režim byl přepnut, ale nepodařilo se aktualizovat data, zkuste to prosím znovu"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "Jste si jisti, že chcete obnovit postup PvP?",
       "reset_pvp_warning": "Tímto trvale smažete veškerý váš PvP pokrok, včetně úkolů, skrytí a úrovně. Vaše PvE data nebudou ovlivněna.",
       "reset_pve_confirmation": "Jste si jisti, že chcete resetovat postup PvE?",
@@ -2068,7 +2114,29 @@
       "prestige_history_duration": "Doba trvání spouštění",
       "prestige_history_days_value": "{days} dnů",
       "prestige_history_compare_title": "Porovnání s předchozím spuštěním",
-      "prestige_history_compare_subtitle": "Aktuální prestiž {from} ve srovnání s prestiží {to}"
+      "prestige_history_compare_subtitle": "Aktuální prestiž {from} ve srovnání s prestiží {to}",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "PvP Prestige Complete",
@@ -2234,6 +2302,20 @@
       "active_mode": "Aktivní",
       "game_edition_hint": "Vyberte verzi hry, kterou vlastníte, aby sledování odpovídalo vašemu dostupnému obsahu."
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "Správa dovedností",
       "explanation": "Odměny za úkol jsou počítány automaticky. Zadejte svou celkovou úroveň dovedností pro úpravu offsetu.",
@@ -2270,19 +2352,6 @@
       "warn_system_omnibar": "Upozornění: Může kolidovat se systémovými zkratkami prohlížeče/OS (např. Ctrl+T, Ctrl+W, Alt+Tab).",
       "warn_system_undo": "Upozornění: Může kolidovat se systémovými zkratkami prohlížeče/OS (např. Ctrl+W, Ctrl+T, Alt+Tab)."
     },
-    "experience": {
-      "title": "Zkušenosti a úroveň",
-      "auto_level_title": "Automatický výpočet úrovně",
-      "auto_level_description": "Pokud je povoleno, vaše úroveň bude automaticky vypočítána na základě celkového počtu XP. Pokud je vypnuto, můžete ručně nastavit úroveň nezávisle na výpočtech XP.",
-      "current_level": "Aktuální úroveň",
-      "set_total_xp": "Nastavit celkový XP",
-      "manual_hint": "Zadejte celkovou hodnotu XP pro automatickou úpravu posunu.",
-      "xp_amount": "{amount} XP",
-      "xp_to_next": "{amount} do dalšího",
-      "reset_offset": "Resetovat odsazení XP",
-      "xp_progress_aria": "Zkus pokrok směrem k další úrovni",
-      "xp_progress_value": "{percent}% směrem k další úrovni"
-    },
     "danger_zone": {
       "confirm_instruction": "Zadejte {word} pro potvrzení resetování všech dat:",
       "confirm_word": "ODSTRANIT"
@@ -2308,6 +2377,21 @@
       "version_filter_label": "Zahrnout logy",
       "version_filter_hint": "Nejnovější hlavní verze je vybrána ve výchozím nastavení. Upravte tak, aby zahrnovala starší vymazání.",
       "version_filter_tooltip": "Protokoly jsou seskupeny podle verze relace. Nejnovější hlavní je ve výchozím nastavení vybrán tak, aby nedocházelo ke směšování starých vymazaných dat.",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "Dokončeno",
+        "started": "Started / active",
+        "failed": "Selhalo"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "Neznámá verze",
       "source_file": "Zdrojový soubor",
       "selected_files": "Vybrané soubory",
@@ -2342,6 +2426,7 @@
       "cleared_logs_toast_title": "Staré logy byly pravděpodobně vymazány",
       "cleared_logs_toast_description": "Import protokolu může číst pouze historii výprav, která je stále ve složce logů. Odstraněné relace nelze obnovit.",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "ZIP archiv je neúplný nebo obsahuje neplatný záznam logu. Nebyl importován žádný průběh.",
         "budget_exceeded": "Vybrané protokoly překračují rozpočet bezpečného importu. Vyberte méně relací nebo rozbalte pouze příslušné soubory protokolů. Žádný postup nebyl importován.",
         "record_too_large": "Individuální záznam v {path} je příliš velký na bezpečné zpracování. Žádný postup nebyl importován. Nahlaste prosím tento formát logu.",
@@ -2353,6 +2438,8 @@
         "parse_failed": "Nepodařilo se analyzovat protokoly EFT.",
         "task_metadata_not_loaded": "Metadata úkolů ještě nejsou načtena. Prosím aktualizujte a zkuste to znovu.",
         "invalid_mode": "Vyberte platný cílový herní režim.",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "Tyto protokoly obsahují události mimo aktivní sezónu nebo bez data použitelnosti. Před importem do sezony vyberte relace z aktivní sezóny."
       },
       "failed_tasks": "Odpovídající neúspěšné úkoly: {count}",
@@ -2404,6 +2491,7 @@
         "rate_limited": "Příliš mnoho pokusů o import. Počkejte asi {minutes} min a zkuste to znovu.",
         "verification_failed": "Lidské ověření se nezdařilo. Znovu načtěte stránku a zkuste to znovu.",
         "fetch_failed": "Profil Tarkov.dev nelze načíst. Otevřete profil na Tarkov.dev, zkuste to znovu.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "Tento profil Tarkov je již propojen s jiným účtem TarkovTracker, takže zde nebyl propojen. Importovaný postup byl uložen. Odpojte jej od druhého účtu a poté importujte znovu.",
         "save_failed": "Profil byl importován do tohoto zařízení, ale zatím nemohl být uložen na váš účet. Zkontrolujte připojení; import zůstane na tomto zařízení, dokud se nesynchronizuje."
       }
@@ -2450,7 +2538,6 @@
     "smart_fill": "Chytré vyplnění",
     "unknown_task": "Neznámý úkol",
     "unknown_station": "Neznámá stanice",
-    "lvl": "Lvl",
     "needed": "potřebný",
     "view_details_for": "Zobrazit podrobnosti pro {name}",
     "locked_before": "{count} před",
@@ -2459,6 +2546,14 @@
     "collected": "Shromážděno",
     "mark_collected": "Označit jako shromážděné",
     "handed_over": "Předáno",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "Zadejte počet položek",
       "decrease_count": "Snížit počet",
@@ -2479,6 +2574,8 @@
     "any_of_items_short": "Alternativy: {count}",
     "view_accepted_items": "Zobrazit všechny přijaté předměty ({count})",
     "not_collected": "Nesbíráno",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "Kliknutím shromáždíte",
     "click_to_uncollect": "Kliknutím zrušíte sběr",
     "modal": {
@@ -2562,6 +2659,18 @@
       "tasks": {
         "title": "Sledovač úkolů v Tarkovu · TarkovTracker.org",
         "description": "Sledujte úkoly v Tarkovu, cíle, odměny a prerekvizity v režimech PvP, PvE a sezónním."
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "Sledovač skrytí v Tarkovu · TarkovTracker.org",
