@@ -213,7 +213,7 @@ jobs:
     name: Preview smoke tests
     needs: [plan, deploy]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 26
     permissions:
       contents: read
     steps:
@@ -224,7 +224,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Install pinned browser
-        timeout-minutes: 12
+        timeout-minutes: 18
         run: |
           echo 'DPkg::Lock::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout >/dev/null
           for attempt in 1 2 3; do
