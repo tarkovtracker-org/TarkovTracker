@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "Mudar para tema escuro"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "Estado de progresso salvo: {status}",
     "cloud_pending_label": "Salvando progresso na nuvem",
     "cloud_retrying_label": "Cloud save nova tentativa",
@@ -111,6 +113,8 @@
     "local_saved_note": "Estas alterações são salvas neste navegador.",
     "cloud_also_pending_note": "Eles também não foram salvos na nuvem. Exporte o seu progresso para manter uma cópia.",
     "retry_scheduled": "Testar automaticamente {attempt} de {total} está programado.",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Changes remain pending, and you can keep tracking. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "Causa: Este dispositivo parece estar offline.",
     "cause_rate_limited": "Causa: o serviço de nuvem está limitando temporariamente as saves.",
     "cause_auth": "Causa: sua sessão de login não pôde ser verificada.",
@@ -124,6 +128,12 @@
     "export_button": "Progresso da exportação",
     "export_hint": "A exportação do seu progresso atual como um arquivo de backup, mesmo quando salvar falhou."
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "Fazer logout com alterações não salvas?",
     "risk": "Suas alterações de progresso mais recentes não são salvas neste navegador ou na nuvem. Se você sair agora, elas serão perdidas.",
@@ -133,13 +143,8 @@
     "retry_succeeded": "Suas alterações foram salvas na nuvem. Você pode sair com segurança."
   },
   "omnibar": {
-    "title": "Pesquisar",
-    "description": "Pesquise tarefas, itens necessários e postos do esconderijo",
-    "trigger_label": "Pesquisar tarefas, itens, comerciantes...",
-    "open_aria": "Abrir pesquisa global",
     "aria_label": "Pesquisa global",
     "placeholder": "Pesquisar tarefas, itens necessários, esconderijo...",
-    "hint_min_chars": "Digite pelo menos 2 caracteres para pesquisar...",
     "no_results": "Nenhum resultado encontrado para \"{query}\".",
     "group_tasks": "Tarefas / Missões",
     "group_hideout": "Postos do esconderijo"
@@ -371,6 +376,16 @@
     "delete_archived_run": "Excluir Corrida Arquivada",
     "validation_error": "Erro de validação",
     "got_it": "Eu tenho que"
+  },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "Limpar filtros",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "Ajuda",
@@ -607,117 +622,40 @@
     "dashboard": {
       "changelog": {
         "title": "Novidades",
-        "show": "Mostrar atualizações",
-        "hide": "Ocultar atualizações",
         "loading": "Carregando atualizações...",
         "error": "Não foi possível carregar as atualizações.",
         "empty": "Ainda não há atualizações.",
-        "view_all": "Ver tudo"
+        "view_all": "Ver tudo",
+        "unread": "New updates"
       },
-      "focus": {
-        "title": {
-          "default": "O que devo fazer agora?",
-          "multiple": "Vários bons próximos passos",
-          "blocked": "Nada está pronto agora",
-          "complete": "Você está em dia"
-        },
-        "heading": {
-          "start": "Iniciar {task}",
-          "continue": "Continuar {task}",
-          "finish": "Concluir {task}",
-          "review_filters": "Revise seus filtros de tarefas",
-          "closest_unlock": "Desbloqueio mais próximo: {task}",
-          "caught_up": "Tudo visível está concluído"
-        },
-        "summary": {
-          "unlock_trader": "{task} é a etapa de desbloqueio de {trader}.",
-          "impact": "{task} oferece o maior retorno a jusante na sua fila atual.",
-          "close": "{task} é uma das suas conclusões disponíveis mais próximas.",
-          "kappa": "{task} é a etapa mais clara para o Kappa agora.",
-          "lightkeeper": "{task} é a etapa mais clara para o Lightkeeper agora.",
-          "default": "{task} é a vitória imediata mais clara no seu painel.",
-          "filter_hidden_one": "Os filtros atuais ocultam 1 tarefa disponível.",
-          "filter_hidden_other": "Os filtros atuais ocultam {count} tarefas disponíveis.",
-          "blocked_requirement": "{task} é bloqueado por seus requisitos.",
-          "complete": "Você concluiu todas as tarefas visíveis neste escopo do painel."
-        },
-        "stat": {
-          "why": "Por que foi escolhida",
-          "status": "Status",
-          "secondary": "Outras boas opções",
-          "secondary_actionable": "Use estas se o plano principal não for adequado.",
-          "secondary_blocked": "Estes são os desbloqueios mais próximos na sua fila.",
-          "secondary_empty": "Esta é a opção mais clara para o próximo passo agora."
-        },
+      "up_next": {
+        "title": "Melhor próximo passo",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
-          "unlock_trader": "Desbloqueia {trader}",
-          "impact_one": "Abre 1 tarefa seguinte",
-          "impact_other": "Abre {count} tarefas seguintes",
-          "close": "Uma das suas conclusões mais próximas",
-          "kappa": "Avança Kappa",
-          "lightkeeper": "Avança Lightkeeper",
-          "trader": "Avança {trader}",
-          "filters": "Os filtros atuais estão ocultando tarefas viáveis",
-          "complete": "Tudo visível está concluído",
-          "default": "Progresso imediato"
-        },
-        "proof": {
-          "unlock_trader_one": "Prioridade máxima de desbloqueio: desbloqueia {trader} com 1 objetivo restante.",
-          "unlock_trader_other": "Prioridade máxima de desbloqueio: desbloqueia {trader} com {count} objetivos restantes.",
-          "impact_one": "Maior retorno: abre 1 tarefa seguinte.",
-          "impact_other": "Maior retorno: abre {count} tarefas seguintes.",
-          "close_one": "Mais rápido disponível: resta apenas 1 objetivo.",
-          "close_other": "Mais rápido disponível: restam apenas {count} objetivos.",
-          "ready_one": "Melhor opção disponível: resta 1 objetivo.",
-          "ready_other": "Melhor opção disponível: restam {count} objetivos.",
-          "ready_zero": "Melhor opção disponível: está pronta para ser entregue agora.",
-          "kappa_one": "Melhor progresso da cadeia especial: avança Kappa com 1 objetivo restante.",
-          "kappa_other": "Melhor progresso da cadeia especial: avança Kappa com {count} objetivos restantes.",
-          "lightkeeper_one": "Melhor progresso da cadeia especial: avança Lightkeeper com 1 objetivo restante.",
-          "lightkeeper_other": "Melhor progresso da cadeia especial: avança Lightkeeper com {count} objetivos restantes.",
-          "filters_one": "Nenhuma opção visível: seus filtros ocultam 1 tarefa disponível.",
-          "filters_other": "Nenhuma opção visível: seus filtros ocultam {count} tarefas disponíveis.",
-          "complete": "Nenhum trabalho visível permanece neste escopo do painel."
-        },
-        "status": {
-          "ready_one": "Pronto agora. Resta 1 objetivo.",
-          "ready_other": "Pronto agora. Restam {count} objetivos.",
-          "ready_no_objectives": "Pronto agora.",
-          "filters": "Ajuste os filtros de tarefas para revelar as opções ocultas.",
-          "complete": "Sem bloqueios. Nada visível ficou pendente."
-        },
-        "badge": {
-          "based_on_filters": "Com base nos filtros atuais",
-          "hidden_available_one": "Os filtros ocultam 1 tarefa disponível",
-          "hidden_available_other": "Os filtros ocultam {count} tarefas disponíveis"
-        },
-        "cta": {
-          "open_task": "Abrir tarefa",
-          "open_tasks": "Abrir lista de tarefas"
+          "unlock_trader": "Unlocks {trader}",
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Guardião",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "Pronto"
         }
       },
       "progress": {
-        "title": "Detalhamento do progresso",
-        "items": "Itens de tarefa",
         "hideout_items": "Itens do esconderijo",
         "filtered_status_active": "Filtrado pelas configurações de tarefas",
-        "filtered_status_inactive": "Usando todos os tipos de tarefa",
-        "filtered_warning_tooltip": "Estes dados seguem suas configurações de filtro de tarefas (Kappa, Lightkeeper e tarefas não especiais)."
-      },
-      "progress_card": {
-        "view_details": "Ver detalhes de {label}",
-        "progress_label": "Progresso de {label}"
-      },
-      "milestones": {
-        "title": "Marcos",
-        "halfway": "Metade do caminho",
-        "veteran": "Quase concluído",
-        "kappa": {
-          "subtitle": "Contêiner conquistado"
-        },
-        "lightkeeper": {
-          "subtitle": "Comerciante desbloqueado"
-        }
+        "filtered_warning_tooltip": "Estes dados seguem suas configurações de filtro de tarefas (Kappa, Lightkeeper e tarefas não especiais).",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "Progresso dos comerciantes",
@@ -729,20 +667,20 @@
         "set_loyalty_level": "Definir nível de fidelidade {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Karma de Scav",
-        "unlock_required": "Desbloqueio necessário:",
-        "locked_summary": "Comerciantes bloqueados: {count}",
         "sort": {
           "aria_label": "Classificar comerciantes",
           "direction_aria_label": "Alternar direção da classificação"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
         "new_cta": "Apoie o TarkovTracker",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {
@@ -763,7 +701,10 @@
     "storyline": {
       "subtitle": "Acompanhe seu progresso pelos capítulos da história de Tarkov.",
       "chapters_complete": "capítulos concluídos",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "Em desenvolvimento",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "WIP",
       "wip_description": "Este recurso ainda está sendo desenvolvido. O conteúdo e a funcionalidade serão ampliados e refinados ao longo do tempo, à medida que continuarmos organizando os dados. Obrigado pela paciência!",
       "no_data": "Não há dados de capítulos da história disponíveis.",
@@ -778,6 +719,7 @@
       "quest_route_evidence_pending": "Nenhum passo capturado ainda",
       "quest_route_conflict": "Mais de uma leitura da rota assim que concluída; apenas uma é possível no jogo.",
       "quest_route_progress": "{completed}/{total} passos",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "1 marca de objetivo salva não coincide mais com os dados da história atual e precisa de uma nova verificação.",
       "stale_progress_other": "{count} salvou as metas que não correspondem mais aos dados da história atual e precisa reverificá-las.",
       "route_choice": "Escolha de rota",
@@ -786,16 +728,16 @@
       "route_blocked_by": "Bloqueado por: {objectives}",
       "route_decision": "Decisão {index}",
       "route_choose_one": "Escolha uma",
-      "route_required_steps": "Etapas obrigatórias",
       "route_optional_steps": "Etapas opcionais",
       "route_selected_hint": "Esta rota está ativa.",
       "route_switch_hint": "Para trocar de rotas, desmarque primeiro a rota selecionada.",
-      "route_unlocks_here": "Desbloqueios aqui",
       "route_unlocks_chapter": "Desbloqueios de capítulos",
       "route_unlocks_estimated": "Tempo estimado",
       "route_unlock_map": "Mapa: {name}",
       "route_unlock_trader": "Comerciante: {name}",
-      "route_unlock_reward": "Recompensa: {name}"
+      "route_unlock_reward": "Recompensa: {name}",
+      "timeline_objective": "Objetivo",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "Acompanhe seu progresso rumo ao contêiner Kappa e às missões do Lightkeeper.",
@@ -901,15 +843,20 @@
       "billing_yearly_interval": "ano"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
-        "graph": "Grafo"
+        "aria_label": "Task views",
+        "graph": "Grafo",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "Exibindo a cadeia de dependências de {taskName}",
         "isolate_chain": "Isolar cadeia",
         "show_context": "Mostrar contexto",
         "no_tasks": "Nenhuma tarefa encontrada para este comerciante.",
-        "mobile_unavailable": "A visualização em grafo é melhor em uma tela mais larga.",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "Legenda",
         "flow_start": "Início (sem pré-requisitos)",
         "flow_end": "Fim (sem tarefas seguintes)",
@@ -924,9 +871,38 @@
       "user_views": {
         "yourself": "Você mesmo"
       },
-      "search": {
-        "placeholder": "Pesquisar...",
-        "aria_label": "Pesquisar tarefas"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "Padrão",
+          "kappa": "Kappa",
+          "lightkeeper": "Guardião"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "Ordem padrão",
@@ -936,53 +912,39 @@
         "trader": "Ordem dos comerciantes",
         "teammates": "Disponíveis para os companheiros de equipe",
         "xp": "Recompensa de XP",
-        "ascending": "Crescente",
-        "descending": "Decrescente",
         "aria_label": "Classificar tarefas",
         "progression": "Progresso"
       },
       "settings": {
         "title": "Configurações de tarefas",
-        "tabs": {
-          "filters": "Filtros de tarefas",
-          "filter_bar": "Barra de filtros",
-          "advanced": "Avançado"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "Recompensas",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "Controle quais tarefas aparecem.",
-          "regular_tasks": "Tarefas regulares",
-          "kappa_required": "Kappa obrigatório",
-          "lightkeeper_required": "Lightkeeper obrigatório",
-          "team_shared_only": "Somente compartilhadas com a equipe",
-          "has_required_keys": "Somente tarefas com chaves",
-          "show_global_tasks": "Mostrar tarefas globais no mapa",
-          "impact_respects_filters": "O impacto respeita os filtros de tarefas",
-          "hide_completed_map_objectives": "Ocultar tarefas concluídas no mapa"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "Ajuste a aparência dos cartões de tarefa.",
-          "required_labels": "Rótulos \"necessário\"",
-          "experience_rewards": "Recompensas de experiência",
-          "next_tasks": "Próximas tarefas",
-          "previous_tasks": "Tarefas anteriores",
-          "collapse_completed_objectives": "Recolher objetivos em tarefas concluídas"
-        },
-        "filter_bar": {
-          "hint": "Ative ou desative os filtros de status das tarefas para controlar quais tarefas são visíveis.",
-          "all_filter": "Mostrar todas as tarefas",
-          "all_filter_hint": "Exibir todas as tarefas, independentemente do status.",
-          "available_filter": "Mostrar disponíveis",
-          "available_filter_hint": "Tarefas que você pode iniciar agora com base no seu nível e pré-requisitos.",
-          "locked_filter": "Mostrar bloqueadas",
-          "locked_filter_hint": "Tarefas bloqueadas por nível, reputação de comerciante ou tarefas de pré-requisito.",
-          "completed_filter": "Mostrar concluídas",
-          "completed_filter_hint": "Tarefas que você já concluiu.",
-          "failed_filter": "Mostrar falhadas",
-          "failed_filter_hint": "Tarefas que falharam devido a condições não cumpridas."
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "Ações manuais de falha",
-          "failed_tasks_label": "Tarefas falhadas",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "Reparar tarefas falhadas",
           "repair_failed_confirm": "Reparar tarefas falhadas limpando os indicadores de falha que não são suportados pelas condições de falha atuais?",
           "repair_failed_done": "O status de falha foi limpo para {count} tarefas.",
@@ -992,6 +954,13 @@
       },
       "no_tasks_found": "Nenhuma tarefa encontrada. Tente alterar seus filtros ou atualizar seu nível.",
       "no_tasks_found_description": "Ajuste seus filtros ou requisitos de nível para ver as tarefas disponíveis.",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "Carregando tarefas",
       "map": {
         "resize_handle": "Redimensionar a altura do mapa",
@@ -1036,24 +1005,34 @@
         }
       },
       "pinned_tasks_section": "Tarefas fixadas",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "Tarefa em foco",
       "focused_task_description": "Aberta a partir de um link de tarefa para que você veja exatamente onde continuar.",
       "global_tasks_section": "Tarefas globais",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "Fixar tarefa",
         "unpin_task": "Desafixar tarefa",
-        "level": "Nível: {count}",
-        "level_badge": "Nv {count}",
-        "fence_rep_badge": "Fence {rep}",
-        "fence_rep_tooltip": "Requer reputação de Fence de {rep}",
-        "trader_level_tooltip": "Requer nível de fidelidade {level} de {trader}",
-        "trader_level_badge": "{trader} LL{level}",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "Página da wiki",
-        "locked_before": "Tarefas antes: {count}",
         "unlocks_next": "Desbloqueia a próxima",
         "copy_task_link": "Copiar link da tarefa",
         "copy_key_name": "Copiar nome da chave",
-        "report_data_issue": "Relatar problema nos dados",
         "tarkov_dev_logo": "Logo do Tarkov.dev",
         "view_task_on_wiki": "Ver {name} na wiki",
         "hand_over": "Entregar",
@@ -1100,13 +1079,8 @@
         "requirement_status_active": "ativa/aceita",
         "requirement_status_available": "disponível",
         "requirement_status_not_started": "não iniciada",
-        "requires_must_be": "deve estar {status}",
         "requires_currently": "atualmente {status}",
-        "requires_tooltip_action": "{action} \"{name}\" para desbloquear esta tarefa",
         "requires_tooltip_conflict": "\"{name}\" está {current}, mas precisa de {expected} — esta tarefa pode estar bloqueada permanentemente",
-        "requires_progress": "{completed} de {total} pré-requisitos concluídos",
-        "requires_progress_tooltip": "Próximas: {tasks}",
-        "requires_progress_tooltip_overflow": "Próximas: {tasks} e mais {count}",
         "objectives_hidden": "{count} objetivos não estão neste mapa ({uncompleted} não concluídos)",
         "needed_by": "Necessário para: {names}",
         "unlocks_next_tooltip": "Número de tarefas que ficam disponíveis após concluir esta tarefa",
@@ -1126,7 +1100,6 @@
         "find_fir": "Encontrar na incursão",
         "items_count": "{count} itens",
         "kappa_tooltip": "Esta missão é necessária para obter o Contêiner Seguro Kappa",
-        "level_badge_tooltip": "O nível mínimo do jogador {level} é necessário para desbloquear esta missão",
         "lightkeeper_tooltip": "Esta missão é necessária para desbloquear o comerciante Lightkeeper",
         "alternatives_tooltip": "Esta missão tem {count} escolhas alternativas — você só precisa concluir uma",
         "alternatives_badge": "{count} alt.",
@@ -1136,24 +1109,21 @@
         "previous_tasks": "Tarefa(s) anterior(es):",
         "progress": "Progresso {completed}/{total}",
         "rewards": "Recompensas",
-        "unlocks_count": "{count} desbloqueios",
-        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
-        "loyalty_level": "LL",
-        "reputation": "Reputação"
+        "unlocks_count": "{count} desbloqueios"
       },
       "blockers": {
-        "player_level": "{comparison} Nível do Jogador {required} necessário (atual: {current}).",
-        "trader_level": "{trader} Nível de Lealdade {comparison} {required} necessário (atual: {current}).",
-        "trader_reputation": "{trader} reputação {comparison} {required} necessária (atual: {current}).",
+        "player_level_required": "Requires player level {requirement} (you: {current}).",
+        "trader_level_required": "Requires {trader} loyalty level {requirement} (you: {current}).",
+        "trader_reputation_required": "Requires {trader} reputation {requirement} (you: {current}).",
         "prerequisite": "Conheça os status de tarefa necessários para: {tasks}.",
         "story_route": "Conheça o status de tarefas necessárias para {tasks}, ou o progresso de um desses capítulos da história: {chapters}.",
         "failed_branch": "Bloqueado por tarefas falhadas: {task}.",
         "faction": "Disponível a {faction} caracteres.",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "Desbloqueie {trader} completando {task}.",
         "prestige": "Requer Prestígio {required} (atual: {current}).",
-        "global_variable": "Valor da progressão do servidor {comparison} {required} necessário (atual: {current}).",
-        "global_variable_unknown": "Requer progressão do servidor {comparison} {required}. Seu valor atual não está disponível para o rastreador. Usar Notas disponíveis apenas se esta tarefa estiver disponível no jogo; nenhuma tarefa contadora será marcada como completa.",
-        "task_counter": "Requer tarefas {comparison} {required} concluídas deste nível de fidelidade do trader (completado: {current}). Se esta tarefa já estiver disponível no jogo, use Marca disponível.",
+        "global_variable_required": "Additional in-game progression required.",
+        "global_variable_unknown_required": "Additional in-game progression required. Use Mark available only if this task is available in-game.",
         "dialogue": "Requer uma conversa de negociante dentro do jogo. Use Marca disponível apenas após confirmar que esta tarefa está disponível no jogo.",
         "story_objective": "Complete o objetivo da história \"{objective}\" ({chapter}).",
         "unknown": "Os dados do requisito não estão disponíveis ou não são suportados. Disponibilidade não pode ser confirmada.",
@@ -1167,16 +1137,67 @@
         "status_active": "ativo ou aceito",
         "status_unknown": "status desconhecido",
         "status_or": " ou "
+      },
+      "requirements": {
+        "title": "Requirements",
+        "met_count": "{met} of {total} met",
+        "show_more": "+{count} mais",
+        "show_less": "Mostrar menos",
+        "comparison_at_least": "{value}+",
+        "comparison_above": "above {value}",
+        "comparison_at_most": "{value} or lower",
+        "comparison_below": "below {value}",
+        "comparison_exactly": "exactly {value}",
+        "comparison_not_equal": "not {value}",
+        "player_level": "Level {requirement}",
+        "trader_level": "{trader} loyalty {requirement}",
+        "trader_reputation": "{trader} reputation {requirement}",
+        "task": "{action} {task}",
+        "you": "you: {value}",
+        "story_alternative": "Or progress a story chapter: {chapters}",
+        "met": "Met",
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Additional in-game progression required",
+        "named_pool_one": "Complete {requirement} LL{level} task for {trader}",
+        "named_pool_other": "Complete {requirement} LL{level} tasks for {trader}",
+        "task_pool_one": "Complete {requirement} task from the required pool",
+        "task_pool_other": "Complete {requirement} tasks from the required pool",
+        "task_count_at_least": "at least {value}",
+        "task_count_above": "more than {value}",
+        "task_count_at_most": "at most {value}",
+        "task_count_below": "fewer than {value}",
+        "task_count_exactly": "exactly {value}",
+        "task_count_not_equal": "a number other than {value}",
+        "pool_tracked": "{value} tracked",
+        "pool_account": "{value} in game",
+        "pool_unverified": "Progress unverified",
+        "pool_show_tasks": "Show tasks",
+        "pool_hide_tasks": "Hide tasks",
+        "pool_tasks": "Tasks that count",
+        "pool_candidates": "Candidate tasks",
+        "pool_explanation": "Only tasks in this pool count. Reaching the trader loyalty level is a separate requirement.",
+        "pool_candidate_explanation": "This requirement belongs to the trader's LL task pool. The tasks below are possible contributors.",
+        "pool_caveat": "The counting rules for this pool are unverified. These tasks may contribute; their completions cannot confirm this requirement.",
+        "pool_confirmation_hint": "If this task is already available in-game, use Mark available. This does not complete any pool tasks.",
+        "pool_confirmed": "Confirmed in game",
+        "pool_any_of": "Any one task counts once",
+        "pool_credit_earned": "1 credit earned",
+        "pool_all_of": "Complete all tasks in this group for one credit",
+        "pool_current_task": "This task",
+        "pool_status_available": "Disponível",
+        "pool_status_locked": "Trancado",
+        "pool_status_completed": "Concluído",
+        "pool_status_failed": "Falhou",
+        "pool_status_unavailable": "Unavailable"
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "Carregando dados do esconderijo",
       "station_link_label": "Ir para {name}",
       "no_stations_found": "Nenhum posto encontrado. Tente alterar seus filtros.",
-      "collapse_completed": "Recolher postos concluídos",
-      "sort": {
-        "ready_first": "Ordenar primeiro os prontos para construir"
-      },
       "prereq_filters": {
         "title": "Requisitos de disponibilidade",
         "station_levels": "Exigir níveis dos postos",
@@ -1209,23 +1230,49 @@
           "mark_incomplete": "Marcar como não concluída",
           "set_custom_amount": "Definir quantidade personalizada:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "Carregando dados de tarefas e do esconderijo",
-      "search_placeholder": "Pesquisar itens, tarefas ou postos do esconderijo...",
-      "items": "itens",
+      "items_count": "{count} item | {count} items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "Nenhum item corresponde à sua pesquisa.",
       "error": "Não foi possível carregar os itens necessários.",
       "filters": {
-        "label": "Filtros",
-        "non_fir": "NON-FIR",
-        "hide_owned": "OCULTAR POSSUÍDOS",
-        "hide_non_fir_special_equipment_title": "Ocultar equipamento especial sem FIR (ex.: marcadores MS2000, câmeras Wi-Fi)",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Mostrar somente os itens necessários para tarefas de Kappa",
-        "kappa_only_disabled_tooltip": "O filtro Kappa aplica-se somente às tarefas.",
-        "hide_team_needs": "OCULTAR NECESSIDADES DA EQUIPE"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "Sem FIR"
+        },
+        "hide": {
+          "title": "Esconder",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "Tarefas",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "Ordenar",
@@ -1238,10 +1285,7 @@
         "grid": "Visualização em grade",
         "combined": "Visualização combinada"
       },
-      "teammates_needed": "Os companheiros precisam deste item",
-      "settings": {
-        "title": "Configurações de itens necessários"
-      }
+      "teammates_needed": "Os companheiros precisam deste item"
     },
     "settings": {
       "card": {
@@ -1302,6 +1346,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "Convide colegas, escolha o progresso da equipe que você vê e acompanhe juntos.",
       "invite": {
         "title": "Link de convite",
@@ -1551,8 +1600,8 @@
       "suggest_description": "Sugira uma ferramenta ou um guia da comunidade para inclusão nesta página.",
       "suggest_cta": "Sugerir recurso",
       "migration_banner": {
-        "title": "Passando de TarkovTracker.io?",
-        "cta": "Leia o guia de migração"
+        "cta": "Leia o guia de migração",
+        "chip": "From .io?"
       },
       "categories": {
         "tarkovtracker_guides": "Guias TarkovTracker.org",
@@ -1790,14 +1839,10 @@
     "profile": "Perfil",
     "section_navigation": "Navegação",
     "account_menu": "Menu da conta",
-    "mode_auto": "Automático",
-    "auto_level_enabled": "O cálculo automático de nível está ativado",
-    "level_display_auto": "Nível {level} (cálculo automático ativado)",
     "level_display_editable": "Nível {level}; clique ou pressione Enter para editar",
     "increment_level": "Aumentar nível",
     "decrement_level": "Diminuir nível",
-    "xp_progress": "Progresso de XP",
-    "xp_settings_link": "Ver configurações de XP e nível"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2003,6 +2048,7 @@
       "switch_mode_fetch_failed": "O modo de jogo foi alterado, mas os dados não foram atualizados; tente novamente"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "Tem certeza de que deseja redefinir seu progresso de PvP?",
       "reset_pvp_warning": "Isso excluirá permanentemente todo o seu progresso de PvP, incluindo tarefas, esconderijo e nível. Seus dados de PvE não serão afetados.",
       "reset_pve_confirmation": "Tem certeza de que deseja redefinir seu progresso de PvE?",
@@ -2068,7 +2114,29 @@
       "prestige_history_duration": "Duração da execução",
       "prestige_history_days_value": "{days} dias",
       "prestige_history_compare_title": "Comparação com a execução anterior",
-      "prestige_history_compare_subtitle": "Prestige atual {from} comparado ao Prestige {to}"
+      "prestige_history_compare_subtitle": "Prestige atual {from} comparado ao Prestige {to}",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "Prestige {mode} concluído",
@@ -2234,6 +2302,20 @@
       "active_mode": "ativo",
       "game_edition_hint": "Selecione a edição do jogo que você possui, então o rastreamento corresponde ao seu conteúdo disponível."
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "Gerenciamento de habilidades",
       "explanation": "As recompensas das missões são calculadas automaticamente. Insira seu nível total de habilidade para ajustar o deslocamento.",
@@ -2270,19 +2352,6 @@
       "warn_system_omnibar": "Aviso: pode entrar em conflito com atalhos do navegador ou do sistema (ex.: Ctrl+T, Ctrl+W, Alt+Tab).",
       "warn_system_undo": "Aviso: pode entrar em conflito com atalhos do navegador ou do sistema (ex.: Ctrl+W, Ctrl+T, Alt+Tab)."
     },
-    "experience": {
-      "title": "Experiência e nível",
-      "auto_level_title": "Cálculo automático de nível",
-      "auto_level_description": "Quando ativado, seu nível será calculado automaticamente com base no XP total. Quando desativado, você pode definir seu nível manualmente independentemente dos cálculos de XP.",
-      "current_level": "Nível atual",
-      "set_total_xp": "Definir XP total",
-      "manual_hint": "Digite seu XP total real para ajustar o deslocamento automaticamente.",
-      "xp_amount": "{amount} XP",
-      "xp_to_next": "{amount} para o próximo",
-      "reset_offset": "Redefinir deslocamento de XP",
-      "xp_progress_aria": "Experiencie o progresso para o próximo nível",
-      "xp_progress_value": "{percent}% em direção ao próximo nível"
-    },
     "danger_zone": {
       "confirm_instruction": "Digite {word} para confirmar a redefinição de todos os dados:",
       "confirm_word": "EXCLUIR"
@@ -2308,6 +2377,21 @@
       "version_filter_label": "Incluir versões de log",
       "version_filter_hint": "A versão principal mais recente é selecionada por padrão. Inclua apenas os logs do personagem e do wipe que deseja restaurar.",
       "version_filter_tooltip": "As versões não identificam mudanças de conta, wipes ou redefinições de Prestige. Selecione as pastas de sessão adequadas antes de importar. Eventos sazonais precisam ocorrer dentro da temporada ativa.",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "Concluído",
+        "started": "Started / active",
+        "failed": "Falhou"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "Versão desconhecida",
       "source_file": "Arquivo de origem",
       "selected_files": "Arquivos selecionados",
@@ -2342,6 +2426,7 @@
       "cleared_logs_toast_title": "Os logs antigos provavelmente foram limpos",
       "cleared_logs_toast_description": "A importação de logs só pode ler o histórico de missões que ainda está na pasta Logs. Sessões excluídas não podem ser recuperadas.",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "O arquivo ZIP está incompleto ou contém uma entrada de log inválida. Nenhum progresso foi importado.",
         "budget_exceeded": "Os logs selecionados excedem o orçamento de importação seguro. Selecione menos sessões recentes ou extraia apenas os arquivos de log relevantes. Nenhum progresso foi importado.",
         "record_too_large": "Um registro de registro individual no {path} é muito grande para analisar com segurança. Nenhum progresso foi importado. Por favor, informe o formato do log.",
@@ -2353,6 +2438,8 @@
         "parse_failed": "Falha ao analisar logs do EFT.",
         "task_metadata_not_loaded": "Os metadados das tarefas ainda não foram carregados. Atualize a página e tente novamente.",
         "invalid_mode": "Selecione um modo de jogo de destino válido.",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "Esses logs contêm eventos fora da temporada ativa ou sem data utilizável. Selecione sessões da temporada ativa antes de importar para o PvP sazonal."
       },
       "failed_tasks": "Tarefas com falha correspondida: {count}",
@@ -2404,6 +2491,7 @@
         "rate_limited": "Muitas tentativas de importação. Aguarde pelo {minutes} min, e tente novamente.",
         "verification_failed": "Falha na verificação humana. Recarregue a página e tente novamente.",
         "fetch_failed": "Não foi possível buscar o perfil Tarkov.dev. Abra o perfil no Tarkov.dev, e então tente novamente.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "Este perfil Tarkov já está ligado a outra conta TarkovTracker, por isso não estava ligado aqui. O progresso importado foi salvo. Desvincule da outra conta, e então importe novamente.",
         "save_failed": "O perfil foi importado neste dispositivo, mas ainda não foi possível salvá-lo na sua conta. Verifique sua conexão; a importação permanece neste dispositivo até que seja sincronizada."
       }
@@ -2450,7 +2538,6 @@
     "smart_fill": "Preenchimento inteligente",
     "unknown_task": "Tarefa desconhecida",
     "unknown_station": "Posto desconhecido",
-    "lvl": "Nível",
     "needed": "necessário",
     "view_details_for": "Ver detalhes de {name}",
     "locked_before": "{count} antes",
@@ -2459,6 +2546,14 @@
     "collected": "Coletado",
     "mark_collected": "Marcar como coletado",
     "handed_over": "Entregue",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "Inserir quantidade de itens",
       "decrease_count": "Diminuir quantidade",
@@ -2479,6 +2574,8 @@
     "any_of_items_short": "Qualquer {count}",
     "view_accepted_items": "Ver todos os {count} itens aceitos",
     "not_collected": "Não coletado",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "Clique para coletar",
     "click_to_uncollect": "Clique para descoletar",
     "modal": {
@@ -2562,6 +2659,18 @@
       "tasks": {
         "title": "Monitor de Missões de Tarkov · TarkovTracker.org",
         "description": "Acompanhe missões de Tarkov, objetivos, recompensas e pré-requisitos nos modos PvP, PvE e Sazonal."
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "Monitor de Abrigo de Tarkov · TarkovTracker.org",

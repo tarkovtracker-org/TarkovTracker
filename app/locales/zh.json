@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "切换到暗色主题"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "进度保存状态：{status}",
     "cloud_pending_label": "保存进度到云端",
     "cloud_retrying_label": "云保存重试",
@@ -111,6 +113,8 @@
     "local_saved_note": "这些更改已保存在此浏览器。",
     "cloud_also_pending_note": "他们也没有保存到云端。导出进度以保存一份副本。",
     "retry_scheduled": "已安排第 {attempt} 次自动重试（共 {total} 次）。",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Changes remain pending, and you can keep tracking. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "原因：此设备似乎处于离线状态。",
     "cause_rate_limited": "原因：云服务暂时限制了节省。",
     "cause_auth": "原因：无法验证您的登录会话。",
@@ -124,6 +128,12 @@
     "export_button": "导出进度",
     "export_hint": "即使保存失败，导出当前进度作为备份文件。"
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "使用未保存的更改登出？",
     "risk": "您的最新进度更改不会保存在此浏览器或云端。如果您现在注销，它们将丢失。",
@@ -133,13 +143,8 @@
     "retry_succeeded": "您的更改已保存到云端。您可以安全登出。"
   },
   "omnibar": {
-    "title": "搜索",
-    "description": "搜索任务、需要的物品和藏身处设施",
-    "trigger_label": "搜索任务、物品、商人…",
-    "open_aria": "打开全局搜索",
     "aria_label": "全局搜索",
     "placeholder": "搜索任务、所需物品、藏身处...",
-    "hint_min_chars": "至少输入2个字符以开始搜索……",
     "no_results": "未找到 “{query}”。",
     "group_tasks": "任务",
     "group_hideout": "藏身处设施"
@@ -371,6 +376,16 @@
     "delete_archived_run": "删除已存档的运行",
     "validation_error": "验证错误",
     "got_it": "明白了"
+  },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "清除筛选条件",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "帮助",
@@ -607,117 +622,40 @@
     "dashboard": {
       "changelog": {
         "title": "更新日志",
-        "show": "显示更新",
-        "hide": "隐藏更新",
         "loading": "正在加载更新...",
         "error": "无法加载更新。",
         "empty": "暂无更新。",
-        "view_all": "查看全部"
+        "view_all": "查看全部",
+        "unread": "New updates"
       },
-      "focus": {
-        "title": {
-          "default": "我接下来该做什么？",
-          "multiple": "有几个不错的下一步",
-          "blocked": "现在没有可立即进行的内容",
-          "complete": "你已经跟上进度了"
-        },
-        "heading": {
-          "start": "开始 {task}",
-          "continue": "继续 {task}",
-          "finish": "完成 {task}",
-          "review_filters": "检查你的任务筛选",
-          "closest_unlock": "最近的解锁项：{task}",
-          "caught_up": "所有可见内容都已完成"
-        },
-        "summary": {
-          "unlock_trader": "{task} 是解锁 {trader} 的关键任务。",
-          "impact": "{task} 在你当前队列里能带来最大的后续收益。",
-          "close": "{task} 是你最接近完成的可用任务之一。",
-          "kappa": "{task} 是你当前最明确的 Kappa 推进步骤。",
-          "lightkeeper": "{task} 是你当前最明确的灯塔守护者推进步骤。",
-          "default": "{task} 是你总览面板上最明确的立即收益。",
-          "filter_hidden_one": "你当前的筛选隐藏了 1 个可用任务。",
-          "filter_hidden_other": "你当前的筛选隐藏了 {count} 个可用任务。",
-          "blocked_requirement": "{task} 未满足前置要求。",
-          "complete": "在当前总览范围内，你已经完成了所有可见任务。"
-        },
-        "stat": {
-          "why": "为什么它赢了",
-          "status": "状态",
-          "secondary": "其他不错的选项",
-          "secondary_actionable": "如果主要方案不合适，可以改做这些。",
-          "secondary_blocked": "这些是你队列里最接近解锁的内容。",
-          "secondary_empty": "这就是当前最明确的下一步。"
-        },
+      "up_next": {
+        "title": "最佳下一步",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
-          "unlock_trader": "解锁 {trader}",
-          "impact_one": "开启 1 个后续任务",
-          "impact_other": "开启 {count} 个后续任务",
-          "close": "最接近完成的任务之一",
-          "kappa": "推进 Kappa",
-          "lightkeeper": "推进灯塔守护者",
-          "trader": "推进 {trader}",
-          "filters": "当前筛选隐藏了可行任务",
-          "complete": "所有可见内容都已完成",
-          "default": "立即推进"
-        },
-        "proof": {
-          "unlock_trader_one": "最高解锁优先级：可解锁 {trader}，还剩 1 个目标。",
-          "unlock_trader_other": "最高解锁优先级：可解锁 {trader}，还剩 {count} 个目标。",
-          "impact_one": "最高收益：开启 1 个后续任务。",
-          "impact_other": "最高收益：开启 {count} 个后续任务。",
-          "close_one": "最快可完成：只剩 1 个目标。",
-          "close_other": "最快可完成：只剩 {count} 个目标。",
-          "ready_one": "最佳可选项：还剩 1 个目标。",
-          "ready_other": "最佳可选项：还剩 {count} 个目标。",
-          "ready_zero": "最佳可选项：现在即可交付。",
-          "kappa_one": "最佳特殊链进度：推进 Kappa，还剩 1 个目标。",
-          "kappa_other": "最佳特殊链进度：推进 Kappa，还剩 {count} 个目标。",
-          "lightkeeper_one": "最佳特殊链进度：推进灯塔守护者，还剩 1 个目标。",
-          "lightkeeper_other": "最佳特殊链进度：推进灯塔守护者，还剩 {count} 个目标。",
-          "filters_one": "当前没有可见选项：1 个可用任务被你的筛选隐藏了。",
-          "filters_other": "当前没有可见选项：{count} 个可用任务被你的筛选隐藏了。",
-          "complete": "在当前总览范围内，已经没有可见工作了。"
-        },
-        "status": {
-          "ready_one": "现在可做。还剩 1 个目标。",
-          "ready_other": "现在可做。还剩 {count} 个目标。",
-          "ready_no_objectives": "现在可做。",
-          "filters": "调整任务筛选以显示被隐藏的选项。",
-          "complete": "没有阻碍。所有可见内容都已完成。"
-        },
-        "badge": {
-          "based_on_filters": "基于当前筛选",
-          "hidden_available_one": "筛选隐藏了 1 个可用任务",
-          "hidden_available_other": "筛选隐藏了 {count} 个可用任务"
-        },
-        "cta": {
-          "open_task": "打开任务",
-          "open_tasks": "打开任务列表"
+          "unlock_trader": "Unlocks {trader}",
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Lightkeeper",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "可进行"
         }
       },
       "progress": {
-        "title": "进度细分",
-        "items": "任务物品",
         "hideout_items": "藏身处物品",
         "filtered_status_active": "已按任务设置筛选",
-        "filtered_status_inactive": "已启用全部任务类型",
-        "filtered_warning_tooltip": "这些数据会遵循你的任务筛选设置（Kappa、灯塔守护者和普通任务）。"
-      },
-      "progress_card": {
-        "view_details": "查看 {label} 的详情",
-        "progress_label": "{label} 进度"
-      },
-      "milestones": {
-        "title": "里程碑",
-        "halfway": "进度过半",
-        "veteran": "即将毕业",
-        "kappa": {
-          "subtitle": "已解锁容器"
-        },
-        "lightkeeper": {
-          "subtitle": "已解锁商人"
-        }
+        "filtered_warning_tooltip": "这些数据会遵循你的任务筛选设置（Kappa、灯塔守护者和普通任务）。",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "商人进度",
@@ -729,20 +667,20 @@
         "set_loyalty_level": "设置忠诚度等级 {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav 信誉",
-        "unlock_required": "需要解锁:",
-        "locked_summary": "{count} 个商人已锁定",
         "sort": {
           "aria_label": "排序商人",
           "direction_aria_label": "切换排序方向"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
         "new_cta": "支持 TarkovTracker",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {
@@ -763,7 +701,10 @@
     "storyline": {
       "subtitle": "追踪你在塔科夫剧情章节中的进度。",
       "chapters_complete": "个章节已完成",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "开发中",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "开发中",
       "wip_description": "该功能仍在开发中。随着我们持续整理数据，内容和功能会逐步扩展并优化。感谢你的耐心等待！",
       "no_data": "暂无可用的剧情章节数据。",
@@ -778,6 +719,7 @@
       "quest_route_evidence_pending": "尚未抓取任何步骤",
       "quest_route_conflict": "多条路读取已完成；游戏中只能有一个。",
       "quest_route_progress": "{completed}/{total} 个步骤",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "1 保存的目标标记不再与当前故事数据匹配，需要重新检查。",
       "stale_progress_other": "有 {count} 个已保存的目标标记与当前剧情数据不再匹配，需要重新检查。",
       "route_choice": "路线选择",
@@ -786,16 +728,16 @@
       "route_blocked_by": "被以下目标阻止：{objectives}",
       "route_decision": "决策 {index}",
       "route_choose_one": "选择一个",
-      "route_required_steps": "必需步骤",
       "route_optional_steps": "可选步骤",
       "route_selected_hint": "此路线已启用。",
       "route_switch_hint": "要切换路线，请先取消选择当前路线。",
-      "route_unlocks_here": "此处解锁内容",
       "route_unlocks_chapter": "章节解锁项",
       "route_unlocks_estimated": "预计用时",
       "route_unlock_map": "地图：{name}",
       "route_unlock_trader": "商人：{name}",
-      "route_unlock_reward": "奖励：{name}"
+      "route_unlock_reward": "奖励：{name}",
+      "timeline_objective": "目标",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "追踪您获取 Kappa 保险箱和完成点灯人任务的进度。",
@@ -901,15 +843,20 @@
       "billing_yearly_interval": "年"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
-        "graph": "图表"
+        "aria_label": "Task views",
+        "graph": "图表",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "显示 {taskName} 的依赖链",
         "isolate_chain": "仅显示该链",
         "show_context": "显示上下文",
         "no_tasks": "未找到该商人的任务。",
-        "mobile_unavailable": "图表视图在更宽的屏幕上效果更好。",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "图例",
         "flow_start": "起点（无前置任务）",
         "flow_end": "终点（无后续任务）",
@@ -924,9 +871,38 @@
       "user_views": {
         "yourself": "仅自己"
       },
-      "search": {
-        "placeholder": "搜索...",
-        "aria_label": "搜索任务"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "常规的",
+          "kappa": "Kappa",
+          "lightkeeper": "Lightkeeper"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "默认订单",
@@ -936,53 +912,39 @@
         "trader": "商人顺序",
         "teammates": "队友可用的任务",
         "xp": "经验奖励",
-        "ascending": "升序排列",
-        "descending": "降序排列",
         "aria_label": "任务排序",
         "progression": "进度"
       },
       "settings": {
         "title": "任务设置",
-        "tabs": {
-          "filters": "任务筛选",
-          "filter_bar": "筛选栏",
-          "advanced": "高级"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "奖励",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "控制显示哪些任务",
-          "regular_tasks": "常规任务",
-          "kappa_required": "Kappa必需",
-          "lightkeeper_required": "灯塔守护者必需",
-          "team_shared_only": "仅全队共享",
-          "has_required_keys": "仅显示需要钥匙的任务",
-          "show_global_tasks": "在地图上显示全局任务",
-          "impact_respects_filters": "影响值遵循任务筛选",
-          "hide_completed_map_objectives": "隐藏地图已完成任务"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "调整任务卡的外观",
-          "required_labels": "“强制要求”标签",
-          "experience_rewards": "经验奖励",
-          "next_tasks": "后续任务",
-          "previous_tasks": "前置任务",
-          "collapse_completed_objectives": "折叠已完成任务的目标"
-        },
-        "filter_bar": {
-          "hint": "显示或隐藏状态筛选",
-          "all_filter": "显示所有任务",
-          "all_filter_hint": "显示所有任务，不限状态。",
-          "available_filter": "显示可用的任务",
-          "available_filter_hint": "根据您的等级和前置条件，当前即可开始的任务。",
-          "locked_filter": "显示锁定的任务",
-          "locked_filter_hint": "受等级、商人声望或前置任务限制的任务。",
-          "completed_filter": "显示已完成的任务",
-          "completed_filter_hint": "您已完成的任务。",
-          "failed_filter": "显示失败的任务",
-          "failed_filter_hint": "因错过条件而失败的任务。"
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "手动失败操作",
-          "failed_tasks_label": "失败任务",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "修复失败的任务",
           "repair_failed_confirm": "是否要通过清除当前失败条件不支持的失败标记来修复失败的任务?",
           "repair_failed_done": "已移除了 {count} 个任务的失败标记",
@@ -992,6 +954,13 @@
       },
       "no_tasks_found": "未找到任务，可尝试修改筛选条件或更新人物等级",
       "no_tasks_found_description": "调整筛选条件或等级要求以查看可用任务。",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "加载任务中",
       "map": {
         "resize_handle": "调整地图高度",
@@ -1036,24 +1005,34 @@
         }
       },
       "pinned_tasks_section": "已固定任务",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "当前聚焦任务",
       "focused_task_description": "该任务来自任务链接，方便你立刻看到接下来该做什么。",
       "global_tasks_section": "全局任务",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "固定任务",
         "unpin_task": "取消固定任务",
-        "level": "等级要求：{count}",
-        "level_badge": "等级 {count}",
-        "fence_rep_badge": "围栏 {rep}",
-        "fence_rep_tooltip": "需要 Fence 声望为 {rep}",
-        "trader_level_tooltip": "需要 {trader} 忠诚度等级 {level}",
-        "trader_level_badge": "{trader} LL{level}",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "维基百科",
-        "locked_before": "前置任务：{count} 个",
         "unlocks_next": "解锁后续任务",
         "copy_task_link": "复制任务链接",
         "copy_key_name": "复制钥匙名称",
-        "report_data_issue": "报告数据问题",
         "tarkov_dev_logo": "Tarkov.dev 徽标",
         "view_task_on_wiki": "在维基查看{name}",
         "hand_over": "交付",
@@ -1100,13 +1079,8 @@
         "requirement_status_active": "进行中/已接受",
         "requirement_status_available": "可用",
         "requirement_status_not_started": "未开始",
-        "requires_must_be": "必须为 {status}",
         "requires_currently": "目前 {status}",
-        "requires_tooltip_action": "{action} \"{name}\" 以解锁此任务",
         "requires_tooltip_conflict": "\"{name}\" 当前为 {current}，但需要 {expected} — 此任务可能会被永久锁定",
-        "requires_progress": "已完成 {completed}/{total} 个前置条件",
-        "requires_progress_tooltip": "下一步：{tasks}",
-        "requires_progress_tooltip_overflow": "下一步：{tasks}，以及另外 {count} 个",
         "objectives_hidden": "其他地图中有 {count} 个任务目标({uncompleted} 个未完成)",
         "needed_by": "被以下任务依赖：{names}",
         "unlocks_next_tooltip": "完成此任务后可解锁的任务数量",
@@ -1126,7 +1100,6 @@
         "find_fir": "战局中找到",
         "items_count": "{count} 件物品",
         "kappa_tooltip": "该任务是获得 Kappa 安全箱的必需任务",
-        "level_badge_tooltip": "需要玩家最低等级 {level} 才能解锁该任务",
         "lightkeeper_tooltip": "该任务是解锁商人 Lightkeeper 的必需任务",
         "alternatives_tooltip": "此任务有 {count} 个备选方案——您只需完成其中一个",
         "alternatives_badge": "{count} 个备选",
@@ -1136,24 +1109,21 @@
         "previous_tasks": "前置任务：",
         "progress": "进度 {completed}/{total}",
         "rewards": "奖励",
-        "unlocks_count": "{count} 项解锁",
-        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
-        "loyalty_level": "LL",
-        "reputation": "重写"
+        "unlocks_count": "{count} 项解锁"
       },
       "blockers": {
-        "player_level": "玩家等级需要 {comparison} {required}（当前：{current}）。",
-        "trader_level": "{trader} 忠诚等级需要 {comparison} {required}（当前：{current}）。",
-        "trader_reputation": "{trader} 声望需要 {comparison} {required}（当前：{current}）。",
+        "player_level_required": "Requires player level {requirement} (you: {current}).",
+        "trader_level_required": "Requires {trader} loyalty level {requirement} (you: {current}).",
+        "trader_reputation_required": "Requires {trader} reputation {requirement} (you: {current}).",
         "prerequisite": "满足以下任务的状态要求：{tasks}。",
         "story_route": "满足 {tasks} 的任务状态要求，或推进以下剧情章节之一：{chapters}。",
         "failed_branch": "被失败任务阻止：{task}。",
         "faction": "仅 {faction} 角色可接取。",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "完成 {task} 以解锁 {trader}。",
         "prestige": "需要声望等级 {required}（当前：{current}）。",
-        "global_variable": "服务器进度值需满足：{comparison} {required}（当前：{current}）。",
-        "global_variable_unknown": "服务器进度需满足 {comparison} {required}。跟踪器无法获取你当前的进度值。仅当此任务已在游戏内可用时，才使用“标记为可用”；计数器任务不会被标记为完成。",
-        "task_counter": "此商人忠诚度等级中的已完成任务数需达到 {comparison} {required}（已完成：{current}）。如果此任务已在游戏内可用，请使用“标记为可用”。",
+        "global_variable_required": "Additional in-game progression required.",
+        "global_variable_unknown_required": "Additional in-game progression required. Use Mark available only if this task is available in-game.",
         "dialogue": "需要游戏内的交易者对话。只有在确认此任务在游戏中可用后才能使用标记。",
         "story_objective": "完成剧情目标\"{objective}\"（{chapter}）。",
         "unknown": "要求数据不可用或不支持。可用性无法确认。",
@@ -1167,16 +1137,67 @@
         "status_active": "活动或接受",
         "status_unknown": "未知状态",
         "status_or": " 或 "
+      },
+      "requirements": {
+        "title": "Requirements",
+        "met_count": "{met} of {total} met",
+        "show_more": "+{count} 个更多",
+        "show_less": "显示较少",
+        "comparison_at_least": "{value}+",
+        "comparison_above": "above {value}",
+        "comparison_at_most": "{value} or lower",
+        "comparison_below": "below {value}",
+        "comparison_exactly": "exactly {value}",
+        "comparison_not_equal": "not {value}",
+        "player_level": "Level {requirement}",
+        "trader_level": "{trader} loyalty {requirement}",
+        "trader_reputation": "{trader} reputation {requirement}",
+        "task": "{action} {task}",
+        "you": "you: {value}",
+        "story_alternative": "Or progress a story chapter: {chapters}",
+        "met": "Met",
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Additional in-game progression required",
+        "named_pool_one": "Complete {requirement} LL{level} task for {trader}",
+        "named_pool_other": "Complete {requirement} LL{level} tasks for {trader}",
+        "task_pool_one": "Complete {requirement} task from the required pool",
+        "task_pool_other": "Complete {requirement} tasks from the required pool",
+        "task_count_at_least": "at least {value}",
+        "task_count_above": "more than {value}",
+        "task_count_at_most": "at most {value}",
+        "task_count_below": "fewer than {value}",
+        "task_count_exactly": "exactly {value}",
+        "task_count_not_equal": "a number other than {value}",
+        "pool_tracked": "{value} tracked",
+        "pool_account": "{value} in game",
+        "pool_unverified": "Progress unverified",
+        "pool_show_tasks": "Show tasks",
+        "pool_hide_tasks": "Hide tasks",
+        "pool_tasks": "Tasks that count",
+        "pool_candidates": "Candidate tasks",
+        "pool_explanation": "Only tasks in this pool count. Reaching the trader loyalty level is a separate requirement.",
+        "pool_candidate_explanation": "This requirement belongs to the trader's LL task pool. The tasks below are possible contributors.",
+        "pool_caveat": "The counting rules for this pool are unverified. These tasks may contribute; their completions cannot confirm this requirement.",
+        "pool_confirmation_hint": "If this task is already available in-game, use Mark available. This does not complete any pool tasks.",
+        "pool_confirmed": "Confirmed in game",
+        "pool_any_of": "Any one task counts once",
+        "pool_credit_earned": "1 credit earned",
+        "pool_all_of": "Complete all tasks in this group for one credit",
+        "pool_current_task": "This task",
+        "pool_status_available": "可用",
+        "pool_status_locked": "已锁定",
+        "pool_status_completed": "已完成",
+        "pool_status_failed": "失败",
+        "pool_status_unavailable": "Unavailable"
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "加载藏身处数据中",
       "station_link_label": "前往 {name}",
       "no_stations_found": "未找到设施，可尝试修改筛选条件",
-      "collapse_completed": "折叠已完成的设施",
-      "sort": {
-        "ready_first": "优先显示可建造"
-      },
       "prereq_filters": {
         "title": "可用性要求",
         "station_levels": "要求设施等级",
@@ -1209,23 +1230,49 @@
           "mark_incomplete": "标记未完成",
           "set_custom_amount": "设置自定义数量："
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "加载任务及藏身处数据中",
-      "search_placeholder": "搜索物品、任务或藏身处设施...",
-      "items": "物品",
+      "items_count": "{count} item | {count} items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "没有符合搜索的物品。",
       "error": "无法加载所需物品。",
       "filters": {
-        "label": "筛选",
-        "non_fir": "非战局拾取",
-        "hide_owned": "隐藏已拥有",
-        "hide_non_fir_special_equipment_title": "隐藏非战局拾取特殊装备(如MS2000信标、无线摄像头)",
-        "kappa_only": "Kappa前置",
-        "kappa_only_tooltip": "只显示Kappa前置任务需要的物品",
-        "kappa_only_disabled_tooltip": "\"只显示Kappa前置\"选项仅对任务界面生效",
-        "hide_team_needs": "隐藏队友所需"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "非FIR"
+        },
+        "hide": {
+          "title": "隐藏",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "任务",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "排序",
@@ -1238,10 +1285,7 @@
         "grid": "网格视图",
         "combined": "组合视图"
       },
-      "teammates_needed": "队友需要这个",
-      "settings": {
-        "title": "所需物品设置"
-      }
+      "teammates_needed": "队友需要这个"
     },
     "settings": {
       "card": {
@@ -1302,6 +1346,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "邀请团队成员，选择您看到的团队进度，并一起跟踪。",
       "invite": {
         "title": "邀请链接",
@@ -1551,8 +1600,8 @@
       "suggest_description": "建议将社区工具或指南收录到此页面。",
       "suggest_cta": "建议资源",
       "migration_banner": {
-        "title": "迁移自TarkovTracker.io？",
-        "cta": "阅读迁移指南"
+        "cta": "阅读迁移指南",
+        "chip": "From .io?"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org 指南",
@@ -1790,14 +1839,10 @@
     "profile": "个人资料",
     "section_navigation": "导航",
     "account_menu": "账户菜单",
-    "mode_auto": "自动",
-    "auto_level_enabled": "已启用自动等级计算",
-    "level_display_auto": "等级 {level}（已启用自动计算）",
     "level_display_editable": "等级 {level}，点击或按回车编辑",
     "increment_level": "提升等级",
     "decrement_level": "降低等级",
-    "xp_progress": "经验值进度",
-    "xp_settings_link": "查看经验值和等级设置"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2003,6 +2048,7 @@
       "switch_mode_fetch_failed": "游戏模式已切换，但未能刷新数据，请重试"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "确定要重置你的 PvP 进度吗？",
       "reset_pvp_warning": "这将永久删除你的 PvP 进度，包括任务、藏身处和等级。你的 PvE 数据不会受到影响。",
       "reset_pve_confirmation": "确定要重置你的 PvE 进度吗？",
@@ -2068,7 +2114,29 @@
       "prestige_history_duration": "周目时长",
       "prestige_history_days_value": "{days} 天",
       "prestige_history_compare_title": "与上次周目对比",
-      "prestige_history_compare_subtitle": "当前声望 {from} 与声望 {to} 对比"
+      "prestige_history_compare_subtitle": "当前声望 {from} 与声望 {to} 对比",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} 转生完成",
@@ -2234,6 +2302,20 @@
       "active_mode": "已启用",
       "game_edition_hint": "选择您自己的游戏版本，因此跟踪符合您的可用内容。"
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "技能管理",
       "explanation": "下方展示游戏内所有技能，任务奖励自动计算，可通过偏移量补充游戏内获得的技能经验",
@@ -2270,19 +2352,6 @@
       "warn_system_omnibar": "警告：可能与浏览器/操作系统快捷键冲突（例如 Ctrl+T、Ctrl+W、Alt+Tab）。",
       "warn_system_undo": "警告：可能与浏览器/操作系统快捷键冲突（例如 Ctrl+W、Ctrl+T、Alt+Tab）。"
     },
-    "experience": {
-      "title": "经验与等级",
-      "auto_level_title": "等级自动计算",
-      "auto_level_description": "开启后将根据总经验自动计算等级；关闭后可手动设置等级，与经验计算结果独立",
-      "current_level": "当前等级",
-      "set_total_xp": "设置总经验",
-      "manual_hint": "输入实际总经验可自动调整偏移量",
-      "xp_amount": "{amount} 经验",
-      "xp_to_next": "距下一级还需 {amount}",
-      "reset_offset": "重置经验偏移量",
-      "xp_progress_aria": "向下一级发展经验",
-      "xp_progress_value": "距离下一级还需 {percent}%"
-    },
     "danger_zone": {
       "confirm_instruction": "请输入 {word} 以确认重置所有数据：",
       "confirm_word": "删除账户"
@@ -2308,6 +2377,21 @@
       "version_filter_label": "包含日志版本",
       "version_filter_hint": "默认选中最新主版本。可调整以包含更早的赛季重置版本。",
       "version_filter_tooltip": "日志按会话版本分组。默认选择最新主版本，以避免混入旧赛季重置数据。",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "已完成",
+        "started": "Started / active",
+        "failed": "失败"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "未知版本",
       "source_file": "源文件",
       "selected_files": "已选择文件",
@@ -2342,6 +2426,7 @@
       "cleared_logs_toast_title": "旧日志可能已被清理",
       "cleared_logs_toast_description": "日志导入只能读取 Logs 文件夹里仍保留的任务历史。已删除的会话无法恢复。",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "ZIP存档不完整或包含无效的日志条目。未导入进度。",
         "budget_exceeded": "选中的日志超出安全导入预算。选择较少最近的会话或仅提取相关的日志文件。没有导入任何进展。",
         "record_too_large": "{path} 中的单条日志记录过大，无法安全解析。未导入任何进度。请报告此日志格式。",
@@ -2353,6 +2438,8 @@
         "parse_failed": "解析 EFT 日志失败。",
         "task_metadata_not_loaded": "任务元数据尚未加载。请刷新后重试。",
         "invalid_mode": "选择一个有效的目标游戏模式。",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "这些日志包含活动季节以外或没有可用日期的事件。从活动季节选择会话，然后导入季节性PvP。"
       },
       "failed_tasks": "匹配到失败任务：{count}",
@@ -2404,6 +2491,7 @@
         "rate_limited": "导入尝试次数过多。请等待约 {minutes} 分钟后重试。",
         "verification_failed": "人类验证失败。重新加载页面然后重试。",
         "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "这个Tarkov个人资料已经链接到另一个TarkovTracker帐户，因此它在这里没有链接。 导入的进度已保存。从另一个帐户取消链接，然后再次导入。",
         "save_failed": "配置文件已经导入到此设备上，但它还不能保存到您的帐户。 检查您的连接；此设备上的导入一直保持到它同步。"
       }
@@ -2450,7 +2538,6 @@
     "smart_fill": "智能填充",
     "unknown_task": "未知任务",
     "unknown_station": "未知车站",
-    "lvl": "等级",
     "needed": "需要的",
     "view_details_for": "查看 {name} 的详情",
     "locked_before": "前置 {count}",
@@ -2459,6 +2546,14 @@
     "collected": "集",
     "mark_collected": "标记为已收集",
     "handed_over": "已上交",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "输入物品数量",
       "decrease_count": "减少数量",
@@ -2479,6 +2574,8 @@
     "any_of_items_short": "任意 {count} 个",
     "view_accepted_items": "查看全部 {count} 个符合条件的物品",
     "not_collected": "未收集",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "点击收藏",
     "click_to_uncollect": "点击取消收集",
     "modal": {
@@ -2562,6 +2659,18 @@
       "tasks": {
         "title": "塔科夫任务追踪器 · TarkovTracker.org",
         "description": "追踪 PvP、PvE 和赛季模式下的塔科夫任务、目标、奖励和前置条件。"
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "塔科夫基地追踪器 · TarkovTracker.org",
