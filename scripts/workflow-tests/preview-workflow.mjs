@@ -55,6 +55,16 @@ function assertTrustedBoundary(workflow) {
   assert.match(smoke, /PREVIEW_URL: \$\{\{ needs\.deploy\.outputs\.url \}\}/);
   assert.match(smoke, /playwright test --config scripts\/preview\/smoke\/playwright\.config\.mjs/);
   assert.match(workflowStep(smoke, 'Retain smoke evidence'), /retention-days: 30/);
+  // The browser install stays off the apt mirror unless the runner image cannot launch Chromium.
+  const browser = workflowStep(smoke, 'Install pinned browser');
+  assert.match(browser, /timeout -k 15 90 pnpm exec playwright install --only-shell chromium /);
+  assert.doesNotMatch(browser, /--with-deps/);
+  const probe = browser.indexOf('probe && exit 0');
+  assert.ok(probe >= 0, 'a launch probe gates the apt fallback');
+  assert.ok(
+    probe < browser.indexOf('install-deps'),
+    'apt host dependencies are only a fallback after a failed launch probe'
+  );
   assert.match(workflowStep(deploy, 'Retain deployment evidence'), /retention-days: 30/);
   assert.match(
     workflowStep(deploy, 'Retain deployment evidence'),

@@ -213,7 +213,7 @@ jobs:
     name: Preview smoke tests
     needs: [plan, deploy]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 26
     permissions:
       contents: read
     steps:
@@ -224,13 +224,37 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Install pinned browser
-        timeout-minutes: 12
+        timeout-minutes: 18
+        # The ubuntu-24.04 image already ships Chromium's shared libraries; Playwright's apt host
+        # dependency install only added optional CJK/Thai/X11 fonts through the Ubuntu mirror, which
+        # intermittently stalls for minutes. Install the headless shell from Playwright's CDN, and
+        # install host dependencies through apt only when the browser cannot launch.
+        # Worst case: 3 x 105s downloads + 2 x 225s apt attempts + one 180s lock wait = 945s.
         run: |
+          probe() {
+            node -e "import('@playwright/test').then(async ({ chromium }) => (await chromium.launch()).close())"
+          }
+          downloaded=false
           for attempt in 1 2 3; do
-            timeout -k 15 210 pnpm exec playwright install --with-deps chromium && exit 0
-            [ "$attempt" -lt 3 ] && echo "::warning::Browser install attempt $attempt failed or stalled; retrying."
+            timeout -k 15 90 pnpm exec playwright install --only-shell chromium && downloaded=true && break
+            echo "::warning::Browser download attempt $attempt failed or stalled."
           done
-          echo "::error::Browser install failed after 3 attempts."
+          if [ "$downloaded" != true ]; then
+            echo "::error::Browser download failed after 3 attempts."
+            exit 1
+          fi
+          probe && exit 0
+          echo "::warning::Chromium cannot launch on this runner image; installing host dependencies."
+          echo 'DPkg::Lock::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout >/dev/null
+          for attempt in 1 2; do
+            if [ "$attempt" -gt 1 ]; then
+              timeout 180 sh -c 'while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done' \
+                || echo "::warning::dpkg lock still held after 180s."
+            fi
+            timeout -k 15 210 pnpm exec playwright install-deps chromium && probe && exit 0
+            echo "::warning::Browser dependency install attempt $attempt failed or stalled."
+          done
+          echo "::error::Chromium still cannot launch after installing host dependencies."
           exit 1
       - name: Run smoke tests against the unique deployment URL
         env:
