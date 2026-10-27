@@ -165,7 +165,7 @@ describe('evaluateExceptions advisory matching', () => {
       NOW
     );
     expect(still.failures).toEqual([
-      'nuxt@4.6.2 is still inside the vulnerable range of GHSA-test',
+      'nuxt@4.6.2 is not cleared by the vulnerable range of GHSA-test',
     ]);
   });
   it('rejects a fix that is still vulnerable under another advisory', () => {
@@ -176,9 +176,23 @@ describe('evaluateExceptions advisory matching', () => {
       NOW
     );
     expect(verdict.failures).toEqual([
-      'nuxt@4.6.2 is still inside the vulnerable range of GHSA-open',
+      'nuxt@4.6.2 is not cleared by the vulnerable range of GHSA-open',
       expect.stringContaining('@nuxt/kit@4.6.2 fixes no open'),
     ]);
+  });
+  it('fails closed on an unparsable range or a vulnerable advisory without an id', () => {
+    for (const [extra, label] of [
+      [{ ...advisory('nuxt', null, null), ghsa_id: 'GHSA-null' }, 'GHSA-null'],
+      [{ ...advisory('nuxt', '~4.6', '4.7.0'), ghsa_id: 'GHSA-tilde' }, 'GHSA-tilde'],
+      [{ ...advisory('nuxt', '<= 4.6.2', '4.6.3'), ghsa_id: undefined }, 'an advisory without'],
+    ]) {
+      const verdict = evaluateExceptions(
+        policy('nuxt@4.6.2'),
+        { nuxt: pkg(nuxt, [...lookup.nuxt.advisories, extra]) },
+        NOW
+      );
+      expect(verdict.failures).toEqual([expect.stringContaining(`vulnerable range of ${label}`)]);
+    }
   });
   it('ignores withdrawn advisories', () => {
     const withdrawn = (entry) => ({ ...entry, withdrawn_at: daysAgo(1) });

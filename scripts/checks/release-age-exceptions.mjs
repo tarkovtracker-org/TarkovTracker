@@ -54,16 +54,20 @@ const COMPARATORS = {
   '<': (order) => order < 0,
   '=': (order) => order === 0,
 };
+// The comparison order, or undefined when the clause cannot be parsed.
 const clauseMatches = (version, clause) => {
   const match = /^\s*(>=|<=|>|<|=)?\s*(\S+)\s*$/.exec(clause);
   const order = match ? compareVersions(version, match[2]) : Number.NaN;
-  return !Number.isNaN(order) && COMPARATORS[match[1] ?? '='](order);
+  return Number.isNaN(order) ? undefined : COMPARATORS[match[1] ?? '='](order);
+};
+/** `version` against a GitHub advisory range (`>= 4.0.0, < 4.6.2`); undefined if unparsable. */
+const rangeVerdict = (version, range) => {
+  if (typeof range !== 'string' || range.trim() === '') return undefined;
+  const clauses = range.split(',').map((clause) => clauseMatches(version, clause));
+  return clauses.includes(undefined) ? undefined : clauses.every(Boolean);
 };
 /** True when `version` satisfies a GitHub advisory range such as `>= 4.0.0, < 4.6.2`. */
-export const inAdvisoryRange = (version, range) =>
-  typeof range === 'string' &&
-  range.trim() !== '' &&
-  range.split(',').every((clause) => clauseMatches(version, clause));
+export const inAdvisoryRange = (version, range) => rangeVerdict(version, range) === true;
 const parseSetting = (json) => (json.trim() === '' ? undefined : JSON.parse(json));
 /** Policy from `pnpm config get <key> --json` output, which pnpm prints empty for unset keys. */
 export function policyFromConfig(ageJson, excludesJson) {
@@ -128,8 +132,9 @@ const rangesFor = (advisory, name) =>
   (advisory.vulnerabilities ?? []).filter(
     (entry) => entry.package?.ecosystem === 'npm' && entry.package?.name === name
   );
+// Fails closed: a range that cannot be evaluated counts as still vulnerable.
 const isVulnerable = (ranges, version) =>
-  ranges.some((entry) => inAdvisoryRange(version, entry.vulnerable_version_range));
+  ranges.some((entry) => rangeVerdict(version, entry.vulnerable_version_range) !== false);
 const patchedAtOrBelow = (ranges, version) =>
   ranges
     .map((entry) => entry.first_patched_version)
@@ -151,9 +156,10 @@ const justifiesEarly = (packument, version, cutoff) => (advisory) => {
   const versions = Object.keys(packument.versions);
   return Boolean(patched) && !versions.some(isMatureFix(packument, ranges, patched, cutoff));
 };
-/** The open advisory for `name` whose vulnerable ranges still include `version`, if any. */
+/** The open advisory for `name` whose ranges include (or cannot clear) `version`, if any. */
 const vulnerableUnder = (advisories, name, version) =>
-  advisories.find((advisory) => isVulnerable(rangesFor(advisory, name), version))?.ghsa_id;
+  advisories.find((advisory) => isVulnerable(rangesFor(advisory, name), version));
+const advisoryLabel = (advisory) => advisory.ghsa_id || 'an advisory without a GHSA id';
 /**
  * The advisory that justifies `version` skipping the release-age window, if any. A version still
  * inside any advisory's vulnerable range is never justified, even when it fixes another one.
@@ -197,7 +203,9 @@ const screeningFailures = (entry) => {
   return [
     ...vetRelease(entry.packument, entry.version),
     ...(entry.repository ? [] : [`${entry.raw} has no readable npm provenance source repository`]),
-    ...(vulnerable ? [`${entry.raw} is still inside the vulnerable range of ${vulnerable}`] : []),
+    ...(vulnerable
+      ? [`${entry.raw} is not cleared by the vulnerable range of ${advisoryLabel(vulnerable)}`]
+      : []),
   ];
 };
 const ADMIT_RULES = [
