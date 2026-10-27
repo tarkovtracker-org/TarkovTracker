@@ -181,10 +181,14 @@ jobs:
             if [ "$MAIN_MERGE_MODE" != strict ]; then
               check_filter+=' | map(select(.app.id != 15368 or (.name != "Filter admission event" and .name != "Review admission controller")))'
             fi
+            # Rebases and edits re-run checks on the same head, leaving the superseded run behind
+            # as `cancelled`. Like GitHub's required-check evaluation, judge only the latest run
+            # of each check name per app.
+            check_filter+=' | group_by([.name, .app.id]) | map(max_by(.id))'
             check_runs="$(
-              gh api \
+              gh api --paginate --slurp \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq "$check_filter"
+                | jq "{check_runs: [.[].check_runs[]]} | $check_filter"
             )"
             # Queue admission is explicitly refreshed after these gates. Old controller checks
             # and status failure/pending must not prevent recovery; strict mode is unchanged.

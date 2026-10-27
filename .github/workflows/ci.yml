@@ -313,6 +313,12 @@ jobs:
     name: Supabase DB
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      # The CLI defaults to public.ecr.aws, then ghcr.io, then Docker Hub, with backoff on every
+      # image. Hosted runners regularly exhaust the anonymous ECR data quota ("Data limit exceeded")
+      # and hit ghcr.io burst throttling, which added minutes per run. GitHub-hosted runners are
+      # exempt from Docker Hub pull limits, so pull Supabase's Docker Hub images directly.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

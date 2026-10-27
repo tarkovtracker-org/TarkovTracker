@@ -133,9 +133,11 @@ if (args[0] === 'api') {
     console.log(JSON.stringify({data:{enqueuePullRequest:{mergeQueueEntry:queued}}}));
     process.exit(0);
   }
-  if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
-    const input = JSON.stringify({ check_runs: JSON.parse(p.WAIT_CHECK_RUNS || '[]') });
-    console.log(execFileSync('jq', [args[args.indexOf('--jq') + 1]], { input, encoding: 'utf8' }));
+  if (args[1] === '--paginate' && args[2] === '--slurp' && args[3] === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/check-runs?per_page=100') {
+    // --slurp prints every page as one JSON array; the step merges and filters with jq itself.
+    const runs = JSON.parse(p.WAIT_CHECK_RUNS || '[]');
+    const pages = runs.length > 1 ? [{ check_runs: runs.slice(0, 1) }, { check_runs: runs.slice(1) }] : [{ check_runs: runs }];
+    console.log(JSON.stringify(pages));
     process.exit(0);
   }
   if (waitEndpoint === 'repos/' + p.GITHUB_REPOSITORY + '/commits/' + p.HEAD_SHA + '/status') {

@@ -563,3 +563,42 @@ test('repository-controlled workflow normalization receives no online-audit toke
   assert.equal(run(command).stdout.trim(), 'token-absent');
   assert.equal(run(command.replace('env -u GH_TOKEN ', '')).status, 9);
 });
+test('Supabase DB pulls images from Docker Hub instead of the rate-limited CLI fallback chain', () => {
+  const job = jobBlock(read('.github/workflows/ci.yml'), 'supabase-db');
+  assert.match(job, /^ {6}SUPABASE_INTERNAL_IMAGE_REGISTRY: docker\.io$/m);
+  assert.doesNotMatch(job, /docker login|secrets\./);
+});
+test('Dependabot gate judges only the latest run of each check, not superseded cancellations', () => {
+  const wait = workflowStep(
+    jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge'),
+    'Wait for checks'
+  );
+  assert.match(wait, /gh api --paginate --slurp \\\n/, 'every check-run page is evaluated');
+  // Compose the strict-mode filter exactly as the step does and run it against real jq.
+  const base = /check_filter='([^']+)'/.exec(wait)[1];
+  const dedupe = /check_filter\+=' (\| group_by[^']+)'/.exec(wait)[1];
+  const run = (id, name, app, conclusion) => ({
+    id,
+    name,
+    app: { id: app },
+    status: 'completed',
+    conclusion,
+  });
+  const pages = [
+    { check_runs: [run(1, 'PR Title', 15368, 'cancelled'), run(3, 'CI Result', 15368, 'failure')] },
+    { check_runs: [run(2, 'PR Title', 15368, 'success'), run(4, 'CI Result', 999, 'success')] },
+  ];
+  const jq = spawnSync('jq', ['-c', `{check_runs: [.[].check_runs[]]} | ${base} ${dedupe}`], {
+    input: JSON.stringify(pages),
+    encoding: 'utf8',
+  });
+  assert.equal(jq.status, 0, jq.stderr);
+  const latest = Object.fromEntries(
+    JSON.parse(jq.stdout).map((check) => [`${check.name}|${check.app.id}`, check.conclusion])
+  );
+  assert.deepEqual(latest, {
+    'PR Title|15368': 'success',
+    'CI Result|15368': 'failure',
+    'CI Result|999': 'success',
+  });
+});
