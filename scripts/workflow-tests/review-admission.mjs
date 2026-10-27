@@ -529,14 +529,18 @@ function lockVersions(lock, name) {
   const record = new RegExp(`^ {2}${escapeRegExp(name)}@(\\d+\\.\\d+\\.\\d+):`, 'gm');
   return [...new Set([...lock.matchAll(record)].map((match) => match[1]))];
 }
-// Rewrites every transitive resolution of name@from (keys, peer suffixes and `name: from` edges)
-// to `to`. Importer `version:` entries are not rewritten, so callers use transitive-only packages.
+// Rewrites every resolution of name@from to `to`: keys, peer suffixes, `name: from` edges and
+// importer `version:` entries, so the result stays internally consistent for direct dependencies.
 function retargetPackage(lock, name, from, to) {
   const id = escapeRegExp(name);
   const version = escapeRegExp(from);
   return lock
     .replace(new RegExp(`(?<![\\w@/.-])${id}@${version}(?![\\w.])`, 'g'), `${name}@${to}`)
-    .replace(new RegExp(`^( +)${id}: ${version}(?=\\(|$)`, 'gm'), `$1${name}: ${to}`);
+    .replace(new RegExp(`^( +)${id}: ${version}(?=\\(|$)`, 'gm'), `$1${name}: ${to}`)
+    .replace(
+      new RegExp(`(^ {6}'?${id}'?:\\n {8}specifier: .*\\n {8}version: )${version}(?=\\(|$)`, 'gm'),
+      `$1${to}`
+    );
 }
 function isDirectDependency(lock, name) {
   const importers = lock.slice(lock.indexOf('\nimporters:\n'), lock.indexOf('\npackages:\n'));
@@ -575,7 +579,6 @@ test('genuine Supabase CLI jose transitive patch remains sensitive with an uncha
   const before = readFileSync('pnpm-lock.yaml', 'utf8');
   const [current] = lockVersions(before, 'jose');
   assert.ok(current, 'the current lock resolves jose');
-  assert.ok(!isDirectDependency(before, 'jose'), 'jose stays a transitive dependency');
   const next = bumpPatch(current, 1);
   const integrity = (version) =>
     new RegExp(
