@@ -568,3 +568,12 @@ test('Supabase DB pulls images from Docker Hub instead of the rate-limited CLI f
   assert.match(job, /SUPABASE_INTERNAL_IMAGE_REGISTRY: docker\.io/);
   assert.doesNotMatch(job, /docker login|secrets\./);
 });
+test('Dependabot gate judges only the latest run of each check, not superseded cancellations', () => {
+  const wait = workflowStep(
+    jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge'),
+    'Wait for checks'
+  );
+  const dedupe = wait.indexOf("check_filter+=' | group_by([.name, .app.id]) | map(max_by(.id))'");
+  assert.ok(dedupe > 0, 'check runs are reduced to the latest per name and app');
+  assert.ok(dedupe < wait.indexOf('check_runs="$('), 'dedupe applies before the runs are fetched');
+});

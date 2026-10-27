@@ -598,7 +598,8 @@ Supabase clients), which stays confirm-required. Majors and GitHub Actions updat
 - PR must stay on the validated head SHA, the GitHub Actions `CI Result` and `PR Meta` check runs
   and Socket's `Socket Security: Pull Request Alerts` check run (app `156372`) must succeed, the latest `Preview Result` status must be `success`, and no check run or latest
   status context may fail or remain pending; the merge command also matches the validated head
-  commit to close the final race. Individual CI/security job names are no longer listed; the wait
+  commit to close the final race. Only the latest check run per name and app counts, so a run
+  cancelled because a rebase re-triggered the same check does not fail the gate. Individual CI/security job names are no longer listed; the wait
   is bounded to 60 minutes inside a 90-minute job
 - An allowlisted candidate requests one preview from the trusted `main` controller only after its
   current-head CI and other checks pass. This retains unattended auto-merge without running a Pages
