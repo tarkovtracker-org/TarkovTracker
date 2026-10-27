@@ -360,7 +360,8 @@ Reusable security gate called by CI, plus the weekly standalone audit:
 - `security-scan` - `scripts/checks/audit-dependencies.mjs` (blocking): any production advisory at
   any severity fails unless its reviewed entry names the package, the complete dependency chains
   reviewed (any other path, or a finding without one, fails), why it cannot reach production, and an expiry; expired or mismatched
-  entries fail and stale ones warn. Informational
+  entries fail and stale ones warn. `scripts/checks/release-age-exceptions.mjs` (blocking)
+  justifies every `minimumReleaseAgeExclude` entry (see Dependency Updates). Informational
   all-dependency audit at `high` (a notice, never a failure), schedule-only outdated check,
   checksum-verified Gitleaks secret detection (blocking), preceded by a canary check that a
   generated service-role JWT in `wrangler.toml` is still reported (allowlists stay value-exact)
@@ -964,8 +965,26 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
   behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
-- Cooldown: 30 days for majors, 7 for minors, 3 for patches; security updates skip the cooldown
-  and are vetted in review instead
+- Cooldown: 30 days for majors, 7 for minors and patches (matching pnpm's `minimumReleaseAge`, so
+  a patch PR never fails install on a release pnpm still holds back); security updates skip the
+  cooldown
+- Release age: `minimumReleaseAge: 10080` in `pnpm-workspace.yaml` refuses any version younger than
+  7 days, including lockfile entries. A security fix skips the wait only through an exact
+  `name@version` entry in `minimumReleaseAgeExclude` that
+  `scripts/checks/release-age-exceptions.mjs` (blocking, in `security-scan`) justifies:
+  - **Early:** a version at or above a reviewed GitHub advisory's first patched version in the same
+    major line, outside every vulnerable range, when no patched version in that line has aged 7
+    days yet; plus siblings built from the same repository (per npm provenance) at the same
+    version and published within a day (e.g. `@nuxt/kit` with `nuxt`). A fix that ages past the
+    window still anchors its siblings until they age too.
+  - **Vetting, every entry still inside the window:** readable npm provenance, the same publisher
+    as the previous release (fails closed when either is unknown), no new install scripts, and no
+    open (non-withdrawn) advisory whose vulnerable range still includes the version.
+  - **Waits:** everything else, including releases of other packages that ride along with a fix
+    and name patterns (`@scope/*`), which fail. Entries past the window warn so they are removed.
+  - **Floor:** the check fails if `minimumReleaseAge` is unset or below 10080 minutes.
+  - To land a fix early, add the exact entries, run `node scripts/checks/release-age-exceptions.mjs`,
+    then `pnpm install`.
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent dependency PRs and 1 GitHub Actions PR

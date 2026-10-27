@@ -38,6 +38,12 @@ jobs:
         # Blocking: any production advisory at any severity fails CI unless it is reviewed,
         # unexpired, and listed in scripts/checks/audit-dependencies.mjs.
         run: node "$GITHUB_WORKSPACE/scripts/checks/audit-dependencies.mjs"
+      - name: Check release-age exceptions
+        # Blocking: each minimumReleaseAgeExclude entry must be a vetted fix for a reviewed advisory
+        # (or a same-release companion of one); everything else waits out minimumReleaseAge.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm run audit:release-age
       - name: Audit all dependencies (informational)
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         # Advisory only: development-dependency findings are reported, never gated.

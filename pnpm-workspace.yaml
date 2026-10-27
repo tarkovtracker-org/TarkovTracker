@@ -65,13 +65,8 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
+# Exact name@version excludes only, each justified by scripts/checks/release-age-exceptions.mjs.
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
-  - nuxt@4.6.2
-  - '@nuxt/kit@4.6.2'
-  - '@nuxt/schema@4.6.2'
-  - '@nuxt/nitro-server@4.6.2'
-  - '@nuxt/vite-builder@4.6.2'
-  - '@nuxt/vite-server@4.6.2'
   # Security fix for GHSA-m5mm-p8h7-m29v; security updates skip the release-age cooldown.
   - serialize-javascript@7.1.3
