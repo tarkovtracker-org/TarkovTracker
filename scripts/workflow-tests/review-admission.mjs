@@ -529,7 +529,8 @@ function lockVersions(lock, name) {
   const record = new RegExp(`^ {2}${escapeRegExp(name)}@(\\d+\\.\\d+\\.\\d+):`, 'gm');
   return [...new Set([...lock.matchAll(record)].map((match) => match[1]))];
 }
-// Rewrites every resolution of name@from (keys, peer suffixes and `name: from` edges) to `to`.
+// Rewrites every transitive resolution of name@from (keys, peer suffixes and `name: from` edges)
+// to `to`. Importer `version:` entries are not rewritten, so callers use transitive-only packages.
 function retargetPackage(lock, name, from, to) {
   const id = escapeRegExp(name);
   const version = escapeRegExp(from);
@@ -537,13 +538,18 @@ function retargetPackage(lock, name, from, to) {
     .replace(new RegExp(`(?<![\\w@/.-])${id}@${version}(?![\\w.])`, 'g'), `${name}@${to}`)
     .replace(new RegExp(`^( +)${id}: ${version}(?=\\(|$)`, 'gm'), `$1${name}: ${to}`);
 }
-// An unscoped, non-sensitive package with one resolved version, an empty snapshot, at least one
-// dependent edge, and no existing record at the next patch version.
+function isDirectDependency(lock, name) {
+  const importers = lock.slice(lock.indexOf('\nimporters:\n'), lock.indexOf('\npackages:\n'));
+  return new RegExp(`^ {6}'?${escapeRegExp(name)}'?:$`, 'm').test(importers);
+}
+// An unscoped, non-sensitive, transitive-only package with one resolved version, an empty
+// snapshot, at least one dependent edge, and no existing record at the next patch version.
 const SENSITIVE_NAME = /supabase|stripe|auth|session|jose|jwt|oauth|passport|credential/i;
 function isOrdinaryCandidate(lock, { name, version, next }) {
   const edge = new RegExp(`^ +${escapeRegExp(name)}: ${escapeRegExp(version)}$`, 'm');
   return [
     !SENSITIVE_NAME.test(name),
+    !isDirectDependency(lock, name),
     lockVersions(lock, name).length === 1,
     edge.test(lock),
     !lock.includes(`${name}@${next}`),
@@ -569,6 +575,7 @@ test('genuine Supabase CLI jose transitive patch remains sensitive with an uncha
   const before = readFileSync('pnpm-lock.yaml', 'utf8');
   const [current] = lockVersions(before, 'jose');
   assert.ok(current, 'the current lock resolves jose');
+  assert.ok(!isDirectDependency(before, 'jose'), 'jose stays a transitive dependency');
   const next = bumpPatch(current, 1);
   const integrity = (version) =>
     new RegExp(
