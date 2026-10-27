@@ -565,17 +565,18 @@ test('known ordinary resolution changes work within the complete current PNPM lo
   assert.equal(safeLockfileChange(before, after), true);
 });
 test('genuine Supabase CLI jose transitive patch remains sensitive with an unchanged manifest', async () => {
-  const after = readFileSync('pnpm-lock.yaml', 'utf8');
-  const [current] = lockVersions(after, 'jose');
-  assert.ok(current && !current.endsWith('.0'), 'the current lock resolves a jose patch release');
-  const previous = bumpPatch(current, -1);
+  // Build forward from the resolved jose to a synthetic next patch, so any current version works.
+  const before = readFileSync('pnpm-lock.yaml', 'utf8');
+  const [current] = lockVersions(before, 'jose');
+  assert.ok(current, 'the current lock resolves jose');
+  const next = bumpPatch(current, 1);
   const integrity = (version) =>
     new RegExp(
       `(\\n {2}jose@${escapeRegExp(version)}:\\n {4}resolution: \\{integrity: )sha512-[\\w+/=]+`
     );
-  assert.match(after, integrity(current));
-  const before = retargetPackage(after, 'jose', current, previous).replace(
-    integrity(previous),
+  assert.match(before, integrity(current));
+  const after = retargetPackage(before, 'jose', current, next).replace(
+    integrity(next),
     `$1sha512-${'A'.repeat(86)}==`
   );
   assert.notEqual(before, after);
