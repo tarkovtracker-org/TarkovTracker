@@ -573,7 +573,32 @@ test('Dependabot gate judges only the latest run of each check, not superseded c
     jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge'),
     'Wait for checks'
   );
-  const dedupe = wait.indexOf("check_filter+=' | group_by([.name, .app.id]) | map(max_by(.id))'");
-  assert.ok(dedupe > 0, 'check runs are reduced to the latest per name and app');
-  assert.ok(dedupe < wait.indexOf('check_runs="$('), 'dedupe applies before the runs are fetched');
+  assert.match(wait, /gh api --paginate --slurp \\\n/, 'every check-run page is evaluated');
+  // Compose the strict-mode filter exactly as the step does and run it against real jq.
+  const base = /check_filter='([^']+)'/.exec(wait)[1];
+  const dedupe = /check_filter\+=' (\| group_by[^']+)'/.exec(wait)[1];
+  const run = (id, name, app, conclusion) => ({
+    id,
+    name,
+    app: { id: app },
+    status: 'completed',
+    conclusion,
+  });
+  const pages = [
+    { check_runs: [run(1, 'PR Title', 15368, 'cancelled'), run(3, 'CI Result', 15368, 'failure')] },
+    { check_runs: [run(2, 'PR Title', 15368, 'success'), run(4, 'CI Result', 999, 'success')] },
+  ];
+  const jq = spawnSync('jq', ['-c', `{check_runs: [.[].check_runs[]]} | ${base} ${dedupe}`], {
+    input: JSON.stringify(pages),
+    encoding: 'utf8',
+  });
+  assert.equal(jq.status, 0, jq.stderr);
+  const latest = Object.fromEntries(
+    JSON.parse(jq.stdout).map((check) => [`${check.name}|${check.app.id}`, check.conclusion])
+  );
+  assert.deepEqual(latest, {
+    'PR Title|15368': 'success',
+    'CI Result|15368': 'failure',
+    'CI Result|999': 'success',
+  });
 });

@@ -186,9 +186,9 @@ jobs:
             # of each check name per app.
             check_filter+=' | group_by([.name, .app.id]) | map(max_by(.id))'
             check_runs="$(
-              gh api \
+              gh api --paginate --slurp \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq "$check_filter"
+                | jq "{check_runs: [.[].check_runs[]]} | $check_filter"
             )"
             # Queue admission is explicitly refreshed after these gates. Old controller checks
             # and status failure/pending must not prevent recovery; strict mode is unchanged.
