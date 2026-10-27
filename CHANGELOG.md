@@ -1,3 +1,49 @@
+# [1.88.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.87.0...v1.88.0) (2026-10-27)
+
+
+### Bug Fixes
+
+* **db:** close default EXECUTE on new postgres functions ([#1322](https://github.com/tarkovtracker-org/TarkovTracker/issues/1322)) ([2394695](https://github.com/tarkovtracker-org/TarkovTracker/commit/23946958c0dba07945d0379ae296b263ec29a816))
+* **dashboard:** exclude ineligible follow-ups from Up next counts ([#1296](https://github.com/tarkovtracker-org/TarkovTracker/issues/1296)) ([a06e4b9](https://github.com/tarkovtracker-org/TarkovTracker/commit/a06e4b90aa5d87158eadf56e9421ee6e125ff09b))
+* **needed-items:** fix count-control sizing and unify requirement labels ([#1297](https://github.com/tarkovtracker-org/TarkovTracker/issues/1297)) ([49d887f](https://github.com/tarkovtracker-org/TarkovTracker/commit/49d887faf6f75ec92b4411a22f013d6833b2330f))
+* **tasks:** keep linked tasks focused after query cleanup ([#1313](https://github.com/tarkovtracker-org/TarkovTracker/issues/1313)) ([3f3f4da](https://github.com/tarkovtracker-org/TarkovTracker/commit/3f3f4da2d9cbf4800c881d4a1d466be83a1242fb))
+* **backup:** keep recovery archive imports responsive ([#1283](https://github.com/tarkovtracker-org/TarkovTracker/issues/1283)) ([b9ebb79](https://github.com/tarkovtracker-org/TarkovTracker/commit/b9ebb7918a49c862aafcfae5c2a11753d1ece4a9))
+* **supabase:** move client definer RPCs out of the exposed schema ([#1325](https://github.com/tarkovtracker-org/TarkovTracker/issues/1325)) ([3099d64](https://github.com/tarkovtracker-org/TarkovTracker/commit/3099d649e0e23f2e4cdc83e975dc838abffc224d))
+* **tooling:** preserve embedded whitespace and split blank-line scanners ([#1285](https://github.com/tarkovtracker-org/TarkovTracker/issues/1285)) ([c506626](https://github.com/tarkovtracker-org/TarkovTracker/commit/c50662635fbfcfb494f63930e0b6b3b83f4269fe))
+* protect production precompute credential boundary ([#1213](https://github.com/tarkovtracker-org/TarkovTracker/issues/1213)) ([57d7151](https://github.com/tarkovtracker-org/TarkovTracker/commit/57d7151d41866eefcb5f30dfac75ba92cea1503f))
+* **import:** reject invalid cumulative profile XP ([#1233](https://github.com/tarkovtracker-org/TarkovTracker/issues/1233)) ([20699b3](https://github.com/tarkovtracker-org/TarkovTracker/commit/20699b34e8ed02ba63fe9e91b3b3561e55ab1894))
+* reject unsafe database observer privileges comprehensively ([#1209](https://github.com/tarkovtracker-org/TarkovTracker/issues/1209)) ([439929b](https://github.com/tarkovtracker-org/TarkovTracker/commit/439929b70628f301bc21bd4292be33d5a6a9b115))
+* **changelog:** restore 100% coverage of release-highlight helpers ([#1273](https://github.com/tarkovtracker-org/TarkovTracker/issues/1273)) ([5990201](https://github.com/tarkovtracker-org/TarkovTracker/commit/599020121bb47d422b9682314f8ab8b319c99d4d))
+* **import:** select EFT log modes, quest states, and reset history ([#1232](https://github.com/tarkovtracker-org/TarkovTracker/issues/1232)) ([88819a5](https://github.com/tarkovtracker-org/TarkovTracker/commit/88819a51d2cd5cc63c9c6fc82c85d889b2fbc725))
+* **settings:** stabilize the level hint during metadata loading ([#1253](https://github.com/tarkovtracker-org/TarkovTracker/issues/1253)) ([1666615](https://github.com/tarkovtracker-org/TarkovTracker/commit/1666615dcbc9638c3eee40979737e684cda6272c))
+* **sync:** support large modes and recover rejected progress saves ([#1301](https://github.com/tarkovtracker-org/TarkovTracker/issues/1301)) ([d55ceb3](https://github.com/tarkovtracker-org/TarkovTracker/commit/d55ceb3596a0ef6f96ed8fc1216d66412dc69c36))
+
+
+### Features
+
+* **tasks:** explain trader tier progression requirements ([#1307](https://github.com/tarkovtracker-org/TarkovTracker/issues/1307)) ([bcb223d](https://github.com/tarkovtracker-org/TarkovTracker/commit/bcb223dc11032d2210707655d83f826e3f29d9a7))
+* **needed-items:** hide objectives of hidden tasks ([#1308](https://github.com/tarkovtracker-org/TarkovTracker/issues/1308)) ([856a5ad](https://github.com/tarkovtracker-org/TarkovTracker/commit/856a5ad84413d5195c5d86063bfebf120fcab96b))
+* **tasks:** keep Graph discoverable on narrow screens ([#1295](https://github.com/tarkovtracker-org/TarkovTracker/issues/1295)) ([02afae7](https://github.com/tarkovtracker-org/TarkovTracker/commit/02afae78e9dc5c76014792d2ff14933a5ee0ceae))
+* **tasks:** let users hide tasks from task lists ([#1303](https://github.com/tarkovtracker-org/TarkovTracker/issues/1303)) ([2d36030](https://github.com/tarkovtracker-org/TarkovTracker/commit/2d36030ad924649d7757c537f089bd78fd08bf23))
+* **tasks:** link story objective requirements to the storyline ([#1319](https://github.com/tarkovtracker-org/TarkovTracker/issues/1319)) ([1843402](https://github.com/tarkovtracker-org/TarkovTracker/commit/184340298920745cb4fd756be8875d32006a0ebe))
+* **dashboard:** make the support banner stand out and reach more users ([#1315](https://github.com/tarkovtracker-org/TarkovTracker/issues/1315)) ([ba5e0eb](https://github.com/tarkovtracker-org/TarkovTracker/commit/ba5e0eb74e120f5e66120cbee3243400d7d78bdc))
+* **dashboard:** merge progress, migration, and changelog into one bar ([#1317](https://github.com/tarkovtracker-org/TarkovTracker/issues/1317)) ([dd1d369](https://github.com/tarkovtracker-org/TarkovTracker/commit/dd1d36911da7bd9952e990335c38265477c72609))
+* **dashboard:** replace next-actions hero with compact Up next list ([#1286](https://github.com/tarkovtracker-org/TarkovTracker/issues/1286)) ([9132d3a](https://github.com/tarkovtracker-org/TarkovTracker/commit/9132d3a8990018b86d236655ccc0185089d21b88))
+* **tasks:** section the trader view by in-game task group ([#1321](https://github.com/tarkovtracker-org/TarkovTracker/issues/1321)) ([711ec77](https://github.com/tarkovtracker-org/TarkovTracker/commit/711ec7787c97741406bf18dd8346dabf2a7be12c))
+* **ui:** share one status tab bar across Tasks, Needed Items, and Hideout ([#1224](https://github.com/tarkovtracker-org/TarkovTracker/issues/1224)) ([3208cd3](https://github.com/tarkovtracker-org/TarkovTracker/commit/3208cd399c1aa7cd5d0f43f5c6ab814979b339d4))
+* **tasks:** show task card requirements in one plain-language surface ([#1298](https://github.com/tarkovtracker-org/TarkovTracker/issues/1298)) ([63a0415](https://github.com/tarkovtracker-org/TarkovTracker/commit/63a0415c28c91b651e607ac3dbfa8d6cafe71407))
+* **tasks:** simplify task card actions and spacing ([#1309](https://github.com/tarkovtracker-org/TarkovTracker/issues/1309)) ([37cdbea](https://github.com/tarkovtracker-org/TarkovTracker/commit/37cdbea56d322d763652dc24bd6faabd55054001))
+* **ui:** split task filters from settings and share them across pages ([#1222](https://github.com/tarkovtracker-org/TarkovTracker/issues/1222)) ([78088a6](https://github.com/tarkovtracker-org/TarkovTracker/commit/78088a6d948e1f62852b2bf0bd6d887d55a3c4f8))
+* **tasks:** switch task views from header tabs again ([#1220](https://github.com/tarkovtracker-org/TarkovTracker/issues/1220)) ([f7067d9](https://github.com/tarkovtracker-org/TarkovTracker/commit/f7067d9600f4b16786fac915e8664d92c4803ad2))
+
+
+### Performance Improvements
+
+* **cache:** reuse serialized responses on cold misses ([#1247](https://github.com/tarkovtracker-org/TarkovTracker/issues/1247)) ([6f9cbf8](https://github.com/tarkovtracker-org/TarkovTracker/commit/6f9cbf89a43568d0965b8cad642508796db4d950))
+* **data:** reuse validated precomputed response bytes ([#1276](https://github.com/tarkovtracker-org/TarkovTracker/issues/1276)) ([f00fe92](https://github.com/tarkovtracker-org/TarkovTracker/commit/f00fe92f8bea5c528796a7a0eba698b9b191efde))
+* **cache:** stream cached lite item responses ([#1236](https://github.com/tarkovtracker-org/TarkovTracker/issues/1236)) ([c6f59f4](https://github.com/tarkovtracker-org/TarkovTracker/commit/c6f59f439e5690c7462c4c03e7c9273c8f5c0a7c))
+* **cache:** stream final task catalog responses ([#1251](https://github.com/tarkovtracker-org/TarkovTracker/issues/1251)) ([aa69ec4](https://github.com/tarkovtracker-org/TarkovTracker/commit/aa69ec43b6a289ae9697c16ab296e439a2ccd3aa))
+
 # [1.87.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.86.0...v1.87.0) (2026-10-13)
 
 
