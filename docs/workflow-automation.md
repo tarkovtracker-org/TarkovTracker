@@ -738,9 +738,8 @@ required maintainer approval, self-approval disabled, administrator bypass allow
 freshness and command-authorization check, re-verifies the artifact, uploads it with pinned Wrangler
 from the default-branch lockfile using `--branch preview-*`, and verifies the Cloudflare deployment
 record. `Preview smoke tests` runs Playwright without Cloudflare credentials against the unique
-deployment URL. It downloads only the pinned Chromium headless shell from Playwright's CDN; the
-runner image already provides the host libraries, so apt (whose Ubuntu mirror intermittently stalls
-for minutes) runs only when a launch probe fails. `Publish preview result` rechecks freshness and publishes success only for a
+deployment URL; its browser setup avoids the apt mirror unless a launch probe fails (see
+[`preview.yml`](../.github/workflows/preview.yml) `Install pinned browser`). `Publish preview result` rechecks freshness and publishes success only for a
 still-current candidate; any failed stage publishes failure, and a controller crash publishes
 failure on the candidate revision.
 

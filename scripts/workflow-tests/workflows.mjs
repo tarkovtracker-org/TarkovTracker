@@ -565,7 +565,7 @@ test('repository-controlled workflow normalization receives no online-audit toke
 });
 test('Supabase DB pulls images from Docker Hub instead of the rate-limited CLI fallback chain', () => {
   const job = jobBlock(read('.github/workflows/ci.yml'), 'supabase-db');
-  assert.match(job, /SUPABASE_INTERNAL_IMAGE_REGISTRY: docker\.io/);
+  assert.match(job, /^ {6}SUPABASE_INTERNAL_IMAGE_REGISTRY: docker\.io$/m);
   assert.doesNotMatch(job, /docker login|secrets\./);
 });
 test('Dependabot gate judges only the latest run of each check, not superseded cancellations', () => {

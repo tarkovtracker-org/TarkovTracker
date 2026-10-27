@@ -30,8 +30,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only and skip thresholds; Codecov merges their lcov uploads.
 - `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds. Uploads `coverage-final` for metrics.
 - `Validate` — Nuxt build for full or preview-required validation, including forks; preview builds export a validated artifact and main builds export the production artifact
-- `Supabase DB` — Reset + pgTAP regressions + lint local migrations (images from Docker Hub via
-  `SUPABASE_INTERNAL_IMAGE_REGISTRY`, avoiding the CLI's rate-limited ECR/ghcr.io fallback chain)
+- `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
 - `Workers` - Verify immutable frontend contracts pins, then fetch the exact tagged API source,
   compare compiled contracts, run its standalone types/schema/API/workerd/dry-run checks, and
