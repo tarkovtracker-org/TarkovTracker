@@ -563,3 +563,8 @@ test('repository-controlled workflow normalization receives no online-audit toke
   assert.equal(run(command).stdout.trim(), 'token-absent');
   assert.equal(run(command.replace('env -u GH_TOKEN ', '')).status, 9);
 });
+test('Supabase DB pulls images from Docker Hub instead of the rate-limited CLI fallback chain', () => {
+  const job = jobBlock(read('.github/workflows/ci.yml'), 'supabase-db');
+  assert.match(job, /SUPABASE_INTERNAL_IMAGE_REGISTRY: docker\.io/);
+  assert.doesNotMatch(job, /docker login|secrets\./);
+});
