@@ -104,7 +104,7 @@ describe('evaluateExceptions', () => {
     );
     expect(verdict.failures).toEqual([expect.stringContaining('@nuxt/kit@4.6.2 fixes no open')]);
   });
-  it('rejects a companion without provenance', () => {
+  it('rejects entries whose provenance cannot be read', () => {
     const verdict = evaluateExceptions(
       policy('nuxt@4.6.2', '@nuxt/kit@4.6.2'),
       {
@@ -113,7 +113,11 @@ describe('evaluateExceptions', () => {
       },
       NOW
     );
-    expect(verdict.failures).toEqual([expect.stringContaining('@nuxt/kit@4.6.2 fixes no open')]);
+    expect(verdict.failures).toEqual([
+      'nuxt@4.6.2 has no readable npm provenance source repository',
+      '@nuxt/kit@4.6.2 has no readable npm provenance source repository',
+    ]);
+    expect(verdict.justified).toEqual([]);
   });
   it('keeps a fix that aged past the window as its companions anchor', () => {
     const agedFix = packument('nuxt', { '4.6.1': [20, release()], '4.6.2': [7.1, release()] });
@@ -160,7 +164,37 @@ describe('evaluateExceptions advisory matching', () => {
       { nuxt: pkg(nuxt, [advisory('nuxt', '<= 4.6.2', '4.6.0')]) },
       NOW
     );
-    expect(still.failures).toEqual([expect.stringContaining('fixes no open advisory')]);
+    expect(still.failures).toEqual([
+      'nuxt@4.6.2 is still inside the vulnerable range of GHSA-test',
+    ]);
+  });
+  it('rejects a fix that is still vulnerable under another advisory', () => {
+    const open = { ...advisory('nuxt', '<= 4.6.2', '4.6.3'), ghsa_id: 'GHSA-open' };
+    const verdict = evaluateExceptions(
+      policy('nuxt@4.6.2', '@nuxt/kit@4.6.2'),
+      { ...lookup, nuxt: pkg(nuxt, [...lookup.nuxt.advisories, open]) },
+      NOW
+    );
+    expect(verdict.failures).toEqual([
+      'nuxt@4.6.2 is still inside the vulnerable range of GHSA-open',
+      expect.stringContaining('@nuxt/kit@4.6.2 fixes no open'),
+    ]);
+  });
+  it('ignores withdrawn advisories', () => {
+    const withdrawn = (entry) => ({ ...entry, withdrawn_at: daysAgo(1) });
+    const fixOnly = evaluateExceptions(
+      policy('nuxt@4.6.2'),
+      { nuxt: pkg(nuxt, lookup.nuxt.advisories.map(withdrawn)) },
+      NOW
+    );
+    expect(fixOnly.failures).toEqual([expect.stringContaining('fixes no open advisory')]);
+    const vulnerable = withdrawn({ ...advisory('nuxt', '<= 4.6.2', '4.6.3'), ghsa_id: 'GHSA-w' });
+    const stillFixes = evaluateExceptions(
+      policy('nuxt@4.6.2'),
+      { nuxt: pkg(nuxt, [...lookup.nuxt.advisories, vulnerable]) },
+      NOW
+    );
+    expect(stillFixes.failures).toEqual([]);
   });
 });
 describe('evaluateExceptions screening', () => {

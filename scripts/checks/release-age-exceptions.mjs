@@ -10,9 +10,10 @@ import { pathToFileURL } from 'node:url';
 // - companion: built from the same repository (per npm provenance) at the same version as an
 //   advisory-fix entry, published within a day of it (monorepo siblings such as @nuxt/kit with
 //   nuxt). A fix that has aged past the window still anchors its companions.
-// Every entry still inside the window must also carry npm provenance, come from the previous
-// release's publisher, and add no install scripts. The window itself may not drop below 7 days. Name patterns and unjustified entries fail; entries that have aged past the
-// window warn so they are removed.
+// Every entry still inside the window must also carry readable npm provenance, come from the
+// previous release's publisher, add no install scripts, and sit outside every open advisory's
+// vulnerable range. The window itself may not drop below 7 days. Name patterns and unjustified
+// entries fail; entries that have aged past the window warn so they are removed.
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -150,9 +151,17 @@ const justifiesEarly = (packument, version, cutoff) => (advisory) => {
   const versions = Object.keys(packument.versions);
   return Boolean(patched) && !versions.some(isMatureFix(packument, ranges, patched, cutoff));
 };
-/** The advisory that justifies `version` skipping the release-age window, if any. */
+/** The open advisory for `name` whose vulnerable ranges still include `version`, if any. */
+const vulnerableUnder = (advisories, name, version) =>
+  advisories.find((advisory) => isVulnerable(rangesFor(advisory, name), version))?.ghsa_id;
+/**
+ * The advisory that justifies `version` skipping the release-age window, if any. A version still
+ * inside any advisory's vulnerable range is never justified, even when it fixes another one.
+ */
 export const advisoryFix = (advisories, packument, version, cutoff) =>
-  advisories.find(justifiesEarly(packument, version, cutoff))?.ghsa_id;
+  vulnerableUnder(advisories, packument.name, version)
+    ? undefined
+    : advisories.find(justifiesEarly(packument, version, cutoff))?.ghsa_id;
 const UNKNOWN = {
   packument: { name: '', versions: {}, time: {} },
   advisories: [],
@@ -165,7 +174,8 @@ const describeEntry = (raw, lookup) => {
     raw,
     version,
     packument,
-    advisories,
+    // Withdrawn advisories neither justify an entry nor mark it vulnerable.
+    advisories: advisories.filter((advisory) => !advisory.withdrawn_at),
     repository: normalizeRepository(provenance[version]),
     published: Date.parse(packument.time[version]),
   };
@@ -180,13 +190,23 @@ const VERIFY_RULES = [
       ? undefined
       : { failures: [`${entry.raw} could not be verified against the registry`] },
 ];
+// Supply-chain and advisory screening for every entry still inside the window. Provenance must be
+// readable (it names the source repository), not just present in the manifest.
+const screeningFailures = (entry) => {
+  const vulnerable = vulnerableUnder(entry.advisories, entry.packument.name, entry.version);
+  return [
+    ...vetRelease(entry.packument, entry.version),
+    ...(entry.repository ? [] : [`${entry.raw} has no readable npm provenance source repository`]),
+    ...(vulnerable ? [`${entry.raw} is still inside the vulnerable range of ${vulnerable}`] : []),
+  ];
+};
 const ADMIT_RULES = [
   (entry, cutoff) =>
     entry.published > cutoff
       ? undefined
       : { warnings: [`${entry.raw} is past the release-age window; remove it from the excludes`] },
   (entry) => {
-    const failures = vetRelease(entry.packument, entry.version);
+    const failures = screeningFailures(entry);
     return failures.length > 0 ? { failures } : undefined;
   },
 ];
@@ -240,7 +260,7 @@ export function evaluateExceptions({ minutes, excludes }, lookup, now) {
   return merge([...verifyOutcomes.filter(Boolean), ...admitted]);
 }
 async function fetchJson(url, headers = {}) {
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response.json();
 }
@@ -266,6 +286,7 @@ async function fetchPackage([name, versions]) {
     ecosystem: 'npm',
     affects: name,
     type: 'reviewed',
+    is_withdrawn: 'false',
     per_page: '100',
   });
   const packument = await fetchJson(`https://registry.npmjs.org/${name.replaceAll('/', '%2F')}`);
