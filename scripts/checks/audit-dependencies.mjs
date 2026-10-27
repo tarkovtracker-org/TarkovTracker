@@ -6,20 +6,6 @@ import { pathToFileURL } from 'node:url';
 // and an expiry. An expired or mismatched entry, or a finding on any other path, fails so it is
 // re-reviewed; a stale one warns.
 export const ACCEPTED_ADVISORIES = {
-  'GHSA-vfj7-8cjw-p6xm': {
-    package: 'braces',
-    via: [
-      '@nuxtjs/i18n>@intlify/unplugin-vue-i18n>fast-glob>micromatch>braces',
-      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
-      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
-      'nuxt>@nuxt/nitro-server>nitropack>globby>fast-glob>micromatch>braces',
-    ],
-    reason:
-      'No patched braces release exists (<= 3.0.3). It is reached only through fast-glob in build ' +
-      'tooling (nitropack globby, @intlify/unplugin-vue-i18n), which expands repo-controlled glob ' +
-      'patterns during the build. It is absent from the deployed .output bundle.',
-    expires: '2026-11-03',
-  },
   'GHSA-86w9-cpqp-85rv': {
     package: 'node-forge',
     via: [
@@ -31,9 +17,11 @@ export const ACCEPTED_ADVISORIES = {
       'nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
     ],
     reason:
-      'No patched node-forge release exists (<= 1.4.0). It is reached only through listhen, which ' +
-      'generates self-signed certificates for the local `nuxt dev` server. It never verifies ' +
-      'signatures from untrusted input and is absent from the deployed .output bundle.',
+      'The patched node-forge 1.4.1 was published 2026-10-27 and clears the 7-day ' +
+      'minimumReleaseAge gate on 2026-11-03; raise the override then and drop this entry. It is ' +
+      'reached only through listhen, which generates self-signed certificates for the local ' +
+      '`nuxt dev` server. It never verifies signatures from untrusted input and is absent from ' +
+      'the deployed .output bundle.',
     expires: '2026-11-03',
   },
 };

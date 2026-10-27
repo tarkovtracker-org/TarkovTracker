@@ -520,24 +520,65 @@ test('native lock proof admits known ordinary patches and refuses auth, major, e
   );
   assert.equal(safeLockfileChange(before, 'unclassified lock output'), false);
 });
+// The live-lock tests derive their subjects from the current pnpm-lock.yaml, so routine
+// dependency updates that move or drop a particular package do not break them.
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const bumpPatch = (version, delta) =>
+  version.replace(/\.(\d+)$/, (_, patch) => `.${Number(patch) + delta}`);
+function lockVersions(lock, name) {
+  const record = new RegExp(`^ {2}${escapeRegExp(name)}@(\\d+\\.\\d+\\.\\d+):`, 'gm');
+  return [...new Set([...lock.matchAll(record)].map((match) => match[1]))];
+}
+// Rewrites every resolution of name@from (keys, peer suffixes and `name: from` edges) to `to`.
+function retargetPackage(lock, name, from, to) {
+  const id = escapeRegExp(name);
+  const version = escapeRegExp(from);
+  return lock
+    .replace(new RegExp(`(?<![\\w@/.-])${id}@${version}(?![\\w.])`, 'g'), `${name}@${to}`)
+    .replace(new RegExp(`^( +)${id}: ${version}(?=\\(|$)`, 'gm'), `$1${name}: ${to}`);
+}
+// An unscoped, non-sensitive package with one resolved version, an empty snapshot, at least one
+// dependent edge, and no existing record at the next patch version.
+const SENSITIVE_NAME = /supabase|stripe|auth|session|jose|jwt|oauth|passport|credential/i;
+function isOrdinaryCandidate(lock, { name, version, next }) {
+  const edge = new RegExp(`^ +${escapeRegExp(name)}: ${escapeRegExp(version)}$`, 'm');
+  return [
+    !SENSITIVE_NAME.test(name),
+    lockVersions(lock, name).length === 1,
+    edge.test(lock),
+    !lock.includes(`${name}@${next}`),
+  ].every(Boolean);
+}
+function ordinaryLockCandidate(lock) {
+  const snapshots = lock.slice(lock.indexOf('\nsnapshots:\n'));
+  const candidates = [...snapshots.matchAll(/^ {2}([a-z0-9][\w.-]*)@(\d+\.\d+\.\d+): \{\}$/gm)].map(
+    ([, name, version]) => ({ name, version, next: bumpPatch(version, 1) })
+  );
+  return candidates.find((candidate) => isOrdinaryCandidate(lock, candidate)) ?? null;
+}
 test('known ordinary resolution changes work within the complete current PNPM lock including empty snapshots', () => {
   const before = readFileSync('pnpm-lock.yaml', 'utf8');
-  const after = before
-    .replaceAll('ansi-regex@6.3.0', 'ansi-regex@6.3.1')
-    .replaceAll('ansi-regex: 6.3.0', 'ansi-regex: 6.3.1');
+  const candidate = ordinaryLockCandidate(before);
+  assert.ok(candidate, 'the current lock has an ordinary empty-snapshot package with an edge');
+  const after = retargetPackage(before, candidate.name, candidate.version, candidate.next);
   assert.notEqual(before, after);
   assert.equal(safeLockfileChange(before, after), true);
 });
 test('genuine Supabase CLI jose transitive patch remains sensitive with an unchanged manifest', async () => {
   const after = readFileSync('pnpm-lock.yaml', 'utf8');
-  assert.ok(after.includes('jose@6.2.12'));
-  const before = after
-    .replaceAll('jose@6.2.12', 'jose@6.2.11')
-    .replace(/jose: 6\.2\.12/g, 'jose: 6.2.11')
-    .replace(
-      'sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==',
-      'sha512-A5NPn7g8EAzGU3IzRs+Yiq8K5n3ypYS75M5+KKiVHdUexfpWK1kP4ZMq7QnTGDoMj6TJ1dtcEJjW60yZDXS4hg=='
+  const [current] = lockVersions(after, 'jose');
+  assert.ok(current && !current.endsWith('.0'), 'the current lock resolves a jose patch release');
+  const previous = bumpPatch(current, -1);
+  const integrity = (version) =>
+    new RegExp(
+      `(\\n {2}jose@${escapeRegExp(version)}:\\n {4}resolution: \\{integrity: )sha512-[\\w+/=]+`
     );
+  assert.match(after, integrity(current));
+  const before = retargetPackage(after, 'jose', current, previous).replace(
+    integrity(previous),
+    `$1sha512-${'A'.repeat(86)}==`
+  );
+  assert.notEqual(before, after);
   assert.equal(safeLockfileChange(before, after), false);
   const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
   const pr = {
