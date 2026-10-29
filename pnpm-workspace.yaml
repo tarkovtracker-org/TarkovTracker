@@ -17,6 +17,8 @@ overrides:
   '@nuxt/test-utils>srvx': '^0.11.15'
   aggregate-error: 'npm:@socketregistry/aggregate-error@^1'
   brace-expansion: '^5.0.12'
+  # Vetted deepmerge 4-compatible fix; upstream 4.3.1 has no patched release.
+  deepmerge: 'npm:@stackline/deepmerge@1.1.0'
   es-define-property: 'npm:@socketregistry/es-define-property@^1'
   es-set-tostringtag: 'npm:@socketregistry/es-set-tostringtag@^1'
   esbuild: '^0.28.1'
