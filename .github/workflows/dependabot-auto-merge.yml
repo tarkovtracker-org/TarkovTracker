@@ -319,6 +319,7 @@ jobs:
           # Queue Submitter App: a job-token queue entry would start no merge_group CI.
           QUEUE_SUBMITTER_APP_ID: ${{ vars.QUEUE_SUBMITTER_APP_ID }}
           QUEUE_SUBMITTER_PRIVATE_KEY: ${{ secrets.QUEUE_SUBMITTER_PRIVATE_KEY }}
+          QUEUE_SUBMITTER_REQUIRED: 'true'
         shell: bash
         run: |
           set -euo pipefail

@@ -1,20 +1,30 @@
 // GitHub starts no workflows for job-token (GITHUB_TOKEN) events, so a queue entry submitted by
 // automation with the job token never receives merge_group CI. The dedicated Queue Submitter App
-// mints a short-lived, single-repository token for the enqueue call only. Its key belongs only in
-// the main-only `merge-queue` environment.
+// mints a short-lived, single-repository token for the guarded enqueue helper. Its key belongs
+// only in the main-only `merge-queue` environment.
 import { createPrivateKey, sign } from 'node:crypto';
 import { requireEvidence } from './review-admission-policy.mjs';
 const PERMISSIONS = Object.freeze({ contents: 'write', pull_requests: 'write' });
 const CONFIG = ['QUEUE_SUBMITTER_APP_ID', 'QUEUE_SUBMITTER_PRIVATE_KEY'];
-/** Returns null when unconfigured so local maintainers keep their inherited gh credential. */
+/**
+ * Returns null when unconfigured so local maintainers keep their inherited gh credential.
+ * Automation sets QUEUE_SUBMITTER_REQUIRED=true and fails closed instead of using the job token.
+ */
 export function queueSubmitterConfig(env = process.env) {
   const [appId, key] = CONFIG.map((name) => env[name] ?? '');
-  if ([appId, key].every((value) => value === '')) return null;
+  if ([appId, key].every((value) => value === '')) return unconfigured(env);
   requireEvidence(
     [/^[1-9]\d{0,11}$/.test(appId), key.length > 0].every(Boolean),
     'Queue submitter App configuration is incomplete or invalid.'
   );
   return { appId: Number(appId), key };
+}
+function unconfigured(env) {
+  requireEvidence(
+    env.QUEUE_SUBMITTER_REQUIRED !== 'true',
+    'Queue submitter App is required; a job-token queue entry would start no merge_group CI.'
+  );
+  return null;
 }
 function appJwt(config) {
   let key;
@@ -85,6 +95,7 @@ function requireToken(token, repo) {
   requireEvidence(
     [
       typeof token.token === 'string' && token.token.length > 0,
+      token.repository_selection === 'selected',
       repositories.length === 1,
       repositories[0]?.full_name === `${repo.owner}/${repo.repo}`,
       exactPermissions(token.permissions),

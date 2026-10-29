@@ -89,7 +89,10 @@ enforce every required check; a missing or weakened required check leaves the PR
   queue entry pinned to the validated head (`scripts/ci/enqueue-pr-cli.mjs`) and reports it as
   queued. Merge-group CI validates the combined tree; main CI is not dispatched for a queued entry.
   Automation submits with the Queue Submitter App token, because a `GITHUB_TOKEN` submission
-  starts no `merge_group` CI ([provisioning](../../docs/merge-queue-rollout.md#queue-submitter-provisioning)).
+  starts no `merge_group` CI. The submitting steps set `QUEUE_SUBMITTER_REQUIRED`, so without
+  the App configuration they fail before submitting instead of falling back to the job token;
+  only local maintainer runs keep their inherited `gh` credential
+  ([provisioning](../../docs/merge-queue-rollout.md#queue-submitter-provisioning)).
 - `strict` only: `gh pr merge --squash --match-head-commit` atomically guards against a
   last-moment PR push, and a fixed commit body prevents inherited CI-skip markers from
   suppressing the post-merge run. After the merge the gate dispatches `CI` on `main`; if that
