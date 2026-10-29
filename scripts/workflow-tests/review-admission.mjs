@@ -520,6 +520,249 @@ test('native lock proof admits known ordinary patches and refuses auth, major, e
   );
   assert.equal(safeLockfileChange(before, 'unclassified lock output'), false);
 });
+// Real Dependabot lock rewrites (#1348-#1350) against main c549aa25, trimmed to the packages they
+// touch or reference. pnpm deduplicated records, re-hashed peer contexts and relinked stripe
+// against a new @types/node, which the old one-for-one pairing rejected.
+const DEPENDABOT_LOCKS = new URL('./fixtures/dependabot-locks/', import.meta.url);
+const dependabotBase = () => readFileSync(new URL('main-c549aa25.lock', DEPENDABOT_LOCKS), 'utf8');
+function applyZeroContextPatch(text, patch) {
+  const lines = text.split('\n');
+  let offset = 0;
+  for (const hunk of patch.split(/^(?=@@ )/m).filter((part) => part.startsWith('@@ '))) {
+    const [, start, count = '1'] = /^@@ -(\d+)(?:,(\d+))? /.exec(hunk);
+    const body = hunk.split('\n').slice(1);
+    const removed = body.filter((line) => line.startsWith('-')).map((line) => line.slice(1));
+    const added = body.filter((line) => line.startsWith('+')).map((line) => line.slice(1));
+    const index = Number(start) - (Number(count) === 0 ? 0 : 1) + offset;
+    assert.deepEqual(lines.slice(index, index + removed.length), removed, hunk.split('\n')[0]);
+    lines.splice(index, removed.length, ...added);
+    offset += added.length - removed.length;
+  }
+  return lines.join('\n');
+}
+function dependabotLock(name) {
+  return applyZeroContextPatch(
+    dependabotBase(),
+    readFileSync(new URL(`${name}.patch`, DEPENDABOT_LOCKS), 'utf8')
+  );
+}
+test('real Dependabot dedupe, peer-hash and sensitive-relink lock rewrites admit', () => {
+  for (const name of [
+    'pr-1348-testing-tooling',
+    'pr-1349-typescript-and-types',
+    'pr-1350-tailwind-tooling',
+  ]) {
+    const after = dependabotLock(name);
+    assert.notEqual(after, dependabotBase(), name);
+    assert.equal(safeLockfileChange(dependabotBase(), after), true, name);
+  }
+});
+test('real Dependabot lock rewrites still hold tampering, new identities, dangling edges and sensitive moves', () => {
+  const before = dependabotBase();
+  const testing = dependabotLock('pr-1348-testing-tooling');
+  const types = dependabotLock('pr-1349-typescript-and-types');
+  const postcss = dependabotLock('pr-1350-tailwind-tooling');
+  const surviving = /( {2}'@nuxt\/devtools-kit@3\.4\.3':\n {4}resolution: \{integrity: sha512-)m/;
+  assert.match(testing, surviving);
+  const stripeKey = 'stripe@22.6.2(@types/node@26.6.5)';
+  assert.ok(types.includes(stripeKey));
+  for (const [label, after] of [
+    ['surviving integrity', testing.replace(surviving, '$1n')],
+    [
+      'dangling peer hash',
+      testing.replace(
+        'version: 4.3.4(feeafea108a446fa17bcbfcc101731b4)',
+        'version: 4.3.4(00000000000000000000000000000000)'
+      ),
+    ],
+    [
+      'unknown transitive peer shape',
+      testing.replace('      - happy-dom\n', '      - happy-dom: 1.0.0\n'),
+    ],
+    [
+      'new package identity',
+      postcss
+        .replace(
+          '\nsnapshots:\n',
+          '\n  brand-new@1.0.0:\n    resolution: {integrity: sha512-AAAA}\n\nsnapshots:\n'
+        )
+        .replace('\n  stylehacks@', '\n  brand-new@1.0.0: {}\n\n  stylehacks@'),
+    ],
+    [
+      'sensitive re-resolution',
+      types
+        .replaceAll('stripe@22.6.2', 'stripe@22.6.3')
+        .replaceAll('version: 22.6.2(', 'version: 22.6.3('),
+    ],
+    ['controls', postcss.replace('autoInstallPeers: true', 'autoInstallPeers: false')],
+  ]) {
+    assert.notEqual(after, before, label);
+    assert.equal(safeLockfileChange(before, after), false, label);
+  }
+});
+test('lock proof holds sensitive removals, sensitive peer moves and downgrades', () => {
+  const pair = simpleLock().replace(
+    '\nsnapshots:\n',
+    '\n  jose@1.0.0:\n    resolution: {integrity: sha512-AAAA}\n\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n\nsnapshots:\n  jose@1.0.0: {}\n\n  jose@1.0.1: {}\n'
+  );
+  const peered = pair
+    .replace('version: 1.0.0', 'version: 1.0.0(jose@1.0.0)')
+    .replace('  ordinary@1.0.0: {}', '  ordinary@1.0.0(jose@1.0.0): {}');
+  assert.equal(
+    safeLockfileChange(peered, peered.replaceAll('(jose@1.0.0)', '(jose@1.0.1)')),
+    false
+  );
+  const dropped = pair.replace('\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n', '');
+  assert.equal(safeLockfileChange(pair, dropped.replace('\n  jose@1.0.1: {}\n', '\n')), false);
+  const edges = simpleLock('1.0.1').replace(
+    '  ordinary@1.0.1: {}',
+    '  leaf@1.0.0: {}\n\n  leaf@1.0.1: {}\n\n  ordinary@1.0.1:\n    dependencies:\n      leaf: 1.0.1'
+  );
+  assert.equal(safeLockfileChange(edges, edges.replace('leaf: 1.0.1', 'leaf: 1.0.0')), false);
+  const jose = pair.replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0:\n    dependencies:\n      jose: 1.0.0'
+  );
+  assert.equal(safeLockfileChange(jose, jose.replace('jose: 1.0.0', 'jose: 1.0.1')), false);
+  const single = pair
+    .replace('\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n', '')
+    .replace('\n  jose@1.0.1: {}\n', '\n');
+  assert.equal(safeLockfileChange(single, pair), false);
+  const orphan = simpleLock().replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0: {}\n\n  ordinary@1.0.1: {}'
+  );
+  assert.equal(safeLockfileChange(simpleLock(), orphan), false);
+  const leaves =
+    '  leaf@1.0.0: {}\n\n  leaf@1.0.1: {}\n\n  ordinary@1.0.0:\n    dependencies:\n      leaf: 1.0.0';
+  const under = (name) =>
+    simpleLock('1.0.0', name).replace(`  ${name}@1.0.0: {}`, leaves.replaceAll('ordinary', name));
+  assert.equal(
+    safeLockfileChange(under('ordinary'), under('ordinary').replace('leaf: 1.0.0', 'leaf: 1.0.1')),
+    true
+  );
+  assert.equal(
+    safeLockfileChange(under('jose'), under('jose').replace('leaf: 1.0.0', 'leaf: 1.0.1')),
+    false
+  );
+  const named = simpleLock().replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0:\n    dependencies:\n      specifier: 1.0.0'
+  );
+  assert.equal(
+    safeLockfileChange(
+      named,
+      named.replace(
+        'dependencies:\n      specifier: 1.0.0',
+        'dependencies:\n      specifier: 1.0.1'
+      )
+    ),
+    false
+  );
+});
+// Synthetic lock with one root importer edge; each package gets an integrity record.
+function graphLock(edge, packages, snapshots) {
+  const record = (key) => `  '${key}':\n    resolution: {integrity: sha512-AAAA}`;
+  const snapshot = ([key, body]) => `  '${key}':${body ? `\n${body}` : ' {}'}`;
+  return `lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n\nimporters:\n  .:\n    dependencies:\n      ordinary:\n        specifier: ^1.0.0\n        version: ${edge}\n\npackages:\n\n${packages.map(record).join('\n\n')}\n\nsnapshots:\n\n${Object.entries(snapshots).map(snapshot).join('\n\n')}\n`;
+}
+test('lock proof holds dangling removals, unsafe peer switches, hashed and malformed peers', () => {
+  const peers = ['peer@1.0.0', 'peer@1.0.1', 'peer@2.0.0'];
+  const variants = {
+    'ordinary@1.0.0(peer@1.0.0)': '    dependencies:\n      peer: 1.0.0',
+    'ordinary@1.0.0(peer@1.0.1)': '    dependencies:\n      peer: 1.0.1',
+    'ordinary@1.0.0(peer@2.0.0)': '    dependencies:\n      peer: 2.0.0',
+    'peer@1.0.0': '',
+    'peer@1.0.1': '',
+    'peer@2.0.0': '',
+  };
+  const lock = (edge) => graphLock(edge, ['ordinary@1.0.0', ...peers], variants);
+  assert.equal(safeLockfileChange(lock('1.0.0(peer@1.0.0)'), lock('1.0.0(peer@1.0.1)')), true);
+  for (const [from, to] of [
+    ['1.0.0(peer@1.0.0)', '1.0.0(peer@2.0.0)'],
+    ['1.0.0(peer@1.0.1)', '1.0.0(peer@1.0.0)'],
+  ])
+    assert.equal(safeLockfileChange(lock(from), lock(to)), false, `${from} -> ${to}`);
+  const kept = graphLock('1.0.0', ['ordinary@1.0.0', 'jose@1.0.0'], {
+    'ordinary@1.0.0': '',
+    'jose@1.0.0': '',
+  });
+  const orphaned = graphLock('1.0.0', ['jose@1.0.0'], { 'jose@1.0.0': '' });
+  assert.equal(safeLockfileChange(kept, orphaned), false);
+  const unlinked = graphLock('1.0.0', ['ordinary@1.0.0', 'jose@1.0.0'], { 'ordinary@1.0.0': '' });
+  assert.equal(safeLockfileChange(kept, unlinked), false);
+  const [hashA, hashB] = ['a', 'b'].map((digit) => `(${digit.repeat(32)})`);
+  const hashedJose = (hash) =>
+    graphLock('1.0.0', ['ordinary@1.0.0', 'jose@1.0.0'], {
+      [`jose@1.0.0${hash}`]: '',
+      'ordinary@1.0.0': `    dependencies:\n      jose: 1.0.0${hash}`,
+    });
+  assert.equal(safeLockfileChange(hashedJose(hashA), hashedJose(hashB)), false);
+  const hashedVariants = {
+    [`ordinary@1.0.0${hashA}`]: '',
+    [`ordinary@1.0.0${hashB}`]: '',
+    'peer@1.0.0': '',
+    'peer@2.0.0': '',
+  };
+  const hashedLock = (edge) =>
+    graphLock(edge, ['ordinary@1.0.0', 'peer@1.0.0', 'peer@2.0.0'], hashedVariants);
+  assert.equal(safeLockfileChange(hashedLock(`1.0.0${hashA}`), hashedLock(`1.0.0${hashB}`)), false);
+  const rehashed = (hash, peer) =>
+    graphLock(`1.0.0${hash}`, ['ordinary@1.0.0', `peer@${peer}`], {
+      [`ordinary@1.0.0${hash}`]: `    dependencies:\n      peer: ${peer}`,
+      [`peer@${peer}`]: '',
+    });
+  assert.equal(safeLockfileChange(rehashed(hashA, '1.0.0'), rehashed(hashB, '1.0.1')), true);
+  assert.equal(safeLockfileChange(rehashed(hashA, '1.0.0'), rehashed(hashB, '2.0.0')), false);
+  // A new hashed target that derives only from a different, major-peer variant still holds.
+  const hashC = `(${'c'.repeat(32)})`;
+  const majorVariant = {
+    [`ordinary@1.0.0${hashC}`]: '    dependencies:\n      peer: 2.0.0',
+    'peer@1.0.0': '',
+    'peer@2.0.0': '',
+  };
+  const packagesWithPeers = ['ordinary@1.0.0', 'peer@1.0.0', 'peer@2.0.0'];
+  const switchedFrom = graphLock(`1.0.0${hashA}`, packagesWithPeers, {
+    [`ordinary@1.0.0${hashA}`]: '    dependencies:\n      peer: 1.0.0',
+    ...majorVariant,
+  });
+  const switchedTo = graphLock(`1.0.0${hashB}`, packagesWithPeers, {
+    [`ordinary@1.0.0${hashB}`]: '    dependencies:\n      peer: 2.0.0',
+    ...majorVariant,
+  });
+  assert.equal(safeLockfileChange(switchedFrom, switchedTo), false);
+  const leafLock = (edge, leafPackages, leafSnapshots) =>
+    graphLock('1.0.0', ['ordinary@1.0.0', ...leafPackages], {
+      'ordinary@1.0.0': `    dependencies:\n      leaf: ${edge}`,
+      ...Object.fromEntries(leafSnapshots.map((key) => [key, ''])),
+    });
+  const leaves = ['leaf@1.0.0', 'leaf@1.0.1'];
+  const leafBefore = leafLock('1.0.0', leaves, leaves);
+  assert.equal(safeLockfileChange(leafBefore, leafLock('1.0.1', leaves, leaves)), true);
+  assert.equal(safeLockfileChange(leafBefore, leafLock('1.0.1', leaves, ['leaf@1.0.0'])), false);
+  assert.equal(safeLockfileChange(leafBefore, leafLock('1.0.0', ['leaf@1.0.0'], leaves)), false);
+  const single = ['leaf@1.0.0'];
+  assert.equal(
+    safeLockfileChange(leafLock('1.0.0', single, single), leafLock('1.0.1', single, single)),
+    false
+  );
+  const malformed = graphLock('1.0.0(not-a-peer)', ['ordinary@1.0.0'], {
+    'ordinary@1.0.0(not-a-peer)': '',
+  });
+  const plain = graphLock('1.0.0', ['ordinary@1.0.0'], { 'ordinary@1.0.0': '' });
+  assert.equal(safeLockfileChange(plain, malformed), false);
+  // A hashed peer cycle (a package and its own test environment, as in #1348) re-hashes together.
+  const cycle = ([own, env], leaf) =>
+    graphLock(`1.0.0${own}`, ['ordinary@1.0.0', 'env@1.0.0', `leaf@${leaf}`], {
+      [`ordinary@1.0.0${own}`]: `    dependencies:\n      env: 1.0.0${env}\n      leaf: ${leaf}`,
+      [`env@1.0.0${env}`]: `    dependencies:\n      ordinary: 1.0.0${own}`,
+      [`leaf@${leaf}`]: '',
+    });
+  const [hashD, hashE] = ['d', 'e'].map((digit) => `(${digit.repeat(32)})`);
+  const cycleBefore = cycle([hashA, hashB], '1.0.0');
+  assert.equal(safeLockfileChange(cycleBefore, cycle([hashD, hashE], '1.0.1')), true);
+  assert.equal(safeLockfileChange(cycleBefore, cycle([hashD, hashE], '2.0.0')), false);
+});
 // The live-lock tests derive their subjects from the current pnpm-lock.yaml, so routine
 // dependency updates that move or drop a particular package do not break them.
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2566,7 +2809,7 @@ test('Cubic event filtering skips unsuccessful signals and uses the exact commen
     );
   }
 });
-test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
+test('Cubic guard mutations expose unknown peer names, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
   const peer = simpleLock()
     .replace('version: 1.0.0', 'version: 1.0.0(@scope/1.0.0@2.0.0)')
     .replace('ordinary@1.0.0: {}', 'ordinary@1.0.0(@scope/1.0.0@2.0.0): {}');
@@ -2574,8 +2817,8 @@ test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse a
   assert.equal(safeLockfileChange(peer, renamed), false);
   const names = await importMutationSource(
     'review-admission-lock.mjs',
-    "return text.replace(VERSION, '$1#VERSION#');",
-    "return text.replace(/\\d+\\.\\d+\\.\\d+/g, '#VERSION#');"
+    '.every((match) => packages.has(`${match[1]}@${match[2]}`));',
+    '.every(() => true);'
   );
   assert.equal(names.safeLockfileChange(peer, renamed), true);
   const jwt = await importMutationSource('review-admission-lock.mjs', '|jsonwebtoken', '');
