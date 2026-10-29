@@ -68,6 +68,9 @@ describe('evaluateAudit', () => {
       expect(evaluateAudit(bad, {}, '2026-10-06').failures).toHaveLength(1);
     }
   });
+  it('does not retain an acceptance for the remediated node-forge advisory', () => {
+    expect(ACCEPTED_ADVISORIES).not.toHaveProperty('GHSA-86w9-cpqp-85rv');
+  });
   it('documents every accepted advisory', () => {
     for (const entry of Object.values(ACCEPTED_ADVISORIES)) {
       expect(entry.package).toBeTruthy();
