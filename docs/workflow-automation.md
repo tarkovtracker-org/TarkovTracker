@@ -119,6 +119,9 @@ lock recovery, and command cleanup live in
    adopted 2026-09-29; repository configuration does not prove dashboard state).
 2. Keep automatic initial CodeRabbit reviews enabled and incremental reviews disabled as configured
    in `.coderabbit.yaml`. Verify exclusions on translation-only and mixed translation/code PRs.
+   `greptile.json` mirrors those exclusions: Greptile skips Crowdin sync PRs by title and ignores
+   the Crowdin-owned locale files. Fix translation wording in Crowdin; review threads on a Crowdin
+   PR hold Review Admission, and each sync rebuilds `locales`, so in-repo edits do not persist.
 3. Retain manual reviewer access. Record representative PR links and observed dashboard settings;
    checked-in policy is not proof of integration state.
 4. Verify revision-specific review evidence and unavailable/quota-exhausted behavior. Preserve
