@@ -44,16 +44,26 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MERGE_PENDING = 'GitHub has not finished computing';
 const CI_RESULT_PENDING = 'CI Result is still running';
 const CI_RESULT_MISSING = 'Waiting for CI Result on this revision';
-// Freshness errors that a newer event (a push, close, draft or CI rerun) already reports on.
+// Freshness errors that a newer event (a push, close, draft or CI rerun) already reports on, or
+// that take the PR out of main's required checks.
 const PULL_NOT_READY = 'pull request is not open and ready';
+const PULL_RETARGETED = 'pull request no longer targets main';
 const PULL_HEAD_MOVED = 'pull request head moved';
 const RUN_ATTEMPT_SUPERSEDED = 'CI run attempt superseded';
 const RUN_HEAD_CHANGED = 'CI run head changed';
-const OWNED_STALENESS = [PULL_NOT_READY, PULL_HEAD_MOVED, RUN_ATTEMPT_SUPERSEDED, RUN_HEAD_CHANGED];
-// Any other late staleness on a PR candidate means main moved under it. No PR event follows a base
-// movement, and the run's artifact can never match the new test merge, so that result is final.
+const OWNED_STALENESS = [
+  PULL_NOT_READY,
+  PULL_RETARGETED,
+  PULL_HEAD_MOVED,
+  RUN_ATTEMPT_SUPERSEDED,
+  RUN_HEAD_CHANGED,
+];
+// When main really moved under a PR candidate, no PR event follows and the run's artifact can never
+// match the new test merge, so that result is final. With main unchanged, the test merge is only
+// briefly unavailable, so the result stays pending under a prefix the hourly fallback re-plans.
 const BASE_MOVED =
   'Main moved during the preview deploy; push a new commit or rebase to rebuild on current main.';
+const MERGE_RETRY = `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -321,14 +331,12 @@ function runTreeSha(run) {
   return SHA_PATTERN.test(String(tree)) ? tree : null;
 }
 function dispatchMergePrerequisite(pull, run) {
-  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return MERGE_RETRY;
   if (!runTreeSha(run)) return 'Dispatched CI run has no verifiable Git tree.';
   return null;
 }
 async function currentPullBaseMismatch(github, context, pull) {
-  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return MERGE_RETRY;
   const { data: main } = await github.rest.git.getRef({
     ...context.repo,
     ref: `heads/${PRODUCTION_BRANCH}`,
@@ -1065,6 +1073,7 @@ export async function reconcileMissingPreviewStatuses({ github, context, core, w
 }
 function pullReadinessError(pull) {
   if (pull.state !== 'open' || pull.draft) return PULL_NOT_READY;
+  if (pull.base.ref !== PRODUCTION_BRANCH) return PULL_RETARGETED;
   return null;
 }
 async function pullFreshnessErrors(github, context, decision) {
@@ -1258,22 +1267,25 @@ async function publishTerminal(github, context, core, decision, result) {
 }
 /**
  * Success is never published for an obsolete candidate. When a newer event owns the head, publish
- * nothing; when only main moved, end this run's pending result instead of leaving it pending (#1357).
+ * nothing; otherwise end or re-arm this run's pending result instead of leaving it stuck (#1357).
  */
 async function publishLateStaleness(github, context, core, decision, stale) {
   core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
-  if (!(await reportsBaseMovement(github, context, decision, stale))) return null;
-  return publishOutcome(github, context, decision, failure(BASE_MOVED));
+  if (!(await reportsLateStaleness(github, context, decision, stale))) return null;
+  const outcome = (await mainMovedSinceUpload(github, context, decision))
+    ? failure(BASE_MOVED)
+    : pending(MERGE_RETRY);
+  return publishOutcome(github, context, decision, outcome);
 }
-function unownedBaseMovement(decision, stale) {
+function unownedStaleness(decision, stale) {
   return [
     Boolean(decision.pullRequest),
     decision.runEvent !== 'merge_group',
     !stale.some((error) => OWNED_STALENESS.includes(error)),
   ].every(Boolean);
 }
-async function reportsBaseMovement(github, context, decision, stale) {
-  if (!unownedBaseMovement(decision, stale)) return false;
+async function reportsLateStaleness(github, context, decision, stale) {
+  if (!unownedStaleness(decision, stale)) return false;
   return ownsLatestResult(github, context, decision.headSha);
 }
 /** True while this run's own interim status is still the head's newest `Preview Result`. */
@@ -1281,6 +1293,23 @@ async function ownsLatestResult(github, context, headSha) {
   const statuses = await allStatuses(github, context.repo, headSha, 'Preview Result');
   const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
   return latest?.target_url === runUrl(context);
+}
+/**
+ * The pre-upload freshness check proved that the planned test merge's first parent was live main,
+ * so a different live main now is a real base movement, not a briefly missing test merge.
+ */
+async function mainMovedSinceUpload(github, context, decision) {
+  const merge = await commitShape(github, context, decision.mergeSha);
+  const uploadedMain = merge?.parents[0];
+  if (!SHA_PATTERN.test(String(uploadedMain))) return false;
+  return uploadedMain !== (await liveMainSha(github, context));
+}
+async function liveMainSha(github, context) {
+  const { data } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  return data.object.sha;
 }
 /** Phase 3: publish the authoritative result only for a still-current candidate. */
 export async function publishResult({ github, context, core, decision, outcomes, evidence }) {

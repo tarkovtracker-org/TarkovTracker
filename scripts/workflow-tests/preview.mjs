@@ -2794,7 +2794,7 @@ function interimStatus(runId, id) {
     target_url: `https://github.com/${REPO_NAME}/actions/runs/${runId}`,
   };
 }
-async function deployedBehindMain(t, context) {
+async function deployedPreview(t, context) {
   const result = await plan(t, context, behindSnapshotOptions({ inputs: { run_id: '900' } }));
   assert.equal(result.decision.action, 'deploy', result.decision.description);
   await verifyForDeploy({
@@ -2804,10 +2804,14 @@ async function deployedBehindMain(t, context) {
     decision: result.decision,
     destination: join(tempDir(t), 'uploaded'),
   });
-  // Another PR merges while smoke tests run: main moves, the head and CI attempt do not (#1357).
-  result.state.mainSha = sha('8');
   result.state.previewStatuses = [interimStatus(context.runId, 20)];
   result.state.statuses.length = 0;
+  return result;
+}
+async function deployedBehindMain(t, context) {
+  const result = await deployedPreview(t, context);
+  // Another PR merges while smoke tests run: main moves, the head and CI attempt do not (#1357).
+  result.state.mainSha = sha('8');
   return result;
 }
 const lateResult = (result, context, core) =>
@@ -2818,6 +2822,13 @@ const lateResult = (result, context, core) =>
     decision: result.decision,
     outcomes: { deploy: 'success', smoke: 'success' },
     evidence: {},
+  });
+const reconcile = (result, t) =>
+  reconcileMissingPreviewStatuses({
+    github: result.github,
+    context: scheduleContext(),
+    core: fakeCore(),
+    workspace: tempDir(t),
   });
 test('main moving after upload ends the head result instead of leaving it pending', async (t) => {
   const context = workflowDispatchContext();
@@ -2833,15 +2844,26 @@ test('main moving after upload ends the head result instead of leaving it pendin
   // longer match the new test merge.
   result.state.previewStatuses = [{ ...result.state.statuses[0], id: 21 }];
   result.state.statuses.length = 0;
-  await reconcileMissingPreviewStatuses({
-    github: result.github,
-    context: scheduleContext(),
-    core: fakeCore(),
-    workspace: tempDir(t),
-  });
+  await reconcile(result, t);
   assert.deepEqual(result.state.statuses, []);
 });
-test('main moving after upload leaves a newer owner or owned staleness unreported', async (t) => {
+test('a briefly missing test merge on unchanged main re-arms the hourly fallback', async (t) => {
+  const context = workflowDispatchContext();
+  const result = await deployedPreview(t, context);
+  result.state.pull = { ...result.state.pull, merge_commit_sha: null };
+  const core = fakeCore();
+  assert.equal(await lateResult(result, context, core), 'pending');
+  assert.deepEqual(statusStates(result.state.statuses), ['a:pending']);
+  assert.match(result.state.statuses[0].description, /^GitHub has not finished computing/);
+  assert.equal(core.failed, null);
+  // Once GitHub computes the test merge again, the hourly fallback re-plans the head.
+  result.state.previewStatuses = [{ ...result.state.statuses[0], id: 21 }];
+  result.state.pull = { ...result.state.pull, merge_commit_sha: MERGE };
+  result.state.statuses.length = 0;
+  await reconcile(result, t);
+  assert.ok(result.state.statuses.length > 0, 'hourly fallback re-planned the head');
+});
+test('late staleness leaves a newer owner or owned staleness unreported', async (t) => {
   const context = workflowDispatchContext();
   const newer = await deployedBehindMain(t, context);
   newer.state.previewStatuses.push(interimStatus(777, 21));
@@ -2854,6 +2876,10 @@ test('main moving after upload leaves a newer owner or owned staleness unreporte
     ],
     ['attempt superseded', (state) => (state.run = { ...state.run, run_attempt: 2 })],
     ['closed', (state) => (state.pull = { ...state.pull, state: 'closed' })],
+    [
+      'retargeted',
+      (state) => (state.pull = { ...state.pull, base: { ...state.pull.base, ref: 'release' } }),
+    ],
   ]) {
     const owned = await deployedBehindMain(t, context);
     change(owned.state);
