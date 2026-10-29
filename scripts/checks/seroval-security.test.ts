@@ -41,6 +41,7 @@ describe('Seroval security patches', () => {
       for (const serialized of [serialize(expression), await serializeAsync(expression)]) {
         expect(serialized).not.toContain('<');
         const decoded = runInNewContext(serialized);
+        expect(types.isRegExp(decoded)).toBe(true);
         expect(decoded.source).toBe(expression.source);
         expect(decoded.flags).toBe(expression.flags);
       }
