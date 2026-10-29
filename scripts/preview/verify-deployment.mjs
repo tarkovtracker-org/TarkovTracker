@@ -37,6 +37,12 @@ const evidence = {
   createdOn: record.created_on ?? null,
   expectedDigest: env.EXPECTED_DIGEST,
   controllerRunId: env.GITHUB_RUN_ID,
+  // Verified by the controller before upload; scripts/preview/queue-reuse.mjs reads these.
+  headSha: env.EXPECTED_HEAD_SHA,
+  treeSha: env.VERIFIED_TREE_SHA || null,
+  pullRequest: env.VERIFIED_PULL_REQUEST ? Number(env.VERIFIED_PULL_REQUEST) : null,
+  sourceCiRunId: env.SOURCE_CI_RUN_ID ? Number(env.SOURCE_CI_RUN_ID) : null,
+  sourceCiAttempt: env.SOURCE_CI_ATTEMPT ? Number(env.SOURCE_CI_ATTEMPT) : null,
 };
 writeFileSync(env.EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`);
 // Evidence is consumed from the retained artifact file, not from logs: record fields are

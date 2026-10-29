@@ -159,6 +159,24 @@ function queueReducedPaths(paths, options) {
   if (options.formatterOnly && formatterPaths(paths)) return true;
   return paths.every(queueDocumentationPath);
 }
+/**
+ * The trusted queue reuse check (scripts/preview/queue-reuse.mjs) proved this queue tree is the
+ * one a member PR already passed full CI and a deployed preview on. Only the always-selected
+ * jobs run again; the preview controller repeats the same proof before publishing its result.
+ */
+export function reusedQueuePlan(paths) {
+  return {
+    ...classifyPaths(paths),
+    full: false,
+    formatter: false,
+    i18n: false,
+    workflows: false,
+    previewRequired: false,
+    jobs: selectExpectedJobs(false, false),
+    reused: true,
+    reason: 'Queue tree is identical to a fully validated and previewed PR revision',
+  };
+}
 function queueComparisonBase(git, base, head, baseSha, headSha) {
   if (![base, head].every((sha) => /^[a-f0-9]{40}$/.test(sha)))
     throw new Error('Queue revisions must be immutable');

@@ -163,6 +163,9 @@ jobs:
             });
             core.setOutput('head_sha', manifest.headSha);
             core.setOutput('source_ci_run_id', decision.runId);
+            core.setOutput('source_ci_attempt', manifest.runAttempt);
+            core.setOutput('tree_sha', manifest.treeSha);
+            core.setOutput('pull_request', manifest.pullRequest ?? '');
             core.setOutput('digest', manifest.digest);
             core.setOutput('preview_branch', manifest.previewBranch);
       - name: Upload verified output to the Pages preview environment
@@ -199,6 +202,11 @@ jobs:
           EXPECTED_PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
           EXPECTED_HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
           EXPECTED_DIGEST: ${{ steps.verify.outputs.digest }}
+          # Verified build identity, recorded so the merge queue can reuse an identical tree.
+          VERIFIED_TREE_SHA: ${{ steps.verify.outputs.tree_sha }}
+          VERIFIED_PULL_REQUEST: ${{ steps.verify.outputs.pull_request }}
+          SOURCE_CI_RUN_ID: ${{ steps.verify.outputs.source_ci_run_id }}
+          SOURCE_CI_ATTEMPT: ${{ steps.verify.outputs.source_ci_attempt }}
           EVIDENCE_PATH: ${{ runner.temp }}/deployment-evidence.json
         run: node scripts/preview/verify-deployment.mjs
       - name: Retain deployment evidence

@@ -17,6 +17,12 @@ jobs:
     name: Validation plan
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # Read-only API access for the trusted merge-queue reuse lookup below.
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: read
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
       full: ${{ steps.plan.outputs.full }}
@@ -32,20 +38,46 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      # Queue reuse is decided by main's code, never the candidate's (docs/systems/previews.md).
+      - name: Checkout trusted queue reuse policy
+        if: github.event_name == 'merge_group'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted-main
+          persist-credentials: false
+      - name: Reuse an identical validated PR tree
+        id: reuse
+        if: github.event_name == 'merge_group'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { existsSync } = await import('node:fs');
+            const policy = `${process.env.GITHUB_WORKSPACE}/.trusted-main/scripts/preview/queue-reuse.mjs`;
+            if (!existsSync(policy)) {
+              core.setOutput('reused', 'false');
+              return;
+            }
+            const { reportQueueReuse } = await import(policy);
+            await reportQueueReuse({ github, context, core });
       - name: Classify changes
         id: plan
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        # PRs select by path/proof; queues reduce only inert docs or verified formatter locks.
-        # Pushes and dispatches stay full.
+          QUEUE_REUSED: ${{ steps.reuse.outputs.reused }}
+        # PRs select by path/proof; queues reduce only inert docs, verified formatter locks, or a
+        # tree identical to a fully validated PR revision. Pushes and dispatches stay full.
         # Rollback: re-add the shadow flag of scripts/ci/validate-changes.mjs to force every job and
         # invert the shadow-flag assertion in scripts/workflow-tests/workflows.mjs in the same change.
         run: |
           args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA")
           if [ "$EVENT_NAME" = "merge_group" ]; then
             args+=(--queue)
+            if [ "$QUEUE_REUSED" = "true" ]; then
+              args+=(--reused)
+            fi
           elif [ "$EVENT_NAME" != "pull_request" ]; then
             args+=(--full)
           fi

@@ -6,9 +6,12 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 Merge-group CI completions also request this trusted pipeline for the live queue integration
 commit. They deploy/smoke-test the anonymous build unless an authenticated prior success
-for the same SHA and digest is reused. Results publish on that queue SHA, with
-exact-ref, current-main first-parent and attempt-specific CI proof repeated before upload and
-success. Queue builds never inherit a member PR's preview result or fork command grant. Activation
+for the same SHA and digest is reused, or the queue tree is identical to the tree a member PR's
+trusted preview already deployed and smoke-tested after full PR CI
+([queue reuse](../merge-queue-rollout.md#reusing-identical-pr-validation-in-the-queue)). Results
+publish on that queue SHA, with exact-ref, current-main first-parent and attempt-specific CI proof
+repeated before upload and success. Queue builds inherit a member PR's preview only through that
+identical-tree proof, never through a status, digest or fork command grant alone. Activation
 is staged; see [merge queue rollout](../merge-queue-rollout.md).
 
 Open, ready ordinary same-repository PRs targeting main request a preview after successful

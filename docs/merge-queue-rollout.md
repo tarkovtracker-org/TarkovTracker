@@ -534,6 +534,29 @@ follow-up request. On resumption read the handoff and changed evidence, not the 
 review. Provider cache retention and billing are outside GitHub's control; no cache or token
 saving is guaranteed.
 
+### Reusing identical PR validation in the queue
+
+A queue entry usually integrates the same tree its PR already tested: PR CI checks out GitHub's
+test merge, and when main has not moved since, the squash queue commit has an identical Git tree.
+The queue then reuses that work instead of repeating it
+([`scripts/preview/queue-reuse.mjs`](../scripts/preview/queue-reuse.mjs)). Reuse requires all of:
+
+- the live queue ref and its single parent (current main) as for any queue candidate;
+- an open, same-repository, non-release member PR named by the canonical queue branch;
+- that PR head's newest `Preview Result` is a success from the trusted `preview.yml` run on
+  main, with a successful `Publish preview result` job and retained `preview-deployment-<head>`
+  evidence whose verified `treeSha` equals the queue tree;
+- the evidence's source CI run is the latest attempt of this repository's `pull_request` CI for
+  that head, and every full-validation job in it succeeded.
+
+Main's code decides: the CI `Validation plan` job checks out the default branch into
+`.trusted-main` for this lookup, and the preview controller repeats it before publishing. A reused
+entry runs only the always-selected jobs (`Lint & Format`, `Systems drift check`, `Security`) and
+publishes `Preview Result` on the queue commit pointing at the PR's preview run, with no new
+deployment. Any missing, mismatched or unreadable evidence validates the entry in full. Release
+version PRs are excluded because finalization needs a queue preview deployment on the merged SHA.
+Previews deployed before deployment evidence recorded `treeSha` are not reusable.
+
 GitHub queue guidance: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>.
 
 The journal reader selects one named GraphQL status context; it does not scan the shared anchor's
