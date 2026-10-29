@@ -111,6 +111,9 @@ repeated before deployment and final success. An hourly state-only reconciliatio
 with no result, or whose latest result is pending only because the test merge was not ready or the
 CI Result read was missing or unfinished, once GitHub has computed the test merge; other pending reasons are
 left alone. A `CI Result` check without a completed conclusion stays pending instead of failing.
+Because the hourly reconciliation covers only PR heads, the CI `workflow_run` evaluation of a
+completed, successful PR or merge-group run re-reads a missing or unfinished `CI Result` check
+after 3, 6 and 12 seconds before publishing pending; such a read is a stale checks-API response.
 
 ### Recovering after a failed-only CI rerun
 

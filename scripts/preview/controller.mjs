@@ -252,6 +252,34 @@ async function checkCiResult(github, context, candidate) {
   if (!evidence) throw pending(`${CI_RESULT_MISSING}.`);
   assertEvidenceComplete(evidenceState(evidence));
 }
+// This runs only after the CI run itself completed successfully, so its `CI Result` job has
+// finished too; a missing or unfinished check run is a stale checks-API read (#1336). The CI
+// completion event is the only trigger a merge-group entry gets (no hourly fallback), so that
+// event re-reads briefly before publishing pending.
+const CI_RESULT_REREAD_DELAYS_MS = [3000, 6000, 12000];
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function staleCiResult(error) {
+  if (!(error instanceof Outcome) || error.action !== 'wait') return false;
+  return [CI_RESULT_PENDING, CI_RESULT_MISSING].some((reason) => error.message.startsWith(reason));
+}
+function rereadDelays(context, candidate) {
+  if (context.eventName !== 'workflow_run') return [];
+  return ['pull_request', 'merge_group'].includes(candidate.runEvent)
+    ? CI_RESULT_REREAD_DELAYS_MS
+    : [];
+}
+async function settledCiResult(github, context, candidate, sleep) {
+  for (const delay of rereadDelays(context, candidate)) {
+    const error = await checkCiResult(github, context, candidate).then(
+      () => null,
+      (e) => e
+    );
+    if (!error) return;
+    if (!staleCiResult(error)) throw error;
+    await sleep(delay);
+  }
+  await checkCiResult(github, context, candidate);
+}
 async function requiresPreview(github, context, pull) {
   if (!pull) return true;
   const paths = await listPullPaths(github, context.repo, pull.number);
@@ -576,7 +604,7 @@ function decisionBase({ candidate, pull, run, fork }) {
 }
 // `state` is filled progressively so an interim outcome (pending/failure) still knows which
 // revision to report on.
-async function evaluate({ github, context, inputs, workspace }, state) {
+async function evaluate({ github, context, inputs, workspace, sleep }, state) {
   assertInputAuthorization(inputs);
   state.candidate = await resolveCandidate({ github, context, inputs });
   state.pull = await resolvePull(github, context, state.candidate);
@@ -586,7 +614,7 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   state.run = await resolveRun(github, context, state.candidate);
   assertSelectedAttempt(state.run, inputs);
   checkRunState(state.run, state.candidate);
-  await checkCiResult(github, context, state.candidate);
+  await settledCiResult(github, context, state.candidate, sleep);
   if (state.candidate.runEvent === 'merge_group') {
     return evaluateQueue({ github, context, state, workspace });
   }
@@ -941,11 +969,18 @@ async function publishPlannedDecision(github, context, core, decision) {
   return publishDecision(github, context, decision);
 }
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
-export async function planPreview({ github, context, core, inputs, workspace }) {
+export async function planPreview({
+  github,
+  context,
+  core,
+  inputs,
+  workspace,
+  sleep = defaultSleep,
+}) {
   const state = {};
   let decision;
   try {
-    decision = await evaluate({ github, context, inputs, workspace }, state);
+    decision = await evaluate({ github, context, inputs, workspace, sleep }, state);
   } catch (error) {
     decision = outcomeDecision(error, state);
   }

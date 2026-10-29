@@ -1392,15 +1392,57 @@ test('running, failed and unsuccessful CI evidence map to pending or failure', a
   ]) {
     const unfinished = fakeGithub(t);
     Object.assign(unfinished.state.check, check);
+    const delays = [];
     const waiting = await planPreview({
       github: unfinished.github,
       context: workflowRunContext(),
       core: fakeCore(),
       workspace: tempDir(t),
+      sleep: async (ms) => delays.push(ms),
     });
     assert.equal(waiting.action, 'wait');
     assert.match(waiting.description, /CI Result is still running/);
+    assert.deepEqual(delays, [3000, 6000, 12000]);
   }
+});
+// #1336: merge group d07b3da5 read `CI Result` as running after the CI run had completed, and
+// nothing re-evaluated the pending merge-group status. A completed run's CI Result re-reads.
+test('a stale CI Result read after a completed CI run re-reads before publishing pending', async (t) => {
+  for (const missing of [false, true]) {
+    const f = queueFixture(t);
+    const settled = f.state.check;
+    const reads = [];
+    const paginate = f.github.paginate;
+    f.github.paginate = async (endpoint, params) => {
+      if (endpoint !== 'checks') return paginate(endpoint, params);
+      reads.push(params.ref);
+      if (reads.length > 1) return [settled];
+      return missing ? [] : [{ ...settled, status: 'in_progress', conclusion: null }];
+    };
+    const delays = [];
+    const decision = await planPreview({
+      github: f.github,
+      context: workflowRunContext(f.state.run),
+      core: fakeCore(),
+      workspace: tempDir(t),
+      sleep: async (ms) => delays.push(ms),
+    });
+    assert.equal(decision.action, 'request', `missing=${missing}`);
+    assert.deepEqual(reads, [HEAD, HEAD]);
+    assert.deepEqual(delays, [3000]);
+  }
+  const failed = queueFixture(t);
+  failed.state.check.conclusion = 'failure';
+  const delays = [];
+  const decision = await planPreview({
+    github: failed.github,
+    context: workflowRunContext(failed.state.run),
+    core: fakeCore(),
+    workspace: tempDir(t),
+    sleep: async (ms) => delays.push(ms),
+  });
+  assert.equal(decision.action, 'fail');
+  assert.deepEqual(delays, []);
 });
 test('head movement, base movement, stale attempts and superseded runs cannot deploy', async (t) => {
   const moved = await plan(t, workflowRunContext(), {
