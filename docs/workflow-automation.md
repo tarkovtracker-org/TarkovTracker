@@ -103,8 +103,9 @@ entry on current main, so a behind branch is enqueued unchanged rather than upda
 and `Preview Result` rerun on the new head. Reuse review evidence for an unchanged diff after
 assessing integration with changed base code; a conflict-free merge alone does not establish that
 validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
-re-review triggers. Repo auto-merge is disabled; an authorized agent submits the reviewed head with
-the head-pinned enqueue helper and Actions owns the merge.
+re-review triggers. Repo auto-merge is enabled for the agent handoff: an authorized agent turns on
+head-pinned auto-merge for the reviewed head, or submits it with the head-pinned enqueue helper,
+and Actions owns the merge ([agent lifecycle](merge-queue-rollout.md#agent-lifecycle-after-activation)).
 
 ### Codex request deduplication and waiting
 

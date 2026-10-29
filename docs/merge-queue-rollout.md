@@ -496,24 +496,39 @@ Rollback is described under [Current state](#current-state).
 ## Agent lifecycle after activation
 
 An agent reviews the immutable PR head, resolves findings, records validation and obtains any
-required independent review. For queue-required main, it uses a trusted checkout of main and submits with:
+required independent review. It does not need to wait for CI, previews or review admission
+before handing off. Right after pushing the reviewed head it enables head-pinned auto-merge:
+
+```sh
+gh pr merge <PR> --auto --match-head-commit <reviewed-head>
+```
+
+GitHub adds the PR to the native queue once `CI Result`, `Preview Result` and `Review Admission`
+pass on the head and every review thread is resolved; the queue's squash method applies, so no
+merge-method flag is needed. Auto-merge never bypasses a required context. A later push still
+needs its own exact-head review admission before the queue accepts it, and a push from an
+account without write access disables auto-merge. Sensitive changes still need the
+`/approve-sensitive <head>` comment, posted after the agent's own review of that head.
+
+When admission is already green, the agent may instead submit immediately from a trusted
+checkout of main:
 
 ```sh
 node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>
 ```
 
 The helper pins the native enqueue mutation to the reviewed head and validates the returned
-entry. A queue entry proves submission; report a merge only after observing it. Do not update a
-behind branch merely for freshness. If admission checks are still pending, leave a handoff
-rather than looping on `gh pr checks --watch` or reviewing an unchanged diff again. Native enqueue
-does not require the repository auto-merge setting.
+entry. An auto-merge request or queue entry proves submission; report a merge only after
+observing it. Do not update a behind branch merely for freshness, and do not loop on
+`gh pr checks --watch` or review an unchanged diff again.
 
-The PR handoff records: reviewed head, findings/review state, validation evidence, queue entry
-or blocking check, branch/worktree, and next command. Report **QUEUED**, not MERGED. End the agent
-turn immediately; Actions owns CI, previews and the merge wait. Resume only for a failure that
-needs a code decision, a new review finding, or an explicit follow-up request. On resumption read
-the handoff and changed evidence, not the entire previous review. Provider cache retention and
-billing are outside GitHub's control; no cache or token saving is guaranteed.
+The PR handoff records: reviewed head, findings/review state, validation evidence, auto-merge or
+queue entry (or the blocking check), branch/worktree, and next command. Report **AUTO-MERGE ON**
+or **QUEUED**, not MERGED. End the agent turn immediately; Actions owns CI, previews and the merge
+wait. Resume only for a failure that needs a code decision, a new review finding, or an explicit
+follow-up request. On resumption read the handoff and changed evidence, not the entire previous
+review. Provider cache retention and billing are outside GitHub's control; no cache or token
+saving is guaranteed.
 
 GitHub queue guidance: <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>.
 
