@@ -33,8 +33,9 @@ function github(roles, comments = []) {
   };
 }
 const roles = { owner: { role: 'admin', id: 7 }, writer: { role: 'write', id: 8 } };
-function comment(id, user, body) {
-  return { id, user, body };
+const created = '2026-10-29T12:00:00Z';
+function comment(id, user, body, updated = created) {
+  return { id, user, body, created_at: created, updated_at: updated };
 }
 test('approval commands name exactly one revision on one line', () => {
   for (const command of ['/approve', '/approve-sensitive']) {
@@ -56,6 +57,7 @@ test('the newest admin approval for the exact head is the review attestation', a
     comment(3, admin, `/approve-sensitive ${head}`),
     comment(4, admin, `/approve ${other}`),
     comment(5, { ...admin, type: 'Bot' }, `/approve ${head}`),
+    comment(6, admin, `/approve ${head}`, '2026-10-29T12:05:00Z'),
   ];
   assert.deepEqual(await currentAdminAttestation(github(roles), repo, comments, head), {
     provider: 'admin-attestation',
@@ -80,6 +82,10 @@ test('consumers recheck the attesting comment itself before trusting a receipt',
     ['retargeted', github(roles, [comment(3, admin, `/approve ${other}`)])],
     ['other author', github(roles, [comment(3, writer, `/approve ${head}`)])],
     ['lost admin', github({ ...roles, owner: { role: 'write', id: 7 } }, live)],
+    [
+      'edited by anyone',
+      github(roles, [comment(3, admin, `/approve ${head}`, '2026-10-29T12:05:00Z')]),
+    ],
   ])
     await assert.rejects(requireCurrentAdminAttestation(client, repo, review), /revoked/, name);
 });
@@ -118,9 +124,9 @@ test('verified generated release assets are admitted without a review provider',
   });
   assert.throws(() => admissionDecision(decisionInput({ releaseSafe: false })), /review/i);
   const unresolved = { threads: [{ isResolved: false, isOutdated: false }] };
-  assert.throws(() => admissionDecision(decisionInput(unresolved)));
+  assert.throws(() => admissionDecision(decisionInput(unresolved)), /Unresolved review findings/);
   const changes = { reviews: [{ state: 'CHANGES_REQUESTED', user: writer, commit_id: head }] };
-  assert.throws(() => admissionDecision(decisionInput(changes)));
+  assert.throws(() => admissionDecision(decisionInput(changes)), /Changes requested remain/);
 });
 test('an admin /approve comment admits a sensitive change in one step', () => {
   const attestation = { provider: 'admin-attestation', reviewId: 3, commit: head, actorId: 7 };

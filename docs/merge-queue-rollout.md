@@ -173,7 +173,8 @@ context. Fetch references, typed wrappers and absolute URLs remain sensitive. Ge
 their diff alone cannot establish whether sensitive capabilities are imported or passed in elsewhere.
 The size limit is 500 changed lines outside docs, root Markdown, locales, `__tests__/` directories
 and supported test files. Sensitive and unclassified changes require an exact-head approving review
-from an independent write collaborator, or a write collaborator's single-line command:
+from an independent write collaborator, or a write collaborator's single-line command (it approves
+the sensitive change only; it replaces the review requirement only when posted by a current admin):
 
 ```text
 /approve <40-character-reviewed-PR-head-SHA>
@@ -253,7 +254,7 @@ single line naming the exact 40-character head:
 /approve <40-character-reviewed-PR-head-SHA>
 ```
 
-- From a current repository **admin**, it is the exact-head **review attestation**: the explicit
+- From a current repository **admin**, in an unedited comment, it is the exact-head **review attestation**: the explicit
   alternative to a completed provider or non-author human review, including when the admin
   authored the PR. It also counts as the sensitive-change approval.
 - From any other write collaborator, it is only the sensitive-change approval; the review
@@ -410,10 +411,11 @@ at once. The queue then requires the same three contexts again on its own integr
 before merging. The queue's squash method applies, so no merge-method flag is needed, and
 auto-merge never bypasses a required context. A later push needs its own exact-head review
 admission before the queue accepts it, and a push from an account without write access disables
-auto-merge. When no provider review covers the head, or the change is sensitive, a write
-collaborator with the required merge authority posts `/approve <40-character reviewed head SHA>`
-alone in a comment ([approval commands](#approval-commands)); an agent posts it only after its own
-review of that exact head.
+auto-merge. When no provider review covers the head, a current repository admin with the required
+merge authority posts `/approve <40-character reviewed head SHA>` alone in a comment
+([approval commands](#approval-commands)); that also approves a sensitive change. A non-admin
+write collaborator's `/approve` approves only the sensitive change. An agent posts the command only
+after its own review of that exact head.
 
 Automation and agents whose admission is already green can still submit directly from a trusted
 checkout of main; this native enqueue does not depend on the auto-merge setting:

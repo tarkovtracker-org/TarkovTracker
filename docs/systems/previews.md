@@ -130,7 +130,7 @@ rebuild the artifact.
 Push a new commit to the candidate branch to start a fresh CI run; an intentional empty commit
 is sufficient when no source change is needed. The new run gets its own rebuilt preview artifact
 and matching manifest. Wait for CI Result and the normal automatic preview on an open, ready
-same-repository PR. Stopped previews need a fresh maintainer `/preview` or the enable control.
+same-repository PR. Stopped previews need a fresh maintainer `/preview` comment.
 Forks need a live maintainer opt-in or approval through `preview-fork`; a CI run grants neither.
 
 Do not rely on **Re-run all jobs** for recovery with the current fixed artifact name: GitHub can

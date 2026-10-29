@@ -99,7 +99,8 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   comment ([approval commands](docs/merge-queue-rollout.md#approval-commands)). From an admin that
   one comment is both the review attestation and the sensitive-change approval; CI and preview
   stay gated by the required checks, so it need not wait for them. Without admin access, a
-  non-author write collaborator's exact-head approval still admits. Repeat after any new head.
+  non-author write collaborator's exact-head approving GitHub review still admits; their `/approve`
+  comment covers only sensitive-change approval. Repeat after any new head.
   Auth, migrations, RLS and concurrency changes take this route; verify them with
   `pnpm run supabase:check` or the owning tests instead of waiting for a human.
 - Merge class: a green PR may merge without asking unless it is high-risk. High-risk (needs the
