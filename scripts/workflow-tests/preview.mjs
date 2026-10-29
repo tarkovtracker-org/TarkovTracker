@@ -36,6 +36,7 @@ import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readines
 import { countApiCalls } from './helpers/api-count.mjs';
 import { toolingPaths } from './helpers/queue-preview-scope.mjs';
 import { buildZip } from './helpers/zip.mjs';
+import { FULL_VALIDATION_JOBS } from '../preview/queue-reuse.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 process.env.REVIEW_ADMISSION_APP_ID = '5328610';
@@ -3037,4 +3038,98 @@ test('queue comparison errors preserve structured obsolete failures and propagat
       false
     );
   }
+});
+/** A canonical queue member whose PR head has a trusted deployed preview of `tree`. */
+function reusableQueueFixture(t, tree = TREE) {
+  const branch = `gh-readonly-queue/main/pr-42-${BASE}`;
+  const previewBranch = previewBranchName({ branch });
+  const f = fakeGithub(t, {
+    run: { event: 'merge_group', head_branch: branch, pull_requests: [] },
+    commits: { [HEAD]: { tree: { sha: TREE }, parents: [{ sha: BASE }] } },
+    manifest: {
+      pullRequest: null,
+      headSha: HEAD,
+      baseSha: BASE,
+      checkedOutSha: HEAD,
+      previewBranch,
+      appUrl: previewAppUrl(previewBranch),
+    },
+    previewStatuses: [
+      {
+        id: 3,
+        context: 'Preview Result',
+        state: 'success',
+        target_url: `https://github.com/${REPO_NAME}/actions/runs/${PREVIOUS_PREVIEW_RUN_ID}`,
+      },
+    ],
+    previousArtifacts: [{ id: 66, name: `preview-deployment-${HEAD}`, expired: false }],
+    ciJobs: [
+      ...FULL_VALIDATION_JOBS.filter((name) => name !== 'CI Result').map((name) => ({
+        name,
+        conclusion: 'success',
+      })),
+      {
+        name: 'CI Result',
+        run_id: 900,
+        run_attempt: 1,
+        head_sha: HEAD,
+        status: 'completed',
+        conclusion: 'success',
+      },
+      { name: 'Publish preview result', conclusion: 'success' },
+    ],
+  });
+  const evidence = buildZip([
+    {
+      name: 'deployment-evidence.json',
+      data: JSON.stringify({
+        headSha: HEAD,
+        treeSha: tree,
+        pullRequest: 42,
+        sourceCiRunId: 400,
+        sourceCiAttempt: 1,
+      }),
+    },
+  ]);
+  const downloadArtifact = f.github.rest.actions.downloadArtifact;
+  f.github.rest.actions.downloadArtifact = async (params) =>
+    params.artifact_id === 66 ? { data: evidence } : downloadArtifact(params);
+  const getWorkflowRun = f.github.rest.actions.getWorkflowRun;
+  f.github.rest.actions.getWorkflowRun = async (params) =>
+    params.run_id === 400
+      ? { data: runFixture({ id: 400, repository: { full_name: REPO_NAME } }) }
+      : getWorkflowRun(params);
+  return f;
+}
+test('an identical queue tree reuses the member PR preview without a deployment', async (t) => {
+  const f = reusableQueueFixture(t);
+  const decision = await planPreview({
+    github: f.github,
+    core: fakeCore(),
+    workspace: tempDir(t),
+    context: workflowRunContext(f.state.run),
+  });
+  assert.equal(decision.action, 'skip');
+  assert.equal(decision.state, 'success');
+  assert.match(decision.description, /Reused PR #42 preview of identical tree/);
+  assert.equal(f.state.dispatches.length, 0);
+  const status = f.state.statuses.at(-1);
+  assert.equal(status.sha, HEAD);
+  assert.equal(status.state, 'success');
+  assert.equal(
+    status.target_url,
+    `https://github.com/${REPO_NAME}/actions/runs/${PREVIOUS_PREVIEW_RUN_ID}`
+  );
+});
+test('a queue tree that differs from the PR preview tree still deploys its own preview', async (t) => {
+  const f = reusableQueueFixture(t, MERGE);
+  const decision = await planPreview({
+    github: f.github,
+    core: fakeCore(),
+    workspace: tempDir(t),
+    context: workflowRunContext(f.state.run),
+  });
+  assert.equal(decision.action, 'request', decision.description);
+  assert.equal(f.state.dispatches.length, 1);
+  assert.equal(f.state.dispatches[0].inputs.queue, 'true');
 });

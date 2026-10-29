@@ -76,7 +76,10 @@ CodeQL) is selected on every CI run. See
 
 ### Invariants
 
-- Pushes, dispatches and merge-group candidates retain full validation; only pull requests receive reduced selection.
+- Pushes and dispatches retain full validation. Pull requests receive path-based selection;
+  merge-group candidates reduce only for inert documentation, a verified formatter lock, or a
+  tree identical to a fully validated and previewed PR revision, which main's
+  `scripts/preview/queue-reuse.mjs` proves before the candidate classifier runs.
 - Queue integration support, live queue state and rollback are specified in
   [merge queue rollout](../merge-queue-rollout.md#current-state). The production queue is active
   and main is queue-only; strict freshness is disabled and remains only a rollback path.
