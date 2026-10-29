@@ -68,7 +68,7 @@ function matchesAttestation(comment, review) {
   if (!comment) return false;
   return [
     userComment(comment),
-    comment.user.id === review.actorId,
+    comment.user?.id === review.actorId,
     unedited(comment),
     approvalCommand(comment.body, review.commit),
   ].every(Boolean);

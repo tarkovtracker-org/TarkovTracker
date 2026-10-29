@@ -81,6 +81,7 @@ test('consumers recheck the attesting comment itself before trusting a receipt',
     ['edited', github(roles, [comment(3, admin, 'Withdrawn')])],
     ['retargeted', github(roles, [comment(3, admin, `/approve ${other}`)])],
     ['other author', github(roles, [comment(3, writer, `/approve ${head}`)])],
+    ['deleted author', github(roles, [comment(3, null, `/approve ${head}`)])],
     ['lost admin', github({ ...roles, owner: { role: 'write', id: 7 } }, live)],
     [
       'edited by anyone',
