@@ -42,6 +42,7 @@ overrides:
   safe-buffer: npm:@socketregistry/safe-buffer@^1
   safer-buffer: npm:@socketregistry/safer-buffer@^1
   serialize-javascript: ^7.1.3
+  seroval: 1.6.12
   sharp@<0.35.5: 0.35.5
   shell-quote: 1.11.0
   simple-git: 4.0.2
@@ -7090,8 +7091,8 @@ packages:
     resolution: {integrity: sha512-kYEnegpAxWFjUw3dSYdSM9zVlTrsxDbsSkq/qd3B7VanqyJ+JdDy6qVyuqVGBhSfuD/rLZQEKuXsO5KZFCrVYQ==}
     engines: {node: '>=20.0.0'}
 
-  seroval@1.6.9:
-    resolution: {integrity: sha512-UeEzHwAK+yl0YLbsvROV1t5yMYEwZZ0CfKYxDvUgS2fO9Vxdf8djqVIB+OuVpuawRNPqw68LE1Du/GMsW2ZPqA==}
+  seroval@1.6.12:
+    resolution: {integrity: sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg==}
     engines: {node: '>=10'}
 
   serve-placeholder@2.0.2:
@@ -10410,7 +10411,7 @@ snapshots:
       pkg-types: 2.4.0
       postcss: 8.5.30
       rolldown-string: 0.3.1(rolldown@1.2.14)
-      seroval: 1.6.9
+      seroval: 1.6.12
       std-env: 4.3.0
       ufo: 1.6.4
       unenv: 2.0.0-rc.24
@@ -16246,7 +16247,7 @@ snapshots:
 
   serialize-javascript@7.1.3: {}
 
-  seroval@1.6.9: {}
+  seroval@1.6.12: {}
 
   serve-placeholder@2.0.2:
     dependencies:
