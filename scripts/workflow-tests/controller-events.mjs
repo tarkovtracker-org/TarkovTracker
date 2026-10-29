@@ -56,7 +56,6 @@ test('unrelated comments allocate no admission-filter runner', () => {
   for (const github of [
     comment(''),
     comment('Thanks for the fix'),
-    comment('<!-- tarkovtracker:pr-controls:v1 -->'),
     comment('<!-- recent_review_start -->', '', { ...bot, id: 2 }),
     event('issue_comment', {
       issue: {},
@@ -92,19 +91,6 @@ test('admission signal intake ignores unsuccessful runs and retains other truste
   }
   for (const name of ['pull_request_target', 'workflow_dispatch'])
     assert.equal(allows('review-admission', 'filter', event(name)), true);
-});
-test('skipped sources allocate no control-panel runner while failures still refresh the panel', () => {
-  for (const conclusion of ['success', 'failure', 'cancelled', 'skipped']) {
-    const github = event('workflow_run');
-    github.event.workflow_run.conclusion = conclusion;
-    assert.equal(allows('pr-controls', 'targets', github), conclusion !== 'skipped');
-  }
-  for (const name of ['pull_request_target', 'workflow_dispatch'])
-    assert.equal(allows('pr-controls', 'targets', event(name)), true);
-  const edited = comment('requested operation', '<!-- tarkovtracker:pr-controls:v1 -->');
-  assert.equal(allows('pr-controls', 'targets', edited), true);
-  edited.ref = 'refs/heads/untrusted';
-  assert.equal(allows('pr-controls', 'targets', edited), false);
 });
 test('only relevant release-promotion jobs enter the serialized queue', () => {
   const workflow = readFileSync('.github/workflows/release-promotion-queue.yml', 'utf8');
@@ -194,27 +180,6 @@ test('the admission locator preserves candidate branches and unscoped events', (
     [{}, 'unscoped'],
   ])
     assert.equal(admissionTitle(payload), `Review Admission ${branch}`);
-});
-const controlSources = [
-  ['ci', 'pull_request', true],
-  ['ci', 'merge_group', true],
-  ['ci', 'push', false],
-  ['ci', 'workflow_dispatch', false],
-  ['ci', 'schedule', false],
-  ['preview-state', 'workflow_dispatch', true],
-  ['preview-state', 'workflow_run', false],
-  ['preview-state', 'schedule', false],
-  ['preview-state', 'pull_request_target', false],
-  ['preview', 'workflow_dispatch', true],
-  ['review-admission', 'workflow_run', true],
-  ['review-admission', 'issue_comment', true],
-  ['review-admission', 'pull_request_target', true],
-];
-test('control-panel intake skips source runs that resolve to no pull request', () => {
-  for (const [path, event, expected] of controlSources) {
-    const github = sourceRun(path, { event, conclusion: 'success' });
-    assert.equal(allows('pr-controls', 'targets', github), expected, `${path}/${event}`);
-  }
 });
 test('review bursts collapse to one admission signal per pull request', () => {
   const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');

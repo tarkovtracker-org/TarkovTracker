@@ -83,7 +83,7 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   and resolved findings; sensitive changes also need exact-head approval. When the merge class
   below allows merging, run `gh pr merge <PR> --auto --match-head-commit <reviewed-head>` right
   after pushing the reviewed head and end the turn; GitHub enqueues it once the required checks
-  pass. If no provider or collaborator review will cover that head, record the self-admission
+  pass. If no provider or collaborator review will cover that head, post the self-admission
   below before ending the turn so `Review Admission` can pass. Report `QUEUED` if GitHub queued it
   at once, otherwise `AUTO-MERGE ON`. High-risk PRs stop at `READY` with the reason instead. Actions owns integration/merge. State, lifecycle and
   rollback: `docs/merge-queue-rollout.md`.
@@ -95,12 +95,12 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   (omit `--request` to check status); never post raw `@codex review`, repost, or run it locally.
   It is optional: an unavailable or usage-limited Codex is noted, not awaited.
 - When no provider review covers the exact head, an agent with merge authority and repo admin
-  access self-admits after its own review with an admin attestation (CI and preview stay gated by
-  the required checks, so it need not wait for them)
-  (`docs/merge-queue-rollout.md#review-and-preview-controls`, operation `approve-review`), plus
-  `/approve-sensitive <40-char head SHA>` alone in a comment for sensitive changes. Without admin
-  access, a non-author write collaborator's exact-head approval still admits. Repeat both after
-  any new head. Auth, migrations, RLS and concurrency changes take this route; verify them with
+  access self-admits after its own review by posting `/approve <40-char head SHA>` alone in a
+  comment ([approval commands](docs/merge-queue-rollout.md#approval-commands)). From an admin that
+  one comment is both the review attestation and the sensitive-change approval; CI and preview
+  stay gated by the required checks, so it need not wait for them. Without admin access, a
+  non-author write collaborator's exact-head approval still admits. Repeat after any new head.
+  Auth, migrations, RLS and concurrency changes take this route; verify them with
   `pnpm run supabase:check` or the owning tests instead of waiting for a human.
 - Merge class: a green PR may merge without asking unless it is high-risk. High-risk (needs the
   user's explicit "merge" naming it): destructive or data-losing migrations (drops, type

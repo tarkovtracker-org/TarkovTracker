@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "issuer": {
+    "appId": 987654,
+    "botId": 987655,
+    "installationId": 987656,
+    "queueAllowed": true
+  },
+  "repository": "example/repo",
+  "number": 1,
+  "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "statusSha": "cccccccccccccccccccccccccccccccccccccccc",
+  "approved": true,
+  "risk": "low",
+  "review": {
+    "provider": "Cubic",
+    "reviewId": 10,
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "sensitiveApprovalId": null,
+  "runId": 9,
+  "runAttempt": null,
+  "workflowSourceSha": "12c085614a905a97e3112d381a4f749bdf0dfee7"
+}

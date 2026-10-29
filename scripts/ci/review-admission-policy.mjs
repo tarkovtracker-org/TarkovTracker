@@ -239,7 +239,7 @@ function explicitComment(comment, head, trusted) {
   return [
     comment.user.type === 'User',
     trusted.has(comment.user.login),
-    comment.body.trim() === `/approve-sensitive ${head}`,
+    [`/approve ${head}`, `/approve-sensitive ${head}`].includes(comment.body.trim()),
     !comment.body.includes('\n'),
   ].every(Boolean);
 }
@@ -273,7 +273,7 @@ function reviewedHead(input, latest) {
   requireCrowdinFindingsResolved(input);
   const human = latest.find((review) => approvedHuman(review, pr.head.sha, pr.user.id, trusted));
   const provider =
-    verifiedProvider(reviews, checks, pr.head.sha, input.comments) ?? crowdinExemption(input);
+    verifiedProvider(reviews, checks, pr.head.sha, input.comments) ?? exemptProvider(input);
   requirePolicy(
     Boolean(provider || human || adminReview(input.adminAttestation, pr.head.sha)),
     reviewRequirement(input)
@@ -311,6 +311,18 @@ function crowdinExemption(input) {
   const proof = input.crowdinSafe;
   if (!currentCrowdinProof(proof, input.pr.head.sha)) return null;
   return proof;
+}
+/**
+ * Generated release version PRs change only the manifest version and CHANGELOG, authored by
+ * GitHub Actions on a canonical `wip/release-*` branch (review-admission-release.mjs). No review
+ * provider covers them, so they are exempt; threads, changes requested and queue proof still apply.
+ */
+function exemptProvider(input) {
+  return crowdinExemption(input) ?? releaseExemption(input);
+}
+function releaseExemption(input) {
+  if (!input.releaseSafe) return null;
+  return { provider: 'release-policy', kind: 'review-exempt', commit: input.pr.head.sha };
 }
 function latestCleanProviderReview(reviews, checks, head, provider) {
   if (!providerChecks(checks, provider, head)) return null;

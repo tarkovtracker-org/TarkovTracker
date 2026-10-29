@@ -7,7 +7,6 @@ const queuedFiles = new Map([
 const specializedNormalizers = new Map([
   ['.github/workflows/preview.yml', normalizePreviewWorkflow],
   ['.github/workflows/review-admission.yml', normalizeAdmissionWorkflow],
-  ['.github/workflows/pr-controls-publish.yml', normalizeControlsWorkflow],
   ['.github/workflows/release-promotion-queue.yml', normalizePromotionWorkflow],
 ]);
 /** Validate the documented queue extension before the older native parser sees the workflow. */
@@ -31,12 +30,6 @@ function normalizePreviewWorkflow(source, filename) {
     expected,
     expected.replace("  queue: ${{ inputs.queue && 'max' || 'single' }}", '')
   );
-}
-function normalizeControlsWorkflow(source, filename) {
-  return normalizeAdmissionWorkflow(
-    source.replace(/^ {2}controls:$/m, '  admission:'),
-    filename
-  ).replace(/^ {2}admission:$/m, '  controls:');
 }
 function normalizeAdmissionWorkflow(source, filename) {
   return normalizeSerializedJob(source, filename, 'admission', 'review-admission-publication');
@@ -66,7 +59,6 @@ function requireSingleConcurrency(source, filename) {
 }
 const publisherJobs = new Map([
   ['.github/workflows/review-admission.yml', ['admission', 'review-admission']],
-  ['.github/workflows/pr-controls-publish.yml', ['controls', 'review-admission']],
   // Queue Submitter App key holders (configuration-only `merge-queue` environment).
   ['.github/workflows/crowdin.yml', ['sync', 'merge-queue']],
   ['.github/workflows/dependabot-auto-merge.yml', ['auto-merge', 'merge-queue']],

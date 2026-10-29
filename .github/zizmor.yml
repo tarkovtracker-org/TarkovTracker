@@ -18,11 +18,6 @@ rules:
       # collaborator, PR and queue proof. Signal workflows have read-only tokens and no checkout.
       # The consumer authenticates run/path/event/source/attempt before trusting the receipt.
       - review-admission.yml
-      # Controls use the same main-only environment and publication lock. They execute only
-      # trusted dependency-free code, validate the actual editor/dispatch sender and live role,
-      # and pin official comment/head/revision to immutable App-issued receipts. Candidate
-      # artifacts are never executable; preview dispatch retains the existing trust boundary.
-      - pr-controls.yml
       # Queue submission uses main's dependency-free controller, authenticates both source runs
       # and run-owned receipts, rechecks immutable generated assets/current main/CI/preview/admission,
       # and requests an ordinary head-pinned merge. It never executes downloaded candidate code.
