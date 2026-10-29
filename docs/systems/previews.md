@@ -130,7 +130,7 @@ rebuild the artifact.
 Push a new commit to the candidate branch to start a fresh CI run; an intentional empty commit
 is sufficient when no source change is needed. The new run gets its own rebuilt preview artifact
 and matching manifest. Wait for CI Result and the normal automatic preview on an open, ready
-same-repository PR. Stopped previews need a fresh maintainer `/preview` or the enable control.
+same-repository PR. Stopped previews need a fresh maintainer `/preview` comment.
 Forks need a live maintainer opt-in or approval through `preview-fork`; a CI run grants neither.
 
 Do not rely on **Re-run all jobs** for recovery with the current fixed artifact name: GitHub can
@@ -396,17 +396,10 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `wrangler.toml` — isolated preview variables and game-data KV binding
 - `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests
 
-### PR control panel
+### Preview commands
 
-The single TarkovTracker PR control comment offers persistent **Enable automatic PR previews**
-and **Stop automatic PR previews** controls. They share one ordered intent timeline with the
-existing `/preview` and `/preview stop` commands. A control receipt pins the actual editor and
-live maintain/admin role; queued deployments also pin the enabling control run ID and recheck it
-immediately before upload. Stop/re-enable cannot reuse an earlier deployment grant.
-
-Accepted controls wake Preview State on trusted `main`. Successful current-head CI, matching
-artifact identity, fork protections, and smoke tests still apply. Stop pauses automatic PR previews and leaves existing deployments available. Required
-merge-group previews and independently authorized manual previews use their own authorization. The panel shows the effective
-mode and verified preview link. Agents use the structured `PR Controls` workflow. Authorization,
-durable receipts, capacity limits, and rollout are documented in
-[merge queue controls](../merge-queue-rollout.md#review-and-preview-controls).
+`/preview` and `/preview stop` are the only PR preview controls; the former PR Controls panel and
+its Enable/Stop checkboxes were removed. Successful current-head CI, matching artifact identity,
+fork protections, and smoke tests still apply. Stop pauses automatic PR previews and leaves
+existing deployments available. Required merge-group previews and independently authorized
+manual previews use their own authorization.

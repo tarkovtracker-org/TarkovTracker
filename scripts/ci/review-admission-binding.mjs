@@ -1,8 +1,7 @@
 import { readAdmissionArchive } from './review-admission-archive.mjs';
 export { readAdmissionArchive } from './review-admission-archive.mjs';
 import { admissionRun, allPages, validateAdmissionReceipt } from './review-admission-api.mjs';
-import { isDeepStrictEqual } from 'node:util';
-import { currentAdminAttestation } from './pr-control-state.mjs';
+import { requireCurrentAdminAttestation } from './review-admission-attestation.mjs';
 import { requireEvidence, SHA } from './review-admission-policy.mjs';
 async function admissionArtifact(github, repo, run, head) {
   const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
@@ -42,12 +41,7 @@ export async function requireReviewAdmission({ github, repo, head, number, expec
   const receipt = await readAdmissionArchive(Buffer.from(data), head);
   validateAdmissionReceipt(receipt, repo, head, run, number);
   await requireTrustedPolicySource(github, repo, receipt.workflowSourceSha);
-  if (receipt.review.provider === 'admin-attestation') {
-    const current = await currentAdminAttestation(github, repo, number, head);
-    requireEvidence(
-      isDeepStrictEqual(current, receipt.review),
-      'Admin attestation was revoked, expired, or lost admin access.'
-    );
-  }
+  if (receipt.review.provider === 'admin-attestation')
+    await requireCurrentAdminAttestation(github, repo, receipt.review);
   return receipt;
 }

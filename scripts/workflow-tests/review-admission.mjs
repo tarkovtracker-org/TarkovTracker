@@ -1441,7 +1441,7 @@ test('service-linked review and native queue signals still prepare both current 
     };
     await withReceiptDirectory(async () => {
       await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-      assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
+      assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
     });
   }
 });
@@ -1805,7 +1805,7 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
       outputs[key] = value;
     };
     await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-    assert.deepEqual(outputs, { pull_request: '1', admission_sha: head, queue_sha: queued });
+    assert.deepEqual(outputs, { admission_sha: head, queue_sha: queued });
     assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'pending');
     f.f.artifacts = [head, queued].map((sha) => ({
       name: `review-admission-${sha}`,
@@ -1846,7 +1846,7 @@ test('an entry still waiting for its single build slot admits the exact PR head 
     await withReceiptDirectory(() =>
       runReviewAdmission({ github: f.github, context: f.context, core: f.core })
     );
-    assert.deepEqual(f.outputs, { pull_request: '1', admission_sha: head });
+    assert.deepEqual(f.outputs, { admission_sha: head });
     assert.equal(lastStatus(f, head).state, 'pending');
     assert.ok(f.statuses.every((status) => status.state !== 'failure'));
   }
@@ -2663,27 +2663,26 @@ test('comment filter regression controls detect old-body revocation loss and wor
 });
 test('whitespace approval revocation guards detect restoring raw startsWith filters', async () => {
   const mutant = await importMutationSource(
-    'review-admission.mjs',
-    "body.trimStart().startsWith('/approve-sensitive ')",
-    "body.startsWith('/approve-sensitive ')"
+    'review-admission-attestation.mjs',
+    'body.trimStart().startsWith(`${command} `)',
+    'body.startsWith(`${command} `)'
   );
   const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
-  for (const prefix of [' ', '\t']) {
-    for (const payload of [
-      commentPayload({
-        action: 'deleted',
-        comment: { body: `${prefix}/approve-sensitive ${head}` },
-      }),
-      commentPayload({
-        action: 'edited',
-        comment: { body: 'Withdrawn' },
-        changes: { body: { from: `${prefix}/approve-sensitive ${head}` } },
-      }),
-    ]) {
-      assert.equal(relevantComment(payload), true);
-      assert.equal(admissionJobAllowsComment(source, payload), true);
-      assert.equal(mutant.relevantComment(payload), false);
-      assert.equal(admissionJobAllowsComment(source, payload, mutant.relevantComment), false);
+  for (const command of ['/approve', '/approve-sensitive']) {
+    for (const prefix of [' ', '\t']) {
+      const body = `${prefix}${command} ${head}`;
+      for (const payload of [
+        commentPayload({ action: 'deleted', comment: { body } }),
+        commentPayload({
+          action: 'edited',
+          comment: { body: 'Withdrawn' },
+          changes: { body: { from: body } },
+        }),
+      ]) {
+        assert.equal(relevantComment(payload), true);
+        assert.equal(admissionJobAllowsComment(source, payload), true);
+      }
+      assert.equal(mutant.approvalCommandPrefix(body), false);
     }
   }
 });
@@ -2967,97 +2966,6 @@ test('admission unzip listing and extraction have hard deadlines and forced term
     assert.equal(boundedAdmissionUnzip(unlimited, mode, 'ETIMEDOUT').signal, 'SIGKILL');
   }
 });
-test('controls publisher is confined to its fixed journal and admission failure; ordinary publisher cannot write control state', async () => {
-  const { CONTROL_ANCHOR, controlContext } = await import('../ci/pr-control-policy.mjs');
-  const f = issuerFixture();
-  f.args.scope = 'controls';
-  f.args.context.workflow = 'PR Controls';
-  f.responses[`/repos/example/repo/statuses/${CONTROL_ANCHOR}`] = { id: 2 };
-  const github = await createReviewPublisher(f.args);
-  await github.rest.repos.createCommitStatus({
-    ...repo,
-    sha: CONTROL_ANCHOR,
-    context: controlContext(1),
-    state: 'success',
-  });
-  await github.rest.repos.createCommitStatus({
-    ...repo,
-    sha: head,
-    context: 'Review Admission',
-    state: 'failure',
-  });
-  for (const params of [
-    { ...repo, sha: head, context: 'Review Admission', state: 'success' },
-    { ...repo, sha: head, context: controlContext(1), state: 'success' },
-    { ...repo, sha: CONTROL_ANCHOR, context: 'Other', state: 'success' },
-    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'pending' },
-    { ...repo, sha: CONTROL_ANCHOR, context: controlContext(1), state: 'failure' },
-  ])
-    await assert.rejects(github.rest.repos.createCommitStatus(params));
-  const ordinary = await createReviewPublisher(issuerFixture().args);
-  await assert.rejects(
-    ordinary.rest.repos.createCommitStatus({
-      ...repo,
-      sha: CONTROL_ANCHOR,
-      context: controlContext(1),
-      state: 'success',
-    })
-  );
-  f.args.context.workflow = 'Unrelated';
-  await assert.rejects(createReviewPublisher(f.args), /dedicated workflow/);
-});
-test('controls scope cannot fall through to the unconfigured legacy writer', async () => {
-  const f = issuerFixture();
-  f.args.scope = 'controls';
-  f.args.context.workflow = 'PR Controls';
-  f.args.env = {};
-  await assert.rejects(createReviewPublisher(f.args), /dedicated App configuration/);
-  f.args.context.ref = 'refs/heads/candidate';
-  await assert.rejects(createReviewPublisher(f.args), /trusted main/);
-});
-test('panel target locators use the owned runner temporary directory', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'admission-target-fixture-'));
-  const previous = process.env.RUNNER_TEMP;
-  process.env.RUNNER_TEMP = directory;
-  try {
-    const f = queuedControlFixture();
-    await withReceiptDirectory(async () => {
-      await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
-      const locator = JSON.parse(
-        readFileSync(join(directory, 'review-admission-target/target.json'), 'utf8')
-      );
-      assert.equal(locator.number, 1);
-      assert.equal(locator.repository, 'example/repo');
-      assert.equal(locator.runId, Number(f.context.runId));
-    });
-  } finally {
-    if (previous === undefined) delete process.env.RUNNER_TEMP;
-    else process.env.RUNNER_TEMP = previous;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-test('a locator storage error fails the scoped admission statuses instead of leaving them pending', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'admission-target-failure-'));
-  const previous = process.env.RUNNER_TEMP;
-  const blocker = join(directory, 'not-a-directory');
-  writeFileSync(blocker, 'fixture');
-  process.env.RUNNER_TEMP = blocker;
-  try {
-    const f = queuedControlFixture();
-    await assert.rejects(
-      runReviewAdmission({ github: f.github, context: f.context, core: f.core })
-    );
-    assert.ok(f.statuses.length > 0);
-    const latest = new Map(f.statuses.map((status) => [status.sha, status.state]));
-    assert.ok(latest.size >= 2);
-    assert.ok([...latest.values()].every((state) => state === 'failure'));
-  } finally {
-    if (previous === undefined) delete process.env.RUNNER_TEMP;
-    else process.env.RUNNER_TEMP = previous;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-// Sanitized verbatim completion/coverage sections from CodeRabbit comment 6241906527 on #1224.
 const codeRabbitComment = JSON.parse(
   readFileSync(new URL('./fixtures/coderabbit-clean-comment.json', import.meta.url), 'utf8')
 );

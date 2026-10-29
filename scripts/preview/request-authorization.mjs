@@ -1,5 +1,3 @@
-import { controlPreviewRecords } from './control-intents.mjs';
-import { selectPreviewAuthorization, previewAuthorizationRequest } from './intent-policy.mjs';
 const COMMANDS = new Map([
   ['/preview', true],
   ['/preview stop', false],
@@ -350,42 +348,6 @@ async function commentEvidence(github, repo, pullRequest, enabledAt) {
     .toSorted((a, b) => b.id - a.id);
   return { comments, editTimes, originalCommands };
 }
-async function trustedCommentRecords(github, repo, pullRequest) {
-  const enabledAt = previewRolloutStart();
-  if (![Boolean(pullRequest), Number.isFinite(enabledAt)].every(Boolean)) return [];
-  const { comments, editTimes, originalCommands } = await commentEvidence(
-    github,
-    repo,
-    pullRequest,
-    enabledAt
-  );
-  const permissions = new Map();
-  const records = [];
-  for (const comment of originalCommands) {
-    if (!(await effectiveCommand(github, repo, comment, permissions, comments, editTimes)))
-      continue;
-    records.push({
-      kind: 'comment',
-      key: `comment-${comment.id}`,
-      sequence: comment.id,
-      at: comment.created_at,
-      request: commandIdentity(comment),
-    });
-  }
-  return records;
-}
-export async function readPreviewAuthorization(github, repo, pullRequest, options = {}) {
-  const controls = await controlPreviewRecords(github, repo, pullRequest, options);
-  const comments = await trustedCommentRecords(github, repo, pullRequest);
-  return selectPreviewAuthorization([...controls, ...comments]);
-}
 export async function readPreviewRequest(github, repo, pullRequest, boundCommentId = null) {
-  const controls = await controlPreviewRecords(github, repo, pullRequest);
-  if (controls.length === 0)
-    return readCommentPreviewRequest(github, repo, pullRequest, boundCommentId);
-  const comments = await trustedCommentRecords(github, repo, pullRequest);
-  return previewAuthorizationRequest(
-    selectPreviewAuthorization([...controls, ...comments]),
-    boundCommentId
-  );
+  return readCommentPreviewRequest(github, repo, pullRequest, boundCommentId);
 }

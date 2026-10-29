@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { candidateEvidence, promotionBranch } from './release-promotion.mjs';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const ADMISSION_PATH = '.github/workflows/review-admission.yml';
-// Review Admission also uploads a PR Controls refresh locator; it is never a receipt.
+// Older Review Admission runs also uploaded a PR Controls refresh locator; it is never a receipt.
 const ADMISSION_LOCATOR = /^review-admission-target-[1-9]\d*$/;
 const RELEASE_PATH = '.github/workflows/release.yml';
 const TRUSTED_ADMISSION_EVENTS = [
