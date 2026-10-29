@@ -63,6 +63,8 @@ it('preserves defaults, nested merges, ordered arrays and independent copies', (
     },
   });
   assert.deepEqual(Object.keys(result), ['mainFields', 'extensions', 'nested']);
+  assert.deepEqual(target.mainFields, ['module', 'main']);
+  assert.notEqual(result.mainFields, target.mainFields);
   assert.notEqual(result.extensions, target.extensions);
   assert.notEqual(result.nested.first, shared);
   assert.notEqual(result.nested.second, shared);

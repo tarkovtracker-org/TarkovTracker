@@ -30,12 +30,16 @@ describe('Vue I18n security patches', () => {
     element.innerHTML = translator()('frame');
     const frame = element.querySelector('iframe');
     expect(frame).not.toBeNull();
-    expect(frame.hasAttribute('srcdoc')).toBe(false);
+    expect(frame?.hasAttribute('srcdoc')).toBe(false);
   });
   it('does not mutate or double-escape reused named parameters', () => {
     const t = translator();
     const named = { name: '<b>named</b>' };
     const first = t('named', named);
+    const element = document.createElement('div');
+    element.innerHTML = first;
+    expect(element.querySelector('b')).toBeNull();
+    expect(element.textContent).toBe('<b>named</b>');
     expect(named).toEqual({ name: '<b>named</b>' });
     expect(t('named', named)).toBe(first);
   });
