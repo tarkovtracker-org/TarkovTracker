@@ -214,18 +214,21 @@ function snapshotRecord(snapshots, key) {
   return body === undefined ? null : { ...identity(key), key, body };
 }
 // An opaque peer hash hides the peer set, so a changed hash must name a new snapshot that derives
-// from the old target edge for edge; switching to another existing hashed variant holds. Peer
-// cycles (a package and its own test environment) are checked once, assuming the pair in progress.
+// from the old target edge for edge; switching to another existing hashed variant holds. A peer
+// cycle (a package and its own test environment) assumes the pair in progress holds; nothing is
+// cached, so a result computed under that assumption cannot outlive a failed outer check.
 function safeHashedSwitch(edge, before, after, graph) {
   const old = snapshotRecord(graph.before, `${edge}@${before}`);
   const next = snapshotRecord(graph.after, `${edge}@${after}`);
   if (![old, next].every(Boolean) || graph.before.has(next.key)) return false;
   const pair = `${old.key}\n${next.key}`;
-  if (!graph.switches.has(pair)) {
-    graph.switches.set(pair, true);
-    graph.switches.set(pair, derivesSnapshot(old, next, graph));
+  if (graph.switching.has(pair)) return true;
+  graph.switching.add(pair);
+  try {
+    return derivesSnapshot(old, next, graph);
+  } finally {
+    graph.switching.delete(pair);
   }
-  return graph.switches.get(pair);
 }
 function safePeerChange(edge, [before, after], [old, next], graph) {
   if (old.peers === next.peers) return true;
@@ -350,7 +353,7 @@ function safeSections(before, after) {
     before: records(before.snapshots),
     after: records(after.snapshots),
     packages: newPackages,
-    switches: new Map(),
+    switching: new Set(),
   };
   const removedPackages = changedRecords(oldPackages, newPackages).removed.map(([key]) => key);
   return [
