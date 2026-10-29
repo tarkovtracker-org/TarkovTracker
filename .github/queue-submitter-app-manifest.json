@@ -1,0 +1,14 @@
+{
+  "name": "TarkovTracker Queue Submitter",
+  "url": "https://github.com/tarkovtracker-org/TarkovTracker",
+  "public": false,
+  "hook_attributes": {
+    "url": "https://github.com/tarkovtracker-org/TarkovTracker",
+    "active": false
+  },
+  "default_permissions": {
+    "contents": "write",
+    "pull_requests": "write"
+  },
+  "default_events": []
+}

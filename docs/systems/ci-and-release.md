@@ -281,8 +281,11 @@ Dependency installation and project checks receive no automation credential.
   combined integration tree. It never attests a different, untested test-merge tree.
 - The server-side head guard (`--match-head-commit` in `strict`, the enqueue mutation's
   `expectedHeadOid` input otherwise) must use the SHA that passed all validation.
-- Merge requests use `GITHUB_TOKEN`. An `OPEN` queue entry is reported as queued, and main CI is
-  dispatched only after an actual merge, never on admission. No personal GitHub token is needed.
+- Direct merges use `GITHUB_TOKEN`. Queue entries use the Queue Submitter App token, because a
+  job-token entry starts no `merge_group` CI
+  ([provisioning](../merge-queue-rollout.md#queue-submitter-provisioning)). An `OPEN` queue entry
+  is reported as queued, and main CI is dispatched only after an actual merge, never on
+  admission. No personal GitHub token is needed.
   CI dispatch failures fail the workflow; candidate failures prevent merging.
   The fixed squash message must not inherit automation-skip markers from translation commits.
 - Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
