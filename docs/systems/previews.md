@@ -93,6 +93,7 @@ reusable service token never enters the instrumented browser or API client.
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
+| Main moves after upload while the head and CI attempt are current  | failure: rebuild on current main           |
 
 Statuses target only the validated head SHA, for pull requests and standalone branch previews
 alike, so GitHub shows one required result. They never target the controller's default-branch SHA
@@ -147,7 +148,12 @@ still needs current revision evidence.
   and digest are compared with live GitHub state and the recomputed digest before planning and
   again immediately before upload. A superseded attempt, moved head, moved base, or test merge
   with different parents or tree cannot deploy, and a late success is not published for an obsolete
-  candidate. A regenerated test merge with the same parents and tree is the same candidate.
+  candidate. When a newer event owns the head (a push, close, draft or CI rerun), the late run
+  publishes nothing. When only main moved, no PR event follows and the run's artifact can never
+  match the new test merge, so a PR candidate whose interim status is still the head's newest
+  result publishes a final failure asking for a rebuild on current main instead of staying pending.
+  Merge-group entries keep publishing nothing. A regenerated test merge with the same parents and
+  tree is the same candidate.
   A `pull_request` build checks out the test merge, so its tree claim must equal the current test
   merge's tree (not the head commit's, which differs whenever the branch is behind its base); push
   and dispatched branch builds claim the tree of the commit the run built. The PR API's base SHA can

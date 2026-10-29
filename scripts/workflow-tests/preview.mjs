@@ -273,6 +273,8 @@ test('deleted or rebased queue entries cannot upload or publish success', async 
     if (change === 'deleted')
       f.state.queueRefError = Object.assign(new Error('Not Found'), { status: 404 });
     else f.state.mainSha = MERGE;
+    // A queue entry never gets the PR-head base-movement report, even while it owns the result.
+    f.state.previewStatuses = [interimStatus(workflowDispatchContext().runId, 20)];
     await assert.rejects(
       verifyForDeploy({ ...args, decision, destination: tempDir(t) }),
       /obsolete/
@@ -286,7 +288,7 @@ test('deleted or rebased queue entries cannot upload or publish success', async 
       'obsolete'
     );
     assert.equal(
-      f.state.statuses.some((status) => status.state === 'success'),
+      f.state.statuses.some((status) => ['success', 'failure'].includes(status.state)),
       false
     );
   }
@@ -2782,6 +2784,82 @@ test('a stale base snapshot cannot hide main advancing before upload even with t
     }),
     /test merge changed/
   );
+});
+function interimStatus(runId, id) {
+  return {
+    id,
+    context: 'Preview Result',
+    state: 'pending',
+    description: 'Deploying the validated preview.',
+    target_url: `https://github.com/${REPO_NAME}/actions/runs/${runId}`,
+  };
+}
+async function deployedBehindMain(t, context) {
+  const result = await plan(t, context, behindSnapshotOptions({ inputs: { run_id: '900' } }));
+  assert.equal(result.decision.action, 'deploy', result.decision.description);
+  await verifyForDeploy({
+    github: result.github,
+    context,
+    core: fakeCore(),
+    decision: result.decision,
+    destination: join(tempDir(t), 'uploaded'),
+  });
+  // Another PR merges while smoke tests run: main moves, the head and CI attempt do not (#1357).
+  result.state.mainSha = sha('8');
+  result.state.previewStatuses = [interimStatus(context.runId, 20)];
+  result.state.statuses.length = 0;
+  return result;
+}
+const lateResult = (result, context, core) =>
+  publishResult({
+    github: result.github,
+    context,
+    core,
+    decision: result.decision,
+    outcomes: { deploy: 'success', smoke: 'success' },
+    evidence: {},
+  });
+test('main moving after upload ends the head result instead of leaving it pending', async (t) => {
+  const context = workflowDispatchContext();
+  const result = await deployedBehindMain(t, context);
+  const core = fakeCore();
+  assert.equal(await lateResult(result, context, core), 'failure');
+  assert.deepEqual(statusStates(result.state.statuses), ['a:failure']);
+  assert.match(result.state.statuses[0].description, /^Main moved during the preview deploy;/);
+  assert.ok(result.state.statuses[0].description.length <= 140);
+  assert.match(core.warnings.at(-1), /obsolete candidate: test merge changed/);
+  assert.match(core.failed, /Main moved/);
+  // The result is terminal: hourly reconciliation must not re-plan an artifact that can no
+  // longer match the new test merge.
+  result.state.previewStatuses = [{ ...result.state.statuses[0], id: 21 }];
+  result.state.statuses.length = 0;
+  await reconcileMissingPreviewStatuses({
+    github: result.github,
+    context: scheduleContext(),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  });
+  assert.deepEqual(result.state.statuses, []);
+});
+test('main moving after upload leaves a newer owner or owned staleness unreported', async (t) => {
+  const context = workflowDispatchContext();
+  const newer = await deployedBehindMain(t, context);
+  newer.state.previewStatuses.push(interimStatus(777, 21));
+  assert.equal(await lateResult(newer, context, fakeCore()), 'obsolete');
+  assert.deepEqual(newer.state.statuses, []);
+  for (const [label, change] of [
+    [
+      'head moved',
+      (state) => (state.pull = { ...state.pull, head: { ...state.pull.head, sha: sha('e') } }),
+    ],
+    ['attempt superseded', (state) => (state.run = { ...state.run, run_attempt: 2 })],
+    ['closed', (state) => (state.pull = { ...state.pull, state: 'closed' })],
+  ]) {
+    const owned = await deployedBehindMain(t, context);
+    change(owned.state);
+    assert.equal(await lateResult(owned, context, fakeCore()), 'obsolete', label);
+    assert.deepEqual(owned.state.statuses, [], label);
+  }
 });
 test('dispatched PR previews reject matching trees with invalid ordered parents on a fresh base', async (t) => {
   const pull = pullFixture({ head: { sha: HEAD, ref: 'locales', repo: { full_name: REPO_NAME } } });

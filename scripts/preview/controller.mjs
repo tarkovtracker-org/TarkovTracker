@@ -44,6 +44,16 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MERGE_PENDING = 'GitHub has not finished computing';
 const CI_RESULT_PENDING = 'CI Result is still running';
 const CI_RESULT_MISSING = 'Waiting for CI Result on this revision';
+// Freshness errors that a newer event (a push, close, draft or CI rerun) already reports on.
+const PULL_NOT_READY = 'pull request is not open and ready';
+const PULL_HEAD_MOVED = 'pull request head moved';
+const RUN_ATTEMPT_SUPERSEDED = 'CI run attempt superseded';
+const RUN_HEAD_CHANGED = 'CI run head changed';
+const OWNED_STALENESS = [PULL_NOT_READY, PULL_HEAD_MOVED, RUN_ATTEMPT_SUPERSEDED, RUN_HEAD_CHANGED];
+// Any other late staleness on a PR candidate means main moved under it. No PR event follows a base
+// movement, and the run's artifact can never match the new test merge, so that result is final.
+const BASE_MOVED =
+  'Main moved during the preview deploy; push a new commit or rebase to rebuild on current main.';
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -1054,12 +1064,12 @@ export async function reconcileMissingPreviewStatuses({ github, context, core, w
   if (errors.length) throw new Error(`Preview reconciliation failed: ${errors.join('; ')}`);
 }
 function pullReadinessError(pull) {
-  if (pull.state !== 'open' || pull.draft) return 'pull request is not open and ready';
+  if (pull.state !== 'open' || pull.draft) return PULL_NOT_READY;
   return null;
 }
 async function pullFreshnessErrors(github, context, decision) {
   const pull = await getPull(github, context.repo, decision.pullRequest);
-  const headMoved = pull.head.sha !== decision.headSha ? 'pull request head moved' : null;
+  const headMoved = pull.head.sha !== decision.headSha ? PULL_HEAD_MOVED : null;
   const mergeChanged = (await equivalentTestMerge(github, context, pull, decision.mergeSha))
     ? null
     : 'test merge changed';
@@ -1067,8 +1077,8 @@ async function pullFreshnessErrors(github, context, decision) {
 }
 function runFreshnessErrors(run, decision) {
   const errors = [];
-  if (run.run_attempt !== decision.runAttempt) errors.push('CI run attempt superseded');
-  if (run.head_sha !== decision.headSha) errors.push('CI run head changed');
+  if (run.run_attempt !== decision.runAttempt) errors.push(RUN_ATTEMPT_SUPERSEDED);
+  if (run.head_sha !== decision.headSha) errors.push(RUN_HEAD_CHANGED);
   return errors;
 }
 async function freshnessErrors(github, context, decision) {
@@ -1233,17 +1243,44 @@ function summarize(core, decision, result, published, evidence) {
     .addTable(summaryRows(decision, result, published, evidence));
   return core.summary.write();
 }
-async function publishTerminal(github, context, core, decision, result) {
-  const stale = result.state === 'success' ? await freshnessErrors(github, context, decision) : [];
-  if (stale.length) {
-    core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
-    return false;
-  }
-  return publishDecision(github, context, {
+async function publishOutcome(github, context, decision, result) {
+  const published = await publishDecision(github, context, {
     ...decision,
     state: result.state,
     description: result.message,
   });
+  return published ? result : null;
+}
+async function publishTerminal(github, context, core, decision, result) {
+  const stale = result.state === 'success' ? await freshnessErrors(github, context, decision) : [];
+  if (stale.length) return publishLateStaleness(github, context, core, decision, stale);
+  return publishOutcome(github, context, decision, result);
+}
+/**
+ * Success is never published for an obsolete candidate. When a newer event owns the head, publish
+ * nothing; when only main moved, end this run's pending result instead of leaving it pending (#1357).
+ */
+async function publishLateStaleness(github, context, core, decision, stale) {
+  core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
+  if (!(await reportsBaseMovement(github, context, decision, stale))) return null;
+  return publishOutcome(github, context, decision, failure(BASE_MOVED));
+}
+function unownedBaseMovement(decision, stale) {
+  return [
+    Boolean(decision.pullRequest),
+    decision.runEvent !== 'merge_group',
+    !stale.some((error) => OWNED_STALENESS.includes(error)),
+  ].every(Boolean);
+}
+async function reportsBaseMovement(github, context, decision, stale) {
+  if (!unownedBaseMovement(decision, stale)) return false;
+  return ownsLatestResult(github, context, decision.headSha);
+}
+/** True while this run's own interim status is still the head's newest `Preview Result`. */
+async function ownsLatestResult(github, context, headSha) {
+  const statuses = await allStatuses(github, context.repo, headSha, 'Preview Result');
+  const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
+  return latest?.target_url === runUrl(context);
 }
 /** Phase 3: publish the authoritative result only for a still-current candidate. */
 export async function publishResult({ github, context, core, decision, outcomes, evidence }) {
@@ -1254,9 +1291,12 @@ export async function publishResult({ github, context, core, decision, outcomes,
   }
   const result = terminalResult(decision, outcomes);
   const published = await publishTerminal(github, context, core, decision, result);
-  await summarize(core, decision, result, published, evidence);
-  if (result.state === 'failure') core.setFailed(result.message);
-  return published ? result.state : 'obsolete';
+  await reportTerminal(core, decision, published ?? result, Boolean(published), evidence);
+  return published ? published.state : 'obsolete';
+}
+async function reportTerminal(core, decision, reported, published, evidence) {
+  await summarize(core, decision, reported, published, evidence);
+  if (reported.state === 'failure') core.setFailed(reported.message);
 }
 function unchangedFailureEvent(context, pull) {
   if (context.eventName !== 'pull_request_target') return true;
