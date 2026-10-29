@@ -28,6 +28,10 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    # Main-only environment holding the Queue Submitter App key; only the merge step reads it.
+    environment:
+      name: merge-queue
+      deployment: false
     env:
       CI_RUN_ID: ${{ github.event.workflow_run.id }}
       GH_TOKEN: ${{ github.token }}
@@ -312,6 +316,10 @@ jobs:
         if: steps.gate.outputs.eligible == 'true'
         env:
           CHECKED_MERGE_MODE: ${{ steps.checks.outputs.merge_mode }}
+          # Queue Submitter App: a job-token queue entry would start no merge_group CI.
+          QUEUE_SUBMITTER_APP_ID: ${{ vars.QUEUE_SUBMITTER_APP_ID }}
+          QUEUE_SUBMITTER_PRIVATE_KEY: ${{ secrets.QUEUE_SUBMITTER_PRIVATE_KEY }}
+          QUEUE_SUBMITTER_REQUIRED: 'true'
         shell: bash
         run: |
           set -euo pipefail

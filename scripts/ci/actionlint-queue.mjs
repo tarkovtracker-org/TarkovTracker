@@ -65,12 +65,16 @@ function requireSingleConcurrency(source, filename) {
     throw new Error(`Ambiguous serialized job concurrency: ${filename}`);
 }
 const publisherJobs = new Map([
-  ['.github/workflows/review-admission.yml', 'admission'],
-  ['.github/workflows/pr-controls-publish.yml', 'controls'],
+  ['.github/workflows/review-admission.yml', ['admission', 'review-admission']],
+  ['.github/workflows/pr-controls-publish.yml', ['controls', 'review-admission']],
+  // Queue Submitter App key holders (configuration-only `merge-queue` environment).
+  ['.github/workflows/crowdin.yml', ['sync', 'merge-queue']],
+  ['.github/workflows/dependabot-auto-merge.yml', ['auto-merge', 'merge-queue']],
+  ['.github/workflows/release-promotion-queue.yml', ['enqueue', 'merge-queue']],
 ]);
 /** Validate the exact supported environment extension; keep every other native parser check. */
 export function normalizePublisherEnvironment(source, filename) {
-  const name = publisherJobs.get(filename);
+  const [name, environment] = publisherJobs.get(filename) ?? [];
   if (!name) return source;
   const jobs = matchingBlock(source, /^jobs:\n(?:[ \t]+[^\n]*\n|[ \t]*\n)*/m);
   const job = matchingBlock(
@@ -78,13 +82,13 @@ export function normalizePublisherEnvironment(source, filename) {
     new RegExp(`^ {2}${name}:\\n(?:[ \\t]{4,}[^\\n]*\\n|[ \\t]*\\n)*`, 'm')
   );
   const block = matchingBlock(job, /^ {4}environment:\n(?:[ \t]{6,}[^\n]*\n)*/m);
-  requirePublisherEnvironment(block, filename);
+  requirePublisherEnvironment(block, filename, environment);
   requireSingleDeploymentExtension(source, filename);
   return source.replace(block, block.replace('      deployment: false', ''));
 }
-function requirePublisherEnvironment(block, filename) {
+function requirePublisherEnvironment(block, filename, environment) {
   const properties = block.split('\n').slice(1, -1).sort().join('\n');
-  const expected = '      deployment: false\n      name: review-admission';
+  const expected = `      deployment: false\n      name: ${environment}`;
   if (properties !== expected)
     throw new Error(`Invalid configuration-only publisher environment: ${filename}`);
 }

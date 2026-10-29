@@ -64,12 +64,13 @@ Main is queue-only as of 2026-10-16:
   commit. #1243 exercised removal and re-formation. #1254 was enqueued while #1255 was building;
   after #1255 merged, #1254 was behind main, built on the new main and merged without a branch
   update.
-- Open: job-token (`GITHUB_TOKEN`) enqueue by Dependabot, Crowdin and release promotion is
-  unproven. The next real bot-submitted entry proves whether `merge_group` CI starts; if it does
-  not, the entry times out after 60 minutes and is removed, so the path fails closed. Hold that
-  automation rather than adding a token or ruleset bypass. Queue preview retention
-  (`PREVIEW_QUEUE_RETENTION_ENABLED`) is not enabled. Flaky smoke tests that remove otherwise
-  healthy queue entries remain to be fixed.
+- Done: job-token (`GITHUB_TOKEN`) enqueue starts no `merge_group` CI. Dependabot (#1349) and
+  Crowdin (#1314) entries sat at `AWAITING_CHECKS` until a maintainer re-enqueued them.
+  Automation is wired to submit through the Queue Submitter App
+  ([provisioning](#queue-submitter-provisioning)) and fails closed without it; no ruleset bypass
+  was added. Open: the first App-submitted automation entry must show `merge_group` CI starting.
+  Queue preview retention (`PREVIEW_QUEUE_RETENTION_ENABLED`) is not enabled. Flaky smoke tests
+  that remove otherwise healthy queue entries remain to be fixed.
 
 [`main-merge-queue-ruleset.json`](../.github/main-merge-queue-ruleset.json) remains the reviewed,
 disabled queue template; [`render-merge-queue-ruleset.mjs`](../scripts/ci/render-merge-queue-ruleset.mjs)
@@ -98,8 +99,8 @@ correspond to [activation procedure](#activation-procedure-history) steps 5 and 
 4. Done: required review admission is App-pinned. Bot comments are not GitHub approval rules;
    enqueue only after reviews are complete and findings resolved. Never use `--admin`.
 5. Open: Crowdin's policy validator, Dependabot merge-state handling and release promotion are
-   queue-aware in code, and queue submission does not dispatch main CI. Live proof of job-token
-   enqueue and version promotion is pending (above).
+   queue-aware in code, and queue submission does not dispatch main CI. They submit through the
+   Queue Submitter App; live proof of App submission and version promotion is pending (above).
 6. Open: queue-preview Pages retention runs dry-run only. Each re-formed queue group has its own
    branch, and GitHub ref deletion does not remove its Pages deployment.
 7. Done: with explicit maintainer authorization, the queue was activated and strict freshness was
@@ -418,6 +419,32 @@ manifest is [`.github/review-admission-app-manifest.json`](../.github/review-adm
   Queue-group admission is denied. Partial configuration or a missing configured key fails
   closed; there is no fallback from a configured App to Actions.
 
+## Queue submitter provisioning
+
+GitHub starts no workflows for events caused by the job token (`GITHUB_TOKEN`). A queue entry
+that Crowdin Sync, Dependabot Auto Merge or Release Promotion Queue submits with the job token
+therefore never receives `merge_group` CI and times out after 60 minutes (observed on #1349 and
+#1314, 2026-10-29). Those workflows submit through a second, isolated App instead, so the
+entry behaves like a maintainer-submitted one. The App only submits entries: GitHub's required
+checks, Review Admission and the queue ruleset still decide what merges. The registration
+manifest is [`.github/queue-submitter-app-manifest.json`](../.github/queue-submitter-app-manifest.json):
+
+- Register an organization-owned App with repository **Contents: write** and **Pull requests:
+  write** (implicit **Metadata: read**), webhooks disabled, and install it on this repository
+  alone. Keep it separate from the statuses-only Review Admission App, so the identity that
+  admits a head cannot also submit it.
+- Store `QUEUE_SUBMITTER_PRIVATE_KEY` only in the `merge-queue` environment, whose custom branch
+  policy allows only `main`. Set the public repository variable `QUEUE_SUBMITTER_APP_ID`.
+- [`queue-submitter.mjs`](../scripts/ci/queue-submitter.mjs) verifies the App's selected
+  installation for this repository and mints a selected-repository token restricted to this
+  repository and those two permissions. [`enqueue-pr-cli.mjs`](../scripts/ci/enqueue-pr-cli.mjs)
+  uses it for the guarded PR check, queue-entry query and enqueue mutation, and only the
+  submitting step receives the key.
+- The submitting steps set `QUEUE_SUBMITTER_REQUIRED=true`: without the App variable and key they
+  fail before submitting instead of using the job token. Without that flag (local maintainer
+  runs) the helper keeps the inherited `gh` credential. Partial configuration always fails
+  closed.
+
 The committed queue template uses admission App ID `0` as an unprovisioned sentinel and stays
 **disabled**. Render a disabled, App-pinned candidate only after provisioning:
 
@@ -449,9 +476,10 @@ Activation gates 5 and 6 above track the same open steps.
 4. Done (#1243). Enqueue and remove a second isolated canary before completion. Prove its deleted/re-formed ref
    cannot publish success or delete a deployment needed by pending jobs. Close its unmerged PR
    and remove only owned canary branches afterward.
-5. Open. Exercise the bot-token enqueue path and version-promotion staging path; queue submission must
-   produce merge-group CI without manual workflow approval, and release preparation must not tag.
-   Keep any unproven automation gate held rather than adding token/ruleset bypasses.
+5. Open. Job-token enqueue was disproven (it starts no `merge_group` CI); automation submits
+   through the [Queue Submitter App](#queue-submitter-provisioning) instead of a ruleset bypass.
+   Still pending: live proof that an App-submitted automation entry starts `merge_group` CI, and
+   that the version-promotion staging path does not tag.
 6. Open. Enable the separately approved `PREVIEW_QUEUE_RETENTION_ENABLED=true` variable in the protected
    `preview` environment only after dry-run/lifecycle proofs. Cleanup remains limited to proven,
    obsolete queue previews at least 48 hours old; production, normal PR previews and unknown

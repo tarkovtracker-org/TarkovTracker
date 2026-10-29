@@ -242,7 +242,8 @@ queue mode compares the PR changes against its merge base so unrelated main chan
 require rewriting the translation branch. Dependency setup and
 project checks run after that checkout. The built-in job token synchronizes translations, updates a
 behind branch only while strict freshness is active, explicitly dispatches candidate CI, and
-requests the merge or queue entry. Live main runs in `queue` mode, so translation branches are not
+requests a strict-mode merge; queue entries use the
+[Queue Submitter App](../merge-queue-rollout.md#queue-submitter-provisioning). Live main runs in `queue` mode, so translation branches are not
 updated. Below, "strict mode" means strict freshness is active: `strict`, or `strict-queue` when a
 rollback re-enables `Main CI freshness` while the queue stays active. Both strict-freshness modes
 update behind branches and compare against captured main; only `strict` merges directly, while
@@ -281,8 +282,12 @@ Dependency installation and project checks receive no automation credential.
   combined integration tree. It never attests a different, untested test-merge tree.
 - The server-side head guard (`--match-head-commit` in `strict`, the enqueue mutation's
   `expectedHeadOid` input otherwise) must use the SHA that passed all validation.
-- Merge requests use `GITHUB_TOKEN`. An `OPEN` queue entry is reported as queued, and main CI is
-  dispatched only after an actual merge, never on admission. No personal GitHub token is needed.
+- Direct merges use `GITHUB_TOKEN`. Queue entries use the Queue Submitter App token, because a
+  job-token entry starts no `merge_group` CI. The merge step sets `QUEUE_SUBMITTER_REQUIRED`, so a
+  missing App configuration fails the step before submission rather than falling back to the job
+  token ([provisioning](../merge-queue-rollout.md#queue-submitter-provisioning)). An `OPEN` queue
+  entry is reported as queued, and main CI is dispatched only after an actual merge, never on
+  admission. No personal GitHub token is needed.
   CI dispatch failures fail the workflow; candidate failures prevent merging.
   The fixed squash message must not inherit automation-skip markers from translation commits.
 - Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.

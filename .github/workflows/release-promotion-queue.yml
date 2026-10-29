@@ -28,6 +28,10 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # Main-only environment holding the Queue Submitter App key; only the submit step reads it.
+    environment:
+      name: merge-queue
+      deployment: false
     permissions:
       actions: write
       checks: read
@@ -47,6 +51,10 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Queue Submitter App: a job-token queue entry would start no merge_group CI.
+          QUEUE_SUBMITTER_APP_ID: ${{ vars.QUEUE_SUBMITTER_APP_ID }}
+          QUEUE_SUBMITTER_PRIVATE_KEY: ${{ secrets.QUEUE_SUBMITTER_PRIVATE_KEY }}
+          QUEUE_SUBMITTER_REQUIRED: 'true'
         with:
           script: |
             const { queueReleasePromotion } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-promotion-queue.mjs`);

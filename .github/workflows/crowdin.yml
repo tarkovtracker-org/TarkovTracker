@@ -11,6 +11,7 @@ on:
       - 'scripts/ci/github-ci-gate.sh'
       - 'scripts/ci/enqueue-pr*.mjs'
       - 'scripts/ci/queue-configuration.mjs'
+      - 'scripts/ci/queue-submitter.mjs'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
@@ -33,6 +34,10 @@ jobs:
     if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    # Main-only environment holding the Queue Submitter App key; only the merge step reads it.
+    environment:
+      name: merge-queue
+      deployment: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,7 +46,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Preserve trusted merge gate
-        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh scripts/ci/review-admission*.mjs scripts/ci/enqueue-pr*.mjs scripts/ci/queue-configuration.mjs scripts/ci/pr-control-policy.mjs scripts/ci/pr-control-state.mjs "$RUNNER_TEMP/"
+        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh scripts/ci/review-admission*.mjs scripts/ci/enqueue-pr*.mjs scripts/ci/queue-configuration.mjs scripts/ci/queue-submitter.mjs scripts/ci/pr-control-policy.mjs scripts/ci/pr-control-state.mjs "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@9c23991700c0ec5256fd41089b9d9d7d540e424e # v3.3.0
@@ -129,4 +134,8 @@ jobs:
           PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
           HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
           BASE_SHA: ${{ steps.candidate.outputs.base_sha }}
+          # Queue Submitter App: a job-token queue entry would start no merge_group CI.
+          QUEUE_SUBMITTER_APP_ID: ${{ vars.QUEUE_SUBMITTER_APP_ID }}
+          QUEUE_SUBMITTER_PRIVATE_KEY: ${{ secrets.QUEUE_SUBMITTER_PRIVATE_KEY }}
+          QUEUE_SUBMITTER_REQUIRED: 'true'
         run: bash "$RUNNER_TEMP/crowdin-pr.sh" merge
