@@ -231,6 +231,8 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 The root `AGENTS.md` owns review requirements. See
 [workflow automation](../../docs/workflow-automation.md#push-cadence) for push batching.
 Dashboard settings must be verified separately; checked-in documentation does not prove them.
+Repository review config lives in `.coderabbit.yaml` and `greptile.json`; both skip Crowdin sync
+PRs and Crowdin-owned locales ([reviewer settings](../../docs/workflow-automation.md#reviewer-settings-external-verification-pending)).
 
 ## Commands
 
