@@ -7,11 +7,15 @@
 // - an added package record is a safe non-major upgrade of a name already in the lock with
 //   unchanged metadata apart from its sha512 integrity, and sensitive packages are never added
 //   or removed;
-// - every changed edge keeps its name, moves only by a safe version step and points at a snapshot
-//   that exists; a sensitive package keeps its version and sensitive peers, and its own edges may
-//   change only where its peer context names that dependency (a relink, not a re-resolution);
-// - every added snapshot matches the edges of an earlier snapshot of the same package, names only
-//   peers that exist as packages, and keeps a sensitive package at its existing version.
+// - a removal leaves no dangling reference: no surviving edge names a removed snapshot, no
+//   snapshot names a removed package record, and every surviving package record keeps a snapshot;
+//   changed edges and added snapshots must resolve to records that exist;
+// - every changed edge keeps its name and moves its version and readable peer versions only by
+//   safe steps; a changed opaque peer hash must point at a new snapshot derived from the old one;
+// - a sensitive package keeps its version, its sensitive peers and any opaque peer hash, and its
+//   own edges may change only where its peer context names that dependency (a relink);
+// - every added snapshot matches the edges of an earlier snapshot of the same package by safe
+//   steps, including its readable peers, and names only peers that exist as packages.
 import { safeVersion } from './review-admission-version.mjs';
 const SENSITIVE =
   /(?:supabase|stripe|auth|session|jose|jwt|jsonwebtoken|oauth|passport|credential|progress-contracts)/i;
@@ -22,6 +26,7 @@ const RESOLUTION =
 const DIRECT_PEER = new RegExp(`\\((${NAME})@`, 'g');
 const PEER_HASH = /^\([0-9a-f]{32}\)$/;
 const PEER = new RegExp(`(?:^|\\()(${NAME})@([0-9][^()]*)`, 'g');
+const PEER_TOKEN = new RegExp(`(?<=\\()${NAME}@[0-9][^()]*`, 'g');
 const TRANSITIVE_PEER = /^ {6}- '?[@a-z0-9_./-]+'?$/;
 const TRANSITIVE_HEADER = /^ {4}transitivePeerDependencies:$/;
 function sections(text) {
@@ -62,9 +67,21 @@ function recordBody(line, key, body) {
 function saveRecord(result, key, body) {
   if (key !== null) result.set(key, body.join('\n'));
 }
+function balancedParens(text) {
+  let rest = text;
+  for (let next = rest.replaceAll('()', ''); next !== rest; next = rest.replaceAll('()', ''))
+    rest = next;
+  return rest === '';
+}
+// A peer suffix is an opaque pnpm hash or nested `(name@version...)` groups and nothing else.
+function wellFormedPeers(peers) {
+  if (!peers || PEER_HASH.test(peers)) return true;
+  return balancedParens(peers.replace(PEER_TOKEN, ''));
+}
 function resolution(value) {
   const match = RESOLUTION.exec(value);
-  return match && { version: match[1], peers: match[2] };
+  if (!match || !wellFormedPeers(match[2])) return null;
+  return { version: match[1], peers: match[2] };
 }
 function identity(key) {
   const match = KEY.exec(key);
@@ -102,12 +119,31 @@ function knownIdentity(key) {
 function safeMove(before, after) {
   return before === after || safeVersion(before, after);
 }
+function hashed(peers) {
+  return PEER_HASH.test(peers);
+}
 function sensitivePeers(peers) {
   return [...peers.matchAll(PEER)]
     .filter((match) => SENSITIVE.test(match[1]))
     .map((match) => `${match[1]}@${match[2]}`)
     .toSorted()
     .join(' ');
+}
+function peerVersions(peers) {
+  const result = new Map();
+  for (const [, name, version] of peers.matchAll(PEER))
+    result.set(name, [...(result.get(name) ?? []), version]);
+  return result;
+}
+function safePeerStep(previous = [], version) {
+  return !previous.length || previous.some((old) => safeMove(old, version));
+}
+// Peers named on both sides may only move by safe steps; pnpm adds or drops peers across versions.
+function safePeerSteps(before, after) {
+  const old = peerVersions(before);
+  return [...peerVersions(after)].every(([name, versions]) =>
+    versions.every((version) => safePeerStep(old.get(name), version))
+  );
 }
 // Names of the direct peers in a suffix such as `(a@1.0.0)(b@2.0.0(c@3.0.0))`: a and b, not c.
 function directPeers(peers) {
@@ -123,7 +159,7 @@ function changeableEdges(name, peers) {
   return SENSITIVE.test(name) ? directPeers(peers) : null;
 }
 function knownPeers(peers, packages) {
-  if (!peers || PEER_HASH.test(peers)) return true;
+  if (!peers || hashed(peers)) return true;
   return [...peers.matchAll(PEER)].every((match) => packages.has(`${match[1]}@${match[2]}`));
 }
 function integrityMetadata(body) {
@@ -171,14 +207,43 @@ function resolvedScalar(entry) {
   if (!scalar) return null;
   const name = scalar[1].replace(/^'(.*)'$/, '$1');
   const edge = name === 'version' ? entry.context.at(-1) : name;
-  return { name, edge, value: scalar[2] };
+  return { name, edge, value: scalar[2].replace(/^'(.*)'$/, '$1') };
 }
-function safeEdgeChange(edge, before, after, graph) {
+function snapshotRecord(snapshots, key) {
+  const body = snapshots.get(key);
+  return body === undefined ? null : { ...identity(key), key, body };
+}
+// An opaque peer hash hides the peer set, so a changed hash must name a new snapshot that derives
+// from the old target edge for edge; switching to another existing hashed variant holds. Peer
+// cycles (a package and its own test environment) are checked once, assuming the pair in progress.
+function safeHashedSwitch(edge, before, after, graph) {
+  const old = snapshotRecord(graph.before, `${edge}@${before}`);
+  const next = snapshotRecord(graph.after, `${edge}@${after}`);
+  if (![old, next].every(Boolean) || graph.before.has(next.key)) return false;
+  const pair = `${old.key}\n${next.key}`;
+  if (!graph.switches.has(pair)) {
+    graph.switches.set(pair, true);
+    graph.switches.set(pair, derivesSnapshot(old, next, graph));
+  }
+  return graph.switches.get(pair);
+}
+function safePeerChange(edge, [before, after], [old, next], graph) {
+  if (old.peers === next.peers) return true;
+  if ([old.peers, next.peers].some(hashed)) return safeHashedSwitch(edge, before, after, graph);
+  return safePeerSteps(old.peers, next.peers);
+}
+function resolvedEdgeChange(edge, before, after, graph) {
   const old = resolution(before);
   const next = resolution(after);
-  if (![old, next, edge].every(Boolean)) return false;
-  if (!steadySensitive(edge, old, next)) return false;
-  return safeMove(old.version, next.version) && graph.has(`${edge}@${after}`);
+  if (![old, next, edge].every(Boolean)) return null;
+  return graph.after.has(`${edge}@${after}`) ? { old, next } : null;
+}
+function safeEdgeChange(edge, before, after, graph) {
+  const change = resolvedEdgeChange(edge, before, after, graph);
+  if (!change) return false;
+  const { old, next } = change;
+  if (!steadySensitive(edge, old, next) || !safeMove(old.version, next.version)) return false;
+  return safePeerChange(edge, [before, after], [old, next], graph);
 }
 // Exact importer specifiers mirror the manifest, which review-admission-dependencies checks.
 function safeSpecifier(context, before, after) {
@@ -216,42 +281,84 @@ function sameResolvedEdges(before, after, graph, changeable = null) {
 }
 // A sensitive package may only be relinked against new non-sensitive peers, never re-resolved.
 function steadySensitive(name, before, after) {
-  if (SENSITIVE.test(name) && before.version !== after.version) return false;
+  if (!SENSITIVE.test(name)) return sensitivePeers(before.peers) === sensitivePeers(after.peers);
+  if (before.version !== after.version) return false;
+  if ([before.peers, after.peers].some(hashed)) return before.peers === after.peers;
   return sensitivePeers(before.peers) === sensitivePeers(after.peers);
 }
 function derivesSnapshot(previous, next, graph) {
   if (!safeMove(previous.version, next.version)) return false;
   if (!steadySensitive(next.name, previous, next)) return false;
+  if (!safePeerSteps(previous.peers, next.peers)) return false;
   return sameResolvedEdges(previous.body, next.body, graph, changeableEdges(next.name, next.peers));
 }
 function safeAddedSnapshot(next, previous, graph) {
   if (!graph.packages.has(`${next.name}@${next.version}`)) return false;
   if (!knownPeers(next.peers, graph.packages)) return false;
-  return (previous.get(next.name) ?? []).some((record) =>
-    derivesSnapshot(record, next, graph.snapshots)
-  );
+  return (previous.get(next.name) ?? []).some((record) => derivesSnapshot(record, next, graph));
 }
 function sameCommonSnapshot(key, before, after, graph) {
   const { name, peers } = identity(key);
   return sameResolvedEdges(before, after, graph, changeableEdges(name, peers));
 }
-function sameSnapshots(before, after, packages) {
-  const same = (key, old, next) => old === next || sameCommonSnapshot(key, old, next, after);
-  if (!unchangedCommon(before, after, same)) return false;
-  const graph = { packages, snapshots: after };
-  const previous = byName(before, knownIdentity);
-  const { added } = changedRecords(before, after);
+function sameSnapshots(graph) {
+  const same = (key, old, next) => old === next || sameCommonSnapshot(key, old, next, graph);
+  if (!unchangedCommon(graph.before, graph.after, same)) return false;
+  const previous = byName(graph.before, knownIdentity);
+  const { added } = changedRecords(graph.before, graph.after);
   return [...byName(added).values()]
     .flat()
     .every((next) => safeAddedSnapshot(next, previous, graph));
 }
+// Registry snapshots name `name@version(peers)`; tarball and alias snapshots use their own key.
+function packageKey(key) {
+  const parsed = knownIdentity(key);
+  return parsed ? `${parsed.name}@${parsed.version}` : key;
+}
+// Importer `version:` and snapshot dependency lines; specifiers and metadata name no snapshot.
+function edgeScalar(entry) {
+  const scalar = entry.context.length ? resolvedScalar(entry) : null;
+  return scalar?.name === 'specifier' ? null : scalar;
+}
+function edgeTarget(entry) {
+  const scalar = edgeScalar(entry);
+  if (!scalar) return null;
+  if (resolution(scalar.value)) return `${scalar.edge}@${scalar.value}`;
+  return KEY.test(scalar.value) ? scalar.value : null;
+}
+function edgeTargets(importers, snapshots) {
+  return [importers, ...snapshots.values()]
+    .flatMap((text) => contextualLines(text).map(edgeTarget))
+    .filter(Boolean);
+}
+function keepsSnapshot(key, linked, packages) {
+  return !packages.has(packageKey(key)) || linked.has(packageKey(key));
+}
+// Removal must leave no surviving reference: no edge names a removed snapshot, no snapshot names
+// a removed package record, and a surviving package record keeps at least one snapshot.
+function safeRemovals(graph, removedPackages, importers) {
+  const removed = new Set(changedRecords(graph.before, graph.after).removed.map(([key]) => key));
+  const linked = new Set([...graph.after.keys()].map(packageKey));
+  if (removedPackages.some((key) => linked.has(key))) return false;
+  if (![...removed].every((key) => keepsSnapshot(key, linked, graph.packages))) return false;
+  return !edgeTargets(importers, graph.after).some((target) => removed.has(target));
+}
 function safeSections(before, after) {
   if (before.controls !== after.controls) return false;
   const [oldPackages, newPackages] = [before, after].map((lock) => records(lock.packages));
-  const [oldSnapshots, newSnapshots] = [before, after].map((lock) => records(lock.snapshots));
-  if (!sameResolvedEdges(before.importers, after.importers, newSnapshots)) return false;
-  if (!samePackages(oldPackages, newPackages)) return false;
-  return sameSnapshots(oldSnapshots, newSnapshots, newPackages);
+  const graph = {
+    before: records(before.snapshots),
+    after: records(after.snapshots),
+    packages: newPackages,
+    switches: new Map(),
+  };
+  const removedPackages = changedRecords(oldPackages, newPackages).removed.map(([key]) => key);
+  return [
+    () => safeRemovals(graph, removedPackages, after.importers),
+    () => sameResolvedEdges(before.importers, after.importers, graph),
+    () => samePackages(oldPackages, newPackages),
+    () => sameSnapshots(graph),
+  ].every((check) => check());
 }
 export function safeLockfileChange(before, after) {
   if (before === after) return true;
