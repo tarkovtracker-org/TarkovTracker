@@ -50,6 +50,25 @@ test('partial or malformed configuration fails closed', () => {
   ])
     assert.throws(() => queueSubmitterConfig(partial), /incomplete or invalid/);
 });
+test('invalid private key material is rejected before any API request', async () => {
+  let requests = 0;
+  const fetchImpl = async () => {
+    requests += 1;
+    throw new Error('unexpected request');
+  };
+  for (const key of [
+    'not a pem',
+    generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }),
+  ])
+    await assert.rejects(
+      queueSubmitterToken({ repo, env: { ...env, QUEUE_SUBMITTER_PRIVATE_KEY: key }, fetchImpl }),
+      /private key is invalid|requires an RSA key/
+    );
+  assert.equal(requests, 0);
+});
 test('mints a single-repository contents/pull-requests token from the verified installation', async () => {
   const f = fixture();
   assert.equal(await f.run(), 'ghs_fixture');
