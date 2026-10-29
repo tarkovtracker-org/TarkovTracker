@@ -1,0 +1,173 @@
+@@ -177 +177 @@
+-        version: 4.3.3(051330ad7d572ddf23ac54e541b04dc5)
++        version: 4.3.4(feeafea108a446fa17bcbfcc101731b4)
+@@ -213 +213 @@
+-        version: 6.2.5
++        version: 6.2.6
+@@ -346,5 +345,0 @@
+-  '@nuxt/devtools-kit@3.4.2':
+-    resolution: {integrity: sha512-TPPbmH9xrExagYxfCe6JgtbHmgchfgDdA656Yws18rn8I/oCvB+gcw3kTWBBp2sC9ipZPXsgbsW/yZnVnGNBiA==}
+-    peerDependencies:
+-      vite: ~8.2.4
+-
+@@ -467,2 +462,2 @@
+-  '@nuxt/test-utils@4.3.3':
+-    resolution: {integrity: sha512-0Nxp6e+VJROAMGuyurTX3+ON+l3y79TuNDsciy+7TfCPx4GcitTrYsxjomi65jLVi0H32aEb2sloh/qmiwj6aA==}
++  '@nuxt/test-utils@4.3.4':
++    resolution: {integrity: sha512-8x0w16DDUi1/6ZivL1zuOaDt9xtACZFHMQySBirUZNIU0H0qljjB5yyajXPtlb8YCQ5l6piFJqafK/zDpDcCnA==}
+@@ -922,2 +917,2 @@
+-  fake-indexeddb@6.2.5:
+-    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
++  fake-indexeddb@6.2.6:
++    resolution: {integrity: sha512-ihhmr0KoET51jT8R4YhbUYuLLvr1qqO6INISygtN16i8loR8kAxtAUr4+EKHTSMjL+lggaAn4OC7DRqzrNgnuQ==}
+@@ -979,3 +973,0 @@
+-  magic-string@1.4.2:
+-    resolution: {integrity: sha512-vG+rjFRj1PqdIBozIxAGMjPlOhaVe+GXpbttY/iSK7rGcJRMlwNJO7dcUwmUqkymsFLJiNGI06t4D7Fr7yRC9g==}
+-
+@@ -1072,3 +1063,0 @@
+-  package-manager-detector@1.8.0:
+-    resolution: {integrity: sha512-yQA4H19AmPEoMUeavPMDIe1higySl/gH/yaQrkT/s07Qp+7pp2hYz30N3z2l5BkjVkF9Ow6o0wjJamm2y7Sn0A==}
+-
+@@ -2073,17 +2061,0 @@
+-  '@nuxt/devtools-kit@3.4.2(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.2)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))':
+-    dependencies:
+-      '@nuxt/kit': 4.6.2(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.2)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))
+-      execa: 8.0.1
+-      vite: 8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)
+-    transitivePeerDependencies:
+-      - '@nuxt/schema'
+-      - confbox
+-      - dotenv
+-      - giget
+-      - jiti
+-      - magic-string
+-      - mlly
+-      - oxc-parser
+-      - rolldown
+-      - unplugin
+-
+@@ -2162 +2134 @@
+-      package-manager-detector: 1.8.0
++      package-manager-detector: 1.9.0
+@@ -2426,30 +2397,0 @@
+-  '@nuxt/kit@4.5.2(magic-string@1.4.2)(magicast@0.5.4)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))':
+-    dependencies:
+-      c12: 3.3.4(magicast@0.5.4)
+-      consola: 3.4.2
+-      defu: 6.1.7
+-      destr: 2.0.5
+-      errx: 0.1.2
+-      exsolve: 1.1.3
+-      ignore: 7.0.9
+-      jiti: 2.7.0
+-      klona: 2.0.6
+-      mlly: 1.8.2
+-      nostics: 1.2.0
+-      ohash: 2.0.12
+-      pathe: 2.0.3
+-      pkg-types: 2.4.0
+-      rc9: 3.1.0
+-      scule: 1.3.0
+-      tinyglobby: 0.2.17
+-      ufo: 1.6.4
+-      unctx: 3.0.0(magic-string@1.4.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))
+-      untyped: 2.0.0
+-      verkit: 0.3.2
+-    transitivePeerDependencies:
+-      - magic-string
+-      - magicast
+-      - oxc-parser
+-      - rolldown
+-      - unplugin
+-
+@@ -2486,33 +2427,0 @@
+-  '@nuxt/kit@4.6.2(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.2)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))':
+-    dependencies:
+-      consola: 3.4.2
+-      defu: 6.1.7
+-      destr: 2.0.5
+-      errx: 0.2.2
+-      exsolve: 1.1.3
+-      ignore: 7.0.12
+-      klona: 2.0.6
+-      microdiff: 1.6.0
+-      nostics: 1.3.0
+-      package-manager-detector: 1.9.0
+-      pathe: 2.0.3
+-      rc9: 3.1.0
+-      scule: 1.3.0
+-      std-env: 4.3.0
+-      tinyexec: 1.3.1
+-      tinyglobby: 0.2.17
+-      unctx: 3.0.1(magic-string@1.4.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))
+-      verkit: 0.5.0
+-    optionalDependencies:
+-      '@nuxt/schema': 4.6.2
+-      confbox: 0.3.1
+-      dotenv: 17.3.1
+-      giget: 3.3.1
+-      jiti: 2.7.0
+-      mlly: 1.8.2
+-      oxc-parser: 0.141.0
+-      rolldown: 1.2.14
+-    transitivePeerDependencies:
+-      - magic-string
+-      - unplugin
+-
+@@ -2662 +2571 @@
+-  '@nuxt/test-utils@4.3.3(051330ad7d572ddf23ac54e541b04dc5)':
++  '@nuxt/test-utils@4.3.4(feeafea108a446fa17bcbfcc101731b4)':
+@@ -2665,2 +2574,2 @@
+-      '@nuxt/devtools-kit': 3.4.2(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.2)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))
+-      '@nuxt/kit': 4.5.2(magic-string@1.4.2)(magicast@0.5.4)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))
++      '@nuxt/devtools-kit': 3.4.4(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))
++      '@nuxt/kit': 4.6.2(@nuxt/schema@4.6.2)(confbox@0.3.1)(dotenv@17.3.1)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1)))
+@@ -2670 +2579 @@
+-      fake-indexeddb: 6.2.5
++      fake-indexeddb: 6.2.6
+@@ -2672 +2581 @@
+-      magic-string: 1.4.2
++      magic-string: 1.4.3
+@@ -2675 +2584 @@
+-      package-manager-detector: 1.8.0
++      package-manager-detector: 1.9.0
+@@ -2683 +2592 @@
+-      vitest-environment-nuxt: 2.0.0(051330ad7d572ddf23ac54e541b04dc5)
++      vitest-environment-nuxt: 2.0.0(feeafea108a446fa17bcbfcc101731b4)
+@@ -2706 +2614,0 @@
+-      - magicast
+@@ -3510 +3418 @@
+-  fake-indexeddb@6.2.5: {}
++  fake-indexeddb@6.2.6: {}
+@@ -3646,4 +3553,0 @@
+-  magic-string@1.4.2:
+-    dependencies:
+-      '@jridgewell/sourcemap-codec': 1.6.0
+-
+@@ -4077,2 +3980,0 @@
+-  package-manager-detector@1.8.0: {}
+-
+@@ -4459,7 +4360,0 @@
+-  unctx@3.0.0(magic-string@1.4.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))):
+-    optionalDependencies:
+-      magic-string: 1.4.2
+-      oxc-parser: 0.141.0
+-      rolldown: 1.2.14
+-      unplugin: 3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))
+-
+@@ -4480,7 +4374,0 @@
+-  unctx@3.0.1(magic-string@1.4.2)(oxc-parser@0.141.0)(rolldown@1.2.14)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))):
+-    optionalDependencies:
+-      magic-string: 1.4.2
+-      oxc-parser: 0.141.0
+-      rolldown: 1.2.14
+-      unplugin: 3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.2.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.15)(yaml@2.9.1))
+-
+@@ -4823 +4711 @@
+-  vitest-environment-nuxt@2.0.0(051330ad7d572ddf23ac54e541b04dc5):
++  vitest-environment-nuxt@2.0.0(feeafea108a446fa17bcbfcc101731b4):
+@@ -4825 +4713 @@
+-      '@nuxt/test-utils': 4.3.3(051330ad7d572ddf23ac54e541b04dc5)
++      '@nuxt/test-utils': 4.3.4(feeafea108a446fa17bcbfcc101731b4)
+@@ -4847 +4734,0 @@
+-      - magicast

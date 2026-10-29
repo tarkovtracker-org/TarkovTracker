@@ -520,6 +520,146 @@ test('native lock proof admits known ordinary patches and refuses auth, major, e
   );
   assert.equal(safeLockfileChange(before, 'unclassified lock output'), false);
 });
+// Real Dependabot lock rewrites (#1348-#1350) against main c549aa25, trimmed to the packages they
+// touch or reference. pnpm deduplicated records, re-hashed peer contexts and relinked stripe
+// against a new @types/node, which the old one-for-one pairing rejected.
+const DEPENDABOT_LOCKS = new URL('./fixtures/dependabot-locks/', import.meta.url);
+const dependabotBase = () => readFileSync(new URL('main-c549aa25.lock', DEPENDABOT_LOCKS), 'utf8');
+function applyZeroContextPatch(text, patch) {
+  const lines = text.split('\n');
+  let offset = 0;
+  for (const hunk of patch.split(/^(?=@@ )/m).filter((part) => part.startsWith('@@ '))) {
+    const [, start, count = '1'] = /^@@ -(\d+)(?:,(\d+))? /.exec(hunk);
+    const body = hunk.split('\n').slice(1);
+    const removed = body.filter((line) => line.startsWith('-')).map((line) => line.slice(1));
+    const added = body.filter((line) => line.startsWith('+')).map((line) => line.slice(1));
+    const index = Number(start) - (Number(count) === 0 ? 0 : 1) + offset;
+    assert.deepEqual(lines.slice(index, index + removed.length), removed, hunk.split('\n')[0]);
+    lines.splice(index, removed.length, ...added);
+    offset += added.length - removed.length;
+  }
+  return lines.join('\n');
+}
+function dependabotLock(name) {
+  return applyZeroContextPatch(
+    dependabotBase(),
+    readFileSync(new URL(`${name}.patch`, DEPENDABOT_LOCKS), 'utf8')
+  );
+}
+test('real Dependabot dedupe, peer-hash and sensitive-relink lock rewrites admit', () => {
+  for (const name of [
+    'pr-1348-testing-tooling',
+    'pr-1349-typescript-and-types',
+    'pr-1350-tailwind-tooling',
+  ]) {
+    const after = dependabotLock(name);
+    assert.notEqual(after, dependabotBase(), name);
+    assert.equal(safeLockfileChange(dependabotBase(), after), true, name);
+  }
+});
+test('real Dependabot lock rewrites still hold tampering, new identities, dangling edges and sensitive moves', () => {
+  const before = dependabotBase();
+  const testing = dependabotLock('pr-1348-testing-tooling');
+  const types = dependabotLock('pr-1349-typescript-and-types');
+  const postcss = dependabotLock('pr-1350-tailwind-tooling');
+  const surviving = /( {2}'@nuxt\/devtools-kit@3\.4\.3':\n {4}resolution: \{integrity: sha512-)m/;
+  assert.match(testing, surviving);
+  const stripeKey = 'stripe@22.6.2(@types/node@26.6.5)';
+  assert.ok(types.includes(stripeKey));
+  for (const [label, after] of [
+    ['surviving integrity', testing.replace(surviving, '$1n')],
+    [
+      'dangling peer hash',
+      testing.replace(
+        'version: 4.3.4(feeafea108a446fa17bcbfcc101731b4)',
+        'version: 4.3.4(00000000000000000000000000000000)'
+      ),
+    ],
+    [
+      'unknown transitive peer shape',
+      testing.replace('      - happy-dom\n', '      - happy-dom: 1.0.0\n'),
+    ],
+    [
+      'new package identity',
+      postcss
+        .replace(
+          '\nsnapshots:\n',
+          '\n  brand-new@1.0.0:\n    resolution: {integrity: sha512-AAAA}\n\nsnapshots:\n'
+        )
+        .replace('\n  stylehacks@', '\n  brand-new@1.0.0: {}\n\n  stylehacks@'),
+    ],
+    [
+      'sensitive re-resolution',
+      types
+        .replaceAll('stripe@22.6.2', 'stripe@22.6.3')
+        .replaceAll('version: 22.6.2(', 'version: 22.6.3('),
+    ],
+    ['controls', postcss.replace('autoInstallPeers: true', 'autoInstallPeers: false')],
+  ]) {
+    assert.notEqual(after, before, label);
+    assert.equal(safeLockfileChange(before, after), false, label);
+  }
+});
+test('lock proof holds sensitive removals, sensitive peer moves and downgrades', () => {
+  const pair = simpleLock().replace(
+    '\nsnapshots:\n',
+    '\n  jose@1.0.0:\n    resolution: {integrity: sha512-AAAA}\n\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n\nsnapshots:\n  jose@1.0.0: {}\n\n  jose@1.0.1: {}\n'
+  );
+  const peered = pair
+    .replace('version: 1.0.0', 'version: 1.0.0(jose@1.0.0)')
+    .replace('  ordinary@1.0.0: {}', '  ordinary@1.0.0(jose@1.0.0): {}');
+  assert.equal(
+    safeLockfileChange(peered, peered.replaceAll('(jose@1.0.0)', '(jose@1.0.1)')),
+    false
+  );
+  const dropped = pair.replace('\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n', '');
+  assert.equal(safeLockfileChange(pair, dropped.replace('\n  jose@1.0.1: {}\n', '\n')), false);
+  const edges = simpleLock('1.0.1').replace(
+    '  ordinary@1.0.1: {}',
+    '  leaf@1.0.0: {}\n\n  leaf@1.0.1: {}\n\n  ordinary@1.0.1:\n    dependencies:\n      leaf: 1.0.1'
+  );
+  assert.equal(safeLockfileChange(edges, edges.replace('leaf: 1.0.1', 'leaf: 1.0.0')), false);
+  const jose = pair.replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0:\n    dependencies:\n      jose: 1.0.0'
+  );
+  assert.equal(safeLockfileChange(jose, jose.replace('jose: 1.0.0', 'jose: 1.0.1')), false);
+  const single = pair
+    .replace('\n  jose@1.0.1:\n    resolution: {integrity: sha512-BBBB}\n', '')
+    .replace('\n  jose@1.0.1: {}\n', '\n');
+  assert.equal(safeLockfileChange(single, pair), false);
+  const orphan = simpleLock().replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0: {}\n\n  ordinary@1.0.1: {}'
+  );
+  assert.equal(safeLockfileChange(simpleLock(), orphan), false);
+  const leaves =
+    '  leaf@1.0.0: {}\n\n  leaf@1.0.1: {}\n\n  ordinary@1.0.0:\n    dependencies:\n      leaf: 1.0.0';
+  const under = (name) =>
+    simpleLock('1.0.0', name).replace(`  ${name}@1.0.0: {}`, leaves.replaceAll('ordinary', name));
+  assert.equal(
+    safeLockfileChange(under('ordinary'), under('ordinary').replace('leaf: 1.0.0', 'leaf: 1.0.1')),
+    true
+  );
+  assert.equal(
+    safeLockfileChange(under('jose'), under('jose').replace('leaf: 1.0.0', 'leaf: 1.0.1')),
+    false
+  );
+  const named = simpleLock().replace(
+    '  ordinary@1.0.0: {}',
+    '  ordinary@1.0.0:\n    dependencies:\n      specifier: 1.0.0'
+  );
+  assert.equal(
+    safeLockfileChange(
+      named,
+      named.replace(
+        'dependencies:\n      specifier: 1.0.0',
+        'dependencies:\n      specifier: 1.0.1'
+      )
+    ),
+    false
+  );
+});
 // The live-lock tests derive their subjects from the current pnpm-lock.yaml, so routine
 // dependency updates that move or drop a particular package do not break them.
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2574,8 +2714,8 @@ test('Cubic guard mutations expose peer-name normalization, JWT, 0.x, PR reuse a
   assert.equal(safeLockfileChange(peer, renamed), false);
   const names = await importMutationSource(
     'review-admission-lock.mjs',
-    "return text.replace(VERSION, '$1#VERSION#');",
-    "return text.replace(/\\d+\\.\\d+\\.\\d+/g, '#VERSION#');"
+    '.every((match) => packages.has(`${match[1]}@${match[2]}`));',
+    '.every(() => true);'
   );
   assert.equal(names.safeLockfileChange(peer, renamed), true);
   const jwt = await importMutationSource('review-admission-lock.mjs', '|jsonwebtoken', '');
