@@ -51,8 +51,9 @@ workflow manually when translations must ship sooner. It never uploads local tra
 existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-Synchronization, branch updates, CI dispatch, and the final merge or queue submission use the
-built-in `GITHUB_TOKEN`.
+Synchronization, branch updates, CI dispatch, and a strict-mode merge use the built-in
+`GITHUB_TOKEN`; queue submission uses the
+[Queue Submitter App](../../docs/merge-queue-rollout.md#queue-submitter-provisioning).
 The job grants contents/pull-request write, actions write, and checks read permissions. No personal
 GitHub token is required. Explicit `workflow_dispatch` starts CI on `locales` before merging and
 on `main` afterward. No write token is passed to dependency installation or project validation.

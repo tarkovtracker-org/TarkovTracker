@@ -242,7 +242,8 @@ queue mode compares the PR changes against its merge base so unrelated main chan
 require rewriting the translation branch. Dependency setup and
 project checks run after that checkout. The built-in job token synchronizes translations, updates a
 behind branch only while strict freshness is active, explicitly dispatches candidate CI, and
-requests the merge or queue entry. Live main runs in `queue` mode, so translation branches are not
+requests a strict-mode merge; queue entries use the
+[Queue Submitter App](../merge-queue-rollout.md#queue-submitter-provisioning). Live main runs in `queue` mode, so translation branches are not
 updated. Below, "strict mode" means strict freshness is active: `strict`, or `strict-queue` when a
 rollback re-enables `Main CI freshness` while the queue stays active. Both strict-freshness modes
 update behind branches and compare against captured main; only `strict` merges directly, while
