@@ -1,6 +1,7 @@
 // @vitest-environment node
 /// <reference types="node" />
 import { createRequire } from 'node:module';
+import { types } from 'node:util';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 // Resolve the serializer used by Nuxt's Vite builder, not a separate test-only dependency.
@@ -19,6 +20,7 @@ const assertSafeArray = (serialized: string) => {
   const context = { atob, injectionMarker: 0 };
   const decoded = runInNewContext(serialized, context);
   expect(context.injectionMarker).toBe(0);
+  expect(types.isUint8Array(decoded)).toBe(true);
   expect(Array.from(decoded)).toEqual([1, 2]);
 };
 describe('Seroval security patches', () => {
