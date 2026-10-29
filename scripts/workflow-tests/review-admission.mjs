@@ -751,6 +751,17 @@ test('lock proof holds dangling removals, unsafe peer switches, hashed and malfo
   });
   const plain = graphLock('1.0.0', ['ordinary@1.0.0'], { 'ordinary@1.0.0': '' });
   assert.equal(safeLockfileChange(plain, malformed), false);
+  // A hashed peer cycle (a package and its own test environment, as in #1348) re-hashes together.
+  const cycle = ([own, env], leaf) =>
+    graphLock(`1.0.0${own}`, ['ordinary@1.0.0', 'env@1.0.0', `leaf@${leaf}`], {
+      [`ordinary@1.0.0${own}`]: `    dependencies:\n      env: 1.0.0${env}\n      leaf: ${leaf}`,
+      [`env@1.0.0${env}`]: `    dependencies:\n      ordinary: 1.0.0${own}`,
+      [`leaf@${leaf}`]: '',
+    });
+  const [hashD, hashE] = ['d', 'e'].map((digit) => `(${digit.repeat(32)})`);
+  const cycleBefore = cycle([hashA, hashB], '1.0.0');
+  assert.equal(safeLockfileChange(cycleBefore, cycle([hashD, hashE], '1.0.1')), true);
+  assert.equal(safeLockfileChange(cycleBefore, cycle([hashD, hashE], '2.0.0')), false);
 });
 // The live-lock tests derive their subjects from the current pnpm-lock.yaml, so routine
 // dependency updates that move or drop a particular package do not break them.
