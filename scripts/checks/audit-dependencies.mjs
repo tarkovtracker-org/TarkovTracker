@@ -5,26 +5,7 @@ import { pathToFileURL } from 'node:url';
 // matched exactly after the leading importer segment), why the advisory cannot reach production,
 // and an expiry. An expired or mismatched entry, or a finding on any other path, fails so it is
 // re-reviewed; a stale one warns.
-export const ACCEPTED_ADVISORIES = {
-  'GHSA-86w9-cpqp-85rv': {
-    package: 'node-forge',
-    via: [
-      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/cli>listhen>node-forge',
-      '@nuxtjs/sitemap>nuxt-site-config>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
-      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/cli>listhen>node-forge',
-      '@nuxtjs/sitemap>nuxtseo-shared>nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
-      'nuxt>@nuxt/cli>listhen>node-forge',
-      'nuxt>@nuxt/nitro-server>nitropack>listhen>node-forge',
-    ],
-    reason:
-      'The patched node-forge 1.4.1 was published 2026-10-27 and clears the 7-day ' +
-      'minimumReleaseAge gate on 2026-11-03; raise the override then and drop this entry. It is ' +
-      'reached only through listhen, which generates self-signed certificates for the local ' +
-      '`nuxt dev` server. It never verifies signatures from untrusted input and is absent from ' +
-      'the deployed .output bundle.',
-    expires: '2026-11-03',
-  },
-};
+export const ACCEPTED_ADVISORIES = {};
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const asList = (value) => (Array.isArray(value) ? value : []);
 const asRecord = (value) => (isRecord(value) ? value : {});
