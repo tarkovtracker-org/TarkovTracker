@@ -80,12 +80,12 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   unavailable or rate-limited.
 - `main` merges only through the native merge queue, which builds each entry on current main; do
   not update a behind branch merely to enqueue it. Review Admission verifies the immutable PR head
-  and resolved findings; sensitive changes also need exact-head approval. Right after pushing the
-  reviewed head, run `gh pr merge <PR> --auto --match-head-commit <reviewed-head>`, report
-  `AUTO-MERGE ON`, and end the turn: GitHub enqueues it once the required checks pass. If admission
-  is already green, `node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>`
-  from a trusted main checkout enqueues immediately (report `QUEUED`). Actions owns
-  integration/merge. State, lifecycle and rollback: `docs/merge-queue-rollout.md`.
+  and resolved findings; sensitive changes also need exact-head approval. When the merge class
+  below allows merging, run `gh pr merge <PR> --auto --match-head-commit <reviewed-head>` right
+  after pushing the reviewed head and end the turn; GitHub enqueues it once the required checks
+  pass. Report `QUEUED` if GitHub queued it at once, otherwise `AUTO-MERGE ON`. High-risk PRs stop
+  at `READY` with the reason instead. Actions owns integration/merge. State, lifecycle and
+  rollback: `docs/merge-queue-rollout.md`.
 - Review bots (CodeRabbit, cubic, Codex) are best-effort: use them when available, never wait on
   one that is unavailable, rate-limited, skipped, or quiet past its normal latency. Fix valid
   findings they post. Request `@coderabbitai review` only for substantial new diff or
