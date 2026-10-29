@@ -46,6 +46,7 @@ overrides:
   safe-buffer: 'npm:@socketregistry/safe-buffer@^1'
   safer-buffer: 'npm:@socketregistry/safer-buffer@^1'
   serialize-javascript: '^7.1.3'
+  seroval: '1.6.12'
   'sharp@<0.35.5': '0.35.5'
   shell-quote: '1.11.0'
   simple-git: '4.0.2'
