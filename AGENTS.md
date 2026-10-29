@@ -83,8 +83,9 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   and resolved findings; sensitive changes also need exact-head approval. When the merge class
   below allows merging, run `gh pr merge <PR> --auto --match-head-commit <reviewed-head>` right
   after pushing the reviewed head and end the turn; GitHub enqueues it once the required checks
-  pass. Report `QUEUED` if GitHub queued it at once, otherwise `AUTO-MERGE ON`. High-risk PRs stop
-  at `READY` with the reason instead. Actions owns integration/merge. State, lifecycle and
+  pass. If no provider or collaborator review will cover that head, record the self-admission
+  below before ending the turn so `Review Admission` can pass. Report `QUEUED` if GitHub queued it
+  at once, otherwise `AUTO-MERGE ON`. High-risk PRs stop at `READY` with the reason instead. Actions owns integration/merge. State, lifecycle and
   rollback: `docs/merge-queue-rollout.md`.
 - Review bots (CodeRabbit, cubic, Codex) are best-effort: use them when available, never wait on
   one that is unavailable, rate-limited, skipped, or quiet past its normal latency. Fix valid
@@ -94,7 +95,8 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   (omit `--request` to check status); never post raw `@codex review`, repost, or run it locally.
   It is optional: an unavailable or usage-limited Codex is noted, not awaited.
 - When no provider review covers the exact head, an agent with merge authority and repo admin
-  access self-admits after its own review and green CI with an admin attestation
+  access self-admits after its own review with an admin attestation (CI and preview stay gated by
+  the required checks, so it need not wait for them)
   (`docs/merge-queue-rollout.md#review-and-preview-controls`, operation `approve-review`), plus
   `/approve-sensitive <40-char head SHA>` alone in a comment for sensitive changes. Without admin
   access, a non-author write collaborator's exact-head approval still admits. Repeat both after
