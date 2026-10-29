@@ -78,6 +78,7 @@ function fixture() {
     },
     calls: [],
   };
+  state.latestRuns = [state.runs[400]];
   const github = {
     rest: {
       git: {
@@ -102,6 +103,11 @@ function fixture() {
           return { data: run };
         },
         listJobsForWorkflowRunAttempt: 'jobs',
+        listWorkflowRuns: async (params) => {
+          assert.equal(params.workflow_id, 'ci.yml');
+          assert.equal(params.head_sha, prHead);
+          return { data: { workflow_runs: state.latestRuns } };
+        },
         listWorkflowRunArtifacts: 'artifacts',
         downloadArtifact: async () => ({
           data: buildZip([
@@ -212,6 +218,10 @@ const rejected = {
     /not the PR head run/,
     (s) => (s.runs[400].event = 'workflow_dispatch'),
   ],
+  'a newer PR CI run exists for the head': [
+    /newer PR CI run/,
+    (s) => s.latestRuns.push({ ...s.runs[400], id: 401 }),
+  ],
   'source CI run is gone': [/GitHub returned 404/, (s) => (s.evidence.sourceCiRunId = 401)],
 };
 for (const [name, [reason, mutate]] of Object.entries(rejected)) {
@@ -272,12 +282,32 @@ test('a reused queue plan runs only the always-selected jobs and still aggregate
   assert.deepEqual(aggregateResults(plan, needs), []);
   assert.notDeepEqual(aggregateResults(plan, { ...needs, security: { result: 'failure' } }), []);
 });
-test('full-validation job names match the CI workflow', () => {
+test('full-validation job names match the CI workflow job names', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const jobs = {
+    'Fallow audit': 'fallow',
+    'Lint & Format': 'lint-format',
+    'Type Check': 'typecheck',
+    'Coverage thresholds': 'coverage',
+    Validate: 'validate',
+    'Supabase DB': 'supabase-db',
+    'Systems drift check': 'systems-drift',
+    Workers: 'workers',
+    'CI Result': 'ci-result',
+  };
   for (const name of FULL_VALIDATION_JOBS) {
-    const pattern = name.startsWith('Test (shard') ? 'Test (shard ${{ matrix.shard }}' : name;
-    assert.ok(ci.includes(`name: ${pattern}`), name);
+    if (name.startsWith('Test (shard ')) continue;
+    assert.match(jobBlock(ci, jobs[name]), new RegExp(`^ {4}name: ${name}$`, 'm'), name);
   }
+  const test = jobBlock(ci, 'test');
+  assert.match(
+    test,
+    /^ {4}name: Test \(shard \$\{\{ matrix\.shard \}\}\/\$\{\{ matrix\.total \}\}\)$/m
+  );
+  assert.match(test, /^ {8}shard: \[1, 2, 3, 4\]$/m);
+  assert.match(test, /^ {8}total: \[4\]$/m);
+  for (const shard of [1, 2, 3, 4])
+    assert.ok(FULL_VALIDATION_JOBS.includes(`Test (shard ${shard}/4)`));
 });
 test('CI decides queue reuse with main code before the candidate classifier', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');

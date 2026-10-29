@@ -40,9 +40,15 @@ function assertStatusBoundary(workflow) {
     job.indexOf('name: Require all selected jobs') < job.indexOf('name: Report dispatched CI')
   );
 }
-// The status job's own checkout; other jobs may check out trusted main for read-only policy.
-const statusCheckoutRef =
-  '# Never execute candidate-branch code in the status-writing job.\n          ref: ${{ github.event.repository.default_branch }}';
+// Mutate only the status job's own checkout; other jobs may check out trusted main for read-only
+// policy lookups.
+function withStatusCheckoutRef(workflow, ref) {
+  const job = jobBlock(workflow, 'ci-result');
+  return workflow.replace(
+    job,
+    job.replace('ref: ${{ github.event.repository.default_branch }}', `ref: ${ref}`)
+  );
+}
 test('only the trusted aggregate CI job reports dispatched validation to branch rules', () => {
   assertStatusBoundary(readFileSync('.github/workflows/ci.yml', 'utf8'));
 });
@@ -57,10 +63,7 @@ test('another job cannot receive status-write permissions', () => {
 });
 test('the status-writing job cannot check out candidate code', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const changed = workflow.replace(
-    statusCheckoutRef,
-    statusCheckoutRef.replace('github.event.repository.default_branch', 'github.sha')
-  );
+  const changed = withStatusCheckoutRef(workflow, '${{ github.sha }}');
   assert.notEqual(changed, workflow);
   assert.throws(() => assertStatusBoundary(changed));
 });
@@ -81,10 +84,7 @@ test('status publication contracts reject misleading configuration changes', () 
     assert.notEqual(changed, workflow, before);
     assert.throws(() => assertStatusBoundary(changed), before);
   }
-  const candidateCheckout = workflow.replace(
-    statusCheckoutRef,
-    statusCheckoutRef.replace('github.event.repository.default_branch', 'github.sha')
-  );
+  const candidateCheckout = withStatusCheckoutRef(workflow, '${{ github.sha }}');
   const decoy =
     '\n      - name: Unrelated\n        with:\n          ref: ${{ github.event.repository.default_branch }}\n';
   assert.notEqual(candidateCheckout, workflow);

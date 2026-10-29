@@ -25,7 +25,7 @@ import {
   requireQueueCi,
   queueRequiresPreview,
 } from './merge-queue.mjs';
-import { findQueueReuseOrFull } from './queue-reuse.mjs';
+import { findQueueReuse } from './queue-reuse.mjs';
 import {
   MANIFEST_FILE,
   PREVIEW_PROFILE_VERSION,
@@ -672,14 +672,23 @@ async function evaluateQueue({ github, context, state, workspace }) {
   state.candidate.queueBaseSha = revision.baseSha;
   state.candidate.queueTreeSha = revision.treeSha;
   await queueProof(() => requireQueueCi(github, context, state.run));
-  const reuse = await findQueueReuseOrFull({ github, context, candidate: state.candidate });
+  // Lookup outages propagate like other queue API outages; only absent proof falls through.
+  const reuse = await findQueueReuse({ github, context, candidate: state.candidate });
   if (reuse.reused) return queueReuseDecision(github, context, state, reuse);
   const previewRequired = await queueProof(() =>
     queueRequiresPreview(github, context, state.candidate, revision)
   );
   if (!previewRequired) return queueDocumentationDecision(github, context, state);
+  await requireQueueBuild(github, context, state.run, reuse);
   state.previewAuthorization = 'queue';
   return deployDecision({ github, context, state, workspace });
+}
+/** Queue CI that reused PR validation built no artifact; if the proof lapsed, say so plainly. */
+async function requireQueueBuild(github, context, run, reuse) {
+  if (await findPreviewArtifact(github, context.repo, run.id)) return;
+  throw failure(
+    `Queue CI built no preview and PR validation is no longer reusable (${reuse.reason}); re-enqueue to validate in full.`
+  );
 }
 /** The queue tree is identical to a deployed and smoke-tested PR tree; publish without a rebuild. */
 async function queueReuseDecision(github, context, state, reuse) {

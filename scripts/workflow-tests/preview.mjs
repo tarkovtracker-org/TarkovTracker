@@ -3040,7 +3040,7 @@ test('queue comparison errors preserve structured obsolete failures and propagat
   }
 });
 /** A canonical queue member whose PR head has a trusted deployed preview of `tree`. */
-function reusableQueueFixture(t, tree = TREE) {
+function reusableQueueFixture(t, tree = TREE, extra = {}) {
   const branch = `gh-readonly-queue/main/pr-42-${BASE}`;
   const previewBranch = previewBranchName({ branch });
   const f = fakeGithub(t, {
@@ -3063,6 +3063,8 @@ function reusableQueueFixture(t, tree = TREE) {
       },
     ],
     previousArtifacts: [{ id: 66, name: `preview-deployment-${HEAD}`, expired: false }],
+    latestRuns: [runFixture({ id: 400 })],
+    ...extra,
     ciJobs: [
       ...FULL_VALIDATION_JOBS.filter((name) => name !== 'CI Result').map((name) => ({
         name,
@@ -3132,4 +3134,16 @@ test('a queue tree that differs from the PR preview tree still deploys its own p
   assert.equal(decision.action, 'request', decision.description);
   assert.equal(f.state.dispatches.length, 1);
   assert.equal(f.state.dispatches[0].inputs.queue, 'true');
+});
+test('a reused queue CI run without a build fails clearly when the reuse proof lapses', async (t) => {
+  const f = reusableQueueFixture(t, MERGE, { artifacts: [] });
+  const decision = await planPreview({
+    github: f.github,
+    core: fakeCore(),
+    workspace: tempDir(t),
+    context: workflowRunContext(f.state.run),
+  });
+  assert.equal(decision.action, 'fail');
+  assert.match(decision.description, /no longer reusable \(Queue tree differs.*re-enqueue/);
+  assert.equal(f.state.dispatches.length, 0);
 });

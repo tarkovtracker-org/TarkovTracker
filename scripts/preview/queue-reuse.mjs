@@ -13,7 +13,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { extractZip } from './archive.mjs';
-import { downloadArtifact, getPull, getRun, latestStatus } from './github-api.mjs';
+import {
+  downloadArtifact,
+  findLatestPullRun,
+  getPull,
+  getRun,
+  latestStatus,
+} from './github-api.mjs';
 import { QueueValidationError, queueRevision } from './merge-queue.mjs';
 import { CI_WORKFLOW_PATH, PRODUCTION_BRANCH, STATUS_CONTEXT } from './profile.mjs';
 const SHA = /^[0-9a-f]{40}$/;
@@ -141,10 +147,10 @@ function readEvidence(buffer) {
 }
 async function deploymentEvidence(github, context, run, headSha) {
   const artifact = await evidenceArtifact(github, context, run, headSha);
+  const archive = await downloadArtifact(github, context.repo, artifact.id);
   try {
-    return readEvidence(await downloadArtifact(github, context.repo, artifact.id)) ?? {};
+    return readEvidence(archive) ?? {};
   } catch (error) {
-    if (error instanceof NotReusable) throw error;
     throw new NotReusable(`Preview deployment evidence is unreadable: ${error.message}`);
   }
 }
@@ -168,9 +174,19 @@ function trustedSourceRun(run, context, pull, evidence) {
     String(run.run_attempt) === String(evidence.sourceCiAttempt),
   ].every(Boolean);
 }
+async function requireLatestSourceRun(github, context, pull, run) {
+  const latest = await findLatestPullRun(github, context.repo, pull.head.sha, (candidate) =>
+    [
+      candidate.path === CI_WORKFLOW_PATH,
+      candidate.head_repository?.full_name === repoName(context),
+    ].every(Boolean)
+  );
+  ensure(latest?.id === run.id, 'A newer PR CI run exists for this head.');
+}
 async function requireFullSourceCi(github, context, pull, evidence) {
   const run = await getRun(github, context.repo, Number(evidence.sourceCiRunId));
   ensure(trustedSourceRun(run, context, pull, evidence), 'Source CI run is not the PR head run.');
+  await requireLatestSourceRun(github, context, pull, run);
   const jobs = await runJobs(github, context, run);
   const missing = FULL_VALIDATION_JOBS.filter((name) => !succeeded(jobs, name));
   ensure(!missing.length, `Source CI did not run full validation: ${missing.join(', ')}`);

@@ -416,6 +416,38 @@ test('queue CLI uses the complete exact parent delta, supports additions/deletio
   f.git('checkout', '--detach', '-q', f.base);
   assert.equal(queueCli(f, head).full, true, 'stale checkout must not skip validation');
 });
+test('queue CLI accepts the trusted reuse flag only for a readable queue comparison', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'app.ts'), 'changed code');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'app integration');
+  const head = f.git('rev-parse', 'HEAD');
+  const reused = queueCli(f, head, ['--reused']);
+  assert.equal(reused.full, false);
+  assert.equal(reused.reused, true);
+  assert.equal(reused.previewRequired, false);
+  assert.deepEqual(reused.jobs, ['lint-format', 'systems-drift', 'security']);
+  // Negative controls: without the flag, with an explicit full run, with an unreadable or
+  // stale comparison, or outside a queue run, the app change validates in full.
+  for (const plan of [
+    queueCli(f, head),
+    queueCli(f, head, ['--reused', '--full']),
+    queueCli(f, 'missing', ['--reused']),
+    queueCli(f, 'HEAD', ['--reused']),
+  ]) {
+    assert.equal(plan.full, true);
+    assert.notEqual(plan.reused, true);
+  }
+  const outsideQueue = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cli, '--mode', 'ci', '--explain', '--reused', '--base', f.base, '--head', head],
+      { cwd: f.cwd, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' } }
+    )
+  );
+  assert.equal(outsideQueue.full, true);
+  assert.notEqual(outsideQueue.reused, true);
+});
 test('queue CLI retains mixed candidates and rejects a comparison that hides earlier integration changes', (t) => {
   const f = queueGit(t);
   writeFileSync(join(f.cwd, 'app.ts'), 'changed');
