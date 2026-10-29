@@ -99,6 +99,8 @@
     "switch_to_dark_theme": "어두운 테마로 전환"
   },
   "progress_save_status": {
+    "live_updates_delayed_label": "Live updates delayed",
+    "live_updates_delayed_description": "Updates from other devices may take longer to appear. Saving your edits is handled separately. We’ll check for updates and reconnect automatically when this tab is online and active.",
     "indicator_aria": "진행도 저장 상태: {status}",
     "cloud_pending_label": "진행도를 클라우드에 저장하는 중",
     "cloud_retrying_label": "클라우드 저장 재시도 중",
@@ -111,6 +113,8 @@
     "local_saved_note": "이러한 변경 사항은 이 브라우저에 저장되었습니다.",
     "cloud_also_pending_note": "클라우드에도 아직 저장되지 않았습니다. 사본을 보관하려면 진행도를 내보내세요.",
     "retry_scheduled": "자동 재시도 {attempt}/{total} 일정이 예약되었습니다.",
+    "cloud_payload_too_large_description": "Your cloud save is too large. Changes remain pending, and you can keep tracking. Automatic retries are paused. Export a backup and contact support for help.",
+    "cause_payload_too_large": "Cause: your progress exceeds the cloud save size limit.",
     "cause_offline": "원인: 이 기기가 오프라인 상태로 보입니다.",
     "cause_rate_limited": "원인: 클라우드 서비스가 저장 요청을 일시적으로 제한하고 있습니다.",
     "cause_auth": "원인: 로그인 세션을 확인할 수 없었습니다.",
@@ -124,6 +128,12 @@
     "export_button": "진행도 내보내기",
     "export_hint": "내보내기를 진행하면 저장에 실패했더라도 현재 진행도가 백업 파일로 다운로드됩니다."
   },
+  "older_tab_recovery_notice": {
+    "title": "Edits from older tabs were kept",
+    "description": "Changes made in a tab running an older version of TarkovTracker were kept as recovery copies. They have not replaced your progress.",
+    "overflow_description": "Some changes made in a tab running an older version of TarkovTracker could not be kept. Keep that tab open and export the available recovery copies.",
+    "review_link": "Review in {section}"
+  },
   "sign_out_confirm": {
     "title": "저장하지 않은 변경 사항이 있는데 로그아웃하시겠습니까?",
     "risk": "최신 진행도 변경 사항이 이 브라우저와 클라우드 어디에도 저장되지 않았습니다. 지금 로그아웃하면 변경 사항이 손실됩니다.",
@@ -133,13 +143,8 @@
     "retry_succeeded": "변경 사항이 클라우드에 저장되었습니다. 로그아웃해도 안전합니다."
   },
   "omnibar": {
-    "title": "검색",
-    "description": "작업, 필요 아이템 및 힐아웃 스테이션 검색",
-    "trigger_label": "작업, 아이템, 상인 검색…",
-    "open_aria": "전역 검색 열기",
     "aria_label": "전역 검색",
     "placeholder": "작업, 필요 아이템, 힐아웃 검색...",
-    "hint_min_chars": "검색하려면 2자 이상 입력하세요...",
     "no_results": "\"{query}\"에 대한 결과가 없습니다.",
     "group_tasks": "작업 / 퀘스트",
     "group_hideout": "힐아웃 스테이션"
@@ -371,6 +376,16 @@
     "delete_archived_run": "보관된 기록 삭제",
     "validation_error": "유효성 검사 오류",
     "got_it": "확인"
+  },
+  "filter_menu": {
+    "button": "Filters",
+    "button_active": "Filters, {count} active",
+    "active_label": "Filtered by",
+    "remove_filter": "Remove filter: {name}",
+    "clear_all": "Clear all",
+    "clear_filters": "필터 지우기",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "page_help": {
     "button": "도움말",
@@ -607,117 +622,40 @@
     "dashboard": {
       "changelog": {
         "title": "새로운 소식",
-        "show": "업데이트 표시",
-        "hide": "업데이트 숨기기",
         "loading": "업데이트 불러오는 중...",
         "error": "업데이트를 불러올 수 없습니다.",
         "empty": "아직 업데이트가 없습니다.",
-        "view_all": "모두 보기"
+        "view_all": "모두 보기",
+        "unread": "New updates"
       },
-      "focus": {
-        "title": {
-          "default": "다음에 무엇을 해야 하나요?",
-          "multiple": "가능한 다음 단계가 여러 개",
-          "blocked": "지금 진행 가능한 항목 없음",
-          "complete": "모든 작업을 완료했습니다"
-        },
-        "heading": {
-          "start": "{task} 시작",
-          "continue": "{task} 계속",
-          "finish": "{task} 완료",
-          "review_filters": "작업 필터 검토",
-          "closest_unlock": "가장 가까운 잠금 해제: {task}",
-          "caught_up": "표시된 모든 항목 완료"
-        },
-        "summary": {
-          "unlock_trader": "{task}은(는) {trader}의 잠금 해제 단계입니다.",
-          "impact": "현재 대기 중인 작업 중 후속 진행에 가장 큰 도움을 주는 작업은 {task}입니다.",
-          "close": "지금 가장 수월하게 완료할 수 있는 작업 중 하나가 {task}입니다.",
-          "kappa": "현재 가장 확실한 카파 진행 단계는 {task}입니다.",
-          "lightkeeper": "현재 가장 확실한 라이트키퍼 진행 단계는 {task}입니다.",
-          "default": "대시보드에서 지금 가장 수월하게 끝낼 수 있는 작업은 {task}입니다.",
-          "filter_hidden_one": "현재 필터가 사용 가능한 작업 1개를 숨기고 있습니다.",
-          "filter_hidden_other": "현재 필터가 사용 가능한 작업 {count}개를 숨기고 있습니다.",
-          "blocked_requirement": "{task}: 요구 조건을 충족하지 않아 진행할 수 없습니다.",
-          "complete": "이 대시보드 범위에서 표시된 모든 작업을 완료했습니다."
-        },
-        "stat": {
-          "why": "선택 이유",
-          "status": "상태",
-          "secondary": "다른 좋은 선택",
-          "secondary_actionable": "기본 계획이 맞지 않으면 이 옵션을 사용하세요.",
-          "secondary_blocked": "대기열에서 다음으로 가까운 잠금 해제 항목입니다.",
-          "secondary_empty": "지금 가장 명확한 다음 단계입니다."
-        },
+      "up_next": {
+        "title": "가장 좋은 다음 단계",
+        "blocked_title": "Closest unlocks",
+        "view_all": "View all tasks",
+        "filtered_badge": "Filtered",
+        "left_one": "1 left",
+        "left_other": "{count} left",
+        "turn_in": "Turn in",
+        "hidden_one": "1 available task is hidden by your filters",
+        "hidden_other": "{count} available tasks are hidden by your filters",
+        "complete": "Every visible task is done.",
+        "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
         "reason": {
-          "unlock_trader": "{trader} 잠금 해제",
-          "impact_one": "후속 작업 1개 열림",
-          "impact_other": "후속 작업 {count}개 열림",
-          "close": "가장 가까운 완료 항목 중 하나",
-          "kappa": "Kappa 진행",
-          "lightkeeper": "Lightkeeper 진행",
-          "trader": "{trader} 진행",
-          "filters": "현재 필터가 가능한 작업을 숨기고 있음",
-          "complete": "표시된 모든 항목 완료",
-          "default": "즉각적인 진행"
-        },
-        "proof": {
-          "unlock_trader_one": "최우선 잠금 해제: {trader}의 잠금을 해제하며 목표 1개가 남았습니다.",
-          "unlock_trader_other": "최우선 잠금 해제: {trader}의 잠금을 해제하며 목표 {count}개가 남았습니다.",
-          "impact_one": "최대 효과: 후속 작업 1개 열림.",
-          "impact_other": "최대 효과: 후속 작업 {count}개 열림.",
-          "close_one": "가장 빠른 항목: 목표 1개만 남음.",
-          "close_other": "가장 빠른 항목: 목표 {count}개만 남음.",
-          "ready_one": "최적 항목: 목표 1개 남음.",
-          "ready_other": "최적 항목: 목표 {count}개 남음.",
-          "ready_zero": "최적 항목: 지금 제출 가능.",
-          "kappa_one": "특수 체인 진행 최적: 목표 1개를 남기고 Kappa를 진행합니다.",
-          "kappa_other": "특수 체인 진행 최적: 목표 {count}개를 남기고 Kappa를 진행합니다.",
-          "lightkeeper_one": "특수 체인 진행 최적: 목표 1개를 남기고 Lightkeeper를 진행합니다.",
-          "lightkeeper_other": "특수 체인 진행 최적: 목표 {count}개를 남기고 Lightkeeper를 진행합니다.",
-          "filters_one": "표시되는 옵션 없음: 필터가 사용 가능한 작업 1개를 숨기고 있습니다.",
-          "filters_other": "표시되는 옵션 없음: 필터가 사용 가능한 작업 {count}개를 숨기고 있습니다.",
-          "complete": "이 대시보드 범위에 남은 작업이 없습니다."
-        },
-        "status": {
-          "ready_one": "지금 준비됨. 목표 1개 남음.",
-          "ready_other": "지금 준비됨. 목표 {count}개 남음.",
-          "ready_no_objectives": "지금 준비됨.",
-          "filters": "필터를 조정하여 숨겨진 옵션을 표시하세요.",
-          "complete": "차단 조건 없음. 표시된 미완료 항목이 없습니다."
-        },
-        "badge": {
-          "based_on_filters": "현재 필터 기준",
-          "hidden_available_one": "필터가 사용 가능한 작업 1개를 숨김",
-          "hidden_available_other": "필터가 사용 가능한 작업 {count}개를 숨김"
-        },
-        "cta": {
-          "open_task": "작업 열기",
-          "open_tasks": "작업 목록 열기"
+          "unlock_trader": "Unlocks {trader}",
+          "opens_one": "Opens 1 task",
+          "opens_other": "Opens {count} tasks",
+          "lightkeeper": "Lightkeeper",
+          "kappa": "Kappa",
+          "almost_done": "Almost done",
+          "in_progress": "In progress",
+          "ready": "준비됨"
         }
       },
       "progress": {
-        "title": "진행도 세부 분석",
-        "items": "작업 아이템",
         "hideout_items": "힐아웃 아이템",
         "filtered_status_active": "작업 설정으로 필터링됨",
-        "filtered_status_inactive": "모든 작업 유형 사용",
-        "filtered_warning_tooltip": "이 통계는 작업 필터 설정(Kappa, Lightkeeper 및 특수 작업 아님)을 따릅니다."
-      },
-      "progress_card": {
-        "view_details": "{label} 세부 정보 보기",
-        "progress_label": "{label} 진행도"
-      },
-      "milestones": {
-        "title": "이정표",
-        "halfway": "절반 달성",
-        "veteran": "거의 완료",
-        "kappa": {
-          "subtitle": "컨테이너 획득"
-        },
-        "lightkeeper": {
-          "subtitle": "상인 잠금 해제"
-        }
+        "filtered_warning_tooltip": "이 통계는 작업 필터 설정(Kappa, Lightkeeper 및 특수 작업 아님)을 따릅니다.",
+        "view_full_progress": "View full progress"
       },
       "traders": {
         "title": "상인 진행도",
@@ -729,20 +667,20 @@
         "set_loyalty_level": "충성 레벨 {level} 설정",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav 카르마",
-        "unlock_required": "잠금 해제 필요:",
-        "locked_summary": "상인 {count}개 잠김",
         "sort": {
           "aria_label": "상인 정렬",
           "direction_aria_label": "정렬 방향 전환"
-        }
+        },
+        "unlock_via_task": "Unlocks after task",
+        "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },
       "support_banner": {
-        "new_title": "TarkovTracker is free, ad-free, and maintained almost entirely by one developer.",
-        "new_body": "It runs on player support. If it saves you time each wipe, a small monthly contribution keeps updates coming.",
+        "new_title": "Keep TarkovTracker free for everyone",
+        "new_body": "Supporting is never required, but it's what keeps the project running and updated with no paywalls or ads for anyone.",
         "new_cta": "TarkovTracker 후원",
-        "returning_title": "Thanks for supporting TarkovTracker before.",
-        "returning_body": "Monthly supporters are what keep fixes and new features shipping. If it still helps your raids, consider picking it back up.",
-        "returning_cta": "Renew support"
+        "returning_title": "Thanks for supporting TarkovTracker before",
+        "returning_body": "Support is always optional. It's what keeps the tracker running, updated, and free of paywalls and ads for everyone.",
+        "returning_cta": "Support again"
       }
     },
     "changelog": {
@@ -763,7 +701,10 @@
     "storyline": {
       "subtitle": "Tarkov 스토리 챕터 진행도를 추적하세요.",
       "chapters_complete": "챕터 완료",
+      "chapter_nav_label": "Story chapters",
+      "chapter_eyebrow": "Chapter",
       "wip_title": "진행 중",
+      "completed_during_tutorial": "Completed during tutorial",
       "wip_badge": "진행 중",
       "wip_description": "이 기능은 아직 개발 중입니다. 데이터를 계속 정리하면서 시간에 따라 콘텐츠와 기능이 확장되고 개선될 예정입니다. 기다려 주셔서 감사합니다!",
       "no_data": "스토리라인 챕터 데이터를 사용할 수 없습니다.",
@@ -778,6 +719,7 @@
       "quest_route_evidence_pending": "아직 확인된 단계가 없습니다.",
       "quest_route_conflict": "둘 이상의 경로가 완료된 것으로 표시되지만, 게임에서는 하나의 경로만 선택할 수 있습니다.",
       "quest_route_progress": "{completed}/{total}단계",
+      "quest_route_unnamed": "Route {index}",
       "stale_progress_one": "저장된 목표 체크 표시 1개가 현재 스토리 데이터와 더 이상 일치하지 않아 다시 확인해야 합니다.",
       "stale_progress_other": "저장된 목표 체크 표시 {count}개가 현재 스토리 데이터와 더 이상 일치하지 않아 다시 확인해야 합니다.",
       "route_choice": "경로 선택",
@@ -786,16 +728,16 @@
       "route_blocked_by": "차단 대상: {objectives}",
       "route_decision": "결정 {index}",
       "route_choose_one": "하나 선택",
-      "route_required_steps": "필수 단계",
       "route_optional_steps": "선택 단계",
       "route_selected_hint": "이 경로가 활성화되어 있습니다.",
       "route_switch_hint": "경로를 변경하려면 먼저 선택한 경로의 체크를 해제하세요.",
-      "route_unlocks_here": "여기에서 잠금 해제",
       "route_unlocks_chapter": "챕터 잠금 해제",
       "route_unlocks_estimated": "예상 시간",
       "route_unlock_map": "지도: {name}",
       "route_unlock_trader": "상인: {name}",
-      "route_unlock_reward": "보상: {name}"
+      "route_unlock_reward": "보상: {name}",
+      "timeline_objective": "목표",
+      "timeline_unlocks": "Unlocks"
     },
     "kappa": {
       "subtitle": "Kappa 컨테이너 및 Lightkeeper 퀘스트를 향한 진행도를 추적하세요.",
@@ -901,15 +843,20 @@
       "billing_yearly_interval": "년"
     },
     "tasks": {
+      "status_tabs_label": "Task status",
       "primary_views": {
-        "graph": "그래프"
+        "aria_label": "Task views",
+        "graph": "그래프",
+        "needs_wider_screen": "(needs a wider screen)"
       },
       "graph": {
         "focus_mode_active": "{taskName}의 의존성 체인 표시 중",
         "isolate_chain": "체인만 표시",
         "show_context": "컨텍스트 표시",
         "no_tasks": "이 상인의 작업을 찾을 수 없습니다.",
-        "mobile_unavailable": "그래프 보기는 더 넓은 화면에서 사용하는 것이 가장 좋습니다.",
+        "narrow_title": "Graph needs a wider screen",
+        "narrow_description": "The task graph opens in windows at least {width} pixels wide. Widen the window, or browse the same trader's tasks in the Traders view.",
+        "narrow_traders_link": "Open Traders view",
         "legend": "범례",
         "flow_start": "시작(선행 조건 없음)",
         "flow_end": "끝(후속 작업 없음)",
@@ -924,9 +871,38 @@
       "user_views": {
         "yourself": "본인"
       },
-      "search": {
-        "placeholder": "검색...",
-        "aria_label": "작업 검색"
+      "filters": {
+        "team_aria_label": "Show progress for {name}",
+        "whole_team": "Whole team",
+        "title": "Filter tasks",
+        "types": {
+          "title": "Task types",
+          "hint": "Show tasks that belong to any selected group.",
+          "locked_hint": "At least one task type stays selected.",
+          "regular": "일반",
+          "kappa": "Kappa",
+          "lightkeeper": "Lightkeeper"
+        },
+        "narrow": {
+          "title": "Narrow down",
+          "required_keys": "Needs keys",
+          "required_keys_hint": "Only tasks that require a key.",
+          "team_shared": "Shared by whole team",
+          "team_shared_hint": "Viewing the whole team's available tasks: only tasks every teammate still needs."
+        },
+        "map": {
+          "title": "This map",
+          "global_tasks": "Show any-location tasks",
+          "global_tasks_hint": "Tasks that can be done on any map, not just this one.",
+          "hide_map_complete": "Hide finished here",
+          "hide_map_complete_hint": "Hide tasks whose objectives on this map are all done."
+        },
+        "chips": {
+          "required_keys": "Needs keys",
+          "team_shared": "Shared by whole team",
+          "global_hidden": "Any-location hidden",
+          "map_complete_hidden": "Finished here hidden"
+        }
       },
       "sort": {
         "none": "기본 순서",
@@ -936,53 +912,39 @@
         "trader": "상인 순서",
         "teammates": "팀원에게 제공되는 작업",
         "xp": "XP 보상",
-        "ascending": "오름차순",
-        "descending": "내림차순",
         "aria_label": "작업 정렬",
         "progression": "진행도"
       },
       "settings": {
         "title": "작업 설정",
-        "tabs": {
-          "filters": "작업 필터",
-          "filter_bar": "필터 바",
-          "advanced": "고급"
+        "filters_moved": "Looking for task type, key, or map filters? They're under Filters in the toolbar.",
+        "cards": {
+          "title": "Task cards",
+          "required_labels": "\"Required\" labels",
+          "required_labels_hint": "Badges for Kappa, Lightkeeper, and edition-exclusive tasks.",
+          "experience_rewards": "Experience rewards",
+          "rewards": "보상",
+          "rewards_hint": "The rewards section on each card.",
+          "previous_tasks": "Previous tasks",
+          "next_tasks": "Next tasks",
+          "start_collapsed": "Start cards collapsed",
+          "start_collapsed_hint": "Show only the title until you expand a card.",
+          "collapse_completed_objectives": "Collapse finished objectives",
+          "collapse_completed_objectives_hint": "On completed tasks, hide the objective list."
         },
-        "filters": {
-          "hint": "표시할 작업을 제어합니다.",
-          "regular_tasks": "일반 작업",
-          "kappa_required": "Kappa 필요",
-          "lightkeeper_required": "Lightkeeper 필요",
-          "team_shared_only": "팀 공유만",
-          "has_required_keys": "키가 있는 작업만",
-          "show_global_tasks": "지도에 전역 작업 표시",
-          "impact_respects_filters": "영향력에 작업 필터 적용",
-          "hide_completed_map_objectives": "지도에서 완료된 작업 숨기기"
+        "status_tabs": {
+          "title": "Status tabs",
+          "hint": "Choose which status tabs appear in the toolbar."
         },
-        "appearance": {
-          "hint": "작업 카드 표시 방식을 조정합니다.",
-          "required_labels": "\"필수\" 라벨",
-          "experience_rewards": "경험치 보상",
-          "next_tasks": "다음 작업",
-          "previous_tasks": "이전 작업",
-          "collapse_completed_objectives": "완료된 작업의 목표 접기"
-        },
-        "filter_bar": {
-          "hint": "작업 상태 필터를 켜고 끄어 표시되는 작업을 제어합니다.",
-          "all_filter": "모든 작업 표시",
-          "all_filter_hint": "상태와 관계없이 모든 작업 표시",
-          "available_filter": "사용 가능 표시",
-          "available_filter_hint": "레벨과 전제 조건 기준으로 지금 시작할 수 있는 작업",
-          "locked_filter": "잠김 표시",
-          "locked_filter_hint": "레벨, 상인 평판 또는 선행 작업으로 차단된 작업",
-          "completed_filter": "완료 표시",
-          "completed_filter_hint": "이미 완료한 작업",
-          "failed_filter": "실패 표시",
-          "failed_filter_hint": "조건을 놓쳐 실패한 작업"
+        "behavior": {
+          "title": "Behavior",
+          "impact_respects_filters": "Impact sort follows filters",
+          "impact_respects_filters_hint": "When sorting by impact, count only follow-up tasks that pass your task type and key filters.",
+          "manual_fail_actions": "Manual fail actions",
+          "manual_fail_actions_hint": "Add a button to mark tasks failed yourself."
         },
         "advanced": {
-          "manual_fail_actions": "수동 실패 처리",
-          "failed_tasks_label": "실패한 작업",
+          "failed_tasks_summary": "{count} failed tasks may be marked failed by mistake.",
           "repair_failed": "실패한 작업 복구",
           "repair_failed_confirm": "현재 실패 조건에서 지원되지 않는 실패 표시를 지워 실패한 작업을 복구할까요?",
           "repair_failed_done": "{count}개 작업의 실패 상태를 지웠습니다.",
@@ -992,6 +954,13 @@
       },
       "no_tasks_found": "작업을 찾을 수 없습니다. 필터를 변경하거나 레벨을 업데이트해 보세요.",
       "no_tasks_found_description": "사용 가능한 작업을 보려면 필터 또는 레벨 요구사항을 조정하세요.",
+      "no_search_matches": "No tasks match your search.",
+      "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
+      "search_scope": {
+        "all_statuses": "Searching all statuses for \"{query}\"",
+        "clear_and_return": "Clear search to return to {status}",
+        "pinned_status": "Showing {status} matches for \"{query}\""
+      },
       "loading": "작업 불러오는 중",
       "map": {
         "resize_handle": "지도 높이 조정",
@@ -1036,24 +1005,34 @@
         }
       },
       "pinned_tasks_section": "고정된 작업",
+      "hidden_tasks": {
+        "section_title": "Hidden tasks ({count})",
+        "section_description": "Hiding never completes or fails a task, so tasks that require it stay locked.",
+        "section_expand": "Show hidden tasks",
+        "section_collapse": "Collapse hidden tasks",
+        "unhide_all": "Unhide all",
+        "hidden_toast": "{name} hidden. Your progress is unchanged; find it under Hidden tasks.",
+        "unhidden_toast": "{name} is back in your task list."
+      },
       "focused_task_section": "집중 작업",
       "focused_task_description": "작업 링크에서 열려 이어서 진행할 위치를 정확히 볼 수 있습니다.",
       "global_tasks_section": "전역 작업",
+      "trader_sections": {
+        "loyalty_level": "Loyalty Level {level}",
+        "essential": "Essential Tasks",
+        "essential_hint": "Not part of a loyalty level group, so they don't count toward its task unlocks.",
+        "other": "Other Tasks",
+        "other_hint": "In-game group not known yet."
+      },
       "questcard": {
         "pin_task": "작업 고정",
         "unpin_task": "작업 고정 해제",
-        "level": "레벨: {count}",
-        "level_badge": "Lv {count}",
-        "fence_rep_badge": "Fence {rep}",
-        "fence_rep_tooltip": "Fence 평판 {rep} 필요",
-        "trader_level_tooltip": "{trader} 충성 레벨 {level} 필요",
-        "trader_level_badge": "{trader} LL{level}",
+        "hide_task": "Hide task",
+        "unhide_task": "Unhide task",
         "wiki": "위키 페이지",
-        "locked_before": "이전 작업: {count}",
         "unlocks_next": "다음 작업 잠금 해제",
         "copy_task_link": "작업 링크 복사",
         "copy_key_name": "키 이름 복사",
-        "report_data_issue": "데이터 문제 보고",
         "tarkov_dev_logo": "Tarkov.dev 로고",
         "view_task_on_wiki": "Wiki에서 {name} 보기",
         "hand_over": "인계",
@@ -1100,13 +1079,8 @@
         "requirement_status_active": "활성/수락됨",
         "requirement_status_available": "사용 가능",
         "requirement_status_not_started": "시작되지 않음",
-        "requires_must_be": "{status}이어야 함",
         "requires_currently": "현재 {status}",
-        "requires_tooltip_action": "이 작업을 잠금 해제하려면 {action} \"{name}\"",
         "requires_tooltip_conflict": "\"{name}\"은(는) {current}이지만 {expected}이어야 합니다 — 이 작업은 영구적으로 잠길 수 있습니다",
-        "requires_progress": "선행 작업 {completed}/{total}개 완료",
-        "requires_progress_tooltip": "다음: {tasks}",
-        "requires_progress_tooltip_overflow": "다음: {tasks} 및 {count}개 더 보기",
         "objectives_hidden": "이 지도에 없는 목표 {count}개(미완료 {uncompleted}개)",
         "needed_by": "필요 대상: {names}",
         "unlocks_next_tooltip": "이 작업을 완료한 후 사용 가능해지는 작업 수",
@@ -1126,7 +1100,6 @@
         "find_fir": "레이드에서 찾기",
         "items_count": "아이템 {count}개",
         "kappa_tooltip": "이 퀘스트는 Kappa 보안 컨테이너를 얻는 데 필요합니다",
-        "level_badge_tooltip": "이 퀘스트 잠금 해제에는 최소 플레이어 레벨 {level}이 필요합니다",
         "lightkeeper_tooltip": "이 퀘스트는 Lightkeeper 상인 잠금 해제에 필요합니다",
         "alternatives_tooltip": "이 퀘스트에는 {count}개의 대안 선택이 있습니다 — 하나만 완료하면 됩니다",
         "alternatives_badge": "대안 {count}개",
@@ -1136,24 +1109,21 @@
         "previous_tasks": "이전 작업:",
         "progress": "진행도 {completed}/{total}",
         "rewards": "보상",
-        "unlocks_count": "잠금 해제 {count}개",
-        "trader_requirement_badge": "{trader} {kind}: {comparison} {value}",
-        "loyalty_level": "충성도 레벨",
-        "reputation": "평판"
+        "unlocks_count": "잠금 해제 {count}개"
       },
       "blockers": {
-        "player_level": "플레이어 레벨 {comparison} {required} 필요 (현재: {current}).",
-        "trader_level": "{trader} 충성도 레벨 {comparison} {required} 필요 (현재: {current}).",
-        "trader_reputation": "{trader} 평판 {comparison} {required} 필요 (현재: {current}).",
+        "player_level_required": "Requires player level {requirement} (you: {current}).",
+        "trader_level_required": "Requires {trader} loyalty level {requirement} (you: {current}).",
+        "trader_reputation_required": "Requires {trader} reputation {requirement} (you: {current}).",
         "prerequisite": "다음 선행 임무의 상태 요건을 충족하세요: {tasks}.",
         "story_route": "{tasks}의 상태 요건을 충족하거나 다음 스토리 챕터 중 하나를 진행하세요: {chapters}.",
         "failed_branch": "실패한 임무로 인해 차단됨: {task}.",
         "faction": "{faction} 소속 캐릭터에서 이용 가능합니다.",
+        "trader_story_unlock": "Unlock {trader}: {objective} ({chapter})",
         "trader_unlock": "{trader} 해제 조건: {task} 완료",
         "prestige": "프레스티지 {required} 필요 (현재: {current}).",
-        "global_variable": "서버 진행도 값이 {comparison} {required}이어야 합니다(현재: {current}).",
-        "global_variable_unknown": "서버 진행도가 {comparison} {required} 조건을 충족해야 합니다. 트래커에서 현재 값을 확인할 수 없습니다. 이 퀘스트가 게임 내에서 사용 가능할 때만 사용 가능으로 표시 버튼을 사용하세요. 카운터 퀘스트는 완료로 표시되지 않습니다.",
-        "task_counter": "이 상인의 로열티 등급에서 완료한 퀘스트 수가 {comparison} {required}이어야 합니다(완료: {current}). 이 퀘스트가 이미 게임 내에서 사용 가능하면 사용 가능으로 표시 버튼을 사용하세요.",
+        "global_variable_required": "Additional in-game progression required.",
+        "global_variable_unknown_required": "Additional in-game progression required. Use Mark available only if this task is available in-game.",
         "dialogue": "게임 내 상인과 대화해야 합니다. 이 퀘스트가 게임 내에서 사용 가능함을 확인한 후에만 사용 가능으로 표시 버튼을 사용하세요.",
         "story_objective": "스토리 목표 \"{objective}\" ({chapter})를 완료하세요.",
         "unknown": "요구 조건 데이터를 사용할 수 없거나 지원되지 않아 이용 가능 여부를 확인할 수 없습니다.",
@@ -1167,16 +1137,67 @@
         "status_active": "활성 상태 또는 수락됨",
         "status_unknown": "알 수 없는 상태",
         "status_or": " 또는 "
+      },
+      "requirements": {
+        "title": "Requirements",
+        "met_count": "{met} of {total} met",
+        "show_more": "+{count}개 더 보기",
+        "show_less": "덜 표시",
+        "comparison_at_least": "{value}+",
+        "comparison_above": "above {value}",
+        "comparison_at_most": "{value} or lower",
+        "comparison_below": "below {value}",
+        "comparison_exactly": "exactly {value}",
+        "comparison_not_equal": "not {value}",
+        "player_level": "Level {requirement}",
+        "trader_level": "{trader} loyalty {requirement}",
+        "trader_reputation": "{trader} reputation {requirement}",
+        "task": "{action} {task}",
+        "you": "you: {value}",
+        "story_alternative": "Or progress a story chapter: {chapters}",
+        "met": "Met",
+        "unmet": "Not met",
+        "dialogue": "Trader conversation",
+        "story_objective": "Story objective: {objective} ({chapter})",
+        "global_variable": "Additional in-game progression required",
+        "named_pool_one": "Complete {requirement} LL{level} task for {trader}",
+        "named_pool_other": "Complete {requirement} LL{level} tasks for {trader}",
+        "task_pool_one": "Complete {requirement} task from the required pool",
+        "task_pool_other": "Complete {requirement} tasks from the required pool",
+        "task_count_at_least": "at least {value}",
+        "task_count_above": "more than {value}",
+        "task_count_at_most": "at most {value}",
+        "task_count_below": "fewer than {value}",
+        "task_count_exactly": "exactly {value}",
+        "task_count_not_equal": "a number other than {value}",
+        "pool_tracked": "{value} tracked",
+        "pool_account": "{value} in game",
+        "pool_unverified": "Progress unverified",
+        "pool_show_tasks": "Show tasks",
+        "pool_hide_tasks": "Hide tasks",
+        "pool_tasks": "Tasks that count",
+        "pool_candidates": "Candidate tasks",
+        "pool_explanation": "Only tasks in this pool count. Reaching the trader loyalty level is a separate requirement.",
+        "pool_candidate_explanation": "This requirement belongs to the trader's LL task pool. The tasks below are possible contributors.",
+        "pool_caveat": "The counting rules for this pool are unverified. These tasks may contribute; their completions cannot confirm this requirement.",
+        "pool_confirmation_hint": "If this task is already available in-game, use Mark available. This does not complete any pool tasks.",
+        "pool_confirmed": "Confirmed in game",
+        "pool_any_of": "Any one task counts once",
+        "pool_credit_earned": "1 credit earned",
+        "pool_all_of": "Complete all tasks in this group for one credit",
+        "pool_current_task": "This task",
+        "pool_status_available": "사용 가능",
+        "pool_status_locked": "잠김",
+        "pool_status_completed": "완료",
+        "pool_status_failed": "실패",
+        "pool_status_unavailable": "Unavailable"
       }
     },
     "hideout": {
+      "status_tabs_label": "Station status",
       "loading": "힐아웃 데이터 불러오는 중",
       "station_link_label": "{name}(으)로 이동",
       "no_stations_found": "스테이션을 찾을 수 없습니다. 필터를 변경해 보세요.",
-      "collapse_completed": "완료된 스테이션 접기",
-      "sort": {
-        "ready_first": "건설 가능한 항목 먼저 정렬"
-      },
       "prereq_filters": {
         "title": "사용 가능 요구사항",
         "station_levels": "스테이션 레벨 요구",
@@ -1209,23 +1230,49 @@
           "mark_incomplete": "미완료 표시",
           "set_custom_amount": "사용자 지정 수량 설정:"
         }
+      },
+      "settings": {
+        "title": "Hideout settings",
+        "requirements_help": "These options decide how strict the hideout page is when it marks stations as available or locked."
       }
     },
     "needed_items": {
+      "filter_tabs_label": "Needed item filters",
       "loading": "작업 및 힐아웃 데이터 불러오는 중",
-      "search_placeholder": "아이템, 작업 또는 힐아웃 스테이션 검색...",
-      "items": "아이템",
+      "items_count": "{count} item | {count} items",
+      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "검색과 일치하는 아이템이 없습니다.",
       "error": "필요 아이템을 불러올 수 없습니다.",
       "filters": {
-        "label": "필터",
-        "non_fir": "비-FIR",
-        "hide_owned": "보유한 아이템 숨기기",
-        "hide_non_fir_special_equipment_title": "비-FIR 특수 장비 숨기기(예: MS2000 마커, Wi-Fi 카메라)",
-        "kappa_only": "KAPPA",
-        "kappa_only_tooltip": "Kappa 작업에 필요한 아이템만 표시",
-        "kappa_only_disabled_tooltip": "Kappa 필터는 작업에만 적용됩니다.",
-        "hide_team_needs": "팀 필요 항목 숨기기"
+        "title": "Filter items",
+        "found_in_raid": {
+          "title": "Found in raid",
+          "hint": "Show only items that need to be found in raid, or only the ones that don't.",
+          "non_fir": "비-FIR"
+        },
+        "hide": {
+          "title": "숨기기",
+          "owned": "Items I already have",
+          "owned_hint": "Hide needs you already have enough of.",
+          "team": "Teammates' needs",
+          "team_hint": "Show only what you need, not what your team needs.",
+          "special_equipment": "Non-FIR special equipment",
+          "special_equipment_hint": "Hide placeable task gear such as MS2000 Markers and Wi-Fi Cameras."
+        },
+        "tasks": {
+          "title": "작업",
+          "kappa_only": "Kappa tasks only",
+          "kappa_only_hint": "Show only task items needed for the Kappa container.",
+          "kappa_only_disabled": "Kappa applies to task items, so it is off on the Hideout tab."
+        },
+        "chips": {
+          "fir": "FIR only",
+          "non_fir": "Non-FIR only",
+          "hide_owned": "Owned hidden",
+          "hide_team": "Team needs hidden",
+          "hide_special_equipment": "Special equipment hidden",
+          "kappa_only": "Kappa only"
+        }
       },
       "sort": {
         "label": "정렬",
@@ -1238,10 +1285,7 @@
         "grid": "그리드 보기",
         "combined": "결합 보기"
       },
-      "teammates_needed": "팀원에게 필요한 아이템",
-      "settings": {
-        "title": "필요 아이템 설정"
-      }
+      "teammates_needed": "팀원에게 필요한 아이템"
     },
     "settings": {
       "card": {
@@ -1302,6 +1346,11 @@
       }
     },
     "team": {
+      "expiry": {
+        "policy": "Teams with only their owner are automatically disbanded after seven consecutive days, even if the owner is active. A member joining cancels the countdown; becoming solo again starts a fresh seven days. Your personal progress is kept.",
+        "title": "Your team has only you",
+        "warning": "This team will be automatically disbanded on or after {deadline} if you remain its only member. Invite someone to cancel the countdown. Account activity does not extend it. Your personal progress is kept."
+      },
       "page_description": "동료를 초대하고 보고 싶은 팀 진행 상황을 선택해 함께 추적하세요.",
       "invite": {
         "title": "초대 링크",
@@ -1551,8 +1600,8 @@
       "suggest_description": "이 페이지에 커뮤니티 도구 또는 가이드를 제안하세요.",
       "suggest_cta": "리소스 제안",
       "migration_banner": {
-        "title": "TarkovTracker.io에서 이전하시나요?",
-        "cta": "이전 가이드 읽기"
+        "cta": "이전 가이드 읽기",
+        "chip": "From .io?"
       },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org 가이드",
@@ -1790,14 +1839,10 @@
     "profile": "프로필",
     "section_navigation": "탐색",
     "account_menu": "계정 메뉴",
-    "mode_auto": "자동",
-    "auto_level_enabled": "자동 레벨 계산이 활성화되어 있습니다",
-    "level_display_auto": "레벨 {level}(자동 계산 활성화)",
     "level_display_editable": "레벨 {level}, 클릭하거나 Enter 키를 눌러 편집",
     "increment_level": "레벨 증가",
     "decrement_level": "레벨 감소",
-    "xp_progress": "XP 진행도",
-    "xp_settings_link": "XP 및 레벨 설정 보기"
+    "level_input": "Current level, {min} to {max}"
   },
   "profile": {
     "season_short": "S{season}"
@@ -2003,6 +2048,7 @@
       "switch_mode_fetch_failed": "게임 모드가 전환되었지만 데이터를 새로 고치지 못했습니다. 다시 시도하세요"
     },
     "data_management": {
+      "reading_backup": "Reading backup…",
       "reset_pvp_confirmation": "PvP 진행도를 초기화하시겠습니까?",
       "reset_pvp_warning": "작업, 힐아웃 및 레벨을 포함한 모든 PvP 진행도가 영구적으로 삭제됩니다. PvE 데이터에는 영향을 주지 않습니다.",
       "reset_pve_confirmation": "PvE 진행도를 초기화하시겠습니까?",
@@ -2068,7 +2114,29 @@
       "prestige_history_duration": "기록 지속 시간",
       "prestige_history_days_value": "{days}일",
       "prestige_history_compare_title": "이전 기록과 비교",
-      "prestige_history_compare_subtitle": "현재 프레스티지 {from}을(를) 프레스티지 {to}과(와) 비교"
+      "prestige_history_compare_subtitle": "현재 프레스티지 {from}을(를) 프레스티지 {to}과(와) 비교",
+      "empty_device_archive": "This recovery archive contains no progress or recovery copies.",
+      "invalid_device_archive": "This recovery archive is invalid or uses an unsupported version. No progress was imported.",
+      "import_owner_changed": "Your signed-in account changed. Review the backup again before importing.",
+      "older_tab_recovery_full": "Some older tab edits could not be retained. Export available recovery copies for this account, then clear exported copies to make room. Keep older tabs open until their edits have been recovered.",
+      "review_older_edit": "Review older edit {index}",
+      "older_tab_recovery_available": "Edits from older tabs are available for recovery ({count}). They have not replaced your locally saved progress.",
+      "export_device_recovery": "Export locally saved device data and recovery copies",
+      "clear_older_copies": "Clear older tab recovery copies",
+      "clear_older_copies_confirmation": "Download a recovery archive and make sure the file is saved before confirming cleanup. Only the exported older tab copies will be cleared. Your locally saved progress and original device data will stay available.",
+      "saved_recovery_archive_confirmation": "I saved the file. Clear exported older copies",
+      "recovery_export_failed": "Unable to export recovery copies. Try again. Your copies are still available.",
+      "recovery_cleanup_failed": "Unable to clear exported recovery copies. Try again using your saved archive.",
+      "recovery_owner_changed": "Your signed-in account changed. Download the recovery archive again before clearing copies.",
+      "recovery_archive_download_required": "Download a recovery archive before clearing copies.",
+      "older_edit_unavailable": "This older edit is no longer available.",
+      "older_edit_read_failed": "Unable to read this older edit. Try again.",
+      "recovery_archive_too_large": "This recovery archive is too large to preview (maximum 128 MiB).",
+      "recovery_archive_select_entry": "Choose which archived copy to preview. Import only after reviewing it.",
+      "recovery_archive_current": "Locally saved progress",
+      "recovery_archive_original": "Original device data",
+      "recovery_archive_older": "Older edit {index}",
+      "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
       "success_title": "{mode} 프레스티지 완료",
@@ -2234,6 +2302,20 @@
       "active_mode": "활성",
       "game_edition_hint": "소유한 게임 에디션을 선택하면 추적 콘텐츠가 이용 가능한 내용에 맞게 설정됩니다."
     },
+    "player_level": {
+      "title": "Current Level",
+      "label": "Current level",
+      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "range_hint": "Enter a whole number from {min} to {max}.",
+      "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
+      "saved_title": "Level Updated",
+      "saved_description": "Your {mode} level is now {level}.",
+      "errors": {
+        "required": "Enter a level from {min} to {max}.",
+        "whole_number": "Level must be a whole number.",
+        "out_of_range": "Level must be between {min} and {max}."
+      }
+    },
     "skills": {
       "title": "스킬 관리",
       "explanation": "퀘스트 보상은 자동 계산됩니다. 총 스킬 레벨을 입력하여 오프셋을 조정하세요.",
@@ -2270,19 +2352,6 @@
       "warn_system_omnibar": "경고: 브라우저 또는 OS 시스템 단축키와 충돌할 수 있습니다(예: Ctrl+T, Ctrl+W, Alt+Tab).",
       "warn_system_undo": "경고: 브라우저 또는 OS 시스템 단축키와 충돌할 수 있습니다(예: Ctrl+W, Ctrl+T, Alt+Tab)."
     },
-    "experience": {
-      "title": "경험치 및 레벨",
-      "auto_level_title": "자동 레벨 계산",
-      "auto_level_description": "활성화하면 총 XP를 기준으로 레벨이 자동 계산됩니다. 비활성화하면 XP 계산과 독립적으로 레벨을 수동 설정할 수 있습니다.",
-      "current_level": "현재 레벨",
-      "set_total_xp": "총 XP 설정",
-      "manual_hint": "실제 총 XP를 입력하면 오프셋이 자동으로 조정됩니다.",
-      "xp_amount": "XP {amount}",
-      "xp_to_next": "다음 레벨까지 {amount}",
-      "reset_offset": "XP 오프셋 초기화",
-      "xp_progress_aria": "다음 레벨까지의 경험치 진행률",
-      "xp_progress_value": "다음 레벨까지 {percent}%"
-    },
     "danger_zone": {
       "confirm_instruction": "모든 데이터를 초기화하려면 {word}을(를) 입력해 확인하세요:",
       "confirm_word": "삭제"
@@ -2308,6 +2377,21 @@
       "version_filter_label": "로그 버전 포함",
       "version_filter_hint": "최신 메이저 버전이 기본 선택됩니다. 복원할 캐릭터와 리플레이스의 로그만 포함하세요.",
       "version_filter_tooltip": "버전은 계정 변경, 리플레이스 또는 프레스티지 초기화를 식별하지 않습니다. 가져오기 전에 적절한 세션 폴더를 선택하세요. Seasonal 이벤트는 활성 시즌에 속해야 합니다.",
+      "mode_filter_label": "Include game modes",
+      "mode_filter_hint": "Unchecked modes are left untouched. Unidentified-mode events are excluded by default when known modes are detected; include them only if you know where they belong.",
+      "unidentified_mode": "Unidentified mode",
+      "state_filter_label": "Include quest states",
+      "state_filter_hint": "Only each quest's latest recorded state is considered. Excluding a state does not restore an older one. Completed tasks also restore objectives and can imply prerequisites, level/trader minimums, and story gates.",
+      "states": {
+        "completed": "완료",
+        "started": "Started / active",
+        "failed": "실패"
+      },
+      "history_filter_label": "Wipe / prestige history",
+      "history_filter_hint": "Logs do not provide a verified self-prestige/reset event. If you know when this character reset, enter an import start time for that mode (your local time). Older events and undated events are excluded, including old notifications replayed later. Leave blank to include all selected history. This does not clear saved progress or change prestige.",
+      "import_since": "{mode}: import events at or after",
+      "selection_summary": "Selected quest states ({count}): {modes}",
+      "no_modes": "no modes",
       "version_unknown": "알 수 없는 버전",
       "source_file": "원본 파일",
       "selected_files": "선택한 파일",
@@ -2342,6 +2426,7 @@
       "cleared_logs_toast_title": "이전 로그가 삭제된 것으로 보입니다",
       "cleared_logs_toast_description": "로그 가져오기는 Logs 폴더에 남아 있는 퀘스트 기록만 읽을 수 있습니다. 삭제된 세션은 복구할 수 없습니다.",
       "errors": {
+        "choose_unknown_mode": "Choose an included destination mode for unidentified events.",
         "invalid_archive": "ZIP 압축 파일이 불완전하거나 유효하지 않은 로그 항목이 포함되어 있습니다. 진행 상황은 가져오지 않았습니다.",
         "budget_exceeded": "선택한 로그가 안전한 가져오기 할당량을 초과합니다. 최근 세션을 더 적게 선택하거나 관련 로그 파일만 추출하십시오. 가져오기가 진행되지 않았습니다.",
         "record_too_large": "{path}의 개별 로그 레코드가 너무 커 안전하게 처리할 수 없습니다. 진행 상황은 가져오지 않았습니다. 이 로그 형식을 보고해 주세요.",
@@ -2353,6 +2438,8 @@
         "parse_failed": "EFT 로그를 분석하지 못했습니다.",
         "task_metadata_not_loaded": "작업 메타데이터가 아직 로드되지 않았습니다. 새로 고친 후 다시 시도하세요.",
         "invalid_mode": "유효한 대상 게임 모드를 선택하세요.",
+        "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
+        "empty_selection": "No matching quest states remain in this selection. Include a game mode and quest state, or adjust the history cutoff.",
         "outside_active_season": "이 로그에는 현재 시즌 밖의 이벤트 또는 사용할 수 있는 날짜가 없는 이벤트가 포함되어 있습니다. 시즌 PvP로 가져오기 전에 현재 시즌에 속한 세션을 선택하세요."
       },
       "failed_tasks": "일치하는 실패 임무: {count}개",
@@ -2404,6 +2491,7 @@
         "rate_limited": "가져오기 시도가 너무 많습니다. 약 {minutes}분 후 다시 시도하세요.",
         "verification_failed": "사람 인증에 실패했습니다. 페이지를 새로 고친 후 다시 시도하세요.",
         "fetch_failed": "Tarkov.dev 프로필을 가져올 수 없습니다. 프로필을 연 후 다시 시도하세요.",
+        "level_thresholds_unavailable": "Unable to load player level data. No progress was imported. Check your connection and try again.",
         "tarkov_uid_conflict": "이 Tarkov 프로필은 이미 다른 TarkovTracker 계정에 연결되어 있어 현재 계정에는 연결되지 않았습니다. 가져온 진행도는 저장되었습니다. 다른 계정에서 연결을 해제한 후 다시 가져오세요.",
         "save_failed": "이 기기에서 프로필을 가져왔지만 아직 계정에 저장하지 못했습니다. 연결 상태를 확인하세요. 가져온 데이터는 동기화될 때까지 이 기기에 보관됩니다."
       }
@@ -2450,7 +2538,6 @@
     "smart_fill": "스마트 채우기",
     "unknown_task": "알 수 없는 작업",
     "unknown_station": "알 수 없는 스테이션",
-    "lvl": "레벨",
     "needed": "필요",
     "view_details_for": "{name} 세부 정보 보기",
     "locked_before": "이전 {count}개",
@@ -2459,6 +2546,14 @@
     "collected": "수집함",
     "mark_collected": "수집으로 표시",
     "handed_over": "인계함",
+    "craft": {
+      "craftable": "Craftable",
+      "available": "Craftable now",
+      "unavailable": "Craftable (station level too low)",
+      "source": "{station} {level} (you: {current})",
+      "more": " +{count} more",
+      "title": "{status}: {sources}{more}"
+    },
     "aria": {
       "enter_count": "아이템 수 입력",
       "decrease_count": "수량 감소",
@@ -2479,6 +2574,8 @@
     "any_of_items_short": "아무 {count}개",
     "view_accepted_items": "허용된 아이템 {count}개 모두 보기",
     "not_collected": "미수집",
+    "hidden_for_you": "Hidden for you",
+    "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
     "click_to_collect": "클릭하여 수집",
     "click_to_uncollect": "클릭하여 수집 해제",
     "modal": {
@@ -2562,6 +2659,18 @@
       "tasks": {
         "title": "타르코프 임무 추적기 · TarkovTracker.org",
         "description": "타르코프 임무, 목표, 보상 및 선행 조건을 PvP, PvE 및 시즌 모드 전반에서 추적하세요."
+      },
+      "tasks_traders": {
+        "title": "Tarkov Quests by Trader · TarkovTracker.org",
+        "description": "Work through each trader's Tarkov quests and see how many are left."
+      },
+      "tasks_maps": {
+        "title": "Tarkov Quest Map View · TarkovTracker.org",
+        "description": "See your open Tarkov quest objectives on each map to plan your next raid."
+      },
+      "tasks_graph": {
+        "title": "Tarkov Quest Graph · TarkovTracker.org",
+        "description": "Explore how each trader's Tarkov quests unlock one another."
       },
       "hideout": {
         "title": "타르코프 은신처 추적기 · TarkovTracker.org",
