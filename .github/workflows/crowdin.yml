@@ -49,7 +49,7 @@ jobs:
         run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh scripts/ci/review-admission*.mjs scripts/ci/enqueue-pr*.mjs scripts/ci/queue-configuration.mjs scripts/ci/queue-submitter.mjs "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
-        uses: crowdin/github-action@9c23991700c0ec5256fd41089b9d9d7d540e424e # v3.3.0
+        uses: crowdin/github-action@959dc74ac104447731cba99a016f85d0ae719788 # v3.5.0
         with:
           config: '.github/crowdin.yml'
           upload_sources: true
