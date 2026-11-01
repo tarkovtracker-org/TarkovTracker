@@ -24,7 +24,7 @@ overrides:
   esbuild: '^0.28.1'
   'fast-uri@3': '^3.1.8'
   fast-xml-parser: '^5.7.1'
-  follow-redirects: '^1.16.1'
+  follow-redirects: '^1.16.2'
   function-bind: 'npm:@socketregistry/function-bind@^1'
   gopd: 'npm:@socketregistry/gopd@^1'
   handlebars: '^4.7.10'
