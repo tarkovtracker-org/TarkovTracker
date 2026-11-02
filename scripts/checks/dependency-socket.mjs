@@ -124,7 +124,10 @@ export async function verifySocket(
   const identical = dependencyFingerprint(scanned.manifest, scanned.lock) === fingerprint;
   if (!identical) {
     requireEvidence(composition, 'Socket scan does not cover this dependency graph');
-    const base = await remoteDependencies(repository, composition.base);
+    const baseRevision = composition.resolveBase
+      ? await composition.resolveBase()
+      : composition.base;
+    const base = await remoteDependencies(repository, baseRevision);
     requireEvidence(
       reviewedComposition(composition.candidate, base, scanned),
       'Queue introduced an artifact, patch or dependency declaration outside trusted-base and Socket-reviewed inputs'

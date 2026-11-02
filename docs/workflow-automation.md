@@ -1024,6 +1024,10 @@ Automated via Dependabot (`.github/dependabot.yml`):
     resolution and direct declaration must already occur in the trusted queue base or scanned PR
     input. Newly synthesized artifacts or redirects require a fresh scan; being behind alone does
     not require updating a branch. Main pushes resolve the API-verified merged PR revision.
+    PR integration composition authenticates the checked-out test merge against the live PR,
+    its two ordered parents, and current main. It reads base evidence only at that verified
+    first-parent SHA, because the event and PR API base snapshots may lag main. A changed head,
+    merge revision or main parent fails closed; the Socket scan remains bound to the PR head.
   - Unchanged graphs reuse the trusted event base; dispatches and schedules resolve current main
     rather than relying on a bootstrap scan SHA. Live vulnerability audits still run. Socket's
     private full-project inventory/continuous monitoring is separate from these published diff reports.

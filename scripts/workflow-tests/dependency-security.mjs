@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { reviewFailures } from '../checks/dependency-artifacts.mjs';
 import {
   comparisonDigest,
@@ -13,6 +13,7 @@ import {
   lockedIntegrity,
   reviewedComposition,
 } from '../checks/dependency-evidence.mjs';
+import { compositionBase } from '../checks/dependency-pr-base.mjs';
 import { eventBase, queueComposition, socketHead } from '../checks/dependency-security.mjs';
 import { evaluateSocket, socketWarnings } from '../checks/dependency-socket.mjs';
 import { compareRuntime } from '../checks/review-release-source.mjs';
@@ -502,4 +503,244 @@ test('the pre-install CLI runs no pnpm script or installation when the base depe
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+describe('authenticated PR dependency composition', () => {
+  const repository = 'owner/repository';
+  const oldBase = 'a'.repeat(40);
+  const parent = 'b'.repeat(40);
+  const head = 'c'.repeat(40);
+  const candidate = 'd'.repeat(40);
+  const identity = { candidate, checkout: candidate };
+  function fixture() {
+    const event = { number: 17, pull_request: { head: { sha: head }, base: { sha: oldBase } } };
+    const responses = {
+      [`repos/${repository}/pulls/17`]: {
+        state: 'open',
+        base: { sha: oldBase, ref: 'main', repo: { full_name: repository } },
+        head: { sha: head },
+        merge_commit_sha: candidate,
+      },
+      [`repos/${repository}/git/commits/${candidate}`]: {
+        sha: candidate,
+        parents: [{ sha: parent }, { sha: head }],
+      },
+      [`repos/${repository}/commits/main`]: { sha: parent },
+    };
+    const request = async (path) => {
+      assert.ok(Object.hasOwn(responses, path), `Unexpected evidence request: ${path}`);
+      return responses[path];
+    };
+    return { event, responses, request };
+  }
+  function graph(a, b) {
+    const importer = (name, version) =>
+      `      ${name}:\n        specifier: ${version}\n        version: ${version}\n`;
+    const artifact = (name, version) =>
+      `  ${name}@${version}:\n    resolution: {integrity: sha512-${version}}\n`;
+    return {
+      manifest: { dependencies: { a, b }, packageManager: 'pnpm@11' },
+      lock: `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n${importer('a', a)}${importer('b', b)}packages:\n${artifact('a', a)}${artifact('b', b)}snapshots:\n  a@${a}: {}\n  b@${b}: {}\n`,
+    };
+  }
+  test('a PR integration uses its authenticated main parent despite stale event and API base snapshots', async () => {
+    const { event, request } = fixture();
+    const base = await compositionBase(event, repository, oldBase, identity, request);
+    assert.equal(base, parent);
+    const inputs = { [oldBase]: graph('1', '1'), [parent]: graph('2', '1') };
+    const scanned = graph('1', '2');
+    const merged = graph('2', '2');
+    assert.equal(reviewedComposition(merged, inputs[oldBase], scanned), false);
+    assert.equal(reviewedComposition(merged, inputs[base], scanned), true);
+  });
+  test('PR identity, checkout, exact merge and current-main evidence fail closed', async () => {
+    const paths = {
+      pull: `repos/${repository}/pulls/17`,
+      commit: `repos/${repository}/git/commits/${candidate}`,
+      main: `repos/${repository}/commits/main`,
+    };
+    const mutations = [
+      (f) => {
+        f.responses[paths.pull].state = 'closed';
+      },
+      (f) => {
+        f.responses[paths.pull].head.sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.pull].base.ref = 'untrusted';
+      },
+      (f) => {
+        f.responses[paths.pull].base.repo.full_name = 'attacker/repository';
+      },
+      (f) => {
+        f.responses[paths.pull].merge_commit_sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.commit].sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.commit].parents = [];
+      },
+      (f) => {
+        f.responses[paths.commit].parents.pop();
+      },
+      (f) => {
+        f.responses[paths.commit].parents.push({ sha: oldBase });
+      },
+      (f) => {
+        f.responses[paths.commit].parents.reverse();
+      },
+      (f) => {
+        f.responses[paths.commit].parents[0].sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.commit].parents[1].sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.main].sha = oldBase;
+      },
+      (f) => {
+        f.responses[paths.main].sha = 'malformed';
+      },
+      (f) => {
+        f.event.number = -1;
+      },
+      (f) => {
+        f.event.pull_request.head.sha = 'malformed';
+      },
+    ];
+    for (const mutate of mutations) {
+      const f = fixture();
+      mutate(f);
+      await assert.rejects(() =>
+        compositionBase(f.event, repository, oldBase, identity, f.request)
+      );
+    }
+    const f = fixture();
+    for (const invalid of [
+      { candidate: 'malformed', checkout: candidate },
+      { candidate, checkout: head },
+    ]) {
+      await assert.rejects(() => compositionBase(f.event, repository, oldBase, invalid, f.request));
+    }
+    await assert.rejects(
+      () =>
+        compositionBase(f.event, repository, oldBase, identity, async () => {
+          throw new Error('API unavailable');
+        }),
+      /API unavailable/
+    );
+  });
+  test('queue, push and dispatch composition retain their established immutable base handling', async () => {
+    const unexpected = async () => {
+      throw new Error('Unexpected PR evidence request');
+    };
+    for (const event of [{ merge_group: { base_sha: parent } }, { before: parent }, {}]) {
+      assert.equal(await compositionBase(event, repository, parent, {}, unexpected), parent);
+    }
+  });
+  function socketChecks() {
+    return ['Socket Security: Project Report', 'Socket Security: Pull Request Alerts'].map(
+      (name, index) => ({
+        id: index + 1,
+        name,
+        head_sha: head,
+        status: 'completed',
+        conclusion: 'success',
+        completed_at: new Date().toISOString(),
+        app: { id: 156372, slug: 'socket-security' },
+        output: {
+          title: index ? 'Success' : 'Project Report: Success',
+          text: '',
+          summary: index
+            ? '|PR #1 Alerts|✅|No new dependency alerts|'
+            : '|Report|Status|Message|\n|---|---|---|\n|Project report|✅|[View full report](https://socket.dev/dashboard/org/org/sbom/123)|\n\nClick through to the see the full socket security project report page for this commit to see information about every dependency in this project.',
+        },
+      })
+    );
+  }
+  test('the pre-install CLI authenticates the PR parent and still rejects unreviewed artifacts', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dependency-pr-parent-'));
+    try {
+      const { event, responses } = fixture();
+      const merged = graph('2', '2');
+      const stale = graph('1', '1');
+      const scanned = graph('1', '2');
+      for (const [sha, input] of [
+        [oldBase, stale],
+        [parent, graph('2', '1')],
+        [head, scanned],
+      ]) {
+        for (const [file, value] of [
+          ['package.json', JSON.stringify(input.manifest)],
+          ['pnpm-lock.yaml', input.lock],
+        ]) {
+          responses[`repos/${repository}/contents/${file}?ref=${sha}`] = {
+            encoding: 'base64',
+            content: Buffer.from(value).toString('base64'),
+          };
+        }
+      }
+      responses[`repos/${repository}/commits/${head}/check-runs?per_page=100&page=1`] = {
+        check_runs: socketChecks(),
+      };
+      writeFileSync(join(root, 'responses.json'), JSON.stringify(responses));
+      writeFileSync(join(root, 'event.json'), JSON.stringify(event));
+      writeFileSync(join(root, 'package.json'), JSON.stringify(merged.manifest));
+      writeFileSync(join(root, 'pnpm-lock.yaml'), merged.lock);
+      const scripts = {
+        pnpm: "if(process.argv[2]!=='config')process.exit(90);console.log(process.argv[4]==='minimumReleaseAge'?'10080':'[]');",
+        git: `const command=process.argv[2];if(command==='rev-parse')process.stdout.write('${candidate}');else if(command==='cat-file')process.stdout.write('${oldBase} commit 100');else if(command==='show')process.stdout.write(process.argv[3].endsWith(':package.json')?${JSON.stringify(JSON.stringify(stale.manifest))}:${JSON.stringify(stale.lock)});else process.exit(91);`,
+        gh: "const fs=require('node:fs');const key=process.argv[3];const data=JSON.parse(fs.readFileSync('responses.json','utf8'));if(!Object.hasOwn(data,key))throw new Error('Unexpected request '+key);fs.appendFileSync('requests.log',key+'\\n');console.log(JSON.stringify(data[key]));",
+      };
+      for (const [name, body] of Object.entries(scripts)) {
+        writeFileSync(join(root, name), `#!${process.execPath}\n${body}\n`);
+        chmodSync(join(root, name), 0o755);
+      }
+      const run = () =>
+        spawnSync(process.execPath, [resolve('scripts/checks/dependency-security.mjs')], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${root}:${process.env.PATH}`,
+            GITHUB_TOKEN: '',
+            GH_TOKEN: '',
+            GITHUB_ACTIONS: 'false',
+            GITHUB_REPOSITORY: repository,
+            GITHUB_SHA: candidate,
+            GITHUB_EVENT_PATH: join(root, 'event.json'),
+          },
+        });
+      const valid = run();
+      assert.equal(valid.status, 0, valid.stdout + valid.stderr);
+      assert.match(valid.stdout, /Dependency Security passed/);
+      assert.match(
+        readFileSync(join(root, 'requests.log'), 'utf8'),
+        new RegExp(`contents/package.json\\?ref=${parent}`)
+      );
+      responses[`repos/${repository}/commits/main`].sha = oldBase;
+      writeFileSync(join(root, 'responses.json'), JSON.stringify(responses));
+      writeFileSync(join(root, 'package.json'), JSON.stringify(scanned.manifest));
+      writeFileSync(join(root, 'pnpm-lock.yaml'), scanned.lock);
+      writeFileSync(join(root, 'requests.log'), '');
+      const exact = run();
+      assert.equal(exact.status, 0, exact.stdout + exact.stderr);
+      assert.doesNotMatch(
+        readFileSync(join(root, 'requests.log'), 'utf8'),
+        /pulls\/17|git\/commits|commits\/main/
+      );
+      responses[`repos/${repository}/commits/main`].sha = parent;
+      writeFileSync(join(root, 'responses.json'), JSON.stringify(responses));
+      writeFileSync(join(root, 'package.json'), JSON.stringify(merged.manifest));
+      writeFileSync(
+        join(root, 'pnpm-lock.yaml'),
+        merged.lock.replace('sha512-2', 'sha512-unreviewed')
+      );
+      const invalid = run();
+      assert.notEqual(invalid.status, 0);
+      assert.match(invalid.stderr, /outside trusted-base and Socket-reviewed inputs/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
