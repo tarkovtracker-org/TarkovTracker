@@ -16,10 +16,11 @@ jobs:
   changes:
     name: Validation plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     # Read-only API access for the trusted merge-queue reuse lookup below.
     permissions:
       actions: read
+      checks: read
       contents: read
       pull-requests: read
       statuses: read
@@ -35,9 +36,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: ./.github/actions/setup-project
         with:
-          node-version-file: .nvmrc
+          install-dependencies: 'false'
+      - name: Dependency Security before installation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/checks/dependency-security.mjs
       # Queue reuse is decided by main's code, never the candidate's (docs/systems/previews.md).
       - name: Checkout trusted queue reuse policy
         if: github.event_name == 'merge_group'

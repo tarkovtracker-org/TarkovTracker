@@ -1,9 +1,12 @@
 {
   "__pinnedNotes": {
+    "minimatch": "Pinned to 11.0.3 for GHSA-g3hv-75wg-m249. The eslint-plugin-import-x 4.17.1 patch replaces its removed makeRe API with Minimatch.match in both published entry points. Keep the compatibility tests and remove the patch after upstream supports minimatch 11.",
+    "zod": "Pinned to 4.6.7 for GHSA-mrhx-c7xc-m3w5. Zod 4.6.7 retains the one-argument record API used by @codecov/bundler-plugin-core 2.0.1; native CommonJS and ESM compatibility tests exercise the actual GitHub job-response parser. @google/design.md bundles its own Zod 3 for local DESIGN.md linting; it is not included in production output.",
     "deepmerge": "Replaced Nitro's transitive deepmerge 4.3.1 with the exact npm alias @stackline/deepmerge 1.1.0 for GHSA-gcqx-w48m-w2h4. Published 2026-10-13 with source-matching npm provenance; no runtime dependencies or install hooks. The security test resolves the actual Rollup consumer and covers prototype poisoning and deepmerge 4 compatibility. Remove the override only after upstream publishes a vetted patched version and the same regressions pass.",
     "@nuxt/test-utils": "Unpinned to ^4.0.2 on 2026-04-23 after vitest-environment-nuxt@2.0.0 was published and the upstream workspace dependency issue was fixed.",
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
-    "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
+    "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI.",
+    "glob": "Pinned to 14.0.3 for GHSA-3g3m-2fjr-6pw4. The pnpm patch redirects upstream minified default exports to the published raw modules compared against the immutable source tag. Nitro/@vercel/nft CommonJS and ESM consumer tests enforce the reviewed raw entry points. Remove this patch only after vetting the replacement default artifacts or obtaining equivalent provenance."
   },
   "version": "1.88.0",
   "dependencies": {
@@ -27,7 +30,7 @@
     "leaflet": "^1.9.4",
     "lru-cache": "^11.3.3",
     "mdast-util-from-markdown": "2.0.3",
-    "nuxt": "^4.6.2",
+    "nuxt": "4.6.3",
     "ofetch": "^1.5.1",
     "parse5": "8.0.1",
     "pinia": "^4.0.2",
@@ -66,7 +69,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "semantic-release": "^25.0.3",
-    "supabase": "2.121.0",
+    "supabase": "2.122.0",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
