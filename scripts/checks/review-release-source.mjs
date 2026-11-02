@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { requireEvidence, sha256 } from './dependency-evidence.mjs';
+import { comparisonDigest, requireEvidence, sha256 } from './dependency-evidence.mjs';
 const require = createRequire(import.meta.url);
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -66,7 +66,7 @@ export function compareRuntime(packageRoot, sourceRoot) {
   const comparison = compared.map((path) => compareFile(packageRoot, sourceRoot, path));
   return {
     comparison,
-    comparisonSha256: sha256(JSON.stringify(comparison)),
+    comparisonSha256: comparisonDigest(comparison),
     notCompared: convenience.map((path) => relative(packageRoot, path)),
   };
 }

@@ -6,12 +6,12 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { reviewFailures } from '../checks/dependency-artifacts.mjs';
 import {
+  comparisonDigest,
   dependencyFingerprint,
   fetchJson,
   githubPages,
   lockedIntegrity,
   reviewedComposition,
-  sha256,
 } from '../checks/dependency-evidence.mjs';
 import { eventBase, socketHead } from '../checks/dependency-security.mjs';
 import { evaluateSocket, socketWarnings } from '../checks/dependency-socket.mjs';
@@ -325,11 +325,18 @@ test('artifact review receipts bind dates, registry integrity, source identity a
       repository: 'owner/package',
       commit: head,
       tag: 'v1.0.0',
-      comparisonSha256: sha256(JSON.stringify(comparison)),
+      comparisonSha256: comparisonDigest(comparison),
     },
   };
   const manifest = { gitHead: head, dist: { integrity: review.integrity } };
   assert.deepEqual(reviewFailures(review, manifest, NOW), []);
+  const reordered = comparison
+    .toReversed()
+    .map((file) => Object.fromEntries(Object.entries(file).reverse()));
+  assert.equal(comparisonDigest(reordered), review.source.comparisonSha256);
+  assert.deepEqual(reviewFailures({ ...review, comparison: reordered }, manifest, NOW), []);
+  const multiple = [...comparison, { ...comparison[0], file: 'lib/other.js' }];
+  assert.equal(comparisonDigest(multiple), comparisonDigest(multiple.toReversed()));
   for (const change of [
     { integrity: 'sha512-Yg==' },
     { expires: '2026-11-01' },
@@ -354,6 +361,7 @@ test('the offline source comparison rejects changed published code and names exc
       writeFileSync(join(path, 'lib/index.js'), 'module.exports = 1;');
     writeFileSync(join(published, 'dist/convenience.min.js'), 'minified convenience');
     const proof = compareRuntime(published, source);
+    assert.equal(proof.comparisonSha256, comparisonDigest(proof.comparison));
     assert.equal(proof.comparison.length, 1);
     assert.equal(proof.comparison[0].method, 'identical');
     assert.deepEqual(proof.notCompared, ['dist/convenience.min.js']);

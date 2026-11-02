@@ -9,7 +9,7 @@
         "repository": "digitalbazaar/forge",
         "commit": "8a917370ec51731e817c2d547b7329a58f8210af",
         "tag": "v1.4.1",
-        "comparisonSha256": "a3136e79ac82a8f945ff2e1e2bbbc0c7660811b7a79841d95df97858e8db64a5"
+        "comparisonSha256": "11cd7b66af71d5ca2a9ce79b080461530303e26b8086a25e6eca8e43013e7538"
       },
       "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 49 public-entry/runtime modules match upstream source byte for byte. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
       "comparison": [
@@ -415,7 +415,7 @@
         "repository": "isaacs/node-glob",
         "commit": "fc93fd5dab2bd40ea02681e8a1f027dacca216ce",
         "tag": "v14.0.3",
-        "comparisonSha256": "0fa42cd17ff257892362c851c1559d9c320e64d5842930ec3a162fc5926664af"
+        "comparisonSha256": "c545b5efe30d0fc987327519dabdd38b13f522c105404563296389498411b46f"
       },
       "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 14 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
       "comparison": [
@@ -541,7 +541,7 @@
         "repository": "isaacs/minimatch",
         "commit": "b0c2aa83161cb6aaa19fa2e612f0b64edffd18ee",
         "tag": "v11.0.3",
-        "comparisonSha256": "1ac6109114ddf4cebc23ab37651b9991b506dbe0662799be6ba7d33cec6f6f52"
+        "comparisonSha256": "dee340694cd66d853b898c1988e2177af57224b5f7b0ae6523adbc41b1438085"
       },
       "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 8 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
       "comparison": [
@@ -620,7 +620,7 @@
         "repository": "isaacs/path-scurry",
         "commit": "31124d97f3bb1e4c7e99e067cacbccc2fbc5dc66",
         "tag": "v3.0.0",
-        "comparisonSha256": "294d6cb0f2b7bd03d7d9455b6a5576b9c5369cdab8b893d2170c48247ff3e947"
+        "comparisonSha256": "275c8edba6c7653d86d304370ef69080cab0bcc0d39646401f8877a8d2fdc494"
       },
       "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 2 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
       "comparison": [
@@ -651,7 +651,7 @@
         "repository": "isaacs/nonrecursive-glob-match",
         "commit": "ad4131ad08b78e80215add95cfd2afcc90518187",
         "tag": "v1.0.3",
-        "comparisonSha256": "7be7f53a55cc46263360bc89609b48a73daf2c6e7dc25d28b2c1aed54bf1529a"
+        "comparisonSha256": "9e36a38fdc0a06665e048545f5b1119d72cefed849ffb61af1cdb249485a4898"
       },
       "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 4 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
       "comparison": [

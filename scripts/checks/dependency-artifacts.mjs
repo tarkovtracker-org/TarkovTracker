@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import {
   SHA,
+  comparisonDigest,
   evidenceDates,
   fetchResponse,
   githubJson,
   requireEvidence,
-  sha256,
 } from './dependency-evidence.mjs';
 const longText = (value) => typeof value === 'string' && value.length >= 80;
 const validTag = (value) =>
@@ -14,7 +14,7 @@ const validTag = (value) =>
   );
 function validComparison(comparison, digest) {
   if (!Array.isArray(comparison)) return false;
-  return [comparison.length > 0, sha256(JSON.stringify(comparison)) === digest].every(Boolean);
+  return [comparison.length > 0, comparisonDigest(comparison) === digest].every(Boolean);
 }
 export function reviewFailures(review, manifest, now) {
   const data = review ?? {};

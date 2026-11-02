@@ -104,6 +104,10 @@ function canonical(value) {
       .map((key) => [key, canonical(value[key])])
   );
 }
+export const comparisonDigest = (comparison) =>
+  sha256(
+    JSON.stringify(canonical(comparison.toSorted((a, b) => a.file.localeCompare(b.file, 'en'))))
+  );
 export function dependencyFingerprint(manifest, lock) {
   const fields = Object.fromEntries(DEPENDENCY_FIELDS.map((key) => [key, manifest[key] ?? null]));
   return sha256(JSON.stringify(canonical(fields)) + '\n' + lock);
