@@ -8,66 +8,23 @@
     title-classes="text-lg font-semibold"
   >
     <template #content>
-      <div class="space-y-6 px-4 py-4">
-        <section class="space-y-3" :aria-labelledby="taskDisplayFlagsLabelId">
-          <p :id="taskDisplayFlagsLabelId" class="text-surface-400 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.flags_section', 'Task Display') }}
-          </p>
-          <div class="grid gap-4 md:grid-cols-2">
-            <UCheckbox
-              v-model="showRequiredLabels"
-              :label="$t('settings.interface.tasks.show_required')"
+      <div class="space-y-5 px-4 py-4">
+        <PreferenceSettingGroups :groups="groups" test-id-prefix="settings-task-setting" />
+        <section :aria-labelledby="taskViewDefaultsLabelId">
+          <h3
+            :id="taskViewDefaultsLabelId"
+            class="text-surface-400 mb-1 px-2 text-xs font-semibold tracking-wide uppercase"
+          >
+            {{ $t('settings.interface.tasks.view_defaults_section') }}
+          </h3>
+          <div class="space-y-2 px-2 md:max-w-xs">
+            <p class="text-surface-100 text-sm">{{ $t('common.hideout') }}</p>
+            <SelectMenuFixed
+              v-model="hideoutDefaultView"
+              :items="hideoutViewOptions"
+              value-key="value"
+              label-key="label"
             />
-            <UCheckbox
-              v-model="showExperienceRewards"
-              :label="$t('settings.interface.tasks.show_xp')"
-            />
-            <UCheckbox v-model="showNextQuests" :label="$t('settings.interface.tasks.show_next')" />
-            <UCheckbox
-              v-model="showPreviousQuests"
-              :label="$t('settings.interface.tasks.show_prev')"
-            />
-            <UCheckbox
-              v-model="taskCollapseDefault"
-              :label="
-                $t('settings.interface.tasks.collapse_by_default', 'Collapse Quests by Default')
-              "
-            />
-            <UCheckbox
-              v-model="hideTaskRewards"
-              :label="$t('settings.interface.tasks.hide_rewards', 'Hide Rewards')"
-            />
-          </div>
-        </section>
-        <USeparator />
-        <section class="space-y-3" :aria-labelledby="taskAvailabilityLabelId">
-          <p :id="taskAvailabilityLabelId" class="text-surface-400 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.availability_section', 'Task Availability') }}
-          </p>
-          <div class="grid gap-4 md:grid-cols-2">
-            <UCheckbox
-              v-model="tasksRequireTraderLevels"
-              :label="$t('settings.interface.tasks.require_trader_levels')"
-            />
-          </div>
-        </section>
-        <USeparator />
-        <section class="space-y-3" :aria-labelledby="taskViewDefaultsLabelId">
-          <p :id="taskViewDefaultsLabelId" class="text-surface-400 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.view_defaults_section', 'Default Views') }}
-          </p>
-          <div class="grid gap-4 md:grid-cols-2">
-            <div class="space-y-2">
-              <p class="text-surface-200 text-sm font-semibold">
-                {{ $t('common.hideout') }}
-              </p>
-              <SelectMenuFixed
-                v-model="hideoutDefaultView"
-                :items="hideoutViewOptions"
-                value-key="value"
-                label-key="label"
-              />
-            </div>
           </div>
         </section>
       </div>
@@ -76,40 +33,28 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import PreferenceSettingGroups from '@/components/ui/PreferenceSettingGroups.vue';
+  import { useTaskDisplaySettings } from '@/features/tasks/composables/useTaskDisplaySettings';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import type { PreferenceSettingGroup } from '@/types/filters';
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
-  const taskDisplayFlagsLabelId = 'settings-task-display-flags-label';
-  const taskAvailabilityLabelId = 'settings-task-availability-label';
-  const taskViewDefaultsLabelId = 'settings-task-view-defaults-label';
-  const showRequiredLabels = computed({
-    get: () => preferencesStore.getShowRequiredLabels,
-    set: (val) => preferencesStore.setShowRequiredLabels(val),
-  });
-  const showExperienceRewards = computed({
-    get: () => preferencesStore.getShowExperienceRewards,
-    set: (val) => preferencesStore.setShowExperienceRewards(val),
-  });
-  const showNextQuests = computed({
-    get: () => preferencesStore.getShowNextQuests,
-    set: (val) => preferencesStore.setShowNextQuests(val),
-  });
-  const showPreviousQuests = computed({
-    get: () => preferencesStore.getShowPreviousQuests,
-    set: (val) => preferencesStore.setShowPreviousQuests(val),
-  });
-  const tasksRequireTraderLevels = computed({
-    get: () => preferencesStore.getTasksRequireTraderLevels,
-    set: (val) => preferencesStore.setTasksRequireTraderLevels(val),
-  });
-  const taskCollapseDefault = computed({
-    get: () => preferencesStore.getTaskCollapseDefault,
-    set: (val) => preferencesStore.setTaskCollapseDefault(val),
-  });
-  const hideTaskRewards = computed({
-    get: () => preferencesStore.getHideTaskRewards,
-    set: (val) => preferencesStore.setHideTaskRewards(val),
-  });
+  // The tasks page settings drawer renders the same groups, so both surfaces stay in sync.
+  const { groups: taskDisplayGroups } = useTaskDisplaySettings();
+  const taskViewDefaultsLabelId = useId();
+  const availabilityGroup = computed<PreferenceSettingGroup>(() => ({
+    key: 'availability',
+    title: t('settings.interface.tasks.availability_section'),
+    settings: [
+      {
+        key: 'require_trader_levels',
+        label: t('settings.interface.tasks.require_trader_levels'),
+        get: () => preferencesStore.getTasksRequireTraderLevels,
+        set: (value) => preferencesStore.setTasksRequireTraderLevels(value),
+      },
+    ],
+  }));
+  const groups = computed(() => [...taskDisplayGroups.value, availabilityGroup.value]);
   const hideoutDefaultView = computed({
     get: () => preferencesStore.getHideoutPrimaryView,
     set: (val) => preferencesStore.setHideoutPrimaryView(val),
