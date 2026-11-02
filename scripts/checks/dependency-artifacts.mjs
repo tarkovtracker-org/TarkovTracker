@@ -7,14 +7,20 @@ import {
   githubJson,
   requireEvidence,
 } from './dependency-evidence.mjs';
-const longText = (value) => typeof value === 'string' && value.length >= 80;
+const longText = (value) => typeof value === 'string' && value.trim().length >= 80;
+const sourceFile = (file) =>
+  [typeof file.source === 'string', SHA.test(file.sourceBlob)].every(Boolean);
 const validTag = (value) =>
   [typeof value === 'string', /^[\w./-]+$/.test(value), !String(value).includes('..')].every(
     Boolean
   );
 function validComparison(comparison, digest) {
   if (!Array.isArray(comparison)) return false;
-  return [comparison.length > 0, comparisonDigest(comparison) === digest].every(Boolean);
+  return [
+    comparison.length > 0,
+    comparison.every(sourceFile),
+    comparisonDigest(comparison) === digest,
+  ].every(Boolean);
 }
 export function reviewFailures(review, manifest, now) {
   const data = review ?? {};
@@ -57,7 +63,9 @@ async function verifySourceTree(review) {
   );
   for (const file of review.comparison) {
     requireEvidence(
-      blobs.get(file.source) === file.sourceBlob,
+      [sourceFile(file), blobs.has(file.source), blobs.get(file.source) === file.sourceBlob].every(
+        Boolean
+      ),
       `Reviewed upstream source changed: ${file.source}`
     );
     requireEvidence(

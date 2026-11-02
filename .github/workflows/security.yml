@@ -51,6 +51,12 @@ jobs:
           if ! pnpm audit --audit-level=high; then
             echo "::notice title=Informational dependency audit::High-severity findings exist in development dependencies. This audit is advisory and does not gate CI."
           fi
+      - name: Cache pnpm for scheduled outdated check
+        if: github.event_name == 'schedule'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
       - name: Install for scheduled outdated check
         if: github.event_name == 'schedule'
         run: pnpm install --frozen-lockfile

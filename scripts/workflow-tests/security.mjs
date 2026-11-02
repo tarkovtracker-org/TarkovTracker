@@ -32,6 +32,8 @@ test('security audits need only the pinned runtime; scheduled outdated checks re
   assert.match(scan, /install-dependencies: 'false'/);
   const install = workflowStep(scan, 'Install for scheduled outdated check');
   assert.match(install, /if: github.event_name == 'schedule'/);
+  assert.match(install, /run: pnpm install --frozen-lockfile/);
+  assert.match(workflowStep(scan, 'Cache pnpm for scheduled outdated check'), /cache: pnpm/);
   assert.ok(
     scan.indexOf('Check release-age exceptions') <
       scan.indexOf('Install for scheduled outdated check')
@@ -73,7 +75,7 @@ test('every ordinary CI installer is gated by the pre-install dependency policy,
     'supabase-db',
     'workers',
   ]) {
-    assert.match(jobBlock(ci, job), /needs: (?:changes|\[changes,)/);
+    assert.match(jobBlock(ci, job), /needs: (?:changes\s*$|\[changes,)/m);
   }
   const lighthouse = jobBlock(read('.github/workflows/pr-checks.yml'), 'lighthouse');
   assert.match(

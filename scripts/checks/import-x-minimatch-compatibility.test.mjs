@@ -31,5 +31,6 @@ it.each(['CommonJS', 'ESM'])(
       expect.objectContaining({ ruleId: 'import-x/no-internal-modules', messageId: 'noAllowed' }),
     ]);
     expect(check('import "vitest";', { forbid: ['vitest/**'] })).toEqual([]);
+    expect(check('import "..";', { forbid: [''] })).toEqual([]);
   }
 );

@@ -199,6 +199,8 @@ function importerBlocks(lock, section) {
 function coveredField(actual, sources) {
   if (![Boolean(actual), typeof actual === 'object'].every(Boolean))
     return sources.includes(actual);
+  if (Object.keys(actual).length === 0)
+    return sources.some((source) => JSON.stringify(source) === JSON.stringify(actual));
   return Object.entries(actual).every(([key, value]) =>
     sources.some(
       (source) => JSON.stringify(canonical(source?.[key])) === JSON.stringify(canonical(value))
@@ -216,11 +218,34 @@ function coveredBlocks(candidate, sources, section, extract) {
   const allowed = new Set(sources.flatMap((input) => extract(input.lock, section)));
   return extract(candidate.lock, section).every((block) => allowed.has(block));
 }
+function lockKey(block) {
+  const match = /^(?:'([^']+)'|"([^"]+)"|([^:'"]+)):\s*(?:\{\})?$/.exec(
+    block.split('\n')[0].trim()
+  );
+  requireEvidence(match, 'Unsupported lockfile entry key');
+  return match.slice(1).find(Boolean);
+}
+function pairedBlocks(input) {
+  const artifacts = new Map(
+    lockBlocks(input.lock, 'packages').map((block) => [lockKey(block), block])
+  );
+  return lockBlocks(input.lock, 'snapshots').map((snapshot) => {
+    const key = lockKey(snapshot).replace(/\(.*/, '');
+    const artifact = artifacts.get(key);
+    requireEvidence(artifact, 'Snapshot has no matching artifact');
+    return `${artifact}\n${snapshot}`;
+  });
+}
+function coveredPairs(candidate, sources) {
+  const allowed = new Set(sources.flatMap(pairedBlocks));
+  return pairedBlocks(candidate).every((pair) => allowed.has(pair));
+}
 /** A queue may combine independently reviewed updates, but cannot invent an artifact or patch. */
 export function reviewedComposition(candidate, base, reviewed) {
   const sources = [base, reviewed];
   [candidate, ...sources].forEach((input) => canonicalLock(input.lock));
   const coverage = [
+    coveredPairs(candidate, sources),
     coveredManifest(
       candidate.manifest,
       sources.map((input) => input.manifest)

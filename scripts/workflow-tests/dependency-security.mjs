@@ -13,13 +13,15 @@ import {
   lockedIntegrity,
   reviewedComposition,
 } from '../checks/dependency-evidence.mjs';
-import { eventBase, socketHead } from '../checks/dependency-security.mjs';
+import { eventBase, queueComposition, socketHead } from '../checks/dependency-security.mjs';
 import { evaluateSocket, socketWarnings } from '../checks/dependency-socket.mjs';
 import { compareRuntime } from '../checks/review-release-source.mjs';
 const NOW = Date.parse('2026-11-02T00:00:00Z');
 const head = 'a'.repeat(40);
 const dates = { reviewedAt: '2026-11-01T00:00:00Z', expires: '2026-11-03T00:00:00Z' };
 const cleanSummary = '|PR #1 Alerts|✅|No new dependency alerts|';
+const projectSummary =
+  '|Report|Status|Message|\n|---|---|---|\n|Project report|✅|[View full report](https://socket.dev/dashboard/org/org/sbom/123)|\n\nClick through to the see the full socket security project report page for this commit to see information about every dependency in this project.';
 const checks = () =>
   ['Socket Security: Project Report', 'Socket Security: Pull Request Alerts'].map(
     (name, index) => ({
@@ -31,10 +33,8 @@ const checks = () =>
       completed_at: '2026-11-01T23:00:00Z',
       app: { id: 156372, slug: 'socket-security' },
       output: {
-        title: 'Success',
-        summary: index
-          ? cleanSummary
-          : '[View full report](https://socket.dev/dashboard/org/org/sbom/123)',
+        title: index ? 'Success' : 'Project Report: Success',
+        summary: index ? cleanSummary : projectSummary,
         text: '',
       },
     })
@@ -62,6 +62,12 @@ test('a real Socket app clean verdict passes, while missing evidence fails close
   const projectWarning = checks();
   projectWarning[0].output.title = 'Complete with warnings';
   assert.throws(() => evaluateSocket(projectWarning, head, [], NOW), /warning report/);
+  const unknownProject = checks();
+  unknownProject[0].output.text = 'New unexplained project payload';
+  assert.throws(() => evaluateSocket(unknownProject, head, [], NOW), /schema/);
+  const unknownClean = checks();
+  unknownClean[1].output.text = 'Unparsed payload';
+  assert.throws(() => evaluateSocket(unknownClean, head, [], NOW), /clean Socket/);
 });
 test('same-named spoofed, wrong-head, stale, incomplete and blocking checks cannot pass', () => {
   const mutations = [
@@ -95,6 +101,7 @@ test('green Socket warnings require exact-package, unexpired, substantive triage
     { package: '@isaacs/matcher@1.0.2' },
     { expires: '2026-11-01' },
     { reason: '' },
+    { reason: ' '.repeat(100) },
   ]) {
     assert.throws(
       () => evaluateSocket(warned(), head, [{ ...triage, ...change }], NOW),
@@ -104,6 +111,15 @@ test('green Socket warnings require exact-package, unexpired, substantive triage
   assert.throws(() => evaluateSocket(warned(), head, [], NOW), /Unreviewed/);
 });
 test('malformed warning counts, unknown report shapes and non-informational alerts cannot hide in green statuses', () => {
+  const zero = checks();
+  zero[1].output = { title: 'Success', summary: 'Found 0 project alerts', text: null };
+  assert.deepEqual(evaluateSocket(zero, head, [], NOW), []);
+  zero[1].output = {
+    title: 'Complete with warnings',
+    summary: 'Found 0 project alerts',
+    text: 'Unparsed finding',
+  };
+  assert.throws(() => evaluateSocket(zero, head, [], NOW), /zero-alert/);
   const runs = warned();
   runs[1].output.summary = 'Found 2 project alerts';
   assert.throws(() => evaluateSocket(runs, head, [], NOW), /count/);
@@ -164,13 +180,26 @@ test('early artifact identity comes from the package resolution table, never sna
 });
 test('queue and merged-main scans use the API-verified member revision, including reviewed fork contributions', async () => {
   const repository = 'owner/repository';
-  const event = { merge_group: { head_ref: `refs/heads/gh-readonly-queue/main/pr-17-${head}` } };
+  const queueBase = 'c'.repeat(40);
+  const event = {
+    merge_group: {
+      head_ref: `refs/heads/gh-readonly-queue/main/pr-17-${queueBase}`,
+      base_sha: queueBase,
+      head_sha: 'd'.repeat(40),
+    },
+  };
   const pull = {
     state: 'open',
     base: { ref: 'main', repo: { full_name: repository } },
     head: { sha: head, repo: { full_name: 'contributor/fork' } },
   };
-  assert.equal(await socketHead(event, repository, null, async () => pull), head);
+  assert.equal(
+    await socketHead(event, repository, null, async (path) => {
+      assert.equal(path, `repos/${repository}/pulls/17`);
+      return pull;
+    }),
+    head
+  );
   await assert.rejects(
     () => socketHead(event, repository, null, async () => ({ ...pull, state: 'closed' })),
     /identity/
@@ -181,9 +210,16 @@ test('queue and merged-main scans use the API-verified member revision, includin
   );
   const merged = { ...pull, merged_at: '2026-11-01', merge_commit_sha: 'b'.repeat(40) };
   assert.equal(
-    await socketHead({ after: merged.merge_commit_sha }, repository, null, async () => [merged]),
+    await socketHead({ after: merged.merge_commit_sha }, repository, null, async (path) => {
+      assert.equal(path, `repos/${repository}/commits/${merged.merge_commit_sha}/pulls`);
+      return [merged];
+    }),
     head
   );
+  const context = queueComposition({ pull_request: {} }, queueBase);
+  assert.ok(context, 'PR merge revisions must permit reviewed composition');
+  assert.equal(context.base, queueBase);
+  assert.ok(context.candidate.lock.includes('packages:'));
 });
 test('dispatches and schedules compare against current trusted main without a bootstrap Socket revision', async () => {
   const repository = 'owner/repository';
@@ -210,13 +246,29 @@ test('a queue combines independent reviewed updates without admitting new artifa
     `      ${name}:\n        specifier: ${version}\n        version: ${version}\n`;
   const input = (a, b) => ({
     manifest: { dependencies: { a, b }, packageManager: 'pnpm@11' },
-    lock: `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n${importer('a', a)}${importer('b', b)}packages:\n${stanza('a', a)}${stanza('b', b)}snapshots:\n`,
+    lock: `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n${importer('a', a)}${importer('b', b)}packages:\n${stanza('a', a)}${stanza('b', b)}snapshots:\n  a@${a}: {}\n  b@${b}: {}\n`,
   });
   const base = input('2', '1');
   const reviewed = input('1', '2');
   const queue = input('2', '2');
   assert.equal(reviewedComposition(queue, base, reviewed), true);
   assert.equal(reviewedComposition(input('3', '2'), base, reviewed), false);
+  assert.equal(
+    reviewedComposition({ ...queue, manifest: { ...queue.manifest, engines: {} } }, base, reviewed),
+    false
+  );
+  const left = input('2', '1');
+  const right = {
+    ...left,
+    lock: left.lock
+      .replace('sha512-2', 'sha512-other')
+      .replace('  a@2: {}', '  a@2:\n    dependencies:\n      b: 1'),
+  };
+  const mixed = {
+    ...left,
+    lock: left.lock.replace('  a@2: {}', '  a@2:\n    dependencies:\n      b: 1'),
+  };
+  assert.equal(reviewedComposition(mixed, left, right), false);
   assert.equal(
     reviewedComposition(
       { ...queue, lock: queue.lock.replace('sha512-2', 'sha512-tampered') },
@@ -341,11 +393,26 @@ test('artifact review receipts bind dates, registry integrity, source identity a
     { integrity: 'sha512-Yg==' },
     { expires: '2026-11-01' },
     { evidence: '' },
+    { evidence: ' '.repeat(100) },
     { comparison: [] },
   ]) {
     assert.ok(reviewFailures({ ...review, ...change }, manifest, NOW).length);
   }
   assert.ok(reviewFailures(review, { ...manifest, gitHead: 'b'.repeat(40) }, NOW).length);
+  const incomplete = { ...comparison[0] };
+  delete incomplete.source;
+  delete incomplete.sourceBlob;
+  assert.ok(
+    reviewFailures(
+      {
+        ...review,
+        comparison: [incomplete],
+        source: { ...review.source, comparisonSha256: comparisonDigest([incomplete]) },
+      },
+      manifest,
+      NOW
+    ).length
+  );
   assert.ok(
     reviewFailures(review, { ...manifest, scripts: { install: 'node install.js' } }, NOW).length
   );
@@ -360,11 +427,27 @@ test('the offline source comparison rejects changed published code and names exc
     for (const path of [published, source])
       writeFileSync(join(path, 'lib/index.js'), 'module.exports = 1;');
     writeFileSync(join(published, 'dist/convenience.min.js'), 'minified convenience');
+    writeFileSync(
+      join(published, 'package.json'),
+      JSON.stringify({
+        main: 'lib/index.js',
+        bin: 'bin/tool',
+        exports: { '.': './lib/index.js', './data': './data.json' },
+      })
+    );
     const proof = compareRuntime(published, source);
     assert.equal(proof.comparisonSha256, comparisonDigest(proof.comparison));
     assert.equal(proof.comparison.length, 1);
     assert.equal(proof.comparison[0].method, 'identical');
     assert.deepEqual(proof.notCompared, ['dist/convenience.min.js']);
+    assert.deepEqual(proof.entrypointsNotCompared, ['bin/tool', 'data.json']);
+    const relativeRun = spawnSync(
+      process.execPath,
+      [resolve('scripts/checks/review-release-source.mjs'), '.', '../source'],
+      { cwd: published, encoding: 'utf8' }
+    );
+    assert.equal(relativeRun.status, 0, relativeRun.stderr);
+    assert.deepEqual(JSON.parse(relativeRun.stdout).notCompared, ['dist/convenience.min.js']);
     writeFileSync(join(published, 'lib/index.js'), 'module.exports = 2;');
     assert.throws(() => compareRuntime(published, source), /Source comparison failed/);
   } finally {
@@ -386,14 +469,12 @@ test('the pre-install CLI runs no pnpm script or installation when the base depe
       const body =
         name === 'pnpm'
           ? `if(process.argv[2]!=='config')process.exit(90);console.log(process.argv[4]==='minimumReleaseAge'?'10080':'[]');`
-          : `process.stdout.write(process.argv[3].endsWith(':package.json')?${JSON.stringify(manifest)}:${JSON.stringify(lock)});`;
+          : `process.stdout.write(process.argv[2]==='cat-file'?'${head} commit 100':process.argv[3].endsWith(':package.json')?${JSON.stringify(manifest)}:${JSON.stringify(lock)});`;
       writeFileSync(file, `#!${process.execPath}\n${body}\n`);
       chmodSync(file, 0o755);
     }
-    const result = spawnSync(
-      process.execPath,
-      [resolve('scripts/checks/dependency-security.mjs')],
-      {
+    const run = () =>
+      spawnSync(process.execPath, [resolve('scripts/checks/dependency-security.mjs')], {
         cwd: root,
         encoding: 'utf8',
         env: {
@@ -401,10 +482,23 @@ test('the pre-install CLI runs no pnpm script or installation when the base depe
           PATH: `${bin}:${process.env.PATH}`,
           GITHUB_EVENT_PATH: join(root, 'event.json'),
         },
-      }
-    );
+      });
+    const result = run();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /dependency graph unchanged/);
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!${process.execPath}\nconsole.error('Unexpected API fallback');process.exit(91);`
+    );
+    chmodSync(join(bin, 'gh'), 0o755);
+    writeFileSync(
+      join(bin, 'git'),
+      `#!${process.execPath}\nprocess.stdout.write(process.argv[2]==='cat-file'?'${head} commit 100':'invalid JSON');`
+    );
+    const invalid = run();
+    assert.notEqual(invalid.status, 0);
+    assert.match(invalid.stderr, /JSON/);
+    assert.doesNotMatch(invalid.stderr, /Unexpected API fallback/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

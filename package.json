@@ -5,7 +5,8 @@
     "deepmerge": "Replaced Nitro's transitive deepmerge 4.3.1 with the exact npm alias @stackline/deepmerge 1.1.0 for GHSA-gcqx-w48m-w2h4. Published 2026-10-13 with source-matching npm provenance; no runtime dependencies or install hooks. The security test resolves the actual Rollup consumer and covers prototype poisoning and deepmerge 4 compatibility. Remove the override only after upstream publishes a vetted patched version and the same regressions pass.",
     "@nuxt/test-utils": "Unpinned to ^4.0.2 on 2026-04-23 after vitest-environment-nuxt@2.0.0 was published and the upstream workspace dependency issue was fixed.",
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
-    "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
+    "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI.",
+    "glob": "Pinned to 14.0.3 for GHSA-3g3m-2fjr-6pw4. The pnpm patch redirects upstream minified default exports to the published raw modules compared against the immutable source tag. Nitro/@vercel/nft CommonJS and ESM consumer tests enforce the reviewed raw entry points. Remove this patch only after vetting the replacement default artifacts or obtaining equivalent provenance."
   },
   "version": "1.88.0",
   "dependencies": {

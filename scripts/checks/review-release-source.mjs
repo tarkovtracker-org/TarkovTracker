@@ -1,7 +1,7 @@
 // Offline review tool. Run with the already-vetted project compiler; never installs or executes
 // the release under review. Its output becomes a protected, code-reviewed artifact receipt.
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -58,9 +58,25 @@ function compareFile(packageRoot, sourceRoot, path) {
     method: compiled ? 'typescript-6.0.3-ast-parity' : 'identical',
   };
 }
+function declaredTargets(value) {
+  if (typeof value === 'string') return [value.replace(/^\.\//, '')];
+  if (![Boolean(value), typeof value === 'object'].every(Boolean)) return [];
+  return Object.entries(value)
+    .filter(([key]) => key !== 'types')
+    .flatMap(([, item]) => declaredTargets(item));
+}
+function unreviewedEntries(packageRoot, comparison) {
+  const manifestPath = join(packageRoot, 'package.json');
+  const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
+  const paths = declaredTargets([manifest.main, manifest.module, manifest.bin, manifest.exports]);
+  const covered = new Set(['package.json', ...comparison.map((item) => item.file)]);
+  return [...new Set(paths)].filter((path) => !covered.has(path)).sort();
+}
 export function compareRuntime(packageRoot, sourceRoot) {
   const runtime = files(packageRoot).filter((path) => /\.[cm]?js$/.test(path));
-  const convenience = runtime.filter((path) => /\/dist\/.*\.min\.js$/.test(path));
+  const convenience = runtime.filter((path) =>
+    /^dist\/.*\.min\.js$/.test(relative(packageRoot, path))
+  );
   const compared = runtime.filter((path) => !convenience.includes(path));
   requireEvidence(compared.length > 0, 'No runtime modules found');
   const comparison = compared.map((path) => compareFile(packageRoot, sourceRoot, path));
@@ -68,6 +84,7 @@ export function compareRuntime(packageRoot, sourceRoot) {
     comparison,
     comparisonSha256: comparisonDigest(comparison),
     notCompared: convenience.map((path) => relative(packageRoot, path)),
+    entrypointsNotCompared: unreviewedEntries(packageRoot, comparison),
   };
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

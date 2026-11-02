@@ -376,6 +376,7 @@ async function reviewPackage([name, versions], input, selected) {
   const reviews = await Promise.all(
     versions.map(async (version) => {
       if (!selected.has(`${name}@${version}`)) return [version, undefined];
+      // Native provenance also binds to npm's tarball, never an arbitrary locked resolution.
       const locked = lockedIntegrity(readFileSync('pnpm-lock.yaml', 'utf8'), `${name}@${version}`);
       requireEvidence(
         locked === packument.versions[version]?.dist?.integrity,

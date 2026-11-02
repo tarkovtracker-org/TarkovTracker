@@ -19,7 +19,8 @@ export function latestSocketChecks(checks) {
         .sort((a, b) => b.id - a.id)[0]
   );
 }
-const outputOf = (run) => Object.assign({ title: '', summary: '', text: '' }, run.output);
+const outputOf = (run) =>
+  Object.fromEntries(['title', 'summary', 'text'].map((key) => [key, run.output?.[key] ?? '']));
 /** Unknown report formats fail closed, including a success status with warnings we cannot parse. */
 export function socketWarnings(run) {
   const { summary, text, title } = outputOf(run);
@@ -35,7 +36,14 @@ export function socketWarnings(run) {
       ),
       'Socket report contains no explicit clean verdict'
     );
+    requireEvidence(!text?.trim(), 'Unrecognized content in clean Socket report');
     return [];
+  }
+  if (Number(count[1]) === 0) {
+    requireEvidence(
+      [!text?.trim(), !/warn|⚠️|🚨/iu.test(title)].every(Boolean),
+      'Unrecognized content in zero-alert Socket report'
+    );
   }
   const rows = [...text.matchAll(/<details\b[^>]*>([\s\S]*?)<\/details>/gi)];
   requireEvidence(
@@ -70,9 +78,19 @@ function projectWarnings(check) {
     /https:\/\/socket\.dev\/dashboard\//.test(output.summary),
     'Socket project report link is missing'
   );
-  return /warn|Found \d+ .*alerts?/i.test(`${output.title} ${output.summary} ${output.text}`)
-    ? socketWarnings(check)
-    : [];
+  if (/warn|Found \d+ .*alerts?/i.test(`${output.title} ${output.summary} ${output.text}`))
+    return socketWarnings(check);
+  requireEvidence(
+    [
+      output.title === 'Project Report: Success',
+      !output.text?.trim(),
+      /^\|Report\|Status\|Message\|\n\|---\|---\|---\|\n\|Project report\|✅\|\[View full report\]\(https:\/\/socket\.dev\/dashboard\/org\/[\w-]+\/sbom\/[a-f0-9-]+\)\|\n\nClick through to the see the full socket security project report page for this commit to see information about every dependency in this project\.$/.test(
+        output.summary
+      ),
+    ].every(Boolean),
+    'Unrecognized Socket project report schema'
+  );
+  return [];
 }
 function requireWarningReview(warning, triage, now) {
   const review = triage.find((entry) =>
@@ -83,7 +101,7 @@ function requireWarningReview(warning, triage, now) {
     `Socket ${warning.type} requires remediation or upstream Socket triage`
   );
   requireEvidence(
-    [evidenceDates(review, now), review?.reason?.length >= 80].every(Boolean),
+    [evidenceDates(review, now), review?.reason?.trim().length >= 80].every(Boolean),
     `Unreviewed Socket warning: ${warning.package} ${warning.type}`
   );
 }

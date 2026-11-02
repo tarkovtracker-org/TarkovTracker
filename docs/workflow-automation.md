@@ -994,8 +994,11 @@ Automated via Dependabot (`.github/dependabot.yml`):
     and bindings; it does not reproduce builds before installation. `node scripts/checks/review-release-source.mjs <published-directory> <upstream-directory>` reproduces
     the source-comparison receipt using the already-vetted TypeScript 6.0.3 pin, or compares plain
     JavaScript byte for byte. Review the package's actual entry points and consumers. The tool
-    lists minified convenience bundles separately; do not claim those were rebuilt. Document any
-    excluded artifacts and prove they are outside the reviewed execution/output paths.
+    lists minified bundles and uncovered manifest entrypoints separately (including extensionless
+    binaries and JSON exports); do not claim those were rebuilt or automatically reviewed. Document any
+    excluded artifacts and prove they are outside the reviewed execution/output paths. Glob 14.0.3
+    defaults to minified bundles upstream; the protected pnpm patch routes its import/require/main/module
+    defaults to the compared raw modules. Native Nitro/`@vercel/nft` tests enforce both module formats.
   - Native provenance remains an admission path; the fallback does not waive publisher,
     script, vulnerability, compatibility, or Socket checks. No package-wide or scope-wide exclusions.
   - Mature exclusions warn for removal; they no longer waive an age requirement. A mature parent
@@ -1026,6 +1029,9 @@ Automated via Dependabot (`.github/dependabot.yml`):
     private full-project inventory/continuous monitoring is separate from these published diff reports.
   - Local preflight: `node scripts/checks/dependency-security.mjs`, then `pnpm install --frozen-lockfile`. It uses the existing `gh` login when no GitHub token is supplied. CI uses
     a read-only token and evaluates package metadata/artifacts without executing package code.
+    For a changed graph, prepare the lockfile with `pnpm install --lockfile-only --ignore-scripts`,
+    publish the PR head for Socket to scan, then set `GITHUB_SHA` to that immutable scanned head
+    for the local preflight before installing. Unchanged graphs reuse trusted main.
   - Policy, evidence, workflow and override changes still require the repository's exact-head
     sensitive-change review. Compatibility and regression tests remain mandatory for overrides.
 - Grouped minor/patch updates for low-risk tooling families

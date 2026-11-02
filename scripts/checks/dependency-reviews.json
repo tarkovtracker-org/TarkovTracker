@@ -417,7 +417,7 @@
         "tag": "v14.0.3",
         "comparisonSha256": "c545b5efe30d0fc987327519dabdd38b13f522c105404563296389498411b46f"
       },
-      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 14 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "evidence": "Verified npm tarball SHA-512, immutable upstream release tag and publisher continuity. All 14 raw ESM/CommonJS runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization. Upstream default exports use minified bundles that were not rebuilt. The protected glob pnpm patch redirects default import/require/main/module to these compared raw modules; native Nitro/@vercel/nft consumer tests enforce that resolution and exercise globSync. Skipped bundles are not used through the patched defaults. This review waives no vulnerability, install-hook or Socket check.",
       "comparison": [
         {
           "file": "dist/esm/glob.js",

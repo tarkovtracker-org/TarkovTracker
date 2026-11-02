@@ -63,7 +63,8 @@ overrides:
 packageExtensionsChecksum: sha256-2eaVFnSq8pFu4K2x1IxkYQlr77abxhs42agaCyMhDQI=
 
 patchedDependencies:
-  eslint-plugin-import-x@4.17.1: 6b2bcaaeb6783d50fc7f488d4b80aec758aabb2d3681823d6ede6c4e07bde513
+  eslint-plugin-import-x@4.17.1: 46b50ffc710b2f3d1b57b2914a7c6e55c45b06c0a6f8f8e1f34f7218e0f09914
+  glob@14.0.3: 78edce7b116460f787ac12e2a0e789fcac9d94c19e060501b8f1fbc0c6dae50f
 
 importers:
 
@@ -213,7 +214,7 @@ importers:
         version: 10.13.0(jiti@2.7.0)
       eslint-plugin-import-x:
         specifier: ^4.16.2
-        version: 4.17.1(patch_hash=6b2bcaaeb6783d50fc7f488d4b80aec758aabb2d3681823d6ede6c4e07bde513)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0))
+        version: 4.17.1(patch_hash=46b50ffc710b2f3d1b57b2914a7c6e55c45b06c0a6f8f8e1f34f7218e0f09914)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0))
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.6
@@ -9456,7 +9457,7 @@ snapshots:
       eslint-flat-config-utils: 3.2.0
       eslint-merge-processors: 2.0.0(eslint@10.13.0(jiti@2.7.0))
       eslint-plugin-import-lite: 0.6.0(eslint@10.13.0(jiti@2.7.0))
-      eslint-plugin-import-x: 4.17.1(patch_hash=6b2bcaaeb6783d50fc7f488d4b80aec758aabb2d3681823d6ede6c4e07bde513)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0))
+      eslint-plugin-import-x: 4.17.1(patch_hash=46b50ffc710b2f3d1b57b2914a7c6e55c45b06c0a6f8f8e1f34f7218e0f09914)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0))
       eslint-plugin-jsdoc: 63.3.3(eslint@10.13.0(jiti@2.7.0))
       eslint-plugin-regexp: 3.2.0(eslint@10.13.0(jiti@2.7.0))
       eslint-plugin-unicorn: 73.0.0(eslint@10.13.0(jiti@2.7.0))
@@ -11761,7 +11762,7 @@ snapshots:
       async-sema: 3.1.1
       bindings: 1.5.0
       estree-walker: 2.0.2
-      glob: 14.0.3
+      glob: 14.0.3(patch_hash=78edce7b116460f787ac12e2a0e789fcac9d94c19e060501b8f1fbc0c6dae50f)
       graceful-fs: 4.2.11
       node-gyp-build: 4.8.4
       picomatch: 4.0.7
@@ -12179,7 +12180,7 @@ snapshots:
 
   archiver-utils@5.0.2:
     dependencies:
-      glob: 14.0.3
+      glob: 14.0.3(patch_hash=78edce7b116460f787ac12e2a0e789fcac9d94c19e060501b8f1fbc0c6dae50f)
       graceful-fs: 4.2.11
       is-stream: 2.0.1
       lazystream: 1.0.1
@@ -12960,7 +12961,7 @@ snapshots:
     dependencies:
       eslint: 10.13.0(jiti@2.7.0)
 
-  eslint-plugin-import-x@4.17.1(patch_hash=6b2bcaaeb6783d50fc7f488d4b80aec758aabb2d3681823d6ede6c4e07bde513)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0)):
+  eslint-plugin-import-x@4.17.1(patch_hash=46b50ffc710b2f3d1b57b2914a7c6e55c45b06c0a6f8f8e1f34f7218e0f09914)(@typescript-eslint/utils@8.67.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.13.0(jiti@2.7.0)):
     dependencies:
       '@typescript-eslint/types': 8.61.1
       comment-parser: 1.4.7
@@ -13470,7 +13471,7 @@ snapshots:
     dependencies:
       is-glob: 4.0.3
 
-  glob@14.0.3:
+  glob@14.0.3(patch_hash=78edce7b116460f787ac12e2a0e789fcac9d94c19e060501b8f1fbc0c6dae50f):
     dependencies:
       minimatch: 11.0.3
       minipass: 7.1.3
@@ -13829,7 +13830,7 @@ snapshots:
     dependencies:
       config-chain: 1.1.13
       editorconfig: 3.0.2
-      glob: 14.0.3
+      glob: 14.0.3(patch_hash=78edce7b116460f787ac12e2a0e789fcac9d94c19e060501b8f1fbc0c6dae50f)
       js-cookie: 3.0.8
       nopt: 10.0.1
 

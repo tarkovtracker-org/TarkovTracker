@@ -17,13 +17,22 @@ function localFingerprint() {
 }
 async function baseFingerprint(base, repository) {
   if (!SHA.test(base)) return null;
-  const read = (file) => execFileSync('git', ['show', `${base}:${file}`], { encoding: 'utf8' });
-  try {
-    return dependencyFingerprint(JSON.parse(read('package.json')), read('pnpm-lock.yaml'));
-  } catch {
-    // Lighthouse and fork checkouts may be shallow. The immutable event base remains the authority.
-    return remoteFingerprint(repository, base);
-  }
+  const identity = execFileSync('git', ['cat-file', '--batch-check'], {
+    input: `${base}^{commit}\n`,
+    encoding: 'utf8',
+  }).trim();
+  // Only an absent commit in a shallow/fork checkout triggers the immutable API fallback.
+  if (identity === `${base}^{commit} missing`) return remoteFingerprint(repository, base);
+  requireEvidence(
+    new RegExp(`^${base} commit [0-9]+$`).test(identity),
+    'Unexpected git object identity'
+  );
+  const read = (file) =>
+    execFileSync('git', ['show', `${base}:${file}`], {
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 ** 2,
+    });
+  return dependencyFingerprint(JSON.parse(read('package.json')), read('pnpm-lock.yaml'));
 }
 const immutableBase = (event) =>
   [event.pull_request?.base.sha, event.merge_group?.base_sha, event.before].find(Boolean);
@@ -102,8 +111,11 @@ function reviewData() {
 const scanCandidate = (reviews) =>
   SHA.test(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : reviews.socket?.head;
 const warningReviews = (reviews) => reviews.socket?.warnings ?? [];
-function queueComposition(event, base) {
-  if (![Boolean(event.merge_group), SHA.test(event.after)].some(Boolean)) return undefined;
+export function queueComposition(event, base) {
+  if (
+    ![Boolean(event.merge_group), Boolean(event.pull_request), SHA.test(event.after)].some(Boolean)
+  )
+    return undefined;
   return {
     base,
     candidate: { manifest: readJson('package.json'), lock: readFileSync('pnpm-lock.yaml', 'utf8') },
