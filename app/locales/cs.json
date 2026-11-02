@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "Karty úkolů",
-        "show_required": "Zobrazit povinné štítky",
-        "show_xp": "Zobrazit XP odměny",
-        "show_next": "Zobrazit další úkoly",
-        "show_prev": "Zobrazit předchozí úkoly",
-        "collapse_by_default": "Sbalit úkoly ve výchozím nastavení",
-        "hide_rewards": "Skrýt odměny",
         "require_trader_levels": "Pro dostupnost úkolů vyžadovat úroveň loajality a reputaci obchodníka",
-        "flags_section": "Zobrazení úloh",
         "availability_section": "Dostupnost úkolu",
         "view_defaults_section": "Výchozí zobrazení"
       },

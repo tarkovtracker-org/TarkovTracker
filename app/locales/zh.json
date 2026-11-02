@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "任务卡片",
-        "show_required": "显示必需标签",
-        "show_xp": "显示经验奖励",
-        "show_next": "显示后续任务",
-        "show_prev": "显示前置任务",
-        "collapse_by_default": "默认情况下收起任务",
-        "hide_rewards": "隐藏奖励",
         "require_trader_levels": "显示任务时要求满足商人忠诚等级和声望条件",
-        "flags_section": "任务显示",
         "availability_section": "任务可用性",
         "view_defaults_section": "默认视图"
       },

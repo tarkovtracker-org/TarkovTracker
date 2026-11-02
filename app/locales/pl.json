@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "Karty zadań",
-        "show_required": "Pokaż wymagane etykiety",
-        "show_xp": "Pokaż nagrody XP",
-        "show_next": "Pokaż następne zadania",
-        "show_prev": "Pokaż poprzednie zadania",
-        "collapse_by_default": "Zwiń zadania domyślnie",
-        "hide_rewards": "Ukryj nagrody",
         "require_trader_levels": "Wymagaj poziomu Lojalności i Reputacji Handlarza przy udostępnianiu zadań",
-        "flags_section": "Wyświetlanie zadań",
         "availability_section": "Dostępność zadania",
         "view_defaults_section": "Domyślne widoki"
       },
