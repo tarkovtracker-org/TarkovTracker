@@ -1,0 +1,705 @@
+{
+  "schemaVersion": 1,
+  "releases": {
+    "node-forge@1.4.1": {
+      "integrity": "sha512-w5/MfWaeMrpR/5ba6fZyAUTLSuE6aYz7H/3cYrqwZEmf5eQS3IaaLgJt4MBv7HglGFWmV22K8h4U18RJQmw/ow==",
+      "reviewedAt": "2026-11-02T04:39:53.581Z",
+      "expires": "2026-11-09T04:39:53.582Z",
+      "source": {
+        "repository": "digitalbazaar/forge",
+        "commit": "8a917370ec51731e817c2d547b7329a58f8210af",
+        "tag": "v1.4.1",
+        "comparisonSha256": "a3136e79ac82a8f945ff2e1e2bbbc0c7660811b7a79841d95df97858e8db64a5"
+      },
+      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 49 public-entry/runtime modules match upstream source byte for byte. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "comparison": [
+        {
+          "file": "lib/aes.js",
+          "publishedSha256": "be13b617cfff1d583f616c0ce97147cebd9bf101cf893f027cc18c3a54bd3a2f",
+          "source": "lib/aes.js",
+          "sourceSha256": "be13b617cfff1d583f616c0ce97147cebd9bf101cf893f027cc18c3a54bd3a2f",
+          "method": "identical",
+          "sourceBlob": "5bdd2acc3e9b83cd889fc19adb2e7158ce0f9e30"
+        },
+        {
+          "file": "lib/aesCipherSuites.js",
+          "publishedSha256": "bdc5762c0d6edee74e469a59e0157555463d7abeadf34c4377121673dacc2360",
+          "source": "lib/aesCipherSuites.js",
+          "sourceSha256": "bdc5762c0d6edee74e469a59e0157555463d7abeadf34c4377121673dacc2360",
+          "method": "identical",
+          "sourceBlob": "fed60f3696e01f79c18e2cfac35e9beb785b1c59"
+        },
+        {
+          "file": "lib/asn1-validator.js",
+          "publishedSha256": "6f206656ab557712c2a09f3b8bba69004dd41b2b37cee0cb836d44ea8034004b",
+          "source": "lib/asn1-validator.js",
+          "sourceSha256": "6f206656ab557712c2a09f3b8bba69004dd41b2b37cee0cb836d44ea8034004b",
+          "method": "identical",
+          "sourceBlob": "2be328501e93e5f0e38245b6ee797bfc426dfcaa"
+        },
+        {
+          "file": "lib/asn1.js",
+          "publishedSha256": "77cc3ca2b4c1009e93cf26594232598f253bd3e046f16eb32386c8bf644857b6",
+          "source": "lib/asn1.js",
+          "sourceSha256": "77cc3ca2b4c1009e93cf26594232598f253bd3e046f16eb32386c8bf644857b6",
+          "method": "identical",
+          "sourceBlob": "39549290089f4d5e27b6ab32ae83f121f8f116a1"
+        },
+        {
+          "file": "lib/baseN.js",
+          "publishedSha256": "08175e677127132340002bdb63dd19ba41c0baae546936032c7d6a6335e219b6",
+          "source": "lib/baseN.js",
+          "sourceSha256": "08175e677127132340002bdb63dd19ba41c0baae546936032c7d6a6335e219b6",
+          "method": "identical",
+          "sourceBlob": "824fa36da56f33d2fc5ea268ba10da2179134214"
+        },
+        {
+          "file": "lib/cipher.js",
+          "publishedSha256": "9dbfb9e9a02a128c9092faf78462221b9092ef0f3555da7ea1f6002aab4819a8",
+          "source": "lib/cipher.js",
+          "sourceSha256": "9dbfb9e9a02a128c9092faf78462221b9092ef0f3555da7ea1f6002aab4819a8",
+          "method": "identical",
+          "sourceBlob": "505333c0752a80faffa4855a7d4e47967a4a941a"
+        },
+        {
+          "file": "lib/cipherModes.js",
+          "publishedSha256": "904c168aecdfdf07afce4e38bdc9e0a8f3a799274b8c36d0adae3439a83324a8",
+          "source": "lib/cipherModes.js",
+          "sourceSha256": "904c168aecdfdf07afce4e38bdc9e0a8f3a799274b8c36d0adae3439a83324a8",
+          "method": "identical",
+          "sourceBlob": "4d11e89f68715050f3a7554103fd480ea607f3e3"
+        },
+        {
+          "file": "lib/des.js",
+          "publishedSha256": "cb0ae63c8477e61be95c3948bf52f1b7ed02d8522791d9ed1704b6b8b8517734",
+          "source": "lib/des.js",
+          "sourceSha256": "cb0ae63c8477e61be95c3948bf52f1b7ed02d8522791d9ed1704b6b8b8517734",
+          "method": "identical",
+          "sourceBlob": "ed8239aa9c8e778656fb3b798f99167e623577a6"
+        },
+        {
+          "file": "lib/ed25519.js",
+          "publishedSha256": "b0d15f1e11168a3a6de9914cdff9bf1be0c5c2fc313499e44dfeb164f5202849",
+          "source": "lib/ed25519.js",
+          "sourceSha256": "b0d15f1e11168a3a6de9914cdff9bf1be0c5c2fc313499e44dfeb164f5202849",
+          "method": "identical",
+          "sourceBlob": "87eb7097aff14b2a26103c10ce6777a672e0a0e8"
+        },
+        {
+          "file": "lib/forge.js",
+          "publishedSha256": "4300955cc75f3cb5b71287b0fa37ec07d3a6bb721a9f6f8b7db19328801046bf",
+          "source": "lib/forge.js",
+          "sourceSha256": "4300955cc75f3cb5b71287b0fa37ec07d3a6bb721a9f6f8b7db19328801046bf",
+          "method": "identical",
+          "sourceBlob": "2e243a9d74aa68a6dac649a048d4bbfd6a30fe52"
+        },
+        {
+          "file": "lib/form.js",
+          "publishedSha256": "a2f6e0fbab87d5acb02e08c8f92ea8269445f9f35ee1706fb82246ba8f5aba12",
+          "source": "lib/form.js",
+          "sourceSha256": "a2f6e0fbab87d5acb02e08c8f92ea8269445f9f35ee1706fb82246ba8f5aba12",
+          "method": "identical",
+          "sourceBlob": "4d7843a23d28139f65ba05ae1484facae37b902b"
+        },
+        {
+          "file": "lib/hmac.js",
+          "publishedSha256": "bab6d0f322458186f6d123cfdd208ab1298a64ab6925b478968a0dfb446a8fa9",
+          "source": "lib/hmac.js",
+          "sourceSha256": "bab6d0f322458186f6d123cfdd208ab1298a64ab6925b478968a0dfb446a8fa9",
+          "method": "identical",
+          "sourceBlob": "b155f247f80742b950b360405633f3e6aae1288b"
+        },
+        {
+          "file": "lib/http.js",
+          "publishedSha256": "257276e15b49964f8e5c4037e1bd6b4368aacdc1de4f6f46a45b67ca72728265",
+          "source": "lib/http.js",
+          "sourceSha256": "257276e15b49964f8e5c4037e1bd6b4368aacdc1de4f6f46a45b67ca72728265",
+          "method": "identical",
+          "sourceBlob": "b94f99682834928206d6cb97b7f60fc405abe126"
+        },
+        {
+          "file": "lib/index.all.js",
+          "publishedSha256": "48fa7454923f3baa3dd5a5bf9475892aa5f272c4cc8b5a0ec4f3d6c2370ac631",
+          "source": "lib/index.all.js",
+          "sourceSha256": "48fa7454923f3baa3dd5a5bf9475892aa5f272c4cc8b5a0ec4f3d6c2370ac631",
+          "method": "identical",
+          "sourceBlob": "22ba72b64b3ac789bb14b1a29cefd5b288ddb5f7"
+        },
+        {
+          "file": "lib/index.js",
+          "publishedSha256": "c231851a9d065df1fae045d6e6fb17cf5688b260f9ee0db4965fe1ef3c0607ab",
+          "source": "lib/index.js",
+          "sourceSha256": "c231851a9d065df1fae045d6e6fb17cf5688b260f9ee0db4965fe1ef3c0607ab",
+          "method": "identical",
+          "sourceBlob": "6cdd5a9cca257b882290b249623f8ec0ba6bd837"
+        },
+        {
+          "file": "lib/jsbn.js",
+          "publishedSha256": "f17e767bfef62490e22a66ec2e12444fe53aee15e838fe572b7808e75194b62d",
+          "source": "lib/jsbn.js",
+          "sourceSha256": "f17e767bfef62490e22a66ec2e12444fe53aee15e838fe572b7808e75194b62d",
+          "method": "identical",
+          "sourceBlob": "b49565f6aad04db0814fb81b202a7a0f3e2bfab7"
+        },
+        {
+          "file": "lib/kem.js",
+          "publishedSha256": "6552b048e05b92278f70b2810317e1505d521ee9e2ec5496047d927f5f7d1f70",
+          "source": "lib/kem.js",
+          "sourceSha256": "6552b048e05b92278f70b2810317e1505d521ee9e2ec5496047d927f5f7d1f70",
+          "method": "identical",
+          "sourceBlob": "1967016df513b442c4b32abe7e42e887bb6cf8df"
+        },
+        {
+          "file": "lib/log.js",
+          "publishedSha256": "9453eeba574a617225c8f54cfd2c11f1bade2e6a39f73d6e1a9da142db1afaeb",
+          "source": "lib/log.js",
+          "sourceSha256": "9453eeba574a617225c8f54cfd2c11f1bade2e6a39f73d6e1a9da142db1afaeb",
+          "method": "identical",
+          "sourceBlob": "4ef700591e839ec5777844af11098c8d56ab2850"
+        },
+        {
+          "file": "lib/md.all.js",
+          "publishedSha256": "6a10918cc8f727cc8cec20fee5e13f55c11e30b3f03b8800108cabb299211d4d",
+          "source": "lib/md.all.js",
+          "sourceSha256": "6a10918cc8f727cc8cec20fee5e13f55c11e30b3f03b8800108cabb299211d4d",
+          "method": "identical",
+          "sourceBlob": "4e0974bd0dc13072fd05f965ef2d5de79226332c"
+        },
+        {
+          "file": "lib/md.js",
+          "publishedSha256": "ebfc33ed52d3c8cf2d584310fe0f45b23d911f532deef8044844bf2271b04402",
+          "source": "lib/md.js",
+          "sourceSha256": "ebfc33ed52d3c8cf2d584310fe0f45b23d911f532deef8044844bf2271b04402",
+          "method": "identical",
+          "sourceBlob": "e4a280c5bd04455f1c1f124a80d214c8e96e0ff6"
+        },
+        {
+          "file": "lib/md5.js",
+          "publishedSha256": "ed58ce89d124a276a083280bd7003b09c294c4063e6925d83fe422664a51f810",
+          "source": "lib/md5.js",
+          "sourceSha256": "ed58ce89d124a276a083280bd7003b09c294c4063e6925d83fe422664a51f810",
+          "method": "identical",
+          "sourceBlob": "d0ba8f65601e3cecf22e31babe9e5e3c61cd521f"
+        },
+        {
+          "file": "lib/mgf.js",
+          "publishedSha256": "2d6d851d6791d0cc1697342edf275993e745fd8c33ef13ad7201026d8a0eea54",
+          "source": "lib/mgf.js",
+          "sourceSha256": "2d6d851d6791d0cc1697342edf275993e745fd8c33ef13ad7201026d8a0eea54",
+          "method": "identical",
+          "sourceBlob": "0223bc36eb0165a2c0697419923ceacfe8d33639"
+        },
+        {
+          "file": "lib/mgf1.js",
+          "publishedSha256": "9a4acd26ee423034995a811c357e69a6c2368480664b62862982f5c404cfcc0e",
+          "source": "lib/mgf1.js",
+          "sourceSha256": "9a4acd26ee423034995a811c357e69a6c2368480664b62862982f5c404cfcc0e",
+          "method": "identical",
+          "sourceBlob": "25ed1f7f059f8ca3cf544857f23200c8857d3b43"
+        },
+        {
+          "file": "lib/oids.js",
+          "publishedSha256": "13e31fe08ccb431fefe44f9d2285891b846e65b17b24329bf14eed04de584015",
+          "source": "lib/oids.js",
+          "sourceSha256": "13e31fe08ccb431fefe44f9d2285891b846e65b17b24329bf14eed04de584015",
+          "method": "identical",
+          "sourceBlob": "817ed1be2001cf1640df2b59cc4822cb01877cce"
+        },
+        {
+          "file": "lib/pbe.js",
+          "publishedSha256": "674750301f7c7d44b7b52c80bde90399aef8ff6021e6d6ccd1553ce3f5768c81",
+          "source": "lib/pbe.js",
+          "sourceSha256": "674750301f7c7d44b7b52c80bde90399aef8ff6021e6d6ccd1553ce3f5768c81",
+          "method": "identical",
+          "sourceBlob": "9154a050eb672fdf5d2500e631502e7a22fb346c"
+        },
+        {
+          "file": "lib/pbkdf2.js",
+          "publishedSha256": "1cd2f133c60cf860f23d05313a39a5dc060389adcca8423c2143ee904db9f627",
+          "source": "lib/pbkdf2.js",
+          "sourceSha256": "1cd2f133c60cf860f23d05313a39a5dc060389adcca8423c2143ee904db9f627",
+          "method": "identical",
+          "sourceBlob": "714560e389f3a0ce937374e00712e30491b068d4"
+        },
+        {
+          "file": "lib/pem.js",
+          "publishedSha256": "38f22a503dc8285e31edfb67f0614a30c8af4abd0032e7738d45a08c31361401",
+          "source": "lib/pem.js",
+          "sourceSha256": "38f22a503dc8285e31edfb67f0614a30c8af4abd0032e7738d45a08c31361401",
+          "method": "identical",
+          "sourceBlob": "b4ad7c55fc0504854ea8022796c5ac54dee45211"
+        },
+        {
+          "file": "lib/pkcs1.js",
+          "publishedSha256": "c43cf348520a3f6adc4769a3c3410cde502a6bc7a768d5a71a575fa72d19acc7",
+          "source": "lib/pkcs1.js",
+          "sourceSha256": "c43cf348520a3f6adc4769a3c3410cde502a6bc7a768d5a71a575fa72d19acc7",
+          "method": "identical",
+          "sourceBlob": "a3af9242ef2c2329a1f8bc00dbae7ecc5517f421"
+        },
+        {
+          "file": "lib/pkcs12.js",
+          "publishedSha256": "4e471bf3e717d940a07b34d5716d988cfa01b143c38c3fc1f8b597cb83d29742",
+          "source": "lib/pkcs12.js",
+          "sourceSha256": "4e471bf3e717d940a07b34d5716d988cfa01b143c38c3fc1f8b597cb83d29742",
+          "method": "identical",
+          "sourceBlob": "47f7749fd508a8f68b1099a69a21df9bb85457ed"
+        },
+        {
+          "file": "lib/pkcs7.js",
+          "publishedSha256": "f5cc5a89b093262cdcf8f7e01615dddcdb87907228a1c56b5fe73db8cc4160a2",
+          "source": "lib/pkcs7.js",
+          "sourceSha256": "f5cc5a89b093262cdcf8f7e01615dddcdb87907228a1c56b5fe73db8cc4160a2",
+          "method": "identical",
+          "sourceBlob": "3a5d845c5d6d62ac9fc6195ee6ef4155ecc0619c"
+        },
+        {
+          "file": "lib/pkcs7asn1.js",
+          "publishedSha256": "9a00faef7bff964e3c983eb4a435e8218bdd631b0f0217807b1b2bff895ab76a",
+          "source": "lib/pkcs7asn1.js",
+          "sourceSha256": "9a00faef7bff964e3c983eb4a435e8218bdd631b0f0217807b1b2bff895ab76a",
+          "method": "identical",
+          "sourceBlob": "0e13c891529bed76242d679e113e0b8bc43b0eb2"
+        },
+        {
+          "file": "lib/pki.js",
+          "publishedSha256": "43f1b98dbd39a0c8277b7c0d44325a851712ce5434146ca2a2587a2a7ae1bb1e",
+          "source": "lib/pki.js",
+          "sourceSha256": "43f1b98dbd39a0c8277b7c0d44325a851712ce5434146ca2a2587a2a7ae1bb1e",
+          "method": "identical",
+          "sourceBlob": "ee82ff1cef21b8f54e206fa7f97456b366721601"
+        },
+        {
+          "file": "lib/prime.js",
+          "publishedSha256": "5c63550c13aa4351c210b0766a8ad4a1f23101e1968c6244be7aad8f008e4073",
+          "source": "lib/prime.js",
+          "sourceSha256": "5c63550c13aa4351c210b0766a8ad4a1f23101e1968c6244be7aad8f008e4073",
+          "method": "identical",
+          "sourceBlob": "3d51473f472890e7911ced09bc92b526e7426ede"
+        },
+        {
+          "file": "lib/prime.worker.js",
+          "publishedSha256": "c2fc7777c7a07c7bc3909d400f9f65dabd6c484a11840e1ef71b2b67236ffd9d",
+          "source": "lib/prime.worker.js",
+          "sourceSha256": "c2fc7777c7a07c7bc3909d400f9f65dabd6c484a11840e1ef71b2b67236ffd9d",
+          "method": "identical",
+          "sourceBlob": "b145f8aeb60ceeb7d6e5960bd0360445dab17d82"
+        },
+        {
+          "file": "lib/prng.js",
+          "publishedSha256": "fc70051ea878498be4d7473ba6b0982f3e2522962e3deee558b393ac4fb18cf9",
+          "source": "lib/prng.js",
+          "sourceSha256": "fc70051ea878498be4d7473ba6b0982f3e2522962e3deee558b393ac4fb18cf9",
+          "method": "identical",
+          "sourceBlob": "d3bd22e0584d43c77552473e9e6947c35c962644"
+        },
+        {
+          "file": "lib/pss.js",
+          "publishedSha256": "c9e83c50451bd90735030cf3fe3d2a68403f678853a6d300cfa3e59b813e7f9b",
+          "source": "lib/pss.js",
+          "sourceSha256": "c9e83c50451bd90735030cf3fe3d2a68403f678853a6d300cfa3e59b813e7f9b",
+          "method": "identical",
+          "sourceBlob": "2596693cc2bc5935cbd662498ef4010a76a8a603"
+        },
+        {
+          "file": "lib/random.js",
+          "publishedSha256": "13daf47db350648ebb98cc0d694f246ae7be508aa03a0d7b9c9f2dbdf127add0",
+          "source": "lib/random.js",
+          "sourceSha256": "13daf47db350648ebb98cc0d694f246ae7be508aa03a0d7b9c9f2dbdf127add0",
+          "method": "identical",
+          "sourceBlob": "d4e4bea9e80690745b8f6d82805f383f31caf7e4"
+        },
+        {
+          "file": "lib/rc2.js",
+          "publishedSha256": "d2eb78b77441d9784f5edfced1ad2f49cb35c2a956687ce9d754cf40bbd1b3c3",
+          "source": "lib/rc2.js",
+          "sourceSha256": "d2eb78b77441d9784f5edfced1ad2f49cb35c2a956687ce9d754cf40bbd1b3c3",
+          "method": "identical",
+          "sourceBlob": "e33f78a7f09ac00f48c9c19eeffd81e67ab0c6a6"
+        },
+        {
+          "file": "lib/rsa.js",
+          "publishedSha256": "6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f",
+          "source": "lib/rsa.js",
+          "sourceSha256": "6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f",
+          "method": "identical",
+          "sourceBlob": "65f6e8469d8a7695f4438722577230136f9dd425"
+        },
+        {
+          "file": "lib/sha1.js",
+          "publishedSha256": "0792cc13fa342fd9d8c213c4ffd0d697fc019144258e383dd0ac985bd717564c",
+          "source": "lib/sha1.js",
+          "sourceSha256": "0792cc13fa342fd9d8c213c4ffd0d697fc019144258e383dd0ac985bd717564c",
+          "method": "identical",
+          "sourceBlob": "5f84eb667c521ee15c70157513522a5267ffb86c"
+        },
+        {
+          "file": "lib/sha256.js",
+          "publishedSha256": "54b2f4c0ee9d4a561b6d18b1713fddeb815ea1c9d50537f7cbb4fc4474ab732d",
+          "source": "lib/sha256.js",
+          "sourceSha256": "54b2f4c0ee9d4a561b6d18b1713fddeb815ea1c9d50537f7cbb4fc4474ab732d",
+          "method": "identical",
+          "sourceBlob": "0659ad71af5d83cf261eeee81327a801ec126000"
+        },
+        {
+          "file": "lib/sha512.js",
+          "publishedSha256": "d600f189d7bd22630b9301a5dea0fd49bb0ac3687f2c8feb7ecdcccd3d21c092",
+          "source": "lib/sha512.js",
+          "sourceSha256": "d600f189d7bd22630b9301a5dea0fd49bb0ac3687f2c8feb7ecdcccd3d21c092",
+          "method": "identical",
+          "sourceBlob": "e09b442afa83f8fa2bf5cce75676f419e0017eb3"
+        },
+        {
+          "file": "lib/socket.js",
+          "publishedSha256": "689715cdeeba3274d6763ab92716a8a3dc1d24a684ea88fee9e2aca72e2dade0",
+          "source": "lib/socket.js",
+          "sourceSha256": "689715cdeeba3274d6763ab92716a8a3dc1d24a684ea88fee9e2aca72e2dade0",
+          "method": "identical",
+          "sourceBlob": "3a1d7ff21dee37cb365618252d4ce7b7be8d44a7"
+        },
+        {
+          "file": "lib/ssh.js",
+          "publishedSha256": "6f27454e3fc028c8a6b1c02ae98969aace558ee0c1b6784e8fb12d4419e46d24",
+          "source": "lib/ssh.js",
+          "sourceSha256": "6f27454e3fc028c8a6b1c02ae98969aace558ee0c1b6784e8fb12d4419e46d24",
+          "method": "identical",
+          "sourceBlob": "6480203a8d98c4214232cbf363542eca6ea8b3da"
+        },
+        {
+          "file": "lib/tls.js",
+          "publishedSha256": "3d7def7a2e1c568de50c18109d7186c0c83d0384c7f9badab4831722b6233cbe",
+          "source": "lib/tls.js",
+          "sourceSha256": "3d7def7a2e1c568de50c18109d7186c0c83d0384c7f9badab4831722b6233cbe",
+          "method": "identical",
+          "sourceBlob": "c56d58e0e483019a700c53df89f65b5b455b6a64"
+        },
+        {
+          "file": "lib/tlssocket.js",
+          "publishedSha256": "99728e72301548ee5233c16bc0417f07892022d24fd178dfb9c0a40aff541a47",
+          "source": "lib/tlssocket.js",
+          "sourceSha256": "99728e72301548ee5233c16bc0417f07892022d24fd178dfb9c0a40aff541a47",
+          "method": "identical",
+          "sourceBlob": "d09b65095d1c57ed3fd7dda1ccf39ba4f2c04064"
+        },
+        {
+          "file": "lib/util.js",
+          "publishedSha256": "a05620c922303dd687e9447754ebde42878f37e51c390a9a3aedb592434795bc",
+          "source": "lib/util.js",
+          "sourceSha256": "a05620c922303dd687e9447754ebde42878f37e51c390a9a3aedb592434795bc",
+          "method": "identical",
+          "sourceBlob": "db2341ac73c935cd8b64fa2fad969258211fb772"
+        },
+        {
+          "file": "lib/x509.js",
+          "publishedSha256": "6749ed90069312a63470cc468d434781494fa3c9d3f2cc194efb2099011f9132",
+          "source": "lib/x509.js",
+          "sourceSha256": "6749ed90069312a63470cc468d434781494fa3c9d3f2cc194efb2099011f9132",
+          "method": "identical",
+          "sourceBlob": "ca6c74fb8879ecd343f8f9618e510589c38596e6"
+        },
+        {
+          "file": "lib/xhr.js",
+          "publishedSha256": "d9abf523180b6d03b2cc99909eef3488a6b4bc1f822d7fb9d1e945abf555cb42",
+          "source": "lib/xhr.js",
+          "sourceSha256": "d9abf523180b6d03b2cc99909eef3488a6b4bc1f822d7fb9d1e945abf555cb42",
+          "method": "identical",
+          "sourceBlob": "1527042b6d26e1b8a03401a0221dbcace71d287c"
+        }
+      ]
+    },
+    "glob@14.0.3": {
+      "integrity": "sha512-A1vjIwC3qpdCso45Iw127gnp7sPhqgY8lUQhDrArIs+GbmfaaVPFuoyy7WyLT9EPZCRZ7j7aLdwUhQmHWesEow==",
+      "reviewedAt": "2026-11-02T04:39:53.581Z",
+      "expires": "2026-11-09T04:39:53.582Z",
+      "source": {
+        "repository": "isaacs/node-glob",
+        "commit": "fc93fd5dab2bd40ea02681e8a1f027dacca216ce",
+        "tag": "v14.0.3",
+        "comparisonSha256": "0fa42cd17ff257892362c851c1559d9c320e64d5842930ec3a162fc5926664af"
+      },
+      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 14 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "comparison": [
+        {
+          "file": "dist/esm/glob.js",
+          "publishedSha256": "0c860d405b7856a292888cda14ba024319ab983cbf861574237ca0cfb1b66e06",
+          "source": "src/glob.ts",
+          "sourceSha256": "d9b32c0a625821ba456cb89078371981367c447886f69be4434f50276586d2f5",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "f2201022921a351a6d142cdef5f6b99c74dee04a"
+        },
+        {
+          "file": "dist/esm/has-magic.js",
+          "publishedSha256": "63e4c0b96c89e30b6dcee52579f9024bccbd9a98caaa012a6d5e408c3729e7bd",
+          "source": "src/has-magic.ts",
+          "sourceSha256": "7d17a8405405bae511e48f8d968c0d94587ac8ccb2d653a2e63e177fde985cdf",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "8a27b896b496a2bedd5aa3efa77ccdfbcadd51e4"
+        },
+        {
+          "file": "dist/esm/ignore.js",
+          "publishedSha256": "90cfb2be460c3bc42df26e468eea58647ccea84de0c90618f21f299ae3e194db",
+          "source": "src/ignore.ts",
+          "sourceSha256": "d5d9605388cda60ad0d10f3f184d7df1fca99ede9446dc2a86cb133b38b168ab",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "ddc8db7edba9defa8149ca3ae0e195c08d4a1674"
+        },
+        {
+          "file": "dist/esm/index.js",
+          "publishedSha256": "c1c6edeb1f365b61dba99c88592aba8bf36fde8bc6d9f7c515e78086d87e2380",
+          "source": "src/index.ts",
+          "sourceSha256": "01a48c4c5e56b0f640e5eff85b6faa291be6cfd8761a186e079f9f6c8a6f1396",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "4adb8e373bf785a46c8e92daaafedf9cd1196208"
+        },
+        {
+          "file": "dist/esm/pattern.js",
+          "publishedSha256": "25151d7323d21e3df22036ef104d814fc03a30614b0f602fc3fa8647820c9325",
+          "source": "src/pattern.ts",
+          "sourceSha256": "c3964e5ef73710d4190efb09d5cb3ec2b51003a47ae7f9a3e8d0bdc53ea89e5a",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "472513df902898767645ab764e7de0973d37157b"
+        },
+        {
+          "file": "dist/esm/processor.js",
+          "publishedSha256": "2e48ffab67ede96c9ec710775171e66a77277adff4fe2803b8f9c17cd0d92d33",
+          "source": "src/processor.ts",
+          "sourceSha256": "4dd602f061af7f35dd691d8ea62f8448a92cb8af4394b22f55a51340a6cb00dc",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "d6f491896cb258139cf56d1b25257d42d7012f9c"
+        },
+        {
+          "file": "dist/esm/walker.js",
+          "publishedSha256": "20446f7048e8234e1fc1ac2c754ebd41217168d7b3a1bebf4d8d00f773aa4cbf",
+          "source": "src/walker.ts",
+          "sourceSha256": "22adee340137e4f0636701c99bb5f75fb572d38c91ff5de0b77b80f453c18e4a",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "34f076653684c3c2bc64c2ddc9ceeb8ca340a7a9"
+        },
+        {
+          "file": "dist/commonjs/glob.js",
+          "publishedSha256": "4d3e7409894bf7ea62c26a6503c8e3276215687d582eeae2ae052ddcca25317e",
+          "source": "src/glob.ts",
+          "sourceSha256": "d9b32c0a625821ba456cb89078371981367c447886f69be4434f50276586d2f5",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "f2201022921a351a6d142cdef5f6b99c74dee04a"
+        },
+        {
+          "file": "dist/commonjs/has-magic.js",
+          "publishedSha256": "d795c663fbdc40e41275b3d4745d73eb5fe8745eb841a740f1329a3d86db1c95",
+          "source": "src/has-magic.ts",
+          "sourceSha256": "7d17a8405405bae511e48f8d968c0d94587ac8ccb2d653a2e63e177fde985cdf",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "8a27b896b496a2bedd5aa3efa77ccdfbcadd51e4"
+        },
+        {
+          "file": "dist/commonjs/ignore.js",
+          "publishedSha256": "4f67a9c6fef8cad9233f4a4e67b6d92c3688a93f8be16838ab7266af8c617759",
+          "source": "src/ignore.ts",
+          "sourceSha256": "d5d9605388cda60ad0d10f3f184d7df1fca99ede9446dc2a86cb133b38b168ab",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "ddc8db7edba9defa8149ca3ae0e195c08d4a1674"
+        },
+        {
+          "file": "dist/commonjs/index.js",
+          "publishedSha256": "be0581401dff74824abe8ecd4f177d96535fdc1fe1b6698a9b4a4a9c4448bb61",
+          "source": "src/index.ts",
+          "sourceSha256": "01a48c4c5e56b0f640e5eff85b6faa291be6cfd8761a186e079f9f6c8a6f1396",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "4adb8e373bf785a46c8e92daaafedf9cd1196208"
+        },
+        {
+          "file": "dist/commonjs/pattern.js",
+          "publishedSha256": "1608dc63d9a395dfce8ec61e4fb73f459ff213b624c5323e4bfbc8b6e2778c38",
+          "source": "src/pattern.ts",
+          "sourceSha256": "c3964e5ef73710d4190efb09d5cb3ec2b51003a47ae7f9a3e8d0bdc53ea89e5a",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "472513df902898767645ab764e7de0973d37157b"
+        },
+        {
+          "file": "dist/commonjs/processor.js",
+          "publishedSha256": "6ed7bff55123d39c38a33dd4d910c09349410aad4a9789e07e631f511bf51d03",
+          "source": "src/processor.ts",
+          "sourceSha256": "4dd602f061af7f35dd691d8ea62f8448a92cb8af4394b22f55a51340a6cb00dc",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "d6f491896cb258139cf56d1b25257d42d7012f9c"
+        },
+        {
+          "file": "dist/commonjs/walker.js",
+          "publishedSha256": "01c5ee096dbe9aa7266f6bf859ebabc233dde2160322cee321eed734958e5b6e",
+          "source": "src/walker.ts",
+          "sourceSha256": "22adee340137e4f0636701c99bb5f75fb572d38c91ff5de0b77b80f453c18e4a",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "34f076653684c3c2bc64c2ddc9ceeb8ca340a7a9"
+        }
+      ]
+    },
+    "minimatch@11.0.3": {
+      "integrity": "sha512-iny/40PEGkNJQ5/Pv6z3nm6FbRAby32GeZRjCUJk2WnNDbgPSTcdI+DDvLqsgBdD4cD5sMtMheqPPnehCCa8Nw==",
+      "reviewedAt": "2026-11-02T04:39:53.581Z",
+      "expires": "2026-11-09T04:39:53.582Z",
+      "source": {
+        "repository": "isaacs/minimatch",
+        "commit": "b0c2aa83161cb6aaa19fa2e612f0b64edffd18ee",
+        "tag": "v11.0.3",
+        "comparisonSha256": "1ac6109114ddf4cebc23ab37651b9991b506dbe0662799be6ba7d33cec6f6f52"
+      },
+      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 8 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "comparison": [
+        {
+          "file": "dist/esm/assert-valid-pattern.js",
+          "publishedSha256": "90e8d3327d573b9d2391edf03dc7d50c1c0b468d720a4c0fb4a08a36ee5c50dc",
+          "source": "src/assert-valid-pattern.ts",
+          "sourceSha256": "8c005b3d77e34f87599bbfd348d9ac6ef9fc97044fd4170cc37d268c7ecfd9ee",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "8da6010bae68282f779451ccf68d4a5c3b6fb48a"
+        },
+        {
+          "file": "dist/esm/escape.js",
+          "publishedSha256": "8418e37c202bcd247e76b1c205d4eff9474f15fb76c1db1ef0688cb6a8ec3c94",
+          "source": "src/escape.ts",
+          "sourceSha256": "9afe88446437ff605240a21d6c0a1afd8ebe839de679f57ae81a1828712b8068",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "4f86ff61b984bed2bb86f55e5eda060197e1e567"
+        },
+        {
+          "file": "dist/esm/index.js",
+          "publishedSha256": "b238ca70371b1f192817ae9516afaacb566d1df2a7a85e47c6c24f41f1707864",
+          "source": "src/index.ts",
+          "sourceSha256": "595f035eae4001eceede940614b6e277f3e274b628472e836e5226fe02e0385f",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "172b94e364d322ac78278f7f7b83e227637f4ad8"
+        },
+        {
+          "file": "dist/esm/unescape.js",
+          "publishedSha256": "2cd61ba96e616969f152445c61ec2ca129a0afd2028ea71309b862a4222304d6",
+          "source": "src/unescape.ts",
+          "sourceSha256": "7a6eb135b52447fc50f8adc0bb78332f7594bb298ff7b01fc4e4ac7967759403",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "768be97ed7c1ed5faf2a467a8ddb94031cadd7bb"
+        },
+        {
+          "file": "dist/commonjs/assert-valid-pattern.js",
+          "publishedSha256": "fcd3b0e6efee67b11249804cc64bf4d22c883395491f79bfb484869d61823600",
+          "source": "src/assert-valid-pattern.ts",
+          "sourceSha256": "8c005b3d77e34f87599bbfd348d9ac6ef9fc97044fd4170cc37d268c7ecfd9ee",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "8da6010bae68282f779451ccf68d4a5c3b6fb48a"
+        },
+        {
+          "file": "dist/commonjs/escape.js",
+          "publishedSha256": "54b57f8f50c8e834f35a30c1848ac3f79acf8dd85894505f046afaf3965e63a0",
+          "source": "src/escape.ts",
+          "sourceSha256": "9afe88446437ff605240a21d6c0a1afd8ebe839de679f57ae81a1828712b8068",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "4f86ff61b984bed2bb86f55e5eda060197e1e567"
+        },
+        {
+          "file": "dist/commonjs/index.js",
+          "publishedSha256": "235c5458355f1449cc100f1cea1a43d45f788a4feb524a83497aa146bea88f32",
+          "source": "src/index.ts",
+          "sourceSha256": "595f035eae4001eceede940614b6e277f3e274b628472e836e5226fe02e0385f",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "172b94e364d322ac78278f7f7b83e227637f4ad8"
+        },
+        {
+          "file": "dist/commonjs/unescape.js",
+          "publishedSha256": "bec1bb4483a2c325599949dd6668b5b7daa2dcbe046c5a09899bc8c5b51c08c1",
+          "source": "src/unescape.ts",
+          "sourceSha256": "7a6eb135b52447fc50f8adc0bb78332f7594bb298ff7b01fc4e4ac7967759403",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "768be97ed7c1ed5faf2a467a8ddb94031cadd7bb"
+        }
+      ]
+    },
+    "path-scurry@3.0.0": {
+      "integrity": "sha512-1pTbQqH1wIwMi/eleQ5leFTTCkzFsPcgXNjwOA8YGGW/W4/kHT3dssE7Z6NH+zuqNLOzOB0uaD61yl7cAcVhgg==",
+      "reviewedAt": "2026-11-02T04:39:53.581Z",
+      "expires": "2026-11-09T04:39:53.582Z",
+      "parent": "glob@14.0.3",
+      "source": {
+        "repository": "isaacs/path-scurry",
+        "commit": "31124d97f3bb1e4c7e99e067cacbccc2fbc5dc66",
+        "tag": "v3.0.0",
+        "comparisonSha256": "294d6cb0f2b7bd03d7d9455b6a5576b9c5369cdab8b893d2170c48247ff3e947"
+      },
+      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 2 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "comparison": [
+        {
+          "file": "dist/esm/index.js",
+          "publishedSha256": "0b3f6d847f3e4edc7ca2ede121815045c3bb3f38c0555ad10b93b5f0ca11912b",
+          "source": "src/index.ts",
+          "sourceSha256": "b18880258f45d41ae3755a437bb7c429dbf340ac0b59c7e5c9ea4ef4785d173e",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "1ef7ac940fd5e4ad5dd998849f2266b931bed150"
+        },
+        {
+          "file": "dist/commonjs/index.js",
+          "publishedSha256": "9f5ce81965ef974ab74eea7f42d34ca53102f9adb5c86752c0893d464c86c951",
+          "source": "src/index.ts",
+          "sourceSha256": "b18880258f45d41ae3755a437bb7c429dbf340ac0b59c7e5c9ea4ef4785d173e",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "1ef7ac940fd5e4ad5dd998849f2266b931bed150"
+        }
+      ]
+    },
+    "@isaacs/nonrecursive-glob-match@1.0.3": {
+      "integrity": "sha512-SI7kyKHq4XXDRozw+r9GlRZkia1ZkFrpLW98r2IC2Bpr8YkFGE3fvjzmxCG0x78A++69HmDNrDvSMYBZmHGpKA==",
+      "reviewedAt": "2026-11-02T04:39:53.581Z",
+      "expires": "2026-11-09T04:39:53.582Z",
+      "parent": "minimatch@11.0.3",
+      "source": {
+        "repository": "isaacs/nonrecursive-glob-match",
+        "commit": "ad4131ad08b78e80215add95cfd2afcc90518187",
+        "tag": "v1.0.3",
+        "comparisonSha256": "7be7f53a55cc46263360bc89609b48a73daf2c6e7dc25d28b2c1aed54bf1529a"
+      },
+      "evidence": "Verified npm tarball SHA-512, upstream immutable release tag and publisher continuity. 4 public-entry/runtime modules match upstream source after TypeScript 6.0.3 ES2022 compilation and AST normalization, for both ESM and CommonJS. Browser/minified convenience bundles are outside this source-comparison scope; package default exports and the actual Nuxt/listhen/ESLint consumers are tested. No dependency install hooks are added. This review does not exempt vulnerabilities or Socket findings.",
+      "comparison": [
+        {
+          "file": "dist/esm/index.js",
+          "publishedSha256": "973928f7ba6c7a0b6f4de1975f8b0a35e7f9085fca65051ab22762b340156efb",
+          "source": "src/index.ts",
+          "sourceSha256": "0ed2b077077f0398a2b97d960372d1f2cadb9eda3f4441d08fef20ce8021c4f5",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "276d9b47749cf20ebc01877cf65712cadfe9f994"
+        },
+        {
+          "file": "dist/esm/parse-class.js",
+          "publishedSha256": "26995e1481cf6853c33a541ebf30ee198e9d3796b15441f1cfdc128e3dbd0ab5",
+          "source": "src/parse-class.ts",
+          "sourceSha256": "b49d7ddb711b1fa7c9db0420b90a3fc942aa92472d9c5e62089731d0f5cfbe5c",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "945896e1d2794c4f8e405eae23801066a1c3055c"
+        },
+        {
+          "file": "dist/commonjs/index.js",
+          "publishedSha256": "a8cb786b8c1efd57c8f341a62e769cbc3bef9d27d9742b01f73e0a4d2c4c6eec",
+          "source": "src/index.ts",
+          "sourceSha256": "0ed2b077077f0398a2b97d960372d1f2cadb9eda3f4441d08fef20ce8021c4f5",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "276d9b47749cf20ebc01877cf65712cadfe9f994"
+        },
+        {
+          "file": "dist/commonjs/parse-class.js",
+          "publishedSha256": "7cb0ca86cf8daffc46ddacc8de1a835935bb6176761819d3bb98216fd25bbf5e",
+          "source": "src/parse-class.ts",
+          "sourceSha256": "b49d7ddb711b1fa7c9db0420b90a3fc942aa92472d9c5e62089731d0f5cfbe5c",
+          "method": "typescript-6.0.3-ast-parity",
+          "sourceBlob": "945896e1d2794c4f8e405eae23801066a1c3055c"
+        }
+      ]
+    }
+  },
+  "socket": {
+    "head": "190082a971f5fa6264724d5d0f89c6a514845d9c",
+    "warnings": [
+      {
+        "package": "@isaacs/nonrecursive-glob-match@1.0.3",
+        "type": "Low adoption",
+        "reviewedAt": "2026-11-02T04:39:53.581Z",
+        "expires": "2026-11-09T04:39:53.582Z",
+        "reason": "New matcher required by the minimatch security fix. Published by isaacs, matching minimatch; all public ESM/CommonJS runtime modules reproduce from the verified upstream source commit. No install hooks or runtime I/O capabilities were found. Low adoption remains visible; this records exact-version review and does not suppress other alert types."
+      }
+    ]
+  }
+}

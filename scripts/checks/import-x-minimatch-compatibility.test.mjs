@@ -24,6 +24,9 @@ it.each(['CommonJS', 'ESM'])(
         { filename: 'dependency-regression.js' }
       );
     expect(check('import "vitest/config";', { allow: ['vitest/**'] })).toEqual([]);
+    expect(check('import "vitest/config";', { allow: ['other/**'] })).toEqual([
+      expect.objectContaining({ ruleId: 'import-x/no-internal-modules', messageId: 'noAllowed' }),
+    ]);
     expect(check('import "vitest/config";', { forbid: ['vitest/**'] })).toEqual([
       expect.objectContaining({ ruleId: 'import-x/no-internal-modules', messageId: 'noAllowed' }),
     ]);

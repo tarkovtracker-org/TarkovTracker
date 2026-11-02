@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareVersions,
+  declaredRange,
   evaluateExceptions,
   inAdvisoryRange,
   parseEntry,
   policyFromConfig,
+  vetRelease,
 } from './release-age-exceptions.mjs';
 const NOW = Date.parse('2026-10-22T00:00:00Z');
 const daysAgo = (days) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
@@ -12,6 +14,82 @@ const release = (overrides = {}) => ({
   _npmUser: { name: 'GitHub Actions' },
   dist: { attestations: { url: 'x' } },
   ...overrides,
+});
+describe('reviewed security-fix closure', () => {
+  const repository = 'https://github.com/owner/package';
+  const sourceRelease = () => release({ _npmUser: { name: 'owner' }, dist: {} });
+  const fixed = packument('fixed', {
+    '1.0.0': [20, sourceRelease()],
+    '1.0.1': [2, sourceRelease()],
+  });
+  const helper = packument('helper', {
+    '2.0.0': [20, sourceRelease()],
+    '3.0.0': [2, sourceRelease()],
+  });
+  const reviewed = (parent) => ({ verified: true, repository, ...(parent ? { parent } : {}) });
+  const data = () => ({
+    fixed: {
+      packument: structuredClone(fixed),
+      advisories: [advisory('fixed', '< 1.0.1', '1.0.1')],
+      reviews: { '1.0.1': reviewed() },
+    },
+    helper: {
+      packument: structuredClone(helper),
+      advisories: [],
+      reviews: { '3.0.0': reviewed('fixed@1.0.1') },
+    },
+  });
+  it('admits a source-reviewed fix and its necessary separately-versioned dependency', () => {
+    const input = data();
+    input.fixed.packument.versions['1.0.1'].dependencies = { helper: '^3.0.0' };
+    expect(evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures).toEqual(
+      []
+    );
+    delete input.fixed.reviews['1.0.1'];
+    expect(
+      evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures.length
+    ).toBeGreaterThan(0);
+  });
+  it('rejects fabricated dependency edges, gratuitous fresh helpers, and missing parents', () => {
+    const input = data();
+    expect(
+      evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures.length
+    ).toBeGreaterThan(0);
+    input.fixed.packument.versions['1.0.1'].dependencies = { helper: '^3.0.0' };
+    expect(evaluateExceptions(policy('helper@3.0.0'), input, NOW).failures.length).toBeGreaterThan(
+      0
+    );
+    input.helper.packument.versions['3.0.1'] = sourceRelease();
+    input.helper.packument.time['3.0.1'] = daysAgo(20);
+    expect(
+      evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures.length
+    ).toBeGreaterThan(0);
+  });
+  it('a review does not waive publisher continuity, install-hook changes, or other advisories', () => {
+    const input = data();
+    input.fixed.packument.versions['1.0.1']._npmUser.name = 'attacker';
+    expect(evaluateExceptions(policy('fixed@1.0.1'), input, NOW).failures.join()).toContain(
+      'published by'
+    );
+    const hooks = structuredClone(fixed);
+    hooks.versions['1.0.0'].scripts = { install: 'node safe.js' };
+    hooks.versions['1.0.1'].scripts = { install: 'node changed.js' };
+    expect(vetRelease(hooks, '1.0.1', true).join()).toContain('changes install scripts');
+    const vulnerable = data();
+    vulnerable.fixed.advisories.push(advisory('fixed', '<= 1.0.1', '1.0.2'));
+    expect(evaluateExceptions(policy('fixed@1.0.1'), vulnerable, NOW).failures.join()).toContain(
+      'not cleared'
+    );
+  });
+  it('dependency ranges are bounded, including zero-major caret semantics', () => {
+    expect(declaredRange('3.0.0', '^3.0.0')).toBe(true);
+    expect(declaredRange('4.0.0', '^3.0.0')).toBe(false);
+    expect(declaredRange('0.2.9', '^0.2.0')).toBe(true);
+    expect(declaredRange('0.3.0', '^0.2.0')).toBe(false);
+    expect(declaredRange('0.0.2', '^0.0.1')).toBe(false);
+    expect(declaredRange('3.1.0', '~3.0.0')).toBe(false);
+    expect(declaredRange('3.0.0', '*')).toBe(false);
+  });
 });
 const packument = (name, versions) => ({
   name,

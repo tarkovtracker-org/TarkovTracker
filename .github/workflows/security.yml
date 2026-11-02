@@ -25,7 +25,7 @@ jobs:
         with:
           # Audits consume the isolated manifest/lockfile below, not node_modules. The weekly
           # outdated check retains the installed workspace; every security scan still runs.
-          install-dependencies: ${{ github.event_name == 'schedule' }}
+          install-dependencies: 'false'
       - name: Prepare pnpm audit workspace
         id: prepare-audit
         run: |
@@ -43,7 +43,7 @@ jobs:
         # (or a same-release companion of one); everything else waits out minimumReleaseAge.
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: pnpm run audit:release-age
+        run: node scripts/checks/release-age-exceptions.mjs
       - name: Audit all dependencies (informational)
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         # Advisory only: development-dependency findings are reported, never gated.
@@ -51,6 +51,9 @@ jobs:
           if ! pnpm audit --audit-level=high; then
             echo "::notice title=Informational dependency audit::High-severity findings exist in development dependencies. This audit is advisory and does not gate CI."
           fi
+      - name: Install for scheduled outdated check
+        if: github.event_name == 'schedule'
+        run: pnpm install --frozen-lockfile
       - name: Check for outdated dependencies
         if: github.event_name == 'schedule'
         run: pnpm outdated || true

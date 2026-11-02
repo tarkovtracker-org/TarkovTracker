@@ -1,19 +1,17 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-// `minimumReleaseAge` in pnpm-workspace.yaml holds every new version back for 7 days. A version
-// may skip the wait only through an exact `name@version` entry in `minimumReleaseAgeExclude`
-// that this check justifies:
-// - advisory fix: a reviewed GitHub advisory for the package lists a first patched version in the
-//   same major line at or below the entry, the entry is outside every vulnerable range, and no
-//   patched version in that line has already aged past the window (so a mature fix is not
-//   skipped over);
-// - companion: built from the same repository (per npm provenance) at the same version as an
-//   advisory-fix entry, published within a day of it (monorepo siblings such as @nuxt/kit with
-//   nuxt). A fix that has aged past the window still anchors its companions.
-// Every entry still inside the window must also carry readable npm provenance, come from the
-// previous release's publisher, add no install scripts, and sit outside every open advisory's
-// vulnerable range. The window itself may not drop below 7 days. Name patterns and unjustified
-// entries fail; entries that have aged past the window warn so they are removed.
+import { verifyArtifact } from './dependency-artifacts.mjs';
+import {
+  fetchJson,
+  githubPages,
+  lockedIntegrity,
+  requireEvidence,
+} from './dependency-evidence.mjs';
+// Seven days remains the default. Exact early releases need an advisory fix, a same-release
+// provenance companion, or a required dependency with no mature compatible version. All retain
+// publisher/script/advisory screening. Missing npm provenance requires a protected artifact
+// attestation whose tarball, release tag and source blob identities are verified before install.
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall'];
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -115,14 +113,18 @@ const publisherFailures = (manifest, prior) =>
       ];
 const scriptFailures = (manifest, prior) => {
   const added = installScripts(manifest).filter((name) => !installScripts(prior).includes(name));
-  return added.length > 0 ? [`adds install scripts: ${added.join(', ')}`] : [];
+  if (added.length > 0) return [`adds install scripts: ${added.join(', ')}`];
+  const changed = installScripts(manifest).filter(
+    (name) => manifest.scripts[name] !== prior?.scripts?.[name]
+  );
+  return changed.length > 0 ? [`changes install scripts: ${changed.join(', ')}`] : [];
 };
 /** Supply-chain checks for one published version; returns failure messages. */
-export function vetRelease(packument, version) {
+export function vetRelease(packument, version, reviewed = false) {
   const manifest = packument.versions[version];
   const prior = packument.versions[previousVersion(packument, version)];
   return [
-    ...provenanceFailures(manifest),
+    ...(reviewed ? [] : provenanceFailures(manifest)),
     ...publisherFailures(manifest, prior),
     ...scriptFailures(manifest, prior),
   ].map((text) => `${packument.name}@${version} ${text}`);
@@ -175,14 +177,16 @@ const UNKNOWN = {
 };
 const describeEntry = (raw, lookup) => {
   const { name, version } = parseEntry(raw);
-  const { packument, advisories, provenance } = { ...UNKNOWN, ...lookup[name] };
+  const { packument, advisories, provenance, reviews = {} } = { ...UNKNOWN, ...lookup[name] };
+  const review = reviews[version];
   return {
     raw,
     version,
     packument,
     // Withdrawn advisories neither justify an entry nor mark it vulnerable.
     advisories: advisories.filter((advisory) => !advisory.withdrawn_at),
-    repository: normalizeRepository(provenance[version]),
+    repository: normalizeRepository(provenance[version] || review?.repository),
+    review,
     published: Date.parse(packument.time[version]),
   };
 };
@@ -201,7 +205,7 @@ const VERIFY_RULES = [
 const screeningFailures = (entry) => {
   const vulnerable = vulnerableUnder(entry.advisories, entry.packument.name, entry.version);
   return [
-    ...vetRelease(entry.packument, entry.version),
+    ...vetRelease(entry.packument, entry.version, entry.review?.verified === true),
     ...(entry.repository ? [] : [`${entry.raw} has no readable npm provenance source repository`]),
     ...(vulnerable
       ? [`${entry.raw} is not cleared by the vulnerable range of ${advisoryLabel(vulnerable)}`]
@@ -239,6 +243,43 @@ const justify = (anchors, cutoff) => (entry) => {
         ],
       };
 };
+function parentOf(entry, described, visited) {
+  const review = entry.review ?? {};
+  if (![review.verified, review.parent, !visited.has(entry.raw)].every(Boolean)) return undefined;
+  const parent = described.find((item) => item.raw === review.parent);
+  return screenedParent(parent) ? parent : undefined;
+}
+const screenedParent = (parent) => parent && screeningFailures(parent).length === 0;
+function neededDependency(entry, parent, cutoff) {
+  const manifest = parent.packument.versions[parent.version];
+  const range = (manifest.dependencies ?? {})[entry.packument.name];
+  if (!declaredRange(entry.version, range)) return false;
+  return !Object.keys(entry.packument.versions).some((version) =>
+    [isMature(entry.packument, version, cutoff), declaredRange(version, range)].every(Boolean)
+  );
+}
+function requiredParent(entry, described, cutoff, visited = new Set()) {
+  const parent = parentOf(entry, described, visited);
+  if (!parent) return false;
+  if (!neededDependency(entry, parent, cutoff)) return false;
+  visited.add(entry.raw);
+  return Boolean(fixAt(parent, cutoff)) || requiredParent(parent, described, cutoff, visited);
+}
+// Runtime dependency edges use a deliberately narrow range grammar; unsupported forms fail closed.
+export function declaredRange(version, range) {
+  const match = /^(\^|~)?(\d+\.\d+\.\d+)$/.exec(range);
+  if (!match) return false;
+  if (!match[1]) return version === match[2];
+  const [major, minor, patch] = match[2].split('.').map(Number);
+  const ceiling = match[1] === '~' ? `${major}.${minor + 1}.0` : caretCeiling(major, minor, patch);
+  return [compareVersions(version, match[2]) >= 0, compareVersions(version, ceiling) < 0].every(
+    Boolean
+  );
+}
+const caretCeiling = (major, minor, patch) => {
+  if (major) return `${major + 1}.0.0`;
+  return minor ? `0.${minor + 1}.0` : `0.0.${patch + 1}`;
+};
 const collect = (outcomes, key) => outcomes.flatMap((outcome) => outcome[key] ?? []);
 const merge = (outcomes) => ({
   failures: collect(outcomes, 'failures'),
@@ -263,19 +304,17 @@ export function evaluateExceptions({ minutes, excludes }, lookup, now) {
   const anchors = verified.filter((entry) => fixAt(entry, entry.published - windowMs));
   const admitted = verified.map(
     (entry) =>
-      firstOutcome(ADMIT_RULES, entry, now - windowMs) ?? justify(anchors, now - windowMs)(entry)
+      firstOutcome(ADMIT_RULES, entry, now - windowMs) ??
+      (requiredParent(entry, verified, now - windowMs)
+        ? {
+            justified: [
+              { entry: entry.raw, reason: `required dependency of ${entry.review.parent}` },
+            ],
+          }
+        : justify(anchors, now - windowMs)(entry))
   );
   return merge([...verifyOutcomes.filter(Boolean), ...admitted]);
 }
-async function fetchJson(url, headers = {}) {
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-  return response.json();
-}
-const ADVISORY_HEADERS = {
-  Accept: 'application/vnd.github+json',
-  ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
-};
 const PROVENANCE_PREDICATE = 'https://slsa.dev/provenance/v1';
 const sourceRepository = (attestations) => {
   const slsa = attestations.find((item) => item.predicateType === PROVENANCE_PREDICATE);
@@ -295,20 +334,31 @@ async function fetchPackage([name, versions]) {
     affects: name,
     type: 'reviewed',
     is_withdrawn: 'false',
-    per_page: '100',
   });
   const packument = await fetchJson(`https://registry.npmjs.org/${name.replaceAll('/', '%2F')}`);
-  const advisories = await fetchJson(
-    `https://api.github.com/advisories?${query}`,
-    ADVISORY_HEADERS
-  );
+  const advisories = await githubPages(`advisories?${query}`);
   const provenance = await Promise.all(versions.map((version) => fetchProvenance(name, version)));
+  const reviews = await Promise.all(
+    versions.map(async (version) => {
+      const mature = Date.parse(packument.time[version]) <= Date.now() - 7 * DAY_MS;
+      if (mature) return [version, undefined];
+      const locked = lockedIntegrity(readFileSync('pnpm-lock.yaml', 'utf8'), `${name}@${version}`);
+      requireEvidence(
+        locked === packument.versions[version]?.dist?.integrity,
+        `${name}@${version} locked artifact differs from npm`
+      );
+      const review = artifactReviews[`${name}@${version}`];
+      if (!review) return [version, undefined];
+      return [version, await verifyArtifact(review, packument.versions[version])];
+    })
+  );
   return [
     name,
     {
       packument: { versions: {}, time: {}, ...packument },
       advisories,
       provenance: Object.fromEntries(provenance),
+      reviews: Object.fromEntries(reviews),
     },
   ];
 }
@@ -327,9 +377,13 @@ async function loadLookup(excludes) {
   }
   return Object.fromEntries(settled.filter(({ value }) => value).map(({ value }) => value));
 }
+const reviewFile = new URL('./dependency-reviews.json', import.meta.url);
+const artifactReviews = existsSync(reviewFile)
+  ? (JSON.parse(readFileSync(reviewFile, 'utf8')).releases ?? {})
+  : {};
 const pnpmConfig = (key) =>
   execFileSync('pnpm', ['config', 'get', key, '--json'], { encoding: 'utf8' });
-async function main() {
+export async function checkReleaseAge() {
   const policy = policyFromConfig(
     pnpmConfig('minimumReleaseAge'),
     pnpmConfig('minimumReleaseAgeExclude')
@@ -345,4 +399,5 @@ async function main() {
   if (failures.length === 0) console.log('Release-age exceptions check passed.');
   return failures.length > 0 ? 1 : 0;
 }
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) process.exitCode = await main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
+  process.exitCode = await checkReleaseAge();

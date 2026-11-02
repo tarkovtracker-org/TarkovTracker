@@ -976,23 +976,56 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Cooldown: 30 days for majors, 7 for minors and patches (matching pnpm's `minimumReleaseAge`, so
   a patch PR never fails install on a release pnpm still holds back); security updates skip the
   cooldown
-- Release age: `minimumReleaseAge: 10080` in `pnpm-workspace.yaml` refuses any version younger than
-  7 days, including lockfile entries. A security fix skips the wait only through an exact
-  `name@version` entry in `minimumReleaseAgeExclude` that
-  `scripts/checks/release-age-exceptions.mjs` (blocking, in `security-scan`) justifies:
-  - **Early:** a version at or above a reviewed GitHub advisory's first patched version in the same
-    major line, outside every vulnerable range, when no patched version in that line has aged 7
-    days yet; plus siblings built from the same repository (per npm provenance) at the same
-    version and published within a day (e.g. `@nuxt/kit` with `nuxt`). A fix that ages past the
-    window still anchors its siblings until they age too.
-  - **Vetting, every entry still inside the window:** readable npm provenance, the same publisher
-    as the previous release (fails closed when either is unknown), no new install scripts, and no
-    open (non-withdrawn) advisory whose vulnerable range still includes the version.
-  - **Waits:** everything else, including releases of other packages that ride along with a fix
-    and name patterns (`@scope/*`), which fail. Entries past the window warn so they are removed.
-  - **Floor:** the check fails if `minimumReleaseAge` is unset or below 10080 minutes.
-  - To land a fix early, add the exact entries, run `node scripts/checks/release-age-exceptions.mjs`,
-    then `pnpm install`.
+- Release age: `minimumReleaseAge: 10080` keeps the seven-day default, including frozen lockfiles.
+  Security fixes use exact `name@version` exclusions, verified by
+  `scripts/checks/release-age-exceptions.mjs`; ordinary updates keep the cooldown.
+  - An exception must fix an open reviewed advisory, be a same-release provenance companion, or
+    be a required runtime dependency of an admitted fix for which no mature compatible release exists.
+    Cross-repository helper edges are verified against the published parent's dependency range.
+  - Every young release must preserve publisher identity and add or change no install hooks, and
+    it must be outside every open advisory range. Advisory queries are paginated and fail closed.
+  - Prefer readable npm provenance. A release without it needs an exact artifact review in
+    `scripts/checks/dependency-reviews.json`: SHA-512 matching npm and the canonical locked
+    resolution, immutable upstream commit/release tag, substantive review evidence, source-comparison
+    receipt, review date and expiry (at most 30 days). The downloaded tarball hash, release tag and
+    source-tree blob identities are checked live before installation; fallback releases cannot run
+    dependency install hooks. A review waives the waiting period only.
+  - Artifact review records are protected, code-reviewed attestations. CI verifies their identity
+    and bindings; it does not reproduce builds before installation. `node scripts/checks/review-release-source.mjs <published-directory> <upstream-directory>` reproduces
+    the source-comparison receipt using the already-vetted TypeScript 6.0.3 pin, or compares plain
+    JavaScript byte for byte. Review the package's actual entry points and consumers. The tool
+    lists minified convenience bundles separately; do not claim those were rebuilt. Document any
+    excluded artifacts and prove they are outside the reviewed execution/output paths.
+  - Native provenance remains an admission path; the fallback does not waive publisher,
+    script, vulnerability, compatibility, or Socket checks. No package-wide or scope-wide exclusions.
+  - Mature exclusions warn for removal; they no longer waive an age requirement. Remove their
+    obsolete records on the next dependency update. Dropping the seven-day floor still fails.
+- **Dependency Security before installation** runs directly with Node in `Validation plan`.
+  Every CI build/test installer already depends on that job, so `CI Result` enforces the policy for
+  all PR authors without a second branch-rule context. Lighthouse runs the same preflight before
+  its independent installation. Security-only audits never trigger pnpm's pre-script auto-install;
+  the scheduled outdated check installs only after release-age validation.
+  - Socket evidence must come from app `156372` / `socket-security`, contain both completed,
+    successful project and PR-alert reports, and be at most seven days old. Missing, malformed,
+    stale, blocking, or unparseable warning reports fail. The project link proves publication;
+    it does not prove that the private dashboard has zero historical alerts.
+  - A green PR-alert result can contain warnings. Published warnings must have exact-package/version,
+    unexpired evidence in `dependency-reviews.json`. Only informational low-adoption alerts can be
+    reviewed here; other findings require remediation or explicit triage in Socket. No ignore-all.
+    Any explicit project-report warnings are also checked; warnings remain visible.
+  - Scan coverage binds the lockfile bytes and dependency/package-manager/engine declarations to
+    an immutable Socket-scanned revision. For a single-entry merge queue, independently reviewed
+    updates may compose with trusted main: every package, snapshot, override, patch, importer
+    resolution and direct declaration must already occur in the trusted queue base or scanned PR
+    input. Newly synthesized artifacts or redirects require a fresh scan; being behind alone does
+    not require updating a branch. Main pushes resolve the API-verified merged PR revision.
+  - Unchanged graphs reuse the trusted event base; dispatches and schedules resolve current main
+    rather than relying on a bootstrap scan SHA. Live vulnerability audits still run. Socket's
+    private full-project inventory/continuous monitoring is separate from these published diff reports.
+  - Local preflight: `node scripts/checks/dependency-security.mjs`, then `pnpm install --frozen-lockfile`. It uses the existing `gh` login when no GitHub token is supplied. CI uses
+    a read-only token and evaluates package metadata/artifacts without executing package code.
+  - Policy, evidence, workflow and override changes still require the repository's exact-head
+    sensitive-change review. Compatibility and regression tests remain mandatory for overrides.
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent dependency PRs and 1 GitHub Actions PR
