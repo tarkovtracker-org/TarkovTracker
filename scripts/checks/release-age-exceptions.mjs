@@ -216,7 +216,11 @@ const ADMIT_RULES = [
   (entry, cutoff) =>
     entry.published > cutoff
       ? undefined
-      : { warnings: [`${entry.raw} is past the release-age window; remove it from the excludes`] },
+      : {
+          warnings: [
+            `${entry.raw} is past the release-age window; remove it once no younger admitted release needs it`,
+          ],
+        },
   (entry) => {
     const failures = screeningFailures(entry);
     return failures.length > 0 ? { failures } : undefined;
@@ -258,12 +262,15 @@ function neededDependency(entry, parent, cutoff) {
     [isMature(entry.packument, version, cutoff), declaredRange(version, range)].every(Boolean)
   );
 }
-function requiredParent(entry, described, cutoff, visited = new Set()) {
+function requiredParent(entry, described, cutoff, windowMs, visited = new Set()) {
   const parent = parentOf(entry, described, visited);
   if (!parent) return false;
   if (!neededDependency(entry, parent, cutoff)) return false;
   visited.add(entry.raw);
-  return Boolean(fixAt(parent, cutoff)) || requiredParent(parent, described, cutoff, visited);
+  return (
+    Boolean(fixAt(parent, parent.published - windowMs)) ||
+    requiredParent(parent, described, cutoff, windowMs, visited)
+  );
 }
 // Runtime dependency edges use a deliberately narrow range grammar; unsupported forms fail closed.
 export function declaredRange(version, range) {
@@ -305,7 +312,7 @@ export function evaluateExceptions({ minutes, excludes }, lookup, now) {
   const admitted = verified.map(
     (entry) =>
       firstOutcome(ADMIT_RULES, entry, now - windowMs) ??
-      (requiredParent(entry, verified, now - windowMs)
+      (requiredParent(entry, verified, now - windowMs, windowMs)
         ? {
             justified: [
               { entry: entry.raw, reason: `required dependency of ${entry.review.parent}` },
@@ -338,10 +345,37 @@ async function fetchPackage([name, versions]) {
   const packument = await fetchJson(`https://registry.npmjs.org/${name.replaceAll('/', '%2F')}`);
   const advisories = await githubPages(`advisories?${query}`);
   const provenance = await Promise.all(versions.map((version) => fetchProvenance(name, version)));
+  return [name, { packument, advisories, provenance: Object.fromEntries(provenance) }];
+}
+function addReviewChain(entry, selected, records) {
+  if (selected.has(entry)) return;
+  selected.add(entry);
+  const parent = records[entry]?.parent;
+  if (parent) addReviewChain(parent, selected, records);
+}
+/** Mature parents retain live artifact vetting only while an admitted child still needs it. */
+export function neededReviews(
+  groups,
+  lookup,
+  now,
+  records = artifactReviews,
+  windowMs = 7 * DAY_MS
+) {
+  const selected = new Set();
+  for (const [name, versions] of groups) {
+    for (const version of versions) {
+      const published = Date.parse(lookup[name]?.packument.time[version]);
+      if (published > now - windowMs) addReviewChain(`${name}@${version}`, selected, records);
+    }
+  }
+  return selected;
+}
+async function reviewPackage([name, versions], input, selected) {
+  requireEvidence(input, `Could not load ${name} release metadata`);
+  const { packument } = input;
   const reviews = await Promise.all(
     versions.map(async (version) => {
-      const mature = Date.parse(packument.time[version]) <= Date.now() - 7 * DAY_MS;
-      if (mature) return [version, undefined];
+      if (!selected.has(`${name}@${version}`)) return [version, undefined];
       const locked = lockedIntegrity(readFileSync('pnpm-lock.yaml', 'utf8'), `${name}@${version}`);
       requireEvidence(
         locked === packument.versions[version]?.dist?.integrity,
@@ -355,9 +389,8 @@ async function fetchPackage([name, versions]) {
   return [
     name,
     {
+      ...input,
       packument: { versions: {}, time: {}, ...packument },
-      advisories,
-      provenance: Object.fromEntries(provenance),
       reviews: Object.fromEntries(reviews),
     },
   ];
@@ -370,12 +403,21 @@ const versionsByName = (excludes) => {
     entries.filter((entry) => entry.name === name).map(({ version }) => version),
   ]);
 };
-async function loadLookup(excludes) {
-  const settled = await Promise.allSettled(versionsByName(excludes).map(fetchPackage));
+function successfulLookup(settled) {
   for (const { reason } of settled.filter(({ status }) => status === 'rejected')) {
     console.log(`::warning title=${TITLE}::${reason.message}`);
   }
   return Object.fromEntries(settled.filter(({ value }) => value).map(({ value }) => value));
+}
+async function loadLookup(excludes, windowMs) {
+  const groups = versionsByName(excludes);
+  const lookup = successfulLookup(await Promise.allSettled(groups.map(fetchPackage)));
+  const selected = neededReviews(groups, lookup, Date.now(), artifactReviews, windowMs);
+  return successfulLookup(
+    await Promise.allSettled(
+      groups.map((group) => reviewPackage(group, lookup[group[0]], selected))
+    )
+  );
 }
 const reviewFile = new URL('./dependency-reviews.json', import.meta.url);
 const artifactReviews = existsSync(reviewFile)
@@ -388,7 +430,7 @@ export async function checkReleaseAge() {
     pnpmConfig('minimumReleaseAge'),
     pnpmConfig('minimumReleaseAgeExclude')
   );
-  const lookup = await loadLookup(policy.excludes);
+  const lookup = await loadLookup(policy.excludes, policy.minutes * 60_000);
   const { failures, warnings, justified } = evaluateExceptions(policy, lookup, Date.now());
   const lines = [
     ...justified.map(({ entry, reason }) => `${entry}: ${reason}`),

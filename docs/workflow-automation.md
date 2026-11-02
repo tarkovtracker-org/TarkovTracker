@@ -998,8 +998,10 @@ Automated via Dependabot (`.github/dependabot.yml`):
     excluded artifacts and prove they are outside the reviewed execution/output paths.
   - Native provenance remains an admission path; the fallback does not waive publisher,
     script, vulnerability, compatibility, or Socket checks. No package-wide or scope-wide exclusions.
-  - Mature exclusions warn for removal; they no longer waive an age requirement. Remove their
-    obsolete records on the next dependency update. Dropping the seven-day floor still fails.
+  - Mature exclusions warn for removal; they no longer waive an age requirement. A mature parent
+    retains its original fix anchor and live artifact vetting while a younger admitted helper
+    still needs it. Once the whole chain matures, obsolete reviews stop gating and can be removed
+    with the exclusions. Dropping the seven-day floor still fails.
 - **Dependency Security before installation** runs directly with Node in `Validation plan`.
   Every CI build/test installer already depends on that job, so `CI Result` enforces the policy for
   all PR authors without a second branch-rule context. Lighthouse runs the same preflight before

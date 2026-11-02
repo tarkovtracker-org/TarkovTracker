@@ -4,6 +4,7 @@ import {
   declaredRange,
   evaluateExceptions,
   inAdvisoryRange,
+  neededReviews,
   parseEntry,
   policyFromConfig,
   vetRelease,
@@ -15,6 +16,38 @@ const release = (overrides = {}) => ({
   dist: { attestations: { url: 'x' } },
   ...overrides,
 });
+const packument = (name, versions) => ({
+  name,
+  versions: Object.fromEntries(
+    Object.entries(versions).map(([version, [, manifest]]) => [version, manifest])
+  ),
+  time: Object.fromEntries(
+    Object.entries(versions).map(([version, [age]]) => [version, daysAgo(age)])
+  ),
+});
+const advisory = (name, range, patched) => ({
+  ghsa_id: 'GHSA-test',
+  vulnerabilities: [
+    {
+      package: { ecosystem: 'npm', name },
+      vulnerable_version_range: range,
+      first_patched_version: patched,
+    },
+  ],
+});
+const nuxt = packument('nuxt', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
+const kit = packument('@nuxt/kit', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
+const NUXT_REPO = 'https://github.com/nuxt/nuxt';
+const pkg = (pk, advisories = [], repository = NUXT_REPO) => ({
+  packument: pk,
+  advisories,
+  provenance: Object.fromEntries(Object.keys(pk.versions).map((version) => [version, repository])),
+});
+const policy = (...excludes) => ({ minutes: 10080, excludes });
+const lookup = {
+  nuxt: pkg(nuxt, [advisory('nuxt', '>= 4.0.0, < 4.6.2', '4.6.2')]),
+  '@nuxt/kit': pkg(kit, []),
+};
 describe('reviewed security-fix closure', () => {
   const repository = 'https://github.com/owner/package';
   const sourceRelease = () => release({ _npmUser: { name: 'owner' }, dist: {} });
@@ -49,6 +82,34 @@ describe('reviewed security-fix closure', () => {
     expect(
       evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures.length
     ).toBeGreaterThan(0);
+  });
+  it('keeps the vetted parent anchor until a later helper matures, then retires artifact review', () => {
+    const input = data();
+    input.fixed.packument.time['1.0.1'] = daysAgo(8);
+    input.helper.packument.time['3.0.0'] = daysAgo(6);
+    input.fixed.packument.versions['1.0.1'].dependencies = { helper: '^3.0.0' };
+    const groups = [
+      ['fixed', ['1.0.1']],
+      ['helper', ['3.0.0']],
+    ];
+    const records = { 'helper@3.0.0': { parent: 'fixed@1.0.1' } };
+    expect([...neededReviews(groups, input, NOW, records)].sort()).toEqual([
+      'fixed@1.0.1',
+      'helper@3.0.0',
+    ]);
+    expect(evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures).toEqual(
+      []
+    );
+    const broken = structuredClone(input);
+    broken.fixed.packument.versions['1.0.1']._npmUser.name = 'attacker';
+    expect(
+      evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), broken, NOW).failures.length
+    ).toBeGreaterThan(0);
+    input.helper.packument.time['3.0.0'] = daysAgo(8);
+    expect([...neededReviews(groups, input, NOW, records)]).toEqual([]);
+    expect(evaluateExceptions(policy('fixed@1.0.1', 'helper@3.0.0'), input, NOW).failures).toEqual(
+      []
+    );
   });
   it('rejects fabricated dependency edges, gratuitous fresh helpers, and missing parents', () => {
     const input = data();
@@ -91,38 +152,6 @@ describe('reviewed security-fix closure', () => {
     expect(declaredRange('3.0.0', '*')).toBe(false);
   });
 });
-const packument = (name, versions) => ({
-  name,
-  versions: Object.fromEntries(
-    Object.entries(versions).map(([version, [, manifest]]) => [version, manifest])
-  ),
-  time: Object.fromEntries(
-    Object.entries(versions).map(([version, [age]]) => [version, daysAgo(age)])
-  ),
-});
-const advisory = (name, range, patched) => ({
-  ghsa_id: 'GHSA-test',
-  vulnerabilities: [
-    {
-      package: { ecosystem: 'npm', name },
-      vulnerable_version_range: range,
-      first_patched_version: patched,
-    },
-  ],
-});
-const nuxt = packument('nuxt', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
-const kit = packument('@nuxt/kit', { '4.6.1': [20, release()], '4.6.2': [2, release()] });
-const NUXT_REPO = 'https://github.com/nuxt/nuxt';
-const pkg = (pk, advisories = [], repository = NUXT_REPO) => ({
-  packument: pk,
-  advisories,
-  provenance: Object.fromEntries(Object.keys(pk.versions).map((version) => [version, repository])),
-});
-const policy = (...excludes) => ({ minutes: 10080, excludes });
-const lookup = {
-  nuxt: pkg(nuxt, [advisory('nuxt', '>= 4.0.0, < 4.6.2', '4.6.2')]),
-  '@nuxt/kit': pkg(kit, []),
-};
 describe('version helpers', () => {
   it('orders releases and prereleases', () => {
     expect(compareVersions('4.6.2', '4.6.10')).toBe(-1);
