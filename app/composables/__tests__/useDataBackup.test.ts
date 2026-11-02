@@ -2348,6 +2348,48 @@ describe('older-tab recovery review', () => {
       text.mockRestore();
     }
   });
+  it.each(['different', null])(
+    'abandons an older-tab native read after auth changes to %s',
+    async (nextOwner) => {
+      const raw = ownedRaw();
+      const record = {
+        version: 1 as const,
+        revision: 0,
+        raw: null,
+        legacyRaw: null,
+        legacyUpdates: [raw],
+      };
+      let resume!: (value: typeof record) => void;
+      const held = new Promise<typeof record>((resolve) => {
+        resume = resolve;
+      });
+      const read = vi
+        .spyOn(progressAuthority, 'readCommittedProgressAuthority')
+        .mockReturnValue(held);
+      const owned = vi.spyOn(progressAuthority, 'ownedLegacyUpdates');
+      const backup = useDataBackup();
+      const before = JSON.stringify(tarkovStore.$state);
+      tarkovStore.$patch.mockClear();
+      const previewing = backup.reviewOlderTabProgress(0);
+      supabaseUser.id = nextOwner;
+      try {
+        resume(record);
+        await previewing;
+        await backup.confirmBackupImport({ pvp: true, pve: true });
+        expect(owned).not.toHaveBeenCalled();
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+        expect(JSON.stringify(tarkovStore.$state)).toBe(before);
+        expect(record.legacyUpdates).toEqual([raw]);
+        expect(backup.importState.value).toBe('error');
+        expect(backup.importError.value).toBe('settings.data_management.import_owner_changed');
+      } finally {
+        resume(record);
+        supabaseUser.id = 'user-123';
+        read.mockRestore();
+        owned.mockRestore();
+      }
+    }
+  );
   it('does not relabel an older-tab preview when File.text crosses an account switch', async () => {
     const raw = ownedRaw();
     const record = {
