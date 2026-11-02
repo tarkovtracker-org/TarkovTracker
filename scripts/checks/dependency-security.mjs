@@ -9,6 +9,7 @@ import {
   requireEvidence,
   SHA,
 } from './dependency-evidence.mjs';
+import { compositionBase } from './dependency-pr-base.mjs';
 import { latestSocketChecks, verifySocket } from './dependency-socket.mjs';
 import { checkReleaseAge } from './release-age-exceptions.mjs';
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
@@ -111,13 +112,14 @@ function reviewData() {
 const scanCandidate = (reviews) =>
   SHA.test(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : reviews.socket?.head;
 const warningReviews = (reviews) => reviews.socket?.warnings ?? [];
-export function queueComposition(event, base) {
+export function queueComposition(event, base, resolveBase) {
   if (
     ![Boolean(event.merge_group), Boolean(event.pull_request), SHA.test(event.after)].some(Boolean)
   )
     return undefined;
   return {
     base,
+    resolveBase,
     candidate: { manifest: readJson('package.json'), lock: readFileSync('pnpm-lock.yaml', 'utf8') },
   };
 }
@@ -138,7 +140,7 @@ async function reviewedSocket(event, repository, base, fingerprint) {
     fingerprint,
     warningReviews(reviews),
     Date.now(),
-    queueComposition(event, base)
+    queueComposition(event, base, () => compositionBase(event, repository, base))
   );
 }
 export async function checkDependencySecurity() {
