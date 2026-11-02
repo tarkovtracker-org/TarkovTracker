@@ -77,4 +77,7 @@ describe('evaluateAudit', () => {
       for (const chain of entry.via) expect(chain.endsWith(entry.package)).toBe(true);
     }
   });
+  it('keeps the patched node-forge advisory out of the acceptance list', () => {
+    expect(ACCEPTED_ADVISORIES).not.toHaveProperty('GHSA-86w9-cpqp-85rv');
+  });
 });
