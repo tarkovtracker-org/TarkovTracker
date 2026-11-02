@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "タスクカード",
-        "show_required": "必須ラベルを表示",
-        "show_xp": "XP報酬を表示",
-        "show_next": "次のクエストを表示",
-        "show_prev": "前のクエストを表示",
-        "collapse_by_default": "デフォルトでタスクを折りたたむ",
-        "hide_rewards": "報酬を非表示",
         "require_trader_levels": "タスクの表示にトレーダーの忠誠度レベルと評価を必須にする",
-        "flags_section": "クエスト表示",
         "availability_section": "クエストの利用可否",
         "view_defaults_section": "既定の表示"
       },

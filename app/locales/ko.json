@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "작업 카드",
-        "show_required": "필수 라벨 표시",
-        "show_xp": "XP 보상 표시",
-        "show_next": "다음 퀘스트 표시",
-        "show_prev": "이전 퀘스트 표시",
-        "collapse_by_default": "임무를 기본적으로 접기",
-        "hide_rewards": "보상 숨기기",
         "require_trader_levels": "작업 사용 가능 여부에 상인 충성 레벨 및 평판 요구",
-        "flags_section": "임무 표시",
         "availability_section": "임무 수행 가능 여부",
         "view_defaults_section": "기본 보기"
       },

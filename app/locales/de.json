@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "Aufgabenkarten",
-        "show_required": "Erforderlich-Labels anzeigen",
-        "show_xp": "XP-Belohnungen anzeigen",
-        "show_next": "Nächste Aufgaben anzeigen",
-        "show_prev": "Vorherige Aufgaben anzeigen",
-        "collapse_by_default": "Quests standardmäßig einklappen",
-        "hide_rewards": "Verstecke Belohnungen",
         "require_trader_levels": "Für die Verfügbarkeit von Aufgaben werden Loyalitätsstufe und Ruf der Händler berücksichtigt",
-        "flags_section": "Aufgabenanzeige",
         "availability_section": "Aufgabenverfügbarkeit",
         "view_defaults_section": "Standardaufrufe"
       },

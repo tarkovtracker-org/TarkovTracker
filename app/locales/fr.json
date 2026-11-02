@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "Cartes de tâches",
-        "show_required": "Afficher les étiquettes requises",
-        "show_xp": "Afficher les récompenses d'XP",
-        "show_next": "Afficher les quêtes suivantes",
-        "show_prev": "Afficher les quêtes précédentes",
-        "collapse_by_default": "Réduire les quêtes par défaut",
-        "hide_rewards": "Cacher les récompenses",
         "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches",
-        "flags_section": "Affichage des Tâches",
         "availability_section": "Disponibilité des tâches",
         "view_defaults_section": "Vues par défaut"
       },

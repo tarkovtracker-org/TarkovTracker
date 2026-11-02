@@ -1997,14 +1997,7 @@
     "interface": {
       "tasks": {
         "title": "Cartões de tarefa",
-        "show_required": "Mostrar rótulos obrigatórios",
-        "show_xp": "Mostrar recompensas de XP",
-        "show_next": "Mostrar próximas missões",
-        "show_prev": "Mostrar missões anteriores",
-        "collapse_by_default": "Recolher Missões por Padrão",
-        "hide_rewards": "Ocultar recompensas",
         "require_trader_levels": "Exigir nível de fidelidade e reputação do comerciante para disponibilidade de tarefas",
-        "flags_section": "Exibição de tarefas",
         "availability_section": "Disponibilidade de tarefas",
         "view_defaults_section": "Visualizações padrão"
       },
