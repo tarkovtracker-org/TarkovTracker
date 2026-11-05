@@ -1,3 +1,10 @@
+## [1.88.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.88.0...v1.88.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **security:** unblock vetted advisory updates without dropping cooldown ([#1370](https://github.com/tarkovtracker-org/TarkovTracker/issues/1370)) ([82751e5](https://github.com/tarkovtracker-org/TarkovTracker/commit/82751e51d8b93ee6d66fd367a251ed3763e40de0))
+
 # [1.88.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.87.0...v1.88.0) (2026-10-29)
 
 
