@@ -5,9 +5,7 @@ import type { TaskBlocker } from '@/stores/taskAvailability';
 export const useTaskBlockerText = () => {
   const { t } = useI18n({ useScope: 'global' });
   const metadata = useMetadataStore();
-  const tasks = computed(
-    () => new Map(metadata.tasks.map((task) => [task.id, task.name ?? task.id]))
-  );
+  const tasks = computed(() => new Map(metadata.tasks.map((task) => [task.id, task.name])));
   const chapters = computed(
     () => new Map((metadata.storyChapters ?? []).map((chapter) => [chapter.id, chapter.name]))
   );
@@ -68,7 +66,9 @@ export const useTaskBlockerText = () => {
   };
   const traderUnlockKey = (blocker: TaskBlocker) => {
     if (blocker.objective) return 'trader_story_unlock';
-    return tasks.value.has(blocker.taskId ?? '') ? 'trader_unlock' : 'trader_unlock_unknown';
+    return tasks.value.get(blocker.taskId ?? '')?.trim()
+      ? 'trader_unlock'
+      : 'trader_unlock_unknown';
   };
   const blockerKey = (blocker: TaskBlocker) =>
     blocker.type === 'trader_unlock'
