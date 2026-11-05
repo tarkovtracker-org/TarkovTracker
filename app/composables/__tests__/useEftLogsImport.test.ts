@@ -1050,6 +1050,8 @@ describe('missing configured trader-unlock recovery', () => {
       for (const method of [
         tarkovStore.setObjectiveCount,
         tarkovStore.setTaskObjectiveComplete,
+        tarkovStore.setTaskObjectiveUncomplete,
+        tarkovStore.confirmTaskAvailability,
         tarkovStore.setTaskFailed,
         tarkovStore.setTaskUncompleted,
         tarkovStore.setLevel,
