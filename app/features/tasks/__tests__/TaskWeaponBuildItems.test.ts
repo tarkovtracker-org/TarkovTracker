@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { useNeededItemProgress } from '@/features/neededitems/useNeededItemProgress';
-import TaskObjective from '@/features/tasks/TaskObjective.vue';
+import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
 import type { Task, TaskObjective as Objective } from '@/types/tarkov';
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => metadata }));
@@ -52,12 +52,13 @@ const store = {
   getCurrentGameMode: () => 'pvp',
 };
 const render = (value = objective) =>
-  mount(TaskObjective, {
-    props: { objective: value },
+  mount(QuestObjectives, {
+    props: { objectives: [value], irrelevantCount: 0, uncompletedIrrelevant: 0 },
     global: {
       stubs: {
         UIcon: true,
         UBadge: true,
+        'i18n-t': true,
         AppTooltip: { template: '<div><slot /></div>' },
         ObjectiveRequiredItems: true,
         ObjectiveItemDisplay: {
@@ -74,6 +75,7 @@ describe('weapon build collection on task cards', () => {
     state.counts = {};
     state.completions = { unrelated: true };
     state.taskState = 'incomplete';
+    metadata.neededItemTaskObjectives = needs;
   });
   it('renders the existing base and part needs below the separate objective control', () => {
     const wrapper = render();
@@ -116,5 +118,23 @@ describe('weapon build collection on task cards', () => {
     expect((wrapper.get('input').element as HTMLInputElement).disabled).toBe(true);
     await wrapper.get('input').trigger('change');
     expect(store.setObjectiveCount).not.toHaveBeenCalled();
+  });
+  it('keeps multi-item collection bounded and separate from objective completion', async () => {
+    metadata.neededItemTaskObjectives = [{ ...needs[0]!, count: 2 }, needs[1]!];
+    const wrapper = render();
+    const controls = wrapper.findComponent({ name: 'ObjectiveCountControls' });
+    controls.vm.$emit('increase');
+    await nextTick();
+    expect(state.counts.build).toBe(1);
+    controls.vm.$emit('set-count', 9);
+    await nextTick();
+    expect(state.counts.build).toBe(2);
+    controls.vm.$emit('toggle');
+    await nextTick();
+    expect(state.counts.build).toBe(0);
+    controls.vm.$emit('decrease');
+    await nextTick();
+    expect(state.counts.build).toBe(0);
+    expect(state.completions).toEqual({ unrelated: true });
   });
 });

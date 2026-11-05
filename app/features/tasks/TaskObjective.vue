@@ -1,129 +1,120 @@
 <template>
-  <div :id="`objective-${props.objective.id}`" class="space-y-1.5">
+  <div
+    :id="`objective-${props.objective.id}`"
+    v-bind="rowInteraction"
+    class="group -mx-1.5 flex items-start gap-2 rounded-md px-1.5 py-1 transition-colors"
+    :class="rowClasses"
+    @click="handleRowClick"
+    @keydown.enter.self="handleRowClick"
+    @keydown.space.self.prevent="handleRowClick"
+    @mouseenter="objectiveMouseEnter()"
+    @mouseleave="objectiveMouseLeave()"
+  >
+    <UIcon
+      :name="displayObjectiveIcon"
+      aria-hidden="true"
+      class="mt-0.5 h-4 w-4 shrink-0"
+      :class="
+        isComplete
+          ? 'text-success-300'
+          : isParentTaskLocked
+            ? 'text-surface-400'
+            : 'text-surface-300 group-hover:text-surface-200'
+      "
+    />
     <div
-      v-bind="rowInteraction"
-      class="group -mx-1.5 flex items-start gap-2 rounded-md px-1.5 py-1 transition-colors"
-      :class="rowClasses"
-      @click="handleRowClick"
-      @keydown.enter.self="handleRowClick"
-      @keydown.space.self.prevent="handleRowClick"
-      @mouseenter="objectiveMouseEnter()"
-      @mouseleave="objectiveMouseLeave()"
+      class="flex min-w-0 flex-1 flex-wrap gap-2"
+      :class="{ 'items-center': isWeaponBuild, 'items-start': !isWeaponBuild }"
     >
-      <UIcon
-        :name="displayObjectiveIcon"
-        aria-hidden="true"
-        class="mt-0.5 h-4 w-4 shrink-0"
-        :class="
-          isComplete
-            ? 'text-success-300'
-            : isParentTaskLocked
-              ? 'text-surface-400'
-              : 'text-surface-300 group-hover:text-surface-200'
-        "
-      />
-      <div
-        class="flex min-w-0 flex-1 flex-wrap gap-2"
-        :class="{ 'items-center': isWeaponBuild, 'items-start': !isWeaponBuild }"
-      >
-        <div class="min-w-0 flex-1 basis-48">
-          <div class="text-surface-100 text-sm leading-5">
-            {{ props.objective?.description }}
-            <AppTooltip
-              v-if="objectiveModeCountDifference"
-              :text="objectiveModeCountDifferenceText"
+      <div class="min-w-0 flex-1 basis-48">
+        <div class="text-surface-100 text-sm leading-5">
+          {{ props.objective?.description }}
+          <AppTooltip v-if="objectiveModeCountDifference" :text="objectiveModeCountDifferenceText">
+            <UBadge
+              variant="soft"
+              size="xs"
+              class="ml-1 text-[10px] font-semibold uppercase"
+              :class="currentModeBadgeClass"
             >
-              <UBadge
-                variant="soft"
-                size="xs"
-                class="ml-1 text-[10px] font-semibold uppercase"
-                :class="currentModeBadgeClass"
-              >
-                {{ currentModeBadgeLabel }}
-              </UBadge>
-            </AppTooltip>
-            <span
-              v-if="props.objective.optional"
-              class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
-            >
-              ({{ t('common.optional') }})
-            </span>
+              {{ currentModeBadgeLabel }}
+            </UBadge>
+          </AppTooltip>
+          <span
+            v-if="props.objective.optional"
+            class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
+          >
+            ({{ t('common.optional') }})
+          </span>
+        </div>
+        <ObjectiveRequiredItems
+          v-if="objectiveRequiredKeys.length"
+          variant="keys"
+          :required-keys="objectiveRequiredKeys"
+        />
+        <ObjectiveRequiredItems
+          v-if="objectiveEquipment.length"
+          variant="equipment"
+          :equipment="objectiveEquipment"
+        />
+        <AppTooltip
+          v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
+          :text="userNeedsTitle"
+        >
+          <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
+            <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
+            <span>{{ userNeeds.length }}</span>
           </div>
-          <ObjectiveRequiredItems
-            v-if="objectiveRequiredKeys.length"
-            variant="keys"
-            :required-keys="objectiveRequiredKeys"
-          />
-          <ObjectiveRequiredItems
-            v-if="objectiveEquipment.length"
-            variant="equipment"
-            :equipment="objectiveEquipment"
-          />
-          <AppTooltip
-            v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-            :text="userNeedsTitle"
+        </AppTooltip>
+      </div>
+      <div class="ml-auto flex shrink-0 items-center gap-2" data-objective-controls>
+        <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
+          <button
+            type="button"
+            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+            :aria-label="t('page.tasks.questcard.jump_to_map')"
+            :disabled="isJumpToMapDisabled"
+            @click.stop="onJumpToMapClick"
           >
-            <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
-              <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
-              <span>{{ userNeeds.length }}</span>
-            </div>
-          </AppTooltip>
-        </div>
-        <div class="ml-auto flex shrink-0 items-center gap-2" data-objective-controls>
-          <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
-            <button
-              type="button"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
-              :aria-label="t('page.tasks.questcard.jump_to_map')"
-              :disabled="isJumpToMapDisabled"
-              @click.stop="onJumpToMapClick"
-            >
-              <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
-            </button>
-          </AppTooltip>
-          <ObjectiveCountControls
-            v-if="neededCount > 1"
-            :current-count="currentObjectiveCount"
-            :needed-count="neededCount"
+            <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
+          </button>
+        </AppTooltip>
+        <ObjectiveCountControls
+          v-if="neededCount > 1"
+          :current-count="currentObjectiveCount"
+          :needed-count="neededCount"
+          :disabled="isParentTaskLocked"
+          @decrease="decreaseCount"
+          @increase="increaseCount"
+          @toggle="toggleCount"
+          @set-count="setCount"
+        />
+        <AppTooltip
+          v-else
+          :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
+        >
+          <button
+            type="button"
+            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+            :aria-label="toggleObjectiveLabel"
+            :aria-pressed="isComplete"
             :disabled="isParentTaskLocked"
-            @decrease="decreaseCount"
-            @increase="increaseCount"
-            @toggle="toggleCount"
-            @set-count="setCount"
-          />
-          <AppTooltip
-            v-else
-            :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
+            :class="
+              isComplete
+                ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
+                : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
+            "
+            @click="toggleObjectiveCompletion()"
           >
-            <button
-              type="button"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-              :aria-label="toggleObjectiveLabel"
-              :aria-pressed="isComplete"
-              :disabled="isParentTaskLocked"
-              :class="
-                isComplete
-                  ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
-                  : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
-              "
-              @click="toggleObjectiveCompletion()"
-            >
-              <UIcon
-                :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
-                aria-hidden="true"
-                class="h-4 w-4"
-              />
-            </button>
-          </AppTooltip>
-        </div>
+            <UIcon
+              :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
+              aria-hidden="true"
+              class="h-4 w-4"
+            />
+          </button>
+        </AppTooltip>
       </div>
     </div>
-    <TaskWeaponBuildItems
-      v-if="isWeaponBuild"
-      :objective-id="props.objective.id"
-      :disabled="isParentTaskLocked"
-    />
   </div>
 </template>
 <script setup lang="ts">
@@ -137,7 +128,6 @@
   import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
   import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
-  import TaskWeaponBuildItems from '@/features/tasks/TaskWeaponBuildItems.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="needs.length" class="space-y-1.5 pl-6" data-weapon-build-items>
+  <div v-if="needs.length" class="mt-1.5 space-y-1.5 pl-6" data-weapon-build-items>
     <div
       v-for="need in needs"
       :key="need.id"
@@ -13,14 +13,14 @@
           class="accent-primary-500 focus-visible:ring-primary-500 h-4 w-4 cursor-pointer rounded focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
           :aria-label="`${t('needed_items.mark_collected')}: ${need.item?.name}`"
           :checked="progress.storedCountOf(need) >= 1"
-          :disabled="props.disabled"
+          :disabled="isParentTaskLocked"
           @change="setCount(need, progress.storedCountOf(need) >= 1 ? 0 : 1)"
         />
         <ObjectiveCountControls
           v-else
           :current-count="progress.storedCountOf(need)"
           :needed-count="neededCountOf(need)"
-          :disabled="props.disabled"
+          :disabled="isParentTaskLocked"
           @decrease="setCount(need, progress.storedCountOf(need) - 1)"
           @increase="setCount(need, progress.storedCountOf(need) + 1)"
           @toggle="
@@ -44,10 +44,12 @@
   import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import { trackTaskProgressInteractionKey } from '@/features/tasks/task-context';
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { useTarkovStore } from '@/stores/useTarkov';
   import type { NeededItemTaskObjective } from '@/types/tarkov';
-  const props = defineProps<{ objectiveId: string; disabled?: boolean }>();
+  const props = defineProps<{ objectiveId: string }>();
   const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();
+  const tarkovStore = useTarkovStore();
   const progress = useNeededItemProgress();
   const trackProgress = inject(trackTaskProgressInteractionKey, null);
   // Consume the same records as Needed Items, including its existing part progress IDs.
@@ -56,8 +58,13 @@
       (need) => (need.sourceObjectiveId ?? need.id) === props.objectiveId
     )
   );
+  const isParentTaskLocked = computed(() =>
+    needs.value.some(
+      (need) => tarkovStore.isTaskComplete(need.taskId) || tarkovStore.isTaskFailed(need.taskId)
+    )
+  );
   const setCount = (need: NeededItemTaskObjective, count: number) => {
-    if (props.disabled) return;
+    if (isParentTaskLocked.value) return;
     progress.setCount(need, Math.max(0, Math.min(neededCountOf(need), count)));
     trackProgress?.(need.taskId, 'objective_progress');
   };
