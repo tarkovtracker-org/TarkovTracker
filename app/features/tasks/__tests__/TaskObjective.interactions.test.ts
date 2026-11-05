@@ -52,9 +52,9 @@ describe('TaskObjective interaction boundaries', () => {
   beforeEach(() => vi.clearAllMocks());
   it('activates the row once with Enter or Space', async () => {
     const wrapper = createWrapper();
-    await wrapper.trigger('keydown', { key: 'Enter' });
+    await wrapper.get('[role="button"]').trigger('keydown', { key: 'Enter' });
     expect(toggle).toHaveBeenCalledTimes(1);
-    await wrapper.trigger('keydown', { key: ' ' });
+    await wrapper.get('[role="button"]').trigger('keydown', { key: ' ' });
     expect(toggle).toHaveBeenCalledTimes(2);
   });
   it('does not toggle twice when the nested completion button is clicked', async () => {
