@@ -148,6 +148,16 @@ discard them when a triggering quest is missing from the logs. Existing complete
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
 All destination catalogs are loaded before mutations, without changing the active metadata store.
+An explicit completion notification can also recover a catalog-missing task whose exact ID is
+configured to unlock a trader in that destination mode. This completion-only allowlist comes from
+`TRADER_UNLOCK_TASKS`; Ref uses its mode-specific ID. Recovery writes only that task's completion
+through the existing progress store, without fabricating task metadata or inferring objectives,
+prerequisites, player level, trader standing or story progress. Arbitrary missing IDs and missing-task
+start/failure events remain ineligible. Later failures/restarts still supersede older completions
+before eligibility/state filtering. Account/version selection, reset cutoffs, Seasonal history,
+explicit unresolved-mode routing and whole-catalog validation apply unchanged; a failed destination
+catalog load still prevents all writes. The log is user-selected evidence for their own progress,
+not an authenticated game-server attestation. There is no new cross-account or API write authority.
 `/api/tarkov/tasks-import` reads one English precomputed snapshot for each requested upstream mode.
 The producer combines core fields, objectives and fail conditions from one raw task set, then applies
 the private overlay once. Import never joins the independently cached UI core/objective projections.

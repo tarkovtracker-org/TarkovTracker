@@ -1,7 +1,12 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
+import {
+  configuredTraderUnlockTaskIds,
+  GAME_MODE_VALUES,
+  isGameMode,
+  type GameMode,
+} from '@/utils/constants';
 import {
   EftLogArchiveError,
   readEftLogSources,
@@ -23,6 +28,7 @@ import {
   UNKNOWN_LOG_VERSION,
   type EftParsedLogFile,
   type EftQuestImportPreview,
+  type EftQuestImportEvent,
 } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
@@ -253,7 +259,10 @@ const applyModeImports = async (
 ): Promise<GameMode> => {
   const tasksMap = new Map((catalogs.get(mode) ?? []).map((task) => [task.id, task]));
   const filter = (ids: Set<string>) => new Set([...ids].filter((id) => tasksMap.has(id)));
-  const completed = filter(taskSets.completed[mode]);
+  const recoveryIds = new Set(configuredTraderUnlockTaskIds(mode));
+  const completed = new Set(
+    [...taskSets.completed[mode]].filter((id) => tasksMap.has(id) || recoveryIds.has(id))
+  );
   const started = filter(taskSets.started[mode]);
   const failed = filter(taskSets.failed[mode]);
   if (![completed, started, failed].some((ids) => ids.size > 0)) return activeMode;
@@ -268,6 +277,10 @@ const applyModeImports = async (
     new Set([...started, ...failed]),
     requireTraders
   );
+  // Only explicit, mode-allowlisted completions may recover without metadata. Do not infer gates or objectives.
+  completed.forEach((id) => {
+    if (!tasksMap.has(id)) store.setTaskComplete(id);
+  });
   applyFailedImports(store, tasksMap, failed);
   applyStartedImports(store, tasksMap, completed, started);
   return mode;
@@ -341,6 +354,13 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   function getTaskIds(): string[] {
     return [...new Set([...catalogs.values()].flatMap((tasks) => tasks.map((task) => task.id)))];
   }
+  const isRecoveryCompletion = (event: EftQuestImportEvent): boolean =>
+    event.status === 'completed' &&
+    [...catalogs.keys()].some(
+      (mode) =>
+        (event.mode === UNKNOWN_MODE || event.mode === mode) &&
+        configuredTraderUnlockTaskIds(mode).includes(event.questId)
+    );
   /** Rebuilds the preview against the loaded destination catalogs and selected log versions. */
   function buildPreviewData(taskIds: string[]): EftLogsImportPreviewData {
     const parsed = parseEftLogsForQuestImport(sourceFiles.value, taskIds, {
@@ -348,6 +368,9 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       account: requestedAccount.value,
       taskIdsByMode: Object.fromEntries(
         [...catalogs].map(([mode, tasks]) => [mode, tasks.map((task) => task.id)])
+      ),
+      completedTaskIdsByMode: Object.fromEntries(
+        [...catalogs.keys()].map((mode) => [mode, configuredTraderUnlockTaskIds(mode)])
       ),
     });
     return {
@@ -477,7 +500,9 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         return;
       }
       const catalogIds = new Set(getTaskIds());
-      if (!parsed.events.some((event) => catalogIds.has(event.questId))) {
+      if (
+        !parsed.events.some((event) => catalogIds.has(event.questId) || isRecoveryCompletion(event))
+      ) {
         importState.value = 'error';
         importError.value = t('settings.log_import.errors.no_matching_tasks_found');
         return;

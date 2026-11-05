@@ -248,6 +248,13 @@ export function resolveTraderUnlockTaskIds(
   if (modeSpecificId) return [modeSpecificId];
   return Object.values(config).filter((value): value is string => typeof value === 'string');
 }
+/** Explicit task IDs trusted for trader-unlock recovery in this mode, independent of catalog presence. */
+export const configuredTraderUnlockTaskIds = (gameMode: GameMode): string[] =>
+  Object.values(TRADER_UNLOCK_TASKS).flatMap((config) => {
+    // Recovery never borrows another mode's ID when a mode-specific gate is unconfigured.
+    const id = typeof config === 'string' ? config : config[gameMode];
+    return id ? [id] : [];
+  });
 // Trader display order (matches in-game order)
 // Uses normalizedName for language-independent, stable identification
 export const TRADER_ORDER = [
