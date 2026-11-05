@@ -1,17 +1,9 @@
 <template>
   <div
     :id="`objective-${props.objective.id}`"
-    :role="isRowInteractive ? 'button' : undefined"
-    :tabindex="isRowInteractive ? 0 : undefined"
-    :aria-label="isRowInteractive ? objectiveAriaLabel : undefined"
-    :aria-disabled="isRowInteractive ? undefined : true"
+    v-bind="rowInteraction"
     class="group -mx-1.5 flex items-start gap-2 rounded-md px-1.5 py-1 transition-colors"
-    :class="[
-      isComplete ? 'bg-success-500/10' : '',
-      isRowInteractive
-        ? 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 cursor-pointer hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-offset-2'
-        : 'opacity-80',
-    ]"
+    :class="rowClasses"
     @click="handleRowClick"
     @keydown.enter.self="handleRowClick"
     @keydown.space.self.prevent="handleRowClick"
@@ -19,7 +11,7 @@
     @mouseleave="objectiveMouseLeave()"
   >
     <UIcon
-      :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
+      :name="displayObjectiveIcon"
       aria-hidden="true"
       class="mt-0.5 h-4 w-4 shrink-0"
       :class="
@@ -30,7 +22,10 @@
             : 'text-surface-300 group-hover:text-surface-200'
       "
     />
-    <div class="flex min-w-0 flex-1 flex-wrap items-start gap-2">
+    <div
+      class="flex min-w-0 flex-1 flex-wrap gap-2"
+      :class="{ 'items-center': isWeaponBuild, 'items-start': !isWeaponBuild }"
+    >
       <div class="min-w-0 flex-1 basis-48">
         <div class="text-surface-100 text-sm leading-5">
           {{ props.objective?.description }}
@@ -151,6 +146,7 @@
     objective: TaskObjective;
   }>();
   const metadataStore = useMetadataStore();
+  const isWeaponBuild = computed(() => props.objective.type === 'buildWeapon');
   const objectives = computed(() => metadataStore.objectives);
   const tarkovStore = useTarkovStore();
   const progressStore = useProgressStore();
@@ -210,6 +206,17 @@
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
   const isRowInteractive = computed(() => !isParentTaskLocked.value);
+  const rowInteraction = computed(() =>
+    isRowInteractive.value
+      ? { role: 'button', tabindex: 0, 'aria-label': objectiveAriaLabel.value }
+      : { 'aria-disabled': true }
+  );
+  const rowClasses = computed(() => [
+    isComplete.value ? 'bg-success-500/10' : '',
+    isRowInteractive.value
+      ? 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 cursor-pointer hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-offset-2'
+      : 'opacity-80',
+  ]);
   const userNeeds = computed(() => {
     const needingUsers: string[] = [];
     if (fullObjective.value == undefined) {
@@ -253,6 +260,9 @@
     }
     return 'mdi-help-circle';
   });
+  const displayObjectiveIcon = computed(() =>
+    objectiveIcon.value.startsWith('mdi-') ? `i-${objectiveIcon.value}` : objectiveIcon.value
+  );
   const objectiveModeCountDifference = computed(() =>
     metadataStore.getObjectiveModeCountDifference(props.objective.id)
   );

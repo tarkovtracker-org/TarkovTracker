@@ -9,6 +9,10 @@
         :optional="row.optional"
       />
       <TaskObjective v-else :objective="row.objective" />
+      <TaskWeaponBuildItems
+        v-if="row.kind === 'objective' && row.objective.type === 'buildWeapon'"
+        :objective-id="row.objective.id"
+      />
     </div>
     <div v-if="irrelevantCount > 0" class="flex w-full items-center gap-2 py-1 text-xs opacity-50">
       <UIcon name="i-mdi-eye-off" class="h-4 w-4 shrink-0" />
@@ -26,6 +30,7 @@
 <script setup lang="ts">
   import TaskObjective from '@/features/tasks/TaskObjective.vue';
   import TaskObjectiveItemGroup from '@/features/tasks/TaskObjectiveItemGroup.vue';
+  import TaskWeaponBuildItems from '@/features/tasks/TaskWeaponBuildItems.vue';
   import type { TaskObjective as TaskObjectiveType } from '@/types/tarkov';
   const props = defineProps<{
     objectives: TaskObjectiveType[];

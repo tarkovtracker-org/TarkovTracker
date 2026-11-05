@@ -474,6 +474,14 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 
 ## Task list and Needed Items
 
+Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
+objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
+records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,
+and each explicit part keeps `${objective.id}:${part.id}` plus `sourceObjectiveId`. Collection
+updates counts only; it never completes the build or validates its required stats. Single-item
+rows use checkboxes, and completed or failed parent tasks disable collection controls. Category
+option browsing remains outside this explicit-part view.
+
 ### Task list loading
 
 `app/composables/useInfiniteScroll.ts` loads another batch only when the sentinel is connected
