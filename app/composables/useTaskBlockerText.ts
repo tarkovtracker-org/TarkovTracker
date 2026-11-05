@@ -66,9 +66,13 @@ export const useTaskBlockerText = () => {
     global_variable: 'global_variable_required',
     global_variable_unknown: 'global_variable_unknown_required',
   };
+  const traderUnlockKey = (blocker: TaskBlocker) => {
+    if (blocker.objective) return 'trader_story_unlock';
+    return tasks.value.has(blocker.taskId ?? '') ? 'trader_unlock' : 'trader_unlock_unknown';
+  };
   const blockerKey = (blocker: TaskBlocker) =>
-    blocker.type === 'trader_unlock' && blocker.objective
-      ? 'trader_story_unlock'
+    blocker.type === 'trader_unlock'
+      ? traderUnlockKey(blocker)
       : (renamedKeys[blocker.type] ?? blocker.type);
   const poolText = (blocker: TaskBlocker): string => {
     const trader = metadata.traders?.find(

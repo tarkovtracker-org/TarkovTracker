@@ -41,6 +41,7 @@ const unlockTasksFor = (trader: LockTrader, deps: TraderLockStatusDeps, configur
   );
 };
 const hasCompletedUnlockTask = (trader: LockTrader, deps: TraderLockStatusDeps) =>
+  configuredUnlockTaskIds(trader, deps).some((id) => deps.isTaskComplete(id)) ||
   unlockTasksFor(trader, deps, configuredUnlockTaskIds(trader, deps)).some((task) =>
     deps.isTaskComplete(task.id)
   );
@@ -49,9 +50,9 @@ const taskRequirement = (
   deps: TraderLockStatusDeps
 ): TraderUnlockRequirement | null => {
   const configured = configuredUnlockTaskIds(trader, deps);
-  if (!deps.tasks?.length) return configured.length ? { kind: 'task', task: null } : null;
+  if (hasCompletedUnlockTask(trader, deps)) return null;
   const [first] = unlockTasksFor(trader, deps, configured);
-  if (!first || hasCompletedUnlockTask(trader, deps)) return null;
+  if (!first) return configured.length ? { kind: 'task', task: null } : null;
   return { kind: 'task', task: { id: first.id, name: first.name ?? '' } };
 };
 const unlockChaptersFor = (trader: LockTrader, deps: TraderLockStatusDeps) =>

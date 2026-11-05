@@ -49,6 +49,22 @@ describe('canonical blocker text', () => {
       })
     ).toBe('Unlock Prapor: Hand over weapons to Mechanic (Story route)');
   });
+  it('explains missing trader-unlock data without displaying a raw ID', () => {
+    expect(
+      useTaskBlockerText()({
+        type: 'trader_unlock',
+        taskId: 'missing-id',
+        trader: { id: 'lk', name: 'Lightkeeper' },
+      })
+    ).toBe('Unlock Lightkeeper by completing its required task. Task data is unavailable.');
+    expect(
+      useTaskBlockerText()({
+        type: 'trader_unlock',
+        taskId: 'prior',
+        trader: { id: 'lk', name: 'Lightkeeper' },
+      })
+    ).toBe('Unlock Lightkeeper by completing Prior quest.');
+  });
   it.each([
     [[], 'completed'],
     [['Complete', 'Failed'], 'completed or failed'],

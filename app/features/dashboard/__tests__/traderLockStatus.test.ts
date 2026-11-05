@@ -62,6 +62,27 @@ const resolve = (trader: LockTrader, overrides: Partial<TraderLockStatusDeps> = 
   resolveTraderUnlock(trader, createDeps(overrides));
 describe('resolveTraderUnlock', () => {
   describe('task unlocks', () => {
+    it.each(['pvp', 'pve', 'seasonal'] as const)(
+      'retains missing configured gates and recorded completions in %s',
+      (gameMode) => {
+        const gates = [
+          ['lightkeeper', TASK_ID_REGISTRY.GETTING_ACQUAINTED],
+          ['btr-driver', TASK_ID_REGISTRY.A_HELPING_HAND],
+          [
+            'ref',
+            gameMode === 'pve'
+              ? TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE
+              : TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP,
+          ],
+        ] as const;
+        for (const [normalizedName, gate] of gates) {
+          const trader = { id: normalizedName, normalizedName };
+          const deps = { gameMode, tasks: [ragmanTask] };
+          expect(resolve(trader, deps)).toEqual({ kind: 'task', task: null });
+          expect(resolve(trader, { ...deps, isTaskComplete: (id) => id === gate })).toBeNull();
+        }
+      }
+    );
     it('returns null for traders with no unlock source', () => {
       expect(resolve({ id: 'skier-id', normalizedName: 'skier' })).toBeNull();
     });
