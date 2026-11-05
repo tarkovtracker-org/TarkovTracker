@@ -309,7 +309,13 @@ objective and cannot be cleared through Mark available; complete the storyline o
 Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
 `finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
 opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
-locked on the dashboard also locks its tasks.
+locked on the dashboard also locks its tasks. A configured unlock ID stays a gate even when its
+task is absent from the catalog; recorded completion can still satisfy it. Ref uses only the
+current mode's configured ID, and an unlock task never gates itself. Missing unlock metadata
+keeps the dashboard locked without a broken task link; task blockers explain the missing data
+instead of showing a raw ID.
+Players can recover a missing configured unlock task from explicit completion notifications through
+the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
 
 Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
 current profile's edition, prestige and faction eligibility. Ineligible children contribute no

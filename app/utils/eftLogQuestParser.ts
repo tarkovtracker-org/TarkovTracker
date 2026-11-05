@@ -80,6 +80,8 @@ export interface ParseEftLogsForQuestImportOptions {
   includedVersions?: Iterable<string> | null;
   account?: string | null;
   taskIdsByMode?: Partial<Record<GameMode, Iterable<string>>>;
+  /** Narrow caller-owned allowlist for explicit completion evidence only; never supplies task metadata. */
+  completedTaskIdsByMode?: Partial<Record<GameMode, Iterable<string>>>;
 }
 interface ChatMessagePayload {
   eventId?: unknown;
@@ -936,18 +938,27 @@ function filterSeasonEvents(events: EftQuestImportEvent[]) {
   return { events: included, skippedSeasonalEventCount };
 }
 /** Annotates event eligibility without changing the active metadata store or progress mode. */
+const matchesImportTaskId = (
+  event: EftQuestImportEvent,
+  ids: ReadonlySet<string>,
+  completedIds: ReadonlySet<string> | undefined
+): boolean =>
+  ids.has(event.questId) ||
+  (event.status === 'completed' && completedIds?.has(event.questId) === true);
 function matchEventModes(
   events: EftQuestImportEvent[],
-  catalogs: ParseEftLogsForQuestImportOptions['taskIdsByMode']
+  catalogs: ParseEftLogsForQuestImportOptions['taskIdsByMode'],
+  completedCatalogs: ParseEftLogsForQuestImportOptions['completedTaskIdsByMode']
 ): void {
   if (!catalogs) return;
   const idsByMode = new Map(Object.entries(catalogs).map(([mode, ids]) => [mode, new Set(ids)]));
+  const completedIdsByMode = new Map(
+    Object.entries(completedCatalogs ?? {}).map(([mode, ids]) => [mode, new Set(ids)])
+  );
   for (const event of events) {
     event.matchedModes = [...idsByMode]
-      .filter(
-        ([mode, ids]) =>
-          (event.mode === UNKNOWN_MODE || event.mode === mode) && ids.has(event.questId)
-      )
+      .filter(([mode]) => event.mode === UNKNOWN_MODE || event.mode === mode)
+      .filter(([mode, ids]) => matchesImportTaskId(event, ids, completedIdsByMode.get(mode)))
       .map(([mode]) => mode as GameMode);
   }
 }
@@ -980,6 +991,7 @@ function summarizeImportEvents(events: EftQuestImportEvent[], taskIdSet: Set<str
   const questIds = idsFor('completed');
   const startedQuestIds = idsFor('started');
   const failedQuestIds = idsFor('failed');
+  const matchedCompletionIds = new Set([...taskIdSet, ...matchedIdsFor('completed')]);
   return {
     events,
     dedupedCompletionEventCount: events.filter((event) => event.status === 'completed').length,
@@ -993,7 +1005,7 @@ function summarizeImportEvents(events: EftQuestImportEvent[], taskIdSet: Set<str
     matchedTaskIdsByMode: matchedByMode('completed'),
     matchedStartedTaskIdsByMode: matchedByMode('started'),
     matchedFailedTaskIdsByMode: matchedByMode('failed'),
-    unmatchedQuestIds: questIds.filter((id) => !taskIdSet.has(id)),
+    unmatchedQuestIds: questIds.filter((id) => !matchedCompletionIds.has(id)),
     unmatchedStartedQuestIds: startedQuestIds.filter((id) => !taskIdSet.has(id)),
     unmatchedFailedQuestIds: failedQuestIds.filter((id) => !taskIdSet.has(id)),
   };
@@ -1013,7 +1025,7 @@ export function parseEftLogsForQuestImport(
   const includedVersions = selectIncludedVersions(availableVersions, options.includedVersions);
   const collected = collectImportEvents(groups, new Set(includedVersions), account.includes);
   const seasonal = filterSeasonEvents(collected.events);
-  matchEventModes(seasonal.events, options.taskIdsByMode);
+  matchEventModes(seasonal.events, options.taskIdsByMode, options.completedTaskIdsByMode);
   return {
     ...summarizeImportEvents(seasonal.events, new Set(taskIds)),
     ...collected.counts,

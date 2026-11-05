@@ -4,9 +4,9 @@ import {
   type TaskAvailabilityTeamData,
   type TaskEvaluationOptions,
 } from '@/stores/taskAvailability';
+import { TASK_ID_REGISTRY, type GameMode } from '@/utils/constants';
 import { normalizeTraderRequirements } from '@/utils/taskRequirements';
 import type { Task, RequirementComparison, StoryChapter } from '@/types/tarkov';
-import type { GameMode } from '@/utils/constants';
 const data = (overrides: Partial<TaskAvailabilityTeamData> = {}): TaskAvailabilityTeamData => ({
   completions: {},
   faction: 'USEC',
@@ -356,6 +356,48 @@ describe('storyline trader task availability', () => {
       ).available
     ).toBe(true);
   });
+});
+describe('configured trader unlocks', () => {
+  const gates = [
+    ['lightkeeper', TASK_ID_REGISTRY.GETTING_ACQUAINTED],
+    ['btr-driver', TASK_ID_REGISTRY.A_HELPING_HAND],
+    ['ref', TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP],
+  ] as const;
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'retains missing configured gates and recorded completions in %s',
+    (mode) => {
+      for (const [name, configuredId] of gates) {
+        const id =
+          name === 'ref' && mode === 'pve' ? TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE : configuredId;
+        const task: Task = { id: 'target', trader: { id: name, name, normalizedName: name } };
+        const blocked = evaluate(task, data({ mode }));
+        expect(blocked.available).toBe(false);
+        expect(blocked.blockers).toEqual([
+          { type: 'trader_unlock', taskId: id, trader: { id: name, name } },
+        ]);
+        expect(evaluate(task, data({ mode }), [{ id }]).available).toBe(false);
+        expect(
+          evaluate(task, data({ mode, completions: { [id]: { complete: true } } })).available
+        ).toBe(true);
+        expect(evaluate(task, data({ mode, prestigeLevel: 1 })).available).toBe(false);
+        expect(evaluate({ ...task, id }, data({ mode })).available).toBe(true);
+      }
+    }
+  );
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    "does not use the other mode's Ref gate in %s",
+    (mode) => {
+      const wrongId =
+        mode === 'pve'
+          ? TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP
+          : TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE;
+      const task: Task = { id: 'target', trader: { id: 'ref', name: 'Ref' } };
+      expect(
+        evaluate(task, data({ mode, completions: { [wrongId]: true } }), [{ id: wrongId }])
+          .available
+      ).toBe(false);
+    }
+  );
 });
 describe('reward-based trader unlocks', () => {
   // Mirrors json.tarkov.dev: Mechanic's Introduction lists Jaeger in finishRewards.traderUnlock.
