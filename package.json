@@ -109,6 +109,7 @@
     "prepare": "husky || true",
     "preview": "nuxt preview",
     "setup": "bash scripts/setup/setup-dev-environment.sh",
+    "supabase:test:task-identity-concurrency": "node scripts/checks/task-identity-concurrency.mjs",
     "supabase:check": "bash scripts/checks/check-supabase-db.sh",
     "supabase:test:concurrency": "node scripts/checks/stripe-event-concurrency.mjs",
     "supabase:test:one-time-concurrency": "node scripts/checks/stripe-one-time-concurrency.mjs",
