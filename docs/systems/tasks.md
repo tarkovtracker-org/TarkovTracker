@@ -474,6 +474,13 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 
 ## Task list and Needed Items
 
+Sell-item objectives keep separate trader descriptions and progress counters. Their full accepted-item
+pool uses `ObjectiveItemDisplay` and the shared "Any of N" popover instead of the capped equipment
+strip. The popover renders at most 50 items per page; larger pools can be searched by name or short
+name and paged through without changing progress. Single-item sales still show the item directly.
+Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
+available.
+
 Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
 objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
 records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,

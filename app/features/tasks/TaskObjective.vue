@@ -14,13 +14,7 @@
       :name="displayObjectiveIcon"
       aria-hidden="true"
       class="mt-0.5 h-4 w-4 shrink-0"
-      :class="
-        isComplete
-          ? 'text-success-300'
-          : isParentTaskLocked
-            ? 'text-surface-400'
-            : 'text-surface-300 group-hover:text-surface-200'
-      "
+      :class="objectiveIconClass"
     />
     <div
       class="flex min-w-0 flex-1 flex-wrap gap-2"
@@ -51,15 +45,19 @@
           variant="keys"
           :required-keys="objectiveRequiredKeys"
         />
+        <div
+          v-if="objectiveSellItems.length"
+          class="border-surface-700/50 bg-surface-800/30 mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1.5"
+          data-objective-display
+        >
+          <ObjectiveItemDisplay v-bind="sellItemDisplayProps" />
+        </div>
         <ObjectiveRequiredItems
           v-if="objectiveEquipment.length"
           variant="equipment"
           :equipment="objectiveEquipment"
         />
-        <AppTooltip
-          v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-          :text="userNeedsTitle"
-        >
+        <AppTooltip v-if="showTeamNeeds" :text="userNeedsTitle">
           <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
             <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
             <span>{{ userNeeds.length }}</span>
@@ -119,6 +117,7 @@
 </template>
 <script setup lang="ts">
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {
     isMapViewKey,
@@ -134,7 +133,7 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES } from '@/utils/constants';
-  import type { TaskObjective } from '@/types/tarkov';
+  import type { TarkovItem, TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
   const jumpToMapObjective = inject(jumpToMapObjectiveKey, null);
@@ -187,8 +186,18 @@
   });
   const objectiveEquipment = computed(() => {
     const obj = fullObjective.value ?? props.objective;
+    if (obj.type === 'sellItem') return [];
     return getObjectiveEquipmentItems(obj);
   });
+  const objectiveSellItems = computed(() => {
+    const objective = fullObjective.value ?? props.objective;
+    if (objective.type !== 'sellItem') return [];
+    const items = objective.items?.length ? objective.items : [objective.item];
+    return items.filter((item): item is TarkovItem => Boolean(item?.id));
+  });
+  const objectiveSellPrimaryItem = computed(
+    () => (fullObjective.value ?? props.objective).item ?? objectiveSellItems.value[0]
+  );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
   });
@@ -204,6 +213,17 @@
   });
   const isParentTaskLocked = computed(() => {
     return isParentTaskComplete.value || isParentTaskFailed.value;
+  });
+  const sellItemDisplayProps = computed(() => ({
+    primaryItem: objectiveSellPrimaryItem.value,
+    acceptedItems: objectiveSellItems.value,
+    fallbackName: props.objective.description ?? '',
+    paused: isParentTaskLocked.value || isComplete.value,
+  }));
+  const objectiveIconClass = computed(() => {
+    if (isComplete.value) return 'text-success-300';
+    if (isParentTaskLocked.value) return 'text-surface-400';
+    return 'text-surface-300 group-hover:text-surface-200';
   });
   const isRowInteractive = computed(() => !isParentTaskLocked.value);
   const rowInteraction = computed(() =>
@@ -242,6 +262,9 @@
       .filter((name): name is string => typeof name === 'string' && name.length > 0)
       .join(', ');
   });
+  const showTeamNeeds = computed(
+    () => userHasTeam.value && activeUserView.value === 'all' && userNeeds.value.length > 0
+  );
   const isHovered = ref(false);
   const objectiveMouseEnter = () => {
     if (isParentTaskLocked.value) return;
@@ -308,7 +331,8 @@
     trackTaskProgressInteraction?.(taskId, 'objective_progress');
   };
   const isObjectiveControlEvent = (event: Event) =>
-    event.target instanceof Element && Boolean(event.target.closest('[data-objective-controls]'));
+    event.target instanceof Element &&
+    Boolean(event.target.closest('[data-objective-controls], [data-objective-display]'));
   const handleRowClick = (event: Event) => {
     if (isObjectiveControlEvent(event)) return;
     if (isParentTaskLocked.value) return;

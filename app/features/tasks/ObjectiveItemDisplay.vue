@@ -32,7 +32,6 @@
           target="_blank"
           rel="noopener noreferrer"
           class="text-link hover:text-link-hover focus-visible:ring-primary-500 flex min-w-0 items-center gap-0.5 rounded-sm text-xs font-bold no-underline focus:outline-none focus-visible:ring-2"
-          @click.stop
         >
           <span class="truncate">{{ displayName }}</span>
           <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
@@ -54,7 +53,6 @@
           target="_blank"
           rel="noopener noreferrer"
           class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
-          @click.stop
         >
           <img
             src="/img/logos/tarkovdevlogo.webp"

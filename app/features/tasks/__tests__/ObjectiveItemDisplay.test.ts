@@ -53,6 +53,18 @@ describe('ObjectiveItemDisplay', () => {
     expect(wrapper.text()).toContain('Augmentin antibiotic pills');
     expect(wrapper.find('.accepted-items-popover').exists()).toBe(false);
   });
+  it('allows item-link clicks to bubble to outside-dismissal listeners', async () => {
+    const wrapper = mountDisplay({ primaryItem: makeItem('item', 'Item'), fallbackName: 'Item' });
+    const host = document.createElement('div');
+    const bubbled = vi.fn((event: Event) => event.preventDefault());
+    host.addEventListener('click', bubbled);
+    host.append(wrapper.element);
+    const links = wrapper.findAll('a');
+    expect(links).toHaveLength(2);
+    for (const link of links) await link.trigger('click');
+    expect(bubbled).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
   it('cycles through accepted items and shows the accepted-items badge', async () => {
     const accepted = [
       makeItem('augmentin', 'Augmentin antibiotic pills'),
