@@ -22,6 +22,8 @@ export interface OverlayLocaleData {
   storyChapters?: OverlayRecords;
 }
 export interface OverlayData extends OverlaySections {
+  /** Only the empty version-1 ledger is supported until identity consumers are deployed. */
+  taskIdAliases?: unknown;
   /** Mode-scoped counter registry; validated and applied by `overlayCounters.ts`. */
   progressionCounters?: unknown;
   /** Mode-scoped task-list groups; validated and applied by `overlayTaskGroups.ts`. */
