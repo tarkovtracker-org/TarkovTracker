@@ -163,6 +163,14 @@ the last-good overlay. Unsupported story statuses/types fail validation. Unknown
 locale sections are logged and retained in `dataOverlay.unconsumedSections`, including cache hits;
 precompute refuses to publish payloads with unconsumed sections.
 
+The root `taskIdAliases` ledger is accepted only as an empty version-1 contract: exactly
+`schemaVersion: 1` and `modes`, with exactly `regular`, `pve`, and `pvp-season`, each containing
+only empty `tasks` and `objectives` objects. This staged compatibility does not activate identity
+migration. Populated maps, malformed values, extra fields, unknown versions, and aliases nested
+under overlay mode/locale scopes remain unconsumed and block both core and import publication.
+Overlay version/SHA provenance and last-good snapshot retention remain mandatory. Full alias
+consumption and activation stay gated by [the progress identity rollout](./progress-storage.md).
+
 | Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches. A map's `extractsAdd` appends well-formed extracts (non-empty `id`/`name`, known or null faction, finite position) whose ID or name is not already present, then is removed from the response; the client applies the same rule to `app/data/maps.json` `extractsAdd`, whose `nameKey` resolves the label through i18n and is copied onto a matching upstream extract that lacks one.                                                                              |

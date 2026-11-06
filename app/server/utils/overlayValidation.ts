@@ -22,6 +22,22 @@ const OVERLAY_SECTION_OWNERS = {
 const sectionNames = new Set(Object.keys(OVERLAY_SECTION_OWNERS));
 /** Upstream mode scopes an overlay may vary a section under. */
 const OVERLAY_MODES = ['regular', 'pve', 'pvp-season'] as const;
+const hasExactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+  isPlainObject(value) &&
+  Object.keys(value).length === keys.length &&
+  keys.every((key) => Object.hasOwn(value, key));
+const emptyAliasMode = (value: unknown): boolean =>
+  hasExactKeys(value, ['tasks', 'objectives']) &&
+  hasExactKeys(value.tasks, []) &&
+  hasExactKeys(value.objectives, []);
+// This is compatibility with the producer's staged empty ledger, not alias consumption.
+// Any populated map must wait for catalog/progress reconciliation in every consumer.
+const emptyTaskIdAliases = (value: unknown): boolean => {
+  if (!hasExactKeys(value, ['schemaVersion', 'modes']) || value.schemaVersion !== 1) return false;
+  return (
+    hasExactKeys(value.modes, OVERLAY_MODES) && Object.values(value.modes).every(emptyAliasMode)
+  );
+};
 const isRecordCollection = (value: unknown): boolean =>
   isPlainObject(value) && Object.values(value).every(isPlainObject);
 const validCollections = (sections: Record<string, unknown>): boolean =>
@@ -239,6 +255,7 @@ export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
   if (validProgressionCounters(overlay.progressionCounters)) rootNames.add('progressionCounters');
   if (validTraderTaskGroups(overlay.traderTaskGroups)) rootNames.add('traderTaskGroups');
+  if (emptyTaskIdAliases(overlay.taskIdAliases)) rootNames.add('taskIdAliases');
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),
