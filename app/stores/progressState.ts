@@ -282,16 +282,20 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
   // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
   confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
 };
-/**
- * A status change must retire the task's current confirmation even when that confirmation carries a
- * clock from a device that runs ahead, so the status timestamp is advanced past it.
- */
+/** Status writes must beat both an earlier status/Undo and any in-game confirmation. */
+const nextTaskStatusClock = (previous = 0, confirmation = 0): number => {
+  const timestamp = nextClock(previous, confirmation);
+  const canAdvance =
+    [previous, confirmation, timestamp].every(Number.isFinite) && timestamp > previous;
+  if (!canAdvance) throw new Error('Task acceptance clock cannot advance');
+  return timestamp;
+};
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
-  const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
-  const timestamp =
-    confirmationTs === undefined
-      ? completion.timestamp
-      : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
+  const data = getCurrentData(state);
+  const timestamp = nextTaskStatusClock(
+    data.taskCompletions[taskId]?.timestamp,
+    data.taskAvailability?.[taskId]?.timestamp
+  );
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
 };
 // Simplified actions
@@ -388,10 +392,10 @@ export const actions = {
   setTaskAcceptanceUnknown(this: UserState, taskId: string) {
     const data = getCurrentData(this);
     const previous = data.taskCompletions[taskId];
-    const previousTimestamp = previous?.timestamp ?? 0;
-    const timestamp = nextClock(previousTimestamp, data.taskAvailability?.[taskId]?.timestamp ?? 0);
-    // A newer unknown write must beat the server's equal-time acceptance carry.
-    if (timestamp <= previousTimestamp) throw new Error('Task acceptance clock cannot advance');
+    const timestamp = nextTaskStatusClock(
+      previous?.timestamp,
+      data.taskAvailability?.[taskId]?.timestamp
+    );
     const restored = { ...previous, ...createCompletion(false, false, false, false), timestamp };
     delete restored.active;
     // Replace atomically so sync observers never see an intermediate active: false.

@@ -162,6 +162,50 @@ describe('useTaskNotification', () => {
       }
     }
   });
+  it.each([undefined, false] as const)(
+    'keeps Accept after Undo through both merge orders with prior acceptance %s and a future confirmation',
+    async (previousAcceptance) => {
+      const state = structuredClone(defaultState);
+      if (previousAcceptance !== undefined)
+        state.pvp.taskCompletions.prior = { active: previousAcceptance, timestamp: 1000 };
+      state.pvp.taskAvailability = { prior: { timestamp: 10000, requirements: 'gate' } };
+      const task: Task = { id: 'prior', name: 'Prior task' };
+      const { notification, tarkovStore, stop } = await setup([task], { progressData: state.pvp });
+      tarkovStore.setTaskActive.mockImplementation((id: string) =>
+        progressActions.setTaskActive.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
+        progressActions.setTaskUncompleted.call(state, id)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      const accept = () => {
+        notification.onTaskAction({ action: 'active', taskId: task.id, taskName: task.name! });
+        progressActions.setTaskActive.call(state, task.id);
+      };
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        accept();
+        await notification.undoLastAction();
+        const afterUndo = sanitizeOwnedProgressData(state.pvp);
+        expect(afterUndo.taskCompletions.prior?.active).toBe(previousAcceptance);
+        accept();
+        const afterAccept = sanitizeOwnedProgressData(state.pvp);
+        for (const [local, remote] of [
+          [afterUndo, afterAccept],
+          [afterAccept, afterUndo],
+        ] as const)
+          expect(mergeProgressData(local, remote).taskCompletions.prior?.active).toBe(true);
+        expect(afterAccept.taskCompletions.prior!.timestamp!).toBeGreaterThan(
+          afterUndo.taskCompletions.prior!.timestamp!
+        );
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
   it('keeps failed unknown acceptance undo retryable at a saturated clock', async () => {
     const state = structuredClone(defaultState);
     state.pvp.taskAvailability = {
