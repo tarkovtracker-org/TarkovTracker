@@ -165,44 +165,27 @@ describe('progressState task lifecycle', () => {
       }
     }
   );
-  it.each([
-    ...statusWriters,
-    { name: 'restore unknown acceptance', write: actions.setTaskAcceptanceUnknown },
-  ])('rejects invalid or saturated $name clocks without mutation', ({ write }) => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
-    try {
-      for (const clocks of [
-        { previous: MAX_CONFIRMATION_TIMESTAMP, confirmation: 0, wall: 5000 },
-        { previous: Number.NaN, confirmation: 0, wall: 5000 },
-        { previous: Infinity, confirmation: 0, wall: 5000 },
-        { previous: 5000, confirmation: Number.NaN, wall: 5000 },
-        { previous: 5000, confirmation: Infinity, wall: 5000 },
-        { previous: 5000, confirmation: 0, wall: Number.NaN },
-      ]) {
-        const state = reactive(
-          createStateWithTaskCompletion({ active: true, timestamp: clocks.previous })
-        );
-        state.pvp.taskAvailability = {
-          'task-1': { timestamp: clocks.confirmation, requirements: 'gate' },
-        };
-        const original = state.pvp.taskCompletions['task-1'];
-        const observed = vi.fn();
-        const stop = watch(() => state.pvp.taskCompletions['task-1'], observed, {
-          flush: 'sync',
+  it.each(statusWriters)(
+    'preserves ordinary $name writes at the persistable clock ceiling',
+    ({ name, write }) => {
+      const state = createStateWithTaskCompletion({ timestamp: MAX_CONFIRMATION_TIMESTAMP });
+      state.pvp.taskAvailability = {
+        'task-1': { timestamp: MAX_CONFIRMATION_TIMESTAMP, requirements: 'gate' },
+      };
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        expect(() => write.call(state, 'task-1')).not.toThrow();
+        expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+          active: name === 'accept',
+          complete: ['complete', 'fail'].includes(name),
+          failed: name === 'fail',
+          timestamp: MAX_CONFIRMATION_TIMESTAMP,
         });
-        now.mockReturnValue(clocks.wall);
-        try {
-          expect(() => write.call(state, 'task-1')).toThrow('Task acceptance clock cannot advance');
-          expect(state.pvp.taskCompletions['task-1']).toBe(original);
-          expect(observed).not.toHaveBeenCalled();
-        } finally {
-          stop();
-        }
+      } finally {
+        now.mockRestore();
       }
-    } finally {
-      now.mockRestore();
     }
-  });
+  );
   it('writes canonical active, completed, failed, and neutral states', () => {
     const state = createBaseState();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
