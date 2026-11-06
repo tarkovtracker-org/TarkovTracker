@@ -26,6 +26,8 @@ export interface UseTaskDeepLinkReturn {
   cleanup: () => void;
 }
 type TaskStatus = 'active' | 'available' | 'locked' | 'completed' | 'failed';
+const selfTaskFlag = (flags: Record<string, Record<string, boolean>> | undefined, taskId: string) =>
+  flags?.[taskId]?.self ?? false;
 export function useTaskDeepLink({
   filteredTasks,
   leafletMapRef,
@@ -51,14 +53,13 @@ export function useTaskDeepLink({
   };
   const lightkeeperTraderId = computed(() => metadataStore.getTraderByName('lightkeeper')?.id);
   const getTaskStatus = (taskId: string): TaskStatus => {
-    const isFailed = tasksFailed.value?.[taskId]?.['self'] ?? false;
-    if (isFailed) return 'failed';
-    const isCompleted = tasksCompletions.value?.[taskId]?.['self'] ?? false;
-    if (isCompleted) return 'completed';
-    if (tasksState.value[taskId] === TASK_STATE.ACTIVE) return 'active';
-    const isUnlocked = unlockedTasks.value?.[taskId]?.['self'] ?? false;
-    if (isUnlocked) return 'available';
-    return 'locked';
+    const rules: Array<{ status: TaskStatus; matches: () => boolean }> = [
+      { status: 'failed', matches: () => selfTaskFlag(tasksFailed.value, taskId) },
+      { status: 'completed', matches: () => selfTaskFlag(tasksCompletions.value, taskId) },
+      { status: 'active', matches: () => tasksState.value[taskId] === TASK_STATE.ACTIVE },
+      { status: 'available', matches: () => selfTaskFlag(unlockedTasks.value, taskId) },
+    ];
+    return rules.find(({ matches }) => matches())?.status ?? 'locked';
   };
   const highlightTask = (taskElement: HTMLElement) => {
     taskElement.classList.add(

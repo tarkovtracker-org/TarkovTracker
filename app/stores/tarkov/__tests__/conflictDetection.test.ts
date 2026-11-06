@@ -43,3 +43,29 @@ describe('detectDataConflicts task active state', () => {
     ).toBe(0);
   });
 });
+describe('detectDataConflicts progress categories', () => {
+  it('counts each differing entry once and treats missing empty progress as equal', () => {
+    const local = {
+      taskCompletions: {},
+      taskObjectives: {
+        changed: { count: 1, complete: false },
+        empty: { count: 0, complete: false },
+      },
+      hideoutModules: { changed: { complete: true } },
+      hideoutParts: { changed: { count: 2 }, missing: { count: 1 } },
+    } as unknown as UserProgressData;
+    const remote = {
+      taskCompletions: {},
+      taskObjectives: { changed: { count: 2, complete: true } },
+      hideoutModules: { changed: { complete: false } },
+      hideoutParts: { changed: { count: 3 } },
+    } as unknown as UserProgressData;
+    expect(detectDataConflicts(local, remote)).toEqual({ hasConflict: true, conflictCount: 4 });
+    expect(detectDataConflicts(remote, local)).toEqual({ hasConflict: true, conflictCount: 4 });
+    expect(detectDataConflicts(local, local)).toEqual({ hasConflict: false, conflictCount: 0 });
+    expect(detectDataConflicts(undefined, remote)).toEqual({
+      hasConflict: false,
+      conflictCount: 0,
+    });
+  });
+});
