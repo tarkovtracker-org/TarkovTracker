@@ -48,7 +48,7 @@
         <div
           v-if="objectiveSellItems.length"
           class="border-surface-700/50 bg-surface-800/30 mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1.5"
-          @click.stop
+          data-objective-display
         >
           <ObjectiveItemDisplay v-bind="sellItemDisplayProps" />
         </div>
@@ -195,6 +195,9 @@
     const items = objective.items?.length ? objective.items : [objective.item];
     return items.filter((item): item is TarkovItem => Boolean(item?.id));
   });
+  const objectiveSellPrimaryItem = computed(
+    () => (fullObjective.value ?? props.objective).item ?? objectiveSellItems.value[0]
+  );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
   });
@@ -212,7 +215,7 @@
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
   const sellItemDisplayProps = computed(() => ({
-    primaryItem: objectiveSellItems.value[0],
+    primaryItem: objectiveSellPrimaryItem.value,
     acceptedItems: objectiveSellItems.value,
     fallbackName: props.objective.description ?? '',
     paused: isParentTaskLocked.value || isComplete.value,
@@ -328,7 +331,8 @@
     trackTaskProgressInteraction?.(taskId, 'objective_progress');
   };
   const isObjectiveControlEvent = (event: Event) =>
-    event.target instanceof Element && Boolean(event.target.closest('[data-objective-controls]'));
+    event.target instanceof Element &&
+    Boolean(event.target.closest('[data-objective-controls], [data-objective-display]'));
   const handleRowClick = (event: Event) => {
     if (isObjectiveControlEvent(event)) return;
     if (isParentTaskLocked.value) return;

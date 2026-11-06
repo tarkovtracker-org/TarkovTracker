@@ -119,6 +119,36 @@ describe('TaskObjective interaction boundaries', () => {
     const wrapper = createWrapper({ type: 'sellItem', item });
     expect(wrapper.getComponent(ObjectiveItemDisplay).props('primaryItem')).toEqual(item);
   });
+  it('lets display clicks reach outside-dismissal listeners without changing progress', async () => {
+    const wrapper = createWrapper({ type: 'sellItem', items: [{ id: 'a' }, { id: 'b' }] });
+    const host = document.createElement('div');
+    const bubbled = vi.fn();
+    host.addEventListener('click', bubbled);
+    host.append(wrapper.element);
+    await wrapper.get('[data-testid="accepted-items"]').trigger('click');
+    await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
+    expect(bubbled).toHaveBeenCalledTimes(2);
+    expect(toggle).not.toHaveBeenCalled();
+    expect(setCount).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('prefers the hydrated canonical item when the accepted pool has a different order', () => {
+    const items = [
+      { id: 'first', name: 'First' },
+      { id: 'canonical', name: 'Canonical' },
+    ];
+    fullObjectives.push({
+      id: 'objective-1',
+      type: 'sellItem',
+      item: items[1],
+      items,
+    } as Objective);
+    isComplete.mockReturnValue(true);
+    const wrapper = createWrapper({ type: 'sellItem', item: items[0] });
+    const display = wrapper.getComponent(ObjectiveItemDisplay);
+    expect(display.props('primaryItem')).toEqual(items[1]);
+    expect(display.props('acceptedItems')).toEqual(items);
+  });
   it('uses the hydrated sell pool when the row only has sparse metadata', () => {
     const items = [
       { id: 'item-1', name: 'First' },
