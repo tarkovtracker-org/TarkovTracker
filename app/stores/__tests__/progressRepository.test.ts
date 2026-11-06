@@ -172,6 +172,7 @@ describe('inactive progress transaction repository', () => {
   it.each([
     { apiUpdateHistory: 'corrupt' },
     { taskAvailability: [] },
+    { taskCompletions: { task: { active: 'corrupt' } } },
     { skills: { Strength: 'corrupt' } },
     { skills: new Map([['Strength', 1]]) },
     { taskAvailability: new Date(0) },

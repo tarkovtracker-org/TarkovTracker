@@ -3,7 +3,7 @@
  * and the station cards so the same status never reads as two different colors.
  * Class strings stay literal so Tailwind can find them at build time.
  */
-export type StatusTone = 'neutral' | 'info' | 'locked' | 'success' | 'error';
+export type StatusTone = 'neutral' | 'primary' | 'info' | 'locked' | 'success' | 'error';
 export interface StatusTabItem<V extends string = string> {
   value: V;
   label: string;
@@ -26,6 +26,11 @@ const STATUS_TONE_CLASSES: Record<StatusTone, StatusToneClasses> = {
     badge: 'bg-surface-500',
     selected:
       'border-white/15 bg-white/10 text-white ring-1 ring-white/10 light:border-surface-600 light:bg-surface-700/60 light:text-surface-50 light:ring-surface-600/40',
+  },
+  primary: {
+    badge: 'bg-primary-600',
+    selected:
+      'border-primary-500/45 bg-primary-500/12 text-white ring-1 ring-primary-500/25 light:text-primary-700',
   },
   info: {
     badge: 'bg-info-600',

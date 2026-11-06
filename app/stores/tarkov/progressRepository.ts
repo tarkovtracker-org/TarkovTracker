@@ -158,6 +158,7 @@ const task: ValueCheck = (value, work) =>
     {
       complete: optional(boolean),
       failed: optional(boolean),
+      active: optional(boolean),
       timestamp: optional(finite),
       manual: optional(boolean),
     },
@@ -178,6 +179,7 @@ const activityTypes = { task: true, hideout: true, item: true, system: true } sa
   true
 >;
 const activityActions = {
+  active: true,
   complete: true,
   uncomplete: true,
   fail: true,

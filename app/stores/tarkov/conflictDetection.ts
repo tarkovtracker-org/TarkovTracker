@@ -1,56 +1,52 @@
-import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
+import { getCompletionFlags } from '@/utils/taskStatus';
 import type { UserProgressData } from '@/stores/progressState';
+type TaskCompletion = UserProgressData['taskCompletions'][string];
+type ObjectiveProgress = UserProgressData['taskObjectives'][string];
+// Unknown acceptance agrees with explicit false; only true is authoritative acceptance.
+const recordedAcceptance = (completion: TaskCompletion | undefined) => completion?.active === true;
+const taskEntriesConflict = (
+  local: TaskCompletion | undefined,
+  remote: TaskCompletion | undefined
+) => {
+  const localFlags = getCompletionFlags(local);
+  const remoteFlags = getCompletionFlags(remote);
+  return (
+    localFlags.complete !== remoteFlags.complete ||
+    localFlags.failed !== remoteFlags.failed ||
+    recordedAcceptance(local) !== recordedAcceptance(remote)
+  );
+};
+const objectiveCount = (entry: ObjectiveProgress | undefined) => entry?.count ?? 0;
+const completedValue = (entry: { complete?: boolean } | undefined) => entry?.complete ?? false;
+const objectiveEntriesConflict = (
+  local: ObjectiveProgress | undefined,
+  remote: ObjectiveProgress | undefined
+) =>
+  objectiveCount(local) !== objectiveCount(remote) ||
+  completedValue(local) !== completedValue(remote);
+const moduleEntriesConflict = (
+  local: { complete?: boolean } | undefined,
+  remote: { complete?: boolean } | undefined
+) => completedValue(local) !== completedValue(remote);
+const countEntryConflicts = <T>(
+  local: Record<string, T> | undefined,
+  remote: Record<string, T> | undefined,
+  differs: (local: T | undefined, remote: T | undefined) => boolean
+): number => {
+  const localEntries = local || {};
+  const remoteEntries = remote || {};
+  const ids = new Set([...Object.keys(localEntries), ...Object.keys(remoteEntries)]);
+  return [...ids].filter((id) => differs(localEntries[id], remoteEntries[id])).length;
+};
 export function detectDataConflicts(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined
 ): { hasConflict: boolean; conflictCount: number } {
   if (!local || !remote) return { hasConflict: false, conflictCount: 0 };
-  let conflictCount = 0;
-  const localTasks = local.taskCompletions || {};
-  const remoteTasks = remote.taskCompletions || {};
-  const taskIds = new Set([...Object.keys(localTasks), ...Object.keys(remoteTasks)]);
-  for (const taskId of taskIds) {
-    const localFlags = getCompletionFlags(localTasks[taskId] as RawTaskCompletion);
-    const remoteFlags = getCompletionFlags(remoteTasks[taskId] as RawTaskCompletion);
-    if (localFlags.complete !== remoteFlags.complete || localFlags.failed !== remoteFlags.failed) {
-      conflictCount++;
-    }
-  }
-  const localObjectives = local.taskObjectives || {};
-  const remoteObjectives = remote.taskObjectives || {};
-  const objectiveIds = new Set([...Object.keys(localObjectives), ...Object.keys(remoteObjectives)]);
-  for (const objId of objectiveIds) {
-    const localObj = localObjectives[objId];
-    const remoteObj = remoteObjectives[objId];
-    if (
-      (localObj?.count ?? 0) !== (remoteObj?.count ?? 0) ||
-      (localObj?.complete ?? false) !== (remoteObj?.complete ?? false)
-    ) {
-      conflictCount++;
-    }
-  }
-  const localModules = local.hideoutModules || {};
-  const remoteModules = remote.hideoutModules || {};
-  const moduleIds = new Set([...Object.keys(localModules), ...Object.keys(remoteModules)]);
-  for (const modId of moduleIds) {
-    const localMod = localModules[modId];
-    const remoteMod = remoteModules[modId];
-    if ((localMod?.complete ?? false) !== (remoteMod?.complete ?? false)) {
-      conflictCount++;
-    }
-  }
-  const localParts = local.hideoutParts || {};
-  const remoteParts = remote.hideoutParts || {};
-  const partIds = new Set([...Object.keys(localParts), ...Object.keys(remoteParts)]);
-  for (const partId of partIds) {
-    const localPart = localParts[partId];
-    const remotePart = remoteParts[partId];
-    if (
-      (localPart?.count ?? 0) !== (remotePart?.count ?? 0) ||
-      (localPart?.complete ?? false) !== (remotePart?.complete ?? false)
-    ) {
-      conflictCount++;
-    }
-  }
+  const conflictCount =
+    countEntryConflicts(local.taskCompletions, remote.taskCompletions, taskEntriesConflict) +
+    countEntryConflicts(local.taskObjectives, remote.taskObjectives, objectiveEntriesConflict) +
+    countEntryConflicts(local.hideoutModules, remote.hideoutModules, moduleEntriesConflict) +
+    countEntryConflicts(local.hideoutParts, remote.hideoutParts, objectiveEntriesConflict);
   return { hasConflict: conflictCount > 0, conflictCount };
 }

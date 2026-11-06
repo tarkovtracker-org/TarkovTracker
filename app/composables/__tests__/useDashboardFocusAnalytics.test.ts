@@ -126,4 +126,19 @@ describe('useDashboardFocusAnalytics', () => {
     );
     expect(window.sessionStorage.getItem(STORAGE_KEYS.dashboardFocusAttribution)).toBeNull();
   });
+  it('tracks accepting an active task as the first focused-task action', () => {
+    const { trackFocusedTaskAction, trackRecommendationClick } = useDashboardFocusAnalytics();
+    trackRecommendationClick({
+      recommendationId: 'available-task-1',
+      reason: 'impact',
+      taskId: 'task-1',
+      variant: 'primary',
+    });
+    trackFocusedTaskAction({ action: 'active', taskId: 'task-1', taskName: 'Task 1' });
+    expect(window.gtag).toHaveBeenCalledWith(
+      'event',
+      'dashboard_recommendation_first_action',
+      expect.objectContaining({ interaction: 'task_active', task_id: 'task-1' })
+    );
+  });
 });

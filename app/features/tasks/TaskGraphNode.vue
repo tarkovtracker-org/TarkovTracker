@@ -11,6 +11,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const isKeyboardFocused = ref(false);
   const STATUS_NODE_CLASSES: Record<TaskNodeStatus, string> = {
+    active: 'border-primary-500/60 bg-primary-500/10',
     completed: 'border-success-500/60 bg-success-500/10',
     available: 'border-info-500/60 bg-info-500/10',
     locked: 'border-locked-500/60 bg-locked-500/10',

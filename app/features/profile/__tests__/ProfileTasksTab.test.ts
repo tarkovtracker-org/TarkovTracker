@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
 import type { Task } from '@/types/tarkov';
 const messages: Record<string, string> = {
+  'common.active': 'Active',
   'common.available': 'Available',
   'common.completed': 'Completed',
   'common.locked': 'Locked',
@@ -12,6 +13,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({ t: (key: string) => messages[key] ?? key }),
 }));
 const tasks: Task[] = [
+  { id: 'active', name: 'Accepted Task' },
   { id: 'available', name: 'Alpha' },
   { id: 'locked', name: 'Beta' },
   { id: 'completed', name: 'Gamma' },
@@ -23,6 +25,7 @@ describe('ProfileTasksTab', () => {
         countedTasks: tasks,
         isTaskSuccessful: (id: string) => id === 'completed',
         isTaskFailed: () => false,
+        isTaskActive: (id: string) => id === 'active',
         isTaskLocked: (id: string) => id === 'locked',
         objectiveCompletions: {},
       },
@@ -34,9 +37,33 @@ describe('ProfileTasksTab', () => {
         },
       },
     });
+    expect(wrapper.text()).toContain('Active');
     expect(wrapper.text()).toContain('Available');
     expect(wrapper.text()).toContain('Locked');
     expect(wrapper.text()).toContain('Completed');
     expect(wrapper.text()).not.toContain('common.completed');
+  });
+  it('renders an active task only in the Active section', () => {
+    const wrapper = mount(ProfileTasksTab, {
+      props: {
+        countedTasks: [{ id: 'active', name: 'Accepted Task' }],
+        isTaskSuccessful: () => false,
+        isTaskFailed: () => false,
+        isTaskActive: () => true,
+        isTaskLocked: () => true,
+        objectiveCompletions: {},
+      },
+      global: {
+        stubs: {
+          UAlert: true,
+          UBadge: { template: '<span><slot /></span>' },
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('Active');
+    expect(wrapper.text()).toContain('Accepted Task');
+    expect(wrapper.text()).not.toContain('Available');
+    expect(wrapper.text()).not.toContain('Locked');
   });
 });

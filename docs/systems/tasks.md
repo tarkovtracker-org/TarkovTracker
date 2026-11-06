@@ -77,14 +77,14 @@ button (`TaskMapVisibilityToggles`) for the separate map-view-only hidden state
 (`mapHiddenTaskIds`, keyed by task ID, so it applies on every map); it uses a distinct icon so it
 is not confused with the eye.
 
-- All, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
+- All, Active, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
   (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
 - Completed and Failed list hidden tasks normally, as does any search, so every hidden task stays
   findable. A deep-linked task is never hidden (`getListHiddenTaskIds` in
   `app/features/tasks/hiddenTasks.ts`).
 - The map shows exactly what the list shows: a hidden task draws no markers and leaves the
   completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
-  deep link). Hidden tasks leave the All, Available and Locked status and trader counts;
+  deep link). Hidden tasks leave the All, Active, Available and Locked status and trader counts;
   Completed and Failed counts still include them (`useTaskCounts`).
 - Needed Items drops the user's own objectives of hidden tasks from every tab and count until the
   task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
@@ -183,7 +183,9 @@ another device set. `requirements` is the exact normalized gate signature (the `
 excluded from it), and a clear is an empty string kept as a tombstone. Sync merges the map per task by
 the confirmation's own timestamp. A confirmation counts only while its signature matches and it is
 not older than the task's status timestamp, so a later reset, completion, failure or progress repair
-on any device retires it without rewriting the map. The row sanitizer preserves the key (migration
+on any device retires it without rewriting the map. An explicitly accepted (`active`) task counts as
+having met its supported server gates without a confirmation, because the game only allows accepting
+a task once they are met; accepting also records the story objectives the task implies. The row sanitizer preserves the key (migration
 `20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
 Every merge selects per-task timestamp winners before applying the
 [map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
@@ -323,8 +325,9 @@ current profile's edition, prestige and faction eligibility. Ineligible children
 do not remove an otherwise eligible follow-up from that count.
 
 Completed and failed tasks are terminal.
-The existing acceptance-unknown interpretation is retained; this does not introduce #715's
-explicit Accept workflow.
+The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
+Legacy rows without an `active` key retain the unlockable prerequisite fallback. Task cards use
+the same fallback when explaining prerequisite status, without labeling unknown tasks Active.
 
 Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
@@ -361,6 +364,8 @@ Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profil
 not import quest completions and therefore has no trader/task backfill path.
 
 ### Invariants
+
+- Undoing completion or failure restores whether the task was accepted before that action.
 
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.

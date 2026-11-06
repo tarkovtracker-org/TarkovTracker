@@ -37,8 +37,14 @@
         }}
       </span>
     </UBadge>
-    <UBadge v-if="isFailed" size="xs" color="error" variant="soft" class="shrink-0 text-[11px]">
-      {{ t('common.failed', 'Failed') }}
+    <UBadge
+      v-if="statusBadge"
+      size="xs"
+      :color="statusBadge.color"
+      variant="soft"
+      class="shrink-0 text-[11px]"
+    >
+      {{ t(statusBadge.key, statusBadge.fallback) }}
     </UBadge>
     <AppTooltip
       v-if="isInvalid && !isFailed"
@@ -150,6 +156,7 @@
     isHidden: boolean;
     locationTooltip: string;
     isFailed: boolean;
+    isActive: boolean;
     isInvalid: boolean;
     showRequiredLabels: boolean;
     exclusiveEditionBadge?: string;
@@ -163,6 +170,13 @@
     copyLink: [];
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const statusBadge = computed(() => {
+    if (props.isFailed)
+      return { color: 'error' as const, key: 'common.failed', fallback: 'Failed' };
+    if (props.isActive)
+      return { color: 'primary' as const, key: 'common.active', fallback: 'Active' };
+    return null;
+  });
   const hasProgress = computed(() => props.progressTotal > 0);
   const hideLabel = computed(() =>
     props.isHidden ? t('page.tasks.questcard.unhide_task') : t('page.tasks.questcard.hide_task')
