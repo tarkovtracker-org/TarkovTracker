@@ -365,6 +365,41 @@ describe('/api/tarkov-dev/profile', () => {
     });
     expect(writeSharedCacheMock).not.toHaveBeenCalled();
   });
+  it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid upstream XP %s without caching it',
+    async (experience) => {
+      const body = freshProfileBody();
+      body.info.experience = experience;
+      getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+      fetchMock.mockResolvedValue(upstreamResponse(body));
+      const handler = await loadHandler();
+      await expect(handler({})).rejects.toMatchObject({
+        statusCode: 502,
+        data: { code: 'profile_fetch_failed' },
+      });
+      expect(writeSharedCacheMock).not.toHaveBeenCalled();
+    }
+  );
+  it('does not serve cached invalid XP or reuse its ETag during refresh', async () => {
+    const body = freshProfileBody();
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+    readSharedCacheMock.mockResolvedValue({
+      body: { ...body, info: { ...body.info, experience: -1 } },
+      etag: 'W/"invalid-xp"',
+      fetchedAt: Date.now(),
+      status: 200,
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(body));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(body);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      PROFILE_JSON_URL,
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ 'if-none-match': 'W/"invalid-xp"' }),
+      })
+    );
+  });
   it('rejects requests that fail Turnstile verification when enforcement is enabled', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
     useRuntimeConfigMock.mockReturnValue({

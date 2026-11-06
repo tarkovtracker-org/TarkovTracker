@@ -2,54 +2,6 @@
   <div
     class="flex scrollbar-none flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:overflow-x-auto"
   >
-    <AppTooltip
-      :text="isPinned ? t('page.tasks.questcard.unpin_task') : t('page.tasks.questcard.pin_task')"
-    >
-      <UButton
-        size="xs"
-        variant="ghost"
-        :color="isPinned ? 'primary' : 'neutral'"
-        :icon="isPinned ? 'i-mdi-pin' : 'i-mdi-pin-outline'"
-        class="shrink-0"
-        :aria-label="
-          isPinned ? t('page.tasks.questcard.unpin_task') : t('page.tasks.questcard.pin_task')
-        "
-        @click.stop="emit('togglePin')"
-      />
-    </AppTooltip>
-    <TaskMapVisibilityToggles :task-id="task.id" />
-    <AppTooltip
-      v-for="req in traderRequirements"
-      :key="req.id"
-      :text="
-        t('page.tasks.questcard.trader_requirement_badge', {
-          trader: req.trader.name,
-          kind: t(
-            `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
-          ),
-          comparison: req.compareMethod,
-          value: req.value,
-        })
-      "
-    >
-      <UBadge
-        size="xs"
-        :color="req.met ? 'success' : 'error'"
-        variant="soft"
-        class="shrink-0 cursor-help text-[11px]"
-      >
-        {{
-          t('page.tasks.questcard.trader_requirement_badge', {
-            trader: req.trader.name,
-            kind: t(
-              `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
-            ),
-            comparison: req.compareMethod,
-            value: req.value,
-          })
-        }}
-      </UBadge>
-    </AppTooltip>
     <AppTooltip :text="locationTooltip">
       <UBadge
         size="xs"
@@ -68,7 +20,8 @@
       </UBadge>
     </AppTooltip>
     <UBadge
-      v-if="hasProgress"
+      v-if="showProgress && hasProgress"
+      data-testid="task-card-progress"
       size="xs"
       color="neutral"
       variant="soft"
@@ -152,33 +105,58 @@
         {{ exclusiveEditionBadge }}
       </UBadge>
     </AppTooltip>
-    <slot name="actions" />
-    <div class="hidden sm:flex">
-      <AppTooltip v-if="isOurFaction" :text="t('common.more', 'More')">
+    <div class="flex shrink-0 items-center" data-testid="task-card-icon-actions">
+      <AppTooltip
+        :text="isPinned ? t('page.tasks.questcard.unpin_task') : t('page.tasks.questcard.pin_task')"
+      >
         <UButton
           size="xs"
-          color="neutral"
           variant="ghost"
+          :color="isPinned ? 'primary' : 'neutral'"
+          :icon="isPinned ? 'i-mdi-pin' : 'i-mdi-pin-outline'"
           class="shrink-0"
-          :aria-label="t('common.more', 'More')"
-          @click.stop="emit('openMenu', $event)"
-        >
-          <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
-        </UButton>
+          :aria-label="
+            isPinned ? t('page.tasks.questcard.unpin_task') : t('page.tasks.questcard.pin_task')
+          "
+          @click.stop="emit('togglePin')"
+        />
       </AppTooltip>
+      <AppTooltip :text="hideLabel">
+        <UButton
+          size="xs"
+          variant="ghost"
+          :color="isHidden ? 'primary' : 'neutral'"
+          :icon="isHidden ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+          class="shrink-0"
+          data-testid="task-card-hide"
+          :aria-label="hideLabel"
+          @click.stop="emit('toggleHide')"
+        />
+      </AppTooltip>
+      <AppTooltip :text="t('page.tasks.questcard.copy_task_link')">
+        <UButton
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          icon="i-mdi-link-variant"
+          class="shrink-0"
+          data-testid="task-card-copy-link"
+          :aria-label="t('page.tasks.questcard.copy_task_link')"
+          @click.stop="emit('copyLink')"
+        />
+      </AppTooltip>
+      <TaskMapVisibilityToggles :task-id="task.id" />
     </div>
+    <slot name="actions" />
   </div>
 </template>
 <script setup lang="ts">
   import TaskMapVisibilityToggles from '@/features/tasks/TaskMapVisibilityToggles.vue';
-  import type { Task, NormalizedTraderRequirement } from '@/types/tarkov';
+  import type { Task } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
     isPinned: boolean;
-    isOurFaction: boolean;
-    traderRequirements: Array<
-      Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }> & { met: boolean }
-    >;
+    isHidden: boolean;
     locationTooltip: string;
     isFailed: boolean;
     isActive: boolean;
@@ -187,11 +165,16 @@
     exclusiveEditionBadge?: string;
     progressCompleted: number;
     progressTotal: number;
+    showProgress: boolean;
   }>();
   const emit = defineEmits<{
     togglePin: [];
-    openMenu: [event: MouseEvent];
+    toggleHide: [];
+    copyLink: [];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const hasProgress = computed(() => props.progressTotal > 0);
+  const hideLabel = computed(() =>
+    props.isHidden ? t('page.tasks.questcard.unhide_task') : t('page.tasks.questcard.hide_task')
+  );
 </script>

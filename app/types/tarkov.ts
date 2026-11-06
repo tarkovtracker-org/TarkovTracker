@@ -135,6 +135,13 @@ export type TaskCounterDerivation =
  * member is (faction variants a player can only ever complete one of).
  */
 export type TaskCounterGroup = string[] | { anyOf: string[] };
+export type TaskProgressionPool = {
+  traderId: string;
+  loyaltyLevel: number;
+  verification: 'verified' | 'unresolved';
+  coverage: 'complete' | 'partial';
+  derivation: TaskCounterDerivation;
+};
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';
@@ -143,6 +150,7 @@ export type TaskOtherRequirement =
       compareMethod: RequirementComparison;
       value: number;
       counter?: TaskCounterDerivation;
+      taskPool?: TaskProgressionPool;
     }
   | { type: 'dialogue'; id: string; traders: string[] }
   /** Overlay story gate: met only when the player completed that storyline objective. */
@@ -283,6 +291,8 @@ export interface RequiredKeyGroup {
   optional?: boolean;
   anyOf?: boolean;
 }
+/** The client's `tierAccessory`: 0 is "Essential Tasks", 1-4 are "Loyalty Level 1-4". */
+export type TraderTaskGroup = 0 | 1 | 2 | 3 | 4;
 export interface Task {
   id: string;
   tarkovDataId?: number;
@@ -296,6 +306,8 @@ export interface Task {
   taskRequirements?: TaskRequirement[];
   otherRequirements?: TaskOtherRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
+  /** In-game trader task-list group from the overlay; absent when unknown. Never a gate. */
+  traderTaskGroup?: TraderTaskGroup;
   minPlayerLevel?: number;
   requiredPrestige?: TaskPrestigeReference;
   /**
@@ -604,6 +616,12 @@ export interface NeededItemTaskObjective extends NeededItemBase {
    * as `objectiveCompletions`, while `id` stays the progress key.
    */
   sourceObjectiveId?: string;
+  /**
+   * Set by Needed Items when the user hid the task but a teammate still needs
+   * the objective: the card shows only teammates' needs and adds nothing to
+   * the user's own counts or Smart Fill targets.
+   */
+  hiddenForSelf?: boolean;
 }
 export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';

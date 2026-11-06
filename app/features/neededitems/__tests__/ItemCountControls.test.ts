@@ -19,7 +19,11 @@ const UIconStub = defineComponent({
 });
 type Wrapper = ReturnType<typeof mount>;
 const mounted: Wrapper[] = [];
-function mountComponent(props: { currentCount: number; neededCount: number }): Wrapper {
+function mountComponent(props: {
+  currentCount: number;
+  neededCount: number;
+  size?: 'xs' | 'sm' | 'responsive';
+}): Wrapper {
   const wrapper = mount(ItemCountControls, {
     props,
     attachTo: document.body,
@@ -124,6 +128,25 @@ describe('ItemCountControls inline edit', () => {
     expect(wrapper.emitted('setCount')).toBeUndefined();
     expect(wrapper.text()).toContain('5/10');
   });
+  it.each(['blur', 'Enter'] as const)(
+    'discards an edit when disabled before %s',
+    async (commit) => {
+      const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
+      const input = await startEditing(wrapper);
+      await input.setValue('8');
+      await wrapper.setProps({ disabled: true });
+      expect(wrapper.find('input').exists()).toBe(false);
+      expect(
+        wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)
+      ).toBe(true);
+      await wrapper.setProps({ disabled: false });
+      if (commit === 'blur') await input.trigger('blur');
+      else await input.trigger('keydown', { key: commit });
+      expect(emittedCounts(wrapper)).toEqual([]);
+      await editAndCommit(wrapper, '4');
+      expect(emittedCounts(wrapper)).toEqual([4]);
+    }
+  );
   it('keeps the input bounded by min/max attributes', async () => {
     const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
     const input = await startEditing(wrapper);
@@ -138,5 +161,22 @@ describe('ItemCountControls inline edit', () => {
     expect(wrapper.emitted('decrease')).toEqual([[]]);
     expect(wrapper.emitted('increase')).toEqual([[]]);
     expect(wrapper.emitted('toggle')).toEqual([[]]);
+  });
+  it('renders the responsive stepper size by default', () => {
+    const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
+    const increase = wrapper.get('button[aria-label="needed_items.aria.increase_count"]');
+    expect(increase.classes()).toEqual(expect.arrayContaining(['h-5', 'sm:h-6', 'lg:h-8']));
+  });
+  it('renders a fixed compact stepper for size="xs"', () => {
+    const wrapper = mountComponent({ currentCount: 2, neededCount: 10, size: 'xs' });
+    const increase = wrapper.get('button[aria-label="needed_items.aria.increase_count"]');
+    expect(increase.classes()).toContain('h-5');
+    expect(increase.classes()).not.toContain('lg:h-8');
+    expect(wrapper.attributes('size')).toBeUndefined();
+  });
+  it('marks every button as type="button"', () => {
+    const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });
+    const types = wrapper.findAll('button').map((button) => button.attributes('type'));
+    expect(types).toEqual(['button', 'button', 'button', 'button']);
   });
 });

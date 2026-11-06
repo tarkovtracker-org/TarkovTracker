@@ -80,6 +80,8 @@ export interface ParseEftLogsForQuestImportOptions {
   includedVersions?: Iterable<string> | null;
   account?: string | null;
   taskIdsByMode?: Partial<Record<GameMode, Iterable<string>>>;
+  /** Narrow caller-owned allowlist for explicit completion evidence only; never supplies task metadata. */
+  completedTaskIdsByMode?: Partial<Record<GameMode, Iterable<string>>>;
 }
 interface ChatMessagePayload {
   eventId?: unknown;
@@ -132,13 +134,22 @@ function* readLogRecords(text: string): Generator<LogRecord> {
 /** Decodes versioned and legacy pipe-delimited headers while preserving message delimiters. */
 function toLogRecord(text: string, match: RegExpExecArray, end: number): LogRecord {
   const fields = match[1]!.split('|');
-  const channelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
+  const headerChannelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
+  const channelIndex = mirroredChannelIndex(fields, headerChannelIndex);
   return {
     timestamp: extractLogLineTimestamp(match[0])!,
     channel: (fields[channelIndex] ?? '').toLowerCase(),
     message: fields.slice(channelIndex + 1).join('|'),
     body: text.slice(match.index + match[0].length, end).trim(),
   };
+}
+/** Unwraps only explicitly source-prefixed output mirrors, never generic output chatter. */
+function mirroredChannelIndex(fields: string[], index: number): number {
+  const sources = ['application', 'backend', 'notifications', 'push-notifications'];
+  return fields[index]?.toLowerCase() === 'output' &&
+    sources.includes(fields[index + 1]?.toLowerCase() ?? '')
+    ? index + 1
+    : index;
 }
 /** Parses log timestamps as UTC when no explicit offset is present; invalid values return null. */
 function eftLogTimestampMillis(timestamp: string | null): number | null {
@@ -552,8 +563,18 @@ function appendLogText(source: EftParsedLogFile, text: string, budget?: EftLogIm
   for (const record of readLogRecords(text)) {
     collectRecordModeSignals(record, source, budget);
   }
-  if (source.notifications)
-    appendNotificationResult(source.notifications, parseEftNotificationLogText(text, budget));
+  appendSourceNotifications(source, text, budget);
+}
+/** Keeps output context-only files out of notification/account counts until notification evidence appears. */
+function appendSourceNotifications(
+  source: EftParsedLogFile,
+  text: string,
+  budget?: EftLogImportBudget
+): void {
+  if (!isEftQuestEvidenceLogFileName(source.name)) return;
+  const result = parseEftNotificationLogText(text, budget);
+  if (source.notifications) appendNotificationResult(source.notifications, result);
+  else if (result.chatMessageCount + result.parseErrorCount > 0) source.notifications = result;
 }
 /** Parses complete records once and retains only evidence needed for later version/mode selection. */
 export function createEftLogFileParser(name: string, budget?: EftLogImportBudget) {
@@ -594,6 +615,10 @@ function matchesChannel(fileName: string, channel: string): boolean {
 export function isEftNotificationLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, '(?:push-notifications|notifications)');
 }
+/** Identifies dedicated notification files and output files that may contain explicit notification mirrors. */
+export function isEftQuestEvidenceLogFileName(fileName: string): boolean {
+  return matchesChannel(fileName, '(?:push-notifications|notifications|output)');
+}
 /** Identifies backend logs that can provide session mode evidence. */
 export function isEftBackendLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, 'backend');
@@ -610,7 +635,7 @@ function modeBuckets<T>(create: () => T): Record<EftQuestEventMode, T> {
   return { pvp: create(), pve: create(), seasonal: create(), unknown: create() };
 }
 /** Prefers original server time and otherwise uses the notification receipt timestamp. */
-function knownQuestEventTime(event: EftQuestEvent): number | null {
+export function knownQuestEventTime(event: EftQuestEvent): number | null {
   return event.occurredAt ?? eftLogTimestampMillis(event.timestamp);
 }
 /** Places events without usable timestamps before dated history during reconciliation. */
@@ -913,18 +938,27 @@ function filterSeasonEvents(events: EftQuestImportEvent[]) {
   return { events: included, skippedSeasonalEventCount };
 }
 /** Annotates event eligibility without changing the active metadata store or progress mode. */
+const matchesImportTaskId = (
+  event: EftQuestImportEvent,
+  ids: ReadonlySet<string>,
+  completedIds: ReadonlySet<string> | undefined
+): boolean =>
+  ids.has(event.questId) ||
+  (event.status === 'completed' && completedIds?.has(event.questId) === true);
 function matchEventModes(
   events: EftQuestImportEvent[],
-  catalogs: ParseEftLogsForQuestImportOptions['taskIdsByMode']
+  catalogs: ParseEftLogsForQuestImportOptions['taskIdsByMode'],
+  completedCatalogs: ParseEftLogsForQuestImportOptions['completedTaskIdsByMode']
 ): void {
   if (!catalogs) return;
   const idsByMode = new Map(Object.entries(catalogs).map(([mode, ids]) => [mode, new Set(ids)]));
+  const completedIdsByMode = new Map(
+    Object.entries(completedCatalogs ?? {}).map(([mode, ids]) => [mode, new Set(ids)])
+  );
   for (const event of events) {
     event.matchedModes = [...idsByMode]
-      .filter(
-        ([mode, ids]) =>
-          (event.mode === UNKNOWN_MODE || event.mode === mode) && ids.has(event.questId)
-      )
+      .filter(([mode]) => event.mode === UNKNOWN_MODE || event.mode === mode)
+      .filter(([mode, ids]) => matchesImportTaskId(event, ids, completedIdsByMode.get(mode)))
       .map(([mode]) => mode as GameMode);
   }
 }
@@ -957,6 +991,7 @@ function summarizeImportEvents(events: EftQuestImportEvent[], taskIdSet: Set<str
   const questIds = idsFor('completed');
   const startedQuestIds = idsFor('started');
   const failedQuestIds = idsFor('failed');
+  const matchedCompletionIds = new Set([...taskIdSet, ...matchedIdsFor('completed')]);
   return {
     events,
     dedupedCompletionEventCount: events.filter((event) => event.status === 'completed').length,
@@ -970,7 +1005,7 @@ function summarizeImportEvents(events: EftQuestImportEvent[], taskIdSet: Set<str
     matchedTaskIdsByMode: matchedByMode('completed'),
     matchedStartedTaskIdsByMode: matchedByMode('started'),
     matchedFailedTaskIdsByMode: matchedByMode('failed'),
-    unmatchedQuestIds: questIds.filter((id) => !taskIdSet.has(id)),
+    unmatchedQuestIds: questIds.filter((id) => !matchedCompletionIds.has(id)),
     unmatchedStartedQuestIds: startedQuestIds.filter((id) => !taskIdSet.has(id)),
     unmatchedFailedQuestIds: failedQuestIds.filter((id) => !taskIdSet.has(id)),
   };
@@ -990,7 +1025,7 @@ export function parseEftLogsForQuestImport(
   const includedVersions = selectIncludedVersions(availableVersions, options.includedVersions);
   const collected = collectImportEvents(groups, new Set(includedVersions), account.includes);
   const seasonal = filterSeasonEvents(collected.events);
-  matchEventModes(seasonal.events, options.taskIdsByMode);
+  matchEventModes(seasonal.events, options.taskIdsByMode, options.completedTaskIdsByMode);
   return {
     ...summarizeImportEvents(seasonal.events, new Set(taskIds)),
     ...collected.counts,

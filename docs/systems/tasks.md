@@ -12,6 +12,8 @@ The app-bar search (`app/features/omnibar/AppSearch.vue`) replaced the page sear
 Needed Items (Resources keeps its own). There, typing writes the page's `q` (debounced 150 ms, with `router.replace`) and its dropdown
 offers jump results for the other entities; elsewhere the dropdown jumps to tasks, items, or hideout
 stations. Opening a `?task=` link clears `q` first so the linked task is not filtered out.
+Task deep-link cleanup retains the selected status filter when removing `task` from the URL, so
+the focused task remains visible after route preferences synchronize.
 
 ## Task views
 
@@ -21,10 +23,82 @@ tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trade
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without
-overwriting the saved one. The sidebar keeps one Tasks entry,
+overwriting the saved one. Graph also drops the sort control, since its layout follows dependencies.
+The Graph canvas needs the `lg` breakpoint (1024px). Below it the Graph tab stays in the header with a
+monitor icon and a screen-reader note. The narrow `/tasks/graph` route hides the mounted toolbar
+and replaces the canvas with an explanation that links to Traders (selected trader, saved status,
+sort mode, sort direction and search carried in the URL). Below `sm` the tabs hide their primary
+icons while Graph keeps its monitor hint,
+so all four fit on one row at 333px. The sidebar keeps one Tasks entry,
 highlighted on every view. No default-view selection is saved; the stored
 `taskPrimaryView` preference follows the route and is kept for compatibility. Legacy `/tasks?view=<view>` links are replaced by the matching route with the other
 params kept (`app/middleware/tasks-legacy-view.global.ts`).
+
+## Filters and page settings
+
+Tasks, Needed Items and Hideout share one pattern built from `app/components/ui/`:
+
+- **Filters** (`FiltersPopover`, `FilterSection`, `PreferenceSwitch`): on Tasks and Needed Items, a
+  toolbar button showing the active count opens everything that changes _which_ items show. Its
+  Reset clears every saved filter, including ones idle in the current view. Hideout has no Filters
+  menu: its station status tabs stay in the toolbar, and its display and prerequisite switches live
+  in the Settings drawer.
+- **Active filter chips** (`ActiveFilterChips`): one removable chip per filter that is narrowing the
+  current view. Clear all, shown when there are several, clears only those visible filters. A
+  filter that cannot apply to the current view gets no chip and does not count: team-shared off the
+  whole team's Available tab, map-only filters off Maps, and the Kappa-only filter on the Hideout
+  scope, where it is disabled.
+- **Settings** (`SettingsButton`, `SettingsDrawer`, `PreferenceSettingGroups`): how items _look or
+  behave_. Tasks and Hideout keep a drawer, docked beside the content on wide screens and an overlay
+  otherwise (`usePageSettingsDrawer`). Needed Items has no drawer; its appearance options are the
+  toolbar view controls.
+- Navigation stays outside both menus: task status tabs and the team view selector on Tasks, and
+  the All, Tasks and Hideout scope tabs on Needed Items.
+- **Sort** (`SortControl`): the sort select plus a direction button.
+
+Task types (`useTaskContentFilters`) are additive: a task shows when it belongs to any selected type.
+An empty saved selection already means every type, so the last selected type stays locked on. Card
+display, status tab visibility and behavior preferences live in `useTaskDisplaySettings`; the
+failed-task repair action shows under Behavior only while failed tasks exist. The Hideout drawer's
+switches are read-only while the help tour points at it. Hideout always lists stations whose next
+level has its station, skill and trader prerequisites met first (item requirements do not count),
+keeping upstream order within each group, so it has no sort setting. Maxed cards already show only
+"Max station level reached", so there is no page-wide collapse setting either; each card keeps its
+own collapse toggle. The drawer holds only the availability requirements. The legacy
+`hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
+
+## Hidden tasks
+
+The eye button in a task card's header (or its right-click menu) hides the task from task lists (`useTaskHiding`, stored in the
+synced `hiddenTaskIds` preference / `user_preferences.hidden_task_ids`). Hiding is view-only: it
+never completes, fails or unlocks anything, so a hidden task still gates its successors. A toast
+offers Undo, and the same button unhides it. On the Maps view the card also shows a map-marker
+button (`TaskMapVisibilityToggles`) for the separate map-view-only hidden state
+(`mapHiddenTaskIds`, keyed by task ID, so it applies on every map); it uses a distinct icon so it
+is not confused with the eye.
+
+- All, Active, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
+  (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
+- Completed and Failed list hidden tasks normally, as does any search, so every hidden task stays
+  findable. A deep-linked task is never hidden (`getListHiddenTaskIds` in
+  `app/features/tasks/hiddenTasks.ts`).
+- The map shows exactly what the list shows: a hidden task draws no markers and leaves the
+  completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
+  deep link). Hidden tasks leave the All, Active, Available and Locked status and trader counts;
+  Completed and Failed counts still include them (`useTaskCounts`).
+- Needed Items drops the user's own objectives of hidden tasks from every tab and count until the
+  task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
+  personal: a hidden task's objective stays while a teammate still needs it (the same pending
+  teammates `NeededItem` shows, unless team items are hidden), so the team can still supply it.
+  That objective is tagged `hiddenForSelf` and its card or row shows "Hidden for you" in place
+  of the user's own count, progress and controls. Row and expanded card list the teammates; the
+  compact card shows their count, and every style's tooltip (and screen-reader text) names who
+  still needs it (`hiddenForSelfHint`). It adds nothing to tab counts, Group by item totals or
+  Smart Fill targets (`countsForSelf`); Group by item shows only the user's own totals, so it
+  leaves these needs out, and its "unique (total)" count uses `groupedNeedCount`. Hide owned
+  ignores the user's own count for these needs, since a teammate still lacks the item.
+  Hideout requirements and the dashboard's overall item progress are unaffected
+  (`useNeededItems` `allItems`).
 
 ## Canonical task progression
 
@@ -72,7 +146,27 @@ groups. An unknown derivation
 type makes the registry malformed, so the tracker must support a type before the overlay publishes
 it. This runs last in `applyOverlay`, so task
 corrections cannot supply a derivation.
-`unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
+`unresolved`/`partial` entries, unsupported revisions and other modes attach no counter.
+
+Registry entries may also carry `pool: { traderId, loyaltyLevel }`. For a supported revision and
+matching mode, the server attaches `taskPool` with that identity, verification, coverage and candidate
+derivation when every contributor exists. This display metadata never creates a counter or an
+additional trader-loyalty gate. Entries without pool metadata retain their existing counter behavior.
+Both `counter` and `taskPool` are excluded from in-game confirmation signatures.
+
+Cards and dashboard blockers share an instruction such as "Complete at least 3 LL2 tasks for
+Mechanic". Cards show actual tracked progress and an expandable contributor list, with available
+incomplete tasks first. Each contributor retains its own availability; the current task is identified
+without being suggested as work to unlock itself. Faction alternatives appear together and earn one
+credit per group. Confirmed in-game availability remains distinct from tracked completions.
+Unresolved pools without an effective account value show "Progress unverified". A known account
+value is displayed as in-game progress. Candidate tasks remain explicitly labeled, and counting
+these candidates cannot clear the gate. Unmapped variables retain generic in-game progression wording.
+Pool descriptions are additive to the existing `json-v3` task-core payload. Keep its cache keys:
+payloads that retain the gate without pool metadata show a generic pool instruction until refreshed.
+Payloads that previously discarded the gate cannot render it until a refreshed catalog restores it. Publish consumer
+support before adding optional pool fields to the overlay, since older consumers reject unknown
+registry entry fields; then refresh precompute and the existing browser/edge caches to expose names.
 
 For a gate carrying `counter`, the evaluator counts that player's completed contributors or
 groups (`task_counter` blocker with current/required on a shortfall). An account without those
@@ -124,8 +218,8 @@ rejected before they can prevent JSONB persistence.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
 bypass an explicit known unmet account value, malformed requirements, or independent
-level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
-menu clears just the in-game confirmation. Mark available either makes the task available or changes
+level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The lock-reset button in
+the card's Requirements header clears just the in-game confirmation. Mark available either makes the task available or changes
 nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
 malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
 device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
@@ -190,7 +284,12 @@ response cannot replace the core catalog's gates.
 The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
-card and dashboard use `useTaskBlockerText` for the same explanations. Shared/non-current profile
+card builds one requirement list with `useTaskRequirements`: while a card is locked, its header
+lists only the unmet requirements as chips (three, then an inline "+N more"), and the expanded body
+has a collapsible Requirements row that marks every level, trader, prerequisite and server-side
+(`otherRequirements`) requirement met or unmet. Cards carry no separate level or trader requirement badges. Comparisons are worded in
+plain language by `requirement-format.ts` (`15+`, `exactly 1`, never `>=`); the dashboard's
+`useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
 story catalogs load for the selected mode without mutating the active metadata store; obsolete
 mode/language requests are aborted on scope change or unmount and late responses are ignored.
@@ -212,7 +311,19 @@ objective and cannot be cleared through Mark available; complete the storyline o
 Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
 `finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
 opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
-locked on the dashboard also locks its tasks.
+locked on the dashboard also locks its tasks. A configured unlock ID stays a gate even when its
+task is absent from the catalog; recorded completion can still satisfy it. Ref uses only the
+current mode's configured ID, and an unlock task never gates itself. Missing unlock metadata
+keeps the dashboard locked without a broken task link; task blockers explain the missing data
+instead of showing a raw ID.
+Players can recover a missing configured unlock task from explicit completion notifications through
+the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
+
+Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
+current profile's edition, prestige and faction eligibility. Ineligible children contribute no
+“Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
+do not remove an otherwise eligible follow-up from that count.
+
 Completed and failed tasks are terminal.
 The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
 Legacy rows without an `active` key retain the unlockable prerequisite fallback. Task cards use
@@ -222,8 +333,9 @@ Shared story chapters followed by matching mode corrections produce `Task.storyU
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
 wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
 condition. Client chapters merge the same mode patches (including partial objectives), and
-edition/chapter caches and in-flight requests are mode-scoped. A satisfied story route also
-suppresses the task card's otherwise-unmet quest prerequisite strip. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
+edition/chapter caches and in-flight requests are mode-scoped. The Requirements row lists a
+story route as its own "Or progress a story chapter" line, met from the same effective story
+progress the evaluator reads; the quest prerequisites keep their own state. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
 faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
 unresolved references remain blocked until metadata is available.
 
@@ -262,21 +374,21 @@ not import quest completions and therefore has no trader/task backfill path.
   leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
   it blocked behind an unknown blocker.
 - `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract, so recording it does not
-  bump the precompute or browser cache versions and adds no new rollout requirement. The
-  `tasks-core-json-v3` operator rollout in the next invariant is unchanged and still applies on its
-  own terms. A payload without the field behaves exactly as it did before, the evaluator
+  bump the precompute or browser cache versions and adds no new rollout requirement. A payload
+  without the field behaves exactly as it did before; the evaluator
   independently blocks a non-list `taskRequirements` from any payload vintage. Successful precompute
   refreshes run every 12 hours, after which edge and browser caches must also refresh. This is not
   a strict 12-hour recovery bound: failed runs can leave older KV entries serving for their seven-day
   TTL. Verify a successful precompute from the deployed fix before claiming production diagnostics
   are active; already-discarded gates cannot be recovered by the evaluator alone.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
-- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
-  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
-  fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
-  merging or promoting the app, an authorized operator must run the precompute workflow from the
-  approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
-  and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
+- Task-core stays on `json-v3` for optional pool descriptions; player progress and IndexedDB schema
+  8 are unchanged. Deploy the compatible consumer with the current overlay first. After publishing
+  pool metadata, run trusted-main precompute without language/mode filters and verify all 48
+  refreshed entries and their overlay provenance before purging corrected edge/browser metadata.
+  This avoids exposing empty versioned KV keys during Pages' automatic deployment. Incompatible
+  contract changes still require the separate compatible-producer/preseed/consumer rollout in
+  [overlay release verification](./overlay-and-precompute.md#release-verification).
 
 ## Map objective visibility and required items
 
@@ -366,6 +478,21 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   the full tooltip directly (#919).
 
 ## Task list and Needed Items
+
+Sell-item objectives keep separate trader descriptions and progress counters. Their full accepted-item
+pool uses `ObjectiveItemDisplay` and the shared "Any of N" popover instead of the capped equipment
+strip. The popover renders at most 50 items per page; larger pools can be searched by name or short
+name and paged through without changing progress. Single-item sales still show the item directly.
+Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
+available.
+
+Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
+objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
+records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,
+and each explicit part keeps `${objective.id}:${part.id}` plus `sourceObjectiveId`. Collection
+updates counts only; it never completes the build or validates its required stats. Single-item
+rows use checkboxes, and completed or failed parent tasks disable collection controls. Category
+option browsing remains outside this explicit-part view.
 
 ### Task list loading
 

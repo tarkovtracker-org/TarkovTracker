@@ -42,6 +42,19 @@
               {{ $t('common.apply') }}
             </UButton>
           </div>
+          <template #help>
+            <span class="grid">
+              <span aria-hidden="true" class="invisible col-start-1 row-start-1">
+                {{
+                  $t('settings.player_level.range_hint_fallback', {
+                    min: minLevel,
+                    max: maxLevel,
+                  })
+                }}
+              </span>
+              <span class="col-start-1 row-start-1">{{ rangeHint }}</span>
+            </span>
+          </template>
         </UFormField>
       </form>
     </template>

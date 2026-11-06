@@ -28,11 +28,19 @@
     </AppTooltip>
     <NuxtLink
       to="/profile"
-      class="text-primary-400 hover:text-primary-300 light:text-primary-800 ml-auto flex items-center gap-1 font-medium transition-colors hover:underline"
+      class="text-primary-400 hover:text-primary-300 light:text-primary-800 flex items-center gap-1 font-medium transition-colors hover:underline"
+      :class="{ 'ml-auto': !$slots.actions }"
     >
       {{ $t('page.dashboard.progress.view_full_progress') }}
       <UIcon name="i-mdi-arrow-right" class="h-4 w-4" aria-hidden="true" />
     </NuxtLink>
+    <div
+      v-if="$slots.actions"
+      class="ml-auto flex flex-wrap items-center gap-2"
+      data-testid="dashboard-summary-actions"
+    >
+      <slot name="actions" />
+    </div>
   </section>
 </template>
 <script setup lang="ts">

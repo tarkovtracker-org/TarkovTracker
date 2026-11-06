@@ -1,5 +1,6 @@
 // Dispatch-created job checks are excluded from branch-rule evaluation by GitHub.
 // Publish the aggregate validator outcome as a commit status on the same immutable SHA.
+import { dispatchedQueuePolicy } from './dispatched-queue-policy.mjs';
 const LOCALES_REF = 'refs/heads/locales';
 const SHA = /^[0-9a-f]{40}$/;
 const MERGE_LOOKUP_ATTEMPTS = 12;
@@ -9,6 +10,8 @@ function eligibleLocalesPull(pull, context) {
   if (!head || !base) return false;
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   return [
+    Number.isSafeInteger(pull.number),
+    pull.number > 0,
     pull.state === 'open',
     pull.draft === false,
     head.ref === 'locales',
@@ -33,6 +36,18 @@ async function localesPull(github, context) {
   });
   const candidates = pulls.filter((pull) => eligibleLocalesPull(pull, context));
   return candidates.length === 1 ? candidates[0] : null;
+}
+async function requireCurrentLocalesHead(github, context) {
+  const pull = await localesPull(github, context);
+  if (!pull) throw new Error('Cannot attest a unique eligible locales head.');
+  const current = await matchingCurrentPull(github, context, pull);
+  if (!current) throw new Error('Cannot attest an unchanged locales head.');
+}
+async function queueHeadOnly(github, context, admissionAppId) {
+  if (context.ref !== LOCALES_REF) return false;
+  const queue = await dispatchedQueuePolicy({ github, repo: context.repo, admissionAppId });
+  if (queue) await requireCurrentLocalesHead(github, context);
+  return queue;
 }
 async function mainSha(github, context) {
   const { data } = await github.rest.git.getRef({ ...context.repo, ref: 'heads/main' });
@@ -143,11 +158,17 @@ async function reportMergeStatus(github, context, targetUrl, mergeSha, state) {
   if (reportedMergeSha)
     await reportLocalesMergeCi(github, context, targetUrl, reportedMergeSha, state);
 }
-export async function reportDispatchedCi({ github, context, outcome }) {
+export async function reportDispatchedCi({
+  github,
+  context,
+  outcome,
+  admissionAppId = process.env.REVIEW_ADMISSION_APP_ID,
+}) {
   if (context.eventName !== 'workflow_dispatch') return;
   const { state, description } = validationStatus(outcome);
   const targetUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-  const mergeSha = await requiredMergeSha(github, context, state);
+  const headOnly = await queueHeadOnly(github, context, admissionAppId);
+  const mergeSha = headOnly ? null : await requiredMergeSha(github, context, state);
   await github.rest.repos.createCommitStatus({
     ...context.repo,
     sha: context.sha,
@@ -156,5 +177,5 @@ export async function reportDispatchedCi({ github, context, outcome }) {
     description,
     target_url: targetUrl,
   });
-  await reportMergeStatus(github, context, targetUrl, mergeSha, state);
+  if (!headOnly) await reportMergeStatus(github, context, targetUrl, mergeSha, state);
 }

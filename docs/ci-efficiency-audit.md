@@ -25,7 +25,9 @@ Read-only GitHub ruleset inspection found active Main deletion/non-fast-forward 
 and strict Main CI freshness requiring `CI Result` and `Preview Result`, both from GitHub
 Actions (integration 15368). No legacy branch-protection rule was returned (404).
 `PR Meta` is additionally required by the existing Dependabot merge helper, not by that
-ruleset. Settings were not changed.
+ruleset. Settings were not changed. Main CI freshness was later disabled (2026-10-16) in favor
+of the native merge queue, which also requires App-issued `Review Admission`; see
+[current state](merge-queue-rollout.md#current-state).
 
 `CI Result` always runs, checks the classifier and every selected job, and rejects missing,
 failed, cancelled or unexpected results. Its status-writing code comes from the default

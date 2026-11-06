@@ -1,22 +1,14 @@
 BEGIN;
 SELECT plan(25);
--- #1028 Phase 3: normalized rows are the only progress store. These checks fail if a legacy
--- pvp_data / pve_data writer, the legacy-to-normalized bridge, or a legacy merge seed returns.
+-- Normalized writes remain usable after retiring the legacy columns and readers.
+-- Keep the account clocks required by accepted normalized-reader clients.
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000001028', 'legacy-writes-owner@example.invalid'),
   ('00000000-0000-0000-0000-000000001029', 'legacy-writes-api@example.invalid'),
   ('00000000-0000-0000-0000-000000001030', 'legacy-writes-placeholder@example.invalid');
--- handle_new_user() created each account row. Give every account frozen legacy progress, as an
--- account last written before this phase has. Its higher reset epoch would win any legacy seed.
--- All writes share this transaction's timestamp and marker, so row identity (ctid) proves no write.
-UPDATE public.user_progress
-SET
-  pvp_data = '{"level":7,"progressEpoch":3,"displayName":"frozen pvp","manualActivityHistory":[{"id":"legacy","timestamp":5000,"type":"task","action":"complete","title":"Legacy"}]}',
-  pve_data = '{"level":8,"progressEpoch":2,"displayName":"frozen pve"}'
-WHERE user_id IN ('00000000-0000-0000-0000-000000001028', '00000000-0000-0000-0000-000000001029',
-  '00000000-0000-0000-0000-000000001030');
+-- Signup creates account metadata without creating normalized placeholder rows.
 CREATE TEMP TABLE frozen_accounts AS
-SELECT user_id, ctid::text AS row_version, updated_at, metadata_write_id, pvp_data, pve_data
+SELECT user_id, ctid::text AS row_version, updated_at, metadata_write_id
 FROM public.user_progress
 WHERE user_id IN ('00000000-0000-0000-0000-000000001028', '00000000-0000-0000-0000-000000001029',
   '00000000-0000-0000-0000-000000001030');
@@ -26,8 +18,8 @@ CREATE FUNCTION pg_temp.account_unchanged(p_user_id uuid) RETURNS boolean LANGUA
   FROM public.user_progress current JOIN frozen_accounts frozen USING (user_id)
   WHERE current.user_id = p_user_id;
 $$;
-CREATE FUNCTION pg_temp.legacy_unchanged(p_user_id uuid) RETURNS boolean LANGUAGE sql AS $$
-  SELECT (current.pvp_data, current.pve_data) IS NOT DISTINCT FROM (frozen.pvp_data, frozen.pve_data)
+CREATE FUNCTION pg_temp.account_metadata_only(p_user_id uuid) RETURNS boolean LANGUAGE sql AS $$
+  SELECT NOT (to_jsonb(current) ?| ARRAY['pvp_data', 'pve_data'])
   FROM public.user_progress current JOIN frozen_accounts frozen USING (user_id)
   WHERE current.user_id = p_user_id;
 $$;
@@ -57,7 +49,7 @@ SELECT ok(NOT EXISTS (
     SELECT 1 FROM public.user_game_mode_progress
     WHERE user_id IN ('00000000-0000-0000-0000-000000001028', '00000000-0000-0000-0000-000000001029',
       '00000000-0000-0000-0000-000000001030')),
-  'a legacy column write no longer reaches normalized progress');
+  'signup leaves normalized progress unmaterialized');
 
 -- Client sync: normalized progress only, with metadata and cached-client compatibility clocks.
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000001028', true);
@@ -65,8 +57,8 @@ CREATE TEMP TABLE sync_outcome AS
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
   '{"pvp":{"level":30,"progressEpoch":4},"pve":{"level":40,"progressEpoch":3},"seasonal":{"level":3}}',
   private.active_season_number()) AS data;
-SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001028'),
-  'a sync leaves the legacy mode columns unchanged');
+SELECT ok(pg_temp.account_metadata_only('00000000-0000-0000-0000-000000001028'),
+  'a sync retains only account metadata');
 SELECT ok(NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001028'),
   'a persistent mode sync retains the cached-client account clock');
 SELECT results_eq(
@@ -82,20 +74,19 @@ SELECT results_eq(
     WHERE user_id = '00000000-0000-0000-0000-000000001028'$$,
   $$VALUES ('pve'::text, 2)$$,
   'changed account metadata still commits');
-SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001028'),
-  'a metadata change does not write the legacy mode columns');
+SELECT ok(pg_temp.account_metadata_only('00000000-0000-0000-0000-000000001028'),
+  'a metadata change retains only account metadata');
 
--- Prestige goes through the same RPC and leaves the legacy columns alone.
+-- Prestige goes through the same normalized RPC.
 SELECT public.archive_prestige_run_and_reset_progress('pvp', 0, 1, '{"level":31}', '{}',
   NULL, 'pve', 2, NULL, '{"level":1,"prestigeLevel":1,"progressEpoch":5}', NULL);
-SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001028'),
-  'a prestige reset does not write the legacy mode columns');
+SELECT ok(pg_temp.account_metadata_only('00000000-0000-0000-0000-000000001028'),
+  'a prestige reset retains only account metadata');
 SELECT is((SELECT progress_data->>'prestigeLevel' FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001028' AND game_mode = 'pvp'), '1',
   'a prestige reset writes normalized progress');
 
--- Frozen legacy progress is never a merge base, for a placeholder or for a missing row. Start
--- from those shapes even where an older schema bridged the legacy writes above into rows.
+-- A placeholder or missing normalized row is the only merge base.
 DELETE FROM public.user_game_mode_progress
 WHERE user_id IN ('00000000-0000-0000-0000-000000001029', '00000000-0000-0000-0000-000000001030');
 INSERT INTO public.user_game_mode_progress (user_id, game_mode, season_number, progress_data)
@@ -108,11 +99,11 @@ SELECT results_eq(
     FROM public.user_game_mode_progress
     WHERE user_id = '00000000-0000-0000-0000-000000001030' ORDER BY game_mode$$,
   $$VALUES ('pve'::text, '2'::text, NULL::text), ('pvp', '1', NULL)$$,
-  'a sync merges only normalized state, never the frozen legacy columns');
+  'a sync merges only normalized state after legacy storage removal');
 SELECT is((SELECT jsonb_array_length(progress_data->'manualActivityHistory')
   FROM public.user_game_mode_progress
   WHERE user_id = '00000000-0000-0000-0000-000000001030' AND game_mode = 'pvp'), 0,
-  'legacy manual history is not unioned into a placeholder');
+  'an empty placeholder does not acquire unrelated manual history');
 SELECT ok(NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001030'),
   'first persistent sync of an existing account retains its compatibility clock');
 
@@ -124,12 +115,12 @@ SELECT results_eq(
     FROM public.user_game_mode_progress
     WHERE user_id = '00000000-0000-0000-0000-000000001029' AND game_mode = 'pvp'$$,
   $$VALUES (NULL::text, 'true'::text)$$,
-  'an API write creates a missing row empty instead of seeding the frozen legacy column');
+  'an API write creates a missing row empty after legacy storage removal');
 SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'pve_data',
   NULL, NULL, '{"level":12}');
-SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
+SELECT ok(pg_temp.account_metadata_only('00000000-0000-0000-0000-000000001029')
     AND NOT pg_temp.account_unchanged('00000000-0000-0000-0000-000000001029'),
-  'PvP and PvE API writes freeze legacy JSON while retaining the account clock');
+  'PvP and PvE API writes retain account metadata and compatibility clocks');
 -- Account activity comes from the normalized write.
 DELETE FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029';
 INSERT INTO private.account_retention (user_id, last_active_at, pending_since)
@@ -142,7 +133,7 @@ SELECT public.merge_progress_data('00000000-0000-0000-0000-000000001029', 'seaso
 SELECT ok((SELECT pending_since IS NULL AND last_active_at > now() - interval '1 hour'
   FROM private.account_retention WHERE user_id = '00000000-0000-0000-0000-000000001029'),
   'a Seasonal API write still records account activity');
-SELECT ok(pg_temp.legacy_unchanged('00000000-0000-0000-0000-000000001029')
+SELECT ok(pg_temp.account_metadata_only('00000000-0000-0000-0000-000000001029')
     AND (SELECT ctid::text IS DISTINCT FROM (SELECT row_version FROM seasonal_api_account_before)
          FROM public.user_progress WHERE user_id = '00000000-0000-0000-0000-000000001029')
     AND (SELECT (current_game_mode, game_edition, tarkov_uid) IS NOT DISTINCT FROM ('pvp', 1, NULL::bigint)

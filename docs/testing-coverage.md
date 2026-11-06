@@ -48,6 +48,12 @@ this section with new tables; update the config instead.
 
 ## Gates
 
+Each blank-line scanner module has separate coverage floors in
+`scripts/checks/blank-lines.vitest.config.mjs`. Run `pnpm run test:blank-lines`;
+CI also runs it in Lint & Format. These floors do not change the application
+coverage denominator or thresholds below. Scanner behavior and CI wiring are
+documented in [workflow automation](./workflow-automation.md#blank-line-scanner-tests).
+
 Unsharded Vitest requires 65% lines, 63% statements, 60% functions and 50%
 branches. These rounded floors preserve the measured pre-change baseline;
 per-module floors additionally protect the newly covered small logic modules
@@ -55,13 +61,20 @@ and changelog handler. Exact values are in `vitest.config.ts`. The larger team
 store retains the project gate rather than treating this test increment as
 complete coverage of every team behavior.
 
-CI continues to report imported files from each of four shards without
-per-shard thresholds. Codecov merges those reports and applies a 65% absolute
-line floor, alongside the existing automatic project/patch comparisons.
-Because local coverage also counts unimported application files, the two
-numbers have different denominators and should not be presented as identical.
-Per-module floors are enforced by the full local coverage run, not by a single
-CI shard. Forks that skip uploads retain the existing missing-report behavior.
+CI runs four shards without thresholds and uploads their Vitest blob reports.
+The `Coverage thresholds` job merges them with `vitest run --merge-reports
+--coverage`, which applies every gate in `vitest.config.ts` and blocks `CI
+Result` when one fails. Merging uses `scripts/ci/vitest-merged-coverage.mjs`
+to apply the `include` filter, zero-fill application files no test imports,
+and sum shard hits per file, so CI reports the same denominator and per-file
+numbers as the local unsharded run, except for
+`app/server/routes/profile/[...path].get.ts`: Vitest treats the covered path as
+a glob ignore pattern and zero-fills it again locally (16/17 statements); the
+merged provider preserves its real coverage (16/16 statements). Shards also upload imported-file lcov to
+Codecov, which applies a 65% absolute line floor alongside the automatic
+project/patch comparisons; Codecov does not count unimported files, so its
+percentage is higher than the gated one. Forks that skip uploads retain the
+existing missing-report behavior.
 
 For focused development, use `pnpm run test <test-file>`. A focused coverage run
 with the full application denominator is expected to fail project/module

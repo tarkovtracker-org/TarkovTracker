@@ -104,3 +104,78 @@ test('Progression controls fit narrow cards and support pointer and keyboard inp
     }
   }
 });
+test('Recovery files parse in a worker and remain preview-only until confirmation', async ({
+  page,
+}) => {
+  await page.goto(`${origin}/settings#backup-restore`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    const parse = JSON.parse;
+    JSON.parse = function (value, ...args) {
+      if (typeof value === 'string' && value.length > 1024 * 1024)
+        throw new Error('Large JSON parsed on UI thread');
+      return parse.call(this, value, ...args);
+    };
+    File.prototype.text = () => {
+      throw new Error('Backup file read on UI thread');
+    };
+    // Hold the first worker open request so cancellation/focus checks are deterministic.
+    const NativeWorker = Worker;
+    let holdOpen = true;
+    window.Worker = class extends NativeWorker {
+      postMessage(message, ...rest) {
+        if (holdOpen && message.command.op === 'open') {
+          holdOpen = false;
+          return;
+        }
+        return super.postMessage(message, ...rest);
+      }
+    };
+  });
+  const mode = {
+    level: 42,
+    pmcFaction: 'USEC',
+    taskCompletions: {},
+    taskObjectives: {},
+    hideoutParts: {},
+    hideoutModules: {},
+    traders: {},
+    skills: {},
+    prestigeLevel: 0,
+    skillOffsets: {},
+    storyChapters: {},
+  };
+  const raw =
+    JSON.stringify({
+      _userId: null,
+      data: { currentGameMode: 'pvp', gameEdition: 1, tarkovUid: null, pvp: mode, pve: mode },
+    }) + ' '.repeat(6 * 1024 * 1024);
+  const archive = Buffer.from(
+    JSON.stringify({ _format: 'tarkovtracker-device-progress', _version: 1, current: raw })
+  );
+  const input = page.locator('#backup-restore input[type="file"]');
+  const panel = page.getByRole('tabpanel', { name: 'Backup & Restore' });
+  const reading = panel.getByTestId('backup-reading-status');
+  await expect(reading).toBeAttached();
+  const upload = { name: 'recovery.json', mimeType: 'application/json', buffer: archive };
+  await input.setInputFiles(upload);
+  await expect(reading).toHaveText('Reading backup…');
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(
+    panel.getByRole('button', { name: 'Import TarkovTracker Backup', exact: true })
+  ).toBeFocused();
+  await expect(reading).toBeEmpty();
+  await input.setInputFiles(upload);
+  await expect(panel.getByRole('button', { name: 'Confirm Import', exact: true })).toBeVisible();
+  await expect(panel).toContainText('42 (USEC)');
+  await expect(
+    page.getByRole('button', { name: 'Level 1, click or press Enter to edit' })
+  ).toBeVisible();
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(panel.getByRole('button', { name: 'Confirm Import', exact: true })).toBeHidden();
+  await input.setInputFiles({
+    name: 'ordinary.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ padding: ' '.repeat(6 * 1024 * 1024) })),
+  });
+  await expect(panel).toContainText('Backup file is too large (max 5 MB)');
+});

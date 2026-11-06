@@ -2,14 +2,14 @@
   <div class="flex min-w-0 items-center gap-2">
     <AppTooltip :text="titleTooltip">
       <component :is="titleComponent" v-bind="titleProps" :class="titleClass">
-        <div class="bg-surface-800 h-9 w-9 shrink-0 overflow-hidden rounded-full">
+        <div class="bg-surface-800 h-7 w-7 shrink-0 overflow-hidden rounded-full">
           <NuxtImg
             v-if="task?.trader?.imageLink"
             :src="task.trader.imageLink"
             :alt="task?.trader?.name || 'Trader'"
-            width="36"
-            height="36"
-            sizes="36px"
+            width="28"
+            height="28"
+            sizes="28px"
             class="h-full w-full object-cover"
           />
           <UIcon v-else name="i-mdi-account-circle" class="text-surface-400 h-full w-full" />
@@ -18,10 +18,10 @@
           v-if="factionImage"
           :src="factionImage"
           :alt="task?.factionName"
-          width="24"
-          height="24"
-          sizes="24px"
-          class="h-6 w-6 shrink-0 object-contain invert"
+          width="20"
+          height="20"
+          sizes="20px"
+          class="h-5 w-5 shrink-0 object-contain invert"
         />
         <span class="min-w-0 text-sm font-semibold sm:truncate sm:text-base">
           {{ task?.name }}
@@ -34,7 +34,7 @@
         />
       </component>
     </AppTooltip>
-    <div class="ml-2 flex shrink-0 items-center gap-1.5">
+    <div class="flex shrink-0 items-center">
       <AppTooltip
         v-if="taskWikiUrl && !shouldLinkToWiki"
         :text="t('common.view_on_wiki', 'View on Wiki')"
@@ -78,25 +78,6 @@
           />
         </a>
       </AppTooltip>
-      <AppTooltip
-        v-if="(task.minPlayerLevel ?? 0) > 0"
-        :text="
-          t(
-            'page.tasks.questcard.level_badge_tooltip',
-            { level: task.minPlayerLevel },
-            `Minimum player level ${task.minPlayerLevel} required to unlock this quest`
-          )
-        "
-      >
-        <UBadge
-          size="xs"
-          :color="meetsLevelRequirement ? 'success' : 'error'"
-          variant="soft"
-          class="shrink-0 cursor-help text-[11px]"
-        >
-          {{ t('page.tasks.questcard.level_badge', { count: task.minPlayerLevel }) }}
-        </UBadge>
-      </AppTooltip>
     </div>
   </div>
 </template>
@@ -106,7 +87,6 @@
   import type { Task } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
-    meetsLevelRequirement: boolean;
   }>();
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });

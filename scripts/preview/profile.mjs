@@ -86,6 +86,7 @@ export function previewBuildEnv(previewBranch) {
     GA_MEASUREMENT_ID: '',
     CLARITY_PROJECT_ID: '',
     NUXT_PUBLIC_CLIENT_LOG_SINK_URL: '',
+    NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL: '',
     NUXT_LOG_SINK_URL: '',
     NUXT_PUBLIC_TURNSTILE_SITE_KEY: '',
     NUXT_TURNSTILE_SECRET_KEY: '',
@@ -108,6 +109,7 @@ export function resolveBuildProfile({ eventName, refName, pullRequest }) {
     const previewBranch = previewBranchName({ pullRequest: Number(pullRequest) });
     return { profile: 'preview', previewBranch, appUrl: previewAppUrl(previewBranch) };
   }
+  if (eventName === 'merge_group') return dispatchProfile(refName);
   if (eventName === 'workflow_dispatch') return dispatchProfile(refName);
   return { profile: 'production' };
 }

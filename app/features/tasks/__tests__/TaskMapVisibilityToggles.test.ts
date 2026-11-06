@@ -30,10 +30,10 @@ const mountToggles = (taskId: string, hidden: string[] = []) =>
         AppTooltip: { template: '<div><slot /></div>' },
         UButton: {
           inheritAttrs: false,
-          props: ['ariaLabel'],
+          props: ['ariaLabel', 'icon'],
           emits: ['click'],
           template:
-            '<button :data-testid="$attrs[\'data-testid\']" :aria-label="ariaLabel" @click="$emit(\'click\', $event)" />',
+            '<button :data-testid="$attrs[\'data-testid\']" :aria-label="ariaLabel" :data-icon="icon" @click="$emit(\'click\', $event)" />',
         },
       },
     },
@@ -55,6 +55,16 @@ describe('TaskMapVisibilityToggles', () => {
       'task-b',
     ]);
     expect(mockPreferencesStore.toggleMapHiddenTask).toHaveBeenCalledWith('task-a');
+  });
+  it('uses map-marker icons so the map-only toggle differs from the card eye (global hide)', () => {
+    const shown = mountToggles('task-a');
+    expect(shown.get('[data-testid="task-map-hide-toggle"]').attributes('data-icon')).toBe(
+      'i-mdi-map-marker-outline'
+    );
+    const hidden = mountToggles('task-a', ['task-a']);
+    expect(hidden.get('[data-testid="task-map-hide-toggle"]').attributes('data-icon')).toBe(
+      'i-mdi-map-marker-off-outline'
+    );
   });
   it('offers only the show action for a hidden task', async () => {
     const wrapper = mountToggles('task-a', ['task-a']);

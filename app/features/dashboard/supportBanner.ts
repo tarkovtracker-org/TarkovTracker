@@ -1,9 +1,9 @@
 import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import type { SupporterStatus } from '@/composables/useSupporter';
 const DAY_MS = 86_400_000;
-const SUPPORT_BANNER_MIN_ACCOUNT_AGE_DAYS = 14;
-const SUPPORT_BANNER_MIN_COMPLETED_TASKS = 20;
-const SUPPORT_BANNER_RESHOW_DAYS = 45;
+const SUPPORT_BANNER_MIN_ACCOUNT_AGE_DAYS = 7;
+const SUPPORT_BANNER_MIN_COMPLETED_TASKS = 5;
+const SUPPORT_BANNER_RESHOW_DAYS = 30;
 export type SupportBannerVariant = 'new' | 'returning';
 export interface SupportBannerInput {
   userId: string | null;

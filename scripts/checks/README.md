@@ -3,15 +3,16 @@
 Formatting, linting, and consistency checks. Each one runs locally through a `pnpm` command and
 most also run in CI or the pre-commit hook.
 
-| File                      | What it does                                                             | Run by                                               |
-| ------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `format-files.mjs`        | Runs Prettier over tracked files.                                        | `format:prettier`, `format:check:prettier`           |
-| `lint-blank-lines.mjs`    | Enforces the compact blank-line style; `--fix` rewrites files.           | `lint:blank-lines`, `format:blank-lines`, pre-commit |
-| `lint-i18n.mjs`           | Fails on broken locales and unused `en.json` keys; ignores untranslated. | `i18n:check`, pre-commit                             |
-| `fallow-audit.mjs`        | Runs Fallow code-health checks on changes against a base ref.            | `lint:fallow`                                        |
-| `check-systems-drift.mjs` | Verifies volatile facts in `docs/systems/` still match the code.         | `systems:check`, `ci.yml`                            |
-| `check-pr-title.mjs`      | Requires a conventional type prefix on the PR title.                     | `pr-title.yml`                                       |
-| `audit-dependencies.mjs`  | Fails on any production advisory not in its reviewed, expiring list.     | `audit:dependencies`, `security.yml`                 |
-| `commit-types.mjs`        | Allowed conventional types, shared with `commitlint.config.js`.          | `check-pr-title.mjs`, commitlint                     |
-| `check-supabase-db.sh`    | Rebuilds the **local** Supabase DB from migrations and lints the schema. | `supabase:check`                                     |
-| `*.test.mjs`              | Vitest tests for the scripts above.                                      | `pnpm run test`                                      |
+| File                         | What it does                                                                                                                                                                                | Run by                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `format-files.mjs`           | Runs Prettier over tracked files.                                                                                                                                                           | `format:prettier`, `format:check:prettier`           |
+| `lint-blank-lines.mjs`       | Enforces the compact blank-line style; `--fix` rewrites files.                                                                                                                              | `lint:blank-lines`, `format:blank-lines`, pre-commit |
+| `lint-i18n.mjs`              | Fails on broken locales and unused `en.json` keys; ignores untranslated.                                                                                                                    | `i18n:check`, pre-commit                             |
+| `fallow-audit.mjs`           | Runs Fallow code-health checks on changes against a base ref.                                                                                                                               | `lint:fallow`                                        |
+| `check-systems-drift.mjs`    | Verifies volatile facts in `docs/systems/` still match the code.                                                                                                                            | `systems:check`, `ci.yml`                            |
+| `check-pr-title.mjs`         | Requires a conventional type prefix on the PR title.                                                                                                                                        | `pr-title.yml`                                       |
+| `audit-dependencies.mjs`     | Fails on any production advisory not in its reviewed, expiring list.                                                                                                                        | `audit:dependencies`, `security.yml`                 |
+| `release-age-exceptions.mjs` | Fails a `minimumReleaseAgeExclude` entry unless it is a vetted advisory fix or a same-release companion of one; warns on entries past the window; fails a `minimumReleaseAge` below 7 days. | `audit:release-age`, `security.yml`                  |
+| `commit-types.mjs`           | Allowed conventional types, shared with `commitlint.config.js`.                                                                                                                             | `check-pr-title.mjs`, commitlint                     |
+| `check-supabase-db.sh`       | Rebuilds the **local** Supabase DB from migrations and lints the schema.                                                                                                                    | `supabase:check`                                     |
+| `*.test.mjs`                 | Vitest tests for the scripts above.                                                                                                                                                         | `pnpm run test`                                      |

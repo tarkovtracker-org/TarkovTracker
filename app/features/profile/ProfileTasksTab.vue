@@ -133,7 +133,7 @@
     failed: { icon: 'i-mdi-close-circle', color: 'text-error-400' },
     complete: { icon: 'i-mdi-check-circle', color: 'text-success-400' },
     active: { icon: 'i-mdi-play-circle', color: 'text-primary-400' },
-    locked: { icon: 'i-mdi-lock', color: 'text-warning-400' },
+    locked: { icon: 'i-mdi-lock', color: 'text-locked-400' },
     default: { icon: 'i-mdi-circle-outline', color: 'text-info-400' },
   };
   interface ObjectiveCompletion {
@@ -216,8 +216,8 @@
         key: 'locked',
         label: t('common.locked', 'Locked'),
         icon: 'i-mdi-lock-outline',
-        chipClass: 'bg-warning-700/25',
-        iconClass: 'text-warning-300',
+        chipClass: 'bg-locked-700/25',
+        iconClass: 'text-locked-300',
         tasks: locked,
       },
       {

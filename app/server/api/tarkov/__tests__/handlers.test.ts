@@ -227,7 +227,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).not.toHaveBeenCalled();
     expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
   });
-  it('builds expected cache key for items-lite', async () => {
+  it('builds expected cache key and opts into response mode for items-lite', async () => {
     const { default: handler } = await import('@/server/api/tarkov/items-lite.get');
     await handler(event);
     expect(mockCreateTarkovJsonItemsFetcher).toHaveBeenCalledWith(
@@ -244,7 +244,7 @@ describe('Tarkov API handlers', () => {
       'items-lite-json-v2-en-regular',
       expect.any(Function),
       222,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('builds expected cache key for items', async () => {
@@ -477,7 +477,7 @@ describe('Tarkov API handlers', () => {
       'tasks-core-json-v3-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov', precomputed: true }
+      { cacheKeyPrefix: 'tarkov', precomputed: true, response: true }
     );
   });
   it('applies overlay for tasks-objectives with versioned cache key', async () => {
@@ -501,7 +501,7 @@ describe('Tarkov API handlers', () => {
       'tasks-objectives-json-v4-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('rejects missing objective overlay provenance before admitting a cache entry', async () => {
@@ -545,7 +545,7 @@ describe('Tarkov API handlers', () => {
       'tasks-rewards-json-v2-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('returns last successful cache purge timestamp from audit log', async () => {

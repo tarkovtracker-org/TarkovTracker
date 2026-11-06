@@ -60,6 +60,53 @@ describe('AcceptedItemsPopover', () => {
     const wrapper = mountPopover({ items: [makeItem('a', 'Item A'), evil] });
     expect(wrapper.findAll('a')[1]?.attributes('href')).toBe('https://tarkov.dev/item/evil');
   });
+  it('bounds rendered rows while keeping every accepted item reachable through paging', async () => {
+    const items = Array.from({ length: 3501 }, (_, index) =>
+      makeItem(`id-${index}`, `Item ${index}`)
+    );
+    const wrapper = mountPopover({ items });
+    expect(wrapper.find('button').text()).toContain('needed_items.any_of_items_short:3501');
+    expect(wrapper.findAll('a')).toHaveLength(50);
+    const seen: string[] = [];
+    for (let page = 1; page <= 71; page++) {
+      seen.push(...wrapper.findAll('a').map((link) => link.text()));
+      const next = wrapper.get('button[aria-label="common.next"]');
+      expect(next.attributes('disabled') !== undefined).toBe(page === 71);
+      if (page < 71) await next.trigger('click');
+    }
+    expect(seen).toEqual(items.map((item) => item.name));
+    await wrapper.get('button[aria-label="common.previous"]').trigger('click');
+    expect(wrapper.findAll('a')).toHaveLength(50);
+    expect(wrapper.findAll('a')[0]?.text()).toBe('Item 3450');
+  });
+  it('searches beyond the first page by name or short name and resets paging', async () => {
+    const items = Array.from({ length: 100 }, (_, index) =>
+      makeItem(`id-${index}`, `Item ${index}`)
+    );
+    items[99] = { ...makeItem('target', 'Secure Flash Drive'), shortName: 'USB' };
+    const wrapper = mountPopover({ items });
+    await wrapper.get('button[aria-label="common.next"]').trigger('click');
+    await wrapper.get('input[type="search"]').setValue('  fLaSh  ');
+    expect(wrapper.findAll('a').map((link) => link.text())).toEqual(['Secure Flash Drive']);
+    await wrapper.get('input[type="search"]').setValue('USB');
+    expect(wrapper.findAll('a')).toHaveLength(1);
+    await wrapper.get('input[type="search"]').setValue('no match');
+    expect(wrapper.findAll('a')).toHaveLength(0);
+    expect(wrapper.text()).toContain('needed_items.no_accepted_items');
+    await wrapper.get('input[type="search"]').setValue('');
+    expect(wrapper.findAll('a')[0]?.text()).toBe('Item 0');
+  });
+  it('resets the page and search when the pool changes', async () => {
+    const items = Array.from({ length: 100 }, (_, index) =>
+      makeItem(`id-${index}`, `Item ${index}`)
+    );
+    const wrapper = mountPopover({ items });
+    await wrapper.get('input[type="search"]').setValue('Item');
+    await wrapper.get('button[aria-label="common.next"]').trigger('click');
+    await wrapper.setProps({ items: [makeItem('replacement', 'Replacement')] });
+    expect(wrapper.findAll('a').map((link) => link.text())).toEqual(['Replacement']);
+    expect(wrapper.find('input').exists()).toBe(false);
+  });
   it('reflects open state via v-model', async () => {
     const open = ref(false);
     const Host = defineComponent({

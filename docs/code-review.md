@@ -14,8 +14,9 @@ Repo-specific review policy loaded by the `review-production` skill and by CodeR
 ## Validation Commands
 
 Use the validation and review requirements in the root `AGENTS.md` and the commands in
-`package.json`. A READY verdict requires applicable validation and any independent review the root
-policy requires. Unavailable checks or reviews remain incomplete, not passing. Do not rerun checks
+`package.json`. A READY verdict requires applicable validation. Provider reviews are best-effort: an
+unavailable, rate-limited, skipped, or quiet reviewer is noted, not awaited. Unavailable required checks remain
+incomplete, not passing. Do not rerun checks
 for unchanged validated inputs. After a base update, verify the reviewed diff and assess changed
 base code for integration risks; rerun affected validation even when the merge had no conflicts.
 
@@ -138,8 +139,8 @@ Verify every diff against the invariants in the root `AGENTS.md`, plus:
 - **Workers rollback:** Workers versions can be rolled back via
   `wrangler rollback [VERSION_ID]`. Omitting the version ID selects the
   preceding version interactively.
-- **Supabase rollback:** Migrations may not be reversible. Treat migration-only
-  PRs as high-risk and require a rollback plan in the PR description. If a down
+- **Supabase rollback:** Migrations may not be reversible. Treat destructive or
+  data-losing migrations as high-risk (`AGENTS.md` merge class); every migration PR needs a rollback plan in the PR description. If a down
   migration exists, verify it actually reverses the up migration.
 - **Rolling compatibility:** Old frontend code may run against new Supabase
   schema for minutes during deploy. Migrations must be forward-compatible (old

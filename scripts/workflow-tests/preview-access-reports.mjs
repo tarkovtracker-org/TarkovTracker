@@ -46,11 +46,12 @@ test('Access exchange and API failures retain no credentials in real Playwright 
       ],
       { stdio: 'ignore' }
     );
+    // These synthetic transport fixtures have no deployed app to pass production readiness.
     writeFileSync(
       path.join(fixture, 'playwright.config.mjs'),
       `
       import config from '../scripts/preview/smoke/playwright.config.mjs';
-      export default { ...config, captureGitInfo: { diff: true }, testDir: '.', outputDir: ${JSON.stringify(path.join(report, 'test-results'))}, testMatch: /exchange.smoke.mjs$/, timeout: 10000 };
+      export default { ...config, globalSetup: undefined, captureGitInfo: { diff: true }, testDir: '.', outputDir: ${JSON.stringify(path.join(report, 'test-results'))}, testMatch: /exchange.smoke.mjs$/, timeout: 10000 };
     `
     );
     writeFileSync(

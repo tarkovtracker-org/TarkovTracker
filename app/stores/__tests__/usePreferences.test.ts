@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sanitizePersistedPreferencesState } from '@/stores/preferences/sanitizers';
 import {
   clearPendingResetPreferencesSnapshot,
   getPersistedPreferencesState,
@@ -27,6 +28,19 @@ vi.mock('@/utils/userScopedStorage', async () => {
     ...actual,
     getCurrentSupabaseUserId: () => currentUserId.value,
   };
+});
+describe('retired hideout preferences', () => {
+  it('discards saved sort and collapse values and preserves other hideout preferences', () => {
+    const store = usePreferencesStore();
+    store.replacePersistedState({
+      hideoutSortReadyFirst: true,
+      hideoutCollapseCompleted: true,
+      hideoutRequireSkillLevels: false,
+    } as Parameters<typeof store.replacePersistedState>[0]);
+    expect(store.$state).not.toHaveProperty('hideoutSortReadyFirst');
+    expect(store.$state).not.toHaveProperty('hideoutCollapseCompleted');
+    expect(store.getHideoutRequireSkillLevels).toBe(false);
+  });
 });
 describe('retired task card density', () => {
   it.each(['comfortable', 'compact'])(
@@ -131,8 +145,6 @@ describe('usePreferencesStore', () => {
     it('should initialize hideout defaults correctly', () => {
       const store = usePreferencesStore();
       expect(store.hideoutPrimaryView).toBeNull();
-      expect(store.hideoutCollapseCompleted).toBe(false);
-      expect(store.hideoutSortReadyFirst).toBe(false);
       expect(store.hideoutRequireStationLevels).toBe(true);
       expect(store.hideoutRequireSkillLevels).toBe(true);
       expect(store.hideoutRequireTraderLoyalty).toBe(true);
@@ -292,6 +304,23 @@ describe('usePreferencesStore', () => {
       setActivePinia(newPinia);
       const store = usePreferencesStore();
       expect(store.neededItemsHideOwned).toBe(false);
+    });
+    it('persists removal of retired hideout preferences on hydration', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage(
+          { hideoutSortReadyFirst: true, hideoutCollapseCompleted: true, showNextQuests: false },
+          'user-1',
+          1234
+        )
+      );
+      currentUserId.value = 'user-1';
+      usePreferencesStore();
+      expect(JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}')).toEqual({
+        _timestamp: 1234,
+        _userId: 'user-1',
+        data: { showNextQuests: false },
+      });
     });
     it.each(['compact', 'comfortable'])(
       'persists removal of legacy %s density on hydration',
@@ -885,12 +914,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.hideoutPrimaryView = 'all';
       expect(store.getHideoutPrimaryView).toBe('all');
-    });
-    it('should return hideoutSortReadyFirst state', () => {
-      const store = usePreferencesStore();
-      expect(store.getHideoutSortReadyFirst).toBe(false);
-      store.hideoutSortReadyFirst = true;
-      expect(store.getHideoutSortReadyFirst).toBe(true);
     });
     it('should return hideoutRequireStationLevels state with default true', () => {
       const store = usePreferencesStore();
@@ -1543,6 +1566,59 @@ describe('usePreferencesStore', () => {
       store.$patch({ mapHiddenTaskIds: undefined });
       store.toggleMapHiddenTask('task-1');
       expect(store.mapHiddenTaskIds).toEqual(['task-1']);
+    });
+  });
+  describe('Actions - Hidden tasks', () => {
+    it('defaults to no hidden tasks', () => {
+      const store = usePreferencesStore();
+      expect(store.getHiddenTaskIds).toEqual([]);
+    });
+    it('toggles a task in and out of the hidden list without touching map visibility', () => {
+      const store = usePreferencesStore();
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      expect(store.mapHiddenTaskIds).toEqual([]);
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual([]);
+    });
+    it('unhides selected tasks or everything', () => {
+      const store = usePreferencesStore();
+      store.toggleHiddenTask('task-1');
+      store.toggleHiddenTask('task-2');
+      store.toggleHiddenTask('task-3');
+      store.unhideTasks(['task-1', 'task-2']);
+      expect(store.hiddenTaskIds).toEqual(['task-3']);
+      store.unhideTasks();
+      expect(store.hiddenTaskIds).toEqual([]);
+    });
+    it('handles a nullish or malformed persisted list', () => {
+      const store = usePreferencesStore();
+      store.$patch({ hiddenTaskIds: undefined });
+      expect(store.getHiddenTaskIds).toEqual([]);
+      store.toggleHiddenTask('task-1');
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      store.$patch({ hiddenTaskIds: ['task-1', 'task-1', '', 7] as unknown as string[] });
+      expect(store.getHiddenTaskIds).toEqual(['task-1']);
+    });
+    it('sanitizes persisted hidden task ids', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        hiddenTaskIds: ['task-1', 'task-1', '', null] as unknown as string[],
+      });
+      expect(sanitized.hiddenTaskIds).toEqual(['task-1']);
+      expect(
+        sanitizePersistedPreferencesState({ hiddenTaskIds: 'x' as never }).hiddenTaskIds
+      ).toEqual([]);
+    });
+    it('sanitizes hidden task ids restored through replacePersistedState', () => {
+      const store = usePreferencesStore();
+      store.replacePersistedState({
+        hiddenTaskIds: ['task-1', 'task-1', '', null],
+      } as unknown as Parameters<typeof store.replacePersistedState>[0]);
+      expect(store.hiddenTaskIds).toEqual(['task-1']);
+      store.replacePersistedState({
+        hiddenTaskIds: 'x',
+      } as unknown as Parameters<typeof store.replacePersistedState>[0]);
+      expect(store.hiddenTaskIds).toEqual([]);
     });
   });
   describe('Actions - Skills', () => {

@@ -11,11 +11,14 @@ export type NeededItemContext = {
   craftableTitle: ComputedRef<string>;
   currentCount: ComputedRef<number>;
   goToCraftStation: () => Promise<void>;
+  /** True when the user hid the task and the need is shown only for teammates. */
+  hiddenForSelf: ComputedRef<boolean>;
+  /** Explains a hidden-for-you need and names the teammates who still need it. */
+  hiddenForSelfHint: ComputedRef<string>;
   imageItem: ComputedRef<NeededItemImageItem>;
   isCraftable: ComputedRef<boolean>;
   isKappaRequired: ComputedRef<boolean>;
   isLightkeeperRequired: ComputedRef<boolean>;
-  isParentCompleted: ComputedRef<boolean>;
   item: ComputedRef<TarkovItem | null>;
   /** All accepted items when the objective allows alternatives (display-only). */
   acceptedItems: ComputedRef<TarkovItem[]>;
@@ -32,7 +35,6 @@ export type NeededItemContext = {
   relatedTask: ComputedRef<Task | null>;
   selfCompletedNeed: ComputedRef<boolean>;
   teamNeeds: ComputedRef<NeededItemTeamNeed[]>;
-  cardStyle: ComputedRef<'compact' | 'expanded'>;
 };
 export const neededItemKey: InjectionKey<NeededItemContext> = Symbol('neededitem');
 export const createDefaultNeededItemContext = (): NeededItemContext => {
@@ -42,11 +44,12 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     craftableTitle: asComputed('Craftable'),
     currentCount: asComputed(0),
     goToCraftStation: async () => {},
+    hiddenForSelf: asComputed(false),
+    hiddenForSelfHint: asComputed(''),
     imageItem: asComputed(null),
     isCraftable: asComputed(false),
     isKappaRequired: asComputed(false),
     isLightkeeperRequired: asComputed(false),
-    isParentCompleted: asComputed(false),
     item: asComputed(null),
     acceptedItems: asComputed([]),
     hasAlternativeItems: asComputed(false),
@@ -59,6 +62,5 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     relatedTask: asComputed(null),
     selfCompletedNeed: asComputed(false),
     teamNeeds: asComputed([]),
-    cardStyle: asComputed('expanded'),
   };
 };

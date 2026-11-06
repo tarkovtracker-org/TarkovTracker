@@ -18,7 +18,7 @@
         size="xs"
         variant="ghost"
         :color="isHidden ? 'warning' : 'neutral'"
-        :icon="isHidden ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+        :icon="isHidden ? 'i-mdi-map-marker-off-outline' : 'i-mdi-map-marker-outline'"
         class="shrink-0"
         :aria-label="hideLabel"
         :aria-pressed="isHidden"

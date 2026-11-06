@@ -76,25 +76,40 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
   `/preview` only for forks or after `/preview stop` ([preview spec](docs/systems/previews.md)).
   Keep workflow access checks, artifact validation, and fork protections.
 - Translations are reviewed like docs. The local CodeRabbit review for executable changes is
-  `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`).
-- The `Main CI freshness` ruleset blocks merging a behind branch; update it
-  (`gh pr update-branch <PR>`) and CI and applicable previews rerun on the new head. Request
-  `@coderabbitai review` for substantial diff changes, hand-resolved conflicts, or unresolved
-  integration risks (incremental reviews are off). Do not pause other merges for freshness.
+  `coderabbit review --base origin/<base> --agent --committed` (after `git fetch`); skip it when
+  unavailable or rate-limited.
+- `main` merges only through the native merge queue, which builds each entry on current main; do
+  not update a behind branch merely to enqueue it. Review Admission verifies the immutable PR head
+  and resolved findings; sensitive changes also need exact-head approval. When the merge class
+  below allows merging, run `gh pr merge <PR> --auto --match-head-commit <reviewed-head>` right
+  after pushing the reviewed head and end the turn; GitHub enqueues it once the required checks
+  pass. If no provider or collaborator review will cover that head, post the self-admission
+  below before ending the turn so `Review Admission` can pass. Report `QUEUED` if GitHub queued it
+  at once, otherwise `AUTO-MERGE ON`. High-risk PRs stop at `READY` with the reason instead. Actions owns integration/merge. State, lifecycle and
+  rollback: `docs/merge-queue-rollout.md`.
+- Review bots (CodeRabbit, cubic, Codex) are best-effort: use them when available, never wait on
+  one that is unavailable, rate-limited, skipped, or quiet past its normal latency. Fix valid
+  findings they post. Request `@coderabbitai review` only for substantial new diff or
+  hand-resolved conflicts (incremental reviews are off).
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
-  (omit `--request` to check status), only when CodeRabbit is rate-limited or for the final review
-  of a change that needs independent review (below). Never post raw `@codex review`, repost, or
-  bypass the guard; never run Codex reviews locally. Pending or unknown review is incomplete.
-- Auth, billing, migrations, and database or Durable Object concurrency control (locks, claims,
-  fencing) need one independent review before merge: Codex, another provider, or a human.
-- Merge class: a green, low-risk PR may merge without asking when every change is docs, tests,
-  CI-only changes that keep every security control, patch/minor dependency updates outside
-  `auth-and-billing`, lockfile-only refreshes, or small fixes with no confirm-required surface.
-  Confirm-required (an explicit "merge" naming it, even when green): migrations or schema/RLS;
-  auth, sessions, permissions, or access checks; billing, payments, or entitlements (Stripe,
-  Supabase clients); secrets or credentials; major upgrades; production data scripts; deploy,
-  infra, DNS, or Worker trigger config; weakening any security control, check, or ruleset; and
-  public API or data-format contracts. Otherwise report it `READY` with the reason.
+  (omit `--request` to check status); never post raw `@codex review`, repost, or run it locally.
+  It is optional: an unavailable or usage-limited Codex is noted, not awaited.
+- When no provider review covers the exact head, an agent with merge authority and repo admin
+  access self-admits after its own review by posting `/approve <40-char head SHA>` alone in a
+  comment ([approval commands](docs/merge-queue-rollout.md#approval-commands)). From an admin that
+  one comment is both the review attestation and the sensitive-change approval; CI and preview
+  stay gated by the required checks, so it need not wait for them. Without admin access, a
+  non-author write collaborator's exact-head approving GitHub review still admits; their `/approve`
+  comment covers only sensitive-change approval. Repeat after any new head.
+  Auth, migrations, RLS and concurrency changes take this route; verify them with
+  `pnpm run supabase:check` or the owning tests instead of waiting for a human.
+- Merge class: a green PR may merge without asking unless it is high-risk. High-risk (needs the
+  user's explicit "merge" naming it): destructive or data-losing migrations (drops, type
+  narrowing, bulk rewrites); production data scripts, backfills or migration repair; billing,
+  payments or entitlements; secrets or credentials; DNS, hosting or Worker trigger config;
+  weakening a security control, check, or ruleset; breaking public API or data-format contracts;
+  and major (or `0.x` cross-minor) upgrades of auth, database or billing dependencies. Otherwise
+  merge; report high-risk PRs `READY` with the reason.
 - The PR body lists the validation commands and results.
 - Review risk areas and severity live in `docs/code-review.md`.
 

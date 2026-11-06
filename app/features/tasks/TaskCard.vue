@@ -5,7 +5,7 @@
     class="card relative divide-none overflow-hidden shadow-md ring-0"
     :class="[taskClasses, accentClasses, 'rounded-md']"
     :ui="{ body: 'p-0 sm:p-0 flex flex-col h-full', footer: 'p-0 sm:p-0 border-t-0' }"
-    @contextmenu.prevent="openOverflowMenu"
+    @contextmenu.prevent="openTaskContextMenu"
   >
     <TaskCardBackground
       :is-complete="isComplete"
@@ -17,40 +17,15 @@
       class="relative z-10 flex h-full flex-col"
       :class="{ 'opacity-80': isComplete && !isFailed }"
     >
-      <ul
-        v-if="isLocked && taskBlockerTexts.length"
-        class="text-surface-300 px-3 pt-2 text-xs"
-        data-testid="task-blockers"
-      >
-        <li v-for="(text, index) in taskBlockerTexts" :key="`${index}-${text}`">{{ text }}</li>
-      </ul>
       <!-- 1) Identity + Header (Padded) -->
       <div data-testid="task-card-header" class="flex flex-col" :class="compactClasses.header">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <div class="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
-            <TaskCardHeader
-              :task="task"
-              :meets-level-requirement="meetsLevelRequirement"
-              class="min-w-0"
-            />
-            <UButton
-              v-if="isOurFaction"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              class="shrink-0 sm:hidden"
-              :aria-label="t('common.more', 'More')"
-              @click.stop="openOverflowMenu"
-            >
-              <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
-            </UButton>
-          </div>
+        <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+          <TaskCardHeader :task="task" class="min-w-0 sm:flex-1" />
           <div class="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end">
             <TaskCardBadges
               :task="task"
               :is-pinned="isPinned"
-              :is-our-faction="isOurFaction"
-              :trader-requirements="traderRequirements"
+              :is-hidden="isHidden"
               :location-tooltip="locationTooltip"
               :is-failed="isFailed"
               :is-active="isActive"
@@ -59,19 +34,23 @@
               :exclusive-edition-badge="exclusiveEditionBadge"
               :progress-completed="taskProgressCompleted"
               :progress-total="taskProgressTotal"
+              :show-progress="!taskExpanded"
               @toggle-pin="togglePin"
-              @open-menu="openOverflowMenu"
+              @toggle-hide="toggleHidden"
+              @copy-link="copyTaskLink"
             >
               <template #actions>
                 <TaskCardActions
                   :state="actionButtonState"
                   :size="actionButtonSize"
                   :is-failed="isFailed"
+                  :show-fail="canMarkFailed"
                   @complete="markTaskComplete"
                   @active="markTaskActive"
                   @uncomplete="markTaskUncomplete"
                   @available="markTaskAvailable"
                   @failed="markTaskFailed"
+                  @mark-failed="confirmMarkFailed"
                 />
               </template>
             </TaskCardBadges>
@@ -97,71 +76,11 @@
           </div>
         </div>
         <!-- Extra Info Strips (padded area) -->
-        <div v-if="lockedBefore > 0" class="text-surface-400 text-xs">
-          <span class="text-surface-500">{{ t('common.requires', 'Requires') }}:</span>
-          <template v-if="useCompactRequires">
-            <AppTooltip :text="compactRequiresTooltip">
-              <span class="text-surface-300 ml-2">
-                {{
-                  t(
-                    'page.tasks.questcard.requires_progress',
-                    { completed: completedParentCount, total: totalParentCount },
-                    `${completedParentCount} of ${totalParentCount} prerequisites completed`
-                  )
-                }}
-              </span>
-            </AppTooltip>
-          </template>
-          <template v-else-if="pendingParentTasks.length">
-            <span class="ml-2 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              <AppTooltip
-                v-for="parent in displayedPendingParents"
-                :key="parent.id"
-                :text="getPendingParentTooltipText(parent)"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <router-link
-                    :to="`/tasks?task=${parent.id}`"
-                    class="text-surface-200 text-[11px] underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
-                  >
-                    <span class="truncate">{{ parent.name }}</span>
-                  </router-link>
-                  <span class="text-surface-500 text-[11px]">
-                    {{
-                      t(
-                        'page.tasks.questcard.requires_must_be',
-                        {
-                          status: formatRequirementExpectedStatuses(parent.expectedStatuses),
-                        },
-                        `must be ${formatRequirementExpectedStatuses(parent.expectedStatuses)}`
-                      )
-                    }}
-                  </span>
-                  <span
-                    class="light:text-warning-900 inline-flex items-center gap-0.5 text-[10px] text-amber-400/80"
-                  >
-                    <UIcon name="i-mdi-information-outline" class="h-3 w-3 shrink-0" />
-                    {{
-                      t(
-                        'page.tasks.questcard.requires_currently',
-                        {
-                          status: formatRequirementCurrentStatus(parent.currentStatus),
-                        },
-                        `currently ${formatRequirementCurrentStatus(parent.currentStatus)}`
-                      )
-                    }}
-                  </span>
-                </span>
-              </AppTooltip>
-              <span v-if="extraPendingParentsCount > 0" class="text-surface-500">
-                +{{ extraPendingParentsCount }}
-              </span>
-            </span>
-          </template>
-          <template v-else>
-            <span class="text-surface-300 ml-2">{{ lockedBefore }}</span>
-          </template>
-        </div>
+        <TaskRequirementChips
+          v-if="isLocked"
+          :rows="blockingRequirements"
+          @show-pool="showRequirementPool"
+        />
         <div
           v-if="isFailed || isInvalid"
           class="text-xs"
@@ -202,16 +121,16 @@
                         ? t(
                             'common.was_status',
                             {
-                              status: formatRequirementExpectedStatuses(source.triggerStatuses),
+                              status: formatExpectedStatuses(t, source.triggerStatuses),
                             },
-                            `was ${formatRequirementExpectedStatuses(source.triggerStatuses)}`
+                            `was ${formatExpectedStatuses(t, source.triggerStatuses)}`
                           )
                         : t(
                             'common.was_status',
                             {
-                              status: formatRequirementExpectedStatuses(source.triggerStatuses),
+                              status: formatExpectedStatuses(t, source.triggerStatuses),
                             },
-                            `was ${formatRequirementExpectedStatuses(source.triggerStatuses)}`
+                            `was ${formatExpectedStatuses(t, source.triggerStatuses)}`
                           )
                     }}
                   </span>
@@ -254,48 +173,56 @@
           :id="`task-content-${task.id}`"
           class="border-surface-700/50 border-t"
         >
-          <div class="flex items-center justify-between rounded-sm transition-colors select-none">
-            <button
-              type="button"
-              class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex min-w-0 flex-1 cursor-pointer items-center justify-between rounded-sm text-left transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="compactClasses.objectivesToggle"
-              :aria-expanded="objectivesVisible"
-              :aria-controls="`objectives-content-${task.id}`"
-              @click="toggleObjectivesVisibility"
-            >
-              <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-                {{ t('common.objectives', 'Objectives') }}
-              </div>
-              <UIcon
-                name="i-mdi-chevron-down"
-                aria-hidden="true"
-                class="pointer-events-none h-4 w-4 transition-transform duration-200"
-                :class="{ 'rotate-180': objectivesVisible }"
-              />
-            </button>
-            <AppTooltip
-              v-if="taskItemObjectives.length > 0"
-              :text="resetItemCountsDisabledReason"
-              :disabled="!resetItemCountsDisabledReason"
-            >
-              <span class="inline-flex">
+          <TaskRequirementSummary
+            :id="task.id"
+            :rows="requirementSummary"
+            :requested-pool="requestedPool"
+          >
+            <template #actions>
+              <AppTooltip
+                v-if="hasAvailabilityConfirmation"
+                :text="t('page.tasks.questcard.clear_availability_confirmation')"
+              >
                 <UButton
                   size="xs"
                   color="neutral"
-                  variant="soft"
-                  class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
-                  :disabled="!canResetTaskItemCounts"
-                  :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
-                  @click.stop="confirmResetTaskItemCounts"
-                >
-                  <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
-                  <span class="hidden sm:inline">
-                    {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
-                  </span>
-                </UButton>
-              </span>
-            </AppTooltip>
-          </div>
+                  variant="ghost"
+                  icon="i-mdi-lock-reset"
+                  data-testid="task-clear-availability"
+                  :aria-label="t('page.tasks.questcard.clear_availability_confirmation')"
+                  @click.stop="tarkovStore.clearTaskAvailability(task.id)"
+                />
+              </AppTooltip>
+            </template>
+          </TaskRequirementSummary>
+          <TaskCardSectionHeader
+            :label="t('common.objectives', 'Objectives')"
+            :meta="objectivesMeta"
+            :expanded="objectivesVisible"
+            :controls="`objectives-content-${task.id}`"
+            test-id="task-objectives-header"
+            @toggle="toggleObjectivesVisibility"
+          >
+            <template #actions>
+              <AppTooltip
+                v-if="taskItemObjectives.length > 0"
+                :text="resetItemCountsDisabledReason || resetItemCountsLabel"
+              >
+                <span class="inline-flex">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-mdi-restore"
+                    data-testid="task-reset-item-counts"
+                    :disabled="!canResetTaskItemCounts"
+                    :aria-label="resetItemCountsLabel"
+                    @click.stop="confirmResetTaskItemCounts"
+                  />
+                </span>
+              </AppTooltip>
+            </template>
+          </TaskCardSectionHeader>
           <Transition
             :css="false"
             @before-enter="onObjectivesBeforeEnter"
@@ -307,7 +234,7 @@
             <div
               v-if="objectivesVisible"
               :id="`objectives-content-${task.id}`"
-              :class="['space-y-1.5', compactClasses.objectivesBody]"
+              :class="compactClasses.objectivesBody"
             >
               <QuestObjectivesSkeleton
                 v-if="showObjectivesSkeleton"
@@ -343,22 +270,25 @@
         @item-context-menu="openItemContextMenu"
       />
     </template>
-    <!-- Overflow / Context Menu -->
+    <!-- Context Menu -->
     <ContextMenu ref="taskContextMenu">
       <template #default="{ close }">
+        <ContextMenuItem
+          data-testid="task-hide-toggle"
+          :icon="isHidden ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'"
+          :label="
+            isHidden ? t('page.tasks.questcard.unhide_task') : t('page.tasks.questcard.hide_task')
+          "
+          @click="
+            toggleHidden();
+            close();
+          "
+        />
         <ContextMenuItem
           icon="i-mdi-link-variant"
           :label="t('page.tasks.questcard.copy_task_link')"
           @click="
             copyTaskLink();
-            close();
-          "
-        />
-        <ContextMenuItem
-          icon="i-mdi-alert-circle-outline"
-          :label="t('page.tasks.questcard.report_data_issue')"
-          @click="
-            openTaskDataIssue();
             close();
           "
         />
@@ -372,7 +302,7 @@
           "
         />
         <ContextMenuItem
-          v-if="preferencesStore.getEnableManualTaskFail && isOurFaction && !isFailed"
+          v-if="canMarkFailed"
           icon="i-mdi-close-circle"
           :label="t('page.tasks.questcard.mark_failed')"
           @click="
@@ -411,19 +341,18 @@
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useTaskActions, type TaskActionPayload } from '@/composables/useTaskActions';
-  import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
   import { useTaskCardLinks } from '@/composables/useTaskCardLinks';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
   import { useTaskCardExpansion } from '@/features/tasks/composables/useTaskCardExpansion';
+  import { useTaskHiding } from '@/features/tasks/composables/useTaskHiding';
+  import { useTaskRequirements } from '@/features/tasks/composables/useTaskRequirements';
   import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
+  import { formatExpectedStatuses } from '@/features/tasks/requirement-format';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
-    getCurrentTaskStatusForRequirement,
     getRequiredTaskStatuses,
-    isTaskRequirementSatisfied,
-    type RequirementCurrentStatus,
     type RequirementExpectedStatus,
   } from '@/features/tasks/task-requirement-helpers';
   import TaskCardActions from '@/features/tasks/TaskCardActions.vue';
@@ -436,8 +365,10 @@
     resolveTaskObjectives,
   } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
+  import TaskCardSectionHeader from '@/features/tasks/TaskCardSectionHeader.vue';
+  import TaskRequirementChips from '@/features/tasks/TaskRequirementChips.vue';
+  import TaskRequirementSummary from '@/features/tasks/TaskRequirementSummary.vue';
   import { resolveTaskActionButtonState, type ActionButtonState } from '@/features/tasks/types';
-  import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -448,7 +379,6 @@
   import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
-  import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { GameEdition, Task } from '@/types/tarkov';
   type ContextMenuRef = { open: (event: MouseEvent) => void };
@@ -457,16 +387,8 @@
     name: string;
     triggerStatuses: RequirementExpectedStatus[];
   };
-  type PendingParentTask = {
-    currentStatus: RequirementCurrentStatus;
-    expectedStatuses: RequirementExpectedStatus[];
-    id: string;
-    name: string;
-  };
   // Module-level constants (moved from reactive scope)
   const MAX_DISPLAYED_NAMES = 3;
-  const COMPACT_REQUIRES_THRESHOLD = 3;
-  const COMPACT_TOOLTIP_PREVIEW = 3;
   const EDITION_SHORT_NAMES: Record<string, string> = {
     'Edge of Darkness': 'EOD',
     'Unheard Edition': 'Unheard',
@@ -498,13 +420,20 @@
   const isGlobalTask = computed(() => isGlobalTaskFn(props.task));
   const taskContextMenu = ref<ContextMenuRef | null>(null);
   const itemContextMenu = ref<ContextMenuRef | null>(null);
-  const { copyTaskLink, openTaskDataIssue, setSelectedItem, openItemOnTarkovDev, openItemOnWiki } =
-    useTaskCardLinks({
-      task: () => props.task,
-      objectives: () => taskObjectives.value,
-    });
+  const { copyTaskLink, setSelectedItem, openItemOnTarkovDev, openItemOnWiki } = useTaskCardLinks({
+    task: () => props.task,
+  });
   const { isComplete, isFailed, isActive, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
+  const requestedPool = shallowRef<{ id: string }>();
+  const showRequirementPool = (id: string) => {
+    if (!taskExpanded.value) toggleTaskVisibility();
+    const request = { id };
+    requestedPool.value = request;
+    nextTick(() => {
+      if (requestedPool.value === request) requestedPool.value = undefined;
+    });
+  };
   const shouldAutoCollapseObjectives = computed(() => {
     return isComplete.value && preferencesStore.getHideCompletedTaskObjectives;
   });
@@ -577,67 +506,8 @@
     const normalized = (status ?? []).map((entry) => entry.toLowerCase());
     return statuses.some((value) => normalized.includes(value));
   };
-  const formatRequirementExpectedStatuses = (statuses: RequirementExpectedStatus[]): string => {
-    const uniqueStatuses = Array.from(new Set(statuses));
-    const labels = uniqueStatuses.map((status) => {
-      if (status === 'active') {
-        return t('page.tasks.questcard.requirement_status_active', 'active/accepted');
-      }
-      if (status === 'failed') {
-        return t('common.status_failed', 'failed');
-      }
-      return t('common.status_completed', 'completed');
-    });
-    return labels.join(` ${t('page.tasks.questcard.keys_or', 'or')} `);
-  };
-  const formatRequirementCurrentStatus = (status: RequirementCurrentStatus): string => {
-    if (status === 'active') {
-      return t('page.tasks.questcard.requirement_status_active', 'active/accepted');
-    }
-    if (status === 'available') {
-      return t('page.tasks.questcard.requirement_status_available', 'available');
-    }
-    if (status === 'failed') {
-      return t('common.status_failed', 'failed');
-    }
-    if (status === 'not_started') {
-      return t('page.tasks.questcard.requirement_status_not_started', 'not started');
-    }
-    return t('common.status_completed', 'completed');
-  };
-  const formatRequirementActionVerbs = (statuses: RequirementExpectedStatus[]): string => {
-    const unique = Array.from(new Set(statuses));
-    const verbs = unique.map((s) => {
-      if (s === 'active') return t('common.accept', 'Accept');
-      if (s === 'failed') return t('common.fail', 'Fail');
-      return t('common.complete', 'Complete');
-    });
-    return verbs.join(` ${t('page.tasks.questcard.keys_or', 'or')} `);
-  };
-  const getPendingParentTooltipText = (parent: PendingParentTask): string => {
-    const expected = formatRequirementExpectedStatuses(parent.expectedStatuses);
-    const current = formatRequirementCurrentStatus(parent.currentStatus);
-    const needsOnlyFailed = parent.expectedStatuses.every((s) => s === 'failed');
-    const needsOnlyCompleted = parent.expectedStatuses.every((s) => s === 'completed');
-    const isConflict =
-      (needsOnlyFailed && parent.currentStatus === 'completed') ||
-      (needsOnlyCompleted && parent.currentStatus === 'failed');
-    if (isConflict) {
-      return t(
-        'page.tasks.questcard.requires_tooltip_conflict',
-        { name: parent.name, expected, current },
-        `"${parent.name}" is ${current} but needs ${expected} — this task may be permanently locked`
-      );
-    }
-    const action = formatRequirementActionVerbs(parent.expectedStatuses);
-    return t(
-      'page.tasks.questcard.requires_tooltip_action',
-      { action, name: parent.name },
-      `${action} "${parent.name}" to unlock this task`
-    );
-  };
   const getStatusSourceTooltipText = (source: FailureSource): string => {
-    const status = formatRequirementExpectedStatuses(source.triggerStatuses);
+    const status = formatExpectedStatuses(t, source.triggerStatuses);
     if (isFailed.value) {
       return t(
         'page.tasks.questcard.failed_because_status_tooltip',
@@ -655,25 +525,8 @@
     const taskFaction = props.task.factionName;
     return taskFaction === 'Any' || taskFaction === tarkovStore.getPMCFaction();
   });
-  const meetsLevelRequirement = computed(() => {
-    const minLevel = props.task.minPlayerLevel ?? 0;
-    return minLevel <= 0 || tarkovStore.playerLevel() >= minLevel;
-  });
-  const blockerText = useTaskBlockerText();
-  const taskBlockerTexts = computed(() =>
-    (progressStore.taskEvaluations?.[props.task.id]?.self?.blockers ?? [])
-      .filter((blocker) => blocker.type !== 'complete' && blocker.type !== 'failed')
-      .map(blockerText)
-  );
-  const traderRequirements = computed(() =>
-    getTaskTraderRequirements(props.task).flatMap((req) => {
-      if (req.requirementType === 'unknown') return [];
-      const current =
-        req.requirementType === 'level'
-          ? tarkovStore.getTraderLevel(req.trader.id)
-          : tarkovStore.getTraderReputation(req.trader.id);
-      return [{ ...req, met: compareRequirement(current, req.compareMethod, req.value) }];
-    })
+  const { blocking: blockingRequirements, summary: requirementSummary } = useTaskRequirements(
+    () => props.task
   );
   const locationTooltip = computed(() => {
     if (isGlobalTask.value) {
@@ -725,9 +578,8 @@
     return '';
   });
   const compactClasses = computed(() => ({
-    header: 'gap-2 px-3 py-2',
-    objectivesToggle: 'px-3 py-1.5',
-    objectivesBody: 'px-3 pt-1 pb-2',
+    header: 'gap-1.5 px-3 py-2',
+    objectivesBody: 'px-3 pb-1.5',
   }));
   const neededBy = computed(() => props.task.neededBy ?? []);
   const showNeededBy = computed(
@@ -762,21 +614,6 @@
       },
       impactEligibleTaskIds.value
     );
-  });
-  const taskCompletions = computed(
-    () => tarkovStore.getCurrentProgressData().taskCompletions ?? {}
-  );
-  const requirementStatusesByTaskId = computed(() => {
-    const map = new Map<string, Array<string[] | undefined>>();
-    (props.task.taskRequirements ?? []).forEach((requirement) => {
-      const requiredTaskId = requirement?.task?.id;
-      if (!requiredTaskId) return;
-      if (!map.has(requiredTaskId)) {
-        map.set(requiredTaskId, []);
-      }
-      map.get(requiredTaskId)!.push(requirement.status);
-    });
-    return map;
   });
   const parentTasks = computed(() => {
     if (!props.task.parents?.length) return [];
@@ -857,64 +694,6 @@
   const statusSources = computed<FailureSource[]>(() =>
     isFailed.value ? failureSources.value : blockedSources.value
   );
-  const pendingParentTasks = computed<PendingParentTask[]>(() => {
-    const modeProgress = tarkovStore.getCurrentProgressData();
-    if (
-      props.task.storyUnlocks?.some((chapter) => hasStoryUnlockProgress(chapter.id, modeProgress))
-    )
-      return [];
-    return parentTasks.value
-      .map((parent) => {
-        const completion = taskCompletions.value[parent.id];
-        const isUnlockable = progressStore.unlockedTasks[parent.id]?.self === true;
-        const requirementStatuses = requirementStatusesByTaskId.value.get(parent.id);
-        const statusesToCheck = requirementStatuses?.length ? requirementStatuses : [undefined];
-        const unmetStatuses = statusesToCheck.filter(
-          (statuses) => !isTaskRequirementSatisfied(statuses, completion, isUnlockable)
-        );
-        if (!unmetStatuses.length) return null;
-        const expectedStatuses = Array.from(
-          new Set(unmetStatuses.flatMap((statuses) => getRequiredTaskStatuses(statuses)))
-        );
-        return {
-          currentStatus: getCurrentTaskStatusForRequirement(completion, isUnlockable),
-          expectedStatuses,
-          id: parent.id,
-          name: parent.name ?? parent.id,
-        };
-      })
-      .filter((parent): parent is PendingParentTask => parent !== null);
-  });
-  const lockedBefore = computed(() => pendingParentTasks.value.length);
-  const useCompactRequires = computed(
-    () => pendingParentTasks.value.length > COMPACT_REQUIRES_THRESHOLD
-  );
-  const totalParentCount = computed(() => parentTasks.value.length);
-  const completedParentCount = computed(
-    () => totalParentCount.value - pendingParentTasks.value.length
-  );
-  const compactRequiresTooltip = computed(() => {
-    const preview = pendingParentTasks.value.slice(0, COMPACT_TOOLTIP_PREVIEW).map((p) => p.name);
-    const remaining = pendingParentTasks.value.length - preview.length;
-    if (remaining > 0) {
-      return t(
-        'page.tasks.questcard.requires_progress_tooltip_overflow',
-        { tasks: preview.join(', '), count: remaining },
-        `Next: ${preview.join(', ')}, and ${remaining} more`
-      );
-    }
-    return t(
-      'page.tasks.questcard.requires_progress_tooltip',
-      { tasks: preview.join(', ') },
-      `Next: ${preview.join(', ')}`
-    );
-  });
-  const displayedPendingParents = computed(() =>
-    pendingParentTasks.value.slice(0, COMPACT_REQUIRES_THRESHOLD)
-  );
-  const extraPendingParentsCount = computed(() =>
-    Math.max(0, pendingParentTasks.value.length - displayedPendingParents.value.length)
-  );
   const childTasks = computed(() => {
     if (!props.task.children?.length) return [];
     return props.task.children
@@ -935,6 +714,10 @@
   );
   const isPinned = computed(() => preferencesStore.getPinnedTaskIds.includes(props.task.id));
   const togglePin = () => preferencesStore.togglePinnedTask(props.task.id);
+  const { isHidden, toggleHidden } = useTaskHiding(() => props.task);
+  const canMarkFailed = computed(
+    () => preferencesStore.getEnableManualTaskFail && isOurFaction.value && !isFailed.value
+  );
   /**
    * Action button state for cleaner template logic.
    * Returns which action button(s) should be shown.
@@ -987,6 +770,9 @@
   const canResetTaskItemCounts = computed(() => {
     return hasResettableItemObjectiveProgress.value && !isComplete.value && !isFailed.value;
   });
+  const resetItemCountsLabel = computed(() =>
+    t('page.tasks.questcard.reset_item_counts', 'Reset item counts')
+  );
   const resetItemCountsDisabledReason = computed(() => {
     if (isComplete.value && !isFailed.value) {
       return t(
@@ -1018,6 +804,9 @@
       ).length
   );
   const taskProgressTotal = computed(() => nonOptionalTaskObjectives.value.length);
+  const objectivesMeta = computed(() =>
+    taskProgressTotal.value > 0 ? `${taskProgressCompleted.value}/${taskProgressTotal.value}` : ''
+  );
   /**
    * Consolidated objective categorization - single pass through objectives array.
    * Categorizes objectives into relevant, irrelevant, and uncompleted irrelevant.
@@ -1050,7 +839,7 @@
       otherRequirementsSignature(props.task)
     );
   });
-  const openOverflowMenu = (event: MouseEvent) => {
+  const openTaskContextMenu = (event: MouseEvent) => {
     taskContextMenu.value?.open(event);
   };
   const openItemContextMenu = (

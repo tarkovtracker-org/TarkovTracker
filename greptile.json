@@ -1,0 +1,4 @@
+{
+  "ignoreKeywords": "update translations from Crowdin",
+  "ignorePatterns": "app/locales/cs.json\napp/locales/de.json\napp/locales/es.json\napp/locales/fr.json\napp/locales/it.json\napp/locales/ja.json\napp/locales/ko.json\napp/locales/pl.json\napp/locales/pt.json\napp/locales/ru.json\napp/locales/uk.json\napp/locales/zh.json"
+}

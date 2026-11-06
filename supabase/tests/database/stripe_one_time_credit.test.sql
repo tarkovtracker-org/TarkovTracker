@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(96);
+SELECT plan(101);
 SELECT set_config('request.headers', '{}', true);
 INSERT INTO auth.users(id,email) SELECT ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid,
   'one-time-credit-' || n || '@example.invalid' FROM generate_series(901,937) n;
@@ -546,6 +546,33 @@ SELECT lives_ok($$SELECT public.refund_one_time_supporter('pi_claimed_refund_sec
 RESET ROLE;
 SELECT is((SELECT expires_at FROM public.supporters WHERE user_id='00000000-0000-0000-0000-000000000932'),
   now()+interval '30 days','claimed refund preserves only the other paid receipt');
+CREATE TEMP TABLE claimed_refund_snapshot AS SELECT to_jsonb(s) AS value
+  FROM public.supporters s WHERE user_id='00000000-0000-0000-0000-000000000932';
+-- Each webhook RPC starts without a payment identity inherited from an earlier request.
+SELECT set_config('stripe.one_time_payment_id','',true);
+SET LOCAL ROLE service_role;
+SELECT lives_ok($$SELECT public.refund_one_time_supporter('pi_claimed_refund_second',
+  '00000000-0000-0000-0000-000000000932','2026-10-07',400)$$,
+  'a claimed refund replay succeeds without inherited payment identity');
+SELECT throws_ok($$SELECT public.refund_one_time_supporter('pi_claimed_refund_first',
+  '00000000-0000-0000-0000-000000000901','2026-10-07',400)$$,
+  'P0001','Stripe payment belongs to another supporter','a claimed refund cannot cross receipt ownership');
+RESET ROLE;
+SELECT is((SELECT to_jsonb(s) FROM public.supporters s
+  WHERE user_id='00000000-0000-0000-0000-000000000932'),
+  (SELECT value FROM claimed_refund_snapshot),'refund replay preserves the complete supporter row');
+SELECT set_config('request.headers',jsonb_build_object('x-supporter-credit-version','1',
+  'x-stripe-event-id','evt_credit_refund_claimed','x-stripe-claim-token','stale')::text,true);
+SELECT set_config('stripe.one_time_payment_id','',true);
+SET LOCAL ROLE service_role;
+SELECT throws_ok($$SELECT public.refund_one_time_supporter('pi_claimed_refund_first',
+  '00000000-0000-0000-0000-000000000932','2026-10-07',400)$$,'40001',
+  'Stripe event claim is no longer current','a stale refund claim cannot revoke another paid receipt');
+RESET ROLE;
+SELECT ok((SELECT refunded_at IS NULL FROM private.stripe_one_time_payments
+  WHERE payment_id='pi_claimed_refund_first'),'rejected refunds leave the other receipt unrefunded');
+SELECT set_config('request.headers',jsonb_build_object('x-supporter-credit-version','1',
+  'x-stripe-event-id','evt_credit_refund_claimed','x-stripe-claim-token',claim->>'token')::text,true) FROM refund_claim;
 SELECT set_config('stripe.one_time_payment_id','',true);
 SELECT throws_ok($$UPDATE public.supporters SET expires_at=now()+interval '90 days'
   WHERE user_id='00000000-0000-0000-0000-000000000932'$$,'40001',

@@ -78,6 +78,7 @@ describe('useTaskFilters', () => {
     const normalizedSearch = ref('');
     const { filteredTasks, searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions: (inputTasks) => inputTasks,
+      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(false),
       mapTaskVisibilityFilterOptions: createOptions(),
@@ -111,6 +112,7 @@ describe('useTaskFilters', () => {
     );
     const { searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions,
+      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(true),
       mapTaskVisibilityFilterOptions: createOptions(),
@@ -133,8 +135,10 @@ describe('useTaskFilters', () => {
       (_tasks: Task[], _options: TaskFilterAndSortOptions, hideCompletedMapObjectives?: boolean) =>
         hideCompletedMapObjectives ? [tasks.value[0]!] : tasks.value
     );
+    const excludedTaskIds = ref<ReadonlySet<string>>(new Set());
     const { mapCompleteTasksCountOnMap, showMapTaskVisibilityNotice } = useTaskFilters({
       calculateFilteredTasksForOptions,
+      excludedTaskIds,
       getTaskMapView: ref('woods'),
       hideCompletedMapObjectives: ref(true),
       mapTaskVisibilityFilterOptions: createOptions({
@@ -150,5 +154,8 @@ describe('useTaskFilters', () => {
     expect(mapCompleteTasksCountOnMap.value).toBe(1);
     expect(calculateFilteredTasksForOptions).toHaveBeenCalledTimes(2);
     expect(showMapTaskVisibilityNotice.value).toBe(true);
+    excludedTaskIds.value = new Set(['2']);
+    expect(mapCompleteTasksCountOnMap.value).toBe(0);
+    expect(showMapTaskVisibilityNotice.value).toBe(false);
   });
 });

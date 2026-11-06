@@ -1,41 +1,18 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed, defineComponent, h, ref } from 'vue';
 import TaskGraphView from '@/features/tasks/TaskGraphView.vue';
 import type { TaskNodeData } from '@/composables/useTaskGraphData';
-mockNuxtImport('useSharedBreakpoints', () => () => ({ lgAndUp: ref(true) }));
-mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
+const isLgAndUp = ref(false);
+const searchQuery = ref('');
+const savedStatus = ref<string | null>('locked');
+mockNuxtImport('useSharedBreakpoints', () => () => ({ lgAndUp: computed(() => isLgAndUp.value) }));
 mockNuxtImport('useRouter', () => () => ({ push: vi.fn() }));
-vi.mock('pinia', () => ({
-  storeToRefs: (store: { getTaskTraderView: unknown }) => ({
-    getTaskTraderView: store.getTaskTraderView,
-  }),
+vi.mock('@/composables/useRouteSearchQuery', () => ({
+  useRouteSearchQuery: () => ({ searchQuery: computed(() => searchQuery.value) }),
 }));
-vi.mock('@/stores/usePreferences', async () => {
-  const { ref } = await import('vue');
-  return {
-    usePreferencesStore: () => ({
-      getTaskTraderView: ref('trader-1'),
-      setTaskPrimaryView: vi.fn(),
-    }),
-  };
-});
-vi.mock('@/composables/useMapResize', async () => {
-  const { ref } = await import('vue');
-  return {
-    useMapResize: () => ({
-      isResizing: ref(false),
-      mapHeight: ref(620),
-      mapHeightMax: ref(900),
-      mapHeightMin: ref(360),
-      onResizeKeydown: vi.fn(),
-      resizeHandleRef: ref(null),
-      startResize: vi.fn(),
-    }),
-  };
-});
 vi.mock('@/composables/useTaskGraphData', async () => {
   const { ref } = await import('vue');
   const data: TaskNodeData = {
@@ -81,6 +58,31 @@ vi.mock('@vue-flow/core', async (importOriginal) => {
 vi.mock('@/utils/taskGraphLayout', () => ({
   layoutTaskGraph: (nodes: unknown[]) => nodes,
 }));
+vi.mock('@/stores/usePreferences', () => ({
+  usePreferencesStore: () => ({
+    getTaskTraderView: '54cb57776803fa99248b456e',
+    getTaskSecondaryView: 'all',
+    get taskSecondaryView() {
+      return savedStatus.value;
+    },
+    getTaskSortMode: 'alphabetical',
+    getTaskSortDirection: 'asc',
+    setTaskPrimaryView: vi.fn(),
+  }),
+}));
+vi.mock('pinia', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('pinia')>()),
+  storeToRefs: (store: Record<string, unknown>) => ({
+    getTaskTraderView: ref(store.getTaskTraderView),
+  }),
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${JSON.stringify(params)}` : key,
+  }),
+}));
 const MiniMapProbe = defineComponent({
   props: { nodeColor: { type: Function, required: true } },
   setup(props) {
@@ -91,20 +93,65 @@ const MiniMapProbe = defineComponent({
       });
   },
 });
-describe('TaskGraphView', () => {
-  it('shows active in the legend and uses the active color in the minimap', () => {
-    const wrapper = mount(TaskGraphView, {
-      global: {
-        stubs: {
-          VueFlow: { template: '<div><slot /></div>' },
-          MiniMap: MiniMapProbe,
-          Controls: true,
-          TaskGraphNode: true,
-          UButton: true,
-          UIcon: true,
+const mountGraph = () =>
+  mount(TaskGraphView, {
+    global: {
+      stubs: {
+        UIcon: true,
+        UButton: {
+          props: ['to'],
+          template: '<a v-bind="$attrs" :data-to="JSON.stringify(to)"><slot /></a>',
         },
+        VueFlow: { template: '<div><slot /></div>' },
+        MiniMap: MiniMapProbe,
+        Controls: true,
       },
-    });
+    },
+  });
+describe('TaskGraphView narrow screens', () => {
+  beforeEach(() => {
+    isLgAndUp.value = false;
+    searchQuery.value = '';
+    savedStatus.value = 'locked';
+  });
+  it('explains the width requirement under a labelled heading', () => {
+    const notice = mountGraph().get('[data-testid="task-graph-narrow"]');
+    const heading = notice.get('h2');
+    expect(notice.attributes('aria-labelledby')).toBe(heading.attributes('id'));
+    expect(heading.text()).toBe('page.tasks.graph.narrow_title');
+    expect(notice.text()).toContain('page.tasks.graph.narrow_description:{"width":1024}');
+  });
+  it.each([
+    ['', 'locked', 'locked'],
+    ['mole', 'locked', 'locked'],
+    ['', null, 'available'],
+  ] as const)(
+    'keeps search %j and saved status %j as %j in the Traders link',
+    (search, status, expectedStatus) => {
+      searchQuery.value = search;
+      savedStatus.value = status;
+      const link = mountGraph().get('[data-testid="task-graph-narrow-traders-link"]');
+      expect(JSON.parse(link.attributes('data-to') ?? '')).toEqual({
+        path: '/tasks/traders',
+        query: {
+          trader: '54cb57776803fa99248b456e',
+          status: expectedStatus,
+          sort: 'alphabetical',
+          sortDir: 'asc',
+          ...(search ? { q: search } : {}),
+        },
+      });
+    }
+  );
+  it('replaces the notice once the window reaches the lg breakpoint', () => {
+    isLgAndUp.value = true;
+    expect(mountGraph().find('[data-testid="task-graph-narrow"]').exists()).toBe(false);
+  });
+});
+describe('TaskGraphView active status', () => {
+  it('shows active in the legend and uses its color in the minimap', () => {
+    isLgAndUp.value = true;
+    const wrapper = mountGraph();
     expect(wrapper.text()).toContain('common.active');
     expect(wrapper.get('[data-testid="minimap-active-color"]').attributes('data-color')).toBe(
       'var(--color-primary-500)'

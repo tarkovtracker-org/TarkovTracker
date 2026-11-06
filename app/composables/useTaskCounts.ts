@@ -7,6 +7,7 @@ import { matchesAllUsersView, type TeamTaskStatus } from '@/utils/allUsersTaskSt
 import { perfEnd, perfStart } from '@/utils/perf';
 import type { Task } from '@/types/tarkov';
 import type { TaskSecondaryView } from '@/types/taskFilter';
+const HIDDEN_TASK_COUNTED_VIEWS: ReadonlySet<TaskSecondaryView> = new Set(['completed', 'failed']);
 type TaskCountStatus = 'active' | 'available' | 'locked' | 'completed' | 'failed';
 type TaskStatusCounts = Record<'all' | TaskCountStatus, number>;
 type TaskCountResult = { statuses: readonly TaskCountStatus[] };
@@ -158,9 +159,15 @@ export function useTaskCounts() {
     visibleTeamIds: string[]
   ): TaskCountResult | null =>
     isAllUsers ? getAllUsersTaskCount(task, visibleTeamIds) : getUserTaskCount(task, userView);
-  const addTaskStatusCount = (counts: TaskStatusCounts, result: TaskCountResult): void => {
-    counts.all++;
-    for (const status of result.statuses) counts[status]++;
+  const addTaskStatusCount = (
+    counts: TaskStatusCounts,
+    result: TaskCountResult,
+    isHidden: boolean
+  ): void => {
+    if (!isHidden) counts.all++;
+    for (const status of result.statuses) {
+      if (!isHidden || HIDDEN_TASK_COUNTED_VIEWS.has(status)) counts[status]++;
+    }
   };
   const countTaskStatuses = (
     tasks: Task[],
@@ -170,11 +177,12 @@ export function useTaskCounts() {
     visibleTeamIds: string[]
   ): TaskStatusCounts => {
     const counts = { all: 0, active: 0, available: 0, locked: 0, completed: 0, failed: 0 };
+    const hiddenTaskIds = new Set(preferencesStore.getHiddenTaskIds);
     for (const task of tasks) {
       if (!isTaskIncluded(task, taskFilterContext)) continue;
       const result = getTaskCountResult(task, userView, isAllUsers, visibleTeamIds);
       if (!result) continue;
-      addTaskStatusCount(counts, result);
+      addTaskStatusCount(counts, result, hiddenTaskIds.has(task.id));
     }
     return counts;
   };
@@ -206,6 +214,7 @@ export function useTaskCounts() {
       secondaryView,
     });
     const counts: Record<string, number> = {};
+    const hiddenTaskIds = new Set(preferencesStore.getHiddenTaskIds);
     const taskFilterContext = getTaskFilterContext();
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
@@ -214,6 +223,7 @@ export function useTaskCounts() {
       const traderId = task.trader?.id;
       if (!traderId) continue;
       if (!counts[traderId]) counts[traderId] = 0;
+      if (hiddenTaskIds.has(task.id) && !HIDDEN_TASK_COUNTED_VIEWS.has(secondaryView)) continue;
       const taskFaction = task.factionName;
       if (isAllUsers) {
         const relevantTeamIds = visibleTeamIds.filter((teamId) => {

@@ -1,38 +1,25 @@
 <template>
-  <div class="flex items-center text-sm">
-    <!-- Level Requirement -->
-    <div v-if="showLevelRequirement" class="mr-2 flex items-center">
-      <UIcon name="i-mdi-menu-right" class="h-5 w-5" />
-      <i18n-t keypath="page.tasks.questcard.level" scope="global">
-        <template #count>{{ levelRequired }}</template>
-      </i18n-t>
-    </div>
-    <!-- Locked Before -->
-    <div v-if="lockedBefore > 0" class="mr-2 flex items-center">
-      <UIcon name="i-mdi-lock-open-outline" class="h-5 w-5" />
-      <i18n-t keypath="page.tasks.questcard.locked_before" scope="global">
-        <template #count>{{ lockedBefore }}</template>
-      </i18n-t>
-    </div>
-    <!-- Station Info for Hideout (only shown when relatedStation is passed) -->
-    <div v-if="needType === 'hideoutModule' && relatedStation" class="mr-2 flex items-center">
-      <station-link :station="relatedStation" :module-id="hideoutModuleId" />
-      <span class="ml-1">{{ hideoutLevel }}</span>
-    </div>
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+    <span v-if="showLevelRequirement" class="flex items-center gap-1">
+      <UIcon name="i-mdi-account" :class="iconClass" />
+      {{ $t('common.lvl_level', { level: levelRequired }) }}
+    </span>
+    <span v-if="lockedBefore > 0" class="flex items-center gap-1">
+      <UIcon name="i-mdi-lock-outline" :class="iconClass" />
+      {{ $t('needed_items.locked_before', { count: lockedBefore }) }}
+    </span>
   </div>
 </template>
 <script setup lang="ts">
-  import StationLink from '@/features/hideout/StationLink.vue';
-  import type { HideoutStation } from '@/types/tarkov';
-  const props = defineProps<{
-    needType: string;
-    levelRequired: number;
-    lockedBefore: number;
-    playerLevel: number;
-    relatedStation?: Pick<HideoutStation, 'id' | 'name' | 'imageLink'> | null;
-    hideoutLevel?: number;
-    hideoutModuleId?: string | null;
-  }>();
+  const props = withDefaults(
+    defineProps<{
+      levelRequired: number;
+      lockedBefore: number;
+      playerLevel: number;
+      iconClass?: string;
+    }>(),
+    { iconClass: 'h-4 w-4' }
+  );
   const showLevelRequirement = computed(
     () => props.levelRequired > 0 && props.levelRequired > props.playerLevel
   );

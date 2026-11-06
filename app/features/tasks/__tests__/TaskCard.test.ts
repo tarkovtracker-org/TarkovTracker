@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
@@ -6,7 +7,10 @@ import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
-import type { Task } from '@/types/tarkov';
+import type { StoryChapter, Task } from '@/types/tarkov';
+const en = JSON.parse(readFileSync('app/locales/en.json', 'utf8'));
+const resolveEn = (key: string): unknown =>
+  key.split('.').reduce<unknown>((value, part) => (value as Record<string, unknown>)?.[part], en);
 const taskState = reactive({
   active: false,
   complete: false,
@@ -15,6 +19,7 @@ const taskState = reactive({
 const preferencesState = reactive({
   collapseDefault: false,
   hideRewards: false,
+  manualFail: false,
   primaryView: 'all',
   pinnedTaskIds: [] as string[],
 });
@@ -27,6 +32,7 @@ const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
 };
 const tarkovStoreMock = {
+  $state: { currentGameMode: 'pvp' },
   clearTaskAvailability: vi.fn(),
   getCurrentProgressData: vi.fn((): Partial<UserProgressData> => ({ taskCompletions: {} })),
   getObjectiveCount: vi.fn(() => 0),
@@ -45,6 +51,8 @@ const metadataStoreMock = {
   editions: [],
   getTaskById: vi.fn(),
   mapsWithSvg: [],
+  storyChapters: [] as StoryChapter[],
+  storyChaptersGameMode: null as string | null,
   tasks: [] as Task[],
   tasksObjectivesHydrated: true,
   tasksObjectivesPending: false,
@@ -67,7 +75,6 @@ const useTaskCardLinksMock = {
   copyTaskLink: vi.fn(),
   openItemOnTarkovDev: vi.fn(),
   openItemOnWiki: vi.fn(),
-  openTaskDataIssue: vi.fn(),
   setSelectedItem: vi.fn(),
 };
 vi.mock('@/stores/useMetadata', () => ({
@@ -75,12 +82,15 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
-    getEnableManualTaskFail: false,
+    get getEnableManualTaskFail() {
+      return preferencesState.manualFail;
+    },
     getHideCompletedTaskObjectives: false,
     get getHideTaskRewards() {
       return preferencesState.hideRewards;
     },
     getPinnedTaskIds: preferencesState.pinnedTaskIds,
+    getHiddenTaskIds: [] as string[],
     getRespectTaskFiltersForImpact: false,
     getShowRequiredLabels: true,
     getTaskCollapseDefault: preferencesState.collapseDefault,
@@ -88,6 +98,7 @@ vi.mock('@/stores/usePreferences', () => ({
     getTaskPrimaryView: preferencesState.primaryView,
     getTaskUserView: 'self',
     togglePinnedTask: vi.fn(),
+    toggleHiddenTask: vi.fn(),
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({
@@ -117,7 +128,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({
     t: (key: string, ...args: unknown[]) => {
       const fallback = args.at(-1);
-      return typeof fallback === 'string' ? fallback : key;
+      if (typeof fallback === 'string') return fallback;
+      const template = resolveEn(key);
+      if (typeof template !== 'string') return key;
+      const params = (args[0] ?? {}) as Record<string, unknown>;
+      return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
     },
   }),
 }));
@@ -138,12 +153,13 @@ const TaskCardHeaderStub = {
 };
 const TaskCardBadgesStub = {
   template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
-  props: ['task', 'traderRequirements', 'isActive'],
+  props: ['task', 'isActive'],
 };
 const TaskCardActionsStub = {
-  props: ['state', 'size', 'isFailed'],
-  emits: ['complete', 'active', 'uncomplete', 'available', 'failed'],
-  template: '<div data-testid="task-card-actions" />',
+  props: ['state', 'size', 'isFailed', 'showFail'],
+  emits: ['complete', 'active', 'uncomplete', 'available', 'failed', 'markFailed'],
+  template:
+    '<div data-testid="task-card-actions" :data-show-fail="String(!!showFail)"><button v-if="showFail" data-testid="task-card-fail-stub" @click="$emit(\'markFailed\')" /></div>',
 };
 const TaskCardBackgroundStub = {
   props: ['isComplete', 'isFailed', 'isLocked', 'isInvalid'],
@@ -208,6 +224,7 @@ describe('TaskCard appearance and expansion controls', () => {
     taskState.failed = false;
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
+    preferencesState.manualFail = false;
     preferencesState.primaryView = 'all';
     preferencesState.pinnedTaskIds = [];
     progressStoreMock.taskEvaluations = {};
@@ -219,6 +236,8 @@ describe('TaskCard appearance and expansion controls', () => {
     mockTaskActionListener = undefined;
     mockTaskGetter = undefined;
     metadataStoreMock.getTaskById.mockReset();
+    metadataStoreMock.storyChapters = [];
+    metadataStoreMock.storyChaptersGameMode = null;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStoreMock.getObjectiveCount.mockReturnValue(0);
   });
@@ -238,11 +257,69 @@ describe('TaskCard appearance and expansion controls', () => {
     const wrapper = await mountTaskCard(gated);
     const reset = wrapper
       .findAll('button')
-      .find((button) => button.text() === 'page.tasks.questcard.clear_availability_confirmation');
+      .find((button) => button.text() === en.page.tasks.questcard.clear_availability_confirmation);
     expect(reset).toBeDefined();
     await reset!.trigger('click');
     expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
     expect(tarkovStoreMock.setObjectiveCount).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('shows the inline clear-confirmation control only for confirmed tasks', async () => {
+    const gated: Partial<Task> = {
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+    };
+    const unconfirmed = await mountTaskCard(gated);
+    expect(unconfirmed.find('[data-testid="task-clear-availability"]').exists()).toBe(false);
+    unconfirmed.unmount();
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      taskAvailability: {
+        'task-1': {
+          requirements: otherRequirementsSignature({ id: 'task-1', ...gated } as Task)!,
+          timestamp: 10,
+        },
+      },
+    });
+    const wrapper = await mountTaskCard(gated);
+    const clear = wrapper.get('[data-testid="task-clear-availability"]');
+    expect(clear.attributes('aria-label')).toBe(
+      en.page.tasks.questcard.clear_availability_confirmation
+    );
+    await clear.trigger('click');
+    expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
+    wrapper.unmount();
+  });
+  it('offers the inline fail action only when manual failing is enabled', async () => {
+    const off = await mountTaskCard();
+    expect(off.get('[data-testid="task-card-actions"]').attributes('data-show-fail')).toBe('false');
+    expect(off.find('[data-testid="task-card-fail-stub"]').exists()).toBe(false);
+    off.unmount();
+    preferencesState.manualFail = true;
+    const wrapper = await mountTaskCard();
+    expect(wrapper.get('[data-testid="task-card-actions"]').attributes('data-show-fail')).toBe(
+      'true'
+    );
+    expect(wrapper.text()).toContain(en.page.tasks.questcard.mark_failed);
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const originalConfirm = window.confirm;
+    window.confirm = confirm;
+    try {
+      const fail = wrapper.get('[data-testid="task-card-fail-stub"]');
+      await fail.trigger('click');
+      expect(useTaskActionsMock.markTaskFailed).not.toHaveBeenCalled();
+      await fail.trigger('click');
+      expect(confirm).toHaveBeenCalledTimes(2);
+      expect(useTaskActionsMock.markTaskFailed).toHaveBeenCalledTimes(1);
+    } finally {
+      window.confirm = originalConfirm;
+    }
+    wrapper.unmount();
+  });
+  it('renders no overflow menu button', async () => {
+    const wrapper = await mountTaskCard();
+    expect(wrapper.find('[aria-label="More"]').exists()).toBe(false);
+    expect(wrapper.find('[icon="i-mdi-dots-horizontal"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Report data issue');
     wrapper.unmount();
   });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
@@ -263,7 +340,7 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     const wrapper = await mountTaskCard();
     expect(wrapper.get('[data-testid="task-card-title"]').text()).toBe('Sample task');
-    expect(wrapper.find('[data-testid="task-blockers"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('styles available global cards and wires accept actions', async () => {
@@ -298,14 +375,27 @@ describe('TaskCard appearance and expansion controls', () => {
       isInvalid: false,
     });
   });
-  it('renders canonical blockers and evaluates reputation badges', async () => {
+  it('lists each unmet requirement once, in plain language, under the header', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     progressStoreMock.taskEvaluations = {
       'task-1': {
-        self: { available: false, blockers: [{ type: 'player_level', current: 1, required: 20 }] },
+        self: {
+          available: false,
+          blockers: [
+            { type: 'player_level', current: 1, required: 20, compareMethod: '>=' },
+            {
+              type: 'trader_reputation',
+              trader: { id: 'prapor', name: 'Prapor' },
+              current: 0,
+              required: 0.5,
+              compareMethod: '>=',
+            },
+          ],
+        },
       },
     };
     const wrapper = await mountTaskCard({
+      minPlayerLevel: 20,
       normalizedTraderRequirements: [
         {
           id: 'rep',
@@ -316,30 +406,205 @@ describe('TaskCard appearance and expansion controls', () => {
         },
       ],
     });
-    expect(wrapper.get('[data-testid="task-blockers"]').text()).not.toBe('');
-    expect(wrapper.findComponent(TaskCardBadgesStub).props('traderRequirements')).toEqual([
-      expect.objectContaining({ id: 'rep', met: false }),
+    const chips = wrapper
+      .findAll('[data-testid="task-requirement-chip"]')
+      .map((chip) => chip.text());
+    expect(chips).toEqual([
+      expect.stringContaining('Level 20+'),
+      expect.stringContaining('Prapor reputation 0.50+'),
+    ]);
+    expect(chips[0]).toContain('you: 1');
+    expect(wrapper.text()).not.toMatch(/[<>]=|!=/);
+    expect(wrapper.get('[data-testid="task-card-badges"]').attributes()).not.toHaveProperty(
+      'trader-requirements'
+    );
+    wrapper.unmount();
+  });
+  it('keeps met requirements out of the header of an available card', async () => {
+    tarkovStoreMock.playerLevel.mockReturnValue(30);
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [
+            {
+              type: 'trader_level',
+              trader: { id: 'prapor', name: 'Prapor' },
+              current: 1,
+              required: 2,
+            },
+          ],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({ minPlayerLevel: 20 });
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.text()).toContain('1 of 1 met');
+    await summary.get('button').trigger('click');
+    expect(summary.text()).toContain('Level 20+');
+    tarkovStoreMock.playerLevel.mockReturnValue(1);
+    wrapper.unmount();
+  });
+  const storyRouteSummary = async () => {
+    metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
+    const wrapper = await mountTaskCard({
+      parents: ['prior'],
+      storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+    });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    await summary.get('button').trigger('click');
+    return { wrapper, rows: summary.findAll('li').map((item) => item.text()) };
+  };
+  it.each([
+    [false, 'Not met'],
+    [true, 'Met'],
+  ])('reports storyline progress as its own route: %s', async (complete, status) => {
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      storyChapters: { chapter: { complete } },
+    });
+    const { wrapper, rows } = await storyRouteSummary();
+    expect(rows[0]).toMatch(/^Not met:\s*Complete Prior quest/);
+    expect(rows[1]).toMatch(new RegExp(`^${status}:\\s*Or progress a story chapter: Chapter`));
+    wrapper.unmount();
+  });
+  it('counts automatic story objectives toward the storyline route', async () => {
+    metadataStoreMock.storyChapters = [
+      {
+        id: 'chapter',
+        objectives: { intro: { id: 'intro', completionPolicy: 'tutorial' } },
+      } as unknown as StoryChapter,
+    ];
+    metadataStoreMock.storyChaptersGameMode = 'pvp';
+    const { wrapper, rows } = await storyRouteSummary();
+    expect(rows[1]).toMatch(/^Met:\s*Or progress a story chapter/);
+    wrapper.unmount();
+  });
+  it('lists satisfied server-side requirements as met', async () => {
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: { available: false, blockers: [{ type: 'dialogue', requirementId: 'talk' }] },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        { type: 'dialogue', id: 'talk', traders: ['trader'] },
+        {
+          type: 'storyObjective',
+          id: 'story',
+          storyChapter: { id: 'chapter', name: 'Chapter' },
+          objective: { id: 'goal', name: 'Goal' },
+        },
+        { type: 'globalVariable', id: 'var', variableId: 'v', compareMethod: '>=', value: 3 },
+      ],
+    });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    await summary.get('button').trigger('click');
+    const rows = summary.findAll('li').map((item) => item.text());
+    expect(rows).toEqual([
+      expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
+      expect.stringMatching(/^Met:\s*Additional in-game progression required/),
+      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
     ]);
     wrapper.unmount();
   });
-  it.each([false, true])(
-    'shows pending prerequisites only without storyline progress: %s',
-    async (complete) => {
-      tarkovStoreMock.getCurrentProgressData.mockReturnValue({
-        taskCompletions: {},
-        storyChapters: { chapter: { complete } },
-      });
-      metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
-      const wrapper = await mountTaskCard({
-        parents: ['prior'],
-        storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
-        taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
-      });
-      expect(wrapper.text().includes('Prior quest')).toBe(!complete);
-      expect(wrapper.find('a[href="/tasks?task=prior"]').exists()).toBe(!complete);
-      wrapper.unmount();
-    }
-  );
+  it('retains the confirmation warning for an unmapped unknown scalar gate', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'global_variable_unknown', requirementId: 'scalar' }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        { type: 'globalVariable', id: 'scalar', variableId: 'v', compareMethod: '>=', value: 3 },
+      ],
+    });
+    expect(wrapper.get('[data-testid="task-requirement-chip"]').text()).toContain(
+      'Use Mark available only if this task is available in-game.'
+    );
+    wrapper.unmount();
+  });
+  it('shows unresolved-pool confirmation guidance before opening contributors', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'global_variable_unknown', requirementId: 'pool-gate' }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'pool-gate',
+          variableId: 'v',
+          compareMethod: '>=',
+          value: 3,
+          taskPool: {
+            traderId: 'mechanic',
+            loyaltyLevel: 2,
+            verification: 'unresolved',
+            coverage: 'partial',
+            derivation: { type: 'distinctTaskCompletions', taskIds: ['contributor'] },
+          },
+        },
+      ],
+    });
+    expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="task-requirements-blocking"]').text()).toContain(
+      'If this task is already available in-game, use Mark available.'
+    );
+    wrapper.unmount();
+  });
+  it('opens pool contributors from a chip even when the task body starts collapsed', async () => {
+    preferencesState.collapseDefault = true;
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'task_counter', requirementId: 'pool-gate', current: 0, required: 1 }],
+        },
+      },
+    };
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: 'Contributor task' }));
+    const wrapper = await mountTaskCard({
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'pool-gate',
+          variableId: 'v',
+          compareMethod: '>=',
+          value: 1,
+          counter: { type: 'distinctTaskCompletions', taskIds: ['contributor'] },
+        },
+      ],
+    });
+    expect(wrapper.find('[data-testid="task-requirements-summary"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="task-requirement-chip"] button').trigger('click');
+    expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('Contributor task');
+    await wrapper
+      .get('button[aria-controls="task-requirements-task-1-pool-gate"]')
+      .trigger('click');
+    expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
+    await wrapper.get('button[aria-label="Collapse task"]').trigger('click');
+    await wrapper.get('button[aria-label="Expand task"]').trigger('click');
+    expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="task-requirement-chip"] button').trigger('click');
+    expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('Contributor task');
+    expect(
+      wrapper.get('[data-testid="task-requirements-summary"] button').attributes('aria-expanded')
+    ).toBe('true');
+    wrapper.unmount();
+  });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {
     const wrapper = await mountTaskCard();
     const header = wrapper.get('[data-testid="task-card-header"]');

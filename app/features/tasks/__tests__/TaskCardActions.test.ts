@@ -9,9 +9,9 @@ const ButtonStub = {
   template:
     '<button v-bind="$attrs" :data-color="color" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
 };
-const mountActions = (state: ActionButtonState, isFailed = false) =>
+const mountActions = (state: ActionButtonState, isFailed = false, showFail = false) =>
   mountSuspended(TaskCardActions, {
-    props: { state, size: 'sm', isFailed },
+    props: { state, size: 'sm', isFailed, showFail },
     global: { stubs: { UButton: ButtonStub } },
   });
 describe('TaskCardActions', () => {
@@ -71,5 +71,24 @@ describe('TaskCardActions', () => {
     expect(button.text()).toBe('');
     await button.trigger('click');
     expect(wrapper.emitted()).toEqual({});
+  });
+  it('hides the inline fail action unless it is enabled', async () => {
+    expect((await mountActions('available')).find('[data-testid="task-card-fail"]').exists()).toBe(
+      false
+    );
+  });
+  it('emits markFailed from the inline fail action', async () => {
+    const wrapper = await mountActions('available', false, true);
+    await wrapper.get('[data-testid="task-card-fail"]').trigger('click');
+    expect(wrapper.emitted('markFailed')).toHaveLength(1);
+  });
+  it('keeps the fail action when no other action applies', async () => {
+    const wrapper = await mountActions('none', false, true);
+    expect(wrapper.find('[data-testid="task-card-fail"]').exists()).toBe(true);
+  });
+  it('leaves hot-wheels tasks with their own fail button only', async () => {
+    const wrapper = await mountActions('hotwheels', false, true);
+    expect(wrapper.find('[data-testid="task-card-fail"]').exists()).toBe(false);
+    expect(wrapper.findAll('button')).toHaveLength(2);
   });
 });

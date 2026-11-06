@@ -282,7 +282,7 @@ describe('useTaskDeepLink', () => {
     expect(taskDeepLink.pinnedTaskId.value).toBe('task-visible');
     expect(taskElement.scrollIntoView).toHaveBeenCalled();
     expect(trackFocusedTaskVisible).toHaveBeenCalledWith('task-visible');
-    expect(replace).toHaveBeenCalledWith({ query: {} });
+    expect(replace).toHaveBeenCalledWith({ query: { status: 'all' } });
   });
   it('selects the active secondary view for an explicitly active task', async () => {
     metadataTasks.value = [{ id: 'task-active', name: 'Active Task', requiredKeys: [] }];
@@ -320,6 +320,39 @@ describe('useTaskDeepLink', () => {
     expect(setTaskSecondaryView).toHaveBeenCalledWith('available');
     expect(taskDeepLink.pinnedTaskId.value).toBe('task-legacy-available');
   });
+  it.each(['locked', 'completed', 'failed'] as const)(
+    'keeps a %s task focused after query cleanup synchronizes the status filter',
+    async (status) => {
+      const task: Task = { id: 'target', name: 'Target', requiredKeys: [] };
+      metadataTasks.value = [task];
+      preferenceState.taskSecondaryView = 'available';
+      if (status === 'completed') tasksCompletions.value.target = { self: true };
+      if (status === 'failed') tasksFailed.value.target = { self: true };
+      applyRouteQuery({ task: task.id });
+      const previousReplace = replace.getMockImplementation()!;
+      replace.mockImplementation(async ({ query }) => {
+        applyRouteQuery(query);
+        preferenceState.taskSecondaryView = String(query.status ?? 'available');
+      });
+      try {
+        const filteredTasks = computed(() =>
+          [status, 'all'].includes(preferenceState.taskSecondaryView) ? [task] : []
+        );
+        const element = document.createElement('div');
+        element.id = `task-${task.id}`;
+        element.scrollIntoView = vi.fn();
+        document.body.appendChild(element);
+        const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+        const link = useTaskDeepLink({ filteredTasks, leafletMapRef: ref(null) });
+        await link.handleTaskQueryParam();
+        expect(link.pinnedTask.value?.id).toBe(task.id);
+        expect(routeState.query.task).toBeUndefined();
+        expect(preferenceState.taskSecondaryView).toBe(status);
+      } finally {
+        replace.mockImplementation(previousReplace);
+      }
+    }
+  );
   it('waits for the task element to mount before clearing the deep-link query', async () => {
     vi.useFakeTimers();
     try {
@@ -348,7 +381,7 @@ describe('useTaskDeepLink', () => {
       expect(taskDeepLink.pinnedTaskId.value).toBe('task-delayed');
       expect(taskElement.scrollIntoView).toHaveBeenCalled();
       expect(trackFocusedTaskVisible).toHaveBeenCalledWith('task-delayed');
-      expect(replace).toHaveBeenCalledWith({ query: {} });
+      expect(replace).toHaveBeenCalledWith({ query: { status: 'all' } });
     } finally {
       vi.useRealTimers();
     }
@@ -382,7 +415,7 @@ describe('useTaskDeepLink', () => {
       expect(taskDeepLink.pinnedTaskId.value).toBe('task-filter-delay');
       expect(taskElement.scrollIntoView).toHaveBeenCalled();
       expect(trackFocusedTaskVisible).toHaveBeenCalledWith('task-filter-delay');
-      expect(replace).toHaveBeenCalledWith({ query: {} });
+      expect(replace).toHaveBeenCalledWith({ query: { status: 'all' } });
     } finally {
       vi.useRealTimers();
     }

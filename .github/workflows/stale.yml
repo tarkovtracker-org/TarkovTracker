@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   stale-reminder:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       issues: write
@@ -26,7 +26,7 @@ jobs:
           exempt-issue-labels: 'pinned,security'
           exempt-pr-labels: 'pinned,security'
   stale-close:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: stale-reminder
     permissions:

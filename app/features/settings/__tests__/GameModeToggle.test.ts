@@ -38,6 +38,18 @@ describe('GameModeToggle', () => {
     expect(seasonalBtn.attributes('aria-pressed')).toBe('false');
     expect(seasonalBtn.classes()).toContain('text-warning-500');
   });
+  it('keeps every mode unselected until an explicit choice', async () => {
+    const wrapper = mount(GameModeToggle, {
+      props: { modelValue: undefined },
+      global: { stubs: { UIcon: UIconStub } },
+    });
+    expect(
+      wrapper.findAll('button').every((button) => button.attributes('aria-pressed') === 'false')
+    ).toBe(true);
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toEqual([[GAME_MODES.PVE]]);
+  });
   it('emits update:modelValue when an enabled mode button is clicked', async () => {
     const wrapper = mount(GameModeToggle, {
       props: {

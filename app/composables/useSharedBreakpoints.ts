@@ -11,10 +11,12 @@ import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
  * - sm: 600px (mobile/tablet boundary)
  * - md: 960px (tablet/desktop boundary)
  */
+/** Matches Tailwind's default `lg` breakpoint, so `lg:` classes and `lgAndUp` agree. */
+export const LG_BREAKPOINT_PX = 1024;
 const breakpoints = useBreakpoints({
   sm: 600,
   md: SHELL_DESKTOP_BREAKPOINT_PX,
-  lg: 1024,
+  lg: LG_BREAKPOINT_PX,
   xl: 1280,
   xxl: 1920,
 });

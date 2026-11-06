@@ -67,6 +67,8 @@ const preferencesStoreMock = {
   getPinnedTaskIds: [] as string[],
   getHideCompletedMapObjectives: false,
   getMapHiddenTaskIds: [] as string[],
+  getHiddenTaskIds: [] as string[],
+  unhideTasks: vi.fn(),
   mapTeamAllHidden: false,
   togglePinnedTask: vi.fn(),
   clearMapTaskVisibility: vi.fn(),
@@ -223,7 +225,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 // Each task view has its own route; keep the mocked route on the view the test picks.
-const TASK_VIEW_PATHS: Record<string, string> = { maps: '/tasks/maps', graph: '/tasks/graph' };
+const TASK_VIEW_PATHS: Record<string, string> = {
+  maps: '/tasks/maps',
+  traders: '/tasks/traders',
+  graph: '/tasks/graph',
+};
 mockNuxtImport('useRoute', (original) => () => {
   const route = original();
   return {
@@ -385,6 +391,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getPinnedTaskIds = [];
     preferencesStoreMock.getHideCompletedMapObjectives = false;
     preferencesStoreMock.getMapHiddenTaskIds = [];
+    preferencesStoreMock.getHiddenTaskIds = [];
     preferencesStoreMock.clearMapTaskVisibility.mockReset();
     preferencesStoreMock.mapTeamAllHidden = false;
     preferencesStoreMock.setHideCompletedMapObjectives.mockReset();
@@ -971,6 +978,46 @@ describe('tasks page', () => {
     await mountPage();
     expect(wrapper.text()).not.toContain('page.tasks.global_tasks_section');
   });
+  it('sections the trader view like the in-game task list', async () => {
+    visibleTasksRef.value = [
+      { ...mapTask, id: 'task-essential', traderTaskGroup: 0 },
+      { ...mapTask, id: 'task-unknown' },
+      { ...mapTask, id: 'task-ll2', traderTaskGroup: 2 },
+      { ...mapTask, id: 'task-ll1', traderTaskGroup: 1 },
+    ];
+    preferencesStoreMock.getTaskPrimaryView = 'traders';
+    await mountPage();
+    expect(
+      wrapper
+        .findAll('[data-testid^="trader-task-section-"]')
+        .map((section: { attributes: (name: string) => string }) =>
+          section.attributes('data-testid')
+        )
+    ).toEqual([
+      'trader-task-section-ll1',
+      'trader-task-section-ll2',
+      'trader-task-section-essential',
+      'trader-task-section-other',
+    ]);
+    expect(
+      wrapper
+        .findAll('[data-testid="task-card"]')
+        .map((item: { text: () => string }) => item.text())
+    ).toEqual(['task-ll1', 'task-ll2', 'task-essential', 'task-unknown']);
+  });
+  it('keeps the trader view flat when no task has a known group', async () => {
+    visibleTasksRef.value = [mapTask, globalTask];
+    preferencesStoreMock.getTaskPrimaryView = 'traders';
+    await mountPage();
+    expect(wrapper.find('[data-testid^="trader-task-section-"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(2);
+  });
+  it('does not section grouped tasks outside the trader view', async () => {
+    visibleTasksRef.value = [{ ...mapTask, traderTaskGroup: 0 }];
+    preferencesStoreMock.getTaskPrimaryView = 'all';
+    await mountPage();
+    expect(wrapper.find('[data-testid^="trader-task-section-"]').exists()).toBe(false);
+  });
   it('keeps global accent for pinned global tasks in map view', async () => {
     visibleTasksRef.value = [globalTask];
     preferencesStoreMock.getTaskPrimaryView = 'maps';
@@ -1027,6 +1074,37 @@ describe('tasks page', () => {
     expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
     await section.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
     expect(preferencesStoreMock.clearMapTaskVisibility).toHaveBeenCalledWith(['task-hidden']);
+  });
+  it('moves user-hidden tasks into their own section and off the map', async () => {
+    const shownTask = createDefaultTask({
+      id: 'task-shown',
+      name: 'Shown Task',
+      objectives: [createMapObjective({ id: 'obj-shown', taskId: 'task-shown' })],
+    });
+    const hiddenTask = createDefaultTask({
+      id: 'task-hidden',
+      name: 'Hidden Task',
+      objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+    });
+    visibleTasksRef.value = [shownTask, hiddenTask];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getHiddenTaskIds = ['task-hidden'];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = {
+      'task-shown': { self: true },
+      'task-hidden': { self: true },
+    };
+    await mountPage();
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-shown']);
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(false);
+    const section = wrapper.find('[data-testid="user-hidden-tasks-section"]');
+    expect(section.exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    await section.find('[data-testid="user-hidden-tasks-toggle"]').trigger('click');
+    expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    await section.find('[data-testid="user-hidden-tasks-show-all"]').trigger('click');
+    expect(preferencesStoreMock.unhideTasks).toHaveBeenCalledWith(['task-hidden']);
   });
   it('keeps teammate objective markers when self already completed the same task objective', async () => {
     const task = createDefaultTask({

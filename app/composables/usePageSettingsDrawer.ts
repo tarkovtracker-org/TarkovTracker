@@ -1,9 +1,8 @@
 const PAGE_SETTINGS_DRAWER_STATE_KEYS = {
   hideout: 'hideoutSettingsDrawer:isOpen',
-  needed_items: 'neededItemsSettingsDrawer:isOpen',
   tasks: 'taskSettingsDrawer:isOpen',
 } as const;
-type PageSettingsDrawerKey = keyof typeof PAGE_SETTINGS_DRAWER_STATE_KEYS;
+export type PageSettingsDrawerKey = keyof typeof PAGE_SETTINGS_DRAWER_STATE_KEYS;
 type UsePageSettingsDrawerResult = {
   isOpen: globalThis.Ref<boolean>;
   open: () => void;

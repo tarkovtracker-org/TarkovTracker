@@ -122,15 +122,16 @@ const createProgressStore = () => ({
 });
 type HideoutTestSetupOptions = {
   view: string;
-  sortReadyFirst?: boolean;
+  reverseStations?: boolean;
   skillLevels?: Record<string, number>;
 };
 const initHideoutTest = async ({
   view,
-  sortReadyFirst = false,
+  reverseStations = false,
   skillLevels = { Strength: 1 },
 }: HideoutTestSetupOptions) => {
-  const hideoutStations = createStations();
+  const stations = createStations();
+  const hideoutStations = reverseStations ? stations.reverse() : stations;
   const metadataStore = {
     hideoutStations: ref(hideoutStations),
     hideoutLoading: ref(false),
@@ -147,7 +148,6 @@ const initHideoutTest = async ({
   const preferencesStore = {
     getHideoutPrimaryView: view,
     setHideoutPrimaryView: vi.fn(),
-    getHideoutSortReadyFirst: sortReadyFirst,
     getHideoutRequireStationLevels: true,
     getHideoutRequireSkillLevels: true,
     getHideoutRequireTraderLoyalty: true,
@@ -231,41 +231,50 @@ describe('useHideoutFiltering', () => {
       'station-locked',
     ]);
   });
-  describe('sortStationsByReadiness', () => {
-    const setupWithReadyFirst = async (view: string, sortReadyFirst: boolean) =>
-      initHideoutTest({ view, sortReadyFirst });
-    it('places ready-to-build stations first when sortReadyFirst is enabled', async () => {
-      const { hideoutFiltering } = await setupWithReadyFirst('available', true);
-      const ids = hideoutFiltering.visibleStations.value.map((s) => s.id);
-      expect(ids[0]).toBe('station-available');
-    });
-    it('preserves original order when sortReadyFirst is disabled', async () => {
-      const { hideoutFiltering } = await setupWithReadyFirst('all', false);
-      const ids = hideoutFiltering.visibleStations.value.map((s) => s.id);
-      expect(ids).toEqual([
+  describe('ready-to-build ordering', () => {
+    it('always lists stations ready to build first and keeps upstream order otherwise', async () => {
+      const { hideoutFiltering } = await initHideoutTest({ view: 'all', reverseStations: true });
+      expect(hideoutFiltering.visibleStations.value.map((station) => station.id)).toEqual([
         'station-available',
-        'station-skill-locked',
-        'station-maxed',
         'station-locked',
+        'station-maxed',
+        'station-skill-locked',
       ]);
     });
-    it('considers station requirements for readiness', async () => {
-      const { hideoutFiltering } = await setupWithReadyFirst('all', true);
-      const ids = hideoutFiltering.visibleStations.value.map((s) => s.id);
-      const availableIdx = ids.indexOf('station-available');
-      const lockedIdx = ids.indexOf('station-locked');
-      expect(availableIdx).toBeLessThan(lockedIdx);
-    });
-    it('unlocks skill-locked station when skill levels are sufficient', async () => {
+    it('counts a skill-gated station as ready once its skill requirement is met', async () => {
       const { hideoutFiltering } = await initHideoutTest({
         view: 'all',
-        sortReadyFirst: true,
+        reverseStations: true,
         skillLevels: { Strength: 5 },
       });
-      const ids = hideoutFiltering.visibleStations.value.map((s) => s.id);
-      const skillLockedIdx = ids.indexOf('station-skill-locked');
-      const lockedIdx = ids.indexOf('station-locked');
-      expect(skillLockedIdx).toBeLessThan(lockedIdx);
+      expect(hideoutFiltering.visibleStations.value.map((station) => station.id)).toEqual([
+        'station-skill-locked',
+        'station-available',
+        'station-locked',
+        'station-maxed',
+      ]);
+    });
+    it('applies the same ordering to stationsForView', async () => {
+      const { hideoutFiltering } = await initHideoutTest({ view: 'all', reverseStations: true });
+      const reversed = createStations().reverse();
+      const idsFor = (view: 'all' | 'maxed') =>
+        hideoutFiltering.stationsForView(reversed, view).map((station) => station.id);
+      expect(idsFor('all')).toEqual([
+        'station-available',
+        'station-locked',
+        'station-maxed',
+        'station-skill-locked',
+      ]);
+      expect(idsFor('maxed')).toEqual(['station-maxed']);
+    });
+    it('shows every station when the stored view is not a known status', async () => {
+      const { hideoutFiltering } = await initHideoutTest({ view: 'legacy', reverseStations: true });
+      expect(hideoutFiltering.visibleStations.value.map((station) => station.id)).toEqual([
+        'station-available',
+        'station-locked',
+        'station-maxed',
+        'station-skill-locked',
+      ]);
     });
   });
 });

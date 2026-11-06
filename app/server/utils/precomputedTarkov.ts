@@ -21,7 +21,7 @@ export type PrecomputedEnvelope<T> = {
   version: typeof PRECOMPUTED_ENVELOPE_VERSION;
 };
 export type PrecomputedKvReader = {
-  get: (key: string, type: 'json') => Promise<unknown>;
+  get: (key: string, type: 'json' | 'text') => Promise<unknown>;
 };
 export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
   return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;

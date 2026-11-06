@@ -32,6 +32,7 @@ export const STORAGE_KEYS = {
   activityLogLastRead: `${STORAGE_PREFIX}activity_log_last_read`,
   tasksMapPanelExpanded: `${STORAGE_PREFIX}tasks_map_panel_expanded`,
   supportBannerDismissedAt: `${STORAGE_PREFIX}support_banner_dismissed_at`,
+  changelogLastSeen: `${STORAGE_PREFIX}changelog_last_seen`,
 } as const;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',

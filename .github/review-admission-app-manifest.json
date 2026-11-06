@@ -1,0 +1,13 @@
+{
+  "name": "TarkovTracker Review Admission",
+  "url": "https://github.com/tarkovtracker-org/TarkovTracker",
+  "public": false,
+  "hook_attributes": {
+    "url": "https://github.com/tarkovtracker-org/TarkovTracker",
+    "active": false
+  },
+  "default_permissions": {
+    "statuses": "write"
+  },
+  "default_events": []
+}

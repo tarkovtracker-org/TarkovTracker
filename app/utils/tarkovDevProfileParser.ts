@@ -15,6 +15,10 @@ export type ParseResult = { ok: true; data: TarkovDevImportResult } | { ok: fals
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
+/** Cumulative game XP must remain a nonnegative, precisely representable integer. */
+function isValidTotalXP(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
 export function validateTarkovDevProfile(data: unknown): data is {
   aid: number;
   info: {
@@ -35,7 +39,7 @@ export function validateTarkovDevProfile(data: unknown): data is {
   const info = data.info;
   if (typeof info.nickname !== 'string' || info.nickname.trim().length === 0) return false;
   if (typeof info.side !== 'string') return false;
-  if (typeof info.experience !== 'number') return false;
+  if (!isValidTotalXP(info.experience)) return false;
   if (!isRecord(data.skills)) return false;
   if (!Array.isArray(data.skills.Common)) return false;
   return true;

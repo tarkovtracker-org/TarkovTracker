@@ -6,7 +6,10 @@
   >
     <div
       class="text-surface-400 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 group flex w-full flex-wrap items-center gap-1.5 text-xs transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:gap-2"
-      :class="[hasExpandableDetails ? 'hover:bg-surface-700/20 cursor-pointer' : '', 'px-3 py-1.5']"
+      :class="[
+        hasExpandableDetails ? 'hover:bg-surface-700/20 cursor-pointer' : '',
+        'min-h-7 px-3 py-1',
+      ]"
       :role="hasExpandableDetails ? 'button' : undefined"
       :tabindex="hasExpandableDetails ? 0 : undefined"
       :aria-expanded="hasExpandableDetails ? showDetails : undefined"
@@ -14,11 +17,8 @@
       @keydown.enter="toggleDetails"
       @keydown.space.prevent="toggleDetails"
     >
-      <span
-        class="text-surface-500 inline-flex items-center gap-1 leading-none font-bold tracking-wider uppercase"
-      >
-        <UIcon name="i-mdi-gift" aria-hidden="true" class="h-3.5 w-3.5 shrink-0" />
-        <span class="leading-none">{{ t('page.tasks.questcard.rewards') }}:</span>
+      <span class="text-surface-400 text-[10px] leading-none font-bold tracking-wider uppercase">
+        {{ t('page.tasks.questcard.rewards') }}
       </span>
       <template v-for="standing in traderStandingRewards" :key="`standing-${standing.trader.id}`">
         <div
@@ -134,13 +134,17 @@
           <span class="leading-none">{{ t('common.impact') }}: {{ impactCount }}</span>
         </div>
       </AppTooltip>
-      <UIcon
+      <span
         v-if="hasExpandableDetails"
-        name="i-mdi-chevron-down"
         aria-hidden="true"
-        class="text-surface-500 group-hover:text-surface-300 h-5 w-5 transition-transform duration-200"
-        :class="{ 'rotate-180': showDetails }"
-      />
+        class="text-surface-400 group-hover:text-surface-200 ml-auto flex h-5 w-7 shrink-0 items-center justify-center"
+      >
+        <UIcon
+          name="i-mdi-chevron-down"
+          class="h-4 w-4 transition-transform duration-200"
+          :class="{ 'rotate-180': showDetails }"
+        />
+      </span>
     </div>
     <Transition
       enter-active-class="transition duration-200 ease-out"

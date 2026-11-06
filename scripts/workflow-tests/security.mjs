@@ -29,7 +29,19 @@ test('security audits need only the pinned runtime; scheduled outdated checks re
     /bash scripts\/setup\/ensure-pnpm.sh/
   );
   const scan = jobBlock(read('.github/workflows/security.yml'), 'security-scan');
-  assert.match(scan, /install-dependencies: \$\{\{ github.event_name == 'schedule' \}\}/);
+  assert.match(scan, /install-dependencies: 'false'/);
+  const install = workflowStep(scan, 'Install for scheduled outdated check');
+  assert.match(install, /if: github.event_name == 'schedule'/);
+  assert.match(install, /run: pnpm install --frozen-lockfile/);
+  assert.match(workflowStep(scan, 'Cache pnpm for scheduled outdated check'), /cache: pnpm/);
+  assert.ok(
+    scan.indexOf('Check release-age exceptions') <
+      scan.indexOf('Install for scheduled outdated check')
+  );
+  assert.match(
+    workflowStep(scan, 'Check release-age exceptions'),
+    /run: node scripts\/checks\/release-age-exceptions\.mjs/
+  );
   assert.match(
     workflowStep(scan, 'Check for outdated dependencies'),
     /if: github.event_name == 'schedule'/
@@ -41,6 +53,39 @@ test('security audits need only the pinned runtime; scheduled outdated checks re
     assert.match(audit, /working-directory: \$\{\{ steps.prepare-audit.outputs.audit_dir \}\}/);
     assert.doesNotMatch(audit, /^\s+if:/m);
   }
+});
+test('every ordinary CI installer is gated by the pre-install dependency policy, including reduced plans', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const changes = jobBlock(ci, 'changes');
+  const preflight = workflowStep(changes, 'Dependency Security before installation');
+  assert.match(preflight, /run: node scripts\/checks\/dependency-security\.mjs/);
+  assert.match(preflight, /GITHUB_TOKEN: \$\{\{ github.token \}\}/);
+  assert.match(permissionsBlock(changes, '    '), /checks: read/);
+  assert.ok(
+    changes.indexOf("install-dependencies: 'false'") <
+      changes.indexOf('Dependency Security before installation')
+  );
+  for (const job of [
+    'fallow',
+    'lint-format',
+    'typecheck',
+    'test',
+    'coverage',
+    'validate',
+    'supabase-db',
+    'workers',
+  ]) {
+    assert.match(jobBlock(ci, job), /needs: (?:changes\s*$|\[changes,)/m);
+  }
+  const lighthouse = jobBlock(read('.github/workflows/pr-checks.yml'), 'lighthouse');
+  assert.match(
+    workflowStep(lighthouse, 'Dependency Security before installation'),
+    /node scripts\/checks\/dependency-security\.mjs/
+  );
+  assert.ok(
+    lighthouse.indexOf('Dependency Security before installation') <
+      lighthouse.lastIndexOf('uses: ./.github/actions/setup-project')
+  );
 });
 test('security is a reusable workflow with only the weekly schedule as a standalone trigger', () => {
   const security = read('.github/workflows/security.yml');
@@ -108,4 +153,20 @@ test('Gitleaks extends the default rules and allowlists only the exact public an
     jwt.includes(`'''^${anonKey.replaceAll('.', '\\.')}$'''`),
     'allowlist must pin the anon key'
   );
+});
+test('precompute credentials require a main-only protected environment and exact event checkout', () => {
+  const job = jobBlock(read('.github/workflows/precompute-tarkov-data.yml'), 'precompute');
+  const header = job.split('    steps:')[0];
+  assert.match(header, /^ {4}if: github.ref == 'refs\/heads\/main'$/m);
+  assert.match(header, /^ {4}environment: production-precompute$/m);
+  const checkout = job.match(
+    /uses: actions\/checkout@[a-f0-9]{40}[^\n]*\n {8}with:\n((?: {10}[^\n]*\n)+)/
+  )?.[1];
+  assert.ok(checkout, 'checkout must have a with block');
+  assert.match(checkout, /^ {10}ref: \$\{\{ github.sha \}\}$/m);
+  assert.match(checkout, /^ {10}persist-credentials: false$/m);
+  const run = workflowStep(job, 'Precompute and write to KV');
+  assert.match(run, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets.CLOUDFLARE_API_TOKEN \}\}/);
+  assert.match(run, /OVERLAY_TOKEN: \$\{\{ secrets.OVERLAY_TOKEN \}\}/);
+  assert.doesNotMatch(run, /secrets\.[A-Z_]+ \|\|/);
 });

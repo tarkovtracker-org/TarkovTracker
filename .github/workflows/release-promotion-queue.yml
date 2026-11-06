@@ -1,0 +1,63 @@
+name: Release Promotion Queue
+on:
+  workflow_run:
+    workflows: [Review Admission, Release]
+    types: [completed]
+permissions: {}
+env:
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
+jobs:
+  enqueue:
+    name: Enqueue reviewed version PR
+    # Coarse intake only: admissions for ordinary PR branches cannot enqueue a generated version
+    # PR, so they never reach the serialized queue. The controller still authenticates every
+    # retained source run and receipt.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      (github.event.workflow_run.path != '.github/workflows/review-admission.yml' ||
+      contains(github.event.workflow_run.display_title, 'wip/release-') ||
+      contains(github.event.workflow_run.display_title, 'gh-readonly-queue/') ||
+      endsWith(github.event.workflow_run.display_title, ' unscoped') ||
+      !startsWith(github.event.workflow_run.display_title, 'Review Admission '))
+    concurrency:
+      group: release-promotion-queue
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Main-only environment holding the Queue Submitter App key; only the submit step reads it.
+    environment:
+      name: merge-queue
+      deployment: false
+    permissions:
+      actions: write
+      checks: read
+      contents: write
+      pull-requests: write
+      statuses: read
+    steps:
+      - name: Checkout trusted release controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Authenticate reviewed immutable promotion and submit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Queue Submitter App: a job-token queue entry would start no merge_group CI.
+          QUEUE_SUBMITTER_APP_ID: ${{ vars.QUEUE_SUBMITTER_APP_ID }}
+          QUEUE_SUBMITTER_PRIVATE_KEY: ${{ secrets.QUEUE_SUBMITTER_PRIVATE_KEY }}
+          QUEUE_SUBMITTER_REQUIRED: 'true'
+        with:
+          script: |
+            const { queueReleasePromotion } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-promotion-queue.mjs`);
+            const result = await queueReleasePromotion({ github, context });
+            core.info(JSON.stringify(result));
+            await core.summary.addRaw(JSON.stringify(result)).write();

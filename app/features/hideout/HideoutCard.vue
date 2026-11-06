@@ -36,7 +36,7 @@
               :class="
                 prerequisitesMet
                   ? 'bg-success-500/20 border-success-500/50 text-success-400'
-                  : 'border-error-500/50 bg-error-500/20 text-error-400'
+                  : 'border-locked-500/50 bg-locked-500/20 text-locked-400'
               "
             >
               <span class="whitespace-nowrap">
@@ -336,6 +336,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { SPECIAL_STATIONS } from '@/utils/constants';
   import HideoutRequirement from './HideoutRequirement.vue';
   import type {
@@ -349,12 +350,10 @@
   const props = withDefaults(
     defineProps<{
       station: HideoutStation;
-      collapsed?: boolean;
       highlighted?: boolean;
       highlightModuleId?: string | null;
     }>(),
     {
-      collapsed: false,
       highlighted: false,
       highlightModuleId: null,
     }
@@ -367,18 +366,8 @@
     useHideoutStationStatus();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
-  const isContentVisible = ref(!props.collapsed);
+  const isContentVisible = ref(true);
   const highlightDismissed = ref(false);
-  watch(
-    () => props.collapsed,
-    (newValue) => {
-      if (highlightActive.value) {
-        isContentVisible.value = true;
-        return;
-      }
-      isContentVisible.value = !newValue;
-    }
-  );
   watch(
     () => [props.highlighted, props.highlightModuleId],
     ([highlighted, highlightModuleId]) => {
@@ -396,29 +385,14 @@
   const downgradeButtonUi = {
     base: 'bg-error-900/40 light:bg-error-50 hover:bg-error-900/60 light:hover:bg-error-100 active:bg-error-900/80 light:active:bg-error-100 text-error-300 border border-error-700/50',
   };
-  const highlightColor = computed((): 'success' | 'error' | 'primary' => {
+  // A station whose next level is blocked by prerequisites uses the shared Locked color.
+  const highlightColor = computed((): 'success' | 'locked' | 'primary' => {
     if (!nextLevel.value) return 'primary';
-    return prerequisitesMet.value ? 'success' : 'error';
+    return prerequisitesMet.value ? 'success' : 'locked';
   });
-  const highlightClasses = computed(() => {
-    const color = highlightColor.value;
-    const classes: Record<string, boolean> = {};
-    switch (color) {
-      case 'primary':
-        classes['bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600'] = true;
-        break;
-      case 'success':
-        classes['bg-gradient-to-br from-success-800 via-success-700 to-success-600'] = true;
-        break;
-      case 'error':
-        classes['bg-gradient-to-br from-error-800 via-error-700 to-error-600'] = true;
-        break;
-      default:
-        classes['bg-gradient-to-br from-accent-800 via-accent-700 to-accent-600'] = true;
-        break;
-    }
-    return classes;
-  });
+  const highlightClasses = computed(() => ({
+    [CARD_HIGHLIGHT_GRADIENTS[highlightColor.value]]: true,
+  }));
   const getStationRequirementLink = (requirement: StationLevelRequirement) => {
     const moduleId = metadataStore
       .getStationById(requirement.station.id)

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { findReleaseRecovery, publishRecoveredRelease } from './release-recovery.mjs';
 import { releaseEligibility } from './release-gate.mjs';
+import { findReleaseRecovery, publishRecoveredRelease } from './release-recovery.mjs';
 function fixture() {
   const baseSha = 'a'.repeat(40);
   const sha = 'b'.repeat(40);
@@ -51,6 +51,7 @@ function fixture() {
   const missing = () => Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
   const rest = {
     checks: { listForRef: vi.fn() },
+    pulls: { list: vi.fn() },
     actions: {
       getWorkflowRun: vi.fn().mockResolvedValue({ data: previewRun }),
       listJobsForWorkflowRun: vi.fn(),
@@ -71,6 +72,7 @@ function fixture() {
     paginate: vi.fn((endpoint) => {
       const results = new Map([
         [rest.repos.listReleases, []],
+        [rest.pulls.list, []],
         [rest.repos.listCommitStatusesForRef, evidence.statuses],
         [rest.actions.listJobsForWorkflowRun, evidence.jobs],
         [rest.actions.listWorkflowRunArtifacts, evidence.artifacts],
@@ -81,19 +83,22 @@ function fixture() {
     }),
     rest: {
       checks: rest.checks,
+      pulls: rest.pulls,
       actions: rest.actions,
       repos: {
         listReleases: rest.repos.listReleases,
         listCommitStatusesForRef: rest.repos.listCommitStatusesForRef,
         getCommit: vi.fn().mockResolvedValue({ data: commit }),
         getContent: vi.fn(({ ref, path }) =>
-          Promise.resolve({
-            data: {
-              type: 'file',
-              encoding: 'base64',
-              content: Buffer.from(assets[`${ref}/${path}`]).toString('base64'),
-            },
-          })
+          path === 'scripts/release/release-run.mjs'
+            ? missing()
+            : Promise.resolve({
+                data: {
+                  type: 'file',
+                  encoding: 'base64',
+                  content: Buffer.from(assets[`${ref}/${path}`]).toString('base64'),
+                },
+              })
         ),
         getReleaseByTag: vi.fn(missing),
         createRelease: vi.fn().mockResolvedValue({ data: {} }),
@@ -120,6 +125,16 @@ function fixture() {
   };
 }
 describe('interrupted release recovery', () => {
+  it('requires async producer sources to use PR provenance instead of authored legacy recovery', async () => {
+    const f = fixture();
+    const content = f.github.rest.repos.getContent.getMockImplementation();
+    f.github.rest.repos.getContent.mockImplementation((params) =>
+      params.path === 'scripts/release/release-run.mjs'
+        ? Promise.resolve({ data: { type: 'file', encoding: 'base64', content: 'present' } })
+        : content(params)
+    );
+    expect(await findReleaseRecovery(f)).toBeNull();
+  });
   it('recovers immutable notes only for a CI-validated version child', async () => {
     const f = fixture();
     expect(await findReleaseRecovery(f)).toEqual(f.recovery);
@@ -316,6 +331,9 @@ describe('interrupted release recovery', () => {
   it('fails closed when an immutable asset cannot be read', async () => {
     const f = fixture();
     f.github.rest.repos.getContent.mockResolvedValue({ data: { type: 'file', encoding: 'none' } });
+    f.github.rest.repos.getContent.mockRejectedValueOnce(
+      Object.assign(new Error('legacy source absent'), { status: 404 })
+    );
     await expect(findReleaseRecovery(f)).rejects.toThrow('Unreadable release asset');
   });
   it('creates a missing exact tag and publishes the original notes', async () => {

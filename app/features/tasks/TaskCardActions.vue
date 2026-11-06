@@ -1,5 +1,5 @@
 <template>
-  <div v-if="state !== 'none'" class="ml-2 shrink-0">
+  <div v-if="state !== 'none' || showInlineFail" class="ml-1 flex shrink-0 items-center gap-1.5">
     <div v-if="state === 'hotwheels'" class="flex flex-col gap-1">
       <UButton
         :size="size"
@@ -15,7 +15,7 @@
       </UButton>
     </div>
     <UButton
-      v-else
+      v-else-if="state !== 'none'"
       :size="size"
       :color="actionColor"
       variant="soft"
@@ -23,6 +23,16 @@
       @click.stop="emitAction"
     >
       {{ actionLabel }}
+    </UButton>
+    <UButton
+      v-if="showInlineFail"
+      :size="size"
+      color="error"
+      variant="ghost"
+      data-testid="task-card-fail"
+      @click.stop="emit('markFailed')"
+    >
+      {{ t('common.fail', 'Fail') }}
     </UButton>
   </div>
 </template>
@@ -65,6 +75,7 @@
     state: ActionButtonState;
     size: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     isFailed?: boolean;
+    showFail?: boolean;
   }>();
   const emit = defineEmits<{
     complete: [];
@@ -72,6 +83,7 @@
     uncomplete: [];
     available: [];
     failed: [];
+    markFailed: [];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const actionLabel = computed(() => {
@@ -81,6 +93,7 @@
     const label = ACTION_LABELS[props.state];
     return label ? t(label.key, label.fallback) : '';
   });
+  const showInlineFail = computed(() => props.showFail && props.state !== 'hotwheels');
   const actionColor = computed(() => ACTION_COLORS[props.state]);
   const actionClass = computed(() => ACTION_CLASSES[props.state]);
   const emitAction = () => {

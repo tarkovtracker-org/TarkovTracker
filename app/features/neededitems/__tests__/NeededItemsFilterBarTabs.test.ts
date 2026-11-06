@@ -4,14 +4,27 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
 type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
 const filterTabs = [
-  { label: 'Alle', value: 'all' as const, icon: 'i-mdi-clipboard-list', count: 0 },
+  {
+    label: 'Alle',
+    value: 'all' as const,
+    icon: 'i-mdi-format-list-bulleted',
+    count: 0,
+    tone: 'neutral' as const,
+  },
   {
     label: 'Aufgaben',
     value: 'tasks' as const,
     icon: 'i-mdi-checkbox-marked-circle-outline',
     count: 17,
+    tone: 'info' as const,
   },
-  { label: 'Versteck', value: 'hideout' as const, icon: 'i-mdi-home', count: 4 },
+  {
+    label: 'Versteck',
+    value: 'hideout' as const,
+    icon: 'i-mdi-home',
+    count: 4,
+    tone: 'info' as const,
+  },
 ];
 const props = {
   modelValue: 'all' as const,
@@ -31,13 +44,15 @@ const props = {
 };
 describe('NeededItemsFilterBar source tabs', () => {
   beforeEach(() => setActivePinia(createPinia()));
-  it('exposes labelled tabs with arrow-key selection through the real tab primitives', async () => {
+  it('exposes the sources as labelled toggle buttons that switch on click', async () => {
     const wrapper = await mountSuspended(NeededItemsFilterBar, {
+      attachTo: document.body,
       props: {
         ...props,
-        'onUpdate:modelValue': (value: FilterType) => wrapper.setProps({ modelValue: value }),
+        'onUpdate:modelValue': (value: FilterType) => {
+          void wrapper.setProps({ modelValue: value });
+        },
       },
-      attachTo: document.body,
       global: {
         stubs: {
           AppTooltip: { template: '<span><slot /></span>' },
@@ -46,24 +61,28 @@ describe('NeededItemsFilterBar source tabs', () => {
         },
       },
     });
-    const tabs = wrapper.find('[role="tablist"]').findAll('[role="tab"]');
+    const group = wrapper.get('[role="group"]');
+    expect(group.attributes('aria-label')).toBe('Needed item filters');
+    const tabs = group.findAll('button');
     expect(
-      tabs.map((tab) => [tab.find('.sr-only').text(), tab.find('.rounded-full').text()])
+      tabs.map((tab) => [tab.get('.sr-only').text(), tab.get('.rounded-full').text()])
     ).toEqual([
       ['Alle', '0'],
       ['Aufgaben', '17'],
       ['Versteck', '4'],
     ]);
-    expect(tabs.map((tab) => tab.attributes('aria-selected'))).toEqual(['true', 'false', 'false']);
-    expect(tabs[0]?.classes().some((name) => name.startsWith('focus-visible:'))).toBe(true);
-    (tabs[0]?.element as HTMLElement).focus();
-    await tabs[0]?.trigger('keydown', { key: 'ArrowRight' });
-    expect(document.activeElement).toBe(tabs[1]?.element);
+    expect(tabs.map((tab) => tab.attributes('aria-pressed'))).toEqual(['true', 'false', 'false']);
+    expect(tabs[0]?.attributes('disabled')).toBeUndefined();
+    (tabs[0]!.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(tabs[0]!.element);
+    await tabs[0]?.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    await tabs[1]?.trigger('click');
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['tasks']);
-    expect(tabs[1]?.attributes('aria-selected')).toBe('true');
-    await tabs[1]?.trigger('keydown', { key: 'ArrowLeft' });
-    expect(document.activeElement).toBe(tabs[0]?.element);
-    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['all']);
+    expect(tabs.map((tab) => tab.attributes('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    expect(tabs[1]?.attributes('disabled')).toBeUndefined();
+    await tabs[1]?.trigger('click');
+    expect(wrapper.emitted('update:modelValue')).toEqual([['tasks']]);
     wrapper.unmount();
   });
 });

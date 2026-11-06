@@ -604,6 +604,61 @@ describe('mode-scoped progress sync', () => {
     );
     expect(batches).toEqual([['pve', 'seasonal']]);
   });
+  it('falls back to individual modes when a combined request is rejected', async () => {
+    const error = { code: 'P0001', message: 'p_modes exceeds the maximum payload size' };
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => ({
+      error: Object.keys(args.p_modes as object).length > 1 ? error : null,
+    }));
+    const result = await syncProgressState(
+      { rpc } as ProgressRpcClient,
+      'fallback-user',
+      withPvpLevel(5)
+    );
+    expect(result.error).toBeNull();
+    expect(rpc.mock.calls.map((call) => Object.keys(call[1].p_modes as object))).toEqual([
+      ['pvp', 'pve', 'seasonal'],
+      ['pvp'],
+      ['pve'],
+      ['seasonal'],
+    ]);
+  });
+  it('does not apply a rejected mode snapshot to another account', async () => {
+    const error = { code: 'P0001', message: 'p_modes exceeds the maximum payload size' };
+    const rpc = vi.fn().mockResolvedValue({ error });
+    const client = { rpc } as ProgressRpcClient;
+    await syncProgressState(client, 'owner-1', withPvpLevel(5));
+    rpc.mockClear().mockResolvedValue({ error: null });
+    expect((await syncProgressState(client, 'owner-2', withPvpLevel(5))).error).toBeNull();
+    expect(Object.keys(sentModes(rpc))).toEqual(['pvp', 'pve', 'seasonal']);
+  });
+  it('holds a rejected mode while saving other modes and retries it only after its progress changes', async () => {
+    const error = { code: 'P0001', message: 'p_modes exceeds the maximum payload size' };
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => ({
+      error: Object.hasOwn(args.p_modes as object, 'pvp') ? error : null,
+    }));
+    const state = withHeavyModes();
+    const client = { rpc } as ProgressRpcClient;
+    expect((await syncProgressState(client, 'size-user', state)).error).toEqual(error);
+    expect(rpc).toHaveBeenCalledTimes(3);
+    rpc.mockClear();
+    expect((await syncProgressState(client, 'size-user', state)).error).toEqual(error);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(sentModes(rpc)).toEqual({});
+    rpc.mockClear();
+    state.gameEdition = 3;
+    await syncProgressState(client, 'size-user', state);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_modes: {}, p_game_edition: 3 });
+    rpc.mockClear();
+    state.pve.level = 10;
+    await syncProgressState(client, 'size-user', state);
+    expect(Object.keys(sentModes(rpc))).toEqual(['pve']);
+    rpc.mockClear();
+    rpc.mockResolvedValue({ error: null });
+    state.pvp.level = 12;
+    expect((await syncProgressState(client, 'size-user', state)).error).toBeNull();
+    expect(Object.keys(sentModes(rpc))).toEqual(['pvp']);
+  });
   it('stops a split sync when the session resets between requests', async () => {
     const rpc = vi.fn().mockImplementation(async () => {
       clearAcknowledgedModes();

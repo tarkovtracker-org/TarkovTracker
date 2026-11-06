@@ -8,7 +8,8 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 humans. It uses Supabase CLI inspection commands for database telemetry and a restricted SQL
 library for schema and bounded data-shape reports. The wrapper normalizes every result to JSON so
 callers do not depend on Supabase CLI presentation formatting. It never applies migrations or
-accepts arbitrary SQL.
+accepts arbitrary SQL. Health and canary require PostgreSQL 17 or newer: effective role switching
+uses PostgreSQL 16 membership options, and table privilege checks include PostgreSQL 17 `MAINTAIN`.
 
 ### Diagram
 
@@ -121,8 +122,26 @@ flowchart LR
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
 - `canary` must fail before telemetry collection when the observer is privileged, can write
-  application tables or create persistent objects, can read stored migration `statements`, lacks
+  application relations or columns, advance sequences, create persistent objects, owns persistent
+  database objects, can read stored migration `statements`, lacks
   default read-only transactions, or has unbounded statement or lock timeouts.
+- These checks cover every non-system schema and roles reachable through inheritance or `SET ROLE`;
+  schema `CREATE` is checked on system schemas too, excluding session temporary schemas.
+  Application `SECURITY DEFINER` execution is rejected conservatively: telemetry needs no such
+  functions, and their bodies can bypass direct grants. The health flag does not claim each function
+  writes. Membership administration and privileged server-file, program, signal, maintenance,
+  checkpoint, and subscription roles are rejected. Inherited privileges after a role switch count;
+  role attributes count only for the current or switchable role. Relation/column, sequence, function
+  and stored-migration read grants require schema USAGE in that same effective role context. Raw
+  grants in inaccessible schemas do not establish a reachable write/read path. Catalog telemetry and
+  migration-version-only reads remain supported. Large-object `UPDATE` grants and explicit parameter
+  `SET`/`ALTER SYSTEM` grants are rejected, including PUBLIC and inherited grants. Parameter grants
+  can change cluster configuration or enable large-object ACL bypass; ordinary unprivileged session
+  settings and large-object SELECT alone remain supported. Enabled `lo_compat_privileges` is
+  rejected even without object or parameter grants, because it disables large-object ACL checks.
+  Execution of built-in large-object creators/importers is also rejected: public defaults can allow
+  persistent creation before any owned object or UPDATE grant exists. Provisioning must account for
+  PUBLIC execution; see the runbook.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL

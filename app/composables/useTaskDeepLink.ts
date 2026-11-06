@@ -254,7 +254,11 @@ export function useTaskDeepLink({
       await highlightObjective(objectiveIdToHighlight);
       leafletMapRef.value?.activateObjectivePopup(objectiveIdToHighlight);
     }
-    const nextQuery = { ...route.query } as Record<string, string | string[] | undefined>;
+    // Keep the chosen filter when consuming the link; an absent status restores Available.
+    const nextQuery = {
+      ...route.query,
+      status: preferencesStore.getTaskSecondaryView,
+    } as Record<string, string | string[] | undefined>;
     delete nextQuery.task;
     delete nextQuery.highlightObjective;
     router.replace({ query: nextQuery });

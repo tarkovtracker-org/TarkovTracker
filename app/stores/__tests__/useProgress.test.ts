@@ -391,22 +391,25 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['fence-low-karma-task']?.self).toBe(true);
     });
   });
-  it('does not lock Ref tasks when unlock task is missing from loaded task payload', async () => {
-    const refTask = {
-      id: 'ref-task',
-      name: 'Ref Task',
-      factionName: 'Any',
-      trader: { id: 'ref', name: 'Ref', normalizedName: 'ref' },
-    };
-    setupMocks({
-      selfCompletions: {},
-      tasks: [refTask],
-      traders: [{ id: 'fence', normalizedName: 'fence', name: 'Fence' }],
-    });
-    const { useProgressStore } = await import('@/stores/useProgress');
-    const store = useProgressStore();
-    expect(store.unlockedTasks['ref-task']?.self).toBe(true);
-  });
+  it.each([false, true])(
+    'retains a missing Ref gate with recorded completion %s',
+    async (complete) => {
+      const refTask = {
+        id: 'ref-task',
+        name: 'Ref Task',
+        factionName: 'Any',
+        trader: { id: 'ref', name: 'Ref', normalizedName: 'ref' },
+      };
+      setupMocks({
+        selfCompletions: { [TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP]: complete },
+        tasks: [refTask],
+        traders: [{ id: 'fence', normalizedName: 'fence', name: 'Fence' }],
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.unlockedTasks['ref-task']?.self).toBe(complete);
+    }
+  );
 });
 vi.mock('@/stores/tarkov/progressAuthority', async () => {
   const { createProgressPolicyAuthority } = await import('#tests/test-helpers/progressAuthority');

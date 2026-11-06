@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import {
   attachCounterDerivations,
+  progressionPools,
+  validProgressionCounters,
   SUPPORTED_COUNTER_REVISIONS,
   usableCounterDerivations,
 } from '@/server/utils/overlayCounters';
@@ -278,5 +280,61 @@ describe('applyOverlay progression counters', () => {
     expect(result.dataOverlay.unconsumedSections).toEqual(['progressionCounters']);
     const target = (result.data!.tasks as Array<{ id: string; otherRequirements?: unknown }>)[3]!;
     expect(target.otherRequirements).toEqual([gate()]);
+  });
+});
+describe('progression pool metadata', () => {
+  const pool = { traderId: 'mechanic', loyaltyLevel: 2 };
+  it.each(['regular', 'pve', 'pvp-season'])(
+    'projects unresolved pools only for supported %s rules',
+    (mode) => {
+      const overlay = {
+        progressionCounters: {
+          [mode]: { tier: entry({ pool, verification: 'unresolved', coverage: 'partial' }) },
+        },
+      };
+      expect(validProgressionCounters(overlay.progressionCounters)).toBe(true);
+      const pools = progressionPools(overlay, mode);
+      expect(pools.get('tier')).toMatchObject({
+        ...pool,
+        verification: 'unresolved',
+        coverage: 'partial',
+      });
+      expect(usableCounterDerivations(overlay, mode).size).toBe(0);
+      const output = attachCounterDerivations(tasks(), new Map(), pools);
+      expect(output[3]!.otherRequirements).toEqual([
+        gate('tier', 2, { taskPool: pools.get('tier') }),
+      ]);
+      expect(progressionPools(overlay, 'missing').size).toBe(0);
+      expect(
+        progressionPools(
+          { progressionCounters: { [mode]: { tier: entry({ pool, revision: 'future' }) } } },
+          mode
+        ).size
+      ).toBe(0);
+    }
+  );
+  it.each([
+    null,
+    {},
+    { traderId: '', loyaltyLevel: 2 },
+    { traderId: 'm', loyaltyLevel: 0 },
+    { traderId: 'm', loyaltyLevel: 2.5 },
+    { ...pool, extra: true },
+  ])('rejects malformed metadata %j', (pool) => {
+    expect(validProgressionCounters({ pve: { tier: entry({ pool }) } })).toBe(false);
+  });
+  it('strips injected metadata and requires every candidate to exist', () => {
+    const pools = progressionPools(
+      { progressionCounters: { pve: { tier: entry({ pool }) } } },
+      'pve'
+    );
+    const injected = gate('tier', 2, {
+      taskPool: { ...pool, traderId: 'injected' },
+      counter: { type: 'distinctTaskCompletions', taskIds: ['a'] },
+    });
+    const input = [{ id: 'target', otherRequirements: [injected] }, { id: 'a' }];
+    expect(attachCounterDerivations(input, new Map(), pools)[0]!.otherRequirements).toEqual([
+      gate(),
+    ]);
   });
 });

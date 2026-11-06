@@ -65,6 +65,43 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it('saves retained preferences from a stale payload after all seven retired columns are rejected', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const columns = [
+      'hideout_sort_ready_first',
+      'hideout_collapse_completed',
+      'task_card_density',
+      'show_task_ids',
+      'show_not_required_labels',
+      'enable_holiday_effects',
+      'neededitems_style',
+    ];
+    const payload = {
+      user_id: 'user-1',
+      streamer_mode: true,
+      ...Object.fromEntries(columns.map((column) => [column, 'synthetic-legacy'])),
+    };
+    upsert.mockImplementation(async (candidate: Record<string, unknown>) => {
+      const missing = columns.find((column) => column in candidate);
+      return missing
+        ? {
+            error: {
+              code: 'PGRST204',
+              message: `Could not find the '${missing}' column of 'user_preferences' in the schema cache`,
+            },
+          }
+        : { error: null };
+    });
+    const store = createMockStore({ streamerMode: true });
+    const sync = useSupabaseSync({ store, table: 'user_preferences', transform: () => payload });
+    await sync.syncToSupabase();
+    expect(upsert).toHaveBeenCalledTimes(columns.length + 1);
+    expect(upsert).toHaveBeenLastCalledWith({ user_id: 'user-1', streamer_mode: true });
+    expect(sync.hasPendingChanges!()).toBe(false);
+    expect(payload).toHaveProperty(columns[0]!);
+    expect(store.$state).toEqual({ streamerMode: true });
+    sync.cleanup();
+  });
   it.each(['realtime', 'snapshot'])(
     'persists a revert to an earlier upload after a %s observation',
     async (observation) => {
@@ -553,6 +590,25 @@ describe('useSupabaseSync', () => {
       await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
       expect(order).toEqual(['upload:1', 'reconcile', 'upload:2']);
       expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it.each([
+      [new TypeError('Failed to fetch'), 'offline'],
+      [new Error('Not authenticated'), 'auth'],
+    ])('retains the exhausted failure cause after a new edit: %s', async (error, cause) => {
+      upsert.mockResolvedValue({ error });
+      const { store, sync } = await createRetryingSync(
+        vi.fn(),
+        vi.fn(async () => {})
+      );
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0] + RETRY_DELAYS[1]);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: cause });
+      store.$state.count = 2;
+      store.notifySubscriber();
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', failure: cause });
       sync.cleanup();
     });
     it('restarts a reconciled schedule when an edit follows exhaustion', async () => {
