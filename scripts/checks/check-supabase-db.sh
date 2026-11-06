@@ -25,6 +25,7 @@ if ! pnpm exec supabase status >/dev/null 2>&1; then
 fi
 pnpm exec supabase db reset --no-seed
 pnpm exec supabase test db supabase/tests/database
+pnpm run supabase:test:task-identity-concurrency
 pnpm run supabase:test:concurrency
 pnpm run supabase:test:one-time-concurrency
 pnpm run supabase:test:owner-only-concurrency
