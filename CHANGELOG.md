@@ -1,3 +1,18 @@
+# [1.89.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.88.0...v1.89.0) (2026-11-06)
+
+
+### Bug Fixes
+
+* **tasks:** preserve trader gates and missing-quest log recovery ([#1381](https://github.com/tarkovtracker-org/TarkovTracker/issues/1381)) ([f87896b](https://github.com/tarkovtracker-org/TarkovTracker/commit/f87896bf4d399f91adaa73172fb01844bb26f99b))
+* **tasks:** show full accepted-item pools for sell objectives ([#1384](https://github.com/tarkovtracker-org/TarkovTracker/issues/1384)) ([0910c9a](https://github.com/tarkovtracker-org/TarkovTracker/commit/0910c9a367e228eb02535a90414f55a194728e40))
+* **security:** unblock vetted advisory updates without dropping cooldown ([#1370](https://github.com/tarkovtracker-org/TarkovTracker/issues/1370)) ([82751e5](https://github.com/tarkovtracker-org/TarkovTracker/commit/82751e51d8b93ee6d66fd367a251ed3763e40de0))
+
+
+### Features
+
+* **progress:** preserve task identity across placeholder replacements ([#1385](https://github.com/tarkovtracker-org/TarkovTracker/issues/1385)) ([d5da9f3](https://github.com/tarkovtracker-org/TarkovTracker/commit/d5da9f30510b398075bdcad7b9c736d5f67ae063))
+* **tasks:** track weapon build parts on task cards ([#1382](https://github.com/tarkovtracker-org/TarkovTracker/issues/1382)) ([3554af3](https://github.com/tarkovtracker-org/TarkovTracker/commit/3554af39fc4bbca4cb0e95cf3d54091c66373292))
+
 # [1.88.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.87.0...v1.88.0) (2026-10-29)
 
 
