@@ -78,14 +78,17 @@ const availableRankOr = (
   fallback: number
 ): number =>
   !isInvalid && hasAvailableForAnyUser(statuses) ? TRADER_SORT_RANK.available : fallback;
+const getFailedTraderRank = (statuses: readonly TeamTaskStatus[], isInvalid: boolean): number =>
+  hasActiveForAnyUser(statuses)
+    ? TRADER_SORT_RANK.failed
+    : availableRankOr(statuses, isInvalid, TRADER_SORT_RANK.failed);
 /**
  * Ranks a task for the all-users trader grouping.
  *
  * Ordering is available, then active or locked, then completed, then failed.
- * Classification keeps the same precedence the counts use — failed and
- * completed outrank active, and active outranks merely being available to a
- * different teammate — so a task active for any teammate is never grouped with
- * the available tasks.
+ * A task active for any teammate stays out of the available group; failure
+ * takes precedence when another teammate is active. Without an active teammate,
+ * preserve available-first grouping even when someone else has failed it.
  */
 export const getAllUsersTraderRank = (
   statuses: readonly TeamTaskStatus[],
@@ -94,9 +97,7 @@ export const getAllUsersTraderRank = (
   if (isCompletedByAllUsers(statuses)) {
     return availableRankOr(statuses, isInvalid, TRADER_SORT_RANK.completed);
   }
-  if (hasFailedForAnyUser(statuses)) {
-    return availableRankOr(statuses, isInvalid, TRADER_SORT_RANK.failed);
-  }
+  if (hasFailedForAnyUser(statuses)) return getFailedTraderRank(statuses, isInvalid);
   if (hasActiveForAnyUser(statuses)) return TRADER_SORT_RANK.inProgress;
   return availableRankOr(statuses, isInvalid, TRADER_SORT_RANK.inProgress);
 };

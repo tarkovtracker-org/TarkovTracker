@@ -160,6 +160,28 @@ describe('mergeProgressData task active state', () => {
     };
     expect(mergeProgressData(local, remote).taskCompletions.task?.active).toBe(active);
   });
+  it.each([
+    { name: 'completed', complete: true, failed: false },
+    { name: 'failed', complete: true, failed: true },
+  ])('retains the stored flag on an equal-time legacy reset of a $name entry', (terminal) => {
+    for (const active of [false, true]) {
+      const stored = createProgressData({});
+      stored.taskCompletions.task = {
+        complete: terminal.complete,
+        failed: terminal.failed,
+        active,
+        timestamp: 100,
+      };
+      const incoming = createProgressData({});
+      incoming.taskCompletions.task = { complete: false, failed: false, timestamp: 100 };
+      expect(mergeProgressData(stored, incoming).taskCompletions.task).toEqual({
+        complete: false,
+        failed: false,
+        active,
+        timestamp: 100,
+      });
+    }
+  });
   it('lets a newer explicit neutral state clear active', () => {
     const local = createProgressData({});
     local.taskCompletions = {

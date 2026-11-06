@@ -82,6 +82,10 @@ describe('getAllUsersTraderRank', () => {
     expect(getAllUsersTraderRank([COMPLETED, COMPLETED], false)).toBe(2);
     expect(getAllUsersTraderRank([FAILED, LOCKED], false)).toBe(3);
   });
+  it('keeps a task with failed and active teammates out of the available trader group', () => {
+    expect(getAllUsersTraderRank([FAILED, ACTIVE, AVAILABLE], false)).toBe(3);
+    expect(getAllUsersTraderRank([AVAILABLE, ACTIVE, FAILED], false)).toBe(3);
+  });
   it('still surfaces a task someone can pick up over a terminal state elsewhere', () => {
     expect(getAllUsersTraderRank([AVAILABLE, FAILED], false)).toBe(0);
   });

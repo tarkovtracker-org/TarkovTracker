@@ -56,7 +56,7 @@ $$;
 
 -- Older clients omit acceptance flags on unchanged tasks during full-mode saves.
 -- Keep newer known entries and carry flags on equal-time nonterminal entries.
--- Equal-time terminal and newer legacy status writes retain their precedence.
+-- Incoming terminal and newer legacy status writes retain their precedence.
 CREATE OR REPLACE FUNCTION public.carry_task_active_flags(existing jsonb, incoming jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE SET search_path = ''
@@ -88,9 +88,7 @@ BEGIN
       task_entry := old_entry;
     ELSIF task_entry->'complete' = 'true'::jsonb OR task_entry->'failed' = 'true'::jsonb THEN
       task_entry := task_entry || '{"active":false}'::jsonb;
-    ELSIF new_timestamp <= old_timestamp
-      AND old_entry->'complete' IS DISTINCT FROM 'true'::jsonb
-      AND old_entry->'failed' IS DISTINCT FROM 'true'::jsonb THEN
+    ELSIF new_timestamp <= old_timestamp THEN
       task_entry := jsonb_set(task_entry, '{active}', old_entry->'active');
     END IF;
     tasks := jsonb_set(tasks, ARRAY[task_id], task_entry);

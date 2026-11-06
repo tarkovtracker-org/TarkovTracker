@@ -67,8 +67,9 @@ flowchart LR
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
    reads resolve the active Seasonal number through the database before selecting a row. Task
    completions live in these JSONB blobs; the optional `active` boolean is preserved by local
-   persistence, merges, realtime, team and sharing transforms. Missing legacy incomplete values
-   remain missing, while terminal complete or failed rows are normalized to `active: false`.
+   persistence, merges, realtime, team and sharing transforms. Missing legacy values may remain
+   missing, including on terminal complete or failed rows. New completion, failure and neutral
+   writes explicitly set `active: false`.
    Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
@@ -281,7 +282,7 @@ retained device recovery copies are not rewritten or discarded by import.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Task-completion sanitizers and timestamp merges preserve explicit `active: true` and
-  `active: false` without manufacturing the property on legacy incomplete entries. No migration or
+  `active: false` without manufacturing the property on legacy-only entries. No migration or
   bulk rewrite backfills ambiguous rows.
 - Full-mode saves from older clients retain an existing acceptance flag when their nonterminal
   task entry omits `active` and has the same timestamp. Older legacy entries retain the newer

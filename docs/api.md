@@ -545,9 +545,11 @@ The legacy direct object-map form remains supported for compatibility:
 ```
 
 `GET /progress` may include `active: true` or `active: false` on each task progress object. The
-property is optional for backward compatibility: its absence on legacy data means the acceptance
-state is unknown, not false. Clients must not infer active from `complete: false` and
-`failed: false`. Existing clients can continue using `complete` and `failed` and ignore `active`.
+property is optional for backward compatibility: its absence on legacy nonterminal data means
+the acceptance state is unknown, not false. Terminal tasks are inactive even when legacy data
+omits `active`; new completed, failed and uncompleted writes explicitly set it to `false`.
+Clients must not infer active from `complete: false` and `failed: false`. Existing clients can
+continue using `complete` and `failed` and ignore `active`.
 
 ---
 

@@ -178,8 +178,8 @@ sequenceDiagram
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
 - Ordinary-task acceptance is explicit. `active` is encoded as `{ complete: false, failed: false,
 active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
-  legacy incomplete task rows means unknown and is never inferred or mass-backfilled; a terminal
-  completed or failed row is inactive by definition and is normalized to `active: false`.
+  legacy incomplete task rows means unknown and is never inferred or mass-backfilled. Terminal
+  completed or failed rows are inactive by definition but may also omit `active` on legacy data.
 - Auto-unlocked successors with no stored progress stay absent and their availability is derived
   from task requirements and current progress. The gateway writes only explicitly requested task
   IDs, so no implicit successor update can overwrite concurrent or explicit progress. An active
