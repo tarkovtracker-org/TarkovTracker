@@ -63,6 +63,7 @@ const createMockNeededItemsState = (options: {
     firFilter: ref('all'),
     groupByItem: groupByItemRef,
     groupedItems,
+    groupedNeedCount: computed(() => items.length),
     hideNonFirSpecialEquipment: ref(false),
     hideOwned: ref(false),
     hideTeamItems: ref(false),
@@ -169,6 +170,23 @@ describe('needed items page', () => {
     expect(wrapper.find('[data-testid="filter-bar"]').exists()).toBe(true);
     const groupedItems = wrapper.findAll('[data-testid="grouped-item"]');
     expect(groupedItems.length).toBeGreaterThan(0);
+  });
+  it('passes the grouped need count, not the ungrouped list length, as the grouped total', async () => {
+    const { NeededItemsPage, state } = await setup({ groupByItem: true });
+    // Teammate-only needs stay in filteredItems but are not folded into any group.
+    Object.assign(state, { groupedNeedCount: computed(() => 7) });
+    const wrapper = await mountSuspended(NeededItemsPage, {
+      global: {
+        stubs: {
+          ...defaultGlobalStubs,
+          NeededItemsFilterBar: {
+            props: ['ungroupedCount'],
+            template: '<div data-testid="filter-bar" :data-ungrouped="ungroupedCount" />',
+          },
+        },
+      },
+    });
+    expect(wrapper.find('[data-testid="filter-bar"]').attributes('data-ungrouped')).toBe('7');
   });
   describe('empty and loading states', () => {
     it('renders empty state when no items', async () => {

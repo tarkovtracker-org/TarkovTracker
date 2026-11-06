@@ -160,8 +160,19 @@ html.no-smooth-scroll {
   --color-completed-800: hsl(95 12% 18%);
   --color-completed-900: hsl(95 10% 12%);
   --color-completed-950: hsl(95 8% 8%);
-  /* Locked state (matches legacy task lock icon accent) */
+  /* Locked (orange): the task lock watermark accent, extended into a full ladder
+     so status badges, tabs, graph nodes, and hideout cards share one Locked color */
+  --color-locked-50: hsl(20 100% 96%);
+  --color-locked-100: hsl(20 100% 90%);
+  --color-locked-200: hsl(20 100% 80%);
+  --color-locked-300: hsl(20 100% 70%);
+  --color-locked-400: hsl(20 100% 60%);
   --color-locked-500: hsl(20 100% 50%);
+  --color-locked-600: hsl(20 95% 40%);
+  --color-locked-700: hsl(20 90% 33%);
+  --color-locked-800: hsl(20 85% 25%);
+  --color-locked-900: hsl(20 80% 17%);
+  --color-locked-950: hsl(20 75% 10%);
   /* Warning (amber) */
   --color-warning-50: hsl(45 80% 96%);
   --color-warning-100: hsl(45 80% 90%);
@@ -494,6 +505,17 @@ html.no-smooth-scroll {
     --color-error-800: oklch(0.333236 0.097764 16.27);
     --color-error-900: oklch(0.27734 0.077642 16.16);
     --color-error-950: oklch(0.218875 0.055957 15.99);
+    --color-locked-50: oklch(0.9682 0.0173 48.54);
+    --color-locked-100: oklch(0.9214 0.0443 48.22);
+    --color-locked-200: oklch(0.8469 0.0914 47.61);
+    --color-locked-300: oklch(0.7789 0.1393 46.57);
+    --color-locked-400: oklch(0.7207 0.1834 44.08);
+    --color-locked-500: oklch(0.6759 0.2175 38.8);
+    --color-locked-600: oklch(0.567 0.1755 40.05);
+    --color-locked-700: oklch(0.4883 0.1446 41.27);
+    --color-locked-800: oklch(0.3983 0.1109 42.66);
+    --color-locked-900: oklch(0.3062 0.0773 44.21);
+    --color-locked-950: oklch(0.2222 0.0474 46.39);
     --color-checker-dark: oklch(0.228228 0.03707 283.07);
     --color-checker-bg: oklch(0.192364 0.027672 283.49);
     --color-kappa-50: oklch(0.97 0.08 25);
@@ -1105,6 +1127,9 @@ summary {
   --color-kappa-200: var(--color-kappa-950);
   --color-kappa-300: var(--color-kappa-900);
   --color-kappa-400: var(--color-kappa-800);
+  --color-locked-200: var(--color-locked-950);
+  --color-locked-300: var(--color-locked-900);
+  --color-locked-400: var(--color-locked-800);
   --color-lightkeeper-200: var(--color-lightkeeper-950);
   --color-lightkeeper-300: var(--color-lightkeeper-900);
   --color-lightkeeper-400: var(--color-lightkeeper-800);

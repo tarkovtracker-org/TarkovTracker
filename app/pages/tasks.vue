@@ -5,7 +5,9 @@
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
+          <!-- Narrow Graph shows only its explanation; v-show keeps the bar's selection watchers. -->
           <TaskFilterBar
+            v-show="!isNarrowGraphView"
             :is-search-active="hasSearchQuery"
             :active-status-view="effectiveTaskSecondaryView"
             :search-status-counts="searchStatusCounts"
@@ -188,6 +190,20 @@
             </div>
             <div v-else ref="taskListRef" data-testid="task-list">
               <MapHiddenTasksSection
+                v-if="userHiddenListTasks.length > 0"
+                variant="list"
+                :count="userHiddenListTasks.length"
+                @show-all="unhideListedTasks"
+              >
+                <div
+                  v-for="task in userHiddenListTasks"
+                  :key="`user-hidden-${task.id}`"
+                  :class="taskCardGapClass"
+                >
+                  <TaskCard :task="task" @on-task-action="handleTaskAction" />
+                </div>
+              </MapHiddenTasksSection>
+              <MapHiddenTasksSection
                 v-if="hiddenListTasks.length > 0"
                 :count="hiddenListTasks.length"
                 @show-all="showHiddenListTasks"
@@ -284,15 +300,13 @@
                 :is-hiding="getHideCompletedMapObjectives"
                 @toggle="toggleMapTaskVisibilityFilter"
               />
-              <div>
-                <div
-                  v-for="task in mapSpecificTasksInSlice"
-                  :key="`task-${task.id}`"
-                  :class="taskCardGapClass"
-                >
-                  <TaskCard :task="task" @on-task-action="handleTaskAction" />
-                </div>
-              </div>
+              <TraderTaskSections
+                :tasks="mapSpecificTasksInSlice"
+                :grouped="shouldGroupTraderTasks"
+                :section-gap-class="taskSectionGapClass"
+                :card-gap-class="taskCardGapClass"
+                @on-task-action="handleTaskAction"
+              />
               <div v-if="globalTasksInSlice.length > 0" class="mt-2" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
@@ -349,7 +363,7 @@
       leave-from-class="translate-x-0 opacity-100"
       leave-to-class="translate-x-4 opacity-0"
     >
-      <div v-if="isDesktopSideRailOpen" class="hidden w-[26rem] shrink-0 px-4 py-6 lg:block">
+      <div v-if="isDesktopSideRailOpen" class="hidden w-104 shrink-0 px-4 py-6 lg:block">
         <PageHelpPanel v-if="isDesktopHelpPanelOpen" page-key="tasks" mode="docked" />
         <TaskSettingsDrawer v-else-if="isDesktopSettingsDrawerOpen" mode="docked" />
       </div>
@@ -538,6 +552,7 @@
   import { useMapTime } from '@/composables/useMapTime';
   import { usePageHelpState } from '@/composables/usePageHelpState';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
+  import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useTarkovTime } from '@/composables/useTarkovTime';
   import { useTaskDeepLink } from '@/composables/useTaskDeepLink';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
@@ -554,6 +569,7 @@
     useTaskSearchQuery,
   } from '@/features/tasks/composables/useTaskSearchQuery';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
+  import { getListHiddenTaskIds } from '@/features/tasks/hiddenTasks';
   import MapHiddenTasksSection from '@/features/tasks/MapHiddenTasksSection.vue';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
   import {
@@ -568,6 +584,11 @@
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
   import TaskSearchScopeHint from '@/features/tasks/TaskSearchScopeHint.vue';
+  import {
+    hasTraderTaskGroups,
+    orderTasksByTraderSection,
+  } from '@/features/tasks/traderTaskGroups';
+  import TraderTaskSections from '@/features/tasks/TraderTaskSections.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -604,6 +625,7 @@
     getHideGlobalTasks,
     getHideCompletedMapObjectives,
     getPinnedTaskIds,
+    getHiddenTaskIds,
   } = storeToRefs(preferencesStore);
   const metadataStore = useMetadataStore();
   const { tasks, loading: tasksLoading } = storeToRefs(metadataStore);
@@ -653,6 +675,9 @@
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
+  const { lgAndUp } = useSharedBreakpoints();
+  // Below lg the Graph route explains its width requirement, and the toolbar has nothing to act on.
+  const isNarrowGraphView = computed(() => showGraphView.value && !lgAndUp.value);
   const showSearchScopeHint = computed(() => isSearchActive.value && !showGraphView.value);
   const {
     isDesktopHelpPanelOpen,
@@ -737,8 +762,19 @@
     }
     isMapPanelExpanded.value = !isMapPanelExpanded.value;
   };
+  // Set from the deep-link pin below; the map shows exactly the tasks the list shows.
+  const mapFocusTaskId = ref<string | null>(null);
+  const userHiddenMapTaskIds = computed(() =>
+    getListHiddenTaskIds(getHiddenTaskIds.value, {
+      searchActive: isSearchActive.value,
+      secondaryView: effectiveTaskSecondaryView.value,
+      focusTaskId: mapFocusTaskId.value,
+    })
+  );
   const sourceMapTasks = computed(() =>
-    isSearchActive.value ? filteredTasks.value : visibleTasks.value
+    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(
+      (task) => !userHiddenMapTaskIds.value.has(task.id)
+    )
   );
   const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds } =
     useMapObjectiveMarks({
@@ -1083,6 +1119,7 @@
     searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
+    excludedTaskIds: userHiddenMapTaskIds,
     calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
       calculateFilteredTasksForOptions(
         taskList,
@@ -1108,6 +1145,13 @@
     filteredTasks,
     leafletMapRef,
   });
+  watch(
+    () => pinnedTask.value?.id ?? null,
+    (taskId) => {
+      mapFocusTaskId.value = taskId;
+    },
+    { immediate: true, flush: 'sync' }
+  );
   const handleTrackedTaskProgressInteraction = (
     taskId: string,
     interaction: DashboardFocusProgressInteraction
@@ -1129,12 +1173,43 @@
     const hidden = getHiddenMapTaskIds(mapTaskIds.value, hiddenTaskIds.value);
     return new Set(hidden.filter((taskId) => taskId !== pinnedTask.value?.id));
   });
+  // Quests the user hid from task lists sit in their own collapsed section; hiding is view-only.
+  const userHiddenListTaskIds = computed(() =>
+    getListHiddenTaskIds(getHiddenTaskIds.value, {
+      searchActive: isSearchActive.value,
+      secondaryView: effectiveTaskSecondaryView.value,
+      focusTaskId: pinnedTask.value?.id ?? null,
+    })
+  );
+  const unorderedListedTasks = computed(() =>
+    filteredTasks.value.filter(
+      (task) => !hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
+    )
+  );
+  // The trader view mirrors the in-game Loyalty Level / Essential Tasks sections when the overlay
+  // supplies groups; otherwise it stays one sorted list. Search can span traders, so it stays flat.
+  const shouldGroupTraderTasks = computed(
+    () =>
+      getTaskPrimaryView.value === 'traders' &&
+      !isSearchActive.value &&
+      hasTraderTaskGroups(unorderedListedTasks.value)
+  );
   const listedTasks = computed(() =>
-    filteredTasks.value.filter((task) => !hiddenListTaskIds.value.has(task.id))
+    shouldGroupTraderTasks.value
+      ? orderTasksByTraderSection(unorderedListedTasks.value, new Set(getPinnedTaskIds.value))
+      : unorderedListedTasks.value
   );
   const hiddenListTasks = computed(() =>
-    filteredTasks.value.filter((task) => hiddenListTaskIds.value.has(task.id))
+    filteredTasks.value.filter(
+      (task) => hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
+    )
   );
+  const userHiddenListTasks = computed(() =>
+    filteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
+  );
+  const unhideListedTasks = () => {
+    preferencesStore.unhideTasks(userHiddenListTasks.value.map((task) => task.id));
+  };
   const showHiddenListTasks = () => {
     preferencesStore.clearMapTaskVisibility([...hiddenListTaskIds.value]);
   };

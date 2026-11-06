@@ -9,9 +9,13 @@ import { compareRequirement } from '@/utils/taskRequirements';
 import { isTaskComplete } from '@/utils/taskStatus';
 import type { TaskAvailabilityTeamData, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task, TaskCounterDerivation, TaskOtherRequirement } from '@/types/tarkov';
+type TaskServerGateData = Pick<
+  TaskAvailabilityTeamData,
+  'completions' | 'confirmations' | 'globalVariables' | 'storyChapters'
+>;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
-const confirmedRequirements = (task: Task, data: TaskAvailabilityTeamData): boolean =>
+const confirmedRequirements = (task: Task, data: TaskServerGateData): boolean =>
   isAvailabilityConfirmed(
     data.confirmations?.[task.id],
     data.completions[task.id],
@@ -20,7 +24,7 @@ const confirmedRequirements = (task: Task, data: TaskAvailabilityTeamData): bool
 type VariableRequirement = Extract<TaskOtherRequirement, { type: 'globalVariable' }>;
 const accountBlockers = (
   requirement: VariableRequirement,
-  data: TaskAvailabilityTeamData,
+  data: TaskServerGateData,
   confirmed: boolean
 ): TaskBlocker[] => {
   const met = globalVariableRequirementMet(requirement, data.globalVariables);
@@ -30,6 +34,7 @@ const accountBlockers = (
       type: met === undefined ? 'global_variable_unknown' : 'global_variable',
       requirementId: requirement.id,
       variableId: requirement.variableId,
+      taskPool: requirement.taskPool,
       current: met === undefined ? undefined : data.globalVariables?.[requirement.variableId],
       required: requirement.value,
       compareMethod: requirement.compareMethod,
@@ -39,7 +44,7 @@ const accountBlockers = (
 /** Tracked story progress decides this gate; an in-game confirmation never bypasses it. */
 const storyObjectiveBlockers = (
   requirement: Extract<TaskOtherRequirement, { type: 'storyObjective' }>,
-  data: TaskAvailabilityTeamData
+  data: TaskServerGateData
 ): TaskBlocker[] => {
   const chapter = data.storyChapters?.[requirement.storyChapter.id];
   if (chapter?.objectives?.[requirement.objective.id]?.complete === true) return [];
@@ -63,7 +68,7 @@ const storyObjectiveBlockers = (
 const counterBlockers = (
   requirement: VariableRequirement,
   counter: TaskCounterDerivation,
-  data: TaskAvailabilityTeamData,
+  data: TaskServerGateData,
   confirmed: boolean
 ): TaskBlocker[] => {
   const current = counterValue(counter, (id) => isTaskComplete(data.completions[id]));
@@ -74,17 +79,18 @@ const counterBlockers = (
       type: 'task_counter',
       requirementId: requirement.id,
       variableId: requirement.variableId,
+      taskPool: requirement.taskPool,
       current,
       required: requirement.value,
       compareMethod: requirement.compareMethod,
     },
   ];
 };
-const hasAccountValue = (requirement: VariableRequirement, data: TaskAvailabilityTeamData) =>
+const hasAccountValue = (requirement: VariableRequirement, data: TaskServerGateData) =>
   isRecord(data.globalVariables) && Object.hasOwn(data.globalVariables, requirement.variableId);
 const variableBlockers = (
   requirement: VariableRequirement,
-  data: TaskAvailabilityTeamData,
+  data: TaskServerGateData,
   confirmed: boolean
 ): TaskBlocker[] =>
   requirement.counter && !hasAccountValue(requirement, data)
@@ -92,7 +98,7 @@ const variableBlockers = (
     : accountBlockers(requirement, data, confirmed);
 const requirementBlockers = (
   requirement: TaskOtherRequirement,
-  data: TaskAvailabilityTeamData,
+  data: TaskServerGateData,
   confirmed: boolean
 ): TaskBlocker[] => {
   if (requirement.type === 'globalVariable') return variableBlockers(requirement, data, confirmed);
@@ -101,10 +107,7 @@ const requirementBlockers = (
   return confirmed ? [] : [{ type: 'dialogue', requirementId: requirement.id }];
 };
 /** Start gates only: never infer producers, current values, or prerequisite edges from an unlock. */
-export const taskServerGateBlockers = (
-  task: Task,
-  data: TaskAvailabilityTeamData
-): TaskBlocker[] => {
+export const taskServerGateBlockers = (task: Task, data: TaskServerGateData): TaskBlocker[] => {
   const confirmed = confirmedRequirements(task, data);
   return normalizeOtherRequirements(task.otherRequirements).flatMap((requirement) =>
     requirementBlockers(requirement, data, confirmed)

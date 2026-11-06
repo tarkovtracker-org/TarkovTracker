@@ -4,11 +4,15 @@
   import { MiniMap } from '@vue-flow/minimap';
   import { storeToRefs } from 'pinia';
   import { useMapResize } from '@/composables/useMapResize';
+  import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
+  import { LG_BREAKPOINT_PX } from '@/composables/useSharedBreakpoints';
   import { useTaskGraphData } from '@/composables/useTaskGraphData';
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { normalizeSecondaryView } from '@/utils/taskFilterNormalization';
   import { layoutTaskGraph } from '@/utils/taskGraphLayout';
-  import type { TaskNodeData } from '@/composables/useTaskGraphData';
+  import { TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
+  import type { TaskNodeData, TaskNodeStatus } from '@/composables/useTaskGraphData';
   import type { Node } from '@vue-flow/core';
   import '@vue-flow/core/dist/style.css';
   import '@vue-flow/controls/dist/style.css';
@@ -21,6 +25,18 @@
   const preferencesStore = usePreferencesStore();
   const { getTaskTraderView } = storeToRefs(preferencesStore);
   const { lgAndUp: isLgAndUp } = useSharedBreakpoints();
+  const { searchQuery } = useRouteSearchQuery();
+  // Carry saved list filters too: an explicit trader query makes the route apply missing defaults.
+  const tradersViewLink = computed(() => ({
+    path: TASK_ROUTE_PATHS.traders,
+    query: {
+      trader: getTaskTraderView.value,
+      status: normalizeSecondaryView(preferencesStore.taskSecondaryView ?? 'available'),
+      sort: preferencesStore.getTaskSortMode,
+      sortDir: preferencesStore.getTaskSortDirection,
+      ...(searchQuery.value ? { q: searchQuery.value } : {}),
+    },
+  }));
   const focusedTaskId = ref<string | null>(null);
   const isFocusChainIsolated = ref(false);
   const traderId = computed(() => getTaskTraderView.value || '');
@@ -424,23 +440,20 @@
   const legendItems = computed(() => [
     { label: t('common.completed'), colorClass: 'bg-success-500' },
     { label: t('common.available'), colorClass: 'bg-info-500' },
-    { label: t('common.locked'), colorClass: 'bg-surface-500' },
+    { label: t('common.locked'), colorClass: 'bg-locked-500' },
     { label: t('common.failed'), colorClass: 'bg-error-500' },
     { label: t('page.tasks.graph.flow_start'), colorClass: 'bg-primary-400' },
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
   ]);
+  const MINIMAP_STATUS_COLORS: Record<TaskNodeStatus, string> = {
+    completed: 'var(--color-success-500)',
+    available: 'var(--color-info-500)',
+    locked: 'var(--color-locked-500)',
+    failed: 'var(--color-error-500)',
+  };
   const minimapNodeColor = (node: Node<TaskNodeData>) => {
     if (node.data?.isDimmed) return 'hsl(0 0% 32%)';
-    switch (node.data?.status) {
-      case 'completed':
-        return 'var(--color-success-500)';
-      case 'available':
-        return 'var(--color-info-500)';
-      case 'failed':
-        return 'var(--color-error-500)';
-      default:
-        return 'hsl(0 0% 58%)';
-    }
+    return MINIMAP_STATUS_COLORS[node.data?.status ?? 'locked'];
   };
   const minimapNodeStrokeColor = (node: Node<TaskNodeData>) => {
     if (node.id === focusedTaskId.value) return 'var(--color-primary-300)';
@@ -448,10 +461,35 @@
   };
 </script>
 <template>
-  <div v-if="!isLgAndUp" class="py-8 text-center">
-    <UIcon name="i-mdi-monitor" class="text-surface-400 mx-auto mb-3 h-10 w-10" />
-    <p class="text-surface-400 text-sm">{{ t('page.tasks.graph.mobile_unavailable') }}</p>
-  </div>
+  <section
+    v-if="!isLgAndUp"
+    data-testid="task-graph-narrow"
+    aria-labelledby="task-graph-narrow-title"
+    class="bg-surface-900 mx-auto max-w-md rounded-lg border border-white/12 px-4 py-6 text-center"
+  >
+    <UIcon
+      name="i-mdi-monitor"
+      class="text-surface-400 mx-auto mb-3 h-10 w-10"
+      aria-hidden="true"
+    />
+    <h2 id="task-graph-narrow-title" class="text-surface-100 text-base font-semibold">
+      {{ t('page.tasks.graph.narrow_title') }}
+    </h2>
+    <p class="text-surface-400 mt-2 text-sm">
+      {{ t('page.tasks.graph.narrow_description', { width: LG_BREAKPOINT_PX }) }}
+    </p>
+    <UButton
+      :to="tradersViewLink"
+      color="primary"
+      variant="soft"
+      size="sm"
+      icon="i-mdi-account-group-outline"
+      class="mt-4"
+      data-testid="task-graph-narrow-traders-link"
+    >
+      {{ t('page.tasks.graph.narrow_traders_link') }}
+    </UButton>
+  </section>
   <div v-else-if="!hasNodes" class="py-8 text-center">
     <UIcon name="i-mdi-graph-outline" class="text-surface-400 mx-auto mb-3 h-10 w-10" />
     <p class="text-surface-400 text-sm">{{ t('page.tasks.graph.no_tasks') }}</p>

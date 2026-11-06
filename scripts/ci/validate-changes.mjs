@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import { appendFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { classifyPaths, collectChanges } from './validation-plan.mjs';
+import {
+  classifyPaths,
+  classifyQueuePaths,
+  collectChanges,
+  reusedQueuePlan,
+} from './validation-plan.mjs';
 import { pnpmEntry } from './validation-tools.mjs';
 const args = process.argv.slice(2);
 const options = { mode: 'local', explain: false, full: false, shadow: false };
@@ -15,29 +20,36 @@ while (args.length) {
       break;
     }
     options[arg.slice(2)] = value;
-  } else if (['--explain', '--full', '--shadow'].includes(arg)) {
+  } else if (['--explain', '--full', '--shadow', '--queue', '--reused'].includes(arg)) {
     options[arg.slice(2)] = true;
   } else {
     malformed = true;
   }
 }
 if (!['local', 'ci', 'full'].includes(options.mode)) malformed = true;
+if (options.queue && options.mode !== 'ci') malformed = true;
+if (options.reused && !options.queue) malformed = true;
 const changes = collectChanges({ ...options, local: options.mode !== 'ci' });
-const proposed = classifyPaths(changes.paths, {
+const classify = options.queue ? classifyQueuePaths : classifyPaths;
+const proposed = classify(changes.paths, {
+  formatterOnly: changes.formatterOnly,
   forceFull: Boolean(changes.error) || malformed || options.full || options.mode === 'full',
   reason:
     changes.error || (malformed ? 'Malformed arguments; selecting full validation' : undefined),
 });
+// `--reused` is set only from the trusted queue reuse step; an unreadable diff still runs in full.
+const reusable = [options.reused, !malformed, !changes.error, !options.full].every(Boolean);
+const selected = reusable ? reusedQueuePlan(changes.paths) : proposed;
 const plan = options.shadow
   ? classifyPaths(changes.paths, { forceFull: true, reason: 'Shadow rollout: all checks enabled' })
-  : proposed;
+  : selected;
 console.log(
   JSON.stringify({ ...plan, proposed, base: changes.baseSha, head: changes.headSha }, null, 2)
 );
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\npreview=${plan.previewRequired}\n`
+    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\ntooling=${plan.full || plan.formatter}\npreview=${plan.previewRequired}\n`
   );
 }
 if (options.explain) process.exit(0);
@@ -53,6 +65,13 @@ const commands = plan.full
       ['run', 'systems:check'],
     ]
   : [
+      ...(plan.formatter
+        ? [
+            ['run', 'lint'],
+            ['run', 'test:workflow'],
+            ['run', 'test:blank-lines'],
+          ]
+        : []),
       ['run', 'format:check'],
       ['run', 'systems:check'],
       ...(plan.i18n ? [['run', 'i18n:check']] : []),

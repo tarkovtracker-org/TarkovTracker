@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(14);
+SELECT plan(12);
 
 CREATE TEMP TABLE cap_fixture ON COMMIT DROP AS
 SELECT jsonb_agg(
@@ -124,13 +124,6 @@ SELECT is(
   '[["second-write", 20, 25], ["first-write", 20, 30]]'::jsonb,
   'API writes keep capped entries and earlier counts in normalized progress'
 );
-SELECT is(
-  (SELECT pvp_data->'apiUpdateHistory'
-   FROM public.user_progress
-   WHERE user_id = '00000000-0000-0000-0000-000000000992'),
-  '[]'::jsonb,
-  'API writes no longer mirror history into the legacy column'
-);
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000990', true);
 SET LOCAL ROLE authenticated;
@@ -159,34 +152,6 @@ SELECT is(
    WHERE user_id = '00000000-0000-0000-0000-000000000990' AND game_mode = 'pvp'),
   '[25, 25]'::jsonb,
   'a client sync that omits taskCount keeps the stored count for the same entry'
-);
-
--- The legacy history trigger remains until the columns are dropped; seed its stored entry directly.
-UPDATE public.user_progress
-SET pvp_data = pvp_data || jsonb_build_object(
-  'apiUpdateHistory', jsonb_build_array(
-    jsonb_build_object('at', 1780000000000, 'id', 'first-write', 'source', 'api', 'taskCount', 30,
-      'tasks', (SELECT jsonb_agg(value ORDER BY ordinality)
-                FROM jsonb_array_elements((SELECT tasks FROM cap_fixture)) WITH ORDINALITY
-                WHERE ordinality <= 20))
-  )
-)
-WHERE user_id = '00000000-0000-0000-0000-000000000992';
-UPDATE public.user_progress
-SET pvp_data = pvp_data || jsonb_build_object(
-  'apiUpdateHistory', jsonb_build_array(
-    jsonb_build_object('at', 1780000000000, 'id', 'first-write', 'source', 'api',
-      'tasks', pvp_data->'apiUpdateHistory'->0->'tasks')
-  )
-)
-WHERE user_id = '00000000-0000-0000-0000-000000000992';
-
-SELECT is(
-  (SELECT entry->'taskCount'
-   FROM public.user_progress, jsonb_array_elements(pvp_data->'apiUpdateHistory') AS entry
-   WHERE user_id = '00000000-0000-0000-0000-000000000992' AND entry->>'id' = 'first-write'),
-  '30'::jsonb,
-  'the legacy history trigger keeps the stored count when a resent entry omits it'
 );
 
 SELECT is(

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildTaskEvaluations, type TaskAvailabilityTeamData } from '@/stores/taskAvailability';
-import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import {
+  normalizeOtherRequirements,
+  otherRequirementsSignature,
+} from '@/utils/taskOtherRequirements';
 import type { RequirementComparison, Task, TaskCounterDerivation } from '@/types/tarkov';
 const gate = (compareMethod: RequirementComparison = '>=', value = 3): Task => ({
   id: 'target',
@@ -408,5 +411,52 @@ describe('registry-derived counters', () => {
     expect(evaluate(task, { completions: done('a') }).blockers[0]?.type).toBe(
       'global_variable_unknown'
     );
+  });
+});
+describe('informational task pools', () => {
+  const derivation: TaskCounterDerivation = { type: 'distinctTaskCompletions', taskIds: ['a'] };
+  const taskPool = {
+    traderId: 'mechanic',
+    loyaltyLevel: 2,
+    verification: 'unresolved' as const,
+    coverage: 'partial' as const,
+    derivation,
+  };
+  const pooled = (counter?: TaskCounterDerivation): Task => ({
+    ...gate(),
+    otherRequirements: [
+      {
+        type: 'globalVariable',
+        id: 'condition',
+        variableId: 'counter',
+        compareMethod: '>=',
+        value: 3,
+        taskPool,
+        ...(counter ? { counter } : {}),
+      },
+    ],
+  });
+  it('preserves copied metadata through normalization without changing confirmations', () => {
+    const task = pooled(derivation);
+    expect(normalizeOtherRequirements(task.otherRequirements)[0]).toMatchObject({ taskPool });
+    expect(otherRequirementsSignature(task)).toBe(otherRequirementsSignature(gate()));
+  });
+  it('carries pools on unknown, account and numeric blockers without deriving unresolved progress', () => {
+    expect(
+      evaluate(pooled(), { completions: { a: { complete: true } } }).blockers[0]
+    ).toMatchObject({
+      type: 'global_variable_unknown',
+      taskPool,
+    });
+    expect(evaluate(pooled(), { globalVariables: { counter: 1 } }).blockers[0]).toMatchObject({
+      type: 'global_variable',
+      taskPool,
+      current: 1,
+    });
+    expect(evaluate(pooled(derivation)).blockers[0]).toMatchObject({
+      type: 'task_counter',
+      taskPool,
+      current: 0,
+    });
   });
 });

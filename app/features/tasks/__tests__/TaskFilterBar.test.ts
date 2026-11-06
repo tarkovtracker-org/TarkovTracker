@@ -246,7 +246,7 @@ describe('TaskFilterBar', () => {
       wrapper.findAll('button').find((button) => button.text().startsWith(label));
     expect(findStatusButton('available')!.text()).toBe('available0');
     expect(findStatusButton('locked')!.text()).toBe('locked1');
-    expect(findStatusButton('All')!.attributes('aria-pressed')).toBe('true');
+    expect(findStatusButton('all')!.attributes('aria-pressed')).toBe('true');
     expect(findStatusButton('available')!.attributes('aria-pressed')).toBe('false');
   });
   it('pins a status picked during search without saving it', async () => {
@@ -278,7 +278,7 @@ describe('TaskFilterBar', () => {
       activeStatusView: 'all',
       searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
     });
-    const allButton = wrapper.findAll('button').find((button) => button.text().startsWith('All'));
+    const allButton = wrapper.findAll('button').find((button) => button.text().startsWith('all'));
     expect(allButton!.attributes('disabled')).toBeUndefined();
     await allButton!.trigger('click');
     expect(wrapper.emitted('pin-status')).toEqual([['all']]);
@@ -311,13 +311,16 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const allStatusButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('All2'));
+      .find((button) => button.text().includes('all2'));
     const availableButton = wrapper
       .findAll('button')
       .find((button) => button.text().includes('available'));
-    expect(allStatusButton?.classes()).toContain('border-primary-500/45');
-    expect(allStatusButton?.classes()).toContain('ring-primary-500/25');
+    // All is neutral grey, so it never borrows a status color.
+    expect(allStatusButton?.classes()).toContain('border-white/15');
+    expect(allStatusButton?.classes()).toContain('ring-white/10');
+    expect(allStatusButton?.classes()).not.toContain('border-primary-500/45');
     expect(availableButton?.classes()).not.toContain('border-info-500/45');
+    expect(availableButton?.classes()).toContain('border-white/10');
   });
   it('keeps completed and failed filters mounted when enabled, even with zero counts', async () => {
     const { TaskFilterBar } = await setup({
@@ -345,7 +348,19 @@ describe('TaskFilterBar', () => {
     expect(buttonTexts.some((text) => text.includes('locked'))).toBe(false);
     expect(buttonTexts.some((text) => text.includes('completed'))).toBe(false);
     expect(buttonTexts.some((text) => text.includes('failed'))).toBe(false);
-    expect(buttonTexts.some((text) => text.includes('All2'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('all2'))).toBe(true);
+  });
+  it('drops the list-only sort control from the graph view', async () => {
+    const sortDirection = '[data-icon="i-mdi-sort-ascending"]';
+    for (const [view, hasSort] of [
+      ['traders', true],
+      ['maps', true],
+      ['graph', false],
+    ] as const) {
+      const { TaskFilterBar } = await setup({ preferencesStore: { getTaskPrimaryView: view } });
+      const wrapper = mountTaskFilterBar(TaskFilterBar);
+      expect(wrapper.find(sortDirection).exists()).toBe(hasSort);
+    }
   });
   it('moves off a hidden active status filter', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({
@@ -373,15 +388,15 @@ describe('TaskFilterBar', () => {
       drawerOpen: true,
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const settingsButton = wrapper.find('button[data-icon="i-mdi-cog"]');
+    const settingsButton = wrapper.find('button[data-icon="i-mdi-tune-variant"]');
     expect(settingsButton.exists()).toBe(true);
-    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.attributes('aria-expanded')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');
     expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
     // Exercise the drawer toggle so the mocked toggle() and the off state are covered
     // (and so the shared drawer state is left closed for later tests in this file).
     await settingsButton.trigger('click');
-    expect(settingsButton.attributes('aria-pressed')).toBe('false');
+    expect(settingsButton.attributes('aria-expanded')).toBe('false');
   });
   it('renders neutral badge class when available count is zero', async () => {
     const { TaskFilterBar } = await setup({

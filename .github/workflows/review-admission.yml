@@ -1,0 +1,140 @@
+name: Review Admission
+# Display-only candidate locator. Release Promotion Queue uses it as a coarse prefilter so
+# ordinary PR admissions allocate no promotion runner; it is never evidence. Events without a
+# branch (comments, dispatch) stay `unscoped` and keep waking promotion. Provider-suite signals
+# run on main, so their branch cannot identify the candidate; keep those unscoped too.
+run-name: Review Admission ${{ github.event.pull_request.head.ref || (github.event.workflow_run.event == 'check_suite' && 'unscoped') || github.event.workflow_run.head_branch || 'unscoped' }}
+# Only trusted events publish. Candidate review/queue events use the separate read-only signal.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: [Review Admission Signal]
+    types: [completed]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number to recheck
+        required: true
+        type: string
+permissions: {}
+jobs:
+  filter:
+    name: Filter admission event
+    # Coarse intake only: trusted main still authenticates and evaluates every retained event.
+    # Preserve old bodies so edited/deleted approvals and provider withdrawals revoke admission.
+    if: >-
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
+      (github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '/approve ') ||
+      contains(github.event.comment.body, '/approve-sensitive ') ||
+      contains(github.event.changes.body.from, '/approve ') ||
+      contains(github.event.changes.body.from, '/approve-sensitive ') ||
+      (github.event.comment.user.id == 136622811 && github.event.comment.user.type == 'Bot' &&
+      (contains(github.event.comment.body, '<!-- recent_review_start') ||
+      contains(github.event.comment.body, '<!-- final_review_risk_coverage:') ||
+      contains(github.event.changes.body.from, '<!-- recent_review_start') ||
+      contains(github.event.changes.body.from, '<!-- final_review_risk_coverage:'))))))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout trusted event filter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Filter current and withdrawn approval commands
+        id: filter
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { filterAdmission } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            core.setOutput('relevant', String(await filterAdmission({ github, context })));
+  admission:
+    name: Review admission controller
+    needs: filter
+    if: >-
+      needs.filter.outputs.relevant == 'true' && (
+      (github.event_name == 'pull_request_target' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group", "check_suite"]'), github.event.workflow_run.event) && github.event.workflow_run.repository.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request))
+    concurrency:
+      group: review-admission-publication
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: review-admission
+      deployment: false
+    env:
+      REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+      REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+      REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted admission policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Evaluate current immutable review evidence
+        id: evaluate
+        env:
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { runReviewAdmissionStep } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core });
+            await runReviewAdmissionStep({ github: publisher, context, core });
+      - name: Upload exact-head admission receipt
+        if: success() && steps.evaluate.outputs.admission_sha != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-admission-${{ steps.evaluate.outputs.admission_sha }}
+          path: review-admission-evidence/${{ steps.evaluate.outputs.admission_sha }}.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+      - name: Upload current queue admission receipt
+        if: success() && steps.evaluate.outputs.queue_sha != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-admission-${{ steps.evaluate.outputs.queue_sha }}
+          path: review-admission-evidence/${{ steps.evaluate.outputs.queue_sha }}.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+      - name: Publish verified admission after evidence upload
+        if: success() && steps.evaluate.outputs.admission_sha != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ADMISSION_SHA: ${{ steps.evaluate.outputs.admission_sha }}
+          QUEUE_SHA: ${{ steps.evaluate.outputs.queue_sha }}
+          REVIEW_ADMISSION_PRIVATE_KEY: ${{ secrets.REVIEW_ADMISSION_PRIVATE_KEY }}
+        with:
+          script: |
+            const { publishReviewScope } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission.mjs`);
+            const { createReviewPublisher } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/review-admission-issuer.mjs`);
+            const publisher = await createReviewPublisher({ github, context, core });
+            await publishReviewScope({ github: publisher, context, head: process.env.ADMISSION_SHA, queued: process.env.QUEUE_SHA });

@@ -2,15 +2,16 @@
 
 Reference documentation for the local log files written by Escape from Tarkov (and EFT: Arena) at
 `C:\Battlestate Games\Escape from Tarkov\Logs\`. Produced by auditing an on-disk log corpus
-covering builds `0.16.8.0.37972`–`1.1.0.1.46911` (main game) and Arena `0.3.2.1.38001` /
-`0.4.2.5.42886`.
+covering builds `0.16.8.0.37972`–`1.2.0.0.47965` (main game) and Arena through
+`0.6.0.0.47752`. The detailed historical tables retain their `H`/`C` provenance; the
+2026-10-15 re-audit below extends observed build coverage, not every historical semantic claim.
 
 ## Privacy
 
 This directory contains **no raw game logs and no personal data**. All example log lines are
 privacy-normalized: identifiers, addresses, hosts, and free text are replaced with angle-bracket
-placeholders such as `<PROFILE_ID>`, `<SERVER_IP>`, or `<GATEWAY>`. The only numeric data is EFT
-build numbers, which are public. Do not commit real player logs anywhere in this repository — see
+placeholders such as `<PROFILE_ID>`, `<SERVER_IP>`, or `<GATEWAY>`. Examples retain public EFT
+build numbers; audit snapshots also retain aggregate counts, never player values. Do not commit real player logs anywhere in this repository — see
 the root `.gitignore` for the raw-log exclusions.
 
 ## Contents
@@ -22,11 +23,38 @@ the root `.gitignore` for the raw-log exclusions.
 | [`.eft_log_audit.py`](./.eft_log_audit.py)                               | Read-only, privacy-safe audit tool that re-verifies the docs against a log corpus. See "Refreshing" below.                                                                                               |
 | [`audit_2026-08-29_signatures.json`](./audit_2026-08-29_signatures.json) | Snapshot output of the audit tool (2026-08-29), the evidence base for the current doc state.                                                                                                             |
 
+The additional [`audit_2026-10-15_signatures.json`](./audit_2026-10-15_signatures.json) records
+latest corpus completeness, signature/notification build evidence, and Arena state tokens.
+
 ## Start here
 
 - **"I want to detect X"** → Dictionary [Part 1](./eft-log-event-dictionary.md#part-1--how-do-i-detect-recipes).
 - **"What is this log line / field?"** → Dictionary [Part 2](./eft-log-event-dictionary.md#part-2--a-z-event-dictionary-by-channel), or the full per-channel catalogue in the reference.
 - **"Can logs answer this?"** → Dictionary [Part 3](./eft-log-event-dictionary.md#part-3--what-the-logs-cannot-answer-do-not-automate-off-these) before building anything on log data.
+
+## Latest re-audit (2026-10-15)
+
+The full `--section all` audit completed with no missing roots or unreadable files:
+
+| Corpus   | Files | Sessions | Observed builds                                   |
+| -------- | ----: | -------: | ------------------------------------------------- |
+| Main EFT | 1,139 |      146 | 22 builds, `0.16.8.0.37972`–`1.2.0.0.47965`       |
+| Arena    |   102 |        9 | `0.3.2.1.38001`, `0.4.2.5.42886`, `0.6.0.0.47752` |
+
+An independent typed-notification scan and production-parser comparison found 235 unique main-game
+quest notifications (149 started, 86 completed, no failures), all available in dedicated
+notification logs. Output mirrors added no unique events in this selection, but are useful recovery
+sources when dedicated logs are missing. This verifies sampled extraction, not complete character
+restoration, full destination-catalog application, or future-build coverage. Real failure-event
+coverage remains unproven by this corpus; fixtures cover type 11.
+
+A targeted prestige-field review found `PrestigeLevel` in friend-request/accept and
+group-invite/readiness payloads, not a verified self-reset event. The only prestige API path matched
+was `/client/prestige/list`; route presence is not a reset. All 296 inspected `profileChangeEvents`
+arrays were empty. No usable self-XP snapshot, partial objective handover, or hideout completion
+was established. Never promote another player's profile fields into the importing user's progress.
+See the [import selection contract](../systems/imports.md#preview-selection-and-reset-history) for
+mode/state selection and manual reset cutoffs.
 
 ## Import resource budgets
 
@@ -92,7 +120,8 @@ python .eft_log_audit.py \
 ```
 
 If the diff shows new builds, endpoints, or event shapes, update the reference and dictionary and
-replace the dated signatures JSON with the new audit output.
+add a dated audit snapshot with the new evidence. Keep older snapshots while the historical tables
+still reference them; do not silently relabel historical claims as current.
 
 The JSON report includes `corpus_status` and `missing_roots`. Treat a report with
 `corpus_status: "incomplete"` as non-authoritative until the missing roots or unreadable files are

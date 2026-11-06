@@ -8,12 +8,20 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 - Relevant checks: `pnpm run supabase:check` (local database replay) for migration or SQL changes.
   Edge Functions run on Deno; their `supabase/functions/_shared/*.deno.test.ts` tests are not
   covered by root Vitest.
-- Independent-review triggers: root `AGENTS.md` → Workflow and review.
+- Review and merge class: root `AGENTS.md` → Workflow and review.
 
 ## Functions and grants
 
 - Security-definer and service-role-only functions revoke `EXECUTE` from `PUBLIC`, `anon`, and
   `authenticated`, granting `service_role` explicitly where required.
+- New `postgres` functions have no default `PUBLIC` EXECUTE in any schema and no default client
+  EXECUTE outside platform-owned `storage`; grant every calling role explicitly
+  (`docs/runbook.md#function-execute-defaults`).
+- Client-callable security-definer bodies live in `private`; `public` exposes them only through
+  same-signature `SECURITY INVOKER` wrappers. Wrappers run as the caller, so these bodies keep
+  `authenticated` and `service_role` `EXECUTE` (never `PUBLIC` or `anon`).
+  `supabase/tests/database/client_definer_rpcs.test.sql` mirrors advisor lints 0028/0029; fix new
+  findings instead of suppressing them.
 
 ## Migrations
 

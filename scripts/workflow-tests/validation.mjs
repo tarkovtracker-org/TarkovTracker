@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { test } from 'node:test';
 import {
   classifyPaths,
+  classifyQueuePaths,
   parseNameStatus,
   collectChanges,
   aggregateResults,
   fullJobs,
 } from '../ci/validation-plan.mjs';
 import { gitExecutable } from '../ci/validation-tools.mjs';
+import { toolingPaths } from './helpers/queue-preview-scope.mjs';
 const cli = resolve('scripts/ci/validate-changes.mjs');
 const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
 const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
@@ -98,6 +100,7 @@ test('only explicit documentation and translation paths receive reduced validati
       'lint-format',
       'typecheck',
       'test',
+      'coverage',
       'validate',
       'supabase-db',
       'systems-drift',
@@ -128,14 +131,14 @@ test('only change sets that cannot reach the deployed app skip the preview', () 
   }
   // Full validation without a preview: automation, tooling, and tests that never ship.
   for (const paths of [
-    ['.github/workflows/ci.yml'],
+    ['.github/workflows/crowdin.yml'],
     ['scripts/workflow-tests/dispatched-status.mjs'],
     ['scripts/ci/README.md'],
     ['docs/eft-log-reference/audit_2026-08-29_signatures.json'],
     ['tests/test-setup.ts'],
     ['.coderabbit.yaml'],
     ['supabase/README.md'],
-    ['README.md', '.github/workflows/ci.yml'],
+    ['README.md', '.github/workflows/crowdin.yml'],
   ]) {
     const plan = classifyPaths(paths);
     assert.equal(plan.previewRequired, false, paths.join());
@@ -233,6 +236,51 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
       assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
   }
 });
+function passingNeeds(plan) {
+  return {
+    changes: { result: 'success' },
+    ...Object.fromEntries(
+      fullJobs.map((job) => [job, { result: plan.jobs.includes(job) ? 'success' : 'skipped' }])
+    ),
+  };
+}
+function assertCoverageOutcomes(plan) {
+  const needs = passingNeeds(plan);
+  const expected = plan.full ? 'success' : 'skipped';
+  const mismatched = ['success', 'failure', 'cancelled', 'skipped', undefined].filter(
+    (result) => result !== expected
+  );
+  // Full validation requires coverage success; reduced validation requires it to skip.
+  assert.deepEqual(aggregateResults(plan, needs), []);
+  assert.deepEqual(aggregateResults(plan, { ...needs, coverage: { result: expected } }), []);
+  for (const result of mismatched) {
+    const errors = aggregateResults(plan, { ...needs, coverage: { result } });
+    assert.deepEqual(errors, [`coverage: expected ${expected}, received ${String(result)}`]);
+  }
+}
+test('activated coverage gate is required for full plans and reports each failure once', () => {
+  const reduced = classifyPaths(['README.md']);
+  assertCoverageOutcomes(reduced);
+  // Like any planned job, a reduced plan that lists coverage requires it to run and succeed.
+  assert.deepEqual(
+    aggregateResults(
+      { ...reduced, jobs: [...reduced.jobs, 'coverage'] },
+      { ...passingNeeds(reduced), coverage: { result: 'skipped' } }
+    ),
+    ['coverage: expected success, received skipped']
+  );
+  const plan = classifyPaths(['app/a.ts']);
+  assertCoverageOutcomes(plan);
+  const needs = passingNeeds(plan);
+  delete needs.coverage;
+  assert.deepEqual(aggregateResults(plan, needs), [
+    'coverage: expected success, received undefined',
+  ]);
+  const withoutCoverage = { ...plan, jobs: plan.jobs.filter((job) => job !== 'coverage') };
+  assert.deepEqual(aggregateResults(withoutCoverage, needs), [
+    'Missing or invalid validation plan',
+  ]);
+});
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
@@ -274,4 +322,187 @@ test('local classifier includes committed, staged, unstaged and untracked paths;
   assert.equal(explain('--mode', 'ci', '--shadow').proposed.full, false);
   assert.equal(explain('--mode', 'ci', '--bad-option').full, true);
   assert.equal(explain('--mode', 'full').full, true);
+});
+test('queue reductions accept only inert documentation and keep the security aggregate', () => {
+  for (const paths of [
+    ['README.md'],
+    ['docs/added.md', 'docs/deleted.markdown'],
+    parseNameStatus('R100\0docs/old.md\0docs/new.md\0'),
+  ]) {
+    const plan = classifyQueuePaths(paths);
+    assert.equal(plan.full, false);
+    assert.equal(plan.previewRequired, false);
+    assert.deepEqual(plan.jobs, reducedDocsJobs);
+    assert.deepEqual(aggregateResults(plan, passingNeeds(plan)), []);
+    assertSelectedJobFailures(plan, passingNeeds(plan));
+  }
+  for (const [paths, previewRequired] of [
+    [[], true],
+    [Array.from({ length: 300 }, (_, i) => `docs/${i}.md`), true],
+    [['AGENTS.md'], false],
+    [['docs/AGENTS.md'], false],
+    [['.github/CONTRIBUTING.md'], false],
+    [['DESIGN.md'], true],
+    [['docs/config.json'], false],
+    [['docs/a.md', 'app/a.ts'], true],
+    [['docs/a.md', 'app/locales/fr.json'], true],
+    [['scripts/tool.mjs'], false],
+    [['scripts/preview/README.md'], true],
+    [['.github/workflows/ci.yml'], true],
+    [['pnpm-lock.yaml'], true],
+    [['nuxt.config.ts'], true],
+    [['public/guide.md'], true],
+    [parseNameStatus('R100\0app/a.ts\0docs/a.md\0'), true],
+  ]) {
+    const plan = classifyQueuePaths(paths);
+    assert.equal(plan.full, true, paths.join());
+    assert.equal(plan.previewRequired, previewRequired, paths.join());
+    assert.deepEqual(plan.jobs, fullJobs);
+  }
+  assert.equal(
+    classifyQueuePaths(Array.from({ length: 299 }, (_, i) => `docs/${i}.md`)).previewRequired,
+    false
+  );
+});
+function queueGit(t) {
+  const cwd = mkdtempSync(join(tmpdir(), 'queue-docs-git-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const git = (...args) => execFileSync(gitExecutable(), args, { cwd, encoding: 'utf8' }).trim();
+  git('init', '-q');
+  git('config', 'user.email', 'test@example.invalid');
+  git('config', 'user.name', 'Test');
+  mkdirSync(join(cwd, 'docs'));
+  writeFileSync(join(cwd, 'README.md'), 'base');
+  writeFileSync(join(cwd, 'docs/removed.md'), 'removed');
+  writeFileSync(join(cwd, 'app.ts'), 'code');
+  git('add', '.');
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'base');
+  return { cwd, git, base: git('rev-parse', 'HEAD') };
+}
+function queueCli(f, head, extra = []) {
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cli, '--mode', 'ci', '--explain', '--queue', '--base', f.base, '--head', head, ...extra],
+      {
+        cwd: f.cwd,
+        encoding: 'utf8',
+        env: { ...process.env, GITHUB_OUTPUT: '' },
+      }
+    )
+  );
+}
+test('queue CLI uses the complete exact parent delta, supports additions/deletions and fails closed on stale evidence', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'docs/added.md'), 'added');
+  f.git('rm', '-q', 'docs/removed.md');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'docs integration');
+  const head = f.git('rev-parse', 'HEAD');
+  assert.deepEqual(
+    collectChanges({ cwd: f.cwd, base: f.base, head, local: false, queue: true }).paths.sort(),
+    ['docs/added.md', 'docs/removed.md']
+  );
+  const plan = queueCli(f, head);
+  assert.equal(plan.full, false);
+  assert.equal(plan.previewRequired, false);
+  assert.equal(plan.base, f.base);
+  assert.equal(plan.head, head);
+  // Negative control: the previous forced-full queue invocation still selects every job/build.
+  assert.equal(queueCli(f, head, ['--full']).full, true);
+  assert.equal(queueCli(f, head, ['--full']).previewRequired, true);
+  assert.equal(queueCli(f, 'missing').full, true);
+  assert.equal(queueCli(f, 'HEAD').full, true);
+  f.git('checkout', '--detach', '-q', f.base);
+  assert.equal(queueCli(f, head).full, true, 'stale checkout must not skip validation');
+});
+test('queue CLI accepts the trusted reuse flag only for a readable queue comparison', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'app.ts'), 'changed code');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'app integration');
+  const head = f.git('rev-parse', 'HEAD');
+  const reused = queueCli(f, head, ['--reused']);
+  assert.equal(reused.full, false);
+  assert.equal(reused.reused, true);
+  assert.equal(reused.previewRequired, false);
+  assert.deepEqual(reused.jobs, ['lint-format', 'systems-drift', 'security']);
+  // Negative controls: without the flag, with an explicit full run, with an unreadable or
+  // stale comparison, or outside a queue run, the app change validates in full.
+  for (const plan of [
+    queueCli(f, head),
+    queueCli(f, head, ['--reused', '--full']),
+    queueCli(f, 'missing', ['--reused']),
+    queueCli(f, 'HEAD', ['--reused']),
+  ]) {
+    assert.equal(plan.full, true);
+    assert.notEqual(plan.reused, true);
+  }
+  const outsideQueue = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cli, '--mode', 'ci', '--explain', '--reused', '--base', f.base, '--head', head],
+      { cwd: f.cwd, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' } }
+    )
+  );
+  assert.equal(outsideQueue.full, true);
+  assert.notEqual(outsideQueue.reused, true);
+});
+test('queue CLI retains mixed candidates and rejects a comparison that hides earlier integration changes', (t) => {
+  const f = queueGit(t);
+  writeFileSync(join(f.cwd, 'app.ts'), 'changed');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'code integration');
+  const middle = f.git('rev-parse', 'HEAD');
+  writeFileSync(join(f.cwd, 'docs/a.md'), 'docs');
+  f.git('add', '.');
+  f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'later docs');
+  const head = f.git('rev-parse', 'HEAD');
+  assert.equal(queueCli(f, head).full, true, 'non-parent base cannot hide mixed queue work');
+  assert.equal(
+    classifyQueuePaths(collectChanges({ cwd: f.cwd, base: f.base, head, local: false }).paths).full,
+    true
+  );
+  assert.equal(
+    collectChanges({ cwd: f.cwd, base: f.base, head, queue: true }).error.length > 0,
+    true
+  );
+  assert.equal(queueCli({ ...f, base: middle }, head).full, false);
+});
+test('queue full CI does not force a deployment for the exact PR 1316 tooling inventory', () => {
+  const plan = classifyQueuePaths(toolingPaths);
+  assert.equal(plan.previewRequired, false);
+  assert.equal(plan.full, true);
+  assert.equal(plan.workflows, true);
+  assert.deepEqual(plan.jobs, fullJobs);
+  assert.deepEqual(aggregateResults(plan, passingNeeds(plan)), []);
+  assertSelectedJobFailures(plan, passingNeeds(plan));
+  assert.equal(classifyQueuePaths(toolingPaths, { forceFull: true }).previewRequired, true);
+});
+test('both classifiers retain previews for deployment automation and uncertain or mixed scopes', () => {
+  for (const path of [
+    '.github/workflows/ci.yml',
+    '.github/workflows/preview.yml',
+    '.github/workflows/preview-state.yml',
+    '.github/workflows/release.yml',
+    '.github/workflows/unknown.yml',
+    '.github/actions/setup-project/action.yml',
+    'scripts/setup/ensure-pnpm.sh',
+    'scripts/preview/profile.mjs',
+    'scripts/preview/README.md',
+    'app/locales/fr.json',
+    'public/guide.md',
+    'shared/runtime.ts',
+    'package.json',
+    'nuxt.config.ts',
+    'unknown',
+    '../docs/a.md',
+  ]) {
+    for (const classify of [classifyPaths, classifyQueuePaths]) {
+      assert.equal(classify([path]).previewRequired, true, path);
+      assert.equal(classify([...toolingPaths, path]).previewRequired, true, path);
+    }
+  }
+  for (const paths of [[], Array.from({ length: 300 }, (_, i) => `docs/${i}.md`)])
+    assert.equal(classifyQueuePaths(paths).previewRequired, true);
 });

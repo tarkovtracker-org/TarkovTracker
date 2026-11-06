@@ -236,6 +236,45 @@ describe('useItemDistribution', () => {
     });
   });
   describe('distributeItems', () => {
+    it.each([
+      { type: 'task', foundInRaid: true },
+      { type: 'task', foundInRaid: false },
+      { type: 'hideout', foundInRaid: true },
+      { type: 'hideout', foundInRaid: false },
+    ] as const)(
+      'normalizes zero-count $type needs (FIR: $foundInRaid)',
+      async ({ type, foundInRaid }) => {
+        const { useItemDistribution } = await import('@/composables/useItemDistribution');
+        const { distributeItems, applyDistribution } = useItemDistribution();
+        const options = { count: 0, foundInRaid };
+        const tasks = type === 'task' ? [createTaskObjective('need', 'task-1', options)] : [];
+        const hideout = type === 'hideout' ? [createHideoutModule('need', options)] : [];
+        const fir = foundInRaid ? 1 : 0;
+        const nonFir = foundInRaid ? 0 : 1;
+        const first = distributeItems(fir, nonFir, tasks, hideout);
+        expect(first).toEqual({
+          updates: [{ id: 'need', type, count: 1, needed: 1 }],
+          remainingFir: 0,
+          remainingNonFir: 0,
+        });
+        const counts =
+          type === 'task' ? mockStoreState.objectiveCounts : mockStoreState.hideoutPartCounts;
+        counts.need = 1;
+        expect(distributeItems(fir, nonFir, tasks, hideout)).toEqual({
+          updates: [],
+          remainingFir: 0,
+          remainingNonFir: 0,
+        });
+        const reduced = distributeItems(0, 0, tasks, hideout);
+        expect(reduced.updates).toEqual([{ id: 'need', type, count: 0, needed: 1 }]);
+        applyDistribution(reduced);
+        const state = mockStoreState.patchedState as {
+          pvp: { taskObjectives: Record<string, unknown>; hideoutParts: Record<string, unknown> };
+        };
+        const entries = type === 'task' ? state.pvp.taskObjectives : state.pvp.hideoutParts;
+        expect(entries.need).toMatchObject({ count: 0, complete: false });
+      }
+    );
     it('distributes FIR items to FIR task objectives first', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

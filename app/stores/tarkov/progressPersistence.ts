@@ -16,6 +16,11 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import {
+  isProgressPayloadTooLarge,
+  PROGRESS_SYNC_INTERRUPTED as SPLIT_SYNC_INTERRUPTED,
+} from '@/utils/progressPayload';
+import { reportProgressPayload } from '@/utils/progressPayloadDiagnostics';
 import { isRecord, sanitizeTarkovUid } from '@/utils/progressSanitizers';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 type SupabaseError = { code?: string; message: string };
@@ -94,7 +99,7 @@ export type ProgressSyncPayload = {
   pve_data: UserProgressData;
   seasonal_data: UserProgressData;
 };
-/** Half the RPC's 512 KiB `p_modes` cap; a larger multi-mode sync sends one mode per request. */
+/** Conservative wire threshold; JSONB storage differs. Large saves send one mode per request. */
 const SINGLE_REQUEST_MODES_LIMIT = 256 * 1024;
 const byteLength = (value: unknown): number =>
   new TextEncoder().encode(JSON.stringify(value)).length;
@@ -105,8 +110,23 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
   }
   return entries.map(([mode, progress]) => ({ [mode]: progress }));
 };
-/** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
-const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
+type RejectedMode = { wire: string; error: unknown };
+// One current owner per SDK client, at most three rejected snapshots. Never persisted or logged.
+const rejectedPayloads = new WeakMap<object, { owner: string; modes: Map<string, RejectedMode> }>();
+const rejectedModesFor = (client: object, owner: string): Map<string, RejectedMode> => {
+  let rejected = rejectedPayloads.get(client);
+  if (rejected?.owner !== owner) {
+    rejected = { owner, modes: new Map() };
+    rejectedPayloads.set(client, rejected);
+  }
+  return rejected.modes;
+};
+const rejectedBatch = (batch: ModeProgressMap, rejected: Map<string, RejectedMode>) => {
+  for (const [mode, progress] of Object.entries(batch)) {
+    const previous = rejected.get(mode);
+    if (previous?.wire === JSON.stringify(progress)) return previous;
+  }
+};
 type ProgressSyncResult<TError> = {
   error: TError | typeof SPLIT_SYNC_INTERRUPTED;
   tarkovUidConflict?: TarkovUidConflict;
@@ -224,29 +244,111 @@ const sendModeBatch = async <TError>(
   }
   return sync.isCurrent() ? { ...result, tarkovUidConflict } : { error: SPLIT_SYNC_INTERRUPTED };
 };
+type BatchSync<TError> = {
+  client: ProgressSyncClient<TError>;
+  userId: string;
+  payload: ProgressSyncPayload;
+  sync: ProgressAcknowledgement;
+  modes: ModeProgressMap;
+  rejected: Map<string, RejectedMode>;
+  batches: ModeProgressMap[];
+  result: ProgressSyncResult<TError>;
+  oversized?: ProgressSyncResult<TError>;
+  metadataSaved: boolean;
+  tarkovUidConflict?: TarkovUidConflict;
+};
+const singleModeBatches = (modes: ModeProgressMap): ModeProgressMap[] =>
+  Object.entries(modes).map(([mode, progress]) => ({ [mode]: progress }));
+const createBatchSync = <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload,
+  sync: ProgressAcknowledgement
+): BatchSync<TError> => {
+  const modes = selectChangedModes(userId, {
+    [GAME_MODES.PVP]: payload.pvp_data,
+    [GAME_MODES.PVE]: payload.pve_data,
+    [GAME_MODES.SEASONAL]: payload.seasonal_data,
+  });
+  // Omitted modes cannot be overwritten, so remote changes to them do not stop this sync.
+  sync.scope(modes);
+  const rejected = rejectedModesFor(client, userId);
+  return {
+    client,
+    userId,
+    payload,
+    sync,
+    modes,
+    rejected,
+    batches: rejectedBatch(modes, rejected) ? singleModeBatches(modes) : toModeBatches(modes),
+    result: { error: SPLIT_SYNC_INTERRUPTED },
+    metadataSaved: false,
+  };
+};
+const readBatchResult = async <TError>(ctx: BatchSync<TError>, batch: ModeProgressMap) => {
+  const previous = rejectedBatch(batch, ctx.rejected);
+  if (previous) return { error: previous.error as TError };
+  const result = await sendModeBatch(ctx.client, ctx.userId, ctx.payload, batch, ctx.sync);
+  reportProgressPayload(ctx.modes, batch, result.error);
+  return result;
+};
+const retainOversizedBatch = <TError>(ctx: BatchSync<TError>, batch: ModeProgressMap) => {
+  if (Object.keys(batch).length > 1) {
+    // JSONB overhead or an older database may reject a small combined wire payload.
+    ctx.batches.push(...singleModeBatches(batch));
+    return;
+  }
+  // A rejected aggregate does not condemn its modes; cache complete individual modes only.
+  for (const [mode, progress] of Object.entries(batch)) {
+    ctx.rejected.set(mode, { wire: JSON.stringify(progress), error: ctx.result.error });
+  }
+  ctx.oversized ??= ctx.result;
+};
+const acknowledgeBatch = <TError>(ctx: BatchSync<TError>, batch: ModeProgressMap) => {
+  for (const mode of Object.keys(batch)) ctx.rejected.delete(mode);
+  ctx.sync.acknowledge(batch);
+  ctx.metadataSaved = true;
+};
+const applyBatchResult = <TError>(ctx: BatchSync<TError>, batch: ModeProgressMap): boolean => {
+  if (!ctx.sync.isCurrent()) {
+    ctx.result = { error: SPLIT_SYNC_INTERRUPTED };
+    return false;
+  }
+  if (isProgressPayloadTooLarge(ctx.result.error)) {
+    retainOversizedBatch(ctx, batch);
+    return true;
+  }
+  if (ctx.result.error) return false;
+  acknowledgeBatch(ctx, batch);
+  return true;
+};
+const saveUnblockedMetadata = async <TError>(ctx: BatchSync<TError>) => {
+  if (!ctx.oversized || ctx.metadataSaved) return null;
+  // Rejected progress must not block metadata edits. The controller deduplicates unchanged
+  // full payloads; direct/repair callers may persist metadata without resending a mode.
+  return sendModeBatch(ctx.client, ctx.userId, ctx.payload, {}, ctx.sync);
+};
+const finishProgressBatches = async <TError>(ctx: BatchSync<TError>) => {
+  const metadata = await saveUnblockedMetadata(ctx);
+  if (metadata?.error) return metadata;
+  return {
+    ...(ctx.oversized ?? ctx.result),
+    tarkovUidConflict: ctx.tarkovUidConflict ?? metadata?.tarkovUidConflict,
+  };
+};
 const sendProgressBatches = async <TError>(
   client: ProgressSyncClient<TError>,
   userId: string,
   payload: ProgressSyncPayload,
   sync: ProgressAcknowledgement
 ): Promise<ProgressSyncResult<TError>> => {
-  const modes = selectChangedModes(userId, {
-    [GAME_MODES.PVP]: payload.pvp_data,
-    [GAME_MODES.PVE]: payload.pve_data,
-    [GAME_MODES.SEASONAL]: payload.seasonal_data,
-  });
-  // Realtime changes to omitted modes cannot be overwritten by this sync, so they do not stop it.
-  sync.scope(modes);
-  let result: ProgressSyncResult<TError> = { error: SPLIT_SYNC_INTERRUPTED };
-  let tarkovUidConflict: TarkovUidConflict | undefined;
-  for (const batch of toModeBatches(modes)) {
-    result = await sendModeBatch(client, userId, payload, batch, sync);
-    tarkovUidConflict ??= result.tarkovUidConflict;
-    if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
-    if (result.error) return result;
-    sync.acknowledge(batch);
+  const ctx = createBatchSync(client, userId, payload, sync);
+  for (const batch of ctx.batches) {
+    ctx.result = await readBatchResult(ctx, batch);
+    ctx.tarkovUidConflict ??= ctx.result.tarkovUidConflict;
+    if (!applyBatchResult(ctx, batch)) return ctx.result;
   }
-  return { ...result, tarkovUidConflict };
+  return finishProgressBatches(ctx);
 };
 /**
  * Sends account metadata plus only the modes the server does not already hold; the RPC keeps

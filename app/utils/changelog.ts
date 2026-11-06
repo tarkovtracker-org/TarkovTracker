@@ -10,10 +10,7 @@ export const cleanText = (value: string): string => {
 export const toSentence = (value: string): string => {
   let text = cleanText(value);
   if (!text) return '';
-  const firstChar = text.charAt(0);
-  if (firstChar) {
-    text = firstChar.toUpperCase() + text.slice(1);
-  }
+  text = text.charAt(0).toUpperCase() + text.slice(1);
   if (!/[.!?]$/.test(text)) {
     text += '.';
   }
@@ -99,7 +96,7 @@ const MARKDOWN_PUNCTUATION = new Set([
   '|',
   '~',
 ]);
-const HTML_ENTITIES: Readonly<Record<string, string>> = Object.freeze({
+const HTML_ENTITIES: Readonly<Record<'amp' | 'lt' | 'gt', string>> = Object.freeze({
   amp: '&',
   lt: '<',
   gt: '>',
@@ -140,9 +137,10 @@ export type ReleaseEntry = { text: string; shas: string[] };
 const commitShas = (line: string): string[] =>
   Array.from(line.matchAll(RELEASE_COMMIT_PATTERN), (match) => String(match[1]).toLowerCase());
 const decodeHighlightEntities = (line: string): string =>
-  line.replace(/&(amp|lt|gt);/gi, (entity, name: string) => {
-    return HTML_ENTITIES[name.toLowerCase()] ?? entity;
-  });
+  line.replace(
+    /&(amp|lt|gt);/gi,
+    (_entity, name: string) => HTML_ENTITIES[name.toLowerCase() as keyof typeof HTML_ENTITIES]
+  );
 const decodeHighlightMarkdownEscapes = (line: string): string =>
   line.replace(/\\(.)/g, (escape) => {
     const character = escape.charAt(1);
@@ -187,7 +185,7 @@ const inferredBullet = (line: string): string | null => {
   const keyword = line.match(VERB_PATTERN)?.[1]?.toLowerCase();
   const verb = keyword ? INFERRED_MAP[keyword] : undefined;
   if (!verb) return null;
-  return toSentence(`${verb} ${cleanText(line.replace(VERB_PATTERN, ''))}`) || null;
+  return toSentence(`${verb} ${cleanText(line.replace(VERB_PATTERN, ''))}`);
 };
 export const normalizeCommitMessage = (message: string | null | undefined): string | null => {
   const firstLine = message?.split('\n')[0]?.trim();

@@ -7,6 +7,7 @@ import {
   type RemoteStateMerge,
   type WithRemoteSnapshot,
 } from '@/utils/pendingState';
+import { isProgressPayloadTooLarge } from '@/utils/progressPayload';
 import type {
   CloudSaveFailure,
   CloudSaveState,
@@ -154,7 +155,11 @@ const classifyKnownFailure = (text: string): CloudSaveFailure => {
 };
 /** Distinguishes a known cause from an unknown one so recovery guidance stays truthful. */
 export const classifyCloudSaveFailure = (error: unknown): CloudSaveFailure =>
-  isBrowserOffline() ? 'offline' : classifyKnownFailure(describeFailure(error).toLowerCase());
+  isProgressPayloadTooLarge(error)
+    ? 'payload_too_large'
+    : isBrowserOffline()
+      ? 'offline'
+      : classifyKnownFailure(describeFailure(error).toLowerCase());
 const sameSaveStatus = (left: CloudSaveStatus, right: CloudSaveStatus): boolean =>
   left.state === right.state &&
   left.failure === right.failure &&
@@ -193,6 +198,7 @@ export function useSupabaseSync<
   const isPaused = ref(false);
   let snapshotDepth = 0;
   let lastSyncedPayload: string | null = null;
+  let rejectedPayload: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
   const pendingState = createPendingStateTracker(() => store.$state, initialAcknowledgedState);
@@ -348,7 +354,7 @@ export function useSupabaseSync<
   };
   /** Transient failures get a bounded schedule; exhaustion keeps the changes pending. */
   const scheduleRetry = () => {
-    if (disposed || retryTimer) return;
+    if (disposed || retryTimer || lastFailure === 'payload_too_large') return;
     const delayMs = retryDelaysMs[retryAttempt];
     if (delayMs === undefined) {
       retriesExhausted = true;
@@ -361,6 +367,11 @@ export function useSupabaseSync<
   const handleWriteFailure = (error: unknown) => {
     lastFailure = classifyCloudSaveFailure(error);
     reconcileRequired = true;
+    if (lastFailure === 'payload_too_large') {
+      clearRetryTimer();
+      retriesExhausted = true;
+      return;
+    }
     scheduleRetry();
   };
   const clearPendingVersion = (syncVersion: number) => {
@@ -403,9 +414,11 @@ export function useSupabaseSync<
     logPayload(dataToSave);
     const attempt = await writePayload(dataToSave, ownerId);
     if (!attempt.synced) {
+      if (isProgressPayloadTooLarge(attempt.error)) rejectedPayload = serializedPayload;
       handleWriteFailure(attempt.error);
       return null;
     }
+    rejectedPayload = null;
     if (canCommitWrite(ownerId)) commitSync(serializedPayload, syncVersion, acknowledge);
     return transformedState;
   };
@@ -418,6 +431,10 @@ export function useSupabaseSync<
     const dataToSave = buildSyncPayload(transformedState, ownerId);
     // Compare the exact captured wire representation: hashes can collide and lose edits.
     const serializedPayload = JSON.stringify(dataToSave);
+    if (serializedPayload === rejectedPayload) {
+      handleWriteFailure({ message: 'p_modes exceeds the maximum payload size' });
+      return null;
+    }
     if (serializedPayload === lastSyncedPayload) {
       acknowledge();
       clearPendingVersion(syncVersion);
@@ -512,10 +529,27 @@ export function useSupabaseSync<
    */
   const defersToReconciledRetry = (): boolean =>
     reconcileRequired && reconcileBeforeRetry !== undefined && retryDelaysMs.length > 0;
-  /** A new edit restarts an exhausted schedule; merges inside a snapshot read do not. */
+  const hasChangedRejectedPayload = (): boolean => {
+    const ownerId = syncOwnerId();
+    if (disposed || !ownerId) return false;
+    const payload = serializeStatePayload(store.$state as TState, ownerId);
+    return payload !== null && payload !== rejectedPayload;
+  };
+  const releaseChangedPayloadFailure = (): boolean => {
+    if (lastFailure !== 'payload_too_large') return true;
+    if (!hasChangedRejectedPayload()) return false;
+    lastFailure = null;
+    return true;
+  };
+  /** Snapshot mutations wait until the outermost read completes before restarting retries. */
+  const restartExhaustedRetry = () => {
+    if (!retriesExhausted || snapshotDepth > 0) return;
+    if (releaseChangedPayloadFailure()) resetRetryBudget();
+  };
+  /** A new edit restarts an exhausted schedule without discarding a known transient cause. */
   const armReconciledRetry = () => {
     debouncedSync.cancel();
-    if (retriesExhausted && snapshotDepth === 0) resetRetryBudget();
+    restartExhaustedRetry();
     scheduleRetry();
     publishSaveStatus();
   };
@@ -597,6 +631,7 @@ export function useSupabaseSync<
       return await read(captureRemoteMerge());
     } finally {
       snapshotDepth -= 1;
+      if (lastFailure === 'payload_too_large') restartExhaustedRetry();
       schedulePendingSync();
     }
   };

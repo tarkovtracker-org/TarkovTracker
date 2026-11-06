@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { countApiCalls } from './helpers/api-count.mjs';
+import { pathToFileURL } from 'node:url';
 import {
   PreviewRequestDenied,
   requestPreviewFromComment,
@@ -16,6 +15,7 @@ import {
   readPreviewRequest,
   rolloutEnabledAt,
 } from '../preview/request-authorization.mjs';
+import { countApiCalls } from './helpers/api-count.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 const REPO = { owner: 'example', repo: 'tracker' };
@@ -76,7 +76,7 @@ function fixture(options = {}) {
       },
       checks: { listForRef: 'checks' },
     },
-    paginate: async (endpoint, params) => {
+    paginate: async (endpoint) => {
       if (endpoint === 'files') return options.files ?? [{ filename: 'app/a.ts' }];
       if (endpoint === 'checks') return [check];
       throw new Error(`Unexpected endpoint ${endpoint}`);
@@ -122,7 +122,7 @@ test('maintainer command dispatches the current successful PR CI run without an 
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: String(RUN_ID), request_comment_id: '1', ci_attempt: '1' },
+      inputs: { run_id: String(RUN_ID), queue: 'false', request_comment_id: '1', ci_attempt: '1' },
     },
   ]);
 });
@@ -551,6 +551,21 @@ test('a comment added between REST and GraphQL snapshots fails closed', async ()
   });
   await assert.rejects(readPreviewRequest(github, REPO, 42), /inconsistent .* snapshots/);
 });
+test('a comment added between snapshots is re-read before failing closed', async () => {
+  const comments = [comment(1)];
+  const github = authorizationFixture(comments);
+  const paginate = github.paginate;
+  github.paginate = async (...args) => [...(await paginate(...args))];
+  const graphql = github.graphql;
+  let calls = 0;
+  github.graphql = async (...args) => {
+    calls += 1;
+    if (calls === 1) comments.push(comment(2, '/preview stop'));
+    return graphql(...args);
+  };
+  assert.equal((await readPreviewRequest(github, REPO, 42)).enabled, false);
+  assert.equal(calls, 2);
+});
 test('all comment pages are considered so a later stop revokes an older grant', async () => {
   const comments = [comment(1), ...Array.from({ length: 101 }, (_, i) => comment(i + 2, 'hello'))];
   comments.push(comment(104, '/preview stop'));
@@ -623,11 +638,11 @@ test('documentation-only commands accept persistent intent without deploying the
   assert.match(message, /Automatic previews enabled/);
   assert.match(message, /This revision does not require a preview/);
 });
-test('automation-only commands report that the revision needs no preview either', async () => {
+test('locale-sync and admission tooling commands report that the revision needs no preview', async () => {
   const f = fixture({
     files: [
-      { filename: '.github/workflows/ci.yml' },
-      { filename: 'scripts/ci/validate-changes.mjs' },
+      { filename: '.github/workflows/crowdin.yml' },
+      { filename: 'scripts/ci/review-admission.mjs' },
     ],
   });
   const result = await requestPreviewFromComment(f);

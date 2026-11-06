@@ -13,6 +13,8 @@ type TaskFilterInputs = {
       hideGlobalTasks?: boolean;
     }
   ) => Task[];
+  /** Tasks left out of the map-complete notice count, such as tasks the user hid. */
+  excludedTaskIds: ComputedRefLike<ReadonlySet<string>>;
   getTaskMapView: RefLike<string>;
   hideCompletedMapObjectives: RefLike<boolean>;
   mapTaskVisibilityFilterOptions: ComputedRefLike<TaskFilterAndSortOptions>;
@@ -54,6 +56,7 @@ const STATUS_VIEWS: readonly TaskSecondaryView[] = [
 ];
 export function useTaskFilters({
   calculateFilteredTasksForOptions,
+  excludedTaskIds,
   getTaskMapView,
   hideCompletedMapObjectives,
   mapTaskVisibilityFilterOptions,
@@ -65,6 +68,8 @@ export function useTaskFilters({
   const filteredTasks = computed(() => {
     return applySearchToTaskList(visibleTasks.value, normalizedSearch.value);
   });
+  const countIncludedTasks = (taskList: Task[]) =>
+    taskList.filter((task) => !excludedTaskIds.value.has(task.id)).length;
   const mapCompleteTasksCountOnMap = computed(() => {
     if (!showMapDisplay.value) return 0;
     if (!tasks.value.length) return 0;
@@ -78,7 +83,10 @@ export function useTaskFilters({
       calculateFilteredTasksForOptions(tasks.value, mapTaskVisibilityFilterOptions.value, true),
       normalizedSearch.value
     );
-    return Math.max(tasksWithoutHiding.length - tasksWithHiding.length, 0);
+    return Math.max(
+      countIncludedTasks(tasksWithoutHiding) - countIncludedTasks(tasksWithHiding),
+      0
+    );
   });
   const showMapTaskVisibilityNotice = computed(() => {
     return showMapDisplay.value && mapCompleteTasksCountOnMap.value > 0;

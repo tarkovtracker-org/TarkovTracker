@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { prepare } from './release-commit.mjs';
+import { prepare, ReleasePrepared } from './release-commit.mjs';
 import { recordPreparedVersion } from './release-note-state.mjs';
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('./release-note-state.mjs', () => ({ recordPreparedVersion: vi.fn() }));
@@ -16,7 +16,7 @@ describe('release commit preparation', () => {
   beforeEach(() => vi.resetAllMocks());
   it('passes the release context to the staging gate without putting credentials in arguments', () => {
     execFileSync.mockReturnValue('a'.repeat(40) + '\n');
-    prepare({}, context);
+    expect(() => prepare({}, context)).toThrow(ReleasePrepared);
     expect(execFileSync).toHaveBeenNthCalledWith(
       1,
       '/bin/bash',
@@ -27,10 +27,9 @@ describe('release commit preparation', () => {
         stdio: 'inherit',
       }
     );
-    expect(execFileSync).toHaveBeenNthCalledWith(2, 'git', ['rev-parse', 'HEAD'], {
-      cwd: '/repo',
-      encoding: 'utf8',
-    });
+    expect(execFileSync).toHaveBeenCalledTimes(2);
+    expect(execFileSync.mock.calls[1].slice(0, 2)).toEqual(['git', ['rev-parse', 'HEAD']]);
+    expect(execFileSync.mock.calls[1][2]).toEqual({ cwd: '/repo', encoding: 'utf8' });
     expect(recordPreparedVersion).toHaveBeenCalledExactlyOnceWith(context, 'a'.repeat(40));
   });
   it('refuses publication from another branch before invoking Git', () => {

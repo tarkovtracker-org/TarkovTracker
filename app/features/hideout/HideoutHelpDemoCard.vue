@@ -330,6 +330,7 @@
 </template>
 <script setup lang="ts">
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { HideoutLevel, HideoutStation, ItemRequirement } from '@/types/tarkov';
   const GenericCard = defineAsyncComponent(() => import('@/components/ui/GenericCard.vue'));
@@ -559,22 +560,16 @@
     return Math.max(availableDemoLevel.value.level - 1, 0);
   });
   const buildLevel = computed(() => activeDemoLevel.value.level || 1);
-  const highlightColor = computed<'error' | 'primary' | 'success'>(() => {
+  const highlightColor = computed<'locked' | 'primary' | 'success'>(() => {
     if (props.mode === 'maxed') return 'primary';
-    return props.mode === 'locked' ? 'error' : 'success';
+    return props.mode === 'locked' ? 'locked' : 'success';
   });
-  const highlightClasses = computed(() => {
-    if (highlightColor.value === 'primary') {
-      return { 'bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600': true };
-    }
-    if (highlightColor.value === 'error') {
-      return { 'bg-gradient-to-br from-error-800 via-error-700 to-error-600': true };
-    }
-    return { 'bg-gradient-to-br from-success-800 via-success-700 to-success-600': true };
-  });
+  const highlightClasses = computed(() => ({
+    [CARD_HIGHLIGHT_GRADIENTS[highlightColor.value]]: true,
+  }));
   const statusBadgeClasses = computed(() => {
     if (props.mode === 'locked') {
-      return 'border-error-500/50 bg-error-500/20 text-error-400';
+      return 'border-locked-500/50 bg-locked-500/20 text-locked-400';
     }
     return 'bg-success-500/20 border-success-500/50 text-success-400';
   });

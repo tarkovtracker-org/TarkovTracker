@@ -1,7 +1,12 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
+import {
+  configuredTraderUnlockTaskIds,
+  GAME_MODE_VALUES,
+  isGameMode,
+  type GameMode,
+} from '@/utils/constants';
 import {
   EftLogArchiveError,
   readEftLogSources,
@@ -10,14 +15,20 @@ import {
 import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
 import {
+  createEftLogImportSelection,
+  hasInvalidEftLogCutoff,
+  selectEftImportEvents,
+  type EftLogImportSelection,
+} from '@/utils/eftLogImportSelection';
+import {
   hasOutsideSeasonEvents,
   isEligibleImportEvent,
-  latestEftQuestEvents,
-  isEftNotificationLogFileName,
+  isEftQuestEvidenceLogFileName,
   parseEftLogsForQuestImport,
   UNKNOWN_LOG_VERSION,
   type EftParsedLogFile,
   type EftQuestImportPreview,
+  type EftQuestImportEvent,
 } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
@@ -49,6 +60,8 @@ export interface UseEftLogsImportReturn {
   previewData: Ref<EftLogsImportPreviewData | null>;
   setIncludedVersions: (versions: string[]) => void;
   setAccount: (accountId: string) => void;
+  selection: Ref<EftLogImportSelection>;
+  setSelection: (selection: EftLogImportSelection) => void;
   confirmImport: (targetMode: GameMode) => Promise<void>;
   reset: () => void;
 }
@@ -134,11 +147,12 @@ const hasModeImports = (sets: ImportTaskSets, mode: GameMode) =>
 /** Reconciles routed events into disjoint completion, start, and failure sets for every mode. */
 const buildImportTaskSets = (
   preview: EftLogsImportPreviewData,
-  targetMode: GameMode
+  targetMode: GameMode,
+  selection: EftLogImportSelection
 ): ImportTaskSets => {
   const create = (): ImportTaskIds => ({ pvp: new Set(), pve: new Set(), seasonal: new Set() });
   const sets = { completed: create(), started: create(), failed: create() };
-  for (const event of latestEftQuestEvents(preview.events, targetMode)) {
+  for (const event of selectEftImportEvents(preview.events, selection, targetMode)) {
     if (!isEligibleImportEvent(event)) continue;
     sets[event.status][event.mode].add(event.questId);
   }
@@ -245,7 +259,10 @@ const applyModeImports = async (
 ): Promise<GameMode> => {
   const tasksMap = new Map((catalogs.get(mode) ?? []).map((task) => [task.id, task]));
   const filter = (ids: Set<string>) => new Set([...ids].filter((id) => tasksMap.has(id)));
-  const completed = filter(taskSets.completed[mode]);
+  const recoveryIds = new Set(configuredTraderUnlockTaskIds(mode));
+  const completed = new Set(
+    [...taskSets.completed[mode]].filter((id) => tasksMap.has(id) || recoveryIds.has(id))
+  );
   const started = filter(taskSets.started[mode]);
   const failed = filter(taskSets.failed[mode]);
   if (![completed, started, failed].some((ids) => ids.size > 0)) return activeMode;
@@ -260,6 +277,10 @@ const applyModeImports = async (
     new Set([...started, ...failed]),
     requireTraders
   );
+  // Only explicit, mode-allowlisted completions may recover without metadata. Do not infer gates or objectives.
+  completed.forEach((id) => {
+    if (!tasksMap.has(id)) store.setTaskComplete(id);
+  });
   applyFailedImports(store, tasksMap, failed);
   applyStartedImports(store, tasksMap, completed, started);
   return mode;
@@ -323,6 +344,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const parseProgress = ref<EftLogReadProgress>({ bytesRead: 0, totalBytes: 0 });
   const sourceFiles = shallowRef<EftParsedLogFile[]>([]);
   const selectedVersions = ref<string[]>([]);
+  const selection = ref<EftLogImportSelection>(createEftLogImportSelection());
   const requestedAccount = ref<string | undefined>(undefined);
   const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
@@ -332,6 +354,13 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   function getTaskIds(): string[] {
     return [...new Set([...catalogs.values()].flatMap((tasks) => tasks.map((task) => task.id)))];
   }
+  const isRecoveryCompletion = (event: EftQuestImportEvent): boolean =>
+    event.status === 'completed' &&
+    [...catalogs.keys()].some(
+      (mode) =>
+        (event.mode === UNKNOWN_MODE || event.mode === mode) &&
+        configuredTraderUnlockTaskIds(mode).includes(event.questId)
+    );
   /** Rebuilds the preview against the loaded destination catalogs and selected log versions. */
   function buildPreviewData(taskIds: string[]): EftLogsImportPreviewData {
     const parsed = parseEftLogsForQuestImport(sourceFiles.value, taskIds, {
@@ -339,6 +368,9 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       account: requestedAccount.value,
       taskIdsByMode: Object.fromEntries(
         [...catalogs].map(([mode, tasks]) => [mode, tasks.map((task) => task.id)])
+      ),
+      completedTaskIdsByMode: Object.fromEntries(
+        [...catalogs.keys()].map((mode) => [mode, configuredTraderUnlockTaskIds(mode)])
       ),
     });
     return {
@@ -348,6 +380,16 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     };
   }
   const canEditPreview = () => !isImporting.value && importState.value === 'preview';
+  /** Copies transient selections so caller mutations cannot change an in-flight import. */
+  function setSelection(next: EftLogImportSelection): void {
+    if (!canEditPreview()) return;
+    selection.value = {
+      modes: [...next.modes],
+      statuses: [...next.statuses],
+      since: { ...next.since },
+    };
+    importError.value = null;
+  }
   /** Updates a preview selection only while no import is applying. */
   function setIncludedVersions(versions: string[]): void {
     if (!canEditPreview()) return;
@@ -371,6 +413,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     const defaults = selectDefaultIncludedVersions(switched.availableVersions);
     selectedVersions.value = defaults.length > 0 ? defaults : switched.availableVersions;
     previewData.value = buildPreviewData(getTaskIds());
+    selection.value = createEftLogImportSelection(previewData.value.events);
     importError.value = null;
   }
   /** Invalidates pending parsing and clears transient import state unless progress application is active. */
@@ -385,6 +428,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     importError.value = null;
     sourceFiles.value = [];
     selectedVersions.value = [];
+    selection.value = createEftLogImportSelection();
     requestedAccount.value = undefined;
     sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
@@ -413,7 +457,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         },
       });
       if (!isActiveRequest()) return;
-      if (!importFiles.some((file) => isEftNotificationLogFileName(file.name))) {
+      if (!importFiles.some((file) => isEftQuestEvidenceLogFileName(file.name))) {
         importState.value = 'error';
         importError.value = t('settings.log_import.errors.no_notification_logs_found');
         return;
@@ -456,7 +500,9 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         return;
       }
       const catalogIds = new Set(getTaskIds());
-      if (!parsed.events.some((event) => catalogIds.has(event.questId))) {
+      if (
+        !parsed.events.some((event) => catalogIds.has(event.questId) || isRecoveryCompletion(event))
+      ) {
         importState.value = 'error';
         importError.value = t('settings.log_import.errors.no_matching_tasks_found');
         return;
@@ -472,6 +518,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       const defaults = selectDefaultIncludedVersions(initial.availableVersions);
       selectedVersions.value = defaults.length > 0 ? defaults : initial.availableVersions;
       previewData.value = buildPreviewData(getTaskIds());
+      selection.value = createEftLogImportSelection(previewData.value.events);
       importState.value = 'preview';
     } catch (error) {
       if (!isActiveRequest()) return;
@@ -489,6 +536,26 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   async function parseFile(file: File): Promise<void> {
     await parseFiles([file]);
   }
+  /** Rejects invalid cutoffs and selected Seasonal history without changing the editable preview. */
+  function validateSelectedHistory(
+    preview: EftLogsImportPreviewData,
+    targetMode: GameMode
+  ): boolean {
+    if (hasInvalidEftLogCutoff(selection.value, targetMode)) {
+      importError.value = t('settings.log_import.errors.invalid_date');
+      return false;
+    }
+    if (
+      hasOutsideSeasonEvents(
+        selectEftImportEvents(preview.events, selection.value, targetMode),
+        targetMode
+      )
+    ) {
+      importError.value = t('settings.log_import.errors.outside_active_season');
+      return false;
+    }
+    return true;
+  }
   /** Validates the destination, Seasonal date constraints, and eligible task sets before any mutation. */
   function validateImport(
     preview: EftLogsImportPreviewData,
@@ -499,13 +566,10 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importError.value = t('settings.log_import.errors.invalid_mode');
       return null;
     }
-    if (hasOutsideSeasonEvents(preview.events, targetMode)) {
-      importError.value = t('settings.log_import.errors.outside_active_season');
-      return null;
-    }
-    const taskSets = buildImportTaskSets(preview, targetMode);
+    if (!validateSelectedHistory(preview, targetMode)) return null;
+    const taskSets = buildImportTaskSets(preview, targetMode, selection.value);
     if (!GAME_MODE_VALUES.some((mode) => hasModeImports(taskSets, mode))) {
-      importError.value = t('settings.log_import.errors.no_matching_tasks_found');
+      importError.value = t('settings.log_import.errors.empty_selection');
       return null;
     }
     return taskSets;
@@ -558,6 +622,8 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     previewData,
     setIncludedVersions,
     setAccount,
+    selection,
+    setSelection,
     confirmImport,
     reset,
   };

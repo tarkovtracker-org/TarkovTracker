@@ -10,6 +10,7 @@ RETURNS public.supporters LANGUAGE sql AS $$
     jsonb_build_object('user_id', ('00000000-0000-0000-0000-' || lpad(p_user::text, 12, '0')),
       'tier', 'scav', 'amount_total', p_amount) || p_extra);
 $$;
+GRANT EXECUTE ON FUNCTION pg_temp.fulfill(text, integer, integer, timestamptz, jsonb) TO service_role;
 SELECT ok(NOT has_function_privilege('anon', 'public.fulfill_one_time_supporter(text,timestamptz,jsonb)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.fulfill_one_time_supporter(text,timestamptz,jsonb)', 'EXECUTE'),
   'browser roles cannot fulfill payments');

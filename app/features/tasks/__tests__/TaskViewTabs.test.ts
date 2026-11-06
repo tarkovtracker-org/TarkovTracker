@@ -75,8 +75,19 @@ describe('TaskViewTabs', () => {
       query: { q: 'mole' },
     });
   });
-  it('hides the Graph tab below the large breakpoint', () => {
+  it('keeps the Graph tab reachable at every width and explains its width need below lg', () => {
     const graph = mountTabs().get('[data-testid="task-view-tab-graph"]');
-    expect(graph.classes()).toEqual(expect.arrayContaining(['hidden', 'lg:flex']));
+    expect(graph.classes()).not.toContain('hidden');
+    expect(graph.get('[data-testid="task-view-tab-wide-screen-hint"]').classes()).toContain(
+      'lg:hidden'
+    );
+    const description = graph.get('.sr-only');
+    expect(description.classes()).toContain('lg:hidden');
+    expect(description.text()).toBe('page.tasks.primary_views.needs_wider_screen');
+  });
+  it('shows the wide-screen hint only on the Graph tab', () => {
+    const wrapper = mountTabs();
+    expect(wrapper.findAll('[data-testid="task-view-tab-wide-screen-hint"]')).toHaveLength(1);
+    expect(wrapper.findAll('.sr-only')).toHaveLength(1);
   });
 });

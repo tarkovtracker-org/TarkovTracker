@@ -4,6 +4,7 @@ import {
   isPrimaryAppHostname,
   isPagesPreviewHostname,
   resolveClientLogSinkUrl,
+  resolveProgressDiagnosticSinkUrl,
   resolveCanonicalSiteUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
@@ -56,6 +57,20 @@ describe('resolveClientLogSinkUrl', () => {
     expect(resolveClientLogSinkUrl({ NUXT_PUBLIC_CLIENT_LOG_SINK_URL: ' /api/logs/client ' })).toBe(
       '/api/logs/client'
     );
+  });
+});
+describe('resolveProgressDiagnosticSinkUrl', () => {
+  it('requires its own opt-in without coupling general log forwarding', () => {
+    expect(resolveProgressDiagnosticSinkUrl({})).toBe('');
+    expect(resolveProgressDiagnosticSinkUrl({ NUXT_PUBLIC_CLIENT_LOG_SINK_URL: '/general' })).toBe(
+      ''
+    );
+    const env = { NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL: ' /api/logs/client ' };
+    expect(resolveProgressDiagnosticSinkUrl(env)).toBe('/api/logs/client');
+    expect(resolveClientLogSinkUrl(env)).toBe('');
+    expect(
+      resolveProgressDiagnosticSinkUrl({ NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL: '  ' })
+    ).toBe('');
   });
 });
 describe('resolvePublicAppUrl', () => {

@@ -33,12 +33,29 @@ request_preview_after_dispatched_ci "$release_sha"
 wait_for_preview_result "$release_sha"
 require_main_revision "$base_sha"
 require_main_ci_policy
-# A non-fast-forward push rejects a concurrently advanced main; required checks cannot be bypassed.
-# GITHUB_TOKEN avoids recursive main CI; this exact commit already passed staging CI.
-git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
-  push "$remote" "$release_sha:refs/heads/main"
-# Delete only the staging ref still pointing at our validated commit.
-if ! git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
-  push --force-with-lease="$staging_ref:$release_sha" "$remote" ":$staging_ref"; then
-  echo "::warning::Release succeeded, but staging branch cleanup failed: $staging_ref"
+# Main changes only through reviewed PR admission and the required merge queue. Publication is
+# a later trusted release run; never wait for review/queue completion inside this job.
+body="Prepared by https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT
+
+Source: $base_sha
+Candidate: $release_sha
+
+Version assets passed exact-head CI and preview. Review this immutable head before queue admission.
+Publication requires the actual merged commit to preserve this source and candidate tree."
+pr_url="$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+  -f "title=chore(release): $RELEASE_VERSION" -f "head=${staging_ref#refs/heads/}" \
+  -f base=main -f "body=$body" --jq '.html_url')"
+printf '%s\n' "$pr_url"
+pr_number="${pr_url##*/}"
+[[ "$pr_number" =~ ^[1-9][0-9]*$ && "$pr_url" == "https://github.com/$GITHUB_REPOSITORY/pull/$pr_number" ]] \
+  || { echo 'Unexpected release PR response.' >&2; exit 1; }
+# Job-token PR events may need approval or be suppressed. Trigger trusted admission explicitly,
+# without treating queue/review submission as approval or waiting for reviewers inside Release.
+if ! gh workflow run review-admission.yml --repo "$GITHUB_REPOSITORY" --ref main \
+  -f "pull_request=$pr_number"; then
+  echo "::warning::Version PR #$pr_number awaits admission; retry: gh workflow run review-admission.yml --repo $GITHUB_REPOSITORY --ref main -f pull_request=$pr_number"
 fi
+printf 'sha=%s\n' "$release_sha" >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
+jq -n --arg source "$base_sha" --arg candidate "$release_sha" --arg version "$RELEASE_VERSION" \
+  --arg pr "$pr_url" '{schema: 1, source: $source, candidate: $candidate, version: $version, pr: $pr}' \
+  > "${RUNNER_TEMP:-$(dirname "$GITHUB_OUTPUT")}/release-promotion.json"

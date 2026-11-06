@@ -24,6 +24,8 @@ export interface OverlayLocaleData {
 export interface OverlayData extends OverlaySections {
   /** Mode-scoped counter registry; validated and applied by `overlayCounters.ts`. */
   progressionCounters?: unknown;
+  /** Mode-scoped task-list groups; validated and applied by `overlayTaskGroups.ts`. */
+  traderTaskGroups?: unknown;
   modes?: Record<string, OverlaySections>;
   locales?: Record<string, OverlayLocaleData>;
   $meta?: { version: string; generated: string; sha256: string };

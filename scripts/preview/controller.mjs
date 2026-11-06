@@ -1,10 +1,8 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { verifiedFormatterChange } from '../ci/formatter-validation.mjs';
 import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
-import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
-import { readPreviewRequest } from './request-authorization.mjs';
-import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
 import {
   ciResultCheck,
   downloadArtifact,
@@ -20,6 +18,14 @@ import {
   publishStatus,
   requestPreviewDispatch,
 } from './github-api.mjs';
+import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
+import {
+  QueueValidationError,
+  queueRevision,
+  requireQueueCi,
+  queueRequiresPreview,
+} from './merge-queue.mjs';
+import { findQueueReuse } from './queue-reuse.mjs';
 import {
   MANIFEST_FILE,
   PREVIEW_PROFILE_VERSION,
@@ -27,13 +33,38 @@ import {
   previewAppUrl,
   previewBranchName,
 } from './profile.mjs';
+import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
+import { previewBindingError, samePreviewAuthorization } from './binding-policy.mjs';
+import { readPreviewRequest, previewGrant } from './request-authorization.mjs';
 // Trusted preview controller. Everything here loads from the default branch and treats candidate
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
-// Every "test merge not ready" pending reason starts with this prefix so the hourly fallback can
-// re-evaluate it once GitHub computes the merge; other pending reasons are left alone.
+// "Test merge not ready" and unfinished CI Result reasons start with these prefixes so the hourly
+// fallback can re-evaluate them; other pending reasons are left alone.
 const MERGE_PENDING = 'GitHub has not finished computing';
+const CI_RESULT_PENDING = 'CI Result is still running';
+const CI_RESULT_MISSING = 'Waiting for CI Result on this revision';
+// Freshness errors that a newer event (a push, close, draft or CI rerun) already reports on, or
+// that take the PR out of main's required checks.
+const PULL_NOT_READY = 'pull request is not open and ready';
+const PULL_RETARGETED = 'pull request no longer targets main';
+const PULL_HEAD_MOVED = 'pull request head moved';
+const RUN_ATTEMPT_SUPERSEDED = 'CI run attempt superseded';
+const RUN_HEAD_CHANGED = 'CI run head changed';
+const OWNED_STALENESS = [
+  PULL_NOT_READY,
+  PULL_RETARGETED,
+  PULL_HEAD_MOVED,
+  RUN_ATTEMPT_SUPERSEDED,
+  RUN_HEAD_CHANGED,
+];
+// When main really moved under a PR candidate, no PR event follows and the run's artifact can never
+// match the new test merge, so that result is final. With main unchanged, the test merge is only
+// briefly unavailable, so the result stays pending under a prefix the hourly fallback re-plans.
+const BASE_MOVED =
+  'Main moved during the preview deploy; push a new commit or rebase to rebuild on current main.';
+const MERGE_RETRY = `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -109,12 +140,23 @@ function requestedRunId(inputs) {
   const runId = Number(inputs?.run_id);
   return Number.isInteger(runId) && runId > 0 ? runId : null;
 }
+function queueScope(value) {
+  if ([true, 'true'].includes(value)) return true;
+  if ([undefined, false, 'false', ''].includes(value)) return false;
+  throw failure('Preview queue profile input is invalid.');
+}
+function requireQueueScope(value, event) {
+  if (queueScope(value) !== (event === 'merge_group'))
+    throw failure('Preview queue profile does not match the authenticated CI event.');
+}
 async function candidateFromDispatch(github, context, inputs) {
   if (context.ref !== `refs/heads/${PRODUCTION_BRANCH}`)
     throw ignore('Manual reruns must dispatch from the default branch.');
   const runId = requestedRunId(inputs);
   if (!runId) throw failure('A numeric CI run id is required.');
-  return candidateFromRun(await getRun(github, context.repo, runId), context);
+  const run = await getRun(github, context.repo, runId);
+  requireQueueScope(inputs?.queue, run.event);
+  return candidateFromRun(run, context);
 }
 async function resolveCandidate({ github, context, inputs }) {
   if (context.eventName === 'workflow_run')
@@ -128,6 +170,7 @@ async function resolveCandidate({ github, context, inputs }) {
 /* Live state                                                                                  */
 /* ------------------------------------------------------------------------------------------ */
 async function findCandidatePull(github, context, candidate) {
+  if (candidate.runEvent === 'merge_group') return null;
   return candidate.pullRequest
     ? await getPull(github, context.repo, candidate.pullRequest)
     : await findPullForHead(github, context.repo, candidate);
@@ -214,7 +257,7 @@ function checkRunState(run, candidate) {
   if (run.conclusion !== 'success') throw failure(`CI concluded ${run.conclusion}.`);
 }
 async function ciEvidence(github, context, candidate) {
-  if (candidate.runEvent === 'pull_request')
+  if (['pull_request', 'merge_group'].includes(candidate.runEvent))
     return ciResultCheck(github, context.repo, candidate.headSha);
   return latestStatus(github, context.repo, candidate.headSha, 'CI Result');
 }
@@ -222,18 +265,53 @@ function evidenceState(evidence) {
   return evidence.conclusion ?? evidence.state;
 }
 function assertEvidenceComplete(state) {
-  if (state === null || state === 'pending') throw pending('CI Result is still running.');
+  if (state == null || state === 'pending') throw pending(`${CI_RESULT_PENDING}.`);
   if (state !== 'success') throw failure(`CI Result concluded ${state}.`);
 }
 async function checkCiResult(github, context, candidate) {
   const evidence = await ciEvidence(github, context, candidate);
-  if (!evidence) throw pending('Waiting for CI Result on this revision.');
+  if (!evidence) throw pending(`${CI_RESULT_MISSING}.`);
   assertEvidenceComplete(evidenceState(evidence));
+}
+// This runs only after the CI run itself completed successfully, so its `CI Result` job has
+// finished too; a missing or unfinished check run is a stale checks-API read (#1336). The CI
+// completion event is the only trigger a merge-group entry gets (no hourly fallback), so that
+// event re-reads briefly before publishing pending.
+const CI_RESULT_REREAD_DELAYS_MS = [3000, 6000, 12000];
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function staleCiResult(error) {
+  if (!(error instanceof Outcome) || error.action !== 'wait') return false;
+  return [CI_RESULT_PENDING, CI_RESULT_MISSING].some((reason) => error.message.startsWith(reason));
+}
+function rereadDelays(context, candidate) {
+  if (context.eventName !== 'workflow_run') return [];
+  return ['pull_request', 'merge_group'].includes(candidate.runEvent)
+    ? CI_RESULT_REREAD_DELAYS_MS
+    : [];
+}
+async function settledCiResult(github, context, candidate, sleep) {
+  for (const delay of rereadDelays(context, candidate)) {
+    const error = await checkCiResult(github, context, candidate).then(
+      () => null,
+      (e) => e
+    );
+    if (!error) return;
+    if (!staleCiResult(error)) throw error;
+    await sleep(delay);
+  }
+  await checkCiResult(github, context, candidate);
 }
 async function requiresPreview(github, context, pull) {
   if (!pull) return true;
   const paths = await listPullPaths(github, context.repo, pull.number);
-  return classifyPaths(paths).previewRequired;
+  const formatterOnly = await verifiedFormatterChange(
+    github,
+    context.repo,
+    pull.base.sha,
+    pull.head.sha,
+    paths
+  );
+  return classifyPaths(paths, { formatterOnly }).previewRequired;
 }
 /* ------------------------------------------------------------------------------------------ */
 /* Artifact verification                                                                       */
@@ -254,32 +332,31 @@ function runTreeSha(run) {
   return SHA_PATTERN.test(String(tree)) ? tree : null;
 }
 function dispatchMergePrerequisite(pull, run) {
-  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return MERGE_RETRY;
   if (!runTreeSha(run)) return 'Dispatched CI run has no verifiable Git tree.';
   return null;
 }
 async function currentPullBaseMismatch(github, context, pull) {
-  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return MERGE_RETRY;
   const { data: main } = await github.rest.git.getRef({
     ...context.repo,
     ref: `heads/${PRODUCTION_BRANCH}`,
   });
-  return pull.base.sha === main.object.sha
+  if (pull.base.sha === main.object.sha) return null;
+  // REST can retain the PR's original base snapshot after main advances. A current test merge
+  // is stronger integration proof; artifact/run base claims remain bound to that snapshot.
+  const merge = await commitShape(github, context, pull.merge_commit_sha);
+  return representsPull(merge, pull, main.object.sha)
     ? null
     : 'PR base is no longer current main; rerun PR CI before requesting a preview.';
 }
 async function dispatchMergeMismatch(github, context, pull, run) {
   const prerequisite = dispatchMergePrerequisite(pull, run);
   if (prerequisite) return prerequisite;
-  const baseMismatch = await currentPullBaseMismatch(github, context, pull);
-  if (baseMismatch) return baseMismatch;
-  const { data: merge } = await github.rest.git.getCommit({
-    ...context.repo,
-    commit_sha: pull.merge_commit_sha,
-  });
-  return merge.tree.sha === runTreeSha(run)
+  const merge = await currentTestMerge(github, context, pull);
+  if (!merge)
+    return 'PR base is no longer current main or test-merge parents are invalid; rerun PR CI before requesting a preview.';
+  return merge.tree === runTreeSha(run)
     ? null
     : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
 }
@@ -300,13 +377,24 @@ async function commitShape(github, context, sha) {
     throw error;
   }
 }
-function representsPull(shape, pull) {
+function representsPull(shape, pull, baseSha) {
+  const parents = shape?.parents ?? [];
   return [
-    shape.parents.length === 2,
-    shape.parents[0] === pull.base.sha,
-    shape.parents[1] === pull.head.sha,
-    SHA_PATTERN.test(String(shape.tree)),
+    parents.length === 2,
+    parents[0] === baseSha,
+    parents[1] === pull.head.sha,
+    SHA_PATTERN.test(String(shape?.tree)),
+    SHA_PATTERN.test(String(baseSha)),
   ].every(Boolean);
+}
+/** Trust the live main ref and GitHub's current PR merge, never the PR's stale base snapshot. */
+async function currentTestMerge(github, context, pull) {
+  const { data: main } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  const merge = await commitShape(github, context, pull.merge_commit_sha);
+  return representsPull(merge, pull, main.object.sha) ? merge : null;
 }
 function comparableMerges(pull, sha) {
   return [sha, pull.merge_commit_sha].every((value) => SHA_PATTERN.test(String(value)));
@@ -314,17 +402,17 @@ function comparableMerges(pull, sha) {
 function sameMergeContent(claimed, current, pull) {
   if (!claimed || !current) return false;
   return [
-    representsPull(claimed, pull),
-    representsPull(current, pull),
+    representsPull(claimed, pull, current.parents[0]),
+    representsPull(current, pull, current.parents[0]),
     claimed.tree === current.tree,
   ].every(Boolean);
 }
 /** True when `sha` is the PR's current test merge or a regenerated equivalent of it. */
 async function equivalentTestMerge(github, context, pull, sha) {
   if (!comparableMerges(pull, sha)) return false;
-  if (sha === pull.merge_commit_sha) return true;
-  const claimed = await commitShape(github, context, sha);
-  const current = await commitShape(github, context, pull.merge_commit_sha);
+  const current = await currentTestMerge(github, context, pull);
+  if (!current) return false;
+  const claimed = sha === pull.merge_commit_sha ? current : await commitShape(github, context, sha);
   return sameMergeContent(claimed, current, pull);
 }
 async function requireDispatchMergeProof(github, context, candidate, pull, run) {
@@ -341,9 +429,9 @@ function expectedManifest(context, candidate, pull, run) {
     repository: repoName(context),
     pullRequest: candidate.runEvent === 'pull_request' ? pullRequestNumber(pull) : null,
     headSha: candidate.headSha,
-    baseSha: claimSha(candidate, pull),
+    baseSha: candidate.queueBaseSha ?? claimSha(candidate, pull),
     checkedOutSha: claimCheckedOutSha(candidate, pull),
-    treeSha: runTreeSha(run),
+    treeSha: candidate.queueTreeSha ?? runTreeSha(run),
     runId: run.id,
     runAttempt: run.run_attempt,
     previewBranch,
@@ -353,7 +441,11 @@ function expectedManifest(context, candidate, pull, run) {
 function claimErrors(manifest, expected) {
   return Object.entries(expected)
     .filter(([key, value]) => manifest[key] !== value)
-    .map(([key, value]) => `${key}: manifest ${String(manifest[key])}, expected ${String(value)}`);
+    .map(([key, value]) => {
+      const recovery =
+        key === 'runAttempt' ? '. Push a new commit to rebuild the preview artifact.' : '';
+      return `${key}: manifest ${String(manifest[key])}, expected ${String(value)}${recovery}`;
+    });
 }
 /** Compare every manifest claim with live GitHub state and the recomputed content digest. */
 export function verifyManifest(manifest, expected, digest) {
@@ -388,8 +480,8 @@ function bindsTestMerge(candidate, pull) {
 /** pull_request CI checks out the test merge, so its build tree is the merge tree, not the head's.
    Equivalent regenerated merges share that tree, so the current merge's tree binds both. */
 async function testMergeTreeSha(github, context, pull) {
-  const shape = await commitShape(github, context, pull.merge_commit_sha);
-  return shape && representsPull(shape, pull) ? shape.tree : null;
+  const shape = await currentTestMerge(github, context, pull);
+  return shape?.tree ?? null;
 }
 async function mergeBoundExpectation({ github, context, candidate, pull, manifest, expected }) {
   if (!bindsTestMerge(candidate, pull)) return expected;
@@ -490,6 +582,10 @@ async function previousSuccess(github, context, headSha, digest) {
   }
   return null;
 }
+function decisionBaseSha(candidate, pull) {
+  if (candidate?.queueBaseSha) return candidate.queueBaseSha;
+  return optional(pull?.base, 'sha');
+}
 function decisionIdentity({ candidate, pull }) {
   return {
     pullRequest: pullRequestNumber(pull),
@@ -497,7 +593,7 @@ function decisionIdentity({ candidate, pull }) {
     headBranch: optional(candidate, 'headBranch'),
     headRepo: optional(candidate, 'headRepo'),
     mergeSha: optional(pull, 'merge_commit_sha'),
-    baseSha: pull?.base?.sha ?? null,
+    baseSha: decisionBaseSha(candidate, pull),
   };
 }
 function decisionRun({ candidate, run }) {
@@ -509,8 +605,13 @@ function decisionRun({ candidate, run }) {
 }
 /** Rebuild the phase-1 candidate for phase-2 re-verification; runEvent picks the claim shape. */
 function decisionRunEvent(candidate, pull) {
-  const dispatch = !candidate || candidate.runEvent !== 'pull_request' || !pull;
-  return dispatch ? 'workflow_dispatch' : 'pull_request';
+  if (candidate?.runEvent === 'merge_group') return 'merge_group';
+  const pr = [
+    Boolean(candidate),
+    optional(candidate, 'runEvent') === 'pull_request',
+    Boolean(pull),
+  ].every(Boolean);
+  return pr ? 'pull_request' : 'workflow_dispatch';
 }
 function decisionBase({ candidate, pull, run, fork }) {
   return {
@@ -522,7 +623,7 @@ function decisionBase({ candidate, pull, run, fork }) {
 }
 // `state` is filled progressively so an interim outcome (pending/failure) still knows which
 // revision to report on.
-async function evaluate({ github, context, inputs, workspace }, state) {
+async function evaluate({ github, context, inputs, workspace, sleep }, state) {
   assertInputAuthorization(inputs);
   state.candidate = await resolveCandidate({ github, context, inputs });
   state.pull = await resolvePull(github, context, state.candidate);
@@ -532,7 +633,13 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   state.run = await resolveRun(github, context, state.candidate);
   assertSelectedAttempt(state.run, inputs);
   checkRunState(state.run, state.candidate);
-  await checkCiResult(github, context, state.candidate);
+  await settledCiResult(github, context, state.candidate, sleep);
+  if (state.candidate.runEvent === 'merge_group') {
+    return evaluateQueue({ github, context, state, workspace });
+  }
+  return evaluatePull({ github, context, inputs, workspace }, state);
+}
+async function evaluatePull({ github, context, inputs, workspace }, state) {
   await requireDispatchMergeProof(github, context, state.candidate, state.pull, state.run);
   if (!(await requiresPreview(github, context, state.pull)))
     return { ...decisionBase(state), ...notApplicable() };
@@ -552,10 +659,70 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   await authorizeReadiness(github, context, inputs, state);
   return deployDecision({ github, context, state, workspace });
 }
+async function queueProof(proof) {
+  try {
+    return await proof();
+  } catch (error) {
+    if (error instanceof QueueValidationError) throw failure(error.message);
+    throw error;
+  }
+}
+async function evaluateQueue({ github, context, state, workspace }) {
+  const revision = await queueProof(() => queueRevision(github, context, state.candidate));
+  state.candidate.queueBaseSha = revision.baseSha;
+  state.candidate.queueTreeSha = revision.treeSha;
+  await queueProof(() => requireQueueCi(github, context, state.run));
+  // Lookup outages propagate like other queue API outages; only absent proof falls through.
+  const reuse = await findQueueReuse({ github, context, candidate: state.candidate });
+  if (reuse.reused) return queueReuseDecision(github, context, state, reuse);
+  const previewRequired = await queueProof(() =>
+    queueRequiresPreview(github, context, state.candidate, revision)
+  );
+  if (!previewRequired) return queueDocumentationDecision(github, context, state);
+  await requireQueueBuild(github, context, state.run, reuse);
+  state.previewAuthorization = 'queue';
+  return deployDecision({ github, context, state, workspace });
+}
+/** Queue CI that reused PR validation built no artifact; if the proof lapsed, say so plainly. */
+async function requireQueueBuild(github, context, run, reuse) {
+  if (await findPreviewArtifact(github, context.repo, run.id)) return;
+  throw failure(
+    `Queue CI built no preview and PR validation is no longer reusable (${reuse.reason}); re-enqueue to validate in full.`
+  );
+}
+/** The queue tree is identical to a deployed and smoke-tested PR tree; publish without a rebuild. */
+async function queueReuseDecision(github, context, state, reuse) {
+  const decision = {
+    ...decisionBase(state),
+    action: 'skip',
+    state: 'success',
+    description: `Reused PR #${reuse.pullRequest} preview of identical tree ${reuse.treeSha.slice(0, 12)}.`,
+    reuseTargetUrl: `${context.serverUrl}/${repoName(context)}/actions/runs/${reuse.previewRunId}`,
+  };
+  const errors = await freshnessErrors(github, context, decision);
+  if (errors.length) throw ignore(`Reused queue candidate is obsolete: ${errors.join('; ')}`);
+  return decision;
+}
+async function queueDocumentationDecision(github, context, state) {
+  const decision = { ...decisionBase(state), ...notApplicable() };
+  const errors = await freshnessErrors(github, context, decision);
+  if (errors.length)
+    throw ignore(`Non-deployable queue candidate is obsolete: ${errors.join('; ')}`);
+  return decision;
+}
 function requestBinding(inputs) {
   return Number(inputs?.request_comment_id) || null;
 }
+function assertControlBindingInputs(inputs) {
+  if (
+    [optional(inputs, 'request_control_run_id'), !optional(inputs, 'request_comment_id')].every(
+      Boolean
+    )
+  )
+    throw ignore('Preview control binding requires its official comment ID.');
+}
 function assertInputAuthorization(inputs) {
+  assertControlBindingInputs(inputs);
   if (inputs?.authorization && inputs.authorization !== 'readiness')
     throw ignore('Unknown preview authorization provenance.');
 }
@@ -623,14 +790,8 @@ function readinessCiJobMatches(job, run) {
   ].every(Boolean);
 }
 function requireRequestedCommand(inputs, request) {
-  const requestedId = optional(inputs, 'request_comment_id');
-  if (!requestedId) return;
-  const activeId = requestCommentId(enabledRequest(request));
-  if (String(requestedId) !== activeId)
-    throw failure('Preview command was revoked or superseded before dispatch.');
-}
-function requestCommentId(request) {
-  return request ? String(request.commentId) : null;
+  const error = previewBindingError(inputs, request);
+  if (error) throw failure(error);
 }
 function draftDecision() {
   return {
@@ -722,7 +883,7 @@ async function deployDecision({ github, context, state, workspace }) {
     destination,
   });
   const commandBound = COMMAND_AUTHORIZATIONS.includes(state.previewAuthorization);
-  const previewRequest = commandBound ? enabledRequest(state.previewRequest) : null;
+  const previewRequest = commandBound ? enabledRequest(previewGrant(state.previewRequest)) : null;
   const common = {
     ...decisionBase(state),
     artifactId: artifact.id,
@@ -800,7 +961,7 @@ function hasMergeIntent(context, state) {
 function hasPreviewIntent(context, state) {
   // Dependabot's dedicated workflow is the sole automatic request owner.
   if (optional(optional(state.pull, 'user'), 'id') === 49699333) return false;
-  if (state.previewAuthorization === 'readiness') return true;
+  if (['readiness', 'queue'].includes(state.previewAuthorization)) return true;
   if (!state.previewRequest) return hasMergeIntent(context, state);
   return [
     state.previewRequest.enabled,
@@ -851,11 +1012,18 @@ async function publishPlannedDecision(github, context, core, decision) {
   return publishDecision(github, context, decision);
 }
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
-export async function planPreview({ github, context, core, inputs, workspace }) {
+export async function planPreview({
+  github,
+  context,
+  core,
+  inputs,
+  workspace,
+  sleep = defaultSleep,
+}) {
   const state = {};
   let decision;
   try {
-    decision = await evaluate({ github, context, inputs, workspace }, state);
+    decision = await evaluate({ github, context, inputs, workspace, sleep }, state);
   } catch (error) {
     decision = outcomeDecision(error, state);
   }
@@ -878,15 +1046,21 @@ function refreshContext(context, pull) {
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
 }
-function awaitingTestMerge(status) {
-  return status.state === 'pending' && String(status.description).startsWith(MERGE_PENDING);
+function awaitingRetry(status) {
+  const description = String(status.description);
+  return (
+    status.state === 'pending' &&
+    [MERGE_PENDING, CI_RESULT_PENDING, CI_RESULT_MISSING].some((prefix) =>
+      description.startsWith(prefix)
+    )
+  );
 }
-/** Refresh a head with no result, or one left pending only because the test merge was not ready. */
+/** Refresh a head with no result, or one left pending on a test merge or CI Result read. */
 async function needsPreviewRefresh(github, context, pull) {
   if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return false;
   const statuses = await allStatuses(github, context.repo, pull.head.sha, 'Preview Result');
   const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
-  return !latest || awaitingTestMerge(latest);
+  return !latest || awaitingRetry(latest);
 }
 async function refreshMissingPull(github, context, core, workspace, item) {
   const pull = await getPull(github, context.repo, item.number);
@@ -923,12 +1097,13 @@ export async function reconcileMissingPreviewStatuses({ github, context, core, w
   if (errors.length) throw new Error(`Preview reconciliation failed: ${errors.join('; ')}`);
 }
 function pullReadinessError(pull) {
-  if (pull.state !== 'open' || pull.draft) return 'pull request is not open and ready';
+  if (pull.state !== 'open' || pull.draft) return PULL_NOT_READY;
+  if (pull.base.ref !== PRODUCTION_BRANCH) return PULL_RETARGETED;
   return null;
 }
 async function pullFreshnessErrors(github, context, decision) {
   const pull = await getPull(github, context.repo, decision.pullRequest);
-  const headMoved = pull.head.sha !== decision.headSha ? 'pull request head moved' : null;
+  const headMoved = pull.head.sha !== decision.headSha ? PULL_HEAD_MOVED : null;
   const mergeChanged = (await equivalentTestMerge(github, context, pull, decision.mergeSha))
     ? null
     : 'test merge changed';
@@ -936,8 +1111,8 @@ async function pullFreshnessErrors(github, context, decision) {
 }
 function runFreshnessErrors(run, decision) {
   const errors = [];
-  if (run.run_attempt !== decision.runAttempt) errors.push('CI run attempt superseded');
-  if (run.head_sha !== decision.headSha) errors.push('CI run head changed');
+  if (run.run_attempt !== decision.runAttempt) errors.push(RUN_ATTEMPT_SUPERSEDED);
+  if (run.head_sha !== decision.headSha) errors.push(RUN_HEAD_CHANGED);
   return errors;
 }
 async function freshnessErrors(github, context, decision) {
@@ -945,8 +1120,31 @@ async function freshnessErrors(github, context, decision) {
     ? await pullFreshnessErrors(github, context, decision)
     : [];
   const run = await getRun(github, context.repo, decision.runId);
+  const queueErrors = await queueFreshness(github, context, decision, run);
   const mismatch = await dispatchFreshnessMismatch(github, context, decision, run);
-  return [...pullErrors, ...runFreshnessErrors(run, decision), ...(mismatch ? [mismatch] : [])];
+  return [
+    ...pullErrors,
+    ...queueErrors,
+    ...runFreshnessErrors(run, decision),
+    ...(mismatch ? [mismatch] : []),
+  ];
+}
+async function checkQueueFreshness(github, context, decision, run) {
+  const candidate = candidateFromDecision(decision);
+  const revision = await queueRevision(github, context, candidate);
+  if (revision.baseSha !== decision.baseSha) return ['Queue base changed.'];
+  checkRunState(run, candidate);
+  await requireQueueCi(github, context, run);
+  return [];
+}
+async function queueFreshness(github, context, decision, run) {
+  if (decision.runEvent !== 'merge_group') return [];
+  try {
+    return await checkQueueFreshness(github, context, decision, run);
+  } catch (error) {
+    if (error instanceof QueueValidationError) return [error.message];
+    throw error;
+  }
 }
 async function dispatchFreshnessMismatch(github, context, decision, run) {
   if (!decision.pullRequest || decision.runEvent !== 'workflow_dispatch') return null;
@@ -962,6 +1160,7 @@ function candidateFromDecision(decision) {
     headRepo: decision.headRepo,
     baseBranch: PRODUCTION_BRANCH,
     pullRequest: decision.pullRequest,
+    queueBaseSha: decision.runEvent === 'merge_group' ? decision.baseSha : null,
   };
 }
 function assertDeployablePlan(decision) {
@@ -980,14 +1179,6 @@ function usesCommandApproval(decision) {
     (decision.fork && decision.environment === ENVIRONMENTS.internal)
   );
 }
-function samePreviewRequest(request, expected) {
-  if (!request || !expected) return false;
-  return [
-    request.enabled,
-    request.commentId === expected.commentId,
-    request.requestedBy === expected.requestedBy,
-  ].every(Boolean);
-}
 async function verifyPreviewRequest(github, context, decision) {
   if (decision.previewAuthorization === 'readiness') {
     return verifyReadinessRequest(github, context, decision);
@@ -1002,7 +1193,7 @@ async function verifyCommandRequest(github, context, decision) {
     decision.pullRequest,
     decision.previewRequest?.commentId
   );
-  if (!samePreviewRequest(request, decision.previewRequest))
+  if (!samePreviewAuthorization(request, decision.previewRequest))
     throw new Error('Preview request was revoked or superseded; request again.');
 }
 async function verifyReadinessRequest(github, context, decision) {
@@ -1022,7 +1213,7 @@ async function requireFreshDecision(github, context, decision) {
   if (errors.length) throw new Error(`Candidate is obsolete: ${errors.join('; ')}`);
 }
 /** Phase 2: immediately before upload, repeat freshness checks and re-verify the artifact. */
-export async function verifyForDeploy({ github, context, core, decision, destination }) {
+export async function verifyForDeploy({ github, context, core, decision, destination, queue }) {
   assertDeployablePlan(decision);
   await requireFreshDecision(github, context, decision);
   const candidate = candidateFromDecision(decision);
@@ -1030,6 +1221,11 @@ export async function verifyForDeploy({ github, context, core, decision, destina
     ? await getPull(github, context.repo, decision.pullRequest)
     : null;
   const run = await getRun(github, context.repo, decision.runId);
+  requireQueueScope(queue, run.event);
+  if (candidate.runEvent === 'merge_group') {
+    const revision = await queueRevision(github, context, candidate);
+    candidate.queueTreeSha = revision.treeSha;
+  }
   const { manifest } = await verifiedArtifact({
     github,
     context,
@@ -1081,17 +1277,64 @@ function summarize(core, decision, result, published, evidence) {
     .addTable(summaryRows(decision, result, published, evidence));
   return core.summary.write();
 }
-async function publishTerminal(github, context, core, decision, result) {
-  const stale = result.state === 'success' ? await freshnessErrors(github, context, decision) : [];
-  if (stale.length) {
-    core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
-    return false;
-  }
-  return publishDecision(github, context, {
+async function publishOutcome(github, context, decision, result) {
+  const published = await publishDecision(github, context, {
     ...decision,
     state: result.state,
     description: result.message,
   });
+  return published ? result : null;
+}
+async function publishTerminal(github, context, core, decision, result) {
+  const stale = result.state === 'success' ? await freshnessErrors(github, context, decision) : [];
+  if (stale.length) return publishLateStaleness(github, context, core, decision, stale);
+  return publishOutcome(github, context, decision, result);
+}
+/**
+ * Success is never published for an obsolete candidate. When a newer event owns the head, publish
+ * nothing; otherwise end or re-arm this run's pending result instead of leaving it stuck (#1357).
+ */
+async function publishLateStaleness(github, context, core, decision, stale) {
+  core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
+  if (!(await reportsLateStaleness(github, context, decision, stale))) return null;
+  const outcome = (await mainMovedSinceUpload(github, context, decision))
+    ? failure(BASE_MOVED)
+    : pending(MERGE_RETRY);
+  return publishOutcome(github, context, decision, outcome);
+}
+function unownedStaleness(decision, stale) {
+  return [
+    Boolean(decision.pullRequest),
+    decision.runEvent !== 'merge_group',
+    !stale.some((error) => OWNED_STALENESS.includes(error)),
+  ].every(Boolean);
+}
+async function reportsLateStaleness(github, context, decision, stale) {
+  if (!unownedStaleness(decision, stale)) return false;
+  return ownsLatestResult(github, context, decision.headSha);
+}
+/** True while this run's own interim status is still the head's newest `Preview Result`. */
+async function ownsLatestResult(github, context, headSha) {
+  const statuses = await allStatuses(github, context.repo, headSha, 'Preview Result');
+  const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
+  return latest?.target_url === runUrl(context);
+}
+/**
+ * The pre-upload freshness check proved that the planned test merge's first parent was live main,
+ * so a different live main now is a real base movement, not a briefly missing test merge.
+ */
+async function mainMovedSinceUpload(github, context, decision) {
+  const merge = await commitShape(github, context, decision.mergeSha);
+  const uploadedMain = merge?.parents[0];
+  if (!SHA_PATTERN.test(String(uploadedMain))) return false;
+  return uploadedMain !== (await liveMainSha(github, context));
+}
+async function liveMainSha(github, context) {
+  const { data } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  return data.object.sha;
 }
 /** Phase 3: publish the authoritative result only for a still-current candidate. */
 export async function publishResult({ github, context, core, decision, outcomes, evidence }) {
@@ -1102,9 +1345,12 @@ export async function publishResult({ github, context, core, decision, outcomes,
   }
   const result = terminalResult(decision, outcomes);
   const published = await publishTerminal(github, context, core, decision, result);
-  await summarize(core, decision, result, published, evidence);
-  if (result.state === 'failure') core.setFailed(result.message);
-  return published ? result.state : 'obsolete';
+  await reportTerminal(core, decision, published ?? result, Boolean(published), evidence);
+  return published ? published.state : 'obsolete';
+}
+async function reportTerminal(core, decision, reported, published, evidence) {
+  await summarize(core, decision, reported, published, evidence);
+  if (reported.state === 'failure') core.setFailed(reported.message);
 }
 function unchangedFailureEvent(context, pull) {
   if (context.eventName !== 'pull_request_target') return true;
@@ -1158,4 +1404,13 @@ export async function publishControllerFailure({ github, context, core, inputs, 
     description: 'Preview controller failed; inspect the workflow run.',
   });
   if (!published) core.warning('No failure status was published.');
+}
+/** Explicit wake-up after an accepted persistent control intent. Inputs locate a PR, never authorize it. */
+export async function reconcilePreviewRequest({ github, context, core, workspace, number }) {
+  if (context.ref !== `refs/heads/${PRODUCTION_BRANCH}`)
+    throw new Error('Preview reconciliation requires trusted main.');
+  if (![Number.isSafeInteger(number), number > 0].every(Boolean))
+    throw new Error('Expected a positive PR number.');
+  const pull = await getPull(github, context.repo, number);
+  return planPreview({ github, context: refreshContext(context, pull), core, workspace });
 }

@@ -71,11 +71,14 @@ product.
 ## Optional Environment Variables
 
 See the canonical map for `NUXT_LOG_SINK_URL`, `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`,
-`NUXT_PUBLIC_LOG_LEVEL`, `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`,
+`NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL`, `NUXT_PUBLIC_LOG_LEVEL`, `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`,
 `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`, `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`, and
 `NUXT_SHARED_PROFILE_CACHE_TTL_MS`. Operational note: set the browser log sink at build time to
 `/api/logs/client` only when the edge/WAF rate limit for that path is enabled, or use an external
-collector URL.
+collector URL. `NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL` separately enables only aggregate progress
+metrics; when targeting `/api/logs/client`, it has the same edge-protection prerequisite. Keep general
+browser log forwarding disabled when enabling these metrics alone. Verify delivery to the approved
+retention/query destination after rebuilding the application.
 
 ## Pre-Deploy Validation
 
@@ -443,6 +446,38 @@ References: [migration history](https://supabase.com/docs/reference/cli/supabase
 [squash limitations](https://supabase.com/docs/reference/cli/supabase-migration-squash), and
 [history repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).
 
+### Retired preference columns (#1223)
+
+[The retirement migration](../supabase/migrations/20261018162607_drop_unused_user_preferences_columns.sql)
+removes seven retired columns from `public.user_preferences`
+with `RESTRICT`; it does not change policies, triggers, RPCs, retained preferences or progress storage.
+Keep `LEGACY_PREFERENCE_KEYS` and hydration sanitizers: cached local state can outlive the schema.
+Current writers omit the retired fields; clients before #1222 still sent the hideout fields but
+already retry missing-column errors without those fields. Repeated removal dates from commit
+`a4112c81` (2026-02-08): each recognized missing-column error removes that field from the retry
+payload until the retained fields save. Earlier single-retry bundles can fail the entire preference
+write when two or more removed fields remain; bundles without fallback fail on the first removed
+field. Those writes are not acknowledged as synced. Reloading the current app restores the supported
+writer; this migration does not recover unsynced changes from an obsolete bundle. Treat pre-`a4112c81`
+bundles as unsupported after the drop and announce the reload requirement before deployment.
+
+Before merge/apply, retain target identity, migration-history and bounded catalog/lock evidence,
+independent review and explicit approval for this exact irreversible drop. #1272's observer hold is
+separate; use only the separately authorized inspection route until its boundary is repaired.
+This cleanup is independent of the held legacy progress cleanup (#1155).
+
+Use the normal transactional migration runner; the linked migration owns the lock and statement
+timeout budgets. A failure before commit rolls back the schema and stored values.
+After a committed drop, recreating columns restores **schema/defaults only**, not their old values.
+Before any production apply, require an approved backup and an isolated restoration rehearsal that
+covers these seven columns, keyed by `user_id`, with their type/default/nullability/ACL metadata.
+Restore only those fields when recovering so intervening retained-preference changes are preserved;
+do not overwrite full rows or rewrite migration history. No down migration is automatic.
+The local synthetic rollback/recovery proof is not evidence that a production backup exists.
+
+Dropping columns does not promise immediate physical disk reclamation; do not schedule a table
+rewrite or `VACUUM FULL` as part of this change.
+
 ### Seasonal-team index recovery (#646)
 
 The applied migration `20260804043344_add_seasonal_team_index_concurrently.sql` uses
@@ -744,6 +779,30 @@ without grant option. Sequence defaults were outside #1134's table/view hardenin
 unchanged by this documentation-only PR. This follow-up checks defaults, not application-table
 grants, feature behavior or the full migration ledger.
 
+### Function EXECUTE defaults
+
+`20261022090000_revoke_postgres_client_function_defaults.sql` makes new `postgres`-created
+functions closed by default. PostgreSQL grants function EXECUTE to `PUBLIC` globally, and a
+schema-scoped revoke cannot cancel a global default, so the migration revokes `PUBLIC` globally
+for `postgres` (every schema, including `private` and `pg_temp`) and revokes Supabase's
+`anon`/`authenticated` grants in `public`. `service_role` keeps its `public` default. Existing
+function ACLs are unchanged; `supabase_admin` defaults are platform-owned and unchanged.
+
+Every role that calls a new function must be granted EXECUTE explicitly in its migration:
+client roles, `service_role` outside `public`, and the roles whose RLS policies call it.
+Readback after rollout: the global `postgres` entry must omit `PUBLIC`, and its `public` entry
+must omit `anon` and `authenticated`. Supabase's `storage` entry keeps client grants; the repo
+creates no `storage` functions.
+
+```sql
+SELECT CASE WHEN d.defaclnamespace = 0 THEN '(global)' ELSE n.nspname END AS scope,
+       d.defaclacl
+FROM pg_catalog.pg_default_acl d
+LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace
+WHERE d.defaclobjtype = 'f' AND d.defaclrole = 'postgres'::regrole
+ORDER BY scope;
+```
+
 ### Progress transfer and freshness rollout
 
 For `20260906174817_suppress_unchanged_progress_writes.sql` and
@@ -765,49 +824,105 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
-### Normalized PvP/PvE progress backfill (#1028)
+### Legacy PvP/PvE storage retirement (#1028)
 
-`20261002090000_side_effect_free_mode_progress_backfill.sql` ships the helper only; running it is
-separately approved operational maintenance under the rules above. The helper writes only rows whose
-legacy payload has a numeric level while the normalized row is missing or has none. It never locks
-or rewrites materialized rows; repairing a placeholder takes its row lock. It keeps source timestamps,
-records unknown freshness, and records no
-account activity, so retention deadlines and pending inactivity deletions are unchanged.
+The historical backfill was completed before #1072 removed normalized-reader fallbacks.
+After #1086 retired legacy writes, its frozen JSON must never seed newer normalized state.
+The forward migration `20261018203633_drop_legacy_progress_columns.sql` removes the range
+helper, completion gate and flag helper with the old columns. Do not run historical backfill
+commands or use their old numeric-level gate as a cleanup precondition.
 
-1. Measure remaining work per range with the completion gate (read-only):
+The approved client-support boundary accepts normalized readers from #1072 onward, retaining
+account timestamps and Realtime for pre-#1087 clients. Older callers requesting `pvp_data`,
+`pve_data`, `get_teammate_legacy_progress` or `team_member_summary` must update. This approval
+does not authorize production deletion.
 
-   ```sql
-   SELECT game_mode, count(*) FROM private.unmaterialized_mode_progress(
-     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000')
-   GROUP BY game_mode;
-   ```
+The destructive target is only `public.user_progress.pvp_data` and `pve_data`. Preserve every
+account row and its seven metadata fields, normalized mode rows, all Seasonal history,
+prestige archives, preferences, team data and account-retention records. Legacy-shaped API and
+prestige RPC arguments are mode/payload contracts and remain unchanged.
 
-2. Run one range per SQL Editor operation so each commits on its own. Start with a two-hex-digit
-   range (`00…`–`01…`) to measure duration, then widen only while it stays well under the timeout.
-   The last range passes `NULL` as the upper bound.
+Before an explicitly approved merge, a fresh production table-only backup and its verified
+isolated restore receipt are mandatory gates, alongside exact pending SQL/history, immutable
+independent review and CI. The synthetic local rehearsal below is supplementary evidence and
+cannot satisfy the production backup/restore gate. Keep deletion held until all gates pass.
+The migration uses one transaction, a one-second lock timeout, a twenty-second statement
+timeout and explicit dependency removal followed by `DROP COLUMN RESTRICT`. An unexpected
+dependency or active reader aborts the complete transaction. It performs no data rewrite,
+row deletion, privilege change or physical reclamation. Supabase's normal integration deploys
+migrations and all Edge Functions; do not use an out-of-band production push.
 
-   ```sql
-   BEGIN;
-   SET LOCAL statement_timeout = '60s';
-   SELECT private.backfill_game_mode_progress_range(
-     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000');
-   COMMIT;
-   ```
+For the mandatory production recovery gate, use an approved operator connection to take a fresh,
+consistent custom-format PostgreSQL 17 dump selecting only `public.user_progress`, followed
+by a local restore of only pre-data and data into an isolated destination with no network,
+app/Auth access or scheduled extensions. Exclude post-data triggers, FKs, grants and publication
+from this extraction destination; compare count and full-row aggregate fingerprints, including
+both legacy JSON values. This target recovery copy is not a complete Auth/normalized-history
+backup. It avoids exporting Auth password/session data, jobs, payment tables and secrets.
+Exporting production account identifiers, Tarkov UIDs, metadata and progress still requires
+explicit privacy/destination approval and an approved existing connection; the telemetry
+observer is not a raw-data export route. Synthetic rehearsal is not production recovery proof.
 
-   The transaction-local timeout cannot leak into later maintenance. The helper sets
-   `lock_timeout = '2s'`; a range that meets a live write fails and rolls back whole. If an error
-   leaves the session in an aborted transaction, run `ROLLBACK;` before retrying. Re-run the range
-   later; completed rows are no-ops.
+A provider physical clone copies jobs that begin immediately and cannot be paused before restore
+([Supabase clone documentation](https://supabase.com/docs/guides/platform/clone-project)).
+The migrations install eight schedules: Stripe-event, API-usage and mutation-rate-limit retention;
+account-deletion-attempt retention; inactive-account cleanup; account-activity snapshots;
+account-deletion retries; and owner-only team cleanup. Recheck the current `cron.job` inventory
+before containment; a physical clone needs separately approved resource cost and safe scheduler
+containment even without external calls.
+Do not assume an after-restore pause proves the copied data was untouched.
 
-3. Record each completed range in the change log and stop on rising latency, CPU, lock waits, or
-   I/O pressure.
-4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
+Before commit, transaction rollback restores the old schema/data automatically. After commit,
+re-adding empty columns is not recovery. Restore required legacy values into an isolated recovery
+target and reconcile through a separately reviewed forward correction. Keep newer normalized
+data; never reinstate the bridge or frozen-JSON backfill. Full production restore is a separate
+outage and loss-of-newer-writes decision.
 
-After `20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` deploys, nothing writes the legacy
-columns, so the gate stays a read-only check and the helper must not run: it would copy frozen
-legacy progress over newer normalized rows. A non-zero gate after that point (for example a
-normalized row saved without a `level`) does not mean missing data, and Phase 4 must not use the
-gate as its precondition; Phase 4 removes the helper and gate with the columns.
+A field-only correction must preserve newer account timestamps and `metadata_write_id` too.
+An ordinary two-column UPDATE fires both metadata triggers. The local-only rehearsal
+`scripts/checks/legacy-progress-cleanup-rehearsal.py` demonstrates a separately committed
+correction under a bounded exclusive account-table lock, checking the exact two enabled
+metadata triggers, temporarily disabling only those triggers, updating only the two legacy
+fields of matching existing accounts, and restoring the triggers before commit. Errors roll
+back fields and trigger states together. New accounts are untouched and deleted accounts are
+not recreated. Nonempty preferences, retention state, normalized progress, history and teams
+are fingerprinted alongside newer account metadata. This test does not authorize a production
+correction or restore any retired reader/writer contract.
+
+Before any production field-only correction, verify the current trigger definitions and the
+complete bodies of both trigger functions against the separately reviewed correction. A guard
+on trigger names and enabled states alone cannot detect changed function behavior.
+
+Run the supplementary synthetic rehearsal with Python 3, Docker, the existing isolated
+`supabase_db_TarkovTracker1086` PostgreSQL 17 container (empty Auth source), checkout path and
+the synthetic pre-cleanup custom archive whose SHA-256 is pinned in the script. It refuses
+other archive bytes and uses only new secondary local databases. No production host, URL or
+credential is accepted. Before any container command, it rejects a non-local `DOCKER_HOST` or
+selected Docker context endpoint, then pins commands to `unix:///var/run/docker.sock` with Docker
+host/context/TLS environment overrides removed. Use a local Linux context pointing to that socket.
+Archives and aggregate receipts stay outside Git.
+
+The pinned synthetic baseline is retained with the owner's local task artifacts at
+`../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump` relative to this
+cleanup checkout. The [rehearsal script](../scripts/checks/legacy-progress-cleanup-rehearsal.py)
+owns and verifies its pinned SHA-256.
+Use that retained artifact through authorized local access; a teammate without it must
+obtain the synthetic baseline from the task owner before running this rehearsal. It is
+not downloadable from Git and must not be replaced with a production dump or a newly
+generated archive. The existing local PostgreSQL 17 container must also be available.
+
+From this checkout in the local Linux shell:
+
+```bash
+python3 scripts/checks/legacy-progress-cleanup-rehearsal.py --self-test-docker-guard
+sha256sum ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
+python3 scripts/checks/legacy-progress-cleanup-rehearsal.py "$PWD" \
+  ../cleanup-local-rehearsal/20261009T061327Z/cleanup-source-061327.dump
+```
+
+`DROP COLUMN` does not immediately shrink files. Measure relation sizes after release; any
+`VACUUM FULL`/rewrite needs a distinct low-traffic maintenance approval, disk headroom and a
+bounded lock/outage plan. Avoid bulk NULL updates and retain normal autovacuum.
 
 ### Manual activity history rollout
 
@@ -1128,20 +1243,26 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, read access to stored
+privileged or write-capable roles across non-system schemas, column writes, sequence advancement,
+persistent-object ownership or creation, application `SECURITY DEFINER` execution, read access to stored
 migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
 interpret cumulative counters.
 
+Health checks include inherited roles and roles reachable through `SET ROLE`. Application
+`SECURITY DEFINER` execution is rejected as an unneeded bypass route; the check does not inspect
+function bodies or assert that every such function writes. See the [observer specification](./systems/prod-db-observer.md).
+
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and
 blocking reports. The result is evidence-only and must be assessed before a migration is merged.
 The implementing agent may collect and assess this evidence; human review is not mandatory.
 Document migration semantics, deployed function dependencies/contracts and permissions, rolling
-compatibility, lock acquisition and timeout/rollback strategy, together with the independent review
-required by `AGENTS.md`. It does not execute the migration. If the parser sees dynamic SQL,
+compatibility, lock acquisition and timeout/rollback strategy, together with any provider review
+that was available; Review Admission still needs exact-head admission and sensitive approval
+(`AGENTS.md`). It does not execute the migration. If the parser sees dynamic SQL,
 unsupported statements, quoted identifiers, malformed literals or comments, multiple statements, or
 any unclassified syntax, it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
 treats an unrecognized migration as safe. An incomplete report requires a documented assessment of
@@ -1170,6 +1291,19 @@ holding the observer credential read stored migration SQL and any literal inside
 conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.
+
+Large-object creation needs explicit review even for an otherwise read-only role. PostgreSQL
+commonly grants PUBLIC execution of `lo_create`, `lo_creat`, and `lo_from_bytea`; `lo_import`
+execution can also create persistent objects. The canary rejects reachable execution of these
+functions, existing large-object UPDATE grants, privileged parameter grants, and enabled
+`lo_compat_privileges`. A role cannot shed a PUBLIC grant in isolation. An authorized database
+operator must review existing consumers before revoking PUBLIC creator execution and regranting
+it only to approved non-observer identities. Do not run blanket revokes as routine cleanup, weaken
+the canary to accept default grants, or treat read-only connection defaults as the boundary.
+Production privilege changes require separate authorization; until the boundary is provisioned,
+the canary intentionally fails closed. Catalog telemetry and migration-version SELECT remain
+supported for a correctly provisioned role. These checks do not constitute an audit of every
+extension or built-in function's implementation.
 
 The production canary should be run manually after provisioning, using only the telemetry commands
 above. Confirm the role, reset timestamps, timeouts, and negligible observer impact before enabling
@@ -1225,21 +1359,24 @@ first edit ([decision record](./decision-browser-progress.md#historical-rollback
 The progression and overlay changes ship together through PR #826, which supersedes PR #825.
 Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
 v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
-Only the combined revision may publish v3 entries. There is no intermediate application release.
+Only the reviewed combined producer contract may publish v3 entries. Split producer and consumer
+changes when preseeding is required: first land the compatible producer on `main`, while the
+application continues reading v2 keys.
 
 For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
-`.github/workflows/precompute-tarkov-data.yml` from the approved combined revision before merging
-or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
-48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
+`.github/workflows/precompute-tarkov-data.yml` on `main` after the reviewed producer changes land
+and before merging or promoting the v3 consumer. Leave both workflow inputs, `lang` and
+`gameMode`, empty to include all 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
 verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
 revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
 a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
 identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
 `overlay-precompute-manifest-json-v3` contains all 48 matching identities.
 
-Before rollout, confirm neither original PR revision has a production deployment or an in-flight
-precompute run. After the v3 population is verified, merge the combined PR only and
-close #825 as superseded. The scheduled workflow then refreshes the combined v3 contract.
+Before rollout, confirm no incompatible original PR revision has a production deployment or an
+in-flight precompute run. After the fresh v3 population and matching overlay identities are
+verified, merge the consumer PR and close #825 as superseded. The scheduled workflow then
+refreshes the combined v3 contract.
 Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
 entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
 standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
@@ -1252,16 +1389,19 @@ fleet verification before closing issue #729.
 503 while a key is missing, so seed before Pages deploys the consumer
 ([release order](./systems/overlay-and-precompute.md#release-verification)):
 
-1. Read the published overlay `$meta.sha256`. Dispatch `precompute-tarkov-data.yml` on the PR
-   branch with `lang=en`, no mode, and that `expectedOverlaySha`. Require the run's
+1. Split producer and consumer changes if preseeding is required. Land the reviewed producer
+   changes on `main` while keeping the existing consumer compatible. Read the published overlay
+   `$meta.sha256`, then dispatch `precompute-tarkov-data.yml` on `main` with `lang=en`, no mode,
+   and that `expectedOverlaySha`. Require the run's
    `importSnapshots.failures` to be empty.
 2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
    overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
-3. Merge. After Pages deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all
-   three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
+3. Only after the fresh matching snapshots are verified, merge the consumer PR. After Pages
+   deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
    environment or a secret store) reports no import mismatches.
-4. If the overlay was published after step 1, dispatch an unfiltered run on `main` so all 48 core
-   entries and the import keys share the release.
+4. If the overlay changes before consumer promotion, repeat the dispatch and snapshot verification
+   with the new approved `expectedOverlaySha` before merging. Use an unfiltered run on `main` so
+   all 48 core entries and the import keys share the release.
 
 Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
 which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail

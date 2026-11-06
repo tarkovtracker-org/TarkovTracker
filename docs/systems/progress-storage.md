@@ -7,9 +7,12 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 **Summary.** Persistent PvP, PvE, and numbered Seasonal PvP progress share one normalized table.
 `user_game_mode_progress` has primary key `(user_id, game_mode, season_number)`; PvP and PvE use
 season `0`, while Seasonal uses the active positive season number. Season 1 is active. The
-`user_progress` row holds account-wide metadata and the accepted client account-clock contract. Its legacy `pvp_data` / `pve_data` columns are
-no longer written (#1028 Phase 3) and remain, frozen, until they are dropped; Seasonal progress was
-never stored there.
+`user_progress` row holds account-wide metadata and the accepted client account-clock contract.
+The forward cleanup migration removes its frozen legacy `pvp_data` / `pve_data` columns;
+Seasonal progress was never stored there. Support is limited to normalized-reader clients
+from #1072 onward. Older clients explicitly requesting the retired columns, legacy teammate RPC
+or summary view must update. Account timestamps and Realtime remain compatible with accepted
+pre-#1087 normalized readers.
 
 ### Diagram
 
@@ -145,14 +148,11 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
 - `supabase/migrations/20260830130000_harden_client_progress_access.sql` — authenticated progress
   sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
-- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — original
-  backfill helper, superseded by `20261002090000`
-- `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` — current
-  revoked one-range backfill helper and its completion gate `private.unmaterialized_mode_progress`.
-  While its transaction-local `tarkovtracker.mode_progress_backfill` flag is set, the prepare trigger
-  keeps source timestamps and records unknown freshness, and `track_account_mutation` records no
-  activity. Correctness does not depend on running it until the legacy fallbacks are removed (#1028);
-  see _Normalized PvP/PvE progress backfill_ in `docs/runbook.md`
+- `supabase/migrations/20261002090000_side_effect_free_mode_progress_backfill.sql` - historical
+  range backfill and completion gate, retired by the physical legacy cleanup migration
+- `supabase/migrations/20261018203633_drop_legacy_progress_columns.sql` - removes only the two
+  legacy columns and their reader/trigger/backfill dependencies; keeps account metadata,
+  compatibility clocks, normalized progress, all Seasonal history and prestige archives
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — former
   legacy seed of an unmaterialized persistent row inside `merge_progress_data`'s row lock
 - `supabase/migrations/20261009020231_retire_legacy_progress_keep_compatibility_clocks.sql` — stops every
@@ -163,11 +163,33 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
 - `supabase/migrations/20261012094933_reconcile_game_profile_entitlements.sql` — game profile tables, supporter gate,
   and profile RPCs
 - `app/composables/useDataBackup.ts` — season-aware native backups
+- `app/workers/backupImport.worker.ts` and `app/utils/backup/` — isolated file import parsing,
+  validation, preview summaries and bounded selected-snapshot transfer
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
 - `app/utils/constants.ts`, [TarkovTracker-API/src/utils/gameMode.ts](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/utils/gameMode.ts) — runtime active-season
   constants and upstream mode mapping
+
+### Backup file imports
+
+Backup file imports parse and validate in a disposable browser worker, including the nested
+raw recovery entries and ownership checks. The ordinary backup ceiling remains 5 MiB; version-1
+device recovery archives may be up to 128 MiB with at most 64 older entries. Files above
+128 MiB are rejected before starting a worker or reading bytes. Ordinary files between 5 and
+128 MiB are format-detected and rejected inside the worker, without parsing on the UI thread.
+If the worker cannot start or fails, import reports an error; there is no synchronous fallback.
+
+The worker retains the archive and returns only entry labels and a compact preview. Explicit
+confirmation pulls the selected normalized snapshot in batches of at most 64 tokens and fewer
+than 16,384 string code units, with one outstanding batch at a time. Unselected archive entries
+and raw recovery strings never return to the UI thread. No progress is applied before the full
+selected snapshot is received and the preview owner is checked again. Cancellation, replacement
+file selection and scope disposal terminate the worker and invalidate pending results.
+Retained-copy reads share the same import generation, so late successes or failures cannot
+replace a newer file preview or restore a cancelled preview. Recovery archives remain bound to the selecting account; ordinary backups retain their portable import
+behavior, with the displayed preview bound to its receiving account. Original archive bytes and
+retained device recovery copies are not rewritten or discarded by import.
 
 ### Invariants
 
@@ -214,11 +236,9 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   regardless of legacy sharing preferences. Visibility on an existing normalized row remains authoritative.
   The production completion gate was verified zero across all 16 UUID ranges for PvP and PvE on
   2026-10-04 before removing database reader fallbacks (#1028).
-- The operational backfill only fills rows whose normalized progress has no numeric `level`; it
-  cannot overwrite an already materialized row or change its visibility. Missing rows use
-  `ON CONFLICT DO NOTHING`; placeholder repairs lock and recheck after concurrent writes. It preserves
-  source timestamps and records no account activity. Schema rollout and data completion are separate
-  checks; see the runbook for bounded verification.
+- The legacy backfill, completion gate and transaction flag helper are retired with the
+  frozen columns. A non-zero old gate after write retirement was not proof of missing normalized
+  data; copying frozen JSON could resurrect reset progress. No normal write path checks the flag.
 - No runtime path writes `user_progress.pvp_data` / `pve_data` or merges from them (#1028 Phase 3).
   `merge_progress_data` creates a missing normalized row empty under the account row lock and
   merges into the normalized row only; as before, every API write also advances
@@ -250,9 +270,10 @@ profiles (gateway, teams, sharing, overlays, Realtime) can never see or mix its 
   Older accepted clients use a global predicate instead, so Phase 3 retains the account-clock
   updates they already require. This preserves their existing contract; it does not correct their
   pre-existing cross-mode policy. Account-row Realtime events therefore remain until that contract
-  is separately retired. The read-only
-  `get_teammate_legacy_progress` RPC, the unused `team_member_summary` view and the backfill gate
-  still read the frozen columns until they are dropped (#1028 Phase 4).
+  is separately retired. The cleanup migration removes `get_teammate_legacy_progress`, `team_member_summary`, and
+  the backfill helpers at the approved normalized-reader cutoff. This contract retirement does
+  not reload old tabs or preserve unsaved old-client state. It is independent of browser
+  authority/cross-renderer work (#1092).
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
@@ -415,3 +436,68 @@ preference sync allows cached clients to save other preferences after the column
 
 Existing production JSON offsets were removed by completed one-off maintenance; see the
 [runbook](../runbook.md#retired-automatic-level-cleanup). Keep historical migrations immutable.
+
+## Permanent task identity support (#1302)
+
+The database supports the overlay's versioned, mode-scoped task/objective aliases through
+`private.progress_task_id_aliases()`. It initially returns empty maps. The public
+`get_progress_task_id_aliases()` RPC exposes that trusted manifest to `service_role` only;
+clients cannot supply aliases to the persistence helpers. No stored rows are backfilled.
+
+Both `user_game_mode_progress` and `user_profile_mode_progress` reconcile writes against the
+previous row while its lock is held. Comparable entry timestamps decide collisions, including
+unchecks and reduced counts. Canonical IDs win equal or unknown clocks; partial objective writes
+preserve omitted fields without inheriting a misleading clock. Reset epochs never contribute to
+one another. Unmapped records and immutable event histories remain intact.
+
+Updates run before row preparation; both sync RPCs and row preparation canonicalize stored and
+incoming records before their bounded availability merge. Fresh inserts are normalized by a
+same-transaction update after insertion: normalizing in `BEFORE INSERT` would erase the alias
+identity from `EXCLUDED` before an upsert can compare it with the existing canonical record.
+Account inserts validate availability entries without capping or changing their IDs/clocks until
+that comparison finishes; the final account row is sanitized even with an empty alias ledger.
+Invalid confirmations are filtered before alias selection so they cannot displace valid ones.
+The existing RPC signatures, account locks, access checks and season rules remain authoritative.
+Profile sync locks its mode row before alias reconciliation, so a concurrent writer cannot change
+the canonical record after alias provenance has been consumed.
+
+Validation lives in `supabase/tests/database/task_identity_aliases.test.sql` and
+`scripts/checks/task-identity-concurrency.mjs`.
+The SQL fixtures match the exported API contracts fixtures from commit `31576d1`; the concurrency
+check observes real row-lock waits for API writes and default/profile upserts. Run the full
+`pnpm run supabase:check` in an isolated local Supabase project. The concurrency script accepts no
+remote database URL or credentials, requires local Docker socket endpoints, pins every exec to
+that socket, and restores its temporary test ledger.
+SIGINT/SIGTERM also restore the ledger and remove the fixture user. A forced kill or host failure
+can bypass cleanup; reset that isolated local database with `pnpm exec supabase db reset --no-seed`
+before reusing it.
+
+### Files and invariants
+
+- `supabase/migrations/20261106155525_reconcile_permanent_task_identities.sql`: empty trusted ledger,
+  service-only RPC, account/profile write guards and pre-cap reconciliation.
+- The SQL and concurrency checks above assert canonical collision precedence, reset isolation,
+  mode isolation and preservation of unrelated confirmations at the count/byte limits.
+- Clients cannot supply trusted aliases. Unmapped IDs stay intact; activated aliases are permanent.
+- Neither this migration nor its rollout rewrites historical rows in bulk.
+
+### Release order and remaining consumer work
+
+1. Review and deploy this empty-ledger schema, overlay contract PR #530, and API PR #34 with its
+   `TASK_ID_ALIASES_ENABLED` flag still false. Schema must precede enabling the Worker consumer.
+2. Validate and publish the immutable `0.1.3` contracts archive under the API release procedure;
+   update Tracker's dependency and Worker source pins in a separate consumer PR. Keep the current
+   production pin until that archive is published and consumer validation passes.
+3. That consumer PR must propagate aliases with tasks-core metadata through live and precomputed
+   paths and load them before progress reconciliation. Cover startup/local storage, initial sync,
+   realtime, imports, recovery, game profiles, team/public reads, prestige archive creation/reads
+   and exports. Preserve original
+   clocks until alias-family reconciliation; the generic progress merge can otherwise manufacture
+   a zero clock or take a maximum count before aliases are considered. Project pinned/hidden task
+   preferences per mode so a global list is not destructively rewritten using one mode's map.
+4. Only after those consumers and all-mode parity pass, enable the Worker flag. Activate verified
+   aliases and canonical catalog definitions together with a reviewed forward ledger migration.
+   Preserve all activated mappings permanently, expire stale metadata caches, and verify an old
+   client write plus a fresh read. No bulk backfill is required for this rollout.
+
+This schema PR is support for #1302, not completion of the issue or authorization to cut over IDs.

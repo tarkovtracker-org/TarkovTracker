@@ -1,4 +1,5 @@
 import { useSupabaseSync, type SupabaseSyncReturn } from '@/composables/supabase/useSupabaseSync';
+import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   clearPendingResetPreferencesSnapshot,
   getPersistedPreferencesState,
@@ -174,8 +175,6 @@ const buildPreferencesSyncPayload = (
     show_map_extracts: preferencesState.showMapExtracts,
     map_marker_colors: normalizeMapMarkerColors(preferencesState.mapMarkerColors),
     hideout_primary_view: preferencesState.hideoutPrimaryView,
-    hideout_collapse_completed: preferencesState.hideoutCollapseCompleted,
-    hideout_sort_ready_first: preferencesState.hideoutSortReadyFirst,
     hideout_require_station_levels: preferencesState.hideoutRequireStationLevels,
     hideout_require_skill_levels: preferencesState.hideoutRequireSkillLevels,
     hideout_require_trader_loyalty: preferencesState.hideoutRequireTraderLoyalty,
@@ -212,6 +211,7 @@ const buildPreferencesSyncPayload = (
           (taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0
         )
       : [],
+    hidden_task_ids: normalizeTaskIdList(preferencesState.hiddenTaskIds),
     task_filter_presets: Array.isArray(preferencesState.taskFilterPresets)
       ? preferencesState.taskFilterPresets
       : [],

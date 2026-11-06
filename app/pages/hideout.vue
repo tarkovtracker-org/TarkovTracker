@@ -3,80 +3,32 @@
     <div class="px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
         <slot name="header" />
-        <div class="flex flex-col gap-4">
-          <div class="flex justify-center">
+        <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
+        <StatusTabBar
+          :tabs="primaryViews"
+          :model-value="displayPrimaryView"
+          :group-label="t('page.hideout.status_tabs_label')"
+          :inert-when-selected="false"
+          tabs-help-target="hideout-status-filters"
+          data-testid="hideout-view-switcher"
+          data-help-target="hideout-view-switcher"
+          @update:model-value="selectPrimaryView"
+        >
+          <template #actions>
             <div
-              class="bg-surface-900 border-surface-700/50 w-full max-w-4xl rounded-lg border px-4 py-3 shadow-sm"
-              data-testid="hideout-view-switcher"
-              data-help-target="hideout-view-switcher"
+              data-testid="hideout-filter-actions"
+              data-help-target="hideout-filter-actions"
+              class="ml-auto flex items-center gap-2"
             >
-              <div class="grid w-full gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-                <div class="hidden lg:block"></div>
-                <div
-                  data-help-target="hideout-status-filters"
-                  class="flex flex-wrap justify-center gap-2"
-                >
-                  <template v-for="(view, index) in primaryViews" :key="view.view">
-                    <UButton
-                      :icon="`i-${view.icon}`"
-                      :variant="'ghost'"
-                      :color="'neutral'"
-                      size="md"
-                      :data-help-target="`hideout-filter-${view.view}`"
-                      :aria-pressed="displayPrimaryView === view.view"
-                      class="shrink-0"
-                      :class="{
-                        'border-surface-200 rounded-none border-b-2':
-                          displayPrimaryView === view.view,
-                      }"
-                      @click="selectPrimaryView(view.view)"
-                    >
-                      <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
-                      <span
-                        :class="[
-                          'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-                          view.badgeColor,
-                        ]"
-                      >
-                        {{ view.count }}
-                      </span>
-                    </UButton>
-                    <span
-                      v-if="index === 0"
-                      aria-hidden="true"
-                      class="bg-surface-700/60 h-6 w-px self-center"
-                    ></span>
-                  </template>
-                </div>
-                <div
-                  data-testid="hideout-filter-actions"
-                  data-help-target="hideout-filter-actions"
-                  class="flex items-center justify-center gap-2 lg:justify-end"
-                >
-                  <UButton
-                    icon="i-mdi-cog"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    data-help-target="hideout-settings-button"
-                    :aria-label="t('common.settings')"
-                    :aria-pressed="isSettingsOpen"
-                    :class="
-                      isSettingsOpen
-                        ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
-                        : 'text-surface-400'
-                    "
-                    @click="toggleSettingsDrawer"
-                  >
-                    <span class="hidden sm:inline">
-                      {{ t('common.settings').toUpperCase() }}
-                    </span>
-                  </UButton>
-                </div>
-              </div>
+              <SettingsButton
+                page-key="hideout"
+                data-testid="hideout-settings-button"
+                data-help-target="hideout-settings-button"
+                :label="t('page.hideout.settings.title')"
+              />
             </div>
-          </div>
-        </div>
+          </template>
+        </StatusTabBar>
         <UModal
           v-model:open="showPrereqConfirm"
           :title="prereqConfirmTitle"
@@ -148,10 +100,6 @@
             >
               <HideoutCard
                 :station="hStation"
-                :collapsed="
-                  getStationStatus(hStation) === 'maxed' &&
-                  preferencesStore.hideoutCollapseCompleted
-                "
                 :highlighted="highlightedStationId === hStation.id"
                 :highlight-module-id="
                   highlightedStationId === hStation.id ? highlightedModuleId : undefined
@@ -180,19 +128,15 @@
       >
         <div
           v-if="isDesktopSettingsDrawerOpen"
-          class="pointer-events-none fixed top-20 right-4 z-30 w-80 xl:w-[22rem]"
+          class="pointer-events-none fixed top-20 right-4 z-30 w-80 xl:w-88"
         >
           <div class="pointer-events-auto">
             <HideoutSettingsDrawer
               mode="docked"
-              :collapse-completed="preferencesStore.hideoutCollapseCompleted"
-              :sort-ready-first="preferencesStore.hideoutSortReadyFirst"
               :require-station-levels="preferencesStore.hideoutRequireStationLevels"
               :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
               :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
               :is-help-tour-active="isHideoutHelpTourActive"
-              @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
-              @update:sort-ready-first="preferencesStore.hideoutSortReadyFirst = $event"
               @update:require-station-levels="handlePrereqToggle('station', $event)"
               @update:require-skill-levels="handlePrereqToggle('skill', $event)"
               @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"
@@ -221,14 +165,10 @@
         <HideoutSettingsDrawer
           v-if="isOverlaySettingsDrawerOpen"
           mode="overlay"
-          :collapse-completed="preferencesStore.hideoutCollapseCompleted"
-          :sort-ready-first="preferencesStore.hideoutSortReadyFirst"
           :require-station-levels="preferencesStore.hideoutRequireStationLevels"
           :require-skill-levels="preferencesStore.hideoutRequireSkillLevels"
           :require-trader-loyalty="preferencesStore.hideoutRequireTraderLoyalty"
           :is-help-tour-active="isHideoutHelpTourActive"
-          @update:collapse-completed="preferencesStore.hideoutCollapseCompleted = $event"
-          @update:sort-ready-first="preferencesStore.hideoutSortReadyFirst = $event"
           @update:require-station-levels="handlePrereqToggle('station', $event)"
           @update:require-skill-levels="handlePrereqToggle('skill', $event)"
           @update:require-trader-loyalty="handlePrereqToggle('trader', $event)"
@@ -240,6 +180,8 @@
 <script setup lang="ts">
   import { useBreakpoints, useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
+  import SettingsButton from '@/components/ui/SettingsButton.vue';
+  import StatusTabBar from '@/components/ui/StatusTabBar.vue';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
@@ -249,9 +191,10 @@
   import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { ALL_TAB_ICON } from '@/utils/statusTones';
   import type { HideoutStation } from '@/types/tarkov';
+  import type { StatusTabItem, StatusTone } from '@/utils/statusTones';
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );
@@ -260,16 +203,15 @@
   const router = useRouter();
   const { t } = useI18n({ useScope: 'global' });
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('hideout');
-  const { isOpen: isSettingsOpen, toggle: toggleSettingsDrawer } = usePageSettingsDrawer('hideout');
+  const { isOpen: isSettingsOpen } = usePageSettingsDrawer('hideout');
   const dockedDrawerBreakpoints = useBreakpoints({ dockedHideoutDrawer: 1768 });
   const isWideEnoughForDockedDrawer = dockedDrawerBreakpoints.greaterOrEqual('dockedHideoutDrawer');
   const { getPageHelpContent } = usePageHelpContent();
   const metadataStore = useMetadataStore();
   const { hideoutStations } = storeToRefs(metadataStore);
   const preferencesStore = usePreferencesStore();
-  const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
-  const { arePrereqsMet, getStationStatus } = useHideoutStationStatus();
+  const { getStationStatus } = useHideoutStationStatus();
   const highlightedStationId = ref<string | null>(null);
   const highlightedModuleId = ref<string | null>(null);
   const helpContent = computed(() => getPageHelpContent('hideout'));
@@ -463,7 +405,7 @@
     },
     setPreference: setPrereqPreference,
   });
-  const { activePrimaryView, isStoreLoading, visibleStations, stationCounts } =
+  const { activePrimaryView, isStoreLoading, visibleStations, stationCounts, stationsForView } =
     useHideoutFiltering();
   useHideoutRouteSync();
   const isDesktopSettingsDrawerOpen = computed(
@@ -478,40 +420,11 @@
   const displayPrimaryView = computed<HideoutPrimaryView>(() => {
     return hideoutHelpPrimaryView.value ?? activePrimaryView.value;
   });
-  const sortReadyFirst = computed(() => preferencesStore.hideoutSortReadyFirst);
   const stationList = computed(() => (hideoutStations.value ?? []) as HideoutStation[]);
-  const isStationReadyToBuild = (station: HideoutStation): boolean => {
-    const currentLevel = progressStore.hideoutLevels?.[station.id]?.self ?? 0;
-    const nextLevel = [...station.levels]
-      .sort((leftLevel, rightLevel) => leftLevel.level - rightLevel.level)
-      .find((level) => level.level === currentLevel + 1);
-    if (!nextLevel) return false;
-    return arePrereqsMet(nextLevel);
-  };
-  const sortStationsByReadiness = (stations: HideoutStation[]) => {
-    if (!sortReadyFirst.value) return stations;
-    return stations
-      .map((station, index) => ({
-        index,
-        ready: isStationReadyToBuild(station),
-        station,
-      }))
-      .sort((leftEntry, rightEntry) => {
-        if (leftEntry.ready === rightEntry.ready) return leftEntry.index - rightEntry.index;
-        return leftEntry.ready ? -1 : 1;
-      })
-      .map((entry) => entry.station);
-  };
-  const filterStationsByView = (stations: HideoutStation[], view: HideoutPrimaryView) => {
-    if (view === 'all') return sortStationsByReadiness(stations);
-    return sortStationsByReadiness(
-      stations.filter((station) => getStationStatus(station) === view)
-    );
-  };
   const displayVisibleStations = computed(() => {
     if (isStoreLoading.value) return [];
     if (!isHideoutHelpTourActive.value) return visibleStations.value;
-    return filterStationsByView(stationList.value, displayPrimaryView.value);
+    return stationsForView(stationList.value, displayPrimaryView.value);
   });
   const selectPrimaryView = (view: HideoutPrimaryView) => {
     if (isHideoutHelpTourActive.value) {
@@ -631,43 +544,32 @@
     }
     handleHideoutHelpStepChange(0);
   });
-  type HideoutPrimaryViewOption = {
-    badgeColor: string;
-    count: number;
-    icon: string;
-    title: string;
+  const PRIMARY_VIEW_TABS: Array<{
     view: HideoutPrimaryView;
-  };
-  const primaryViews = computed<HideoutPrimaryViewOption[]>(() => [
+    labelKey: string;
+    icon: string;
+    tone: StatusTone;
+  }> = [
+    { view: 'all', labelKey: 'common.all', icon: ALL_TAB_ICON, tone: 'neutral' },
     {
-      title: t('common.all'),
-      icon: 'mdi-clipboard-check',
-      view: 'all',
-      count: stationCounts.value.all,
-      badgeColor: 'bg-secondary-600',
-    },
-    {
-      title: t('common.available'),
-      icon: 'mdi-tag-arrow-up-outline',
       view: 'available',
-      count: stationCounts.value.available,
-      badgeColor: 'bg-info-600',
+      labelKey: 'common.available',
+      icon: 'i-mdi-tag-arrow-up-outline',
+      tone: 'info',
     },
-    {
-      title: t('common.locked'),
-      icon: 'mdi-lock',
-      view: 'locked',
-      count: stationCounts.value.locked,
-      badgeColor: 'bg-surface-600 light:text-surface-50',
-    },
-    {
-      title: t('common.maxed'),
-      icon: 'mdi-arrow-collapse-up',
-      view: 'maxed',
-      count: stationCounts.value.maxed,
-      badgeColor: 'bg-success-600',
-    },
-  ]);
+    { view: 'locked', labelKey: 'common.locked', icon: 'i-mdi-lock', tone: 'locked' },
+    { view: 'maxed', labelKey: 'common.maxed', icon: 'i-mdi-arrow-collapse-up', tone: 'success' },
+  ];
+  const primaryViews = computed<StatusTabItem<HideoutPrimaryView>[]>(() =>
+    PRIMARY_VIEW_TABS.map((tab) => ({
+      value: tab.view,
+      label: t(tab.labelKey),
+      icon: tab.icon,
+      tone: tab.tone,
+      count: stationCounts.value[tab.view],
+      helpTarget: `hideout-filter-${tab.view}`,
+    }))
+  );
   const prereqLabels = computed(() => ({
     station: helpText('page.hideout.prereq_filters.station_levels', 'Require station levels'),
     skill: helpText('page.hideout.prereq_filters.skill_levels', 'Require skill levels'),
@@ -731,7 +633,7 @@
     if (activePrimaryView.value !== status) {
       activePrimaryView.value = status;
     }
-    const targetStations = filterStationsByView(stationList.value, status);
+    const targetStations = stationsForView(stationList.value, status);
     const stationIndex = targetStations.findIndex(
       (targetStation) => targetStation.id === stationId
     );

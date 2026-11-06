@@ -1,54 +1,36 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed } from 'vue';
 import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
+import type { PreferenceSettingGroup } from '@/types/filters';
 const { mockState, setters } = vi.hoisted(() => ({
   mockState: {
-    taskCollapseDefault: false,
-    hideTaskRewards: false,
+    requireTraderLevels: true,
   },
   setters: {
-    setTaskCollapseDefault: vi.fn(),
-    setHideTaskRewards: vi.fn(),
+    setTasksRequireTraderLevels: vi.fn(),
+    setHideoutPrimaryView: vi.fn(),
   },
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
-    get getShowRequiredLabels() {
-      return true;
-    },
-    get getShowExperienceRewards() {
-      return true;
-    },
-    get getShowNextQuests() {
-      return true;
-    },
-    get getShowPreviousQuests() {
-      return true;
-    },
     get getTasksRequireTraderLevels() {
-      return true;
-    },
-    get getTaskCollapseDefault() {
-      return mockState.taskCollapseDefault;
-    },
-    get getHideTaskRewards() {
-      return mockState.hideTaskRewards;
-    },
-    get getTaskPrimaryView() {
-      return 'all';
+      return mockState.requireTraderLevels;
     },
     get getHideoutPrimaryView() {
       return 'available';
     },
-    setTaskCollapseDefault: setters.setTaskCollapseDefault,
-    setHideTaskRewards: setters.setHideTaskRewards,
-    setShowRequiredLabels: vi.fn(),
-    setShowExperienceRewards: vi.fn(),
-    setShowNextQuests: vi.fn(),
-    setShowPreviousQuests: vi.fn(),
-    setTasksRequireTraderLevels: vi.fn(),
-    setTaskPrimaryView: vi.fn(),
-    setHideoutPrimaryView: vi.fn(),
+    setTasksRequireTraderLevels: setters.setTasksRequireTraderLevels,
+    setHideoutPrimaryView: setters.setHideoutPrimaryView,
+  }),
+}));
+vi.mock('@/features/tasks/composables/useTaskDisplaySettings', () => ({
+  useTaskDisplaySettings: () => ({
+    groups: computed(() => [
+      { key: 'cards', title: 'cards', settings: [] },
+      { key: 'status_tabs', title: 'status_tabs', settings: [] },
+      { key: 'behavior', title: 'behavior', settings: [] },
+    ]),
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -57,19 +39,17 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (key: string) => key,
   }),
 }));
-const UCheckboxStub = {
-  template:
-    '<button type="button" role="checkbox" :aria-label="label" :aria-checked="modelValue" @click="$emit(\'update:modelValue\', !modelValue)" />',
-  props: ['modelValue', 'label'],
-  emits: ['update:modelValue'],
+const PreferenceSettingGroupsStub = {
+  name: 'PreferenceSettingGroups',
+  template: '<div data-testid="preference-groups" />',
+  props: ['groups', 'testIdPrefix'],
 };
 const createWrapper = () =>
   mount(TaskDisplayCard, {
     global: {
       stubs: {
         GenericCard: { template: '<div><slot name="content" /></div>' },
-        USeparator: true,
-        UCheckbox: UCheckboxStub,
+        PreferenceSettingGroups: PreferenceSettingGroupsStub,
         SelectMenuFixed: true,
       },
       mocks: {
@@ -77,32 +57,34 @@ const createWrapper = () =>
       },
     },
   });
-describe('TaskDisplayCard compact options', () => {
+const renderedGroups = (wrapper: ReturnType<typeof createWrapper>) =>
+  wrapper.findComponent(PreferenceSettingGroupsStub).props('groups') as PreferenceSettingGroup[];
+describe('TaskDisplayCard', () => {
   beforeEach(() => {
-    mockState.taskCollapseDefault = false;
-    mockState.hideTaskRewards = false;
+    mockState.requireTraderLevels = true;
     vi.clearAllMocks();
   });
-  it('removes the density selector and keeps only the hideout default view', () => {
-    const wrapper = createWrapper();
-    expect(wrapper.text()).not.toContain('settings.interface.tasks.density');
-    const selectors = wrapper.findAll('select-menu-fixed-stub');
-    expect(selectors).toHaveLength(1);
-    expect(selectors[0]!.element.parentElement?.querySelector('p')?.textContent?.trim()).toBe(
-      'common.hideout'
-    );
+  it('renders the shared task display groups followed by task availability', () => {
+    const groups = renderedGroups(createWrapper());
+    expect(groups.map((group) => group.key)).toEqual([
+      'cards',
+      'status_tabs',
+      'behavior',
+      'availability',
+    ]);
   });
-  it('always shows collapse and reward controls and persists toggles', async () => {
-    const wrapper = createWrapper();
-    const collapseToggle = wrapper.find(
-      '[aria-label="settings.interface.tasks.collapse_by_default"]'
+  it('persists the trader level availability toggle', () => {
+    const availability = renderedGroups(createWrapper()).find(
+      (group) => group.key === 'availability'
     );
-    const rewardsToggle = wrapper.find('[aria-label="settings.interface.tasks.hide_rewards"]');
-    expect(collapseToggle.exists()).toBe(true);
-    expect(rewardsToggle.exists()).toBe(true);
-    await collapseToggle.trigger('click');
-    expect(setters.setTaskCollapseDefault).toHaveBeenCalledWith(true);
-    await rewardsToggle.trigger('click');
-    expect(setters.setHideTaskRewards).toHaveBeenCalledWith(true);
+    const setting = availability?.settings[0];
+    expect(setting?.get()).toBe(true);
+    setting?.set(false);
+    expect(setters.setTasksRequireTraderLevels).toHaveBeenCalledWith(false);
+  });
+  it('keeps the hideout default view selector', () => {
+    const wrapper = createWrapper();
+    expect(wrapper.findAll('select-menu-fixed-stub')).toHaveLength(1);
+    expect(wrapper.text()).toContain('common.hideout');
   });
 });

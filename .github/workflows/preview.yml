@@ -1,5 +1,5 @@
 name: Preview
-run-name: Preview CI ${{ inputs.run_id }} request ${{ inputs.request_comment_id || '0' }}
+run-name: Preview CI ${{ inputs.run_id }} request ${{ inputs.request_comment_id || '0' }} control ${{ inputs.request_control_run_id || '0' }}
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
@@ -13,8 +13,17 @@ on:
         description: Successful CI run id for the exact PR revision to preview.
         required: true
         type: string
+      queue:
+        description: Native merge queue CI profile; verified against the source run before deployment.
+        required: false
+        type: boolean
+        default: false
       request_comment_id:
         description: Command authorizing this automatic request; omit for a manual preview.
+        required: false
+        type: string
+      request_control_run_id:
+        description: App-pinned preview enable intent; supplied by the trusted requester.
         required: false
         type: string
       authorization:
@@ -25,19 +34,23 @@ on:
         description: Exact CI attempt selected by the trusted requester.
         required: false
         type: string
-# Repeated requests for the same CI run replace an older attempt. Late results are also rejected
-# by revision checks.
+# Native queue deployment, smoke/result jobs and retention share one lifecycle lock. Ordinary
+# previews use a per-CI-run group so fork approval waits cannot block queue deployment or cleanup.
 concurrency:
-  group: preview-${{ inputs.run_id }}
-  cancel-in-progress: true
+  group: ${{ inputs.queue && 'pages-preview-lifecycle' || format('preview-ci-{0}', inputs.run_id) }}
+  queue: ${{ inputs.queue && 'max' || 'single' }}
+  cancel-in-progress: ${{ !inputs.queue }}
 permissions:
   contents: read
 env:
   PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
+  REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
+  REVIEW_ADMISSION_BOT_ID: ${{ vars.REVIEW_ADMISSION_BOT_ID }}
+  REVIEW_ADMISSION_INSTALLATION_ID: ${{ vars.REVIEW_ADMISSION_INSTALLATION_ID }}
 jobs:
   plan:
     name: Plan preview
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: read
@@ -56,7 +69,7 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
       - name: Resolve candidate and verify evidence
@@ -64,7 +77,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RUN_ID_INPUT: ${{ inputs.run_id }}
+          QUEUE_INPUT: ${{ inputs.queue }}
           REQUEST_COMMENT_ID_INPUT: ${{ inputs.request_comment_id }}
+          REQUEST_CONTROL_RUN_ID_INPUT: ${{ inputs.request_control_run_id }}
           AUTHORIZATION_INPUT: ${{ inputs.authorization }}
           CI_ATTEMPT_INPUT: ${{ inputs.ci_attempt }}
         with:
@@ -74,7 +89,7 @@ jobs:
               github,
               context,
               core,
-              inputs: { run_id: process.env.RUN_ID_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
+              inputs: { run_id: process.env.RUN_ID_INPUT, queue: process.env.QUEUE_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT, request_control_run_id: process.env.REQUEST_CONTROL_RUN_ID_INPUT, authorization: process.env.AUTHORIZATION_INPUT, ci_attempt: process.env.CI_ATTEMPT_INPUT },
               workspace: process.env.RUNNER_TEMP,
             });
             core.setOutput('decision', JSON.stringify(decision));
@@ -90,7 +105,7 @@ jobs:
     name: Deploy preview
     needs: plan
     if: needs.plan.outputs.action == 'deploy'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # A live maintainer /preview command authorizes the PR through `preview`, including forks.
     # Forks without that opt-in use `preview-fork`, with manual review or an admin override.
@@ -102,6 +117,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
+      statuses: read
     outputs:
       url: ${{ steps.verify-deployment.outputs.url }}
       deployment_id: ${{ steps.verify-deployment.outputs.deployment_id }}
@@ -114,12 +130,12 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
       - name: Activate packageManager
         run: bash scripts/setup/ensure-pnpm.sh
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -132,6 +148,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DECISION: ${{ needs.plan.outputs.decision }}
+          QUEUE_INPUT: ${{ inputs.queue }}
         with:
           script: |
             const { verifyForDeploy } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
@@ -141,9 +158,14 @@ jobs:
               context,
               core,
               decision,
+              queue: process.env.QUEUE_INPUT,
               destination: `${process.env.RUNNER_TEMP}/preview-dist`,
             });
             core.setOutput('head_sha', manifest.headSha);
+            core.setOutput('source_ci_run_id', decision.runId);
+            core.setOutput('source_ci_attempt', manifest.runAttempt);
+            core.setOutput('tree_sha', manifest.treeSha);
+            core.setOutput('pull_request', manifest.pullRequest ?? '');
             core.setOutput('digest', manifest.digest);
             core.setOutput('preview_branch', manifest.previewBranch);
       - name: Upload verified output to the Pages preview environment
@@ -154,6 +176,7 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
           PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
           HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+          SOURCE_CI_RUN_ID: ${{ steps.verify.outputs.source_ci_run_id }}
         run: |
           set -euo pipefail
           case "$PREVIEW_BRANCH" in
@@ -168,7 +191,7 @@ jobs:
             --project-name tarkovtracker \
             --branch "$PREVIEW_BRANCH" \
             --commit-hash "$HEAD_SHA" \
-            --commit-message "Actions preview for $HEAD_SHA" \
+            --commit-message "Actions preview for $HEAD_SHA CI $SOURCE_CI_RUN_ID controller $GITHUB_RUN_ID" \
             --commit-dirty=true
       - name: Verify deployment record
         id: verify-deployment
@@ -179,11 +202,16 @@ jobs:
           EXPECTED_PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
           EXPECTED_HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
           EXPECTED_DIGEST: ${{ steps.verify.outputs.digest }}
+          # Verified build identity, recorded so the merge queue can reuse an identical tree.
+          VERIFIED_TREE_SHA: ${{ steps.verify.outputs.tree_sha }}
+          VERIFIED_PULL_REQUEST: ${{ steps.verify.outputs.pull_request }}
+          SOURCE_CI_RUN_ID: ${{ steps.verify.outputs.source_ci_run_id }}
+          SOURCE_CI_ATTEMPT: ${{ steps.verify.outputs.source_ci_attempt }}
           EVIDENCE_PATH: ${{ runner.temp }}/deployment-evidence.json
         run: node scripts/preview/verify-deployment.mjs
       - name: Retain deployment evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: preview-deployment-${{ steps.verify.outputs.head_sha || github.run_id }}
           path: ${{ runner.temp }}/deployment-evidence.json
@@ -192,8 +220,8 @@ jobs:
   smoke:
     name: Preview smoke tests
     needs: [plan, deploy]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
     permissions:
       contents: read
     steps:
@@ -204,7 +232,38 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Install pinned browser
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 18
+        # The ubuntu-24.04 image already ships Chromium's shared libraries; Playwright's apt host
+        # dependency install only added optional CJK/Thai/X11 fonts through the Ubuntu mirror, which
+        # intermittently stalls for minutes. Install the headless shell from Playwright's CDN, and
+        # install host dependencies through apt only when the browser cannot launch.
+        # Worst case: 3 x 105s downloads + 2 x 225s apt attempts + one 180s lock wait = 945s.
+        run: |
+          probe() {
+            node -e "import('@playwright/test').then(async ({ chromium }) => (await chromium.launch()).close())"
+          }
+          downloaded=false
+          for attempt in 1 2 3; do
+            timeout -k 15 90 pnpm exec playwright install --only-shell chromium && downloaded=true && break
+            echo "::warning::Browser download attempt $attempt failed or stalled."
+          done
+          if [ "$downloaded" != true ]; then
+            echo "::error::Browser download failed after 3 attempts."
+            exit 1
+          fi
+          probe && exit 0
+          echo "::warning::Chromium cannot launch on this runner image; installing host dependencies."
+          echo 'DPkg::Lock::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout >/dev/null
+          for attempt in 1 2; do
+            if [ "$attempt" -gt 1 ]; then
+              timeout 180 sh -c 'while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done' \
+                || echo "::warning::dpkg lock still held after 180s."
+            fi
+            timeout -k 15 210 pnpm exec playwright install-deps chromium && probe && exit 0
+            echo "::warning::Browser dependency install attempt $attempt failed or stalled."
+          done
+          echo "::error::Chromium still cannot launch after installing host dependencies."
+          exit 1
       - name: Run smoke tests against the unique deployment URL
         env:
           PREVIEW_URL: ${{ needs.deploy.outputs.url }}
@@ -217,7 +276,7 @@ jobs:
         run: pnpm exec playwright test --config scripts/preview/smoke/playwright.config.mjs
       - name: Retain smoke evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: preview-smoke-${{ needs.deploy.outputs.head_sha || github.run_id }}
           path: ${{ runner.temp }}/smoke-report
@@ -227,7 +286,7 @@ jobs:
     name: Publish preview result
     needs: [plan, deploy, smoke]
     if: always() && needs.plan.outputs.action != 'ignore'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       actions: read
@@ -240,7 +299,7 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
       - name: Publish Preview Result

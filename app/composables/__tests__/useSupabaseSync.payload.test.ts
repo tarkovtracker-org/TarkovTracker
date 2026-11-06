@@ -4,6 +4,7 @@ import { createPinia, defineStore, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { defaultState } from '@/stores/progressState';
+import { reconcileRemoteSnapshot } from '@/stores/tarkov/realtimeListener';
 import { ProgressSyncSession } from '@/stores/tarkov/syncSession';
 const { sendProgressSync, user } = vi.hoisted(() => ({
   sendProgressSync: vi.fn(),
@@ -39,6 +40,7 @@ describe('progress sync payload equality', () => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
     sendProgressSync.mockReset().mockResolvedValue({ error: null });
+    vi.mocked(reconcileRemoteSnapshot).mockClear();
     user.id = 'user-1';
     user.loggedIn = true;
   });
@@ -94,6 +96,89 @@ describe('progress sync payload equality', () => {
     await sync.retryNow();
     expect(sendProgressSync).toHaveBeenCalledTimes(2);
     expect(sync.hasPendingChanges!()).toBe(false);
+  });
+  it('holds an oversized payload without retrying it and recovers after an edit', async () => {
+    sendProgressSync.mockResolvedValue({
+      error: { code: 'P0001', message: 'p_modes exceeds the maximum payload size' },
+    });
+    const { store, sync } = startSync();
+    store.pvp.displayName = 'oversized';
+    await nextTick();
+    await sync.syncToSupabase();
+    expect(sync.saveStatus.value).toMatchObject({
+      state: 'failed',
+      failure: 'payload_too_large',
+      nextRetryAt: null,
+    });
+    await vi.advanceTimersByTimeAsync(120000);
+    await sync.retryNow();
+    window.dispatchEvent(new Event('online'));
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(sendProgressSync).toHaveBeenCalledTimes(1);
+    expect(sync.hasPendingChanges!()).toBe(true);
+    expect(store.pvp.displayName).toBe('oversized');
+    sendProgressSync.mockResolvedValue({ error: null });
+    store.pvp.displayName = 'recovered';
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(6001);
+    expect(sendProgressSync).toHaveBeenCalledTimes(2);
+    expect(sync.hasPendingChanges!()).toBe(false);
+  });
+  it('recovers an edit held during a deferred snapshot after an oversized rejection', async () => {
+    sendProgressSync.mockResolvedValueOnce({
+      error: { message: 'p_modes exceeds the maximum payload size' },
+    });
+    const { store, sync } = startSync();
+    store.pvp.displayName = 'oversized';
+    await nextTick();
+    await sync.syncToSupabase();
+    const gate = Promise.withResolvers<undefined>();
+    const reading = Promise.withResolvers<undefined>();
+    const snapshot = sync.withSnapshot!(async () => {
+      reading.resolve(undefined);
+      await gate.promise;
+    });
+    await reading.promise;
+    store.pvp.displayName = 'recovered';
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(sendProgressSync).toHaveBeenCalledTimes(1);
+    expect(sync.hasPendingChanges!()).toBe(true);
+    expect(reconcileRemoteSnapshot).not.toHaveBeenCalled();
+    gate.resolve(undefined);
+    await snapshot;
+    expect(sync.hasPendingChanges!()).toBe(true);
+    await vi.advanceTimersByTimeAsync(6001);
+    expect(reconcileRemoteSnapshot).toHaveBeenCalledOnce();
+    expect(vi.mocked(reconcileRemoteSnapshot).mock.invocationCallOrder[0]).toBeLessThan(
+      sendProgressSync.mock.invocationCallOrder[1]!
+    );
+    expect(sendProgressSync).toHaveBeenCalledTimes(2);
+    expect(sendProgressSync.mock.calls[1]?.[2]).toMatchObject({
+      pvp_data: { displayName: 'recovered' },
+    });
+    expect(sync.hasPendingChanges!()).toBe(false);
+  });
+  it('keeps an unchanged rejected payload blocked across snapshots and merge notifications', async () => {
+    sendProgressSync.mockResolvedValue({
+      error: { message: 'p_modes exceeds the maximum payload size' },
+    });
+    const { store, sync } = startSync();
+    store.pvp.displayName = 'oversized';
+    await nextTick();
+    await sync.syncToSupabase();
+    await sync.withSnapshot!(async (reconcile) => {
+      store.$patch(reconcile(JSON.parse(JSON.stringify(store.$state))));
+      await nextTick();
+    });
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(sendProgressSync).toHaveBeenCalledTimes(1);
+    expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: 'payload_too_large' });
+    expect(sync.hasPendingChanges!()).toBe(true);
+    // A notification that does not change the wire payload must not clear the cause either.
+    store.$patch({});
+    await nextTick();
+    expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: 'payload_too_large' });
   });
   it('does not acknowledge an upload that finishes after an owner switch', async () => {
     let finish!: (result: { error: null }) => void;

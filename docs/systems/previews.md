@@ -4,6 +4,16 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 ## Actions-owned Cloudflare previews
 
+Merge-group CI completions also request this trusted pipeline for the live queue integration
+commit. They deploy/smoke-test the anonymous build unless an authenticated prior success
+for the same SHA and digest is reused, or the queue tree is identical to the tree a member PR's
+trusted preview already deployed and smoke-tested after full PR CI
+([queue reuse](../merge-queue-rollout.md#reusing-identical-pr-validation-in-the-queue)). Results
+publish on that queue SHA, with exact-ref, current-main first-parent and attempt-specific CI proof
+repeated before upload and success. Queue builds inherit a member PR's preview only through that
+identical-tree proof, never through a status, digest or fork command grant alone. Activation
+is staged; see [merge queue rollout](../merge-queue-rollout.md).
+
 Open, ready ordinary same-repository PRs targeting main request a preview after successful
 current PR CI, without a command or merge intent. `ready_for_review` and `reopened` reuse
 already-passed current CI; they do not request another build. Drafts pause and `/preview stop`
@@ -65,9 +75,16 @@ PR update → CI (selected validation + security + preview build + manifest + ar
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
-          → smoke tests on the unique deployment URL (5-minute startup window)
+          → shared readiness on the unique deployment URL (5-minute startup window)
+          → smoke tests across two file-level workers; existing serial groups stay ordered
           → freshness recheck → Preview Result success [preview <digest12> v<profile>]
 ```
+
+The smoke runner finishes shared readiness before starting two browser workers. Files may overlap;
+tests within each file keep their existing order and intentional serial groups. Each test retains
+its own browser context, and Access sessions remain scoped to the preview origin and process.
+Setup and each worker obtain their own session through the existing native HTTPS exchange. The
+reusable service token never enters the instrumented browser or API client.
 
 ### Result contract
 
@@ -79,13 +96,15 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
+| PR candidate: main moves after upload, head and CI attempt current | failure: rebuild on current main           |
 
 Statuses target only the validated head SHA, for pull requests and standalone branch previews
 alike, so GitHub shows one required result. They never target the controller's default-branch SHA
 or the test-merge commit: GitHub regenerates a PR's test-merge commit (new SHA, same parents and
 tree) when a merge is attempted, which dropped test-merge statuses and blocked every merge. The
-ruleset's strict freshness requires the head to contain current main at merge time, so a
-head-bound result cannot merge against a stale base. The status links to the controller run summary, which
+merge queue requires a separate `Preview Result` on the queue commit built on current main, so a
+head-bound result cannot merge against a stale base (strict freshness, if restored for rollback,
+instead requires the head to contain current main). The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
 Artifact claims still bind to the test merge. When GitHub has not computed it yet, the controller
 retries and leaves the required result pending. A regenerated test merge is the same candidate only
@@ -93,8 +112,32 @@ when both commits have the current base and head as parents and identical trees.
 build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
 and its base is current main, including when the change set has no deployable paths. The comparison is
 repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
-with no result, or whose latest result is pending only because the test merge was not ready, once
-GitHub has computed the test merge; other pending reasons are left alone.
+with no result, or whose latest result is pending only because the test merge was not ready or the
+CI Result read was missing or unfinished, once GitHub has computed the test merge; other pending reasons are
+left alone. A `CI Result` check without a completed conclusion stays pending instead of failing.
+Because the hourly reconciliation covers only PR heads, the CI `workflow_run` evaluation of a
+completed, successful PR or merge-group run re-reads a missing or unfinished `CI Result` check
+after 3, 6 and 12 seconds before publishing pending; such a read is a stale checks-API response.
+
+### Recovering after a failed-only CI rerun
+
+A failed-only CI rerun can reuse a successful build job from an earlier attempt. Its
+`pages-preview` manifest still names that earlier attempt, so Preview Result rejects it with
+`runAttempt: manifest 1, expected 2` even when the rerun's CI Result succeeds. This is the
+exact-attempt artifact check working as designed; retrying only the preview controller cannot
+rebuild the artifact.
+
+Push a new commit to the candidate branch to start a fresh CI run; an intentional empty commit
+is sufficient when no source change is needed. The new run gets its own rebuilt preview artifact
+and matching manifest. Wait for CI Result and the normal automatic preview on an open, ready
+same-repository PR. Stopped previews need a fresh maintainer `/preview` comment.
+Forks need a live maintainer opt-in or approval through `preview-fork`; a CI run grants neither.
+
+Do not rely on **Re-run all jobs** for recovery with the current fixed artifact name: GitHub can
+retain same-name artifacts across reruns ([artifact client contract](https://github.com/actions/toolkit/blob/main/packages/artifact/src/internal/client.ts)),
+and `findPreviewArtifact` rejects that ambiguity. Do not delete or overwrite retained evidence,
+edit the manifest, reuse an older artifact, or relax attempt verification. A changed head or base
+still needs current revision evidence.
 
 ### Invariants
 
@@ -108,10 +151,23 @@ GitHub has computed the test merge; other pending reasons are left alone.
   and digest are compared with live GitHub state and the recomputed digest before planning and
   again immediately before upload. A superseded attempt, moved head, moved base, or test merge
   with different parents or tree cannot deploy, and a late success is not published for an obsolete
-  candidate. A regenerated test merge with the same parents and tree is the same candidate.
+  candidate. When a newer event owns the head (a push, close, draft, retarget or CI rerun), the
+  late run publishes nothing. Otherwise a PR candidate whose interim status is still the head's
+  newest result reports the staleness. If live main differs from the main the upload verified, no
+  PR event follows and the run's artifact can never match the new test merge, so it publishes a
+  final failure asking for a rebuild on current main. If main is unchanged, the test merge was only
+  briefly unavailable, so the result stays pending under the test-merge retry reason that the
+  hourly reconciliation re-plans. Merge-group entries and standalone branch candidates keep
+  publishing nothing. A regenerated test merge with the same parents and tree is the same
+  candidate.
   A `pull_request` build checks out the test merge, so its tree claim must equal the current test
   merge's tree (not the head commit's, which differs whenever the branch is behind its base); push
-  and dispatched branch builds claim the tree of the commit the run built.
+  and dispatched branch builds claim the tree of the commit the run built. The PR API's base SHA can
+  remain its original snapshot after main advances. That snapshot still binds the run/manifest
+  claims; integration proof instead reads live `heads/main` and requires the current GitHub test
+  merge's ordered parents to be exactly `[live main, PR head]`. The artifact's checked-out merge
+  must have those same parents and tree. This proof is repeated before upload, even when GitHub
+  reports the same test-merge SHA, so advancing main invalidates an older plan.
 - Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
   completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
@@ -220,7 +276,7 @@ GitHub has computed the test merge; other pending reasons are left alone.
   integration for `main` and is unchanged.
 - The public repository's `pull_request_target` use is confined to `preview-state.yml` by a
   repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
-  `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
+  `workflow_run`, `schedule`, and `workflow_dispatch` for that workflow path. GitHub enforces its default
   public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
   external state; `docs/workflow-automation.md` records how to recreate it.
 
@@ -234,6 +290,51 @@ before moving the ordinary preview build out of CI. When an aggregate accepts a 
 documented compatibility window, the window
 applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
 the accepting aggregator version ships in the same change that activates the job.
+
+### Queue preview retention
+
+`.github/workflows/preview-retention.yml` uses trusted main and the protected `preview`
+environment. It runs hourly in dry-run mode until the separately approved environment variable
+`PREVIEW_QUEUE_RETENTION_ENABLED=true` enables bounded cleanup. Manual `apply=true` additionally
+requires a current maintainer. No production, normal PR, unknown or pre-lock deployment is eligible.
+
+Native queue Preview workflows and retention share `pages-preview-lifecycle` with
+`queue: max` and `cancel-in-progress: false` through upload, smoke and authoritative result
+publication. Ordinary PR, fork and release previews use `preview-ci-<CI run id>` instead, so an
+unapproved fork cannot occupy the queue lifecycle lock. Ordinary previews keep `single` pending
+capacity and cancel an earlier request for the same CI run; native queue previews keep `max`
+capacity without cancellation. The trusted requester sets the boolean
+`queue` input from authenticated CI metadata; planning rejects either profile mismatch before
+entering an environment approval wait, and upload verifies it again against the live CI event.
+The existing `preview` and `preview-fork` environments, branch policies, reviewers and secrets
+remain in use. Pending requests are retained up to GitHub's queue bound. The uploader
+records the exact source CI and controller run IDs in immutable Pages deployment metadata.
+Cleanup authenticates those runs and the controller's historical workflow lock, not a branch
+prefix alone. Older deployments without that evidence stay retained.
+
+Deletion requires a preview record at least 48 hours old, a completed same-repository queue CI
+run, exact recomputed SHA/alias identity, an absent original ref, no re-formed live alias, no
+pending queue or unclassified Preview jobs, and a terminal bot-created Preview Result. Positively
+authenticated ordinary previews awaiting approval do not block cleanup; their deployments are
+never deletion candidates. Pending-run classification checks at most 50 controllers per pass;
+larger inventories stay protected. It rechecks the live project,
+deployment identity, refs and pending jobs immediately before each deletion. Canonical production
+and latest project deployments are always protected. API errors, unknown or incomplete protection
+evidence fail closed; lifecycle validation is mandatory before applying.
+
+Pages discovery uses supported 25-record pages and rotates through at most 40 history pages per
+hour plus a metadata request. The window is explicitly partial; absence from it never authorizes
+deletion. Fifty-candidate batches rotate across traversal cycles, and each run permits at most
+10 deletions. Complete bounded GitHub protection evidence remains mandatory. This handles large
+historical projects without repeatedly scanning only new records or silently truncating evidence.
+Dry-run reports include the discovery window, candidates, retained reasons and deletion budget.
+
+GitHub supports `queue: max` before the pinned actionlint parser recognizes it.
+`scripts/ci/actionlint-queue.mjs` strictly validates only the known serialization blocks before
+blanking that field for native lint input. It retains line numbers and every other native
+schema, expression and shell check; unsupported values or changed lock/cancellation settings fail.
+
+Live activation/canary and rollback remain gated by [merge queue rollout](../merge-queue-rollout.md).
 
 ### Opt-in finalization shadow
 
@@ -294,3 +395,11 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `scripts/ci/github-ci-gate.sh`, `scripts/release/release-recovery.mjs` — dual-gate waits for automation
 - `wrangler.toml` — isolated preview variables and game-data KV binding
 - `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests
+
+### Preview commands
+
+`/preview` and `/preview stop` are the only PR preview controls; the former PR Controls panel and
+its Enable/Stop checkboxes were removed. Successful current-head CI, matching artifact identity,
+fork protections, and smoke tests still apply. Stop pauses automatic PR previews and leaves
+existing deployments available. Required merge-group previews and independently authorized
+manual previews use their own authorization.

@@ -4,8 +4,9 @@ import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
 const en = JSON.parse(readFileSync('app/locales/en.json', 'utf8'));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
-    tasks: [{ id: 'prior', name: 'Prior quest' }],
+    tasks: [{ id: 'prior', name: 'Prior quest' }, { id: 'unnamed' }, { id: 'blank', name: '  ' }],
     storyChapters: [{ id: 'story', name: 'Story route' }],
+    traders: [{ id: 'mechanic', name: 'Mechanic' }],
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -20,6 +21,24 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('canonical blocker text', () => {
+  it('uses the same named pool instruction for dashboard blockers', () => {
+    expect(
+      useTaskBlockerText()({
+        type: 'global_variable_unknown',
+        required: 3,
+        compareMethod: '>=',
+        taskPool: {
+          traderId: 'mechanic',
+          loyaltyLevel: 2,
+          verification: 'unresolved',
+          coverage: 'partial',
+          derivation: { type: 'distinctTaskCompletions', taskIds: ['a'] },
+        },
+      })
+    ).toBe(
+      'Complete at least 3 LL2 tasks for Mechanic · Progress unverified · If this task is already available in-game, use Mark available. This does not complete any pool tasks.'
+    );
+  });
   it('names the trader and exact storyline unlock objective', () => {
     expect(
       useTaskBlockerText()({
@@ -30,10 +49,29 @@ describe('canonical blocker text', () => {
       })
     ).toBe('Unlock Prapor: Hand over weapons to Mechanic (Story route)');
   });
+  it.each(['missing-id', 'unnamed', 'blank'])(
+    'explains unavailable trader-unlock data for %s without displaying a raw ID',
+    (taskId) => {
+      expect(
+        useTaskBlockerText()({
+          type: 'trader_unlock',
+          taskId,
+          trader: { id: 'lk', name: 'Lightkeeper' },
+        })
+      ).toBe('Unlock Lightkeeper by completing its required task. Task data is unavailable.');
+      expect(
+        useTaskBlockerText()({
+          type: 'trader_unlock',
+          taskId: 'prior',
+          trader: { id: 'lk', name: 'Lightkeeper' },
+        })
+      ).toBe('Unlock Lightkeeper by completing Prior quest.');
+    }
+  );
   it.each([
     [[], 'completed'],
     [['Complete', 'Failed'], 'completed or failed'],
-    [['Accepted'], 'active or accepted'],
+    [['Accepted'], 'accepted'],
     [['Failed'], 'failed'],
   ])('shows the accepted statuses %j', (status, expected) => {
     const text = useTaskBlockerText()({
@@ -50,5 +88,33 @@ describe('canonical blocker text', () => {
         chapterIds: ['story'],
       })
     ).toContain('Prior quest (failed), or progress one of these story chapters: Story route');
+  });
+  it.each([
+    [
+      { type: 'player_level', current: 12, required: 15, compareMethod: '>=' },
+      'Requires player level 15+ (you: 12).',
+    ],
+    [
+      {
+        type: 'trader_reputation',
+        trader: { id: 'fence', name: 'Fence' },
+        current: 0.1,
+        required: 0.2,
+        compareMethod: '>=',
+      },
+      'Requires Fence reputation 0.20+ (you: 0.10).',
+    ],
+    [
+      { type: 'prestige', current: 0, required: 1, compareMethod: '=' },
+      'Requires Prestige 1 (current: 0).',
+    ],
+    [
+      { type: 'task_counter', current: 3, required: 5, compareMethod: '>=' },
+      'Complete at least 5 tasks from the required pool · 3/5 tracked',
+    ],
+  ] as const)('phrases %o comparisons in plain language', (blocker, expected) => {
+    const text = useTaskBlockerText()(blocker);
+    expect(text).toContain(expected);
+    expect(text).not.toMatch(/[<>]=?|!=/);
   });
 });

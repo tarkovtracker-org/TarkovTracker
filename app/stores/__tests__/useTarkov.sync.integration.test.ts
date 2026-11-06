@@ -3533,6 +3533,50 @@ describe('useTarkov sync integration', () => {
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
     expect(showLoadFailed).not.toHaveBeenCalled();
   });
+  it.each([false, true])(
+    'splits every populated local mode on first sign-in, oversized=%s',
+    async (oversized) => {
+      const objectives = Object.fromEntries(
+        Array.from({ length: 2500 }, (_, i) => [
+          `objective-${i}`.padEnd(40, 'x'),
+          { complete: true, count: 1 },
+        ])
+      );
+      const populated = structuredClone(defaultState);
+      for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
+        populated[mode].level = 7;
+        populated[mode].taskObjectives = structuredClone(objectives);
+      }
+      seedOwnedEnvelope('user-1', populated);
+      single.mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST116', message: 'No rows found' },
+      });
+      modeProgressResult.data = [];
+      rpc.mockImplementation(async (_name, args) => ({
+        error:
+          oversized && Object.hasOwn(args!.p_modes, 'pvp')
+            ? { code: 'P0001', message: 'p_modes exceeds the maximum payload size' }
+            : null,
+      }));
+      if (oversized) {
+        await expect(initializeTarkovSync()).rejects.toThrow(
+          'p_modes exceeds the maximum payload size'
+        );
+        expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+        expect(Object.keys(saved.data.seasonal.taskObjectives)).toHaveLength(2500);
+      } else {
+        await initializeTarkovSync();
+        expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
+      }
+      expect(rpc.mock.calls.map((call) => Object.keys(call[1]!.p_modes))).toEqual([
+        ['pvp'],
+        ['pve'],
+        ['seasonal'],
+      ]);
+    }
+  );
   it('migrates persisted item-only progress when remote row is missing', async () => {
     localStorage.setItem(
       STORAGE_KEYS.progress,

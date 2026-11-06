@@ -25,5 +25,6 @@
   definePageMeta({
     layout: 'default',
     usesWindowScroll: true,
+    scrollToTop: (to) => !to.query.chapter,
   });
 </script>

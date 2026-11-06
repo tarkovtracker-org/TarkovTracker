@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(17);
+SELECT plan(15);
 
 CREATE TEMP TABLE seasonal_progress_fixture AS
 SELECT
@@ -125,18 +125,6 @@ SELECT results_eq(
     FROM seasonal_progress_expected
     ORDER BY game_mode, season_number$$,
   'the sync stores PvP and PvE at season zero and Seasonal at the active season'
-);
-SELECT is(
-  (SELECT pvp_data->>'level' FROM public.user_progress
-   WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)),
-  NULL,
-  'the sync no longer writes the legacy PvP column'
-);
-SELECT is(
-  (SELECT pve_data->>'level' FROM public.user_progress
-   WHERE user_id = (SELECT synced_user_id FROM seasonal_progress_fixture)),
-  NULL,
-  'the sync no longer writes the legacy PvE column'
 );
 
 CREATE TEMP TABLE seasonal_progress_snapshot AS

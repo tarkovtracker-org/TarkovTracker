@@ -19,6 +19,7 @@ import type {
   RequirementComparison,
   StoryChapter,
   Task,
+  TaskProgressionPool,
   TaskRequirement,
   TaskRequirementDiagnostic,
 } from '@/types/tarkov';
@@ -59,6 +60,7 @@ export type TaskBlocker = {
     | 'disabled';
   requirementId?: string;
   variableId?: string;
+  taskPool?: TaskProgressionPool;
   current?: number;
   required?: number;
   compareMethod?: RequirementComparison;
@@ -296,7 +298,7 @@ const createTeamEvaluator = (
   const unlockBlockers = (task: Task): TaskBlocker[] => {
     const traderName = traderNameFor(task);
     if (!traderName) return [];
-    const ids = unlockTaskIds(task, traderName).filter((id) => id !== task.id && tasksById.has(id));
+    const ids = unlockTaskIds(task, traderName).filter((id) => id !== task.id);
     if (traderUnlocked(ids, data)) return [];
     return [
       {

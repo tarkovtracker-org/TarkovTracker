@@ -1,0 +1,52 @@
+name: Review Admission Signal
+# Candidate event definitions have no write permissions and never publish admission.
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  merge_group:
+    types: [checks_requested]
+  check_suite:
+    types: [completed]
+permissions: {}
+# Review bursts (one review plus its inline comments) collapse to the newest signal per PR. A
+# cancelled signal never wakes the controller, and the surviving one makes it reread the live PR,
+# so dropping intermediate signals loses no evidence. Queue and provider-suite signals stay unique.
+concurrency:
+  group: review-admission-signal-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: true
+jobs:
+  signal:
+    name: Admission signal
+    # Provider suites on GitHub's temporary queue commits are not review evidence; the group's
+    # own merge_group signal drives queue admission, so they never wake the serialized controller.
+    if: >-
+      contains(fromJSON('["pull_request_review", "pull_request_review_comment", "merge_group"]'), github.event_name) ||
+      (github.event_name == 'check_suite' && contains(fromJSON('[347564, 1082092]'), github.event.check_suite.app.id) &&
+      !startsWith(github.event.check_suite.head_branch, 'gh-readonly-queue/'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      # A locator is never review evidence: the trusted controller authenticates the
+      # provider suite through GitHub, then rereads the live PR and queue policy.
+      - name: Record provider suite locator
+        if: github.event_name == 'check_suite'
+        env:
+          SUITE_ID: ${{ github.event.check_suite.id }}
+        run: |
+          node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("signal.json", JSON.stringify({ suiteId: Number(process.env.SUITE_ID) }));'
+      - name: Upload provider suite locator
+        if: github.event_name == 'check_suite'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-admission-signal-${{ github.run_attempt }}
+          path: signal.json
+          if-no-files-found: error
+          retention-days: 1
+      # Debounce window: later events for the same PR cancel this run before it can complete.
+      - name: Coalesce review burst
+        if: github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment'
+        run: sleep 45
+      - name: Notify trusted admission controller
+        run: 'true'

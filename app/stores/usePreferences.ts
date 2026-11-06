@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
+import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   normalizeNeededItemsCardStyle,
   normalizeNeededItemsFilterType,
@@ -118,8 +119,6 @@ export interface PreferencesState {
   hideNonKappaTasks: boolean;
   hideCompletedMapObjectives: boolean;
   hideoutPrimaryView?: string | null;
-  hideoutCollapseCompleted: boolean;
-  hideoutSortReadyFirst: boolean;
   hideoutRequireStationLevels: boolean;
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
@@ -157,6 +156,8 @@ export interface PreferencesState {
   pinnedTaskIds: string[];
   // Quests the user hid from the Tasks map (#918); persisted locally only, not synced to Supabase
   mapHiddenTaskIds: string[];
+  // Quests the user hid from every task list; view-only, never changes progress or unlocks
+  hiddenTaskIds: string[];
   mapShowSelfObjectives: boolean;
   mapShowPinnedObjectives: boolean;
   mapShowTeamObjectives: boolean;
@@ -208,8 +209,6 @@ export const preferencesDefaultState: PreferencesState = {
   hideNonKappaTasks: false,
   hideCompletedMapObjectives: false,
   hideoutPrimaryView: null,
-  hideoutCollapseCompleted: false,
-  hideoutSortReadyFirst: false,
   hideoutRequireStationLevels: true,
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
@@ -246,6 +245,7 @@ export const preferencesDefaultState: PreferencesState = {
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
   mapHiddenTaskIds: [],
+  hiddenTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
   mapShowTeamObjectives: true,
@@ -535,9 +535,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getHideoutPrimaryView: (state) => {
       return state.hideoutPrimaryView ?? 'available';
     },
-    getHideoutSortReadyFirst: (state) => {
-      return state.hideoutSortReadyFirst ?? false;
-    },
     getHideoutRequireStationLevels: (state) => {
       return state.hideoutRequireStationLevels ?? true;
     },
@@ -634,6 +631,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getMapHiddenTaskIds: (state) => {
       return state.mapHiddenTaskIds ?? [];
+    },
+    getHiddenTaskIds: (state): string[] => {
+      return normalizeTaskIdList(state.hiddenTaskIds);
     },
     getMapShowSelfObjectives: (state) => {
       return state.mapShowSelfObjectives ?? true;
@@ -951,6 +951,21 @@ export const usePreferencesStore = defineStore('preferences', {
       const clearSet = new Set(taskIds);
       this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => !clearSet.has(id));
     },
+    toggleHiddenTask(taskId: string) {
+      const hidden = this.getHiddenTaskIds;
+      this.hiddenTaskIds = hidden.includes(taskId)
+        ? hidden.filter((id) => id !== taskId)
+        : [...hidden, taskId];
+    },
+    /** Shows the given quests in task lists again, or every hidden quest when omitted. */
+    unhideTasks(taskIds?: readonly string[]) {
+      if (!taskIds) {
+        this.hiddenTaskIds = [];
+        return;
+      }
+      const clearSet = new Set(taskIds);
+      this.hiddenTaskIds = this.getHiddenTaskIds.filter((id) => !clearSet.has(id));
+    },
     // Skills actions
     setSkillSortMode(mode: SkillSortMode) {
       this.skillSortMode = mode;
@@ -1047,8 +1062,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapShowPinnedObjectives',
       'mapShowTeamObjectives',
       'dashboardNoticeDismissed',
-      'hideoutCollapseCompleted',
-      'hideoutSortReadyFirst',
       'hideoutRequireStationLevels',
       'hideoutRequireSkillLevels',
       'hideoutRequireTraderLoyalty',
@@ -1060,6 +1073,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapZoneOpacity',
       'pinnedTaskIds',
       'mapHiddenTaskIds',
+      'hiddenTaskIds',
       'taskFilterPresets',
       'skillSortMode',
       'traderSortMode',

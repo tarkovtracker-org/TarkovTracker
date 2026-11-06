@@ -1,17 +1,9 @@
 <template>
   <div
     :id="`objective-${props.objective.id}`"
-    :role="isRowInteractive ? 'button' : undefined"
-    :tabindex="isRowInteractive ? 0 : undefined"
-    :aria-label="isRowInteractive ? objectiveAriaLabel : undefined"
-    :aria-disabled="isRowInteractive ? undefined : true"
-    class="group flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors"
-    :class="[
-      isComplete ? 'bg-success-500/10' : '',
-      isRowInteractive
-        ? 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 cursor-pointer hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-offset-2'
-        : 'opacity-80',
-    ]"
+    v-bind="rowInteraction"
+    class="group -mx-1.5 flex items-start gap-2 rounded-md px-1.5 py-1 transition-colors"
+    :class="rowClasses"
     @click="handleRowClick"
     @keydown.enter.self="handleRowClick"
     @keydown.space.self.prevent="handleRowClick"
@@ -19,19 +11,16 @@
     @mouseleave="objectiveMouseLeave()"
   >
     <UIcon
-      :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
+      :name="displayObjectiveIcon"
       aria-hidden="true"
-      class="mt-1.5 h-4 w-4 shrink-0"
-      :class="
-        isComplete
-          ? 'text-success-300'
-          : isParentTaskLocked
-            ? 'text-surface-400'
-            : 'text-surface-300 group-hover:text-surface-200'
-      "
+      class="mt-0.5 h-4 w-4 shrink-0"
+      :class="objectiveIconClass"
     />
-    <div class="flex flex-1 flex-wrap items-center gap-2">
-      <div class="min-w-0">
+    <div
+      class="flex min-w-0 flex-1 flex-wrap gap-2"
+      :class="{ 'items-center': isWeaponBuild, 'items-start': !isWeaponBuild }"
+    >
+      <div class="min-w-0 flex-1 basis-48">
         <div class="text-surface-100 text-sm leading-5">
           {{ props.objective?.description }}
           <AppTooltip v-if="objectiveModeCountDifference" :text="objectiveModeCountDifferenceText">
@@ -56,22 +45,26 @@
           variant="keys"
           :required-keys="objectiveRequiredKeys"
         />
+        <div
+          v-if="objectiveSellItems.length"
+          class="border-surface-700/50 bg-surface-800/30 mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1.5"
+          data-objective-display
+        >
+          <ObjectiveItemDisplay v-bind="sellItemDisplayProps" />
+        </div>
         <ObjectiveRequiredItems
           v-if="objectiveEquipment.length"
           variant="equipment"
           :equipment="objectiveEquipment"
         />
-        <AppTooltip
-          v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-          :text="userNeedsTitle"
-        >
+        <AppTooltip v-if="showTeamNeeds" :text="userNeedsTitle">
           <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
             <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
             <span>{{ userNeeds.length }}</span>
           </div>
         </AppTooltip>
       </div>
-      <div class="flex items-center gap-2" data-objective-controls>
+      <div class="ml-auto flex shrink-0 items-center gap-2" data-objective-controls>
         <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
           <button
             type="button"
@@ -124,6 +117,7 @@
 </template>
 <script setup lang="ts">
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {
     isMapViewKey,
@@ -139,7 +133,7 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES } from '@/utils/constants';
-  import type { TaskObjective } from '@/types/tarkov';
+  import type { TarkovItem, TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
   const jumpToMapObjective = inject(jumpToMapObjectiveKey, null);
@@ -151,6 +145,7 @@
     objective: TaskObjective;
   }>();
   const metadataStore = useMetadataStore();
+  const isWeaponBuild = computed(() => props.objective.type === 'buildWeapon');
   const objectives = computed(() => metadataStore.objectives);
   const tarkovStore = useTarkovStore();
   const progressStore = useProgressStore();
@@ -191,8 +186,18 @@
   });
   const objectiveEquipment = computed(() => {
     const obj = fullObjective.value ?? props.objective;
+    if (obj.type === 'sellItem') return [];
     return getObjectiveEquipmentItems(obj);
   });
+  const objectiveSellItems = computed(() => {
+    const objective = fullObjective.value ?? props.objective;
+    if (objective.type !== 'sellItem') return [];
+    const items = objective.items?.length ? objective.items : [objective.item];
+    return items.filter((item): item is TarkovItem => Boolean(item?.id));
+  });
+  const objectiveSellPrimaryItem = computed(
+    () => (fullObjective.value ?? props.objective).item ?? objectiveSellItems.value[0]
+  );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
   });
@@ -209,7 +214,29 @@
   const isParentTaskLocked = computed(() => {
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
+  const sellItemDisplayProps = computed(() => ({
+    primaryItem: objectiveSellPrimaryItem.value,
+    acceptedItems: objectiveSellItems.value,
+    fallbackName: props.objective.description ?? '',
+    paused: isParentTaskLocked.value || isComplete.value,
+  }));
+  const objectiveIconClass = computed(() => {
+    if (isComplete.value) return 'text-success-300';
+    if (isParentTaskLocked.value) return 'text-surface-400';
+    return 'text-surface-300 group-hover:text-surface-200';
+  });
   const isRowInteractive = computed(() => !isParentTaskLocked.value);
+  const rowInteraction = computed(() =>
+    isRowInteractive.value
+      ? { role: 'button', tabindex: 0, 'aria-label': objectiveAriaLabel.value }
+      : { 'aria-disabled': true }
+  );
+  const rowClasses = computed(() => [
+    isComplete.value ? 'bg-success-500/10' : '',
+    isRowInteractive.value
+      ? 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 cursor-pointer hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-offset-2'
+      : 'opacity-80',
+  ]);
   const userNeeds = computed(() => {
     const needingUsers: string[] = [];
     if (fullObjective.value == undefined) {
@@ -235,6 +262,9 @@
       .filter((name): name is string => typeof name === 'string' && name.length > 0)
       .join(', ');
   });
+  const showTeamNeeds = computed(
+    () => userHasTeam.value && activeUserView.value === 'all' && userNeeds.value.length > 0
+  );
   const isHovered = ref(false);
   const objectiveMouseEnter = () => {
     if (isParentTaskLocked.value) return;
@@ -253,6 +283,9 @@
     }
     return 'mdi-help-circle';
   });
+  const displayObjectiveIcon = computed(() =>
+    objectiveIcon.value.startsWith('mdi-') ? `i-${objectiveIcon.value}` : objectiveIcon.value
+  );
   const objectiveModeCountDifference = computed(() =>
     metadataStore.getObjectiveModeCountDifference(props.objective.id)
   );
@@ -298,7 +331,8 @@
     trackTaskProgressInteraction?.(taskId, 'objective_progress');
   };
   const isObjectiveControlEvent = (event: Event) =>
-    event.target instanceof Element && Boolean(event.target.closest('[data-objective-controls]'));
+    event.target instanceof Element &&
+    Boolean(event.target.closest('[data-objective-controls], [data-objective-display]'));
   const handleRowClick = (event: Event) => {
     if (isObjectiveControlEvent(event)) return;
     if (isParentTaskLocked.value) return;
