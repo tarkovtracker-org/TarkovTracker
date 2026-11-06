@@ -454,13 +454,32 @@ Updates run before row preparation; both sync RPCs and row preparation canonical
 incoming records before their bounded availability merge. Fresh inserts are normalized by a
 same-transaction update after insertion: normalizing in `BEFORE INSERT` would erase the alias
 identity from `EXCLUDED` before an upsert can compare it with the existing canonical record.
+Account inserts validate availability entries without capping or changing their IDs/clocks until
+that comparison finishes; the final account row is sanitized even with an empty alias ledger.
+Invalid confirmations are filtered before alias selection so they cannot displace valid ones.
 The existing RPC signatures, account locks, access checks and season rules remain authoritative.
+Profile sync locks its mode row before alias reconciliation, so a concurrent writer cannot change
+the canonical record after alias provenance has been consumed.
 
-Validation lives in `task_identity_aliases.test.sql` and `task-identity-concurrency.mjs`.
+Validation lives in `supabase/tests/database/task_identity_aliases.test.sql` and
+`scripts/checks/task-identity-concurrency.mjs`.
 The SQL fixtures match the exported API contracts fixtures from commit `31576d1`; the concurrency
 check observes real row-lock waits for API writes and default/profile upserts. Run the full
 `pnpm run supabase:check` in an isolated local Supabase project. The concurrency script accepts no
-remote database URL or credentials and restores its temporary test ledger.
+remote database URL or credentials, requires local Docker socket endpoints, pins every exec to
+that socket, and restores its temporary test ledger.
+SIGINT/SIGTERM also restore the ledger and remove the fixture user. A forced kill or host failure
+can bypass cleanup; reset that isolated local database with `pnpm exec supabase db reset --no-seed`
+before reusing it.
+
+### Files and invariants
+
+- `supabase/migrations/20261106155525_reconcile_permanent_task_identities.sql`: empty trusted ledger,
+  service-only RPC, account/profile write guards and pre-cap reconciliation.
+- The SQL and concurrency checks above assert canonical collision precedence, reset isolation,
+  mode isolation and preservation of unrelated confirmations at the count/byte limits.
+- Clients cannot supply trusted aliases. Unmapped IDs stay intact; activated aliases are permanent.
+- Neither this migration nor its rollout rewrites historical rows in bulk.
 
 ### Release order and remaining consumer work
 
@@ -471,7 +490,8 @@ remote database URL or credentials and restores its temporary test ledger.
    production pin until that archive is published and consumer validation passes.
 3. That consumer PR must propagate aliases with tasks-core metadata through live and precomputed
    paths and load them before progress reconciliation. Cover startup/local storage, initial sync,
-   realtime, imports, recovery, game profiles, team/public reads and exports. Preserve original
+   realtime, imports, recovery, game profiles, team/public reads, prestige archive creation/reads
+   and exports. Preserve original
    clocks until alias-family reconciliation; the generic progress merge can otherwise manufacture
    a zero clock or take a maximum count before aliases are considered. Project pinned/hidden task
    preferences per mode so a global list is not destructively rewritten using one mode's map.

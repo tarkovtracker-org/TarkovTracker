@@ -1,5 +1,5 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(42);
 SELECT is(public.get_progress_task_id_aliases()->'modes'->'regular'->'tasks', '{}'::jsonb, 'deployment does not activate aliases');
 SELECT ok(NOT has_function_privilege('anon', 'public.get_progress_task_id_aliases()', 'EXECUTE'), 'anonymous cannot read the service RPC');
 SELECT ok(NOT has_function_privilege('authenticated', 'public.get_progress_task_id_aliases()', 'EXECUTE'), 'browser cannot read the service RPC');
@@ -33,6 +33,64 @@ BEGIN
     '', 'SELECT ' || quote_literal(v_manifest::text) || '::jsonb');
 END;
 $test$;
+-- Direct inserts and the INSERT side of an upsert must not cap duplicate identities first.
+INSERT INTO auth.users(id,email) VALUES ('00000000-0000-0000-0000-000000001321','alias-insert-cap@example.invalid');
+CREATE TEMP TABLE insert_availability AS SELECT
+  (SELECT jsonb_object_agg('unrelated_' || n, jsonb_build_object('requirements','gate','timestamp',n)) FROM generate_series(1,999) n)
+  || '{"placeholder_honest_review":{"requirements":"alias gate","timestamp":3000},"6a764077161e4b45b101566e":{"requirements":"canonical gate","timestamp":2000}}'::jsonb AS value;
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+SELECT '00000000-0000-0000-0000-000000001321','pvp',0,jsonb_build_object('level',1,'taskAvailability',value) FROM insert_availability;
+SELECT is((SELECT count(*)::int FROM public.user_game_mode_progress,
+  LATERAL jsonb_object_keys(progress_data->'taskAvailability') keys
+  WHERE user_id='00000000-0000-0000-0000-000000001321' AND game_mode='pvp'),1000,
+  'fresh insert reconciles duplicate availability identities before the first cap');
+SELECT ok((SELECT (progress_data->'taskAvailability') ? 'unrelated_1'
+  AND progress_data->'taskAvailability'->'6a764077161e4b45b101566e'->>'requirements' = 'alias gate'
+  FROM public.user_game_mode_progress WHERE user_id='00000000-0000-0000-0000-000000001321' AND game_mode='pvp'),
+  'fresh insert retains the oldest unrelated confirmation and the newer alias edit');
+INSERT INTO auth.users(id,email) VALUES ('00000000-0000-0000-0000-000000001322','alias-upsert-cap@example.invalid');
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+VALUES ('00000000-0000-0000-0000-000000001322','pvp',0,
+  '{"level":1,"taskAvailability":{"6a764077161e4b45b101566e":{"requirements":"stored gate","timestamp":2500}}}');
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+SELECT '00000000-0000-0000-0000-000000001322','pvp',0,jsonb_build_object('level',1,'taskAvailability',value) FROM insert_availability
+ON CONFLICT(user_id,game_mode,season_number) DO UPDATE SET progress_data=EXCLUDED.progress_data;
+SELECT is((SELECT count(*)::int FROM public.user_game_mode_progress,
+  LATERAL jsonb_object_keys(progress_data->'taskAvailability') keys
+  WHERE user_id='00000000-0000-0000-0000-000000001322' AND game_mode='pvp'),1000,
+  'upsert insert phase does not discard an unrelated confirmation before resolving identities');
+INSERT INTO auth.users(id,email) VALUES ('00000000-0000-0000-0000-000000001323','alias-invalid@example.invalid');
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+VALUES ('00000000-0000-0000-0000-000000001323','pvp',0,
+  '{"level":1,"taskAvailability":{"placeholder_honest_review":{"requirements":null,"timestamp":30},"6a764077161e4b45b101566e":{"requirements":"valid gate","timestamp":20}}}');
+SELECT is((SELECT progress_data->'taskAvailability' FROM public.user_game_mode_progress
+  WHERE user_id='00000000-0000-0000-0000-000000001323' AND game_mode='pvp'),
+  '{"6a764077161e4b45b101566e":{"requirements":"valid gate","timestamp":20}}'::jsonb,
+  'invalid alias cannot erase valid canonical availability during insert');
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000001323', true);
+SELECT public.sync_user_game_mode_progress('pvp',1,NULL,
+  '{"pvp":{"level":1,"taskAvailability":{"placeholder_honest_review":{"requirements":"invalid clock","timestamp":32503680000001}}}}',NULL);
+SELECT is((SELECT progress_data->'taskAvailability' FROM public.user_game_mode_progress
+  WHERE user_id='00000000-0000-0000-0000-000000001323' AND game_mode='pvp'),
+  '{"6a764077161e4b45b101566e":{"requirements":"valid gate","timestamp":20}}'::jsonb,
+  'invalid alias cannot erase stored canonical availability during sync');
+INSERT INTO auth.users(id,email) VALUES ('00000000-0000-0000-0000-000000001324','alias-insert-bytes@example.invalid');
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+SELECT '00000000-0000-0000-0000-000000001324','pvp',0,jsonb_build_object('level',1,'taskAvailability',
+  (SELECT jsonb_object_agg('unrelated_' || n, jsonb_build_object('requirements',repeat('x',4096),'timestamp',n)) FROM generate_series(1,63) n)
+  || jsonb_build_object('placeholder_honest_review',jsonb_build_object('requirements',repeat('a',3000),'timestamp',3000),
+    '6a764077161e4b45b101566e',jsonb_build_object('requirements',repeat('c',3000),'timestamp',2000)));
+SELECT is((SELECT count(*)::int FROM public.user_game_mode_progress,
+  LATERAL jsonb_object_keys(progress_data->'taskAvailability') keys
+  WHERE user_id='00000000-0000-0000-0000-000000001324' AND game_mode='pvp'),64,
+  'fresh insert reconciles identities before the 256 KiB availability cap');
+INSERT INTO public.user_game_mode_progress(user_id,game_mode,season_number,progress_data)
+SELECT '00000000-0000-0000-0000-000000001324','pve',0,jsonb_build_object('level',1,'taskAvailability',
+  (SELECT jsonb_object_agg('unrelated_' || n, jsonb_build_object('requirements','gate','timestamp',n)) FROM generate_series(1,1001) n));
+SELECT is((SELECT count(*)::int FROM public.user_game_mode_progress,
+  LATERAL jsonb_object_keys(progress_data->'taskAvailability') keys
+  WHERE user_id='00000000-0000-0000-0000-000000001324' AND game_mode='pve'),1000,
+  'insert still enforces the availability cap when the mode has no aliases');
 INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-000000001302', 'aliases@example.invalid');
 INSERT INTO public.user_progress(user_id) VALUES ('00000000-0000-0000-0000-000000001302') ON CONFLICT DO NOTHING;
 INSERT INTO public.user_game_mode_progress(user_id, game_mode, season_number, progress_data)

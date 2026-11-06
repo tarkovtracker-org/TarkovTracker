@@ -103,13 +103,30 @@ BEGIN
 END;
 $$;
 
+-- Keep availability entry validation before identity selection, but defer its aggregate limits.
+-- Reuse the existing validator on one entry at a time and retain original IDs and clocks.
+CREATE FUNCTION private.prepare_task_identity_progress(p_progress jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
+  SELECT CASE WHEN jsonb_typeof(p_progress->'taskAvailability') = 'object' THEN
+    jsonb_set(p_progress, '{taskAvailability}', (
+      SELECT COALESCE(jsonb_object_agg(entry.key, entry.value), '{}'::jsonb)
+      FROM jsonb_each(p_progress->'taskAvailability') entry
+      WHERE public.merge_task_availability('{}'::jsonb,
+        jsonb_set('{}'::jsonb, ARRAY[entry.key], entry.value)) ? entry.key
+    )) ELSE p_progress END;
+$$;
+REVOKE ALL ON FUNCTION private.prepare_task_identity_progress(jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.prepare_task_identity_progress(jsonb) TO service_role;
+
 -- Reconcile before the existing bounded availability merge, which must never spend two slots
 -- on an alias family or reintroduce a stored placeholder. Existing reset/history rules still win.
 CREATE FUNCTION private.merge_task_identity_progress(p_existing jsonb, p_incoming jsonb, p_mode text)
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   SELECT public.merge_manual_activity_progress(
-    private.reconcile_task_identity_progress(p_existing, NULL, p_mode, private.progress_task_id_aliases()),
-    private.reconcile_task_identity_progress(p_incoming, p_existing, p_mode, private.progress_task_id_aliases())
+    private.reconcile_task_identity_progress(private.prepare_task_identity_progress(p_existing), NULL,
+      p_mode, private.progress_task_id_aliases()),
+    private.reconcile_task_identity_progress(private.prepare_task_identity_progress(p_incoming),
+      private.prepare_task_identity_progress(p_existing), p_mode, private.progress_task_id_aliases())
   );
 $$;
 REVOKE ALL ON FUNCTION private.merge_task_identity_progress(jsonb, jsonb, text) FROM PUBLIC, anon, authenticated;
@@ -127,11 +144,15 @@ DECLARE
 BEGIN
   IF TG_OP = 'UPDATE' THEN v_previous := OLD.progress_data; END IF;
   v_canonical := private.reconcile_task_identity_progress(
-    NEW.progress_data, v_previous, NEW.game_mode, private.progress_task_id_aliases()
+    private.prepare_task_identity_progress(NEW.progress_data),
+    private.prepare_task_identity_progress(v_previous), NEW.game_mode, private.progress_task_id_aliases()
   );
   IF TG_OP = 'UPDATE' THEN
     NEW.progress_data := v_canonical;
     RETURN NEW;
+  END IF;
+  IF TG_TABLE_NAME = 'user_game_mode_progress' THEN
+    v_canonical := public.sanitize_user_progress_mode_data(v_canonical);
   END IF;
   IF v_canonical IS NOT DISTINCT FROM NEW.progress_data THEN RETURN NEW; END IF;
   IF TG_TABLE_NAME = 'user_game_mode_progress' THEN
@@ -162,8 +183,8 @@ REVOKE ALL ON FUNCTION private.reconcile_task_identity_map(jsonb, jsonb, jsonb, 
 REVOKE ALL ON FUNCTION private.reconcile_task_identity_progress(jsonb, jsonb, text, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION private.reconcile_task_identities_on_write() FROM PUBLIC, anon, authenticated, service_role;
 
--- Preserve current RPC bodies, signatures, grants, locking, authorization and seasonal guards;
--- only route their pre-persistence merge through the mode-aware identity boundary.
+-- Preserve RPC signatures, grants, account/profile authorization and seasonal guards. Route
+-- pre-persistence merges through the identity boundary with the mode row locked before re-keying.
 CREATE OR REPLACE FUNCTION private.sync_user_game_mode_progress(p_current_game_mode text, p_game_edition integer, p_tarkov_uid bigint, p_modes jsonb, p_seasonal_season_number smallint DEFAULT NULL::smallint)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -366,7 +387,8 @@ BEGIN
     END IF;
     v_season_number := CASE WHEN v_mode = v_seasonal_mode THEN v_active_season ELSE 0 END;
     SELECT progress_data INTO v_existing FROM public.user_profile_mode_progress
-    WHERE profile_id = p_profile_id AND game_mode = v_mode AND season_number = v_season_number;
+    WHERE profile_id = p_profile_id AND game_mode = v_mode AND season_number = v_season_number
+    FOR UPDATE;
     INSERT INTO public.user_profile_mode_progress (
       profile_id, user_id, game_mode, season_number, progress_data
     )
@@ -394,13 +416,23 @@ CREATE OR REPLACE FUNCTION public.prepare_user_game_mode_progress_row()
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
+DECLARE
+  v_insert_availability jsonb;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     NEW.progress_data := private.merge_task_identity_progress(OLD.progress_data, NEW.progress_data, NEW.game_mode);
+  ELSIF jsonb_typeof(NEW.progress_data->'taskAvailability') = 'object' THEN
+    v_insert_availability := private.prepare_task_identity_progress(NEW.progress_data)->'taskAvailability';
+    NEW.progress_data := NEW.progress_data - 'taskAvailability';
   END IF;
   NEW.progress_data := public.sanitize_user_progress_mode_data(
     COALESCE(NEW.progress_data, '{}'::jsonb)
   );
+  -- EXCLUDED must retain valid alias/canonical provenance until the stored row is locked.
+  -- The AFTER INSERT identity trigger always sanitizes the final account row, even with no aliases.
+  IF v_insert_availability IS NOT NULL THEN
+    NEW.progress_data := jsonb_set(NEW.progress_data, '{taskAvailability}', v_insert_availability);
+  END IF;
   IF TG_OP = 'INSERT' THEN
     NEW.progress_updated_at := now();
   ELSIF NEW.progress_data IS DISTINCT FROM OLD.progress_data THEN
