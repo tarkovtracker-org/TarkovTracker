@@ -4,6 +4,7 @@ import { isPlainObject } from './deepMerge';
 import { validProgressionCounters } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import { validTraderTaskGroups } from './overlayTaskGroups';
+import { isInactiveTaskIdAliases } from './overlayTaskIdAliases';
 import type { OverlayData, OverlayRecords } from './overlayTypes';
 const OVERLAY_SECTION_OWNERS = {
   tasks: 'tasks',
@@ -239,6 +240,7 @@ export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
   if (validProgressionCounters(overlay.progressionCounters)) rootNames.add('progressionCounters');
   if (validTraderTaskGroups(overlay.traderTaskGroups)) rootNames.add('traderTaskGroups');
+  if (isInactiveTaskIdAliases(overlay.taskIdAliases)) rootNames.add('taskIdAliases');
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),
