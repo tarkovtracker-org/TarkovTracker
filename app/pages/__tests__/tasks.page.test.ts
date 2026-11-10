@@ -424,14 +424,23 @@ describe('tasks page', () => {
           release = resolve;
         })
     );
-    metadataStoreMock.tasksCoreRevision += 1;
-    await nextTick();
-    handleTaskQueryParamMock.mockClear();
-    await wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
-    await nextTick();
-    expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
-    release();
-    await vi.waitFor(() => expect(handleTaskQueryParamMock).toHaveBeenCalled());
+    // Fake timers before the revision bump also hold the bounded detail wait, so only
+    // `release()` can clear readiness; the deep link then waits on the refresh debounce.
+    vi.useFakeTimers();
+    try {
+      metadataStoreMock.tasksCoreRevision += 1;
+      await nextTick();
+      handleTaskQueryParamMock.mockClear();
+      void wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(wrapper.vm.$router.currentRoute.value.query.task).toBe(defaultTask.id);
+      expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
+      release();
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect(handleTaskQueryParamMock).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it.each([
     'fetchTaskObjectivesData',
