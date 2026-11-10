@@ -30,14 +30,18 @@ describe('markerGlyphs', () => {
   });
   it('builds a pin whose name is text-only and doubles as its accessible name', () => {
     const pin = createMapPinElement('transit', '#cf5959', 'Transit to <Reserve>');
-    expect(pin.className).toBe('map-pin map-pin--transit');
+    expect(pin.classList).toContain('map-pin');
+    expect(pin.classList).toContain('map-pin--transit');
     expect(pin.getAttribute('role')).toBe('img');
-    expect(pin.getAttribute('title')).toBe('Transit to <Reserve>');
+    // The styled label already shows on hover, so there is no duplicate native tooltip.
+    expect(pin.hasAttribute('title')).toBe(false);
     expect(pin.getAttribute('aria-label')).toBe('Transit to <Reserve>');
     expect(pin.style.getPropertyValue('--pin-color')).toBe('#cf5959');
     const head = pin.querySelector('.map-pin-head');
     expect(head?.querySelector('path')?.getAttribute('d')).toBe(MAP_MARKER_GLYPH_PATHS.transit);
-    expect(pin.querySelector('.map-pin-label')?.textContent).toBe('Transit to <Reserve>');
+    const label = pin.querySelector('.map-pin-label');
+    expect(label?.textContent).toBe('Transit to <Reserve>');
+    expect(label?.classList).toContain('border-dashed');
     expect(pin.querySelector('reserve')).toBeNull();
   });
   it('ignores inherited property names when classifying factions', () => {

@@ -1,5 +1,6 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import type { TarkovMap } from '@/types/tarkov';
 const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
   const instance = {
@@ -207,10 +208,10 @@ describe('LeafletMap controls', () => {
       map: {
         ...mapData,
         extracts: [
-          { id: 'a', name: 'Crossroads', faction: 'pmc' },
-          { id: 'b', name: 'Old Gas Station', faction: 'scav' },
-          { id: 'c', name: 'Railroad', faction: 'shared' },
-          { id: 'd', name: 'Scav Co-op Exfil', faction: 'shared' },
+          { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+          { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+          { id: 'c', name: 'Railroad', faction: 'shared', position: { x: 3, y: 0, z: 3 } },
+          { id: 'd', name: 'Scav Co-op Exfil', faction: 'shared', position: { x: 4, y: 0, z: 4 } },
         ],
       },
       showPmcExtracts: true,
@@ -266,7 +267,7 @@ describe('LeafletMap controls', () => {
     mapState.extractLayer = layer();
     mapState.spawnLayer = layer();
     mapState.transitLayer = layer();
-    // The mocked view sits at zoom 4.25, so names show for every pin once the fit zoom is <= 3.25.
+    // The mocked view sits at zoom 4.25; names show for every pin once the fit zoom is <= 3.25.
     mapState.fitZoom = 4;
     const extractMap: TarkovMap = {
       ...mapData,
@@ -299,9 +300,30 @@ describe('LeafletMap controls', () => {
     clicks[1]!();
     expect(pins[0]!.classList.contains('is-open')).toBe(false);
     expect(pins[1]!.classList.contains('is-open')).toBe(true);
+    // Pin clicks bubble to the map; only a click outside every pin closes the open name.
+    const mapClick = mockMapInstance.on.mock.calls
+      .filter(([event]) => event === 'click')
+      .at(-1)?.[1] as (event: { originalEvent: { target: EventTarget } }) => void;
+    mapClick({ originalEvent: { target: pins[1]!.firstElementChild! } });
+    expect(pins[1]!.classList.contains('is-open')).toBe(true);
+    mapClick({ originalEvent: { target: document.body } });
+    expect(pins[1]!.classList.contains('is-open')).toBe(false);
+    clicks[1]!();
     clicks[1]!();
     expect(pins[1]!.classList.contains('is-open')).toBe(false);
     const viewport = wrapper.get('[data-testid="map-viewport"]');
+    expect(viewport.classes()).not.toContain('map-names-visible');
+    // A resize that lowers the whole-map fit zoom makes the current view count as zoomed in.
+    const onResize = mockMapInstance.on.mock.calls
+      .filter(([event]) => event === 'resize')
+      .at(-1)?.[1] as () => void;
+    mapState.fitZoom = 3;
+    onResize();
+    await nextTick();
+    expect(viewport.classes()).toContain('map-names-visible');
+    mapState.fitZoom = 4;
+    onResize();
+    await nextTick();
     expect(viewport.classes()).not.toContain('map-names-visible');
     const row = await openLayersPanel(wrapper);
     expect(row('pmc').attributes('aria-pressed')).toBe('true');

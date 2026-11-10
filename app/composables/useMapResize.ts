@@ -49,11 +49,12 @@ function migrateLegacyHeight(legacyKey: string, choiceKey: string, untouchedHeig
   try {
     const legacy = localStorage.getItem(legacyKey);
     if (legacy === null) return;
-    localStorage.removeItem(legacyKey);
     const choice = readLegacyChoice(legacy, untouchedHeight);
+    // Persist the replacement before deleting the old value, so a storage error cannot lose it.
     if (choice !== null && localStorage.getItem(choiceKey) === null) {
       localStorage.setItem(choiceKey, String(choice));
     }
+    localStorage.removeItem(legacyKey);
   } catch {
     // Storage can be unavailable (privacy modes); the automatic height still works.
   }

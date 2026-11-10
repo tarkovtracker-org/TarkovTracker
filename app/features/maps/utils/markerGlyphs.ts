@@ -43,10 +43,20 @@ function createGlyphSvg(kind: MapMarkerGlyphKind): SVGSVGElement {
   svg.appendChild(path);
   return svg;
 }
+// Pins are plain Leaflet DOM, so their Tailwind utilities live here (Tailwind scans this file).
+// The head's tail tip is the marker position: the head ends 7px above it and the 7px tail fills the
+// gap. The name label is hidden until the pin is hovered, tapped open (`is-open`), or the map shows
+// all names (`map-names-visible` on an ancestor).
+const PIN_CLASS = 'map-pin group/pin relative size-0 cursor-pointer';
+const PIN_HEAD_CLASS =
+  "map-pin-head absolute -top-7.25 -left-2.75 flex size-5.5 items-center justify-center rounded-full border-2 border-white bg-(--pin-color) text-white shadow-md after:absolute after:-bottom-2.25 after:left-1/2 after:-translate-x-1/2 after:border-x-4 after:border-t-7 after:border-x-transparent after:border-t-white after:content-['']";
+const PIN_LABEL_CLASS =
+  'map-pin-label absolute -top-7 left-3.5 hidden rounded-full border-2 border-(--pin-color) bg-surface-900 px-1.75 py-0.75 text-[11px] leading-none font-semibold whitespace-nowrap text-surface-100 shadow-md group-hover/pin:block group-[.is-open]/pin:block in-[.map-names-visible]:block';
+/** Leaflet's marker wrapper: lift a hovered or opened pin and its name above its neighbours. */
+export const MAP_PIN_ICON_CLASS = 'hover:z-100000! has-[.is-open]:z-100000!';
 /**
  * Build a map pin: a colored glyph head whose tail tip sits exactly on the marker position, and a
- * name label beside it. CSS shows the label on hover, when the pin is tapped open, or while names
- * are shown for the whole map; the accessible name is always the label.
+ * name label beside it. The accessible name is always the label.
  */
 export function createMapPinElement(
   kind: MapMarkerGlyphKind,
@@ -54,16 +64,17 @@ export function createMapPinElement(
   label: string
 ): HTMLElement {
   const pin = document.createElement('div');
-  pin.className = `map-pin map-pin--${kind}`;
+  pin.className = `${PIN_CLASS} map-pin--${kind}`;
   pin.style.setProperty('--pin-color', color);
   pin.setAttribute('role', 'img');
-  pin.setAttribute('title', label);
   pin.setAttribute('aria-label', label);
   const head = document.createElement('span');
-  head.className = 'map-pin-head';
-  head.appendChild(createGlyphSvg(kind));
+  head.className = PIN_HEAD_CLASS;
+  const svg = createGlyphSvg(kind);
+  svg.setAttribute('class', 'size-3 drop-shadow-sm');
+  head.appendChild(svg);
   const text = document.createElement('span');
-  text.className = 'map-pin-label';
+  text.className = kind === 'transit' ? `${PIN_LABEL_CLASS} border-dashed` : PIN_LABEL_CLASS;
   text.textContent = label;
   pin.append(head, text);
   return pin;

@@ -92,7 +92,12 @@ describe('useLeafletMapControls', () => {
   it('derives extract/spawn visibility and clamps slider settings', () => {
     const controls = useLeafletMapControls({
       map: ref({
-        extracts: [{ faction: 'shared', name: 'Co-op extract' }],
+        extracts: [
+          { faction: 'shared', name: 'Co-op extract', position: { x: 1, y: 0, z: 1 } },
+          // Layers rows only count extracts the map can draw.
+          { faction: 'pmc', name: 'No position' },
+          { faction: null, name: 'Unknown', position: { x: 2, y: 0, z: 2 } },
+        ],
         id: 'woods',
         spawns: [{ categories: ['player'], position: { x: 1, y: 0, z: 1 }, sides: ['pmc'] }],
       } as TarkovMap),
@@ -101,6 +106,10 @@ describe('useLeafletMapControls', () => {
     });
     expect(controls.hasPmcSpawns.value).toBe(true);
     expect(controls.hasCoopExtracts.value).toBe(true);
+    expect(controls.hasPmcExtracts.value).toBe(false);
+    expect(controls.hasScavExtracts.value).toBe(false);
+    expect(controls.hasSharedExtracts.value).toBe(false);
+    expect(controls.hasUnknownFactionExtracts.value).toBe(true);
     controls.mapZoomSpeed.value = 9;
     controls.mapPanSpeed.value = -4;
     controls.mapZoneOpacity.value = 9;

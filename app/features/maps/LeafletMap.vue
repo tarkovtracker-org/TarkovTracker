@@ -618,6 +618,7 @@
     createMapPinElement,
     getExtractGlyphKind,
     MAP_MARKER_GLYPH_COLOR_KEYS,
+    MAP_PIN_ICON_CLASS,
     type MapMarkerGlyphKind,
   } from '@/features/maps/utils/markerGlyphs';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
@@ -1826,7 +1827,10 @@
     if (openPin && openPin !== pin) openPin.classList.remove('is-open');
     openPin = pin.classList.toggle('is-open') ? pin : null;
   }
-  function closeOpenPin(): void {
+  /** A map click outside every pin closes the open name; clicks on a pin bubble here too. */
+  function closeOpenPin(event?: L.LeafletMouseEvent): void {
+    const target = event?.originalEvent?.target;
+    if (target instanceof Element && target.closest('.map-pin')) return;
     openPin?.classList.remove('is-open');
     openPin = null;
   }
@@ -1841,7 +1845,7 @@
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
     const icon = leafletApi.divIcon({
-      className,
+      className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
       iconAnchor: [0, 0],
       iconSize: undefined,
@@ -1850,9 +1854,9 @@
     const marker = leafletApi.marker([latLng.lat, latLng.lng], {
       icon,
       // Interactive for hover and tap; keyboard stays on the map surface instead of every pin.
+      // Mouse events still bubble so double-click zoom and idle detection work over pins.
       interactive: true,
       keyboard: false,
-      bubblingMouseEvents: false,
       zIndexOffset: 1000,
     });
     marker.on('click', () => togglePinName(pin));
@@ -2054,6 +2058,7 @@
       if (oldInstance && oldInstance !== instance) {
         oldInstance.off('zoomend', handleSpawnZoomChange);
         oldInstance.off('zoomend', updateCurrentMapZoom);
+        oldInstance.off('resize', updateCurrentMapZoom);
         oldInstance.off('click', closeOpenPin);
       }
       if (
@@ -2069,6 +2074,9 @@
       instance.on('zoomend', handleSpawnZoomChange);
       instance.off('zoomend', updateCurrentMapZoom);
       instance.on('zoomend', updateCurrentMapZoom);
+      // A resize changes the whole-map fit zoom that the names threshold is measured from.
+      instance.off('resize', updateCurrentMapZoom);
+      instance.on('resize', updateCurrentMapZoom);
       instance.off('click', closeOpenPin);
       instance.on('click', closeOpenPin);
       updateCurrentMapZoom();
@@ -2132,6 +2140,7 @@
     if (mapInstance.value) {
       mapInstance.value.off('zoomend', handleSpawnZoomChange);
       mapInstance.value.off('zoomend', updateCurrentMapZoom);
+      mapInstance.value.off('resize', updateCurrentMapZoom);
       mapInstance.value.off('click', closeOpenPin);
     }
     if (activePinnedPopupCleanup) {

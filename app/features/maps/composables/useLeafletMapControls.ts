@@ -70,24 +70,22 @@ export function useLeafletMapControls({
   const showCoopExtracts = ref(showSharedExtracts.value);
   const showPmcSpawns = ref(initialShowPmcSpawns);
   const hasPmcSpawns = computed(() => mapPmcSpawns.value.length > 0);
-  const hasSharedExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
-    );
-  });
-  const hasExtractsOf = (faction: 'pmc' | 'scav') =>
-    computed(() => mapExtracts.value.some((extract) => extract.faction === faction));
-  const hasPmcExtracts = hasExtractsOf('pmc');
-  const hasScavExtracts = hasExtractsOf('scav');
-  /** Extracts without a recognized faction are drawn with the Shared row's visibility. */
-  const hasUnknownFactionExtracts = computed(() =>
-    mapExtracts.value.some((extract) => !['pmc', 'scav', 'shared'].includes(extract.faction ?? ''))
+  // Layers rows mirror drawn markers, so availability only counts extracts with a position.
+  const drawableExtracts = computed(() => mapExtracts.value.filter((extract) => extract.position));
+  const hasDrawable = (predicate: (extract: MapExtract) => boolean) =>
+    computed(() => drawableExtracts.value.some(predicate));
+  const hasSharedExtracts = hasDrawable(
+    (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
   );
-  const hasCoopExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && isCoopExtract(extract)
-    );
-  });
+  const hasPmcExtracts = hasDrawable((extract) => extract.faction === 'pmc');
+  const hasScavExtracts = hasDrawable((extract) => extract.faction === 'scav');
+  /** Extracts without a recognized faction are drawn with the Shared row's visibility. */
+  const hasUnknownFactionExtracts = hasDrawable(
+    (extract) => !['pmc', 'scav', 'shared'].includes(extract.faction ?? '')
+  );
+  const hasCoopExtracts = hasDrawable(
+    (extract) => extract.faction === 'shared' && isCoopExtract(extract)
+  );
   const mapZoomSpeed = computed({
     get: () => preferencesStore.getMapZoomSpeed,
     set: (value) => {
