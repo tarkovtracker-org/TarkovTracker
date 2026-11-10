@@ -897,23 +897,43 @@ summary {
   background: transparent;
   border: none;
 }
+/* The glyph chip's center sits on the marker's map position: 2px border + 2px padding + 9px. */
 .extract-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
+  gap: 5px;
+  padding: 2px 8px 2px 2px;
   border: 2px solid transparent;
   border-radius: 999px;
   background-color: var(--color-surface-900);
-  color: var(--color-surface-200);
+  color: var(--color-surface-100);
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;
   box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
-  transform: translate(-50%, calc(-100% - 6px));
+  transform: translate(-13px, -50%);
+}
+.extract-badge--transit {
+  border-style: dashed;
 }
 .extract-badge-label {
   font-weight: 600;
+}
+.map-marker-glyph {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  color: var(--color-white);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
+}
+.map-marker-glyph svg {
+  width: 12px;
+  height: 12px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.45));
 }
 .leaflet-tooltip.spawn-cluster-label {
   background: transparent !important;

@@ -2,7 +2,9 @@ import { useStorage, useWindowSize } from '@vueuse/core';
 import type { Ref } from 'vue';
 export type UseMapResizeOptions = {
   storageKey?: string;
+  /** Fixed height used until resized; omit to size from the window via `autoHeightRatio`. */
   defaultHeight?: number;
+  autoHeightRatio?: number;
   minHeight?: number;
   maxHeightRatio?: number;
   step?: number;
@@ -11,6 +13,8 @@ export interface UseMapResizeReturn {
   mapHeight: Ref<number>;
   mapHeightMax: Readonly<Ref<number>>;
   mapHeightMin: number;
+  isAutoHeight: Readonly<Ref<boolean>>;
+  resetHeight: () => void;
   resizeHandleRef: Ref<HTMLElement | null>;
   isResizing: Readonly<Ref<boolean>>;
   startResize: (event: PointerEvent) => void;
@@ -18,35 +22,74 @@ export interface UseMapResizeReturn {
   onResizeKeydown: (event: KeyboardEvent) => void;
 }
 const MAP_HEIGHT_MIN = 320;
-const MAP_HEIGHT_DEFAULT = 520;
 const MAP_HEIGHT_MAX_FALLBACK = 1200;
 const MAP_HEIGHT_STEP = 24;
+/** Share of the window an untouched map fills, leaving room for its header and legend. */
+const MAP_HEIGHT_AUTO_RATIO = 0.75;
+/** Used before the window is measured (SSR) and as the old fixed tasks map default. */
+const MAP_HEIGHT_FALLBACK = 520;
+/**
+ * Old versions wrote the fixed default to storage on first visit, so a stored value equal to it
+ * means "never resized" and falls back to the automatic height.
+ */
+function createHeightSerializer(untouchedHeight: number) {
+  return {
+    read: (raw: string): number | null => {
+      const value = Number(raw);
+      if (raw === '' || !Number.isFinite(value) || value === untouchedHeight) return null;
+      return value;
+    },
+    write: (value: number | null): string => (value === null ? '' : String(value)),
+  };
+}
+/**
+ * Resizable panel height. Until the user resizes it, the height follows the window (or the fixed
+ * `defaultHeight` when given); a chosen height persists, and `resetHeight` restores the default.
+ */
 export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeReturn {
   const {
     storageKey = 'tasks_map_height',
-    defaultHeight = MAP_HEIGHT_DEFAULT,
+    defaultHeight,
+    autoHeightRatio = MAP_HEIGHT_AUTO_RATIO,
     minHeight = MAP_HEIGHT_MIN,
     maxHeightRatio = 0.85,
     step = MAP_HEIGHT_STEP,
   } = options;
   const { height: windowHeight } = useWindowSize();
-  const mapHeightStorage = useStorage<number>(storageKey, defaultHeight);
+  const mapHeightStorage = useStorage<number | null>(storageKey, null, undefined, {
+    serializer: createHeightSerializer(defaultHeight ?? MAP_HEIGHT_FALLBACK),
+  });
+  const measuredWindowHeight = computed(() =>
+    Number.isFinite(windowHeight.value) && windowHeight.value > 0 ? windowHeight.value : null
+  );
   const mapHeightMax = computed(() => {
-    if (!windowHeight.value) return MAP_HEIGHT_MAX_FALLBACK;
-    return Math.max(minHeight, Math.round(windowHeight.value * maxHeightRatio));
+    if (measuredWindowHeight.value === null) return MAP_HEIGHT_MAX_FALLBACK;
+    return Math.max(minHeight, Math.round(measuredWindowHeight.value * maxHeightRatio));
+  });
+  const clampHeight = (value: number) => Math.min(Math.max(value, minHeight), mapHeightMax.value);
+  const autoHeight = computed(() => {
+    if (defaultHeight !== undefined) return clampHeight(defaultHeight);
+    const viewport = measuredWindowHeight.value;
+    return clampHeight(
+      viewport === null ? MAP_HEIGHT_FALLBACK : Math.round(viewport * autoHeightRatio)
+    );
   });
   const mapHeight = computed({
     get: () => {
-      const nextValue =
-        typeof mapHeightStorage.value === 'number' ? mapHeightStorage.value : defaultHeight;
-      return Math.min(Math.max(nextValue, minHeight), mapHeightMax.value);
+      const stored = mapHeightStorage.value;
+      return typeof stored === 'number' ? clampHeight(stored) : autoHeight.value;
     },
     set: (value: number) => {
-      mapHeightStorage.value = Math.min(Math.max(value, minHeight), mapHeightMax.value);
+      mapHeightStorage.value = clampHeight(value);
     },
   });
+  const isAutoHeight = computed(() => typeof mapHeightStorage.value !== 'number');
+  const resetHeight = () => {
+    mapHeightStorage.value = null;
+  };
   watch(mapHeightMax, (nextMax) => {
-    if (mapHeightStorage.value > nextMax) {
+    const stored = mapHeightStorage.value;
+    if (typeof stored === 'number' && stored > nextMax) {
       mapHeightStorage.value = nextMax;
     }
   });
@@ -122,6 +165,8 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
     mapHeight,
     mapHeightMax,
     mapHeightMin: minHeight,
+    isAutoHeight,
+    resetHeight,
     resizeHandleRef,
     isResizing,
     startResize,

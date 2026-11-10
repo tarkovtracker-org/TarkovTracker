@@ -26,7 +26,7 @@
     </div>
     <template v-else>
       <div
-        class="pointer-events-none absolute inset-x-2 top-2 z-1000 flex flex-wrap items-start justify-between gap-2"
+        class="pointer-events-none absolute inset-x-2 top-2 z-1000 flex flex-wrap items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
       >
         <AppTooltip
           v-if="hasMultipleFloors"
@@ -34,18 +34,20 @@
           :content="{ side: 'right' }"
         >
           <div
-            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg"
+            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg @max-[30rem]:w-full @max-[30rem]:flex-row @max-[30rem]:items-center"
           >
             <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
               {{ t('maps.floors') }}
             </span>
-            <div class="flex flex-col-reverse gap-0.5">
+            <div
+              class="flex flex-col-reverse gap-0.5 @max-[30rem]:min-w-0 @max-[30rem]:flex-row @max-[30rem]:flex-wrap"
+            >
               <button
                 v-for="floor in floors"
                 :key="floor"
                 type="button"
                 :aria-pressed="floor === selectedFloor"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @max-[30rem]:w-auto"
                 :class="
                   floor === selectedFloor
                     ? 'bg-primary-500/15 text-surface-50'
@@ -604,54 +606,37 @@
               </span>
             </button>
           </div>
-          <div v-if="showTransits && hasTransits" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-transit-transfer"
-              class="h-3 w-3"
-              :style="{ color: mapColors.TRANSIT }"
-            />
+          <div v-if="showTransits && hasTransits" class="flex items-center gap-1.5">
+            <MapMarkerGlyph kind="transit" :color="mapColors.TRANSIT" />
             <span>{{ t('maps.layers.transit') }}</span>
           </div>
-          <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
-            <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: mapColors.PMC_SPAWN }" />
+          <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1.5">
+            <span
+              class="h-2.5 w-2.5 rounded-full border border-white"
+              :style="{ backgroundColor: mapColors.PMC_SPAWN }"
+            />
             <span>{{ t('common.pmc_spawn') }}</span>
           </div>
-          <div v-if="showPmcExtracts" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.PMC_EXTRACT }"
-            />
+          <div v-if="showPmcExtracts" class="flex items-center gap-1.5">
+            <MapMarkerGlyph kind="pmc" :color="mapColors.PMC_EXTRACT" />
             <span>{{ t('common.pmc_extract') }}</span>
           </div>
-          <div v-if="showScavExtracts" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.SCAV_EXTRACT }"
-            />
+          <div v-if="showScavExtracts" class="flex items-center gap-1.5">
+            <MapMarkerGlyph kind="scav" :color="mapColors.SCAV_EXTRACT" />
             <span>{{ t('common.scav_extract') }}</span>
           </div>
           <div
             v-if="(showPmcExtracts || showScavExtracts) && hasSharedExtracts"
-            class="flex items-center gap-1"
+            class="flex items-center gap-1.5"
           >
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.SHARED_EXTRACT }"
-            />
+            <MapMarkerGlyph kind="shared" :color="mapColors.SHARED_EXTRACT" />
             <span>{{ t('maps.legend.shared_extract') }}</span>
           </div>
           <div
             v-if="(showPmcExtracts || showScavExtracts) && hasCoopExtracts"
-            class="flex items-center gap-1"
+            class="flex items-center gap-1.5"
           >
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.COOP_EXTRACT }"
-            />
+            <MapMarkerGlyph kind="coop" :color="mapColors.COOP_EXTRACT" />
             <span>{{ t('maps.legend.coop_extract') }}</span>
           </div>
         </div>
@@ -676,12 +661,18 @@
     ZONE_OPACITY_MIN,
     ZOOM_SPEED_MAX,
     ZOOM_SPEED_MIN,
-    isCoopExtract,
     useLeafletMapControls,
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import MapLayerToggle from '@/features/maps/MapLayerToggle.vue';
+  import MapMarkerGlyph from '@/features/maps/MapMarkerGlyph.vue';
+  import {
+    createMarkerBadgeElement,
+    getExtractGlyphKind,
+    MAP_MARKER_GLYPH_COLOR_KEYS,
+    type MapMarkerGlyphKind,
+  } from '@/features/maps/utils/markerGlyphs';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
   import {
     findObjectiveHitStackAtPoint,
@@ -1823,7 +1814,6 @@
     if (!showAnyExtracts) return;
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
-      const isCoop = extract.faction === 'shared' && isCoopExtract(extract);
       const shouldShow =
         extract.faction === 'pmc'
           ? showPmcExtracts.value
@@ -1831,54 +1821,33 @@
             ? showScavExtracts.value
             : showAnyExtracts;
       if (!shouldShow) return;
-      const latLng = gameToLatLng(extract.position.x, extract.position.z);
-      let markerColor: string;
-      switch (extract.faction) {
-        case 'pmc':
-          markerColor = mapColors.value.PMC_EXTRACT;
-          break;
-        case 'scav':
-          markerColor = mapColors.value.SCAV_EXTRACT;
-          break;
-        case 'shared':
-          markerColor = isCoop ? mapColors.value.COOP_EXTRACT : mapColors.value.SHARED_EXTRACT;
-          break;
-        default:
-          markerColor = mapColors.value.DEFAULT_EXTRACT;
-          break;
-      }
-      const extractDot = L.circleMarker([latLng.lat, latLng.lng], {
-        radius: 3,
-        fillColor: markerColor,
-        fillOpacity: 1,
-        color: mapColors.value.EXTRACT_DOT_BORDER,
-        weight: 1,
-        opacity: 1,
-        interactive: false,
-      });
+      const kind = getExtractGlyphKind(extract);
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
-      const extractBadge = document.createElement('div');
-      extractBadge.setAttribute('title', extractName);
-      extractBadge.setAttribute('aria-label', extractName);
-      extractBadge.className = 'extract-badge';
-      extractBadge.style.borderColor = markerColor;
-      const extractLabel = document.createElement('span');
-      extractLabel.className = 'extract-badge-label';
-      extractLabel.textContent = extractName;
-      extractBadge.appendChild(extractLabel);
-      const extractIcon = L.divIcon({
-        className: 'extract-marker',
-        html: extractBadge,
-        iconAnchor: [0, 0],
-        iconSize: undefined,
-      });
-      const labelMarker = L.marker([latLng.lat, latLng.lng], {
-        icon: extractIcon,
-        interactive: false,
-        zIndexOffset: 1000,
-      });
-      extractLayer.value!.addLayer(extractDot);
-      extractLayer.value!.addLayer(labelMarker);
+      extractLayer.value!.addLayer(
+        createBadgeMarker(L, kind, extractName, extract.position, 'extract-marker')
+      );
+    });
+  }
+  /** Place a labeled glyph badge whose icon chip is centered on the game position. */
+  function createBadgeMarker(
+    leafletApi: NonNullable<typeof leaflet.value>,
+    kind: MapMarkerGlyphKind,
+    label: string,
+    position: { x: number; z: number },
+    className: string
+  ): L.Marker {
+    const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
+    const icon = leafletApi.divIcon({
+      className,
+      html: createMarkerBadgeElement(kind, color, label),
+      iconAnchor: [0, 0],
+      iconSize: undefined,
+    });
+    const latLng = gameToLatLng(position.x, position.z);
+    return leafletApi.marker([latLng.lat, latLng.lng], {
+      icon,
+      interactive: false,
+      zIndexOffset: 1000,
     });
   }
   const visibleTransits = computed(() => {
@@ -1893,28 +1862,14 @@
     if (!layer || !L) return;
     layer.clearLayers();
     visibleTransits.value.forEach((transit) => {
-      const badge = document.createElement('div');
-      badge.className = 'extract-badge';
-      badge.style.borderColor = mapColors.value.TRANSIT;
-      badge.style.borderStyle = 'dashed';
-      badge.setAttribute('title', transit.description);
-      const label = document.createElement('span');
-      label.className = 'extract-badge-label';
-      label.textContent = `↗ ${transit.description}`;
-      badge.appendChild(label);
-      const icon = L.divIcon({
-        className: 'extract-marker transit-marker',
-        html: badge,
-        iconAnchor: [0, 0],
-        iconSize: undefined,
-      });
-      const position = gameToLatLng(transit.position.x, transit.position.z);
       layer.addLayer(
-        L.marker([position.lat, position.lng], {
-          icon,
-          interactive: false,
-          zIndexOffset: 1000,
-        })
+        createBadgeMarker(
+          L,
+          'transit',
+          transit.description,
+          transit.position,
+          'extract-marker transit-marker'
+        )
       );
     });
   }

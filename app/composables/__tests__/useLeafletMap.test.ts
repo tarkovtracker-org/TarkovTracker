@@ -877,6 +877,73 @@ describe('useLeafletMap', () => {
       wrapper.unmount();
     });
   });
+  describe('container resize', () => {
+    const resizeMap = {
+      id: 'customs',
+      name: 'Customs',
+      normalizedName: 'customs',
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    } as TarkovMap;
+    const mountWithResizeObserver = async (center: { lat: number; lng: number }) => {
+      let onResize: (() => void) | null = null;
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            onResize = callback;
+          }
+          observe() {}
+          disconnect() {}
+        }
+      );
+      const view = { lat: center.lat, lng: center.lng };
+      // Leaflet returns a fresh LatLng on every getCenter call.
+      const readCenter = () => ({
+        lat: view.lat,
+        lng: view.lng,
+        equals(other: { lat: number; lng: number }) {
+          return other.lat === this.lat && other.lng === this.lng;
+        },
+      });
+      Object.assign(mockMapInstance, { getCenter: vi.fn(readCenter), once: vi.fn() });
+      const mounted = await mountUseLeafletMap(resizeMap);
+      expect(onResize).not.toBeNull();
+      return { ...mounted, view, resize: () => onResize!() };
+    };
+    afterEach(() => {
+      const instance = mockMapInstance as Partial<Record<'getCenter' | 'once', unknown>>;
+      delete instance.getCenter;
+      delete instance.once;
+    });
+    it('refits an untouched map when its container resizes', async () => {
+      const { wrapper, resize } = await mountWithResizeObserver({ lat: 50, lng: 50 });
+      mockMapInstance.fitBounds.mockClear();
+      resize();
+      expect(mockMapInstance.invalidateSize).toHaveBeenCalledWith({ animate: false });
+      expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(expect.anything(), {
+        animate: false,
+      });
+      wrapper.unmount();
+    });
+    it('keeps a panned view when its container resizes', async () => {
+      const { wrapper, view, resize } = await mountWithResizeObserver({ lat: 50, lng: 50 });
+      mockMapInstance.fitBounds.mockClear();
+      view.lat = 10;
+      resize();
+      expect(mockMapInstance.invalidateSize).toHaveBeenCalledWith({ animate: false });
+      expect(mockMapInstance.fitBounds).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+  });
   describe('cleanup', () => {
     it('destroy removes map instance', async () => {
       const mapData = {

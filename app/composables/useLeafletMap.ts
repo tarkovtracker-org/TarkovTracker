@@ -181,12 +181,27 @@ function setInitialMapView(
   instance: L.Map,
   view: MapViewState | null | undefined,
   bounds: L.LatLngBoundsExpression
-): void {
+): boolean {
   if (isRestorableMapView(view)) {
     withoutZoomSnap(instance, () => instance.setView(view.center, view.zoom, { animate: false }));
-    return;
+    return false;
   }
   instance.fitBounds(bounds);
+  return true;
+}
+type FittedView = { center: L.LatLng; zoom: number };
+/** Snapshot the view right after a fit; mocks without view getters never count as fitted. */
+function readFittedView(instance: L.Map): FittedView | null {
+  if (typeof instance.getCenter !== 'function' || typeof instance.getZoom !== 'function') {
+    return null;
+  }
+  return { center: instance.getCenter(), zoom: instance.getZoom() };
+}
+/** True while the user has not panned or zoomed away from the last fitted view. */
+function isStillFitted(instance: L.Map, fitted: FittedView | null): boolean {
+  const current = fitted ? readFittedView(instance) : null;
+  if (!fitted || !current) return false;
+  return current.zoom === fitted.zoom && current.center.equals(fitted.center);
 }
 /** Own the map instance, background loading, marker layers, and their reactive lifecycle. */
 export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapReturn {
@@ -213,6 +228,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const crsKey = ref('');
   const renderKey = ref('');
   let hasAppliedInitialView = false;
+  let fittedView: FittedView | null = null;
   const consumeInitialView = (): MapViewState | null => {
     if (hasAppliedInitialView) return null;
     hasAppliedInitialView = true;
@@ -794,7 +810,8 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
       const bounds = getLeafletBounds(renderConfig);
-      setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
+      const didFit = setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
+      fittedView = didFit ? readFittedView(mapInstance.value) : null;
       // Set initial floor
       selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';
@@ -834,11 +851,13 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     // Setup resize observer
     if (containerRef.value) {
       const handleResize = useDebounceFn(() => {
-        if (mapInstance.value) {
-          mapInstance.value.invalidateSize({ animate: false });
-          // Optional: re-fit bounds if needed, or just invalidate size
-          // refreshView(); // calling refreshView would re-fit bounds
-        }
+        const instance = mapInstance.value;
+        if (!instance) return;
+        // An untouched map keeps fitting its container as it grows or shrinks; a view the user
+        // panned or zoomed is preserved.
+        const shouldRefit = isStillFitted(instance, fittedView);
+        instance.invalidateSize({ animate: false });
+        if (shouldRefit) fitMapToBounds(instance, { animate: false });
       }, 100);
       try {
         resizeObserver = new ResizeObserver(handleResize);
@@ -861,12 +880,19 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       await loadStandardMapSvg(leaflet.value, initToken, loadToken);
     }
   }
+  /** Fit the active render bounds and remember the result for resize-time refitting. */
+  function fitMapToBounds(instance: L.Map, options?: L.FitBoundsOptions): void {
+    // Registered first: moveend fires synchronously for instant fits and after animated ones.
+    instance.once?.('moveend', () => {
+      fittedView = readFittedView(instance);
+    });
+    instance.fitBounds(getLeafletBounds(getRenderConfig()), options);
+    fittedView = readFittedView(instance);
+  }
   function refreshView(): void {
     if (mapInstance.value) {
       mapInstance.value.invalidateSize();
-      const renderConfig = getRenderConfig();
-      const bounds = getLeafletBounds(renderConfig);
-      mapInstance.value.fitBounds(bounds);
+      fitMapToBounds(mapInstance.value);
     }
     resetIdleTimer();
   }
@@ -909,6 +935,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     extractLayer.value = null;
     spawnLayer.value = null;
     transitLayer.value = null;
+    fittedView = null;
     leaflet.value = null;
   }
   // Watch for map changes

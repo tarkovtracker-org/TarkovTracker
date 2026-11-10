@@ -390,7 +390,7 @@ not import quest completions and therefore has no trader/task backfill path.
 The map's independent **Transit** layer shows transit locations from the active mode's
 `json.tarkov.dev` map payload. It defaults on and the toggle appears only when the selected
 map has transit coordinates. Labels use upstream localized descriptions (with the existing
-English fallback), a directional arrow, and a dashed border; the marker color is configurable
+English fallback), the transit glyph, and a dashed border; the marker color is configurable
 alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
 Like extract labels, transit labels remain visible across floors: named map floors have no
 height ranges for matching upstream vertical bounds. Transit conditions are not displayed;
@@ -399,6 +399,22 @@ No overlay additions or additional upstream requests are required.
 
 `app/features/maps/LeafletMap.vue` renders the layer and `useLeafletMapControls` derives its
 visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
+
+## Map markers, legend, and sizing
+
+Extract and transit markers are labeled badges whose colored glyph chip sits exactly on the map
+position. The glyph names who can use the location: PMC (shield), Scav (skull), shared (two
+people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
+`app/features/maps/utils/markerGlyphs.ts` owns the classification and path data; the legend
+renders the same chips through `MapMarkerGlyph.vue`, so the map and legend always match. Chip
+colors come from the customizable marker palette.
+
+The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
+the user drags or keys the resize handle; that choice persists in `tasks_map_height`, and
+double-clicking the handle returns to the automatic height. A stored `520` (the old default that
+was written on first visit) counts as untouched. An untouched view refits the map bounds whenever
+its container resizes; a panned or zoomed view is kept. In containers narrower than 30rem, the
+toolbar and floor picker stack above the map instead of covering it.
 
 ## Map objective visibility and required items
 
