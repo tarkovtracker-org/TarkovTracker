@@ -1,5 +1,5 @@
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
-import type { MapExtract, MapSpawn, TarkovMap } from '@/types/tarkov';
+import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
 type RefLike<T> = { value: T };
 type UseLeafletMapControlsOptions = {
@@ -46,8 +46,9 @@ export function useLeafletMapControls({
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
   const mapExtracts = computed<MapExtract[]>(() => map.value?.extracts ?? []);
   const mapTransits = computed(() =>
-    (map.value?.transits ?? []).filter((transit) =>
-      [transit.position?.x, transit.position?.z].every(Number.isFinite)
+    (map.value?.transits ?? []).filter(
+      (transit): transit is MapTransit & { position: MapPosition } =>
+        [transit.position?.x, transit.position?.z].every(Number.isFinite)
     )
   );
   const hasTransits = computed(() => mapTransits.value.length > 0);

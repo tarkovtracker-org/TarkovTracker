@@ -48,12 +48,12 @@ test('Transit locations toggle independently in inline and fullscreen maps', asy
     await expect(markers).not.toHaveCount(0);
     const count = await markers.count();
     const extracts = surface.getByRole('button', { name: 'PMC', exact: true });
-    const extractsBefore = await extracts.getAttribute('aria-pressed');
+    if ((await extracts.getAttribute('aria-pressed')) !== 'true') await extracts.click();
     await expectHitTarget(toggle);
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(markers).toHaveCount(0);
-    await expect(extracts).toHaveAttribute('aria-pressed', extractsBefore);
+    await expect(extracts).toHaveAttribute('aria-pressed', 'true');
     await toggle.focus();
     await page.keyboard.press('Enter');
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');

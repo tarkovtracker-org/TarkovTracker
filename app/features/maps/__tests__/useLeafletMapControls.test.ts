@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
 import type { TarkovMap } from '@/types/tarkov';
 const createPreferencesStore = () => {
@@ -52,7 +52,7 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
-  it('keeps transits independent and updates them when the map changes', () => {
+  it('keeps transits independent and updates them when the map changes', async () => {
     const map = ref<TarkovMap>({ id: 'empty', name: 'Empty' });
     const controls = useLeafletMapControls({
       map,
@@ -77,13 +77,17 @@ describe('useLeafletMapControls', () => {
         { ...transit, id: 'bad', position: { x: NaN, y: 0, z: 1 } },
         { ...transit, id: 'missing', position: undefined },
       ],
-    } as unknown as TarkovMap;
+    };
     expect(controls.mapTransits.value).toEqual([transit]);
     expect(controls.hasTransits.value).toBe(true);
+    controls.showPmcExtracts.value = true;
+    controls.showScavExtracts.value = true;
+    controls.showPmcSpawns.value = true;
     controls.showTransits.value = false;
-    expect(controls.showPmcExtracts.value).toBe(false);
-    expect(controls.showScavExtracts.value).toBe(false);
-    expect(controls.showPmcSpawns.value).toBe(false);
+    await nextTick();
+    expect(controls.showPmcExtracts.value).toBe(true);
+    expect(controls.showScavExtracts.value).toBe(true);
+    expect(controls.showPmcSpawns.value).toBe(true);
   });
   it('derives extract/spawn visibility and clamps slider settings', () => {
     const controls = useLeafletMapControls({

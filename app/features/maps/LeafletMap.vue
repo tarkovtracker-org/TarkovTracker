@@ -1881,13 +1881,17 @@
       extractLayer.value!.addLayer(labelMarker);
     });
   }
+  const visibleTransits = computed(() => {
+    const hasRenderConfig =
+      isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile);
+    return showTransits.value && hasRenderConfig ? mapTransits.value : [];
+  });
   function createTransitMarkers(): void {
     const layer = transitLayer.value;
     const L = leaflet.value;
     if (!layer || !L) return;
     layer.clearLayers();
-    if (!showTransits.value) return;
-    mapTransits.value.forEach((transit) => {
+    visibleTransits.value.forEach((transit) => {
       const badge = document.createElement('div');
       badge.className = 'extract-badge';
       badge.style.borderColor = mapColors.value.TRANSIT;
@@ -2036,7 +2040,7 @@
   });
   watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
-  watch([showTransits, mapTransits], () => createTransitMarkers());
+  watch(visibleTransits, () => createTransitMarkers());
   watch(
     () => props.showPmcSpawns,
     (value) => {

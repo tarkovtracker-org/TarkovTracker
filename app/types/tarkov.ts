@@ -350,7 +350,7 @@ export interface MapTransit {
   id: string;
   description: string;
   map: string;
-  position: MapPosition;
+  position?: MapPosition;
 }
 export interface MapSpawn {
   zoneName?: string;

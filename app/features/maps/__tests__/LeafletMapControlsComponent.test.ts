@@ -215,12 +215,29 @@ describe('LeafletMap controls', () => {
       map: 'reserve',
       position: { x: 650.64, y: 1.59, z: 124.94 },
     };
+    const transitMap: TarkovMap = {
+      ...mapData,
+      transits: [transit],
+      spawns: [{ position: { x: 1, y: 0, z: 1 }, sides: ['pmc'], categories: ['player'] }],
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    };
     const wrapper = await mountMap({
-      map: { ...mapData, transits: [transit] },
-      showExtracts: false,
+      map: transitMap,
+      showPmcExtracts: true,
+      showScavExtracts: true,
+      showPmcSpawns: true,
     });
     // Exercise the real redraw watcher without depending on SVG load timing.
-    await wrapper.setProps({ map: { ...mapData, transits: [transit] } });
+    await wrapper.setProps({ map: { ...transitMap } });
     const toggle = wrapper.get('button[aria-label="Transit"]');
     expect(toggle.attributes('aria-pressed')).toBe('true');
     expect(marker).toHaveBeenLastCalledWith([124.94, 650.64], expect.any(Object));
@@ -234,8 +251,29 @@ describe('LeafletMap controls', () => {
     expect(toggle.attributes('aria-pressed')).toBe('false');
     expect(transitLayer.clearLayers).toHaveBeenCalledOnce();
     expect(transitLayer.addLayer).toHaveBeenCalledTimes(added);
+    for (const label of ['PMC', 'Scav', 'PMC Spawns']) {
+      expect(wrapper.get(`button[aria-label="${label}"]`).attributes('aria-pressed')).toBe('true');
+    }
     await toggle.trigger('click');
     expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
+    transitLayer.addLayer.mockClear();
+    await wrapper.setProps({ map: { ...transitMap, svg: undefined } });
+    expect(transitLayer.addLayer).not.toHaveBeenCalled();
+    await wrapper.setProps({
+      map: {
+        ...transitMap,
+        svg: undefined,
+        tile: {
+          tilePath: '/tiles/{z}/{x}/{y}.png',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+    });
+    expect(transitLayer.addLayer).toHaveBeenCalled();
     transitLayer.clearLayers.mockClear();
     await wrapper.setProps({ map: { ...mapData, id: 'other', transits: [] } });
     expect(wrapper.find('button[aria-label="Transit"]').exists()).toBe(false);

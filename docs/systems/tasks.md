@@ -385,7 +385,7 @@ not import quest completions and therefore has no trader/task backfill path.
   contract changes still require the separate compatible-producer/preseed/consumer rollout in
   [overlay release verification](./overlay-and-precompute.md#release-verification).
 
-## Map objective visibility and required items
+## Map transit layer
 
 The map's independent **Transit** layer shows transit locations from the active mode's
 `json.tarkov.dev` map payload. It defaults on and the toggle appears only when the selected
@@ -396,6 +396,11 @@ Like extract labels, transit labels remain visible across floors: named map floo
 height ranges for matching upstream vertical bounds. Transit conditions are not displayed;
 this layer identifies locations, not whether a particular player can use them in a raid.
 No overlay additions or additional upstream requests are required.
+
+`app/features/maps/LeafletMap.vue` renders the layer and `useLeafletMapControls` derives its
+visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
+
+## Map objective visibility and required items
 
 **Summary.** The Tasks map derives objective visibility once for map markers and the required-item
 summary. Objectives are categorized as pinned, self, or team, while the summary separately groups
