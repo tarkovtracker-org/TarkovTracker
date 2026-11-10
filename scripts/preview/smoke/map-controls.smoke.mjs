@@ -110,25 +110,29 @@ async function checkToolbarControl(page, control) {
   if (isLayersToggle) return checkDisclosure(control, expanded);
   return checkPopover(page, control);
 }
+async function checkLayerRow(row) {
+  await expectHitTarget(row);
+  const pressed = await row.getAttribute('aria-pressed');
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', flip(pressed));
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', pressed);
+}
+// Leave the disclosure as found so later viewports keep their original layout.
+async function setLayersPanel(layersToggle, expanded) {
+  if ((await layersToggle.getAttribute('aria-expanded')) !== expanded) await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute('aria-expanded', expanded);
+}
 // Layer rows inside the Layers panel must be reachable and flip, then restore their state.
 async function checkLayerRows(surface) {
   const layersToggle = surface.getByTestId('map-layers-toggle');
   await expect(layersToggle).toBeVisible();
   const expanded = await layersToggle.getAttribute('aria-expanded');
-  if (expanded !== 'true') await layersToggle.click();
+  await setLayersPanel(layersToggle, 'true');
   const rows = surface.getByTestId('map-layers-panel').locator('button[aria-pressed]');
   await expect(rows.first()).toBeVisible();
-  for (const row of await rows.all()) {
-    await expectHitTarget(row);
-    const pressed = await row.getAttribute('aria-pressed');
-    await row.click();
-    await expect(row).toHaveAttribute('aria-pressed', flip(pressed));
-    await row.click();
-    await expect(row).toHaveAttribute('aria-pressed', pressed);
-  }
-  // Leave the disclosure as found so later viewports keep their original layout.
-  if (expanded !== 'true') await layersToggle.click();
-  await expect(layersToggle).toHaveAttribute('aria-expanded', expanded);
+  for (const row of await rows.all()) await checkLayerRow(row);
+  await setLayersPanel(layersToggle, expanded);
 }
 async function checkToolbar(page, toolbar) {
   for (const control of await toolbar.getByRole('button').all()) {
