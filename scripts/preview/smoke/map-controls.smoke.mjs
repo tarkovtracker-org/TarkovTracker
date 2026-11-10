@@ -115,7 +115,8 @@ async function checkToolbarControl(page, control) {
 async function checkLayerRows(surface) {
   const layersToggle = surface.getByTestId('map-layers-toggle');
   if ((await layersToggle.count()) === 0) return;
-  if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
+  const expanded = await layersToggle.getAttribute('aria-expanded');
+  if (expanded !== 'true') await layersToggle.click();
   const rows = surface.getByTestId('map-layers-panel').locator('button[aria-pressed]');
   await expect(rows.first()).toBeVisible();
   for (const row of await rows.all()) {
@@ -126,6 +127,9 @@ async function checkLayerRows(surface) {
     await row.click();
     await expect(row).toHaveAttribute('aria-pressed', pressed);
   }
+  // Leave the disclosure as found so later viewports keep their original layout.
+  if (expanded !== 'true') await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute('aria-expanded', expanded);
 }
 async function checkToolbar(page, toolbar) {
   for (const control of await toolbar.getByRole('button').all()) {
