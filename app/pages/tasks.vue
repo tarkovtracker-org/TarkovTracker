@@ -145,6 +145,7 @@
                           role="separator"
                           aria-orientation="horizontal"
                           :aria-label="t('page.tasks.map.resize_handle')"
+                          :aria-description="t('maps.tooltips.drag_to_resize')"
                           :aria-valuemin="mapHeightMin"
                           :aria-valuemax="mapHeightMax"
                           :aria-valuenow="mapHeight"

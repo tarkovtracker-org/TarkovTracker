@@ -460,6 +460,7 @@
           <MapLayersPanel
             v-if="isLayersPanelOpen && layerGroups.length > 0"
             :id="layersPanelId"
+            v-model:always-show-names="alwaysShowNames"
             :groups="layerGroups"
             @toggle="toggleLayer"
             @show-all="showAllLayers"
@@ -472,7 +473,11 @@
       >
         <UIcon name="i-mdi-loading" class="text-surface-200 h-8 w-8 animate-spin" />
       </div>
-      <div class="relative" :class="{ 'min-h-0 flex-1': props.fill }">
+      <div
+        class="relative"
+        :class="{ 'min-h-0 flex-1': props.fill, 'map-names-visible': showAllNames }"
+        data-testid="map-viewport"
+      >
         <div
           ref="mapContainer"
           class="bg-surface-900 w-full rounded ring-1 ring-white/10 ring-inset"
@@ -610,7 +615,7 @@
     type MapLayerItem,
   } from '@/features/maps/utils/mapLayerGroups';
   import {
-    createMarkerBadgeElement,
+    createMapPinElement,
     getExtractGlyphKind,
     MAP_MARKER_GLYPH_COLOR_KEYS,
     type MapMarkerGlyphKind,
@@ -696,6 +701,11 @@
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
     showExtracts: true,
+    // Explicit undefined keeps Vue from casting absent booleans to false, so these fall back to
+    // showExtracts / the spawn default instead of hiding extracts on first load.
+    showPmcExtracts: undefined,
+    showScavExtracts: undefined,
+    showPmcSpawns: undefined,
     showExtractToggle: true,
     showSpawnToggle: true,
     showLegend: true,
@@ -750,6 +760,7 @@
     transitLayer,
     setFloor,
     refreshView,
+    getFitZoom,
     clearMarkers,
   } = useLeafletMap({
     containerRef: mapContainer,
@@ -769,8 +780,11 @@
     mapTransits,
     showTransits,
     hasCoopExtracts,
+    hasPmcExtracts,
     hasPmcSpawns,
+    hasScavExtracts,
     hasSharedExtracts,
+    hasUnknownFactionExtracts,
     mapColors,
     mapColorOptions,
     mapExtracts,
@@ -849,9 +863,11 @@
       transit: showTransits,
       spawns: showPmcSpawns,
       available: {
-        extracts: props.showExtractToggle,
-        shared: hasSharedExtracts.value,
-        coop: hasCoopExtracts.value,
+        pmc: props.showExtractToggle && hasPmcExtracts.value,
+        scav: props.showExtractToggle && hasScavExtracts.value,
+        shared:
+          props.showExtractToggle && (hasSharedExtracts.value || hasUnknownFactionExtracts.value),
+        coop: props.showExtractToggle && hasCoopExtracts.value,
         transit: hasTransits.value,
         spawns: props.showSpawnToggle && hasPmcSpawns.value,
       },
@@ -901,7 +917,18 @@
   });
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
+    fitZoom.value = getFitZoom();
   };
+  // Names appear for every pin once the user zooms in past the whole-map view, where there is room
+  // for them; hover and tap show a single name at any zoom.
+  const NAMES_ZOOM_DELTA = 1;
+  const fitZoom = ref<number | null>(null);
+  const alwaysShowNames = useStorage<boolean>('map_always_show_names', false);
+  const showAllNames = computed(
+    () =>
+      alwaysShowNames.value ||
+      (fitZoom.value !== null && currentMapZoom.value >= fitZoom.value + NAMES_ZOOM_DELTA)
+  );
   const zoomMapBy = (direction: 1 | -1) => {
     const instance = mapInstance.value;
     if (!instance) return;
@@ -1789,12 +1816,22 @@
       if (!extractVisibility[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       extractLayer.value!.addLayer(
-        createBadgeMarker(L, kind, extractName, extract.position, 'extract-marker')
+        createPinMarker(L, kind, extractName, extract.position, 'extract-marker')
       );
     });
   }
-  /** Place a labeled glyph badge whose icon chip is centered on the game position. */
-  function createBadgeMarker(
+  let openPin: HTMLElement | null = null;
+  /** Tap or click shows one pin's name until another pin or the map is clicked. */
+  function togglePinName(pin: HTMLElement): void {
+    if (openPin && openPin !== pin) openPin.classList.remove('is-open');
+    openPin = pin.classList.toggle('is-open') ? pin : null;
+  }
+  function closeOpenPin(): void {
+    openPin?.classList.remove('is-open');
+    openPin = null;
+  }
+  /** Place a glyph pin whose tail tip is the game position; its name shows on demand. */
+  function createPinMarker(
     leafletApi: NonNullable<typeof leaflet.value>,
     kind: MapMarkerGlyphKind,
     label: string,
@@ -1802,18 +1839,24 @@
     className: string
   ): L.Marker {
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
+    const pin = createMapPinElement(kind, color, label);
     const icon = leafletApi.divIcon({
       className,
-      html: createMarkerBadgeElement(kind, color, label),
+      html: pin,
       iconAnchor: [0, 0],
       iconSize: undefined,
     });
     const latLng = gameToLatLng(position.x, position.z);
-    return leafletApi.marker([latLng.lat, latLng.lng], {
+    const marker = leafletApi.marker([latLng.lat, latLng.lng], {
       icon,
-      interactive: false,
+      // Interactive for hover and tap; keyboard stays on the map surface instead of every pin.
+      interactive: true,
+      keyboard: false,
+      bubblingMouseEvents: false,
       zIndexOffset: 1000,
     });
+    marker.on('click', () => togglePinName(pin));
+    return marker;
   }
   const visibleTransits = computed(() => {
     const hasRenderConfig =
@@ -1828,7 +1871,7 @@
     layer.clearLayers();
     visibleTransits.value.forEach((transit) => {
       layer.addLayer(
-        createBadgeMarker(
+        createPinMarker(
           L,
           'transit',
           transit.description,
@@ -2011,6 +2054,7 @@
       if (oldInstance && oldInstance !== instance) {
         oldInstance.off('zoomend', handleSpawnZoomChange);
         oldInstance.off('zoomend', updateCurrentMapZoom);
+        oldInstance.off('click', closeOpenPin);
       }
       if (
         loading ||
@@ -2025,6 +2069,8 @@
       instance.on('zoomend', handleSpawnZoomChange);
       instance.off('zoomend', updateCurrentMapZoom);
       instance.on('zoomend', updateCurrentMapZoom);
+      instance.off('click', closeOpenPin);
+      instance.on('click', closeOpenPin);
       updateCurrentMapZoom();
       waitForSvgAndUpdateMarkers(instance);
     },
@@ -2086,6 +2132,7 @@
     if (mapInstance.value) {
       mapInstance.value.off('zoomend', handleSpawnZoomChange);
       mapInstance.value.off('zoomend', updateCurrentMapZoom);
+      mapInstance.value.off('click', closeOpenPin);
     }
     if (activePinnedPopupCleanup) {
       activePinnedPopupCleanup();

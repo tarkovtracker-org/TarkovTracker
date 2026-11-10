@@ -28,19 +28,35 @@ const MAP_HEIGHT_STEP = 24;
 const MAP_HEIGHT_AUTO_RATIO = 0.75;
 /** Used before the window is measured (SSR) and as the old fixed tasks map default. */
 const MAP_HEIGHT_FALLBACK = 520;
+const heightSerializer = {
+  read: (raw: string): number | null => {
+    const value = Number(raw);
+    return raw === '' || !Number.isFinite(value) ? null : value;
+  },
+  write: (value: number | null): string => (value === null ? '' : String(value)),
+};
+const readLegacyChoice = (raw: string | null, untouchedHeight: number): number | null => {
+  const value = heightSerializer.read(raw ?? '');
+  return value === untouchedHeight ? null : value;
+};
 /**
- * Old versions wrote the fixed default to storage on first visit, so a stored value equal to it
- * means "never resized" and falls back to the automatic height.
+ * One-time move from the old key, which wrote its fixed default on first visit. A stored value
+ * equal to that default means "never resized"; anything else was the user's choice and is kept.
+ * Chosen heights live under a separate key, so a later choice of exactly that value is exact.
  */
-function createHeightSerializer(untouchedHeight: number) {
-  return {
-    read: (raw: string): number | null => {
-      const value = Number(raw);
-      if (raw === '' || !Number.isFinite(value) || value === untouchedHeight) return null;
-      return value;
-    },
-    write: (value: number | null): string => (value === null ? '' : String(value)),
-  };
+function migrateLegacyHeight(legacyKey: string, choiceKey: string, untouchedHeight: number): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy === null) return;
+    localStorage.removeItem(legacyKey);
+    const choice = readLegacyChoice(legacy, untouchedHeight);
+    if (choice !== null && localStorage.getItem(choiceKey) === null) {
+      localStorage.setItem(choiceKey, String(choice));
+    }
+  } catch {
+    // Storage can be unavailable (privacy modes); the automatic height still works.
+  }
 }
 /**
  * Resizable panel height. Until the user resizes it, the height follows the window (or the fixed
@@ -56,8 +72,10 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
     step = MAP_HEIGHT_STEP,
   } = options;
   const { height: windowHeight } = useWindowSize();
-  const mapHeightStorage = useStorage<number | null>(storageKey, null, undefined, {
-    serializer: createHeightSerializer(defaultHeight ?? MAP_HEIGHT_FALLBACK),
+  const choiceKey = `${storageKey}_choice`;
+  migrateLegacyHeight(storageKey, choiceKey, defaultHeight ?? MAP_HEIGHT_FALLBACK);
+  const mapHeightStorage = useStorage<number | null>(choiceKey, null, undefined, {
+    serializer: heightSerializer,
   });
   const measuredWindowHeight = computed(() =>
     Number.isFinite(windowHeight.value) && windowHeight.value > 0 ? windowHeight.value : null
@@ -143,20 +161,19 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
     window.addEventListener('pointercancel', stopResize);
     handle?.addEventListener?.('lostpointercapture', stopResize);
   };
+  // Arrows step, Home/End jump to the limits, and Enter returns to the automatic height.
+  const keyActions: Record<string, () => void> = {
+    ArrowUp: () => (mapHeight.value = mapHeight.value - step),
+    ArrowDown: () => (mapHeight.value = mapHeight.value + step),
+    Home: () => (mapHeight.value = minHeight),
+    End: () => (mapHeight.value = mapHeightMax.value),
+    Enter: resetHeight,
+  };
   const onResizeKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'ArrowUp') {
-      mapHeight.value = mapHeight.value - step;
-      event.preventDefault();
-    } else if (event.key === 'ArrowDown') {
-      mapHeight.value = mapHeight.value + step;
-      event.preventDefault();
-    } else if (event.key === 'Home') {
-      mapHeight.value = minHeight;
-      event.preventDefault();
-    } else if (event.key === 'End') {
-      mapHeight.value = mapHeightMax.value;
-      event.preventDefault();
-    }
+    const action = Object.hasOwn(keyActions, event.key) ? keyActions[event.key] : undefined;
+    if (!action) return;
+    action();
+    event.preventDefault();
   };
   onScopeDispose(() => {
     stopResize();

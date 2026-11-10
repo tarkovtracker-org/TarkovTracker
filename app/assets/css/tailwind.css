@@ -897,43 +897,84 @@ summary {
   background: transparent;
   border: none;
 }
-/* The glyph chip's center sits on the marker's map position: 2px border + 2px padding + 9px. */
-.extract-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px 2px 2px;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-color: var(--color-surface-900);
-  color: var(--color-surface-100);
-  font-size: 11px;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
-  transform: translate(-13px, -50%);
+/*
+ * Map pin: a 22px glyph head on a 7px tail whose tip is the marker's map position (the divIcon
+ * anchor). The name label sits beside the head and is shown on hover, when tapped open, or when
+ * names are shown for the whole map.
+ */
+.map-pin {
+  position: relative;
+  width: 0;
+  height: 0;
+  cursor: pointer;
 }
-.extract-badge--transit {
-  border-style: dashed;
-}
-.extract-badge-label {
-  font-weight: 600;
-}
+.map-pin-head,
 .map-marker-glyph {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  border: 2px solid var(--color-white);
   border-radius: 999px;
   color: var(--color-white);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
 }
+.map-pin-head {
+  position: absolute;
+  top: -29px;
+  left: -11px;
+  width: 22px;
+  height: 22px;
+  background-color: var(--pin-color);
+}
+.map-pin-head::after {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  border-top: 7px solid var(--color-white);
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  content: '';
+  transform: translateX(-50%);
+}
+.map-marker-glyph {
+  width: 18px;
+  height: 18px;
+}
+.map-pin-head svg,
 .map-marker-glyph svg {
   width: 12px;
   height: 12px;
   filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.45));
+}
+.map-pin-label {
+  position: absolute;
+  top: -28px;
+  left: 14px;
+  display: none;
+  padding: 3px 7px;
+  border: 2px solid var(--pin-color);
+  border-radius: 999px;
+  background-color: var(--color-surface-900);
+  color: var(--color-surface-100);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
+}
+.map-pin--transit .map-pin-label {
+  border-style: dashed;
+}
+.map-pin:hover .map-pin-label,
+.map-pin.is-open .map-pin-label,
+.map-names-visible .map-pin-label {
+  display: block;
+}
+/* A hovered or opened pin and its label draw above neighbouring pins. */
+.leaflet-marker-icon:hover,
+.leaflet-marker-icon:has(.map-pin.is-open) {
+  z-index: 100000 !important;
 }
 .leaflet-tooltip.spawn-cluster-label {
   background: transparent !important;

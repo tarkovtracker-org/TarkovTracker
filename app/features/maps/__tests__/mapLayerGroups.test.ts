@@ -15,7 +15,8 @@ const createInput = (available: Partial<MapLayerGroupsInput['available']> = {}) 
     transit: toggle(true),
     spawns: toggle(false),
     available: {
-      extracts: true,
+      pmc: true,
+      scav: true,
       shared: true,
       coop: true,
       transit: true,
@@ -44,7 +45,7 @@ describe('buildMapLayerGroups', () => {
       ['tasks', ['self', 'pinned', 'team']],
       ['extracts', ['pmc', 'scav', 'coop']],
     ]);
-    expect(keysOf(createInput({ extracts: false, coop: true }))).toEqual([
+    expect(keysOf(createInput({ pmc: false, scav: false, shared: false, coop: false }))).toEqual([
       ['tasks', ['self', 'pinned', 'team']],
       ['locations', ['transit', 'spawns']],
     ]);

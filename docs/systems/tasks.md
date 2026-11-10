@@ -402,29 +402,38 @@ visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
 
 ## Map markers, legend, and sizing
 
-Extract and transit markers are labeled badges whose colored glyph chip sits exactly on the map
-position. The glyph names who can use the location: PMC (shield), Scav (skull), shared (two
+Extract and transit markers are pins: a colored glyph head on a short tail whose tip is the exact
+map position. The glyph names who can use the location: PMC (shield), Scav (skull), shared (two
 people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
-`app/features/maps/utils/markerGlyphs.ts` owns the classification and path data. Chip colors
-come from the customizable marker palette.
+`app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
+colors come from the customizable marker palette. A pin's name appears beside it on hover, when
+it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
+zoomed in at least one level past the whole-map fit, or always when **Always show names** is on
+(`map_always_show_names`). The name is also the pin's accessible label. Pins stay out of the
+keyboard tab order; the map surface keeps its own keyboard controls.
 
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
-controls (`MapLayersPanel.vue`, rows built by `app/features/maps/utils/mapLayerGroups.ts`). Rows
-are grouped as Tasks (Regular, Pinned, Team), Extracts (PMC, Scav, Shared, Co-op), and Locations
-(Transit, PMC Spawns). Each row draws the marker exactly as the map does and toggles exactly that
-marker type; hidden rows stay listed, dimmed with an eye-off icon. Marker types the selected map
-lacks are omitted. The collapsed button shows how many rows are hidden, and the panel offers
-**Show all layers** while any are hidden. Shared and co-op extracts have their own toggles and
-start visible when either faction's extracts start visible; extracts without a known faction
-follow the Shared row. The panel opens by default when the map is at least 480 px wide and
-remembers an explicit open or close in `map_layers_panel_open`.
+controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
+`app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
+Extracts (PMC, Scav, Shared, Co-op), and Locations (Transit, PMC Spawns). Each row draws the marker
+as the map does and toggles exactly that marker type; hidden rows stay listed, dimmed with an
+eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
+map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
+**Show all layers** while any are hidden. Shared and co-op extracts have their own toggles and start
+visible when either faction's extracts start visible; extracts without a known faction follow the
+Shared row, which is listed whenever such extracts exist. Extracts are visible by default. The
+panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
+in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
+containers narrower than 30rem.
 
 The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
-the user drags or keys the resize handle; that choice persists in `tasks_map_height`, and
-double-clicking the handle returns to the automatic height. A stored `520` (the old default that
-was written on first visit) counts as untouched. An untouched view refits the map bounds whenever
-its container resizes; a panned or zoomed view is kept. In containers narrower than 30rem, the
-toolbar and floor picker stack above the map instead of covering it.
+the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That
+choice persists in `tasks_map_height_choice`; double-clicking the handle or pressing Enter on it
+returns to the automatic height. On first load, a value in the old `tasks_map_height` key moves
+to the new key unless it equals the old default `520`, which the old code wrote on first visit
+and therefore means "never resized"; the old key is then removed. An untouched view refits the
+map bounds whenever its container resizes; a panned or zoomed view is kept. In containers narrower
+than 30rem, the toolbar and floor picker stack above the map instead of covering it.
 
 ## Map objective visibility and required items
 

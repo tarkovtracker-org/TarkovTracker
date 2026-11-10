@@ -27,18 +27,13 @@ export const MAP_MARKER_GLYPH_COLOR_KEYS: Record<MapMarkerGlyphKind, MapMarkerCo
   transit: 'TRANSIT',
   extract: 'DEFAULT_EXTRACT',
 };
-const FACTION_GLYPHS: Record<string, MapMarkerGlyphKind> = { pmc: 'pmc', scav: 'scav' };
 /** Classify an extract by who can use it; unknown factions keep the generic exit glyph. */
 export function getExtractGlyphKind(extract: MapExtract): MapMarkerGlyphKind {
   if (extract.faction === 'shared') return isCoopExtract(extract) ? 'coop' : 'shared';
-  return FACTION_GLYPHS[extract.faction ?? ''] ?? 'extract';
+  return extract.faction === 'pmc' || extract.faction === 'scav' ? extract.faction : 'extract';
 }
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** Build the colored icon chip that sits exactly on a marker's map position. */
-function createMarkerGlyphElement(kind: MapMarkerGlyphKind, color: string): HTMLElement {
-  const chip = document.createElement('span');
-  chip.className = 'map-marker-glyph';
-  chip.style.backgroundColor = color;
+function createGlyphSvg(kind: MapMarkerGlyphKind): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
@@ -46,24 +41,30 @@ function createMarkerGlyphElement(kind: MapMarkerGlyphKind, color: string): HTML
   path.setAttribute('fill', 'currentColor');
   path.setAttribute('d', MAP_MARKER_GLYPH_PATHS[kind]);
   svg.appendChild(path);
-  chip.appendChild(svg);
-  return chip;
+  return svg;
 }
-/** Build a labeled map badge whose glyph chip is anchored on the marker position. */
-export function createMarkerBadgeElement(
+/**
+ * Build a map pin: a colored glyph head whose tail tip sits exactly on the marker position, and a
+ * name label beside it. CSS shows the label on hover, when the pin is tapped open, or while names
+ * are shown for the whole map; the accessible name is always the label.
+ */
+export function createMapPinElement(
   kind: MapMarkerGlyphKind,
   color: string,
   label: string
 ): HTMLElement {
-  const badge = document.createElement('div');
-  badge.className = `extract-badge extract-badge--${kind}`;
-  badge.style.borderColor = color;
-  badge.setAttribute('title', label);
-  badge.setAttribute('aria-label', label);
-  badge.appendChild(createMarkerGlyphElement(kind, color));
+  const pin = document.createElement('div');
+  pin.className = `map-pin map-pin--${kind}`;
+  pin.style.setProperty('--pin-color', color);
+  pin.setAttribute('role', 'img');
+  pin.setAttribute('title', label);
+  pin.setAttribute('aria-label', label);
+  const head = document.createElement('span');
+  head.className = 'map-pin-head';
+  head.appendChild(createGlyphSvg(kind));
   const text = document.createElement('span');
-  text.className = 'extract-badge-label';
+  text.className = 'map-pin-label';
   text.textContent = label;
-  badge.appendChild(text);
-  return badge;
+  pin.append(head, text);
+  return pin;
 }

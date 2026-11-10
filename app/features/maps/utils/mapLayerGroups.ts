@@ -24,8 +24,10 @@ export interface MapLayerGroupsInput {
   extracts: { pmc: Toggle; scav: Toggle; shared: Toggle; coop: Toggle };
   transit: Toggle;
   spawns: Toggle;
+  /** Whether the selected map has each marker type (task rows are always listed). */
   available: {
-    extracts: boolean;
+    pmc: boolean;
+    scav: boolean;
     shared: boolean;
     coop: boolean;
     transit: boolean;
@@ -71,7 +73,7 @@ function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): 
       color: colors.PMC_EXTRACT,
       swatch: 'pmc',
       visible: extracts.pmc,
-      available: available.extracts,
+      available: available.pmc,
     },
     {
       key: 'scav',
@@ -79,7 +81,7 @@ function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): 
       color: colors.SCAV_EXTRACT,
       swatch: 'scav',
       visible: extracts.scav,
-      available: available.extracts,
+      available: available.scav,
     },
     {
       key: 'shared',
@@ -88,7 +90,7 @@ function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): 
       color: colors.SHARED_EXTRACT,
       swatch: 'shared',
       visible: extracts.shared,
-      available: available.extracts && available.shared,
+      available: available.shared,
     },
     {
       key: 'coop',
@@ -97,7 +99,7 @@ function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): 
       color: colors.COOP_EXTRACT,
       swatch: 'coop',
       visible: extracts.coop,
-      available: available.extracts && available.coop,
+      available: available.coop,
     },
   ];
 }

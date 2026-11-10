@@ -46,6 +46,7 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
       hasMultipleFloors: false,
       isLoading: false,
       leaflet: null as unknown,
+      fitZoom: null as number | null,
       objectiveLayer: null as unknown,
       extractLayer: null as unknown,
       spawnLayer: null as unknown,
@@ -83,6 +84,7 @@ vi.mock('@/composables/useLeafletMap', () => ({
       transitLayer: shallowRef(mapState.transitLayer),
       setFloor: setFloorSpy,
       refreshView: refreshViewSpy,
+      getFitZoom: () => mapState.fitZoom,
       clearMarkers: vi.fn(),
       destroy: vi.fn(),
     };
@@ -174,6 +176,7 @@ describe('LeafletMap controls', () => {
     mapState.extractLayer = null;
     mapState.spawnLayer = null;
     mapState.transitLayer = null;
+    mapState.fitZoom = null;
     localStorage.clear();
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
@@ -249,9 +252,70 @@ describe('LeafletMap controls', () => {
     expect(localStorage.getItem('map_layers_panel_open')).toBe('false');
     wrapper.unmount();
   });
+  it('shows pin names on tap, past the whole-map zoom, or with the always-names switch', async () => {
+    const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    const pinClicks: Array<() => void> = [];
+    const marker = vi.fn(() => ({
+      on: vi.fn((event: string, handler: () => void) => {
+        if (event === 'click') pinClicks.push(handler);
+      }),
+    }));
+    const divIcon = vi.fn((options) => options);
+    mapState.leaflet = { marker, divIcon };
+    mapState.objectiveLayer = layer();
+    mapState.extractLayer = layer();
+    mapState.spawnLayer = layer();
+    mapState.transitLayer = layer();
+    // The mocked view sits at zoom 4.25, so names show for every pin once the fit zoom is <= 3.25.
+    mapState.fitZoom = 4;
+    const extractMap: TarkovMap = {
+      ...mapData,
+      extracts: [
+        { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+        { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+      ],
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    };
+    const wrapper = await mountMap({ map: extractMap });
+    await wrapper.setProps({ map: { ...extractMap } });
+    // Extracts start visible when the parent asks for them, without per-faction props.
+    const pins = divIcon.mock.calls.map(([options]) => options.html as HTMLElement).slice(-2);
+    expect(pins.map((pin) => pin.getAttribute('aria-label'))).toEqual([
+      'Crossroads',
+      'Old Gas Station',
+    ]);
+    const clicks = pinClicks.slice(-2);
+    clicks[0]!();
+    expect(pins[0]!.classList.contains('is-open')).toBe(true);
+    clicks[1]!();
+    expect(pins[0]!.classList.contains('is-open')).toBe(false);
+    expect(pins[1]!.classList.contains('is-open')).toBe(true);
+    clicks[1]!();
+    expect(pins[1]!.classList.contains('is-open')).toBe(false);
+    const viewport = wrapper.get('[data-testid="map-viewport"]');
+    expect(viewport.classes()).not.toContain('map-names-visible');
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    const names = wrapper.get('[data-testid="map-layers-always-names"]');
+    expect(names.attributes('aria-checked')).toBe('false');
+    await names.trigger('click');
+    expect(names.attributes('aria-checked')).toBe('true');
+    expect(viewport.classes()).toContain('map-names-visible');
+    expect(localStorage.getItem('map_always_show_names')).toBe('true');
+    wrapper.unmount();
+  });
   it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
     const transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
-    const marker = vi.fn(() => ({}));
+    const marker = vi.fn(() => ({ on: vi.fn() }));
     const divIcon = vi.fn((options) => options);
     mapState.transitLayer = transitLayer;
     mapState.leaflet = { marker, divIcon };
@@ -298,9 +362,9 @@ describe('LeafletMap controls', () => {
     expect(toggle.attributes('aria-pressed')).toBe('false');
     expect(transitLayer.clearLayers).toHaveBeenCalledOnce();
     expect(transitLayer.addLayer).toHaveBeenCalledTimes(added);
-    for (const key of ['pmc', 'scav', 'spawns']) {
-      expect(row(key).attributes('aria-pressed')).toBe('true');
-    }
+    // This map has no extracts, so only the spawn row sits beside Transit outside the task rows.
+    expect(row('pmc').exists()).toBe(false);
+    expect(row('spawns').attributes('aria-pressed')).toBe('true');
     await toggle.trigger('click');
     expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
     transitLayer.addLayer.mockClear();

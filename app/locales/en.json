@@ -565,6 +565,7 @@
       "pmc": "PMC"
     },
     "layers": {
+      "always_show_names": "Always show names",
       "coop": "Co-op",
       "coop_hint": "PMC and Scav together",
       "groups": {
@@ -572,6 +573,7 @@
         "locations": "Locations"
       },
       "hidden_count": "{count} hidden",
+      "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
       "pmc_spawns": "PMC Spawns",
       "shared": "Shared",
       "shared_hint": "Either faction",
@@ -589,7 +591,7 @@
       "reset_view": "Reset view",
       "open_fullscreen": "Open map full screen",
       "exit_fullscreen": "Exit full screen",
-      "drag_to_resize": "Drag to resize map. Double-click to fit the window again.",
+      "drag_to_resize": "Drag or use the arrow keys to resize the map. Double-click or press Enter to fit the window again.",
       "switch_floor": "Switch floor (Ctrl + Scroll)"
     },
     "help": {

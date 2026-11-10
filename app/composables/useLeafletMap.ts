@@ -56,6 +56,8 @@ export interface UseLeafletMapReturn {
   transitLayer: ShallowRef<L.LayerGroup | null>;
   /** Set the current floor */
   setFloor: (floor: string) => void;
+  /** Zoom at which the whole map fits the container, or null before the map exists */
+  getFitZoom: () => number | null;
   /** Refresh the map view */
   refreshView: () => void;
   /** Clear all markers */
@@ -886,6 +888,12 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     const didFit = setInitialMapView(instance, consumeInitialView(), bounds);
     fittedView = didFit ? readFittedView(instance) : null;
   }
+  /** Zoom at which the whole map fits the container; null before the map exists. */
+  function getFitZoom(): number | null {
+    const instance = mapInstance.value;
+    if (!instance || typeof instance.getBoundsZoom !== 'function') return null;
+    return instance.getBoundsZoom(getLeafletBounds(getRenderConfig()));
+  }
   /** Fit the active render bounds and remember the result for resize-time refitting. */
   function fitMapToBounds(instance: L.Map, options?: L.FitBoundsOptions): void {
     // Registered first: moveend fires synchronously for instant fits and after animated ones.
@@ -1023,6 +1031,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     transitLayer,
     setFloor,
     refreshView,
+    getFitZoom,
     clearMarkers,
     destroy,
   };

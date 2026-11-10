@@ -75,6 +75,14 @@ export function useLeafletMapControls({
       (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
     );
   });
+  const hasExtractsOf = (faction: 'pmc' | 'scav') =>
+    computed(() => mapExtracts.value.some((extract) => extract.faction === faction));
+  const hasPmcExtracts = hasExtractsOf('pmc');
+  const hasScavExtracts = hasExtractsOf('scav');
+  /** Extracts without a recognized faction are drawn with the Shared row's visibility. */
+  const hasUnknownFactionExtracts = computed(() =>
+    mapExtracts.value.some((extract) => !['pmc', 'scav', 'shared'].includes(extract.faction ?? ''))
+  );
   const hasCoopExtracts = computed(() => {
     return mapExtracts.value.some(
       (extract) => extract.faction === 'shared' && isCoopExtract(extract)
@@ -124,8 +132,11 @@ export function useLeafletMapControls({
     mapTransits,
     showTransits,
     hasCoopExtracts,
+    hasPmcExtracts,
     hasPmcSpawns,
+    hasScavExtracts,
     hasSharedExtracts,
+    hasUnknownFactionExtracts,
     mapColors,
     mapColorOptions,
     mapExtracts,

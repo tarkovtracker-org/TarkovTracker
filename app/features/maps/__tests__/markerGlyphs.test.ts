@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createMarkerBadgeElement,
+  createMapPinElement,
   getExtractGlyphKind,
   MAP_MARKER_GLYPH_COLOR_KEYS,
   MAP_MARKER_GLYPH_PATHS,
@@ -28,18 +28,20 @@ describe('markerGlyphs', () => {
       expect(MAP_MARKER_GLYPH_COLOR_KEYS[kind]).toBeTruthy();
     }
   });
-  it('builds a labeled badge with a colored glyph chip and text-only label', () => {
-    const badge = createMarkerBadgeElement('transit', '#cf5959', 'Transit to <Reserve>');
-    expect(badge.className).toBe('extract-badge extract-badge--transit');
-    expect(badge.getAttribute('title')).toBe('Transit to <Reserve>');
-    expect(badge.getAttribute('aria-label')).toBe('Transit to <Reserve>');
-    const chip = badge.querySelector<HTMLElement>('.map-marker-glyph');
-    const reference = document.createElement('span');
-    reference.style.backgroundColor = '#cf5959';
-    expect(chip?.style.backgroundColor).toBe(reference.style.backgroundColor);
-    expect(badge.style.borderColor).toBeTruthy();
-    expect(chip?.querySelector('path')?.getAttribute('d')).toBe(MAP_MARKER_GLYPH_PATHS.transit);
-    expect(badge.querySelector('.extract-badge-label')?.textContent).toBe('Transit to <Reserve>');
-    expect(badge.querySelector('reserve')).toBeNull();
+  it('builds a pin whose name is text-only and doubles as its accessible name', () => {
+    const pin = createMapPinElement('transit', '#cf5959', 'Transit to <Reserve>');
+    expect(pin.className).toBe('map-pin map-pin--transit');
+    expect(pin.getAttribute('role')).toBe('img');
+    expect(pin.getAttribute('title')).toBe('Transit to <Reserve>');
+    expect(pin.getAttribute('aria-label')).toBe('Transit to <Reserve>');
+    expect(pin.style.getPropertyValue('--pin-color')).toBe('#cf5959');
+    const head = pin.querySelector('.map-pin-head');
+    expect(head?.querySelector('path')?.getAttribute('d')).toBe(MAP_MARKER_GLYPH_PATHS.transit);
+    expect(pin.querySelector('.map-pin-label')?.textContent).toBe('Transit to <Reserve>');
+    expect(pin.querySelector('reserve')).toBeNull();
+  });
+  it('ignores inherited property names when classifying factions', () => {
+    const odd = { id: 'x', name: 'Odd', faction: 'toString' } as unknown as MapExtract;
+    expect(getExtractGlyphKind(odd)).toBe('extract');
   });
 });
