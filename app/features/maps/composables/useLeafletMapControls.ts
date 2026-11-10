@@ -65,6 +65,9 @@ export function useLeafletMapControls({
   });
   const showPmcExtracts = ref(initialShowPmcExtracts ?? showExtracts);
   const showScavExtracts = ref(initialShowScavExtracts ?? showExtracts);
+  // Shared and co-op extracts used to appear whenever either faction was shown; keep that default.
+  const showSharedExtracts = ref(showPmcExtracts.value || showScavExtracts.value);
+  const showCoopExtracts = ref(showSharedExtracts.value);
   const showPmcSpawns = ref(initialShowPmcSpawns);
   const hasPmcSpawns = computed(() => mapPmcSpawns.value.length > 0);
   const hasSharedExtracts = computed(() => {
@@ -136,6 +139,8 @@ export function useLeafletMapControls({
     showPmcExtracts,
     showPmcSpawns,
     showScavExtracts,
+    showSharedExtracts,
+    showCoopExtracts,
     zoomSpeedLabel,
     zoneOpacityLabel,
   };

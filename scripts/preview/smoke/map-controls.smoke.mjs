@@ -42,12 +42,16 @@ test('Transit locations toggle independently in inline and fullscreen maps', asy
   await expect(inline.locator('.leaflet-image-layer')).toBeVisible();
   await page.getByTestId('map-hint-dismiss').click();
   const assertTransits = async (surface) => {
-    const toggle = surface.getByRole('button', { name: 'Transit', exact: true });
+    const layersToggle = surface.getByTestId('map-layers-toggle');
+    if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
+    await expect(layersToggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = surface.getByTestId('map-layers-panel');
+    const toggle = panel.getByRole('button', { name: 'Transit', exact: true });
     const markers = surface.locator('.transit-marker');
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(markers).not.toHaveCount(0);
     const count = await markers.count();
-    const extracts = surface.getByRole('button', { name: 'PMC', exact: true });
+    const extracts = panel.getByRole('button', { name: 'PMC', exact: true });
     if ((await extracts.getAttribute('aria-pressed')) !== 'true') await extracts.click();
     await expectHitTarget(toggle);
     await toggle.click();
@@ -83,18 +87,31 @@ function areSeparate(first, second) {
     second.y + second.height <= first.y
   );
 }
+const flip = (value) => (value === 'true' ? 'false' : 'true');
+async function checkPopover(page, control) {
+  await expect(control).toHaveAttribute('data-state', 'open');
+  await page.keyboard.press('Escape');
+  await expect(control).toHaveAttribute('data-state', 'closed');
+}
+// The Layers disclosure toggles in place; restore it so later controls keep their layout.
+async function checkDisclosure(control, expanded) {
+  await expect(control).toHaveAttribute('aria-expanded', flip(expanded));
+  await control.click();
+  await expect(control).toHaveAttribute('aria-expanded', expanded);
+}
+async function checkToolbarControl(page, control) {
+  await expectHitTarget(control);
+  const pressed = await control.getAttribute('aria-pressed');
+  const expanded = await control.getAttribute('aria-expanded');
+  const isPopover = (await control.getAttribute('data-state')) !== null;
+  await control.click();
+  if (pressed !== null) return expect(control).toHaveAttribute('aria-pressed', flip(pressed));
+  if (isPopover) return checkPopover(page, control);
+  return checkDisclosure(control, expanded);
+}
 async function checkToolbar(page, toolbar) {
   for (const control of await toolbar.getByRole('button').all()) {
-    await expectHitTarget(control);
-    const pressed = await control.getAttribute('aria-pressed');
-    await control.click();
-    if (pressed !== null) {
-      await expect(control).toHaveAttribute('aria-pressed', pressed === 'true' ? 'false' : 'true');
-    } else {
-      await expect(control).toHaveAttribute('data-state', 'open');
-      await page.keyboard.press('Escape');
-      await expect(control).toHaveAttribute('data-state', 'closed');
-    }
+    await checkToolbarControl(page, control);
   }
 }
 async function checkFloors(page, surface) {

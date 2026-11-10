@@ -565,14 +565,23 @@
       "pmc": "PMC"
     },
     "layers": {
+      "coop": "Co-op",
+      "coop_hint": "PMC and Scav together",
+      "groups": {
+        "extracts": "Extracts",
+        "locations": "Locations"
+      },
+      "hidden_count": "{count} hidden",
       "pmc_spawns": "PMC Spawns",
+      "shared": "Shared",
+      "shared_hint": "Either faction",
+      "show_all": "Show all layers",
+      "title": "Layers",
       "transit": "Transit"
     },
     "legend": {
       "regular": "Regular",
-      "pinned": "Pinned",
-      "shared_extract": "Shared Extract (Either Faction)",
-      "coop_extract": "Co-op Extract (PMC + Scav)"
+      "pinned": "Pinned"
     },
     "tooltips": {
       "zoom_in": "Zoom in",

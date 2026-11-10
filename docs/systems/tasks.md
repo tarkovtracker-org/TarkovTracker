@@ -405,9 +405,19 @@ visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
 Extract and transit markers are labeled badges whose colored glyph chip sits exactly on the map
 position. The glyph names who can use the location: PMC (shield), Scav (skull), shared (two
 people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
-`app/features/maps/utils/markerGlyphs.ts` owns the classification and path data; the legend
-renders the same chips through `MapMarkerGlyph.vue`, so the map and legend always match. Chip
-colors come from the customizable marker palette.
+`app/features/maps/utils/markerGlyphs.ts` owns the classification and path data. Chip colors
+come from the customizable marker palette.
+
+The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
+controls (`MapLayersPanel.vue`, rows built by `app/features/maps/utils/mapLayerGroups.ts`). Rows
+are grouped as Tasks (Regular, Pinned, Team), Extracts (PMC, Scav, Shared, Co-op), and Locations
+(Transit, PMC Spawns). Each row draws the marker exactly as the map does and toggles exactly that
+marker type; hidden rows stay listed, dimmed with an eye-off icon. Marker types the selected map
+lacks are omitted. The collapsed button shows how many rows are hidden, and the panel offers
+**Show all layers** while any are hidden. Shared and co-op extracts have their own toggles and
+start visible when either faction's extracts start visible; extracts without a known faction
+follow the Shared row. The panel opens by default when the map is at least 480 px wide and
+remembers an explicit open or close in `map_layers_panel_open`.
 
 The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
 the user drags or keys the resize handle; that choice persists in `tasks_map_height`, and

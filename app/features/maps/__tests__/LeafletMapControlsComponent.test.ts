@@ -109,6 +109,9 @@ vi.mock('@/stores/usePreferences', () => ({
     getMapZoomSpeed: 1,
     mapPanSpeed: 1,
     setMapMarkerColor: vi.fn(),
+    setMapShowPinnedObjectives: vi.fn(),
+    setMapShowSelfObjectives: vi.fn(),
+    setMapShowTeamObjectives: vi.fn(),
     setMapPanSpeed: vi.fn(),
     setMapTooltipDensity: vi.fn(),
     setMapZoneOpacity: vi.fn(),
@@ -192,15 +195,58 @@ describe('LeafletMap controls', () => {
     mockMapInstance.latLngToContainerPoint.mockClear();
     mockMapInstance.latLngToContainerPoint.mockReturnValue({ x: 50, y: 50 });
   });
-  it('keeps enabled extract labels readable on the light toolbar and updates when toggled', async () => {
-    const wrapper = await mountMap({ showPmcExtracts: true });
-    const toggle = wrapper.findAll('button').find((button) => button.text() === 'PMC')!;
-    expect(toggle.attributes('aria-pressed')).toBe('true');
-    expect(toggle.classes()).toContain('text-primary-100');
+  const openLayersPanel = async (wrapper: Awaited<ReturnType<typeof mountMap>>) => {
+    await wrapper.get('[data-testid="map-layers-toggle"]').trigger('click');
+    return (key: string) => wrapper.find(`[data-testid="map-layers-panel"] [data-layer="${key}"]`);
+  };
+  it('combines the legend and layer toggles in one panel that remembers being opened', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'a', name: 'Crossroads', faction: 'pmc' },
+          { id: 'b', name: 'Old Gas Station', faction: 'scav' },
+          { id: 'c', name: 'Railroad', faction: 'shared' },
+          { id: 'd', name: 'Scav Co-op Exfil', faction: 'shared' },
+        ],
+      },
+      showPmcExtracts: true,
+      showScavExtracts: true,
+    });
+    const toggle = wrapper.get('[data-testid="map-layers-toggle"]');
+    // The test surface has no width, so the narrow-screen default keeps the panel closed.
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('[data-testid="map-layers-panel"]').exists()).toBe(false);
+    const row = await openLayersPanel(wrapper);
+    expect(toggle.attributes('aria-expanded')).toBe('true');
     expect(toggle.classes()).toContain('light:text-primary-900');
+    expect(localStorage.getItem('map_layers_panel_open')).toBe('true');
+    const panel = wrapper.get('[data-testid="map-layers-panel"]');
+    expect(panel.attributes('id')).toBe(toggle.attributes('aria-controls'));
+    expect(panel.findAll('[role="group"]').map((group) => group.find('p').text())).toEqual([
+      'Tasks',
+      'Extracts',
+    ]);
+    for (const key of ['self', 'pinned', 'team', 'pmc', 'scav', 'shared', 'coop']) {
+      expect(row(key).exists()).toBe(true);
+    }
+    expect(row('transit').exists()).toBe(false);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    expect(row('pmc').text()).toContain('PMC');
+    expect(row('coop').text()).toContain('PMC and Scav together');
+    await row('pmc').trigger('click');
+    await row('shared').trigger('click');
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    expect(row('shared').attributes('aria-pressed')).toBe('false');
+    expect(row('scav').attributes('aria-pressed')).toBe('true');
+    // Pinned and Team start hidden in the mocked preferences.
+    expect(wrapper.get('[data-testid="map-layers-hidden-count"]').text()).toBe('4 hidden');
+    await wrapper.get('[data-testid="map-layers-show-all"]').trigger('click');
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    expect(row('shared').attributes('aria-pressed')).toBe('true');
     await toggle.trigger('click');
-    expect(toggle.attributes('aria-pressed')).toBe('false');
-    expect(toggle.classes()).not.toContain('light:text-primary-900');
+    expect(wrapper.find('[data-testid="map-layers-panel"]').exists()).toBe(false);
+    expect(localStorage.getItem('map_layers_panel_open')).toBe('false');
     wrapper.unmount();
   });
   it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
@@ -238,7 +284,8 @@ describe('LeafletMap controls', () => {
     });
     // Exercise the real redraw watcher without depending on SVG load timing.
     await wrapper.setProps({ map: { ...transitMap } });
-    const toggle = wrapper.get('button[aria-label="Transit"]');
+    const row = await openLayersPanel(wrapper);
+    const toggle = row('transit');
     expect(toggle.attributes('aria-pressed')).toBe('true');
     expect(marker).toHaveBeenLastCalledWith([124.94, 650.64], expect.any(Object));
     const badge = divIcon.mock.calls.at(-1)?.[0].html as HTMLElement;
@@ -251,8 +298,8 @@ describe('LeafletMap controls', () => {
     expect(toggle.attributes('aria-pressed')).toBe('false');
     expect(transitLayer.clearLayers).toHaveBeenCalledOnce();
     expect(transitLayer.addLayer).toHaveBeenCalledTimes(added);
-    for (const label of ['PMC', 'Scav', 'PMC Spawns']) {
-      expect(wrapper.get(`button[aria-label="${label}"]`).attributes('aria-pressed')).toBe('true');
+    for (const key of ['pmc', 'scav', 'spawns']) {
+      expect(row(key).attributes('aria-pressed')).toBe('true');
     }
     await toggle.trigger('click');
     expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
@@ -278,7 +325,7 @@ describe('LeafletMap controls', () => {
     expect(transitLayer.addLayer).toHaveBeenCalled();
     transitLayer.clearLayers.mockClear();
     await wrapper.setProps({ map: { ...mapData, id: 'other', transits: [] } });
-    expect(wrapper.find('button[aria-label="Transit"]').exists()).toBe(false);
+    expect(row('transit').exists()).toBe(false);
     expect(transitLayer.clearLayers).toHaveBeenCalled();
     wrapper.unmount();
   });

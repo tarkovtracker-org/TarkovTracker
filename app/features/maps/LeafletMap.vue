@@ -26,7 +26,7 @@
     </div>
     <template v-else>
       <div
-        class="pointer-events-none absolute inset-x-2 top-2 z-1000 flex flex-wrap items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
+        class="pointer-events-none absolute inset-2 z-1000 flex flex-wrap content-start items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
       >
         <AppTooltip
           v-if="hasMultipleFloors"
@@ -65,331 +65,267 @@
           </div>
         </AppTooltip>
         <div
-          class="bg-surface-850/95 pointer-events-auto order-first ml-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg @min-[30rem]:order-last"
-          data-testid="map-toolbar"
+          class="pointer-events-none order-first ml-auto flex max-h-full min-h-0 max-w-full flex-col items-end gap-2 pb-40 @max-[30rem]:w-full @max-[30rem]:pb-0 @min-[30rem]:order-last"
         >
-          <div class="flex flex-wrap items-center gap-1">
-            <MapLayerToggle
-              v-model="showPmcExtracts"
-              :available="props.showExtractToggle"
-              :label="t('maps.factions.pmc')"
-              icon="i-mdi-shield-account-outline"
-            />
-            <MapLayerToggle
-              v-model="showScavExtracts"
-              :available="props.showExtractToggle"
-              :label="t('common.scav')"
-              icon="i-mdi-skull-outline"
-            />
-            <MapLayerToggle
-              v-model="showTransits"
-              :available="hasTransits"
-              :label="t('maps.layers.transit')"
-              icon="i-mdi-transit-transfer"
-            />
-            <MapLayerToggle
-              v-model="showPmcSpawns"
-              :available="props.showSpawnToggle && hasPmcSpawns"
-              :label="t('maps.layers.pmc_spawns')"
-              icon="i-mdi-crosshairs-gps"
-            />
-          </div>
-          <div class="mx-1 h-6 w-px bg-white/10" />
-          <div class="flex items-center gap-1">
-            <AppTooltip
-              :text="t('settings.interface.maps.colors.title')"
-              :disabled="mapColorsOpen"
-              :content="{ side: 'bottom' }"
+          <div
+            class="bg-surface-850/95 pointer-events-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg"
+            data-testid="map-toolbar"
+          >
+            <button
+              v-if="layerGroups.length > 0"
+              type="button"
+              data-testid="map-layers-toggle"
+              :aria-expanded="isLayersPanelOpen"
+              :aria-controls="layersPanelId"
+              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :class="isLayersPanelOpen ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
+              @click="isLayersPanelOpen = !isLayersPanelOpen"
             >
-              <UPopover
-                v-model:open="mapColorsOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('colors', $event)"
+              <UIcon name="i-mdi-layers-outline" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap">{{ t('maps.layers.title') }}</span>
+              <span
+                v-if="hiddenLayerCount > 0"
+                data-testid="map-layers-hidden-count"
+                class="bg-surface-700 text-surface-200 rounded-full px-1.5 py-px text-[10px] leading-4 tabular-nums"
               >
-                <button
-                  :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
-                  type="button"
-                  :aria-label="t('settings.interface.maps.colors.title')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapColorsOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
+                {{ t('maps.layers.hidden_count', { count: hiddenLayerCount }) }}
+              </span>
+              <UIcon
+                :name="isLayersPanelOpen ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+                class="h-4 w-4 shrink-0 opacity-70"
+              />
+            </button>
+            <div v-if="layerGroups.length > 0" class="mx-1 h-6 w-px bg-white/10" />
+            <div class="flex items-center gap-1">
+              <AppTooltip
+                :text="t('settings.interface.maps.colors.title')"
+                :disabled="mapColorsOpen"
+                :content="{ side: 'bottom' }"
+              >
+                <UPopover
+                  v-model:open="mapColorsOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('colors', $event)"
                 >
-                  <UIcon name="i-mdi-palette" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-80 space-y-3 p-3 md:w-96">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="space-y-0.5">
-                        <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                          {{ t('settings.interface.maps.colors.title') }}
-                        </p>
-                        <p class="text-surface-400 text-xs">
-                          {{ t('settings.interface.maps.colors.description') }}
-                        </p>
+                  <button
+                    :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
+                    type="button"
+                    :aria-label="t('settings.interface.maps.colors.title')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapColorsOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <UIcon name="i-mdi-palette" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-80 space-y-3 p-3 md:w-96">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="space-y-0.5">
+                          <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                            {{ t('settings.interface.maps.colors.title') }}
+                          </p>
+                          <p class="text-surface-400 text-xs">
+                            {{ t('settings.interface.maps.colors.description') }}
+                          </p>
+                        </div>
+                        <UButton
+                          color="neutral"
+                          size="xs"
+                          variant="ghost"
+                          @click="preferencesStore.resetMapMarkerColors()"
+                        >
+                          {{ t('common.reset') }}
+                        </UButton>
                       </div>
-                      <UButton
-                        color="neutral"
-                        size="xs"
-                        variant="ghost"
-                        @click="preferencesStore.resetMapMarkerColors()"
-                      >
-                        {{ t('common.reset') }}
-                      </UButton>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                      <label
-                        v-for="option in mapColorOptions"
-                        :key="option.key"
-                        class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
-                      >
-                        <span class="flex min-w-0 items-center gap-2">
-                          <span
-                            class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
-                            :style="{ backgroundColor: mapColors[option.key] }"
-                          />
-                          <span class="text-surface-200 text-[11px] font-medium">
-                            {{ option.label }}
+                      <div class="grid grid-cols-2 gap-2">
+                        <label
+                          v-for="option in mapColorOptions"
+                          :key="option.key"
+                          class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
+                        >
+                          <span class="flex min-w-0 items-center gap-2">
+                            <span
+                              class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
+                              :style="{ backgroundColor: mapColors[option.key] }"
+                            />
+                            <span class="text-surface-200 text-[11px] font-medium">
+                              {{ option.label }}
+                            </span>
                           </span>
-                        </span>
-                        <input
-                          :aria-label="option.label"
-                          :value="mapColors[option.key]"
-                          type="color"
-                          class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
-                          @input="onMapColorInput(option.key, $event)"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
-            <AppTooltip
-              :text="t('maps.map_settings')"
-              :disabled="mapSettingsOpen"
-              :content="{ side: 'bottom' }"
-            >
-              <UPopover
-                v-model:open="mapSettingsOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('settings', $event)"
-              >
-                <button
-                  :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
-                  type="button"
-                  :aria-label="t('maps.map_settings')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapSettingsOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
-                >
-                  <UIcon name="i-mdi-cog" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-56 space-y-2 p-3">
-                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                      {{ t('maps.map_settings') }}
-                    </p>
-                    <div class="space-y-2">
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.zoom_speed') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapZoomSpeed"
-                          type="range"
-                          :min="ZOOM_SPEED_MIN"
-                          :max="ZOOM_SPEED_MAX"
-                          step="0.1"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.zoom_speed')"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.pan_speed') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapPanSpeed"
-                          type="range"
-                          :min="PAN_SPEED_MIN"
-                          :max="PAN_SPEED_MAX"
-                          step="0.1"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.pan_speed')"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.zone_opacity') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapZoneOpacity"
-                          type="range"
-                          :min="ZONE_OPACITY_MIN"
-                          :max="ZONE_OPACITY_MAX"
-                          step="0.01"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.zone_opacity')"
-                        />
-                      </div>
-                      <div class="flex items-center justify-between">
-                        <span class="text-surface-400 text-[10px] font-semibold uppercase">
-                          {{ t('maps.tooltip_density') }}
-                        </span>
-                        <button
-                          type="button"
-                          class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
-                          :class="
-                            mapTooltipDensity === 'compact'
-                              ? 'bg-surface-600 text-surface-100'
-                              : 'bg-surface-800 text-surface-400 hover:text-surface-200'
-                          "
-                          :aria-label="t('maps.aria.tooltip_density')"
-                          @click="
-                            mapTooltipDensity =
-                              mapTooltipDensity === 'compact' ? 'default' : 'compact'
-                          "
-                        >
-                          {{
-                            mapTooltipDensity === 'compact'
-                              ? t('common.compact')
-                              : t('common.default')
-                          }}
-                        </button>
+                          <input
+                            :aria-label="option.label"
+                            :value="mapColors[option.key]"
+                            type="color"
+                            class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
+                            @input="onMapColorInput(option.key, $event)"
+                          />
+                        </label>
                       </div>
                     </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
-            <AppTooltip
-              :text="t('maps.help.title')"
-              :disabled="mapHelpOpen"
-              :content="{ side: 'bottom' }"
-            >
-              <UPopover
-                v-model:open="mapHelpOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('help', $event)"
+                  </template>
+                </UPopover>
+              </AppTooltip>
+              <AppTooltip
+                :text="t('maps.map_settings')"
+                :disabled="mapSettingsOpen"
+                :content="{ side: 'bottom' }"
               >
-                <button
-                  :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
-                  type="button"
-                  data-testid="map-help-toggle"
-                  :aria-label="t('maps.help.title')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapHelpOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
+                <UPopover
+                  v-model:open="mapSettingsOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('settings', $event)"
                 >
-                  <span
-                    v-if="!mapHelpSeen"
-                    data-testid="map-help-unseen-dot"
-                    class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
-                  />
-                  <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-80 space-y-2.5 p-3">
-                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                      {{ t('maps.help.title') }}
-                    </p>
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                      <div class="space-y-1">
-                        <p
-                          class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.navigate') }}
-                        </p>
-                        <i18n-t
-                          keypath="maps.help.pan"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #keys>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'WASD' }}
-                            </kbd>
-                            <span>/</span>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ '←↑↓→' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <i18n-t
-                          keypath="maps.help.zoom"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #keys>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Shift' }}
-                            </kbd>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Scroll' }}
-                            </kbd>
-                            <span>/</span>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Q/E' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <i18n-t
-                          keypath="maps.help.reset"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #key>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'R' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
+                  <button
+                    :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
+                    type="button"
+                    :aria-label="t('maps.map_settings')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapSettingsOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <UIcon name="i-mdi-cog" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-56 space-y-2 p-3">
+                      <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                        {{ t('maps.map_settings') }}
+                      </p>
+                      <div class="space-y-2">
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.zoom_speed') }}</span>
+                            <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
+                          </div>
+                          <input
+                            v-model.number="mapZoomSpeed"
+                            type="range"
+                            :min="ZOOM_SPEED_MIN"
+                            :max="ZOOM_SPEED_MAX"
+                            step="0.1"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.zoom_speed')"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.pan_speed') }}</span>
+                            <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
+                          </div>
+                          <input
+                            v-model.number="mapPanSpeed"
+                            type="range"
+                            :min="PAN_SPEED_MIN"
+                            :max="PAN_SPEED_MAX"
+                            step="0.1"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.pan_speed')"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.zone_opacity') }}</span>
+                            <span class="text-surface-200 tabular-nums">
+                              {{ zoneOpacityLabel }}
+                            </span>
+                          </div>
+                          <input
+                            v-model.number="mapZoneOpacity"
+                            type="range"
+                            :min="ZONE_OPACITY_MIN"
+                            :max="ZONE_OPACITY_MAX"
+                            step="0.01"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.zone_opacity')"
+                          />
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <span class="text-surface-400 text-[10px] font-semibold uppercase">
+                            {{ t('maps.tooltip_density') }}
+                          </span>
+                          <button
+                            type="button"
+                            class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
+                            :class="
+                              mapTooltipDensity === 'compact'
+                                ? 'bg-surface-600 text-surface-100'
+                                : 'bg-surface-800 text-surface-400 hover:text-surface-200'
+                            "
+                            :aria-label="t('maps.aria.tooltip_density')"
+                            @click="
+                              mapTooltipDensity =
+                                mapTooltipDensity === 'compact' ? 'default' : 'compact'
+                            "
+                          >
+                            {{
+                              mapTooltipDensity === 'compact'
+                                ? t('common.compact')
+                                : t('common.default')
+                            }}
+                          </button>
+                        </div>
                       </div>
-                      <div class="space-y-1">
-                        <div v-if="hasMultipleFloors" class="space-y-1">
+                    </div>
+                  </template>
+                </UPopover>
+              </AppTooltip>
+              <AppTooltip
+                :text="t('maps.help.title')"
+                :disabled="mapHelpOpen"
+                :content="{ side: 'bottom' }"
+              >
+                <UPopover
+                  v-model:open="mapHelpOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('help', $event)"
+                >
+                  <button
+                    :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
+                    type="button"
+                    data-testid="map-help-toggle"
+                    :aria-label="t('maps.help.title')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapHelpOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <span
+                      v-if="!mapHelpSeen"
+                      data-testid="map-help-unseen-dot"
+                      class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
+                    />
+                    <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-80 space-y-2.5 p-3">
+                      <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                        {{ t('maps.help.title') }}
+                      </p>
+                      <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                        <div class="space-y-1">
                           <p
                             class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
                           >
-                            {{ t('maps.help.groups.floors') }}
+                            {{ t('maps.help.groups.navigate') }}
                           </p>
                           <i18n-t
-                            keypath="maps.help.cycle_floors"
+                            keypath="maps.help.pan"
                             tag="p"
                             scope="global"
                             class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
@@ -398,61 +334,136 @@
                               <kbd
                                 class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                               >
-                                {{ 'Ctrl' }}
+                                {{ 'WASD' }}
+                              </kbd>
+                              <span>/</span>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ '←↑↓→' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <i18n-t
+                            keypath="maps.help.zoom"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #keys>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Shift' }}
                               </kbd>
                               <kbd
                                 class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                               >
                                 {{ 'Scroll' }}
                               </kbd>
+                              <span>/</span>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Q/E' }}
+                              </kbd>
                             </template>
                           </i18n-t>
-                          <p class="text-surface-400 text-[11px]">
-                            {{ t('maps.help.floor_panel') }}
+                          <i18n-t
+                            keypath="maps.help.reset"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'R' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                        </div>
+                        <div class="space-y-1">
+                          <div v-if="hasMultipleFloors" class="space-y-1">
+                            <p
+                              class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                            >
+                              {{ t('maps.help.groups.floors') }}
+                            </p>
+                            <i18n-t
+                              keypath="maps.help.cycle_floors"
+                              tag="p"
+                              scope="global"
+                              class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                            >
+                              <template #keys>
+                                <kbd
+                                  class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                                >
+                                  {{ 'Ctrl' }}
+                                </kbd>
+                                <kbd
+                                  class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                                >
+                                  {{ 'Scroll' }}
+                                </kbd>
+                              </template>
+                            </i18n-t>
+                            <p class="text-surface-400 text-[11px]">
+                              {{ t('maps.help.floor_panel') }}
+                            </p>
+                          </div>
+                          <p
+                            class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
+                          >
+                            {{ t('maps.help.groups.interact') }}
+                          </p>
+                          <i18n-t
+                            keypath="maps.help.click_at_cursor"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'F' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.click_marker') }}
                           </p>
                         </div>
-                        <p
-                          class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.interact') }}
-                        </p>
-                        <i18n-t
-                          keypath="maps.help.click_at_cursor"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #key>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'F' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.click_marker') }}
-                        </p>
-                      </div>
-                      <div class="col-span-2 space-y-1">
-                        <p
-                          class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.view') }}
-                        </p>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.fullscreen') }}
-                        </p>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.resize') }}
-                        </p>
+                        <div class="col-span-2 space-y-1">
+                          <p
+                            class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                          >
+                            {{ t('maps.help.groups.view') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.fullscreen') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.resize') }}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
+                  </template>
+                </UPopover>
+              </AppTooltip>
+            </div>
           </div>
+          <MapLayersPanel
+            v-if="isLayersPanelOpen && layerGroups.length > 0"
+            :id="layersPanelId"
+            :groups="layerGroups"
+            @toggle="toggleLayer"
+            @show-all="showAllLayers"
+          />
         </div>
       </div>
       <div
@@ -567,85 +578,12 @@
           </div>
         </div>
       </div>
-      <div class="mt-2 flex shrink-0 flex-wrap items-start justify-between gap-x-4 gap-y-4">
-        <div
-          v-if="props.showLegend"
-          class="bg-surface-850/95 text-surface-300 flex flex-wrap items-center gap-4 rounded-lg border border-white/8 px-3 py-2 text-xs shadow-lg"
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-surface-400 text-[10px] font-medium tracking-wide uppercase">
-              {{ t('common.tasks') }}
-            </span>
-            <button
-              v-for="chip in objectiveChips"
-              :key="chip.key"
-              type="button"
-              class="flex items-center gap-2 rounded-full border px-3 py-1.5 transition-opacity"
-              :class="chip.isOn ? '' : 'opacity-55 hover:opacity-80'"
-              :style="{
-                borderColor: chip.isOn
-                  ? `color-mix(in srgb, ${chip.color} 45%, transparent)`
-                  : 'var(--color-surface-700)',
-                backgroundColor: chip.isOn
-                  ? `color-mix(in srgb, ${chip.color} 15%, transparent)`
-                  : 'transparent',
-              }"
-              :aria-pressed="chip.isOn"
-              @click="chip.toggle()"
-            >
-              <span
-                class="h-2 w-2 shrink-0 rounded-full"
-                :class="chip.isOn ? '' : 'box-border border-2'"
-                :style="chip.isOn ? { backgroundColor: chip.color } : { borderColor: chip.color }"
-              />
-              <span
-                class="text-surface-100"
-                :class="chip.isOn ? '' : 'text-surface-400 line-through'"
-              >
-                {{ chip.label }}
-              </span>
-            </button>
-          </div>
-          <div v-if="showTransits && hasTransits" class="flex items-center gap-1.5">
-            <MapMarkerGlyph kind="transit" :color="mapColors.TRANSIT" />
-            <span>{{ t('maps.layers.transit') }}</span>
-          </div>
-          <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1.5">
-            <span
-              class="h-2.5 w-2.5 rounded-full border border-white"
-              :style="{ backgroundColor: mapColors.PMC_SPAWN }"
-            />
-            <span>{{ t('common.pmc_spawn') }}</span>
-          </div>
-          <div v-if="showPmcExtracts" class="flex items-center gap-1.5">
-            <MapMarkerGlyph kind="pmc" :color="mapColors.PMC_EXTRACT" />
-            <span>{{ t('common.pmc_extract') }}</span>
-          </div>
-          <div v-if="showScavExtracts" class="flex items-center gap-1.5">
-            <MapMarkerGlyph kind="scav" :color="mapColors.SCAV_EXTRACT" />
-            <span>{{ t('common.scav_extract') }}</span>
-          </div>
-          <div
-            v-if="(showPmcExtracts || showScavExtracts) && hasSharedExtracts"
-            class="flex items-center gap-1.5"
-          >
-            <MapMarkerGlyph kind="shared" :color="mapColors.SHARED_EXTRACT" />
-            <span>{{ t('maps.legend.shared_extract') }}</span>
-          </div>
-          <div
-            v-if="(showPmcExtracts || showScavExtracts) && hasCoopExtracts"
-            class="flex items-center gap-1.5"
-          >
-            <MapMarkerGlyph kind="coop" :color="mapColors.COOP_EXTRACT" />
-            <span>{{ t('maps.legend.coop_extract') }}</span>
-          </div>
-        </div>
-      </div>
     </template>
   </div>
 </template>
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
+  import { useElementSize, useStorage } from '@vueuse/core';
   import { createApp } from 'vue';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
@@ -665,8 +603,12 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
-  import MapLayerToggle from '@/features/maps/MapLayerToggle.vue';
-  import MapMarkerGlyph from '@/features/maps/MapMarkerGlyph.vue';
+  import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
+  import {
+    buildMapLayerGroups,
+    countHiddenLayers,
+    type MapLayerItem,
+  } from '@/features/maps/utils/mapLayerGroups';
   import {
     createMarkerBadgeElement,
     getExtractGlyphKind,
@@ -794,44 +736,6 @@
     get: () => preferencesStore.getMapShowTeamObjectives,
     set: (value: boolean) => preferencesStore.setMapShowTeamObjectives(value),
   });
-  interface ObjectiveChip {
-    key: MapObjectiveCategory;
-    label: string;
-    color: string;
-    isOn: boolean;
-    toggle: () => void;
-  }
-  const objectiveChips = computed<ObjectiveChip[]>(() => {
-    return [
-      {
-        key: 'self',
-        label: t('maps.legend.regular'),
-        color: mapColors.value.SELF_OBJECTIVE,
-        isOn: mapShowSelfObjectives.value,
-        toggle: () => {
-          mapShowSelfObjectives.value = !mapShowSelfObjectives.value;
-        },
-      },
-      {
-        key: 'pinned',
-        label: t('maps.legend.pinned'),
-        color: mapColors.value.PINNED_OBJECTIVE,
-        isOn: mapShowPinnedObjectives.value,
-        toggle: () => {
-          mapShowPinnedObjectives.value = !mapShowPinnedObjectives.value;
-        },
-      },
-      {
-        key: 'team',
-        label: t('common.team'),
-        color: mapColors.value.TEAM_OBJECTIVE,
-        isOn: mapShowTeamObjectives.value,
-        toggle: () => {
-          mapShowTeamObjectives.value = !mapShowTeamObjectives.value;
-        },
-      },
-    ];
-  });
   const mapContainer = ref<HTMLElement | null>(null);
   const {
     mapInstance,
@@ -880,6 +784,8 @@
     showPmcExtracts,
     showPmcSpawns,
     showScavExtracts,
+    showSharedExtracts,
+    showCoopExtracts,
     zoomSpeedLabel,
     zoneOpacityLabel,
   } = useLeafletMapControls({
@@ -923,6 +829,64 @@
       mapColorsOpen.value = false;
       mapSettingsOpen.value = false;
     }
+  });
+  const layersPanelId = `map-layers-${useId()}`;
+  const layerGroups = computed(() =>
+    buildMapLayerGroups({
+      t,
+      colors: mapColors.value,
+      objectives: {
+        self: mapShowSelfObjectives,
+        pinned: mapShowPinnedObjectives,
+        team: mapShowTeamObjectives,
+      },
+      extracts: {
+        pmc: showPmcExtracts,
+        scav: showScavExtracts,
+        shared: showSharedExtracts,
+        coop: showCoopExtracts,
+      },
+      transit: showTransits,
+      spawns: showPmcSpawns,
+      available: {
+        extracts: props.showExtractToggle,
+        shared: hasSharedExtracts.value,
+        coop: hasCoopExtracts.value,
+        transit: hasTransits.value,
+        spawns: props.showSpawnToggle && hasPmcSpawns.value,
+      },
+    })
+  );
+  const hiddenLayerCount = computed(() => countHiddenLayers(layerGroups.value));
+  const toggleLayer = (item: MapLayerItem) => {
+    item.visible.value = !item.visible.value;
+  };
+  const showAllLayers = () => {
+    layerGroups.value.forEach((group) => group.items.forEach(showLayer));
+  };
+  const showLayer = (item: MapLayerItem) => {
+    if (!item.visible.value) item.visible.value = true;
+  };
+  // The panel opens by default where there is room beside the map, and stays closed on narrow
+  // screens where it would push the map down. An explicit open/close choice is remembered.
+  const { width: mapSurfaceWidth } = useElementSize(mapSurfaceRef);
+  const layersPanelPreference = useStorage<boolean | null>(
+    'map_layers_panel_open',
+    null,
+    undefined,
+    {
+      serializer: {
+        read: (raw: string) => (raw === 'true' ? true : raw === 'false' ? false : null),
+        write: (value: boolean | null) => (value === null ? '' : String(value)),
+      },
+    }
+  );
+  const LAYERS_PANEL_MIN_WIDTH = 480;
+  const isLayersPanelOpen = computed({
+    get: () => layersPanelPreference.value ?? mapSurfaceWidth.value >= LAYERS_PANEL_MIN_WIDTH,
+    set: (open: boolean) => {
+      layersPanelPreference.value = open;
+    },
   });
   const currentMapZoom = ref(0);
   const canZoomIn = computed(() => {
@@ -1810,18 +1774,19 @@
     const L = leaflet.value;
     if (!isValidMapSvgConfig(props.map.svg) && !isValidMapTileConfig(props.map.tile)) return;
     extractLayer.value.clearLayers();
-    const showAnyExtracts = showPmcExtracts.value || showScavExtracts.value;
-    if (!showAnyExtracts) return;
+    const extractVisibility: Record<MapMarkerGlyphKind, boolean> = {
+      pmc: showPmcExtracts.value,
+      scav: showScavExtracts.value,
+      shared: showSharedExtracts.value,
+      coop: showCoopExtracts.value,
+      // Extracts without a known faction follow the Shared row, the closest legend entry.
+      extract: showSharedExtracts.value,
+      transit: false,
+    };
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
-      const shouldShow =
-        extract.faction === 'pmc'
-          ? showPmcExtracts.value
-          : extract.faction === 'scav'
-            ? showScavExtracts.value
-            : showAnyExtracts;
-      if (!shouldShow) return;
       const kind = getExtractGlyphKind(extract);
+      if (!extractVisibility[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       extractLayer.value!.addLayer(
         createBadgeMarker(L, kind, extractName, extract.position, 'extract-marker')
@@ -1994,7 +1959,9 @@
     lastMarksHash.value = '';
     updateMarkers();
   });
-  watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
+  watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
+    createExtractMarkers()
+  );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
   watch([leaflet, transitLayer, visibleTransits], () => createTransitMarkers());
   watch(
