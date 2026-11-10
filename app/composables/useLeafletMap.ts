@@ -810,8 +810,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
       const bounds = getLeafletBounds(renderConfig);
-      const didFit = setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
-      fittedView = didFit ? readFittedView(mapInstance.value) : null;
+      applyInitialView(mapInstance.value, bounds);
       // Set initial floor
       selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';
@@ -848,23 +847,25 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       }
     }
     if (!isInitializeTokenActive(initToken)) return;
-    // Setup resize observer
-    if (containerRef.value) {
-      const handleResize = useDebounceFn(() => {
-        const instance = mapInstance.value;
-        if (!instance) return;
-        // An untouched map keeps fitting its container as it grows or shrinks; a view the user
-        // panned or zoomed is preserved.
-        const shouldRefit = isStillFitted(instance, fittedView);
-        instance.invalidateSize({ animate: false });
-        if (shouldRefit) fitMapToBounds(instance, { animate: false });
-      }, 100);
-      try {
-        resizeObserver = new ResizeObserver(handleResize);
-        resizeObserver.observe(containerRef.value);
-      } catch (error) {
-        logger.error('Failed to initialize ResizeObserver:', error);
-      }
+    observeContainerResize();
+  }
+  /** Keep Leaflet sized to its container; an untouched view also refits as the container changes. */
+  function observeContainerResize(): void {
+    const container = containerRef.value;
+    if (!container) return;
+    const handleResize = useDebounceFn(() => {
+      const instance = mapInstance.value;
+      if (!instance) return;
+      // A view the user panned or zoomed is preserved.
+      const shouldRefit = isStillFitted(instance, fittedView);
+      instance.invalidateSize({ animate: false });
+      if (shouldRefit) fitMapToBounds(instance, { animate: false });
+    }, 100);
+    try {
+      resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(container);
+    } catch (error) {
+      logger.error('Failed to initialize ResizeObserver:', error);
     }
   }
   async function loadMapLayer(initToken?: number, loadToken?: MapLayerLoadToken): Promise<void> {
@@ -879,6 +880,11 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     if (svgConfig) {
       await loadStandardMapSvg(leaflet.value, initToken, loadToken);
     }
+  }
+  /** Restore a saved view or fit the bounds, remembering only fitted views for resize refits. */
+  function applyInitialView(instance: L.Map, bounds: L.LatLngBoundsExpression): void {
+    const didFit = setInitialMapView(instance, consumeInitialView(), bounds);
+    fittedView = didFit ? readFittedView(instance) : null;
   }
   /** Fit the active render bounds and remember the result for resize-time refitting. */
   function fitMapToBounds(instance: L.Map, options?: L.FitBoundsOptions): void {

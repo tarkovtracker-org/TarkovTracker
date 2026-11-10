@@ -35,7 +35,7 @@ export function getExtractGlyphKind(extract: MapExtract): MapMarkerGlyphKind {
 }
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Build the colored icon chip that sits exactly on a marker's map position. */
-export function createMarkerGlyphElement(kind: MapMarkerGlyphKind, color: string): HTMLElement {
+function createMarkerGlyphElement(kind: MapMarkerGlyphKind, color: string): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'map-marker-glyph';
   chip.style.backgroundColor = color;
