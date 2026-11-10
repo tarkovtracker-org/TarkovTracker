@@ -105,11 +105,27 @@ async function checkToolbarControl(page, control) {
   await expectHitTarget(control);
   const pressed = await control.getAttribute('aria-pressed');
   const expanded = await control.getAttribute('aria-expanded');
-  const isPopover = (await control.getAttribute('data-state')) !== null;
+  const isLayersToggle = (await control.getAttribute('data-testid')) === 'map-layers-toggle';
   await control.click();
   if (pressed !== null) return expect(control).toHaveAttribute('aria-pressed', flip(pressed));
-  if (isPopover) return checkPopover(page, control);
-  return checkDisclosure(control, expanded);
+  if (isLayersToggle) return checkDisclosure(control, expanded);
+  return checkPopover(page, control);
+}
+// Layer rows inside the Layers panel must be reachable and flip, then restore their state.
+async function checkLayerRows(surface) {
+  const layersToggle = surface.getByTestId('map-layers-toggle');
+  if ((await layersToggle.count()) === 0) return;
+  if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
+  const rows = surface.getByTestId('map-layers-panel').locator('button[aria-pressed]');
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all()) {
+    await expectHitTarget(row);
+    const pressed = await row.getAttribute('aria-pressed');
+    await row.click();
+    await expect(row).toHaveAttribute('aria-pressed', flip(pressed));
+    await row.click();
+    await expect(row).toHaveAttribute('aria-pressed', pressed);
+  }
 }
 async function checkToolbar(page, toolbar) {
   for (const control of await toolbar.getByRole('button').all()) {
@@ -196,5 +212,6 @@ test('Ground Zero floors and toolbar remain operable in normal and fullscreen ma
   ]) {
     await page.setViewportSize({ width, height });
     await checkToolbar(page, inline.getByTestId('map-toolbar'));
+    await checkLayerRows(inline);
   }
 });
