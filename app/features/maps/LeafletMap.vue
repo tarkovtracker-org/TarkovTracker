@@ -1886,6 +1886,7 @@
       isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile);
     return showTransits.value && hasRenderConfig ? mapTransits.value : [];
   });
+  /** Rebuild source-map transit labels, clearing stale markers when none are visible. */
   function createTransitMarkers(): void {
     const layer = transitLayer.value;
     const L = leaflet.value;
@@ -2040,7 +2041,7 @@
   });
   watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
-  watch(visibleTransits, () => createTransitMarkers());
+  watch([leaflet, transitLayer, visibleTransits], () => createTransitMarkers());
   watch(
     () => props.showPmcSpawns,
     (value) => {
@@ -2079,7 +2080,7 @@
     window.addEventListener('blur', onMapWindowBlur);
   });
   watch(
-    [isLoading, objectiveLayer, extractLayer, spawnLayer, mapInstance, transitLayer],
+    [isLoading, objectiveLayer, extractLayer, spawnLayer, mapInstance],
     (
       [loading, objectiveMarkersLayer, extractMarkersLayer, spawnMarkersLayer, instance],
       oldValues
