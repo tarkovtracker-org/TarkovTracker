@@ -188,6 +188,7 @@ function setInitialMapView(
   }
   instance.fitBounds(bounds);
 }
+/** Own the map instance, background loading, marker layers, and their reactive lifecycle. */
 export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapReturn {
   const {
     containerRef,
@@ -768,6 +769,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     resetIdleTimer();
   }
+  /** Initialize the active map and layer groups, ignoring superseded asynchronous loads. */
   async function initializeMap(): Promise<void> {
     // Skip initialization for unavailable maps or missing container
     if (!containerRef.value || isMapUnavailable()) return;
@@ -868,6 +870,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     resetIdleTimer();
   }
+  /** Clear every marker group while retaining the map and its background. */
   function clearMarkers(): void {
     transitLayer.value?.clearLayers();
     if (objectiveLayer.value) {
@@ -880,6 +883,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       spawnLayer.value.clearLayers();
     }
   }
+  /** Cancel pending loads and release the map, timers, and all layer references. */
   function destroy(): void {
     initializeToken += 1;
     cancelMapLayerLoad();

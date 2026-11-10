@@ -34,6 +34,7 @@ export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
 export const isCoopExtract = (extract: MapExtract): boolean =>
   /\bco-?op\b/i.test(extract.name || '');
+/** Derive available map locations and expose independent layer toggles and display controls. */
 export function useLeafletMapControls({
   map,
   preferencesStore,

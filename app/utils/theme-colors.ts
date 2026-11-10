@@ -75,6 +75,7 @@ const LEGACY_MAP_MARKER_COLOR_KEYS: MapMarkerColorKey[] = [
   'MARKER_BORDER',
   'EXTRACT_DOT_BORDER',
 ];
+/** Build translated labels for the marker colors users can customize. */
 export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[] => {
   return [
     { key: 'SELF_OBJECTIVE', label: t('settings.interface.maps.colors.self_objective') },
