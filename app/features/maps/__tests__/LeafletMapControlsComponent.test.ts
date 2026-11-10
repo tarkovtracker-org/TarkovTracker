@@ -257,7 +257,9 @@ describe('LeafletMap controls', () => {
     await toggle.trigger('click');
     expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
     transitLayer.addLayer.mockClear();
+    transitLayer.clearLayers.mockClear();
     await wrapper.setProps({ map: { ...transitMap, svg: undefined } });
+    expect(transitLayer.clearLayers).toHaveBeenCalled();
     expect(transitLayer.addLayer).not.toHaveBeenCalled();
     await wrapper.setProps({
       map: {
