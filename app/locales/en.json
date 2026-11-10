@@ -565,7 +565,8 @@
       "pmc": "PMC"
     },
     "layers": {
-      "pmc_spawns": "PMC Spawns"
+      "pmc_spawns": "PMC Spawns",
+      "transit": "Transit"
     },
     "legend": {
       "regular": "Regular",

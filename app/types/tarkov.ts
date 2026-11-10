@@ -345,6 +345,13 @@ export interface MapPosition {
   y: number;
   z: number;
 }
+/** A transit location on the source map; `map` identifies its destination. */
+export interface MapTransit {
+  id: string;
+  description: string;
+  map: string;
+  position: MapPosition;
+}
 export interface MapSpawn {
   zoneName?: string;
   position: MapPosition;
@@ -402,6 +409,7 @@ export interface TarkovMap {
   spawns?: MapSpawn[];
   /** Extraction points available on this map */
   extracts?: MapExtract[];
+  transits?: MapTransit[];
   /** Whether the map is unavailable for display */
   unavailable?: boolean;
   svg?: string | MapSvgConfig;

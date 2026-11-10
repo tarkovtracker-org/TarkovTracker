@@ -36,6 +36,37 @@ describe('default fetch budget', () => {
     expect(worstCaseMs).toBeLessThan(100_000);
   });
 });
+describe('map transit data', () => {
+  it.each(['regular', 'pve', 'pvp-season'] as const)(
+    'preserves localized transit coordinates through the %s map adapter',
+    async (gameMode) => {
+      const transit = {
+        id: '9',
+        description: 'CUST_TRANSIT_9_DESC',
+        map: 'reserve',
+        position: { x: 650.64, y: 1.59, z: 124.94 },
+      };
+      const fetcher = createFetcher({
+        [`https://json.tarkov.dev/${gameMode}/maps`]: {
+          data: { maps: { customs: { id: 'customs', name: 'Customs', transits: [transit] } } },
+          translations: ['$.data.maps.*.transits[*].description'],
+        },
+        [`https://json.tarkov.dev/${gameMode}/maps_de`]: { data: {} },
+        [`https://json.tarkov.dev/${gameMode}/maps_en`]: {
+          data: { CUST_TRANSIT_9_DESC: 'Transit to Reserve' },
+        },
+      });
+      const payload = await fetchTarkovJsonEndpoint<{ maps: Record<string, unknown> }>('maps', {
+        gameMode,
+        lang: 'de',
+        deps: { fetcher },
+      });
+      const result = adaptTasksCoreResponse({}, payload, {}).data;
+      expect(result.maps[0]?.transits).toEqual([{ ...transit, description: 'Transit to Reserve' }]);
+      expect(transit.description).toBe('CUST_TRANSIT_9_DESC');
+    }
+  );
+});
 describe('createTarkovJsonBootstrapFetcher', () => {
   it('reads player levels from the base envelope without fetching language envelopes', async () => {
     const fetcher = createFetcher({

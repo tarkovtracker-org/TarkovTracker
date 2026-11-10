@@ -52,6 +52,8 @@ export interface UseLeafletMapReturn {
   extractLayer: ShallowRef<L.LayerGroup | null>;
   /** PMC spawn markers layer group */
   spawnLayer: ShallowRef<L.LayerGroup | null>;
+  /** Transit location markers layer group */
+  transitLayer: ShallowRef<L.LayerGroup | null>;
   /** Set the current floor */
   setFloor: (floor: string) => void;
   /** Refresh the map view */
@@ -206,6 +208,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const objectiveLayer = shallowRef<L.LayerGroup | null>(null);
   const extractLayer = shallowRef<L.LayerGroup | null>(null);
   const spawnLayer = shallowRef<L.LayerGroup | null>(null);
+  const transitLayer = shallowRef<L.LayerGroup | null>(null);
   const crsKey = ref('');
   const renderKey = ref('');
   let hasAppliedInitialView = false;
@@ -806,6 +809,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       objectiveLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       extractLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       spawnLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
+      transitLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       // Setup idle detection
       if (enableIdleDetection && mapInstance.value) {
         mapInstance.value.on('movestart', resetIdleTimer);
@@ -865,6 +869,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     resetIdleTimer();
   }
   function clearMarkers(): void {
+    transitLayer.value?.clearLayers();
     if (objectiveLayer.value) {
       objectiveLayer.value.clearLayers();
     }
@@ -899,6 +904,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     objectiveLayer.value = null;
     extractLayer.value = null;
     spawnLayer.value = null;
+    transitLayer.value = null;
     leaflet.value = null;
   }
   // Watch for map changes
@@ -977,6 +983,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     objectiveLayer,
     extractLayer,
     spawnLayer,
+    transitLayer,
     setFloor,
     refreshView,
     clearMarkers,

@@ -67,39 +67,30 @@
           data-testid="map-toolbar"
         >
           <div class="flex flex-wrap items-center gap-1">
-            <button
-              v-if="props.showExtractToggle"
-              type="button"
-              :aria-pressed="showPmcExtracts"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showPmcExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showPmcExtracts = !showPmcExtracts"
-            >
-              <UIcon name="i-mdi-shield-account-outline" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('maps.factions.pmc') }}</span>
-            </button>
-            <button
-              v-if="props.showExtractToggle"
-              type="button"
-              :aria-pressed="showScavExtracts"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showScavExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showScavExtracts = !showScavExtracts"
-            >
-              <UIcon name="i-mdi-skull-outline" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('common.scav') }}</span>
-            </button>
-            <button
-              v-if="props.showSpawnToggle && hasPmcSpawns"
-              type="button"
-              :aria-pressed="showPmcSpawns"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showPmcSpawns ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showPmcSpawns = !showPmcSpawns"
-            >
-              <UIcon name="i-mdi-crosshairs-gps" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('maps.layers.pmc_spawns') }}</span>
-            </button>
+            <MapLayerToggle
+              v-model="showPmcExtracts"
+              :available="props.showExtractToggle"
+              :label="t('maps.factions.pmc')"
+              icon="i-mdi-shield-account-outline"
+            />
+            <MapLayerToggle
+              v-model="showScavExtracts"
+              :available="props.showExtractToggle"
+              :label="t('common.scav')"
+              icon="i-mdi-skull-outline"
+            />
+            <MapLayerToggle
+              v-model="showTransits"
+              :available="hasTransits"
+              :label="t('maps.layers.transit')"
+              icon="i-mdi-transit-transfer"
+            />
+            <MapLayerToggle
+              v-model="showPmcSpawns"
+              :available="props.showSpawnToggle && hasPmcSpawns"
+              :label="t('maps.layers.pmc_spawns')"
+              icon="i-mdi-crosshairs-gps"
+            />
           </div>
           <div class="mx-1 h-6 w-px bg-white/10" />
           <div class="flex items-center gap-1">
@@ -613,6 +604,14 @@
               </span>
             </button>
           </div>
+          <div v-if="showTransits && hasTransits" class="flex items-center gap-1">
+            <UIcon
+              name="i-mdi-transit-transfer"
+              class="h-3 w-3"
+              :style="{ color: mapColors.TRANSIT }"
+            />
+            <span>{{ t('maps.layers.transit') }}</span>
+          </div>
           <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
             <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: mapColors.PMC_SPAWN }" />
             <span>{{ t('common.pmc_spawn') }}</span>
@@ -682,6 +681,7 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapLayerToggle from '@/features/maps/MapLayerToggle.vue';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
   import {
     findObjectiveHitStackAtPoint,
@@ -852,6 +852,7 @@
     objectiveLayer,
     extractLayer,
     spawnLayer,
+    transitLayer,
     setFloor,
     refreshView,
     clearMarkers,
@@ -869,6 +870,9 @@
   const SPAWN_CLUSTER_MAX_RADIUS = 14;
   const MARKER_SVG_LOAD_DELAY_MS = 500;
   const {
+    hasTransits,
+    mapTransits,
+    showTransits,
     hasCoopExtracts,
     hasPmcSpawns,
     hasSharedExtracts,
@@ -1877,6 +1881,38 @@
       extractLayer.value!.addLayer(labelMarker);
     });
   }
+  function createTransitMarkers(): void {
+    const layer = transitLayer.value;
+    const L = leaflet.value;
+    if (!layer || !L) return;
+    layer.clearLayers();
+    if (!showTransits.value) return;
+    mapTransits.value.forEach((transit) => {
+      const badge = document.createElement('div');
+      badge.className = 'extract-badge';
+      badge.style.borderColor = mapColors.value.TRANSIT;
+      badge.style.borderStyle = 'dashed';
+      badge.setAttribute('title', transit.description);
+      const label = document.createElement('span');
+      label.className = 'extract-badge-label';
+      label.textContent = `↗ ${transit.description}`;
+      badge.appendChild(label);
+      const icon = L.divIcon({
+        className: 'extract-marker transit-marker',
+        html: badge,
+        iconAnchor: [0, 0],
+        iconSize: undefined,
+      });
+      const position = gameToLatLng(transit.position.x, transit.position.z);
+      layer.addLayer(
+        L.marker([position.lat, position.lng], {
+          icon,
+          interactive: false,
+          zIndexOffset: 1000,
+        })
+      );
+    });
+  }
   let lastSpawnZoomAboveThreshold: boolean | null = null;
   function createPmcSpawnMarkers(): void {
     if (!leaflet.value || !spawnLayer.value || !props.map) return;
@@ -1953,6 +1989,7 @@
     try {
       createObjectiveMarkers();
       createExtractMarkers();
+      createTransitMarkers();
       createPmcSpawnMarkers();
     } catch (error) {
       logger.error('Error updating map markers:', error);
@@ -1999,6 +2036,7 @@
   });
   watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
+  watch([showTransits, mapTransits], () => createTransitMarkers());
   watch(
     () => props.showPmcSpawns,
     (value) => {
@@ -2037,7 +2075,7 @@
     window.addEventListener('blur', onMapWindowBlur);
   });
   watch(
-    [isLoading, objectiveLayer, extractLayer, spawnLayer, mapInstance],
+    [isLoading, objectiveLayer, extractLayer, spawnLayer, mapInstance, transitLayer],
     (
       [loading, objectiveMarkersLayer, extractMarkersLayer, spawnMarkersLayer, instance],
       oldValues

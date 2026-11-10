@@ -45,6 +45,13 @@ export function useLeafletMapControls({
 }: UseLeafletMapControlsOptions) {
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
   const mapExtracts = computed<MapExtract[]>(() => map.value?.extracts ?? []);
+  const mapTransits = computed(() =>
+    (map.value?.transits ?? []).filter((transit) =>
+      [transit.position?.x, transit.position?.z].every(Number.isFinite)
+    )
+  );
+  const hasTransits = computed(() => mapTransits.value.length > 0);
+  const showTransits = ref(true);
   const mapPmcSpawns = computed<MapSpawn[]>(() => {
     if (!map.value?.spawns) return [];
     return map.value.spawns.filter((spawn) => {
@@ -108,6 +115,9 @@ export function useLeafletMapControls({
     },
   });
   return {
+    hasTransits,
+    mapTransits,
+    showTransits,
     hasCoopExtracts,
     hasPmcSpawns,
     hasSharedExtracts,

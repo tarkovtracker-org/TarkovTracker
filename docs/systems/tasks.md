@@ -387,6 +387,16 @@ not import quest completions and therefore has no trader/task backfill path.
 
 ## Map objective visibility and required items
 
+The map's independent **Transit** layer shows transit locations from the active mode's
+`json.tarkov.dev` map payload. It defaults on and the toggle appears only when the selected
+map has transit coordinates. Labels use upstream localized descriptions (with the existing
+English fallback), a directional arrow, and a dashed border; the marker color is configurable
+alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
+Like extract labels, transit labels remain visible across floors: named map floors have no
+height ranges for matching upstream vertical bounds. Transit conditions are not displayed;
+this layer identifies locations, not whether a particular player can use them in a raid.
+No overlay additions or additional upstream requests are required.
+
 **Summary.** The Tasks map derives objective visibility once for map markers and the required-item
 summary. Objectives are categorized as pinned, self, or team, while the summary separately groups
 items and keys from pinned tasks and active tasks so pinned requirements remain distinguishable.

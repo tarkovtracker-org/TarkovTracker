@@ -4,9 +4,17 @@ import {
   LEGACY_MAP_MARKER_COLORS,
   MAP_MARKER_COLORS,
   migrateLegacyMapMarkerColors,
+  normalizeMapMarkerColors,
 } from '@/utils/theme-colors';
 const t = (key: string) => key;
 describe('theme-colors', () => {
+  it('defaults the transit color without replacing a stored custom palette', () => {
+    const { TRANSIT: _transit, ...oldPalette } = MAP_MARKER_COLORS;
+    const normalized = normalizeMapMarkerColors({ ...oldPalette, PMC_EXTRACT: '#123456' });
+    expect(normalized.TRANSIT).toBe(MAP_MARKER_COLORS.TRANSIT);
+    expect(normalized.PMC_EXTRACT).toBe('#123456');
+    expect(getMapColorOptions(t)).toContainEqual({ key: 'TRANSIT', label: 'maps.layers.transit' });
+  });
   it('defines PINNED_OBJECTIVE with the selection accent and keeps a separate SELECTED key', () => {
     expect(MAP_MARKER_COLORS.PINNED_OBJECTIVE).toBe('#7c3bed');
     expect('SELECTED' in MAP_MARKER_COLORS).toBe(true);
