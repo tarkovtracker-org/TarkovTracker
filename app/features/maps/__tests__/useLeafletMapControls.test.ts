@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
 import type { TarkovMap } from '@/types/tarkov';
 const createPreferencesStore = () => {
@@ -18,6 +18,7 @@ const createPreferencesStore = () => {
         PINNED_OBJECTIVE: '#7c3bed',
         PMC_EXTRACT: '#f97316',
         PMC_SPAWN: '#ef4444',
+        TRANSIT: '#cf5959',
         SCAV_EXTRACT: '#3b82f6',
         SELECTED: '#f59e0b',
         SELF_OBJECTIVE: '#10b981',
@@ -51,6 +52,43 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
+  it('keeps transits independent and updates them when the map changes', async () => {
+    const map = ref<TarkovMap>({ id: 'empty', name: 'Empty' });
+    const controls = useLeafletMapControls({
+      map,
+      preferencesStore: createPreferencesStore(),
+      showExtracts: false,
+      t: (key: string) => key,
+    });
+    expect(controls.mapTransits.value).toEqual([]);
+    expect(controls.hasTransits.value).toBe(false);
+    expect(controls.showTransits.value).toBe(true);
+    const transit = {
+      id: '9',
+      description: 'Transit to Reserve',
+      map: 'reserve',
+      position: { x: 650.64, y: 1.59, z: 124.94 },
+    };
+    map.value = {
+      id: 'customs',
+      name: 'Customs',
+      transits: [
+        transit,
+        { ...transit, id: 'bad', position: { x: NaN, y: 0, z: 1 } },
+        { ...transit, id: 'missing', position: undefined },
+      ],
+    };
+    expect(controls.mapTransits.value).toEqual([transit]);
+    expect(controls.hasTransits.value).toBe(true);
+    controls.showPmcExtracts.value = true;
+    controls.showScavExtracts.value = true;
+    controls.showPmcSpawns.value = true;
+    controls.showTransits.value = false;
+    await nextTick();
+    expect(controls.showPmcExtracts.value).toBe(true);
+    expect(controls.showScavExtracts.value).toBe(true);
+    expect(controls.showPmcSpawns.value).toBe(true);
+  });
   it('derives extract/spawn visibility and clamps slider settings', () => {
     const controls = useLeafletMapControls({
       map: ref({

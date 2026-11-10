@@ -1,5 +1,5 @@
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
-import type { MapExtract, MapSpawn, TarkovMap } from '@/types/tarkov';
+import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
 type RefLike<T> = { value: T };
 type UseLeafletMapControlsOptions = {
@@ -34,6 +34,7 @@ export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
 export const isCoopExtract = (extract: MapExtract): boolean =>
   /\bco-?op\b/i.test(extract.name || '');
+/** Derive available map locations and expose independent layer toggles and display controls. */
 export function useLeafletMapControls({
   map,
   preferencesStore,
@@ -45,6 +46,14 @@ export function useLeafletMapControls({
 }: UseLeafletMapControlsOptions) {
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
   const mapExtracts = computed<MapExtract[]>(() => map.value?.extracts ?? []);
+  const mapTransits = computed(() =>
+    (map.value?.transits ?? []).filter(
+      (transit): transit is MapTransit & { position: MapPosition } =>
+        [transit.position?.x, transit.position?.z].every(Number.isFinite)
+    )
+  );
+  const hasTransits = computed(() => mapTransits.value.length > 0);
+  const showTransits = ref(true);
   const mapPmcSpawns = computed<MapSpawn[]>(() => {
     if (!map.value?.spawns) return [];
     return map.value.spawns.filter((spawn) => {
@@ -108,6 +117,9 @@ export function useLeafletMapControls({
     },
   });
   return {
+    hasTransits,
+    mapTransits,
+    showTransits,
     hasCoopExtracts,
     hasPmcSpawns,
     hasSharedExtracts,

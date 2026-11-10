@@ -52,6 +52,8 @@ export interface UseLeafletMapReturn {
   extractLayer: ShallowRef<L.LayerGroup | null>;
   /** PMC spawn markers layer group */
   spawnLayer: ShallowRef<L.LayerGroup | null>;
+  /** Transit location markers layer group */
+  transitLayer: ShallowRef<L.LayerGroup | null>;
   /** Set the current floor */
   setFloor: (floor: string) => void;
   /** Refresh the map view */
@@ -186,6 +188,7 @@ function setInitialMapView(
   }
   instance.fitBounds(bounds);
 }
+/** Own the map instance, background loading, marker layers, and their reactive lifecycle. */
 export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapReturn {
   const {
     containerRef,
@@ -206,6 +209,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const objectiveLayer = shallowRef<L.LayerGroup | null>(null);
   const extractLayer = shallowRef<L.LayerGroup | null>(null);
   const spawnLayer = shallowRef<L.LayerGroup | null>(null);
+  const transitLayer = shallowRef<L.LayerGroup | null>(null);
   const crsKey = ref('');
   const renderKey = ref('');
   let hasAppliedInitialView = false;
@@ -765,6 +769,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     resetIdleTimer();
   }
+  /** Initialize the active map and layer groups, ignoring superseded asynchronous loads. */
   async function initializeMap(): Promise<void> {
     // Skip initialization for unavailable maps or missing container
     if (!containerRef.value || isMapUnavailable()) return;
@@ -806,6 +811,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       objectiveLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       extractLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       spawnLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
+      transitLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       // Setup idle detection
       if (enableIdleDetection && mapInstance.value) {
         mapInstance.value.on('movestart', resetIdleTimer);
@@ -864,7 +870,9 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     resetIdleTimer();
   }
+  /** Clear every marker group while retaining the map and its background. */
   function clearMarkers(): void {
+    transitLayer.value?.clearLayers();
     if (objectiveLayer.value) {
       objectiveLayer.value.clearLayers();
     }
@@ -875,6 +883,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       spawnLayer.value.clearLayers();
     }
   }
+  /** Cancel pending loads and release the map, timers, and all layer references. */
   function destroy(): void {
     initializeToken += 1;
     cancelMapLayerLoad();
@@ -899,6 +908,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     objectiveLayer.value = null;
     extractLayer.value = null;
     spawnLayer.value = null;
+    transitLayer.value = null;
     leaflet.value = null;
   }
   // Watch for map changes
@@ -977,6 +987,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     objectiveLayer,
     extractLayer,
     spawnLayer,
+    transitLayer,
     setFloor,
     refreshView,
     clearMarkers,

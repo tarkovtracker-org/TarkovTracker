@@ -33,6 +33,48 @@ async function expectHitTarget(control) {
     )
     .toBe(true);
 }
+test('Transit locations toggle independently in inline and fullscreen maps', async ({ page }) => {
+  await page.goto(`${origin}/tasks/maps`);
+  const inline = page
+    .locator('[tabindex="0"]')
+    .filter({ has: page.locator('.leaflet-container') })
+    .first();
+  await expect(inline.locator('.leaflet-image-layer')).toBeVisible();
+  await page.getByTestId('map-hint-dismiss').click();
+  const assertTransits = async (surface) => {
+    const toggle = surface.getByRole('button', { name: 'Transit', exact: true });
+    const markers = surface.locator('.transit-marker');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(markers).not.toHaveCount(0);
+    const count = await markers.count();
+    const extracts = surface.getByRole('button', { name: 'PMC', exact: true });
+    if ((await extracts.getAttribute('aria-pressed')) !== 'true') await extracts.click();
+    await expectHitTarget(toggle);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(markers).toHaveCount(0);
+    await expect(extracts).toHaveAttribute('aria-pressed', 'true');
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(markers).toHaveCount(count);
+  };
+  await assertTransits(inline);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertTransits(inline);
+  await inline.getByTestId('map-fullscreen-toggle').click();
+  const fullscreen = page.getByTestId('map-fullscreen-overlay');
+  await expect(fullscreen.locator('.leaflet-image-layer')).toBeVisible();
+  await assertTransits(fullscreen);
+  await fullscreen.getByTestId('map-fullscreen-exit').click();
+  await page.getByRole('button', { name: /^Customs(?:\s*\d+)?$/ }).click();
+  await expect(
+    inline.locator('.transit-marker').filter({ hasText: 'Transit to Reserve' })
+  ).toHaveCount(1);
+  await expect(
+    inline.locator('.transit-marker').filter({ hasText: 'Transit to Streets of Tarkov' })
+  ).toHaveCount(0);
+});
 function areSeparate(first, second) {
   return (
     first.x + first.width <= second.x ||

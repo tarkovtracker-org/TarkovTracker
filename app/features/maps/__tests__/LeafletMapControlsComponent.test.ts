@@ -49,6 +49,7 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
       objectiveLayer: null as unknown,
       extractLayer: null as unknown,
       spawnLayer: null as unknown,
+      transitLayer: null as unknown,
     },
   };
 });
@@ -79,6 +80,7 @@ vi.mock('@/composables/useLeafletMap', () => ({
       objectiveLayer: shallowRef(mapState.objectiveLayer),
       extractLayer: shallowRef(mapState.extractLayer),
       spawnLayer: shallowRef(mapState.spawnLayer),
+      transitLayer: shallowRef(mapState.transitLayer),
       setFloor: setFloorSpy,
       refreshView: refreshViewSpy,
       clearMarkers: vi.fn(),
@@ -97,6 +99,7 @@ vi.mock('@/stores/usePreferences', () => ({
       SCAV_EXTRACT: '#555555',
       SHARED_EXTRACT: '#666666',
       COOP_EXTRACT: '#777777',
+      TRANSIT: '#cf5959',
     },
     getMapTooltipDensity: 'comfortable',
     getMapShowSelfObjectives: true,
@@ -167,6 +170,7 @@ describe('LeafletMap controls', () => {
     mapState.objectiveLayer = null;
     mapState.extractLayer = null;
     mapState.spawnLayer = null;
+    mapState.transitLayer = null;
     localStorage.clear();
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
@@ -197,6 +201,85 @@ describe('LeafletMap controls', () => {
     await toggle.trigger('click');
     expect(toggle.attributes('aria-pressed')).toBe('false');
     expect(toggle.classes()).not.toContain('light:text-primary-900');
+    wrapper.unmount();
+  });
+  it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
+    const transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    const marker = vi.fn(() => ({}));
+    const divIcon = vi.fn((options) => options);
+    mapState.transitLayer = transitLayer;
+    mapState.leaflet = { marker, divIcon };
+    const transit = {
+      id: '9',
+      description: 'Transit to <Reserve>',
+      map: 'reserve',
+      position: { x: 650.64, y: 1.59, z: 124.94 },
+    };
+    const transitMap: TarkovMap = {
+      ...mapData,
+      transits: [transit],
+      spawns: [{ position: { x: 1, y: 0, z: 1 }, sides: ['pmc'], categories: ['player'] }],
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    };
+    const wrapper = await mountMap({
+      map: transitMap,
+      showPmcExtracts: true,
+      showScavExtracts: true,
+      showPmcSpawns: true,
+    });
+    // Exercise the real redraw watcher without depending on SVG load timing.
+    await wrapper.setProps({ map: { ...transitMap } });
+    const toggle = wrapper.get('button[aria-label="Transit"]');
+    expect(toggle.attributes('aria-pressed')).toBe('true');
+    expect(marker).toHaveBeenLastCalledWith([124.94, 650.64], expect.any(Object));
+    const badge = divIcon.mock.calls.at(-1)?.[0].html as HTMLElement;
+    expect(badge.textContent).toContain('Transit to <Reserve>');
+    expect(badge.querySelector('reserve')).toBeNull();
+    expect(transitLayer.addLayer).toHaveBeenCalled();
+    const added = transitLayer.addLayer.mock.calls.length;
+    transitLayer.clearLayers.mockClear();
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-pressed')).toBe('false');
+    expect(transitLayer.clearLayers).toHaveBeenCalledOnce();
+    expect(transitLayer.addLayer).toHaveBeenCalledTimes(added);
+    for (const label of ['PMC', 'Scav', 'PMC Spawns']) {
+      expect(wrapper.get(`button[aria-label="${label}"]`).attributes('aria-pressed')).toBe('true');
+    }
+    await toggle.trigger('click');
+    expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
+    transitLayer.addLayer.mockClear();
+    transitLayer.clearLayers.mockClear();
+    await wrapper.setProps({ map: { ...transitMap, svg: undefined } });
+    expect(transitLayer.clearLayers).toHaveBeenCalled();
+    expect(transitLayer.addLayer).not.toHaveBeenCalled();
+    await wrapper.setProps({
+      map: {
+        ...transitMap,
+        svg: undefined,
+        tile: {
+          tilePath: '/tiles/{z}/{x}/{y}.png',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+    });
+    expect(transitLayer.addLayer).toHaveBeenCalled();
+    transitLayer.clearLayers.mockClear();
+    await wrapper.setProps({ map: { ...mapData, id: 'other', transits: [] } });
+    expect(wrapper.find('button[aria-label="Transit"]').exists()).toBe(false);
+    expect(transitLayer.clearLayers).toHaveBeenCalled();
     wrapper.unmount();
   });
   it('uses the same theme-aware active foreground for the opened help control', async () => {
