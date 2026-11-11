@@ -63,6 +63,12 @@ describe('extract rule selection', () => {
     expect(extractRulesForMode(split, ids, 'pve')).toEqual(coop);
     expect(extractRulesForMode(split, ids, 'seasonal')).toEqual([]);
     expect(extractRulesForMode(data({ rules: coop }, both), ids, 'seasonal')).toEqual(coop);
+    // Shared rules win over a mode's own list when an entry carries both.
+    const shared = [{ type: 'activation' as const }];
+    const mixed = data({ rules: shared, pvp: coop, seasonal: coop }, both);
+    for (const mode of ['pvp', 'pve', 'seasonal']) {
+      expect(extractRulesForMode(mixed, ids, mode)).toEqual(shared);
+    }
   });
   it('gives a mode without a capture no rules, even when shared rules exist', () => {
     const regularOnly = data({ rules: coop });
