@@ -631,8 +631,8 @@
       "hidden_count": "{count} hidden",
       "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
       "pmc_spawns": "PMC Spawns",
-      "shared": "Shared",
-      "shared_hint": "Either faction",
+      "shared_or_unknown": "Shared / unknown",
+      "shared_or_unknown_hint": "Either faction, or faction not supplied",
       "show_all": "Show all layers",
       "title": "Layers",
       "transit": "Transit"

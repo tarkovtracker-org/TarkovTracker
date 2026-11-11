@@ -503,11 +503,14 @@ out of it. The map surface keeps its own keyboard controls.
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
 controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
 `app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
-Extracts (PMC, Scav, Shared, Co-op), and Locations (Transit, PMC Spawns). Each row draws the marker
-as the map does and toggles exactly that marker type; hidden rows stay listed, dimmed with an
+Extracts (PMC, Scav, Shared / unknown, Co-op), and Locations (Transit, PMC Spawns). Each row depicts
+the markers it controls, including combined rows; hidden rows stay listed, dimmed with an
 eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
 map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
-**Show all layers** while any are hidden. Shared and co-op extracts have their own toggles and start
+**Show all layers** while any are hidden. The combined Shared / unknown row depicts both the shared
+glyph/color and the generic exit glyph/default color; it controls either-faction exits and exits
+whose faction was not supplied without implying that unknown factions are shared. Shared and co-op
+extracts have their own toggles and start
 visible when either faction's extracts start visible; extracts without a known faction follow the
 Shared row, which is listed whenever such extracts exist. Extracts are visible by default. The
 panel opens by default when the map is at least 480 px wide, remembers an explicit open or close

@@ -7,7 +7,7 @@
     @click="emit('toggle', item)"
   >
     <span
-      class="flex h-6 w-6 shrink-0 items-center justify-center transition"
+      class="flex h-6 w-10 shrink-0 items-center justify-center gap-1 transition"
       :class="visible ? '' : 'opacity-35 grayscale'"
       aria-hidden="true"
     >
@@ -18,6 +18,11 @@
         :style="{ backgroundColor: item.color }"
       />
       <MapMarkerGlyph v-else :kind="glyphKind" :color="item.color" />
+      <MapMarkerGlyph
+        v-if="item.secondaryGlyph"
+        :kind="item.secondaryGlyph.kind"
+        :color="item.secondaryGlyph.color"
+      />
     </span>
     <span class="flex min-w-0 flex-1 flex-col">
       <span class="truncate font-medium" :class="visible ? 'text-surface-100' : 'text-surface-500'">

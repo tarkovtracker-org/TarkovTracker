@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import maps from '@/data/maps.json';
+import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
 import type { TarkovMap } from '@/types/tarkov';
 const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
   const instance = {
@@ -107,6 +108,7 @@ vi.mock('@/stores/usePreferences', () => ({
       SCAV_EXTRACT: '#555555',
       SHARED_EXTRACT: '#666666',
       COOP_EXTRACT: '#777777',
+      DEFAULT_EXTRACT: '#888888',
       TRANSIT: '#cf5959',
     },
     getMapTooltipDensity: 'comfortable',
@@ -242,6 +244,12 @@ describe('LeafletMap controls', () => {
     expect(row('transit').exists()).toBe(false);
     expect(row('pmc').attributes('aria-pressed')).toBe('true');
     expect(row('pmc').text()).toContain('PMC');
+    expect(row('shared').text()).toContain('Shared / unknown');
+    expect(
+      row('shared')
+        .findAll('svg path')
+        .map((path) => path.attributes('d'))
+    ).toEqual([MAP_MARKER_GLYPH_PATHS.shared, MAP_MARKER_GLYPH_PATHS.extract]);
     expect(row('coop').text()).toContain('PMC and Scav together');
     await row('pmc').trigger('click');
     await row('shared').trigger('click');
