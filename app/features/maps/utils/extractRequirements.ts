@@ -60,14 +60,18 @@ function fallbackTransfer(extract: MapExtract): Rule[] {
   if (!transfer || !Number.isFinite(transfer.count) || transfer.count <= 0) return [];
   return transferRule(transfer);
 }
+function nonBlankString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.trim() || undefined : undefined;
+}
 function transferRule(transfer: NonNullable<MapExtract['transferItem']>): Rule[] {
   const item = typeof transfer.item === 'string' ? { id: transfer.item } : transfer.item;
-  return item?.id
+  const id = nonBlankString(item?.id);
+  return id
     ? [
         {
           type: 'transfer',
-          item: item.id,
-          itemName: item.name?.trim() || undefined,
+          item: id,
+          itemName: nonBlankString(item?.name),
           count: transfer.count,
         },
       ]

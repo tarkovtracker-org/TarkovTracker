@@ -164,4 +164,30 @@ describe('extract requirements', () => {
     item.name = '   ';
     expect(getExtractRequirements(options).details.join(' ')).toContain('Metadata payment item');
   });
+  it('ignores malformed external item names without interrupting requirement rendering', () => {
+    for (const name of [123, {}, [], true, null]) {
+      const result = getExtractRequirements({
+        mapId: 'unknown',
+        mode: 'pvp',
+        t,
+        extract: {
+          id: 'malformed-name',
+          name: 'Transfer',
+          transferItem: { item: { id: 'custom-item', name }, count: 2 },
+        } as unknown as MapExtract,
+        itemName: () => 'Metadata payment item',
+      });
+      expect(result.details.join(' ')).toContain('2 × Metadata payment item');
+    }
+  });
+  it('rejects invalid external item IDs rather than producing a handover rule', () => {
+    for (const id of [123, {}, [], true, null, '   ']) {
+      const result = inspect('unknown', {
+        id: 'malformed-id',
+        name: 'Transfer',
+        transferItem: { item: { id, name: 'Payment item' }, count: 2 },
+      } as unknown as MapExtract);
+      expect(result.tags.map((tag) => tag.key)).toEqual(['unknown']);
+    }
+  });
 });
