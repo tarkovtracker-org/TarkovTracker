@@ -35,6 +35,8 @@ type Options = {
   mode: string;
   t: Translate;
   itemName?: (id: string) => string | undefined;
+  /** Formats counts in the app's selected locale; defaults to the runtime locale. */
+  formatNumber?: (count: number) => string;
 };
 const profiles: Record<string, Record<string, Profile>> = snapshot.maps;
 const CURRENCY_KEYS: Record<string, string> = {
@@ -50,7 +52,8 @@ const ITEM_KEYS: Record<string, string> = {
 };
 const text = (options: Options, key: string, params?: Record<string, string | number>) =>
   options.t(`maps.extract_requirements.${key}`, params);
-const formatCount = (count: number): string => new Intl.NumberFormat().format(count);
+const formatCount = (options: Options, count: number): string =>
+  (options.formatNumber ?? new Intl.NumberFormat().format)(count);
 /** Seconds after raid start as m:ss, the way the in-raid timer reads. */
 const clock = (seconds: number): string =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -95,7 +98,7 @@ function payment(rule: Rule, options: Options): TaggedDetail {
   return {
     tag: currency ? 'money' : 'transfer',
     text: text(options, currency ? 'base_cost' : 'hand_over', {
-      count: formatCount(count ?? 0),
+      count: formatCount(options, count ?? 0),
       item: itemLabel(options, rule.item ?? '', rule.itemName),
     }),
     hint: currency ? text(options, 'base_cost_hint') : undefined,
@@ -127,7 +130,7 @@ function availability(rule: Rule, options: Options): number {
 const DETAIL_BUILDERS: Record<string, (rule: Rule, options: Options) => string> = {
   item: (rule, options) =>
     text(options, 'bring', {
-      count: formatCount(rule.count ?? 1),
+      count: formatCount(options, rule.count ?? 1),
       item: itemLabel(options, rule.item ?? ''),
     }),
   key: (rule, options) =>
@@ -159,11 +162,7 @@ function appendRule(
   details.push(entry);
   if (!rule.vehicle) return;
   addTag('conditional');
-  details.push({
-    tag: 'conditional',
-    text: text(options, 'vehicle_detail'),
-    hint: text(options, 'vehicle_hint'),
-  });
+  details.push({ tag: 'conditional', text: text(options, 'vehicle_detail') });
 }
 /** Combine captured rules with reviewed scene cues; absence never means an extract is open. */
 export function getExtractRequirements(options: Options): ExtractRequirements {

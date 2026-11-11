@@ -576,7 +576,6 @@
       "armor_slot": "body armor",
       "chance_detail": "{percent}% chance to be open",
       "vehicle_detail": "Vehicle must still be there",
-      "vehicle_hint": "One use per raid",
       "coop_detail": "Needs a PMC and a Scav together",
       "activation_detail": "Activate first (power, switch, or door)",
       "green_flare_detail": "Fire a green flare in the signal area first",

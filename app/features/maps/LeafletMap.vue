@@ -648,6 +648,7 @@
   } from '@/features/maps/utils/objectiveStack';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
   import {
@@ -733,6 +734,7 @@
   });
   const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
   const { t } = useI18n({ useScope: 'global' });
+  const formatNumber = useLocaleNumberFormatter();
   const router = useRouter();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -1842,6 +1844,7 @@
         mode: metadataStore.currentGameMode ?? 'pvp',
         t,
         itemName: (id) => metadataStore.itemsById?.get(id)?.name,
+        formatNumber,
       });
       extractLayer.value!.addLayer(
         createPinMarker(

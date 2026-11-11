@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import maps from '@/data/maps.json';
 import { createElevationIndicator, getMapFloorDelta } from '@/features/maps/utils/mapElevation';
-import { MAP_ELEVATION_ARROW_PATHS } from '@/features/maps/utils/mapIcons';
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import type { TarkovMap } from '@/types/tarkov';
 const groundZero = {
@@ -110,12 +109,19 @@ describe('floor-relative elevation', () => {
   it('renders a solid arrow toward the floor, with the level count beyond one level', () => {
     const indicator = createElevationIndicator(-4, 'Go down 4 levels');
     expect(indicator?.dataset.direction).toBe('down');
+    // Reviewed mdi:arrow-down-bold data, so an inverted or malformed arrow cannot pass.
     expect(indicator?.querySelector('path')?.getAttribute('d')).toBe(
-      MAP_ELEVATION_ARROW_PATHS.down
+      'M9 4h6v8h4.84L12 19.84L4.16 12H9z'
     );
     expect(indicator?.textContent).toBe('4');
     expect(indicator?.getAttribute('aria-label')).toBe('Go down 4 levels');
     expect(indicator?.classList).toContain('absolute');
+    const multiple = createElevationIndicator(2, 'Go up 2 levels', false);
+    expect(multiple?.dataset.direction).toBe('up');
+    expect(multiple?.querySelector('path')?.getAttribute('d')).toBe(
+      'M15 20H9v-8H4.16L12 4.16L19.84 12H15z'
+    );
+    expect(multiple?.textContent).toBe('2');
     const single = createElevationIndicator(1, 'Go up 1 level', false);
     expect(single?.dataset.direction).toBe('up');
     expect(single?.textContent).toBe('');

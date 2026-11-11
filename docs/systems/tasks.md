@@ -398,7 +398,8 @@ map has transit coordinates. Labels use upstream localized descriptions (with th
 English fallback), the transit glyph, and a dashed border; the marker color is configurable
 alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
 Extract and transit labels remain visible across floors. Elevation arrows point toward the
-marker from the selected floor, one arrow per selectable level; no arrow is shown for unknown
+marker from the selected floor as a single badge (the level count is added beyond one level); no
+badge is shown for unknown
 height or a volume spanning the selected floor. Transit conditions are not displayed;
 this layer identifies locations, not whether a particular player can use them in a raid.
 No overlay additions or additional upstream requests are required.
@@ -431,8 +432,8 @@ arrow. Task-zone positions and vertical bounds survive mark construction and par
 mark hashes. Legacy two-dimensional GPS has unknown height, never a fabricated zero.
 Extract/transit pins and task markers update floor badges on floor changes: a solid up/down arrow,
 plus the level count when it is more than one, with translated accessible descriptions. Markers
-on another floor stay visible but fade and desaturate (pins return to full strength on hover or
-tap); their floor badge keeps full contrast. Counts describe displayed levels, not stair routes
+on another floor stay visible but fade (pins also desaturate and return to full strength on hover
+or tap); their floor badge keeps full contrast. Counts describe displayed levels, not stair routes
 or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
 
 ## Extract requirement cues and details

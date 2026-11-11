@@ -185,6 +185,18 @@ describe('extract requirements', () => {
     appendExtractRequirementTags(coopOnly, { tags: [tag('coop')], details: [] }, ['coop']);
     expect(coopOnly.querySelector('.map-extract-requirements')).toBeNull();
   });
+  it('formats costs with the app locale formatter instead of the browser default', () => {
+    const result = getExtractRequirements({
+      mapId: groundZero,
+      extract: vehicle,
+      mode: 'pvp',
+      t,
+      formatNumber: (count) => count.toLocaleString('de-DE'),
+    });
+    expect(result.details[0]?.text).toBe('Pay 20.000 roubles');
+    // The vehicle row states only the reviewed condition, without an unsourced usage limit.
+    expect(result.details[1]).toEqual({ tag: 'conditional', text: 'Vehicle must still be there' });
+  });
   it('preserves a supplied transfer item name before consulting optional metadata', () => {
     const item = { id: 'custom-item', name: 'Captured payment item' };
     const options = {
