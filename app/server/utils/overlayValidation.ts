@@ -1,4 +1,5 @@
 import { isGameEdition } from '@/utils/editionHelpers';
+import { isExtractCuesSection, isExtractRequirementsSection } from '@/utils/extractRuleData';
 import { validStoryUnlock } from '@/utils/storylineUnlocks';
 import { isPlainObject } from './deepMerge';
 import { validProgressionCounters } from './overlayCounters';
@@ -235,12 +236,16 @@ const scopedUnknownSections = (
       : unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
   );
 // A valid registry is consumed by `overlayCounters.ts`; a malformed one is applied nowhere and
-// stays unconsumed so precompute refuses to certify it.
+// stays unconsumed so precompute refuses to certify it. Extract rules and cues follow the same
+// rule: `extract-requirements.get.ts` serves them only when they are valid.
 export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
   if (validProgressionCounters(overlay.progressionCounters)) rootNames.add('progressionCounters');
   if (validTraderTaskGroups(overlay.traderTaskGroups)) rootNames.add('traderTaskGroups');
   if (isInactiveTaskIdAliases(overlay.taskIdAliases)) rootNames.add('taskIdAliases');
+  if (isExtractRequirementsSection(overlay.extractRequirements))
+    rootNames.add('extractRequirements');
+  if (isExtractCuesSection(overlay.extractCues)) rootNames.add('extractCues');
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),

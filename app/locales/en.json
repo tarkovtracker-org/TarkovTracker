@@ -554,8 +554,8 @@
   "maps": {
     "extract_requirements": {
       "raid_notice": "Not live raid status",
-      "source": "Requirements: game data, EFT {version} ({date})",
-      "source_curated": "Requirements: game data, EFT {version} ({date}), plus curated cues",
+      "source": "Requirements: game data, EFT {version}",
+      "source_curated": "Requirements: game data, EFT {version}, plus curated cues",
       "source_detail": "From the EFT {build} client's location and global definitions. Base values only; check the in-raid extraction list.",
       "curated_detail": "Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
       "no_additional_data": "No requirements listed. Availability is not guaranteed.",

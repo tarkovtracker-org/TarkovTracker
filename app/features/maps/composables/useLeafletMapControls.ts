@@ -1,4 +1,4 @@
-import extractRules from '@/data/extractRules.json';
+import { currentExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
@@ -34,15 +34,23 @@ export const MAP_BUTTON_ACTIVE_CLASS =
   'border border-primary-400/60 bg-primary-500/15 text-primary-100 light:text-primary-900';
 export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
-const coopExtractIds = new Set(
-  Object.values(extractRules.maps).flatMap((map) =>
-    Object.entries(map)
-      .filter(([, profile]) => profile.rules.some((rule) => rule.type === 'coop'))
-      .map(([id]) => id)
-  )
+/** Shared exits that need a PMC and a Scav, from the current extract rule data. */
+const coopExtractIds = computed(
+  () =>
+    new Set(
+      Object.values(currentExtractRuleData().requirements.maps).flatMap((map) =>
+        Object.entries(map)
+          .filter(([, entry]) =>
+            [entry.rules, entry.pvp, entry.seasonal].some((rules) =>
+              rules?.some((rule) => rule.type === 'coop')
+            )
+          )
+          .map(([id]) => id)
+      )
+    )
 );
 export const isCoopExtract = (extract: MapExtract): boolean =>
-  coopExtractIds.has(extract.id) || /\bco-?op\b/i.test(extract.name || '');
+  coopExtractIds.value.has(extract.id) || /\bco-?op\b/i.test(extract.name || '');
 /** Derive available map locations and expose independent layer toggles and display controls. */
 export function useLeafletMapControls({
   map,

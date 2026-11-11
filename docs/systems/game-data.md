@@ -26,22 +26,23 @@ before returning it.
 
 ### Endpoints
 
-| Endpoint                       | Purpose                          | Cache TTL  | Precomputed? | Overlay? |
-| ------------------------------ | -------------------------------- | ---------- | ------------ | -------- |
-| `/api/tarkov/bootstrap`        | Player levels (no `lang`)        | 12h        | no           | no       |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders             | 12h        | **yes**      | yes      |
-| `/api/tarkov/tasks-import`     | Whole English EFT import catalog | no-store   | **yes**      | yes      |
-| `/api/tarkov/tasks-objectives` | Task objectives                  | 12h        | no           | yes      |
-| `/api/tarkov/tasks-rewards`    | Task rewards                     | 12h        | no           | yes      |
-| `/api/tarkov/hideout`          | Hideout stations                 | 12h        | no           | yes      |
-| `/api/tarkov/items-lite`       | Items (minimal)                  | 24h        | no           | yes      |
-| `/api/tarkov/items`            | Items (full)                     | 24h        | no           | yes      |
-| `/api/tarkov/prestige`         | Prestige levels                  | 24h        | no           | yes      |
-| `/api/tarkov/editions`         | Editions, chapters, perks        | 1h overlay | no           | yes      |
-| `/api/tarkov/overlay-status`   | Last complete fleet manifest     | no-store   | no           | metadata |
-| `/api/tarkov/map-spawns`       | Map spawn points                 | 12h        | no           | no       |
-| `/api/tarkov/cache-meta`       | Cache purge status               | 5m edge    | no           | no       |
-| `/api/tarkov/access-check`     | Browser clearance probe          | no-store   | no           | no       |
+| Endpoint                           | Purpose                            | Cache TTL  | Precomputed? | Overlay? |
+| ---------------------------------- | ---------------------------------- | ---------- | ------------ | -------- |
+| `/api/tarkov/bootstrap`            | Player levels (no `lang`)          | 12h        | no           | no       |
+| `/api/tarkov/tasks-core`           | Tasks, maps, traders               | 12h        | **yes**      | yes      |
+| `/api/tarkov/tasks-import`         | Whole English EFT import catalog   | no-store   | **yes**      | yes      |
+| `/api/tarkov/tasks-objectives`     | Task objectives                    | 12h        | no           | yes      |
+| `/api/tarkov/tasks-rewards`        | Task rewards                       | 12h        | no           | yes      |
+| `/api/tarkov/hideout`              | Hideout stations                   | 12h        | no           | yes      |
+| `/api/tarkov/items-lite`           | Items (minimal)                    | 24h        | no           | yes      |
+| `/api/tarkov/items`                | Items (full)                       | 24h        | no           | yes      |
+| `/api/tarkov/prestige`             | Prestige levels                    | 24h        | no           | yes      |
+| `/api/tarkov/editions`             | Editions, chapters, perks          | 1h overlay | no           | yes      |
+| `/api/tarkov/extract-requirements` | Extract rules and cues (all modes) | 1h overlay | no           | yes      |
+| `/api/tarkov/overlay-status`       | Last complete fleet manifest       | no-store   | no           | metadata |
+| `/api/tarkov/map-spawns`           | Map spawn points                   | 12h        | no           | no       |
+| `/api/tarkov/cache-meta`           | Cache purge status                 | 5m edge    | no           | no       |
+| `/api/tarkov/access-check`         | Browser clearance probe            | no-store   | no           | no       |
 
 Task, hideout, item and prestige endpoints consume overlays. The editions endpoint projects
 editions, story chapters and Seasonal perks from the same validated loader. Bootstrap and

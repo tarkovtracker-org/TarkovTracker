@@ -598,12 +598,12 @@
   import 'leaflet/dist/leaflet.css';
   import { useElementSize, useStorage } from '@vueuse/core';
   import { createApp } from 'vue';
-  import { useSafeLocale } from '@/composables/i18nHelpers';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
     type MapObjectiveCategory,
   } from '@/composables/useMapObjectiveMarks';
+  import { useExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
   import {
     MAP_BUTTON_ACTIVE_CLASS,
     MAP_BUTTON_INACTIVE_CLASS,
@@ -902,11 +902,7 @@
     })
   );
   const hiddenLayerCount = computed(() => countHiddenLayers(layerGroups.value));
-  const locale = useSafeLocale();
-  const formatCaptureDate = (iso: string) =>
-    new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-      new Date(iso)
-    );
+  const extractRuleData = useExtractRuleData();
   /** Which extract glyph categories are drawn; markers and the source line share this rule. */
   const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
     pmc: showPmcExtracts.value,
@@ -925,9 +921,13 @@
   );
   /** One map-level line names the requirement data source and that it is not live status. */
   const extractSource = computed(() => {
-    const source = getExtractDataSource(props.map.id, metadataStore.currentGameMode ?? 'pvp');
+    const source = getExtractDataSource(
+      props.map.id,
+      metadataStore.currentGameMode ?? 'pvp',
+      extractRuleData.value
+    );
     if (!source || !anyExtractsVisible.value) return null;
-    return describeExtractSource(source, t, formatCaptureDate);
+    return describeExtractSource(source, t);
   });
   const toggleLayer = (item: MapLayerItem) => {
     item.visible.value = !item.visible.value;
@@ -1872,6 +1872,7 @@
         extract,
         mode: metadataStore.currentGameMode ?? 'pvp',
         t,
+        data: extractRuleData.value,
         itemName: (id) => metadataStore.itemsById?.get(id)?.name,
         formatNumber,
       });
@@ -2135,7 +2136,7 @@
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
     createExtractMarkers()
   );
-  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById], () =>
+  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById, extractRuleData], () =>
     createExtractMarkers()
   );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());

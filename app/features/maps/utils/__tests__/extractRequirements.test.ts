@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createI18n } from 'vue-i18n';
-import snapshot from '@/data/extractRules.json';
+import bundledCues from '@/data/extractCues.json';
+import bundledRequirements from '@/data/extractRequirements.json';
 import {
   appendExtractRequirementTags,
   createExtractDetails,
@@ -11,6 +12,7 @@ import {
 } from '@/features/maps/utils/extractRequirements';
 import en from '@/locales/en.json';
 import type { MapExtract } from '@/types/tarkov';
+import type { ExtractRuleData } from '@/utils/extractRuleData';
 const i18n = createI18n<[typeof en], 'en', false>({
   legacy: false,
   locale: 'en',
@@ -23,8 +25,9 @@ const vehicle: MapExtract = {
   name: 'Police Cordon V-Ex',
   transferItem: { item: '5449016a4bdc2d6f028b456f', count: 20000 },
 };
-const inspect = (mapId: string, extract: MapExtract, mode = 'pvp') =>
-  getExtractRequirements({ mapId, extract, mode, t });
+const data = { requirements: bundledRequirements, cues: bundledCues } as ExtractRuleData;
+const inspect = (mapId: string, extract: MapExtract, mode = 'pvp', ruleData = data) =>
+  getExtractRequirements({ mapId, extract, mode, t, data: ruleData });
 /** Every popup row's instruction and qualifier, as one searchable string. */
 const copy = (result: ExtractRequirements) =>
   result.details.map((entry) => [entry.text, entry.hint].join(' ')).join(' ');
@@ -53,7 +56,7 @@ describe('extract requirements', () => {
   });
   it('keeps per-extract PvE prices instead of assigning a universal vehicle fee', () => {
     const mapId = '5714dbc024597771384a510d';
-    const entry = Object.entries(snapshot.maps[mapId]).find(
+    const entry = Object.entries(data.requirements.maps[mapId]!).find(
       ([, value]) => value.name === 'ex_interchange_pmc_auto'
     );
     expect(entry).toBeDefined();
@@ -113,7 +116,7 @@ describe('extract requirements', () => {
     expect(copy(result)).toContain('not guaranteed');
   });
   it('does not treat the train timer count as an item cost', () => {
-    const entry = Object.entries(snapshot.maps['5704e5fad2720bc05b8b4567']).find(
+    const entry = Object.entries(data.requirements.maps['5704e5fad2720bc05b8b4567']!).find(
       ([, value]) => value.name === 'EXFIL_Train'
     );
     expect(entry).toBeDefined();
@@ -169,35 +172,80 @@ describe('extract requirements', () => {
     expect(panel.textContent).not.toContain('game data');
   });
   it('names the game capture for each mode and flags maps that use curated cues', () => {
-    const date = (iso: string) => iso.slice(0, 10);
-    const regular = getExtractDataSource(groundZero, 'pvp');
+    const regular = getExtractDataSource(groundZero, 'pvp', data);
     expect(regular).toEqual({
-      capturedAt: snapshot.sources.pvp.capturedAt,
       clientVersion: '1.3.0.0',
-      clientBuild: '1.3.0.0.48484',
+      clientBuild: bundledRequirements.sources.regular.clientBuild,
       curatedCues: true,
     });
     // PvE reads the regular definitions' PvE fields, so it shares the regular capture.
-    expect(getExtractDataSource(groundZero, 'pve')).toEqual(regular);
-    expect(getExtractDataSource(groundZero, 'seasonal')).toEqual({
-      capturedAt: snapshot.sources['pvp-season'].capturedAt,
+    expect(getExtractDataSource(groundZero, 'pve', data)).toEqual(regular);
+    expect(getExtractDataSource(groundZero, 'seasonal', data)).toEqual({
       clientVersion: '1.3.0.1',
-      clientBuild: '1.3.0.1.48558',
+      clientBuild: bundledRequirements.sources['pvp-season'].clientBuild,
       curatedCues: true,
     });
-    expect(snapshot.sources['pvp-season'].capturedAt).not.toBe(snapshot.sources.pvp.capturedAt);
-    expect(describeExtractSource(regular!, t, date)).toEqual({
-      label: 'Requirements: game data, EFT 1.3.0.0 (2026-11-06), plus curated cues',
+    // Maps without curated cues say so; no capture dates are published.
+    const reserve = getExtractDataSource('5704e5fad2720bc05b8b4567', 'pvp', data);
+    expect(reserve?.curatedCues).toBe(false);
+    expect(describeExtractSource(regular!, t)).toEqual({
+      label: 'Requirements: game data, EFT 1.3.0.0, plus curated cues',
       detail:
         "From the EFT 1.3.0.0.48484 client's location and global definitions. Base values only; check the in-raid extraction list. Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
     });
-    const plain = { ...regular!, curatedCues: false };
-    expect(describeExtractSource(plain, t, date).label).toBe(
-      'Requirements: game data, EFT 1.3.0.0 (2026-11-06)'
+    expect(describeExtractSource(reserve!, t).label).toBe('Requirements: game data, EFT 1.3.0.0');
+    expect(describeExtractSource(reserve!, t).detail).not.toContain('tarkov.help');
+    expect(getExtractDataSource('unknown-map', 'pvp', data)).toBeUndefined();
+    expect(getExtractDataSource(groundZero, 'arena', data)).toBeUndefined();
+    const regularOnly = {
+      ...data,
+      requirements: {
+        ...data.requirements,
+        sources: { regular: data.requirements.sources.regular },
+      },
+    };
+    expect(getExtractDataSource(groundZero, 'seasonal', regularOnly)).toBeUndefined();
+  });
+  it('uses PvE train windows and drops a chance the current mode never applies', () => {
+    const lighthouse = '5704e4dad2720bb55b8b4567';
+    const entry = Object.entries(data.requirements.maps[lighthouse]!).find(
+      ([, value]) => value.name === 'EXFIL_Train'
     );
-    expect(describeExtractSource(plain, t, date).detail).not.toContain('tarkov.help');
-    expect(getExtractDataSource('unknown-map', 'pvp')).toBeUndefined();
-    expect(getExtractDataSource(groundZero, 'arena')).toBeUndefined();
+    expect(entry).toBeDefined();
+    const train = { id: entry![0], name: 'Train' };
+    expect(inspect(lighthouse, train).details[0]?.hint).toBe('Window: 20:00–25:00 into the raid');
+    expect(inspect(lighthouse, train, 'pve').details[0]?.hint).toBe(
+      'Window: 21:40–23:40 into the raid'
+    );
+    const custom = {
+      requirements: {
+        sources: data.requirements.sources,
+        maps: {
+          map: {
+            closed: { name: 'closed', rules: [{ type: 'chance', percent: 100, percentPve: 0 }] },
+          },
+        },
+      },
+      cues: {},
+    } as ExtractRuleData;
+    const exit = { id: 'closed', name: 'Closed in PvE' };
+    expect(inspect('map', exit, 'pvp', custom).tags).toEqual([]);
+    expect(inspect('map', exit, 'pve', custom).details).toEqual([
+      { tag: 'conditional', text: '0% chance to be open', hint: undefined },
+    ]);
+  });
+  it('adds curated cues after the game rules and keeps cue-only maps cue-only', () => {
+    const woods = '5704e3c2d2720bac5b8b4567';
+    const zb014 = { id: 'c89cb6207811316f70945ed1de3e5e0d9f8cfc96', name: 'ZB-014' };
+    expect(inspect(woods, zb014).tags.map((tag) => tag.key)).toEqual([
+      'conditional',
+      'green_smoke',
+      'key',
+    ]);
+    const withoutCues = { ...data, cues: {} };
+    expect(inspect(woods, zb014, 'pvp', withoutCues).tags.map((tag) => tag.key)).toEqual([
+      'conditional',
+    ]);
   });
   it('orders pin icons by the legend, skips glyph-redundant ones, and collapses overflow', () => {
     const pin = document.createElement('div');
@@ -226,6 +274,7 @@ describe('extract requirements', () => {
       extract: vehicle,
       mode: 'pvp',
       t,
+      data,
       formatNumber: (count) => count.toLocaleString('de-DE'),
     });
     expect(result.details[0]?.text).toBe('Pay 20.000 roubles');
@@ -244,6 +293,7 @@ describe('extract requirements', () => {
       },
       itemName: () => 'Metadata payment item',
       t,
+      data,
     };
     const result = getExtractRequirements(options);
     expect(copy(result)).toContain('2 × Captured payment item');
@@ -257,6 +307,7 @@ describe('extract requirements', () => {
         mapId: 'unknown',
         mode: 'pvp',
         t,
+        data,
         extract: {
           id: 'malformed-name',
           name: 'Transfer',
