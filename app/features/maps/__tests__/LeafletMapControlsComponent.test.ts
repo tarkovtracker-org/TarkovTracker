@@ -793,8 +793,12 @@ describe('LeafletMap controls', () => {
       createLayer(options)
     );
     const objectiveLayer = createLayerGroup();
+    const divIcon = vi.fn((options: { html: HTMLElement }) => options);
+    const marker = vi.fn((_position: unknown, options: Record<string, unknown>) => ({ options }));
     mapState.leaflet = {
       circleMarker,
+      divIcon,
+      marker,
       polygon: (_positions: unknown, options: Record<string, unknown>) => createLayer(options),
       popup: createPopup,
       DomEvent: { stop: vi.fn() },
@@ -806,6 +810,7 @@ describe('LeafletMap controls', () => {
     const marks = [
       {
         id: 'objective-a',
+        type: 'plantItem',
         users: ['self'],
         zones: [
           {
@@ -821,6 +826,7 @@ describe('LeafletMap controls', () => {
       },
       {
         id: 'objective-b',
+        type: 'findQuestItem',
         users: ['self'],
         zones: [],
         possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
@@ -848,6 +854,12 @@ describe('LeafletMap controls', () => {
     await nextTick();
     expect(objectiveLayer.clearLayers).toHaveBeenCalled();
     expect(circleMarker).toHaveBeenCalled();
+    // Each dot carries a pass-through glyph for its objective's action.
+    const glyphs = divIcon.mock.calls.map(([options]) => options.html);
+    expect(glyphs.map((glyph) => glyph.dataset.kind)).toEqual(['plant', 'find']);
+    expect(glyphs.every((glyph) => glyph.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(marker.mock.calls.map(([, options]) => options.interactive)).toEqual([false, false]);
+    expect(objectiveLayer.addLayer).toHaveBeenCalledWith(marker.mock.results[0]?.value);
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();
