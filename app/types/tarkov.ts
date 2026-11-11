@@ -366,6 +366,8 @@ export interface MapSpawn {
  * Extraction point on a map
  */
 export interface MapExtract {
+  /** Upstream transfer cost; static JSON uses an item ID, adapted payloads may embed the item. */
+  transferItem?: { item: string | { id: string; name?: string }; count: number };
   id: string;
   name: string;
   /** Faction that can use this extract: 'pmc', 'scav', 'shared', or null */

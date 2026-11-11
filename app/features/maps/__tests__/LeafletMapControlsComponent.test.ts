@@ -258,10 +258,61 @@ describe('LeafletMap controls', () => {
     expect(localStorage.getItem('map_layers_panel_open')).toBe('false');
     wrapper.unmount();
   });
+  it('attaches visible vehicle requirements and keyboard details that fit after resizing', async () => {
+    const popup = { options: {}, isOpen: vi.fn(() => true), update: vi.fn() };
+    const markerInstance = {
+      on: vi.fn<(event: string, handler: (event: { popup: typeof popup }) => void) => void>(),
+      getPopup: vi.fn(() => popup),
+      bindPopup: vi.fn<(content: HTMLElement, options: unknown) => unknown>().mockReturnThis(),
+    };
+    const marker = vi.fn((_position: unknown, _options: unknown) => markerInstance);
+    const divIcon = vi.fn((options) => options);
+    const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    mapState.leaflet = { marker, divIcon };
+    mapState.objectiveLayer = layer();
+    mapState.spawnLayer = layer();
+    mapState.extractLayer = {
+      ...layer(),
+      eachLayer: (visit: (entry: unknown) => void) => visit(markerInstance),
+    };
+    const extractMap = {
+      ...mapData,
+      id: '653e6760052c01c1c805532f',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'e858220a780a95ffbb923225d7649aa134df8836',
+          name: 'Police Cordon V-Ex',
+          faction: 'pmc',
+          position: { x: 0, y: 0, z: 0 },
+        },
+      ],
+    } as TarkovMap;
+    const wrapper = await mountMap({ map: extractMap });
+    await wrapper.setProps({ map: { ...extractMap } });
+    const pin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
+    expect(pin.querySelector('.map-extract-requirements')?.textContent).toBe('MoneyConditional');
+    expect(pin.getAttribute('aria-label')).toContain('Money, Conditional');
+    expect(marker.mock.calls.at(-1)?.[1]).toMatchObject({ keyboard: true });
+    const details = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
+    expect(details.textContent).toContain('20000');
+    expect(details.textContent).toContain('does not show live extract availability');
+    const openPopup = markerInstance.on.mock.calls.find(([event]) => event === 'popupopen')![1];
+    mockMapInstance.size = { x: 286, y: 320 };
+    openPopup({ popup });
+    expect(popup.options).toMatchObject({ maxWidth: 226, maxHeight: 220 });
+    mockMapInstance.size = { x: 220, y: 240 };
+    const resize = mockMapInstance.on.mock.calls.filter(([event]) => event === 'resize').at(-1)![1];
+    resize();
+    expect(popup.options).toMatchObject({ maxWidth: 160, minWidth: 160, maxHeight: 140 });
+    expect(popup.update).toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('shows pin names on tap, past the whole-map zoom, or with the always-names switch', async () => {
     const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
     const pinClicks: Array<() => void> = [];
     const marker = vi.fn(() => ({
+      bindPopup: vi.fn().mockReturnThis(),
       on: vi.fn((event: string, handler: () => void) => {
         if (event === 'click') pinClicks.push(handler);
       }),
@@ -295,7 +346,7 @@ describe('LeafletMap controls', () => {
     await wrapper.setProps({ map: { ...extractMap } });
     // Extracts start visible when the parent asks for them, without per-faction props.
     const pins = divIcon.mock.calls.map(([options]) => options.html as HTMLElement).slice(-2);
-    expect(pins.map((pin) => pin.getAttribute('aria-label'))).toEqual([
+    expect(pins.map((pin) => pin.querySelector('.map-pin-label')?.textContent)).toEqual([
       'Crossroads',
       'Old Gas Station',
     ]);
@@ -342,7 +393,7 @@ describe('LeafletMap controls', () => {
   });
   it('redraws extract and transit arrows with accessible directions when the selected floor changes', async () => {
     const divIcon = vi.fn((options) => options);
-    const marker = vi.fn(() => ({ on: vi.fn() }));
+    const marker = vi.fn(() => ({ on: vi.fn(), bindPopup: vi.fn().mockReturnThis() }));
     mapState.leaflet = { divIcon, marker };
     mapState.extractLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
     mapState.transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
@@ -392,7 +443,7 @@ describe('LeafletMap controls', () => {
   });
   it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
     const transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
-    const marker = vi.fn(() => ({ on: vi.fn() }));
+    const marker = vi.fn(() => ({ on: vi.fn(), bindPopup: vi.fn().mockReturnThis() }));
     const divIcon = vi.fn((options) => options);
     mapState.transitLayer = transitLayer;
     mapState.leaflet = { marker, divIcon };

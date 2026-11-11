@@ -610,6 +610,12 @@
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import {
+    appendExtractRequirementTags,
+    createExtractDetails,
+    getExtractRequirements,
+    type ExtractRequirements,
+  } from '@/features/maps/utils/extractRequirements';
+  import {
     createElevationIndicator,
     getMapFloorDelta,
     type MapElevation,
@@ -639,6 +645,7 @@
     type ObjectivePopupControl,
     type ObjectiveStackEntry,
   } from '@/features/maps/utils/objectiveStack';
+  import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -726,6 +733,7 @@
   const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const router = useRouter();
+  const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
@@ -924,6 +932,10 @@
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
     fitZoom.value = getFitZoom();
+    extractLayer.value?.eachLayer?.((layer) => {
+      const popup = (layer as L.Marker).getPopup?.();
+      if (popup) fitExtractPopup(popup);
+    });
   };
   // Names appear for every pin once the user zooms in past the whole-map view, where there is room
   // for them; hover and tap show a single name at any zoom.
@@ -1823,8 +1835,23 @@
       const kind = getExtractGlyphKind(extract);
       if (!extractVisibility[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
+      const requirements = getExtractRequirements({
+        mapId: props.map.id,
+        extract,
+        mode: metadataStore.currentGameMode ?? 'pvp',
+        t,
+        itemName: (id) => metadataStore.itemsById?.get(id)?.name,
+      });
       extractLayer.value!.addLayer(
-        createPinMarker(L, kind, extractName, extract.position, 'extract-marker', extract)
+        createPinMarker(
+          L,
+          kind,
+          extractName,
+          extract.position,
+          'extract-marker',
+          extract,
+          requirements
+        )
       );
     });
   }
@@ -1869,6 +1896,18 @@
     openPin?.classList.remove('is-open');
     openPin = null;
   }
+  /** Keep requirement details inside the current map, including after viewport changes. */
+  function fitExtractPopup(popup: L.Popup): void {
+    const size = mapInstance.value?.getSize();
+    if (!size) return;
+    const maxWidth = Math.max(80, Math.min(320, size.x - 60));
+    Object.assign(popup.options, {
+      maxWidth,
+      minWidth: Math.min(200, maxWidth),
+      maxHeight: Math.max(60, size.y - 100),
+    });
+    if (popup.isOpen()) popup.update();
+  }
   /** Place a glyph pin whose tail tip is the game position; its name shows on demand. */
   function createPinMarker(
     leafletApi: NonNullable<typeof leaflet.value>,
@@ -1876,11 +1915,13 @@
     label: string,
     position: { x: number; y?: number; z: number },
     className: string,
-    elevation: MapElevation = { position }
+    elevation: MapElevation = { position },
+    requirements?: ExtractRequirements
   ): L.Marker {
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
     appendElevation(pin, elevation);
+    if (requirements) appendExtractRequirementTags(pin, requirements);
     const icon = leafletApi.divIcon({
       className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
@@ -1890,12 +1931,18 @@
     const latLng = gameToLatLng(position.x, position.z);
     const marker = leafletApi.marker([latLng.lat, latLng.lng], {
       icon,
-      // Interactive for hover and tap; keyboard stays on the map surface instead of every pin.
-      // Pins listen only for click, so double-click zoom still reaches the map over a pin.
+      // Extracts expose their requirement details to keyboard users as well as pointer users.
+      // Transit pins keep the map surface keyboard controls.
       interactive: true,
-      keyboard: false,
+      keyboard: Boolean(requirements),
       zIndexOffset: 1000,
     });
+    if (requirements) {
+      marker.bindPopup(createExtractDetails(label, requirements, t), {
+        className: 'map-extract-popup',
+      });
+      marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
+    }
     marker.on('click', () => togglePinName(pin));
     return marker;
   }
@@ -2045,6 +2092,9 @@
     updateMarkers();
   });
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
+    createExtractMarkers()
+  );
+  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById], () =>
     createExtractMarkers()
   );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());

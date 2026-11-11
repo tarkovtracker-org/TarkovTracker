@@ -433,6 +433,58 @@ Extract/transit pins and task markers update arrows on floor changes; directions
 translated accessible descriptions. Arrow counts describe displayed levels, not stair routes
 or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
 
+## Extract requirement cues and details
+
+Extract pins show compact, always-visible requirement badges independently of their name labels.
+Selecting an extract (or pressing Enter on its marker) opens a plain-text requirement popup.
+Money, flare, gear, empty backpack/armor slots, conditional availability, activation, co-op,
+and timed/train extracts have distinct labels. These cues supplement faction glyphs and floor
+arrows; they never indicate live raid availability or replace the in-raid extraction list.
+
+`extractRequirements.ts` combines the public catalog's `transferItem` with a reviewed compact
+snapshot in `app/data/extractRules.json`. The supplemental snapshot is necessary because the
+public static API omits equipment restrictions, opening chances, timers, and requirement
+references. Its source is RequestExtract's read-only `/api/<mode>/locations` and
+`/api/<mode>/globals` responses, with capture timestamps and client versions recorded in the
+file. No session tokens, profile/account data, private LAN addresses, or live-session requests
+are shipped. Production does not contact RequestExtract.
+
+The regular snapshot was captured on November 6, 2026 (1.3.0.0.48484) and was stale when reviewed;
+the Seasonal snapshot was captured on November 11 (1.3.0.1.48558). Their rules are collapsed only
+where both mode captures agree. PvE uses the explicit `CountPVE` / `ChancePVE` values in the
+regular location definitions; there was no independent PvE session capture. Match by containing
+map ID and exact raw exit name, then retain the public extract ID; never join translated names
+or assume a same-named exit on another map has the same requirements. Unmatched/incomplete
+records retain an unknown-requirements cue, and raw switch references alone do not imply a
+power requirement (the public catalog currently assigns the Customs ZB-013 switch too broadly).
+
+`Reference` resolves through `globals.config.RequirementReferences`, including Alpinist's
+Paracord, Red Rebel, and empty `ArmorVest` slot. `Empty` uses its actual `RequiredSlot`.
+`TransferItem` is distinct from `HasItem`; train counts are never treated as money. Costs are
+base configuration amounts, not reputation-adjusted prices. In particular Ground Zero's vehicle
+is 20,000 roubles in regular/Seasonal and 5,000 in the regular definition's PvE field; Interchange's
+PvE base cost is still 20,000. A configured `Chance` is not a live status signal. Timers describe
+the configured arrival/activation window, not a guarantee an exit remains usable afterward.
+
+Hardcoded scene cues missing from backend definitions are small, explicitly referenced additions
+(`extra` / `reference`): [Mira Avenue](https://tarkov.help/en/map/ground-zero/home),
+[Railroad Passage](https://tarkov.help/en/map/customs/home),
+[Power Line Passage](https://tarkov.help/en/map/woods/home), and
+[Klimov Street](https://tarkov.help/en/map/streets/extractions/extract-klimov-street) need a green
+flare. Path to River is marked as a flare extract from its public label without guessing color.
+[ZB-016 green smoke](https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point),
+[ZB-014 smoke and key](https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point), and
+[Old Gas Station smoke](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point)
+are independently reviewed scene cues; smoke is not a flare the player must bring. ZB-013 also
+shows the Factory emergency exit key alongside its captured activation requirement. Additional
+activation steps and cues are not invented when data is missing.
+
+When refreshing the snapshot, inspect the capture version/date and mode, resolve references,
+review current public map/name joins and mode differences, and preserve independently sourced
+scene additions. Read only the location/global definitions; never read, persist, or commit the
+RequestExtract session-state file. Update the capture provenance and regression cases alongside
+changed facts. Popup reference dates expose capture age without disclosing session metadata.
+
 ## Map markers, legend, and sizing
 
 Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer

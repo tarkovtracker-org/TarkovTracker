@@ -65,6 +65,9 @@
     >
       {{ t('maps.layers.show_all') }}
     </button>
+    <p class="text-surface-400 border-surface-700 border-t px-2 pt-2 text-[10px] leading-snug">
+      {{ t('maps.extract_requirements.help') }}
+    </p>
   </div>
 </template>
 <script setup lang="ts">
