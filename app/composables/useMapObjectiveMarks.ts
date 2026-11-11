@@ -4,8 +4,9 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { ComputedRef } from '#imports';
+import type { MapElevation } from '@/features/maps/utils/mapElevation';
 import type { ObjectiveGPSInfo, ObjectiveMapInfo, Task, TaskObjective } from '@/types/tarkov';
-type MapObjectiveZone = { map: { id: string }; outline: { x: number; z: number }[] };
+type MapObjectiveZone = MapElevation & { map: { id: string }; outline: { x: number; z: number }[] };
 type MapObjectiveLocation = {
   map: { id: string };
   positions?: Array<{ x: number; y?: number; z: number }>;
@@ -133,7 +134,15 @@ const getZoneLocation = (
 ): { zone?: MapObjectiveZone; possibleLocation?: MapObjectiveLocation } | null => {
   const outline = getObjectiveOutline(zone);
   if (outline.length >= 3) {
-    return { zone: { map: { id: selectedMapId }, outline } };
+    return {
+      zone: {
+        map: { id: selectedMapId },
+        outline,
+        position: zone.position,
+        top: zone.top,
+        bottom: zone.bottom,
+      },
+    };
   }
   if (!zone.position) return null;
   return {
@@ -206,7 +215,7 @@ const getGpsLocation = (
   return [
     {
       map: { id: selectedMapId },
-      positions: [{ x: gpsInfo.x, y: 0, z: gpsInfo.y }],
+      positions: [{ x: gpsInfo.x, z: gpsInfo.y }],
     },
   ];
 };

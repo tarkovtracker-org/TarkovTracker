@@ -1,0 +1,792 @@
+{
+  "sources": {
+    "pvp": {
+      "version": "EFT Client 1.3.0.0.48484",
+      "capturedAt": "2026-11-06T16:52:17.893001+00:00",
+      "staleAtReview": true,
+      "globalsCapturedAt": "2026-11-06T16:46:32.825656+00:00"
+    },
+    "pvp-season": {
+      "version": "EFT Client 1.3.0.1.48558",
+      "capturedAt": "2026-11-11T08:00:42.438522+00:00",
+      "staleAtReview": false,
+      "globalsCapturedAt": "2026-11-11T07:29:04.106246+00:00"
+    }
+  },
+  "maps": {
+    "55f2d3fd4bdc2d5f408b4567": {
+      "4b93f765fc6e0b6379679b3c827074d4e57ff680": {
+        "name": "Gate m",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "f261d229a5b13a3292a4a49dced2a4949dfc342b": {
+        "name": "Cellars",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "f16ce849a9d153a8813b6bf6a049d530f1cc44c2": {
+        "name": "Gate 3",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "b1e817c36812ebf2a8b1ac141ca88449a0b0469c": {
+        "name": "Gate_o",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "99c2f21880da0baf75d431a5f45b462fde2f79b1": {
+        "name": "Gate 0",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      }
+    },
+    "56f40101d2720b2a4d8b45d6": {
+      "f367bab752ed8474989104613d1151e9434f2bd4": {
+        "name": "ex_customs_pmc_rail_milbase",
+        "rules": []
+      },
+      "ab12c1f902a669fb0c940820e8cc40d7131e3208": {
+        "name": "ex_customs_pmc_crossroads",
+        "rules": []
+      },
+      "457b313c6ca6a631ca127134e6ecfde3b6cbc1a1": {
+        "name": "ex_customs_coop_boiler",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "1dd5cede4fa747d279b076872c45fc59a4c3b916": {
+        "name": "ex_customs_pmc_flare",
+        "rules": [],
+        "extra": [
+          {
+            "type": "green_flare"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/customs/home"
+      },
+      "3f7e27d7bae8ffb6e3004af071b18bf0e7d896b8": {
+        "name": "ex_customs_pmc_zb1013",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ],
+        "extra": [
+          {
+            "type": "key",
+            "item": "5448ba0b4bdc2d02308b456c"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/customs/home"
+      },
+      "59c2c12e375a1b45a8e5ac1a32c5581b593aa4df": {
+        "name": "ex_customs_pmc_zb1011",
+        "rules": []
+      },
+      "f4cdf3dbe54ef647a2a798266a39f1761f871b96": {
+        "name": "ex_customs_pmc_trailerpark",
+        "rules": []
+      },
+      "fed921b46204418ef8fa0174468c6886e91325c4": {
+        "name": "ex_customs_pmc_auto",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 20000,
+            "vehicle": true
+          },
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      },
+      "c936f6e98a38c78963a308892b708474c54f4718": {
+        "name": "ex_customs_pmc_gasstation",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ],
+        "extra": [
+          {
+            "type": "green_smoke"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point"
+      }
+    },
+    "5704e3c2d2720bac5b8b4567": {
+      "66f71d2b38d7af05a0fa888343dda2d5df97b314": {
+        "name": "ZB-016",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 66,
+            "percentPve": 66
+          }
+        ],
+        "extra": [
+          {
+            "type": "green_smoke"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point"
+      },
+      "bd8c86edf705cfb2bd02f8ccc95e64ed3450760c": {
+        "name": "UN Roadblock",
+        "rules": []
+      },
+      "d71465c84357271657810c0395fd1e69b7636e4a": {
+        "name": "wood_sniper_exit",
+        "rules": [],
+        "extra": [
+          {
+            "type": "green_flare"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/woods/home"
+      },
+      "5e2529edb827c041cb4198afb28b8c1ded6eace9": {
+        "name": "Outskirts",
+        "rules": []
+      },
+      "69c8400dbe1a154ddc5a4617d3ae2053239f4f33": {
+        "name": "RUAF Gate",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 66,
+            "percentPve": 66
+          }
+        ]
+      },
+      "c89cb6207811316f70945ed1de3e5e0d9f8cfc96": {
+        "name": "ZB-014",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 66,
+            "percentPve": 66
+          }
+        ],
+        "extra": [
+          {
+            "type": "green_smoke"
+          },
+          {
+            "type": "key",
+            "item": "591afe0186f77431bd616a11"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point"
+      },
+      "ab12f6c1f417aae2de34a55560d4be3ff5f7c309": {
+        "name": "Factory Gate",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "edceeaccf9cb0f6c3fd47c0e5625f4cdd2f49e9e": {
+        "name": "un-sec",
+        "rules": []
+      },
+      "010b98a982808abfba6d5419a3705cbe05409de1": {
+        "name": "South V-Ex",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 5000,
+            "vehicle": true
+          },
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      }
+    },
+    "5704e4dad2720bb55b8b4567": {
+      "cc16b27f07697867c3afe8731a5323f8b6db7574": {
+        "name": "EXFIL_Train",
+        "rules": [
+          {
+            "type": "train",
+            "min": 1200,
+            "max": 1500
+          }
+        ]
+      },
+      "73ce3c0b6f2e55c2d5d38132e4046244cb7ddcfa": {
+        "name": "Coastal_South_Road",
+        "rules": []
+      },
+      "a2f8464f5b47a91fbc0ecf12e1183a8c4884d9b0": {
+        "name": "Alpinist_light",
+        "rules": [
+          {
+            "type": "item",
+            "item": "5c12688486f77426843c7d32",
+            "count": 1
+          },
+          {
+            "type": "item",
+            "item": "5c0126f40db834002a125382",
+            "count": 1
+          },
+          {
+            "type": "empty",
+            "slot": "ArmorVest"
+          }
+        ]
+      },
+      "7abf70359636bf5dc3515359a3553cb0731d4f4e": {
+        "name": "Nothern_Checkpoint",
+        "rules": []
+      },
+      "2c1d67e0a46f41e0c268dce15848eb3722fae9ad": {
+        "name": "tunnel_shared",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "65541e3df26023e91dd4f156e6409ef06eb0027a": {
+        "name": "Shorl_free",
+        "rules": []
+      }
+    },
+    "5704e554d2720bac5b8b456e": {
+      "f7da3681df4ae3bd7b3d5ba0e0f960dc1722d23f": {
+        "name": "RedRebel_alp",
+        "rules": [
+          {
+            "type": "item",
+            "item": "5c12688486f77426843c7d32",
+            "count": 1
+          },
+          {
+            "type": "item",
+            "item": "5c0126f40db834002a125382",
+            "count": 1
+          },
+          {
+            "type": "empty",
+            "slot": "ArmorVest"
+          }
+        ]
+      },
+      "cf857a4cc48ed3c8c6dd27f7d55d6348ffbdbc68": {
+        "name": "Tunnel",
+        "rules": []
+      },
+      "fd880bdc668a7a177b5f2eedde4b40a9661e68b1": {
+        "name": "Rock Passage",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 0,
+            "percentPve": 0
+          }
+        ]
+      },
+      "40f2f8a82926d016855443fba325070fa8b5dafb": {
+        "name": "Smugglers_Trail_coop",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "ef41c42e56e8f67e5835245dd4f66c4ed8684db9": {
+        "name": "Lighthouse_pass",
+        "rules": []
+      },
+      "818e7812793c8e47a09c62f670ae189c8bd61901": {
+        "name": "CCP Temporary",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      },
+      "a302bfd6b8b040202ce873db7386f930318c3f0b": {
+        "name": "Road to Customs",
+        "rules": []
+      },
+      "04d0f85f6abb2d77d803449be6918c26efc58478": {
+        "name": "Road_at_railbridge",
+        "rules": []
+      },
+      "aef6de6ce5e7c898a2a6a65c4433e683f4e06baa": {
+        "name": "Pier Boat",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      },
+      "1dc6fca97ac062b2363fe53479748fb0bc6e2d6b": {
+        "name": "Shorl_V-Ex",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 5000,
+            "vehicle": false
+          }
+        ]
+      }
+    },
+    "5704e5fad2720bc05b8b4567": {
+      "bd1ef03f5270eb97daeb05b6e4f206895c17860d": {
+        "name": "EXFIL_Train",
+        "rules": [
+          {
+            "type": "train",
+            "min": 1450,
+            "max": 1700
+          }
+        ]
+      },
+      "c22a209b9f46247ff2d5376595377db3908d53fa": {
+        "name": "Alpinist",
+        "rules": [
+          {
+            "type": "item",
+            "item": "5c12688486f77426843c7d32",
+            "count": 1
+          },
+          {
+            "type": "item",
+            "item": "5c0126f40db834002a125382",
+            "count": 1
+          },
+          {
+            "type": "empty",
+            "slot": "ArmorVest"
+          }
+        ]
+      },
+      "78919c46c8d06b4ea7790a701b383e1cc0dda28e": {
+        "name": "EXFIL_vent",
+        "rules": [
+          {
+            "type": "empty",
+            "slot": "Backpack"
+          }
+        ]
+      },
+      "b166214093a289801ff6e25389caabe8c83792a5": {
+        "name": "EXFIL_Bunker_D2",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "819ea4a9c6d61f208739c3cf866c6a17c79b4707": {
+        "name": "EXFIL_Bunker",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "c5ec07b1e95683ea53288f219183662c035bc507": {
+        "name": "EXFIL_ScavCooperation",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      }
+    },
+    "5714dbc024597771384a510d": {
+      "7bdf4ff52b59f4bb8d60cc0ec90a932596b0f6ac": {
+        "name": "ex_interchange_pmc_saferoom",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "714a00d27d6ac36ca35a714c54b5517b32373914": {
+        "name": "ex_interchange_pmc_railway",
+        "rules": []
+      },
+      "56bd754c4ce1864b212e908114bd6190940e01c2": {
+        "name": "ex_interchange_pmc_emercom",
+        "rules": []
+      },
+      "44bd9f5882e7a6044c3d6e15abb6560306575d96": {
+        "name": "ex_interchange_coop_basement",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "1e65f8bedbd9322074ae387892f0972883bdb794": {
+        "name": "ex_interchange_pmc_sniper",
+        "rules": [],
+        "extra": [
+          {
+            "type": "flare"
+          }
+        ],
+        "reference": "https://json.tarkov.dev/regular/maps_en"
+      },
+      "12448fe61862391cd784b298a6c3081f24de39d6": {
+        "name": "ex_interchange_pmc_auto",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 20000,
+            "vehicle": true
+          },
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      }
+    },
+    "5714dc692459777137212e12": {
+      "51cfcc623bcf29fa75c44fe4997e4b130ffbba34": {
+        "name": "E5",
+        "rules": []
+      },
+      "62268c2eccf21f2a38b8ad9c7a18fcdd470b6ff3": {
+        "name": "E4",
+        "rules": []
+      },
+      "faaa78ad8ea79ae073fc497da44fedc3cc0364be": {
+        "name": "E3",
+        "rules": []
+      },
+      "85a39576dc7f2aab49bf944f4f272464758d0e56": {
+        "name": "Exit_E10_coop",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "321358e7c712157a0692f8212c0ce644a85d8d9a": {
+        "name": "E1",
+        "rules": []
+      },
+      "d93214582e40ec0c37a7f55ba8777447f43e9b2f": {
+        "name": "E9_sniper",
+        "rules": [],
+        "extra": [
+          {
+            "type": "green_flare"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/streets/extractions/extract-klimov-street"
+      },
+      "dfe286a04cab0aa9063256c15fb11f9d1af61383": {
+        "name": "E8_yard",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 40,
+            "percentPve": 40
+          }
+        ]
+      },
+      "dd263ba81dc18be1d7e25f213b19481699c0a898": {
+        "name": "E7",
+        "rules": []
+      },
+      "6ba57e258ce3f2d026ef5aa22e2c8b046e427f2d": {
+        "name": "E2",
+        "rules": []
+      },
+      "f44cf9cd1192e55035944c19fb2745c9c8c58692": {
+        "name": "E6",
+        "rules": [
+          {
+            "type": "chance",
+            "percent": 0,
+            "percentPve": 0
+          }
+        ]
+      },
+      "e565f6d911f327638f03bdd00990cdd8585a4f80": {
+        "name": "E7_car",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 5000,
+            "vehicle": true
+          },
+          {
+            "type": "chance",
+            "percent": 50,
+            "percentPve": 50
+          }
+        ]
+      }
+    },
+    "59fc81d786f774390775787e": {
+      "0c8fea1d2d9b2cc660fc83de3f26bb146dde93ef": {
+        "name": "Cellars",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "51ab65d13d6e1b2ffcd590d1fee5bef867f1738d": {
+        "name": "Gate 3",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "dd5303f7cf204d2f0a656d139c0b385ec0353d27": {
+        "name": "Gate 0",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "523d85848f0f3e2b14d15aabc4f5e05fa58b6080": {
+        "name": "Gate m",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      },
+      "ce502fb70d91371013dac88a6c342bf0178da6fb": {
+        "name": "Gate_o",
+        "rules": [
+          {
+            "type": "unknown"
+          }
+        ]
+      }
+    },
+    "5b0fc42d86f7744a585f9105": {
+      "e4449767a7b69f57de8efbd2cf7dd5ee11a8468d": {
+        "name": "lab_Hangar_Gate",
+        "rules": [
+          {
+            "type": "activation"
+          },
+          {
+            "type": "chance",
+            "percent": 60,
+            "percentPve": 60
+          }
+        ]
+      },
+      "9f0ea7a638bbcc3e2d855a66ef7a9f643cc06265": {
+        "name": "lab_Elevator_Med",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "bb32a5dbbe8116e0765ed80a5ec7980e47676dc6": {
+        "name": "lab_Vent",
+        "rules": [
+          {
+            "type": "empty",
+            "slot": "Backpack"
+          }
+        ]
+      },
+      "aecf93f8def45d42877594c4170f5a71b5b41b39": {
+        "name": "lab_Elevator_Cargo",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "718b3e098cf256525a98ad84c481876082391b18": {
+        "name": "lab_Elevator_Main",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      },
+      "99477cb352520521b92ba91a2c1cfd7fc219ad26": {
+        "name": "lab_Parking_Gate",
+        "rules": [
+          {
+            "type": "activation"
+          },
+          {
+            "type": "chance",
+            "percent": 60,
+            "percentPve": 60
+          }
+        ]
+      },
+      "70e59e240344a72e8dbb151c370f32851997fd50": {
+        "name": "lab_Under_Storage_Collector",
+        "rules": [
+          {
+            "type": "activation"
+          }
+        ]
+      }
+    },
+    "653e6760052c01c1c805532f": {
+      "58b21021d80db728cd7db688a00677980593bf85": {
+        "name": "Nakatani_stairs_free_exit",
+        "rules": []
+      },
+      "d36aaa1e0306978ca39f00edec5b4195bf7a57da": {
+        "name": "Scav_coop_exit",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "22f281b913a76b31fe574b792b65c115fd8bb656": {
+        "name": "Sniper_exit",
+        "rules": [],
+        "extra": [
+          {
+            "type": "green_flare"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/ground-zero/home"
+      },
+      "af20846a32f03fec90986c60eb732da7b87f72b0": {
+        "name": "Unity_free_exit",
+        "rules": []
+      },
+      "e858220a780a95ffbb923225d7649aa134df8836": {
+        "name": "Sandbox_VExit",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 5000,
+            "vehicle": true
+          }
+        ]
+      }
+    },
+    "65b8d6f5cdde2479cb2a3125": {
+      "60df4348793d4cde35ee2de0865480b5824a8ee6": {
+        "name": "Sandbox_VExit",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "5449016a4bdc2d6f028b456f",
+            "count": 20000,
+            "countPve": 5000,
+            "vehicle": true
+          }
+        ]
+      },
+      "c812e0bac1d630c34af374428e34cf10dc344e9b": {
+        "name": "Unity_free_exit",
+        "rules": []
+      },
+      "4fdf4eeb9e65607d68760103109e9e72dd5d816e": {
+        "name": "Scav_coop_exit",
+        "rules": [
+          {
+            "type": "coop"
+          }
+        ]
+      },
+      "1bb328c35dbf9c2127defe6df5a48c630ece92a1": {
+        "name": "Nakatani_stairs_free_exit",
+        "rules": []
+      },
+      "d9e23573110e4fe1dbe4a47bc3ba7e316e09cfbc": {
+        "name": "Sniper_exit",
+        "rules": [],
+        "extra": [
+          {
+            "type": "green_flare"
+          }
+        ],
+        "reference": "https://tarkov.help/en/map/ground-zero/home"
+      }
+    },
+    "6733700029c367a3d40b02af": {
+      "8eabbd6a5b3d8d277b4acdbfc2ba735ff5a26ae8": {
+        "name": "labir_exit",
+        "rules": [
+          {
+            "type": "timer",
+            "min": 900,
+            "max": 905
+          }
+        ]
+      }
+    },
+    "69af492a4819ea4ba10a69c5": {
+      "9bf65c4c24d0153f1542a90ddabadb37198ab9ff": {
+        "name": "Heli",
+        "rules": [
+          {
+            "type": "transfer",
+            "item": "569668774bdc2da2298b4568",
+            "count": 2400,
+            "countPve": 2400,
+            "vehicle": true
+          }
+        ]
+      }
+    }
+  }
+}

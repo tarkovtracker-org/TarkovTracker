@@ -27,6 +27,7 @@ type SetupOptions = {
     getHideCompletedMapObjectives: boolean;
   }>;
   sortedTraders?: Array<{ id: string; name: string; imageLink?: string }>;
+  maps?: Array<{ id: string; name: string }>;
   traderCounts?: Record<string, number>;
   mapTaskTotals?: Record<string, number>;
   mapTaskTotalsHideCompleted?: Record<string, number>;
@@ -92,7 +93,7 @@ const setup = async (options: SetupOptions = {}) => {
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => ({
       tasks: [{ id: 'task-1' }],
-      mapsWithSvg: [{ id: 'map-1', name: 'Map One' }],
+      mapsWithSvg: options.maps ?? [{ id: 'map-1', name: 'Map One' }],
       sortedTraders,
     }),
   }));
@@ -216,6 +217,77 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     await wrapper.find('button[data-icon="i-mdi-sort-ascending"]').trigger('click');
     expect(preferencesStore.setTaskSortDirection).toHaveBeenCalledWith('desc');
+  });
+  it('marks the selected map clearly and wraps every map on wider screens', async () => {
+    const { TaskFilterBar } = await setup({
+      preferencesStore: { getTaskPrimaryView: 'maps', getTaskMapView: 'map-2' },
+      maps: [
+        { id: 'map-1', name: 'Map One' },
+        { id: 'map-2', name: 'Map Two' },
+        { id: 'map-3', name: 'Map Three' },
+      ],
+      mapTaskTotals: { 'map-1': 2, 'map-2': 0, 'map-3': 5 },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const picker = wrapper.get('[data-testid="task-map-picker"]');
+    const row = picker.get('div');
+    expect(row.classes()).toContain('sm:flex-wrap');
+    const buttons = row.findAll('button');
+    expect(buttons.map((button) => button.text())).toEqual(['Map One2', 'Map Two0', 'Map Three5']);
+    const selected = buttons.filter((button) => button.attributes('aria-pressed') === 'true');
+    expect(selected.map((button) => button.text())).toEqual(['Map Two0']);
+    expect(selected[0]!.classes()).toEqual(
+      expect.arrayContaining(['bg-primary-500/20', 'border-primary-400/80'])
+    );
+    for (const button of [buttons[0]!, buttons[2]!]) {
+      expect(button.attributes('aria-pressed')).toBe('false');
+      expect(button.classes()).not.toContain('bg-primary-500/20');
+    }
+  });
+  it('re-centers the selected map when the scrolling picker is resized', async () => {
+    const observers: Array<() => void> = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          observers.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      }
+    );
+    try {
+      const { TaskFilterBar } = await setup({
+        preferencesStore: { getTaskPrimaryView: 'maps', getTaskMapView: 'map-2' },
+        maps: [
+          { id: 'map-1', name: 'Map One' },
+          { id: 'map-2', name: 'Map Two' },
+        ],
+      });
+      const wrapper = mountTaskFilterBar(TaskFilterBar);
+      const picker = wrapper.get('[data-testid="task-map-picker"]').element as HTMLElement;
+      const selected = picker.querySelector<HTMLElement>('[aria-pressed="true"]')!;
+      const size = (element: HTMLElement, values: Record<string, number>) => {
+        for (const [key, value] of Object.entries(values)) {
+          Object.defineProperty(element, key, { configurable: true, value });
+        }
+      };
+      size(picker, { scrollWidth: 1000, clientWidth: 300 });
+      size(selected, { offsetLeft: 600, offsetWidth: 100 });
+      const scrollTo = vi.fn();
+      picker.scrollTo = scrollTo as unknown as HTMLElement['scrollTo'];
+      expect(observers.length).toBeGreaterThan(0);
+      observers.at(-1)!();
+      expect(scrollTo).toHaveBeenCalledWith({ left: 500 });
+      // A wrapped picker does not overflow, so a resize leaves it alone.
+      scrollTo.mockClear();
+      size(picker, { scrollWidth: 300, clientWidth: 300 });
+      observers.at(-1)!();
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it('hides completed map objectives from map counts when the preference is enabled', async () => {
     const { TaskFilterBar } = await setup({

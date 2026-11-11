@@ -97,6 +97,54 @@ const objectiveWithLocation = (id: string, mapId: string) => ({
   ],
 });
 describe('useMapObjectiveMarks', () => {
+  it('preserves zone height and keeps legacy GPS elevation unknown', async () => {
+    const { useMapObjectiveMarks } = await setup();
+    unlockedTasks.value = { task: { self: true } };
+    objectiveMaps.value = { task: [{ objectiveID: 'gps', mapID: 'customs' }] };
+    objectiveGPS.value = { task: [{ objectiveID: 'gps', x: 10, y: 20 }] };
+    const position = { x: 1, y: 5, z: 3 };
+    const result = useMapObjectiveMarks({
+      mapId: computed(() => 'customs'),
+      shouldShowCompletedObjectives: computed(() => false),
+      tasks: computed(
+        () =>
+          [
+            {
+              id: 'task',
+              name: 'Task',
+              objectives: [
+                {
+                  id: 'zone',
+                  zones: [
+                    {
+                      map: { id: 'customs' },
+                      position,
+                      bottom: 3,
+                      top: 7,
+                      outline: [
+                        { x: 0, y: 3, z: 0 },
+                        { x: 2, y: 3, z: 0 },
+                        { x: 2, y: 3, z: 2 },
+                      ],
+                    },
+                  ],
+                },
+                { id: 'gps' },
+              ],
+            },
+          ] as Task[]
+      ),
+    });
+    expect
+      .soft(result.mapObjectiveMarks.value.find((mark) => mark.id === 'zone')?.zones[0])
+      .toMatchObject({ position, bottom: 3, top: 7 });
+    expect
+      .soft(
+        result.mapObjectiveMarks.value.find((mark) => mark.id === 'gps')?.possibleLocations?.[0]
+          ?.positions?.[0]
+      )
+      .toEqual({ x: 10, z: 20 });
+  });
   describe('user-hidden quests (#918)', () => {
     const planTasks: Task[] = [
       { id: 'task-a', name: 'A', objectives: [objectiveWithLocation('obj-a', 'customs')] },

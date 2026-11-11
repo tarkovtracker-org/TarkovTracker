@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-350">
+      <div class="mx-auto" :class="pageWidthClass">
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
@@ -23,7 +23,7 @@
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
-              <div class="bg-surface-800/50 rounded-lg p-4">
+              <div class="bg-surface-800/50 rounded-lg p-2 sm:p-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
                     <h3 class="min-w-0 flex-1">
@@ -145,6 +145,7 @@
                           role="separator"
                           aria-orientation="horizontal"
                           :aria-label="t('page.tasks.map.resize_handle')"
+                          :aria-description="t('maps.tooltips.drag_to_resize')"
                           :aria-valuemin="mapHeightMin"
                           :aria-valuemax="mapHeightMax"
                           :aria-valuenow="mapHeight"
@@ -152,6 +153,7 @@
                           class="group hover:border-primary-500/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-3.5 w-full cursor-ns-resize touch-none items-center justify-center rounded-md border border-transparent transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                           :class="{ 'ring-primary-500 ring-1': isResizing }"
                           @pointerdown="startResize"
+                          @dblclick="resetMapHeight"
                           @keydown="onResizeKeydown"
                         >
                           <span
@@ -670,6 +672,10 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
+  // The map needs the room, so Maps widens past the other views on large screens.
+  const pageWidthClass = computed(() =>
+    getTaskPrimaryView.value === 'maps' ? 'max-w-350 xl:max-w-440 2xl:max-w-560' : 'max-w-350'
+  );
   const taskCardGapClass = 'pb-2';
   const taskSectionGapClass = 'mb-4';
   const showGraphView = computed(() => {
@@ -750,6 +756,7 @@
     startResize,
     stopResize,
     onResizeKeydown,
+    resetHeight: resetMapHeight,
   } = useMapResize();
   const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, true);
   const toggleMapPanelVisibility = () => {

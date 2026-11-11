@@ -58,9 +58,17 @@ const IDLE_TAB_CLASS =
 /** Every status tab and segment button shares this frame so selected and idle line up. */
 const TAB_BASE_CLASS =
   'border font-medium leading-none transition-colors duration-150 disabled:cursor-default disabled:opacity-100';
+/** Selected map or trader in a picker row: the accent fill makes the current pick obvious. */
+const PICKER_SELECTED_CLASS =
+  'border-primary-400/80 bg-primary-500/20 text-white ring-1 ring-primary-400/40 shadow-[0_0_12px_rgba(0,0,0,0.35)] light:border-primary-600 light:bg-primary-100 light:text-primary-900 light:ring-primary-600/30';
 export const getStatusBadgeClass = (tone: StatusTone, count: number): string =>
   count > 0 ? STATUS_TONE_CLASSES[tone].badge : EMPTY_STATUS_BADGE_CLASS;
 export const getTabClass = (tone: StatusTone, isSelected: boolean): string[] => [
   TAB_BASE_CLASS,
   isSelected ? STATUS_TONE_CLASSES[tone].selected : IDLE_TAB_CLASS,
+];
+/** Map and trader pickers: same frame as the tabs, with a stronger selected state. */
+export const getPickerTabClass = (isSelected: boolean): string[] => [
+  TAB_BASE_CLASS,
+  isSelected ? PICKER_SELECTED_CLASS : IDLE_TAB_CLASS,
 ];

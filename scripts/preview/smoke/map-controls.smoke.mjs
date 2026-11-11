@@ -42,18 +42,17 @@ test('Transit locations toggle independently in inline and fullscreen maps', asy
   await expect(inline.locator('.leaflet-image-layer')).toBeVisible();
   await page.getByTestId('map-hint-dismiss').click();
   const assertTransits = async (surface) => {
-    // Layer toggles live in the Layers panel when the map has one, otherwise in the toolbar.
+    // Layer toggles live in the Layers panel.
     const layersToggle = surface.getByTestId('map-layers-toggle');
-    if ((await layersToggle.count()) > 0) {
-      if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
-      await expect(layersToggle).toHaveAttribute('aria-expanded', 'true');
-    }
-    const toggle = surface.getByRole('button', { name: 'Transit', exact: true });
+    if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
+    await expect(layersToggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = surface.getByTestId('map-layers-panel');
+    const toggle = panel.getByRole('button', { name: 'Transit', exact: true });
     const markers = surface.locator('.transit-marker');
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(markers).not.toHaveCount(0);
     const count = await markers.count();
-    const extracts = surface.getByRole('button', { name: 'PMC', exact: true });
+    const extracts = panel.getByRole('button', { name: 'PMC', exact: true });
     if ((await extracts.getAttribute('aria-pressed')) !== 'true') await extracts.click();
     await expectHitTarget(toggle);
     await toggle.click();
@@ -127,7 +126,7 @@ async function setLayersPanel(layersToggle, expanded) {
 // Layer rows inside the Layers panel must be reachable and flip, then restore their state.
 async function checkLayerRows(surface) {
   const layersToggle = surface.getByTestId('map-layers-toggle');
-  if ((await layersToggle.count()) === 0) return;
+  await expect(layersToggle).toBeVisible();
   const expanded = await layersToggle.getAttribute('aria-expanded');
   await setLayersPanel(layersToggle, 'true');
   const rows = surface.getByTestId('map-layers-panel').locator('button[aria-pressed]');

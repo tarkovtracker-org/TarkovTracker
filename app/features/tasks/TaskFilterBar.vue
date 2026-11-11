@@ -29,12 +29,16 @@
       </template>
     </StatusTabBar>
     <ActiveFilterChips test-id-prefix="task-active-filters" :filters="activeFilters" />
+    <!-- Phones keep one scrolling row (the selected map is scrolled into view); wider screens wrap
+         so every map and its count is visible at once. -->
     <div
       v-if="primaryView === 'maps' && maps.length > 0"
-      class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
+      ref="mapPickerRef"
+      data-testid="task-map-picker"
+      class="relative w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] sm:overflow-visible sm:pb-0"
     >
       <div
-        class="bg-surface-900 flex w-max min-w-full gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+        class="bg-surface-900 flex w-max min-w-full gap-1.5 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:w-full sm:flex-wrap sm:px-4"
       >
         <UButton
           v-for="mapOption in mapOptions"
@@ -43,15 +47,22 @@
           variant="ghost"
           color="neutral"
           size="sm"
-          :disabled="preferencesStore.getTaskMapView === mapOption.value"
-          :aria-pressed="preferencesStore.getTaskMapView === mapOption.value"
-          :class="[
-            'gap-1.5',
-            ...getTabClass('neutral', preferencesStore.getTaskMapView === mapOption.value),
-          ]"
+          :disabled="mapOption.selected"
+          :aria-pressed="mapOption.selected"
+          :class="['shrink-0 gap-1.5', ...mapOption.tabClass]"
           @click="onMapSelect(mapOption)"
         >
-          <span class="text-xs font-medium whitespace-nowrap">{{ mapOption.label }}</span>
+          <UIcon
+            name="i-mdi-map-marker"
+            :class="[
+              'text-primary-300 light:text-primary-700 size-3.5 shrink-0',
+              mapOption.iconClass,
+            ]"
+            aria-hidden="true"
+          />
+          <span :class="['text-xs whitespace-nowrap', mapOption.labelClass]">
+            {{ mapOption.label }}
+          </span>
           <span
             :class="[
               'light:text-surface-50 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
@@ -79,10 +90,7 @@
           size="sm"
           :disabled="preferencesStore.getTaskTraderView === trader.id"
           :aria-pressed="preferencesStore.getTaskTraderView === trader.id"
-          :class="[
-            'gap-2',
-            ...getTabClass('neutral', preferencesStore.getTaskTraderView === trader.id),
-          ]"
+          :class="['gap-2', ...getPickerTabClass(preferencesStore.getTaskTraderView === trader.id)]"
           @click="onTraderSelect(trader.id)"
         >
           <div class="relative">
@@ -108,6 +116,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useResizeObserver } from '@vueuse/core';
   import ActiveFilterChips from '@/components/ui/ActiveFilterChips.vue';
   import SettingsButton from '@/components/ui/SettingsButton.vue';
   import SortControl from '@/components/ui/SortControl.vue';
@@ -119,7 +128,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { TASK_SORT_MODES } from '@/types/taskSort';
-  import { ALL_TAB_ICON, getTabClass } from '@/utils/statusTones';
+  import { ALL_TAB_ICON, getPickerTabClass } from '@/utils/statusTones';
   import {
     getTaskSecondaryViewForPrimaryView,
     normalizeSecondaryView,
@@ -296,13 +305,19 @@
   // Map selection
   const mapOptions = computed(() => {
     const counts = mapTaskCounts.value;
+    const selectedMap = preferencesStore.getTaskMapView;
     return maps.value.map((map) => {
       const count = counts[map.id] ?? 0;
+      const selected = map.id === selectedMap;
       return {
         label: map.name,
         value: map.id,
         count,
         countClass: count > 0 ? 'bg-pve-500' : 'bg-surface-600',
+        selected,
+        tabClass: getPickerTabClass(selected),
+        labelClass: selected ? 'font-semibold' : 'font-medium',
+        iconClass: selected ? '' : 'hidden',
       };
     });
   });
@@ -311,6 +326,23 @@
       preferencesStore.setTaskMapView(selected.value);
     }
   };
+  // In the single scrolling row on phones, keep the selected map in view, including after a resize
+  // or rotation switches between the wrapped and scrolling layouts. Wrapped rows never overflow,
+  // so this is a no-op there.
+  const mapPickerRef = ref<HTMLElement | null>(null);
+  const scrollSelectedMapIntoView = () => {
+    const picker = mapPickerRef.value;
+    const selected = picker?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!picker || !selected || picker.scrollWidth <= picker.clientWidth) return;
+    const left = selected.offsetLeft - (picker.clientWidth - selected.offsetWidth) / 2;
+    picker.scrollTo({ left: Math.max(0, left) });
+  };
+  watch(
+    [() => preferencesStore.getTaskMapView, mapPickerRef],
+    () => nextTick(scrollSelectedMapIntoView),
+    { flush: 'post' }
+  );
+  useResizeObserver(mapPickerRef, scrollSelectedMapIntoView);
   watch(
     [isTraderView, traders, () => preferencesStore.getTaskTraderView],
     ([showsTrader, visibleTraders, selectedTrader]) => {

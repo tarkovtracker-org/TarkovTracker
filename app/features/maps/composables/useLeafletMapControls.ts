@@ -1,3 +1,5 @@
+import extractRules from '@/data/extractRules.json';
+import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
@@ -32,8 +34,15 @@ export const MAP_BUTTON_ACTIVE_CLASS =
   'border border-primary-400/60 bg-primary-500/15 text-primary-100 light:text-primary-900';
 export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
+const coopExtractIds = new Set(
+  Object.values(extractRules.maps).flatMap((map) =>
+    Object.entries(map)
+      .filter(([, profile]) => profile.rules.some((rule) => rule.type === 'coop'))
+      .map(([id]) => id)
+  )
+);
 export const isCoopExtract = (extract: MapExtract): boolean =>
-  /\bco-?op\b/i.test(extract.name || '');
+  coopExtractIds.has(extract.id) || /\bco-?op\b/i.test(extract.name || '');
 /** Derive available map locations and expose independent layer toggles and display controls. */
 export function useLeafletMapControls({
   map,
@@ -45,11 +54,15 @@ export function useLeafletMapControls({
   t,
 }: UseLeafletMapControlsOptions) {
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
-  const mapExtracts = computed<MapExtract[]>(() => map.value?.extracts ?? []);
+  const mapExtracts = computed<MapExtract[]>(() =>
+    (map.value?.extracts ?? []).filter((extract) =>
+      isDrawableMapPosition(map.value, extract.position)
+    )
+  );
   const mapTransits = computed(() =>
     (map.value?.transits ?? []).filter(
       (transit): transit is MapTransit & { position: MapPosition } =>
-        [transit.position?.x, transit.position?.z].every(Number.isFinite)
+        isDrawableMapPosition(map.value, transit.position)
     )
   );
   const hasTransits = computed(() => mapTransits.value.length > 0);
@@ -65,18 +78,27 @@ export function useLeafletMapControls({
   });
   const showPmcExtracts = ref(initialShowPmcExtracts ?? showExtracts);
   const showScavExtracts = ref(initialShowScavExtracts ?? showExtracts);
+  // Shared and co-op extracts used to appear whenever either faction was shown; keep that default.
+  const showSharedExtracts = ref(showPmcExtracts.value || showScavExtracts.value);
+  const showCoopExtracts = ref(showSharedExtracts.value);
   const showPmcSpawns = ref(initialShowPmcSpawns);
   const hasPmcSpawns = computed(() => mapPmcSpawns.value.length > 0);
-  const hasSharedExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
-    );
-  });
-  const hasCoopExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && isCoopExtract(extract)
-    );
-  });
+  // Layers rows mirror drawn markers, so availability only counts extracts with a position.
+  const drawableExtracts = computed(() => mapExtracts.value.filter((extract) => extract.position));
+  const hasDrawable = (predicate: (extract: MapExtract) => boolean) =>
+    computed(() => drawableExtracts.value.some(predicate));
+  const hasSharedExtracts = hasDrawable(
+    (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
+  );
+  const hasPmcExtracts = hasDrawable((extract) => extract.faction === 'pmc');
+  const hasScavExtracts = hasDrawable((extract) => extract.faction === 'scav');
+  /** Extracts without a recognized faction are drawn with the Shared row's visibility. */
+  const hasUnknownFactionExtracts = hasDrawable(
+    (extract) => !['pmc', 'scav', 'shared'].includes(extract.faction ?? '')
+  );
+  const hasCoopExtracts = hasDrawable(
+    (extract) => extract.faction === 'shared' && isCoopExtract(extract)
+  );
   const mapZoomSpeed = computed({
     get: () => preferencesStore.getMapZoomSpeed,
     set: (value) => {
@@ -121,8 +143,11 @@ export function useLeafletMapControls({
     mapTransits,
     showTransits,
     hasCoopExtracts,
+    hasPmcExtracts,
     hasPmcSpawns,
+    hasScavExtracts,
     hasSharedExtracts,
+    hasUnknownFactionExtracts,
     mapColors,
     mapColorOptions,
     mapExtracts,
@@ -136,6 +161,8 @@ export function useLeafletMapControls({
     showPmcExtracts,
     showPmcSpawns,
     showScavExtracts,
+    showSharedExtracts,
+    showCoopExtracts,
     zoomSpeedLabel,
     zoneOpacityLabel,
   };

@@ -897,24 +897,6 @@ summary {
   background: transparent;
   border: none;
 }
-.extract-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-color: var(--color-surface-900);
-  color: var(--color-surface-200);
-  font-size: 11px;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
-  transform: translate(-50%, calc(-100% - 6px));
-}
-.extract-badge-label {
-  font-weight: 600;
-}
 .leaflet-tooltip.spawn-cluster-label {
   background: transparent !important;
   border: none !important;

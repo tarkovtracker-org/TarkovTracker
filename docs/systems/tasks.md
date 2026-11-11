@@ -19,7 +19,12 @@ the focused task remains visible after route preferences synchronize.
 
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
 tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
-tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. Tabs in the
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The Maps
+view widens past the other views on large screens (`xl` and `2xl`) so the map gets the room. Its
+map picker (`TaskFilterBar.vue`) wraps every map and its count onto as many rows as needed from
+`sm` up; below `sm` it stays one scrolling row and scrolls the selected map into view. The selected
+map and trader use the accent fill and border (`getPickerTabClass` in `app/utils/statusTones.ts`),
+and the selected map also shows a marker icon. Tabs in the
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without
@@ -390,15 +395,151 @@ not import quest completions and therefore has no trader/task backfill path.
 The map's independent **Transit** layer shows transit locations from the active mode's
 `json.tarkov.dev` map payload. It defaults on and the toggle appears only when the selected
 map has transit coordinates. Labels use upstream localized descriptions (with the existing
-English fallback), a directional arrow, and a dashed border; the marker color is configurable
+English fallback), the transit glyph, and a dashed border; the marker color is configurable
 alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
-Like extract labels, transit labels remain visible across floors: named map floors have no
-height ranges for matching upstream vertical bounds. Transit conditions are not displayed;
+Extract and transit labels remain visible across floors. Elevation arrows point toward the
+marker from the selected floor as a single badge (the level count is added beyond one level); no
+badge is shown for unknown
+height or a volume spanning the selected floor. Transit conditions are not displayed;
 this layer identifies locations, not whether a particular player can use them in a raid.
 No overlay additions or additional upstream requests are required.
 
 `app/features/maps/LeafletMap.vue` renders the layer and `useLeafletMapControls` derives its
 visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
+
+## Map location accuracy and elevation
+
+`mapLocations.ts` rejects missing/non-finite horizontal positions for extracts and transits
+before layer availability and rendering. Ground Zero also checks its render bounds: upstream
+`regular`, `pve`, and `pvp-season` catalogs checked on 2026-11-10 incorrectly included UN Roadblock,
+Scav Bunker (Woods), and Pinewood Basement (Streets). Their coordinates are not repaired or moved.
+Transits belong to their containing source map; their `map` field identifies the destination.
+Other maps retain edge extracts outside artwork bounds. Existing cached catalogs receive the
+same presentation validation, without waiting for a server cache refresh.
+
+`app/data/mapFloors.json` contains reviewed height ranges and spatial extents from
+[the-hideout/tarkov-dev maps.json at a7cb849](https://github.com/the-hideout/tarkov-dev/blob/a7cb849a9c881bb1fa12ffb666c20e46aa5d1038/src/data/maps.json).
+The `order` is lowest to highest **selectable** floor, independent of SVG stacking order.
+Layer names map to our existing floor IDs (Labs `Second Level` becomes `Second_Level`).
+Keep spatial bounds with the heights when refreshing this metadata: low outdoor Ground Zero
+locations are not necessarily in Garage, and the showroom has a local second-floor exception.
+Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
+
+`mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
+scoped spatial exceptions before the base layer. A volume spanning several levels uses the
+nearest supported level toward the selected floor; a selected floor within that span needs no
+arrow. Task-zone positions and vertical bounds survive mark construction and participate in
+mark hashes. Legacy two-dimensional GPS has unknown height, never a fabricated zero.
+Extract/transit pins and task markers update floor badges on floor changes: a solid up/down arrow,
+plus the level count when it is more than one, with translated accessible descriptions. Markers
+on another floor stay visible but fade (pins also desaturate and return to full strength on hover
+or tap); their floor badge keeps full contrast. Counts describe displayed levels, not stair routes
+or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
+
+## Extract requirement cues and details
+
+Extract pins show always-visible requirement icons beside the pin head, ahead of the on-demand
+name label, in the Layers panel's "Extract icons" key order. Up to three icons show, then `+N`;
+the co-op handshake is skipped on co-op pins because the glyph already shows it. Selecting an
+extract (or pressing Enter on its marker) opens a compact plain-text popup above the pin head, so
+the pin and its name stay visible: one icon row per requirement with a short instruction and an
+optional qualifier (price variance, train window). The data source and the not-live notice appear
+once per map, in a line at the map's lower-left corner, instead of in every popup. It names the
+game client version and capture date for the current mode, says when the map also uses curated
+cues, and gives the full client build and curation note on hover. Money, item
+handover, keys, gear, empty backpack/armor slots, flares, activation, green smoke, train, timer,
+conditional availability, and unknown requirements have distinct icons. These cues supplement
+faction glyphs and floor badges; they never indicate live raid availability or replace the
+in-raid extraction list.
+
+`extractRequirements.ts` combines the public catalog's `transferItem` with a reviewed compact
+snapshot in `app/data/extractRules.json`. The supplemental snapshot is necessary because the
+public static API omits equipment restrictions, opening chances, timers, and requirement
+references. Its source is the official game backend's `/client/locations` and `/client/globals`
+definitions, captured through the private RemoteSession worker (formerly part of RequestExtract),
+with capture timestamps and client versions recorded in the file. The map labels this "game
+data" and names curated cues separately. No session tokens, profile/account data, private LAN
+addresses, or live-session requests are shipped. Production does not contact the capture tooling.
+
+The regular snapshot was captured on November 6, 2026 (1.3.0.0.48484) and was stale when reviewed;
+the Seasonal snapshot was captured on November 11 (1.3.0.1.48558). Their rules are collapsed only
+where both mode captures agree. PvE uses the explicit `CountPVE` / `ChancePVE` values in the
+regular location definitions; there was no independent PvE session capture. Match by containing
+map ID and exact raw exit name, then retain the public extract ID; never join translated names
+or assume a same-named exit on another map has the same requirements. Unmatched/incomplete
+records retain an unknown-requirements cue, and raw switch references alone do not imply a
+power requirement (the public catalog currently assigns the Customs ZB-013 switch too broadly).
+
+`Reference` resolves through `globals.config.RequirementReferences`, including Alpinist's
+Paracord, Red Rebel, and empty `ArmorVest` slot. `Empty` uses its actual `RequiredSlot`.
+`TransferItem` is distinct from `HasItem`; train counts are never treated as money. Costs are
+base configuration amounts, not reputation-adjusted prices. In particular Ground Zero's vehicle
+is 20,000 roubles in regular/Seasonal and 5,000 in the regular definition's PvE field; Interchange's
+PvE base cost is still 20,000. A configured `Chance` is not a live status signal. Timers describe
+the configured arrival/activation window, not a guarantee an exit remains usable afterward.
+
+Hardcoded scene cues missing from backend definitions are small, explicitly referenced additions
+(`extra` / `reference`): [Mira Avenue](https://tarkov.help/en/map/ground-zero/home),
+[Railroad Passage](https://tarkov.help/en/map/customs/home),
+[Power Line Passage](https://tarkov.help/en/map/woods/home), and
+[Klimov Street](https://tarkov.help/en/map/streets/extractions/extract-klimov-street) need a green
+flare. Path to River is marked as a flare extract from its public label without guessing color.
+[ZB-016 green smoke](https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point),
+[ZB-014 smoke and key](https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point), and
+[Old Gas Station smoke](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point)
+are independently reviewed scene cues; smoke is not a flare the player must bring. ZB-013 also
+shows the Factory emergency exit key alongside its captured activation requirement. Additional
+activation steps and cues are not invented when data is missing.
+
+When refreshing the snapshot, inspect the capture version/date and mode, resolve references,
+review current public map/name joins and mode differences, and preserve independently sourced
+scene additions. Read only the location/global definitions; never read, persist, or commit the
+RequestExtract session-state file. Update the capture provenance and regression cases alongside
+changed facts. The map-level source line exposes capture age without disclosing session metadata.
+
+## Map markers, legend, and sizing
+
+Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
+ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
+teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
+white glyph inside names who can use the location: PMC (shield), Scav (skull), shared (two
+people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
+`app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
+colors come from the customizable marker palette. A pin's name appears beside it on hover, when
+it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
+zoomed in at least one level past the whole-map fit, or always when **Always show names** is on
+(`map_always_show_names`). The accessible label includes the name, floor direction, and requirement
+badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
+out of it. The map surface keeps its own keyboard controls.
+
+The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
+controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
+`app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
+Extracts (PMC, Scav, Shared / unknown, Co-op), and Locations (Transit, PMC Spawns). Each row depicts
+the markers it controls, including combined rows; hidden rows stay listed, dimmed with an
+eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
+map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
+**Show all layers** while any are hidden. The combined Shared / unknown row depicts both the shared
+glyph/color and the generic exit glyph/default color; it controls either-faction exits and exits
+whose faction was not supplied without implying that unknown factions are shared. Shared and co-op
+extracts have their own toggles and start
+visible when either faction's extracts start visible; extracts without a known faction follow the
+Shared row, which is listed whenever such extracts exist. Extracts are visible by default. The
+panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
+in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
+containers narrower than 30rem.
+
+The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
+the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That
+choice persists in `tasks_map_height_choice`; double-clicking the handle or pressing Enter on it
+returns to the automatic height. On first load, a value in the old `tasks_map_height` key moves
+to the new key unless it equals the old default `520`, which the old code wrote on first visit
+and therefore means "never resized"; the old key is then removed. An untouched view refits the
+map bounds whenever its container resizes; a panned or zoomed view is kept.
+Leaflet's native window-resize handler is disabled so the ResizeObserver can decide whether to
+refit before invalidating size and changing the center.
+In containers narrower than 30rem, the toolbar and floor picker stack above the map instead of
+covering it.
 
 ## Map objective visibility and required items
 

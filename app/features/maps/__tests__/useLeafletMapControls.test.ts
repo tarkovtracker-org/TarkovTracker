@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { nextTick, ref } from 'vue';
+import maps from '@/data/maps.json';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
+import { getExtractGlyphKind } from '@/features/maps/utils/markerGlyphs';
 import type { TarkovMap } from '@/types/tarkov';
 const createPreferencesStore = () => {
   const state = {
@@ -52,6 +54,58 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
+  it('keeps translated co-op extracts under the same glyph and layer toggle', () => {
+    const extract = {
+      id: '44bd9f5882e7a6044c3d6e15abb6560306575d96',
+      name: 'Scav Camp (Koop)',
+      faction: 'shared' as const,
+      position: { x: 0, y: 0, z: 0 },
+    };
+    const controls = useLeafletMapControls({
+      map: ref({ id: '5714dbc024597771384a510d', name: 'Interchange', extracts: [extract] }),
+      preferencesStore: createPreferencesStore(),
+      t: (key) => key,
+    });
+    expect(getExtractGlyphKind(extract)).toBe('coop');
+    expect(controls.hasCoopExtracts.value).toBe(true);
+    expect(controls.hasSharedExtracts.value).toBe(false);
+  });
+  it('uses the same source-map validation for layer availability and drawn locations', () => {
+    const native = {
+      id: 'native',
+      name: 'Emercom Checkpoint',
+      faction: 'shared' as const,
+      position: { x: 151.63, y: 24.66, z: -97.46 },
+    };
+    const foreign = {
+      id: 'foreign',
+      name: 'Scav Bunker',
+      faction: 'scav' as const,
+      position: { x: 220.43, y: 20.54, z: -705.8 },
+    };
+    const transit = {
+      id: '1',
+      description: 'Transit to Streets',
+      map: 'streets',
+      position: { x: 229.6, y: 16.99, z: 65.36 },
+    };
+    const controls = useLeafletMapControls({
+      map: ref({
+        id: '653e6760052c01c1c805532f',
+        name: 'Ground Zero',
+        svg: maps.groundzero.svg,
+        extracts: [native, foreign, { ...foreign, position: undefined }],
+        transits: [transit, { ...transit, id: 'bad', position: foreign.position }],
+      } as TarkovMap),
+      preferencesStore: createPreferencesStore(),
+      t: (key) => key,
+    });
+    expect(controls.mapExtracts.value).toEqual([native]);
+    expect(controls.hasScavExtracts.value).toBe(false);
+    expect(controls.hasSharedExtracts.value).toBe(true);
+    expect(controls.mapTransits.value).toEqual([transit]);
+    expect(controls.hasTransits.value).toBe(true);
+  });
   it('keeps transits independent and updates them when the map changes', async () => {
     const map = ref<TarkovMap>({ id: 'empty', name: 'Empty' });
     const controls = useLeafletMapControls({
@@ -92,7 +146,12 @@ describe('useLeafletMapControls', () => {
   it('derives extract/spawn visibility and clamps slider settings', () => {
     const controls = useLeafletMapControls({
       map: ref({
-        extracts: [{ faction: 'shared', name: 'Co-op extract' }],
+        extracts: [
+          { faction: 'shared', name: 'Co-op extract', position: { x: 1, y: 0, z: 1 } },
+          // Layers rows only count extracts the map can draw.
+          { faction: 'pmc', name: 'No position' },
+          { faction: null, name: 'Unknown', position: { x: 2, y: 0, z: 2 } },
+        ],
         id: 'woods',
         spawns: [{ categories: ['player'], position: { x: 1, y: 0, z: 1 }, sides: ['pmc'] }],
       } as TarkovMap),
@@ -101,6 +160,10 @@ describe('useLeafletMapControls', () => {
     });
     expect(controls.hasPmcSpawns.value).toBe(true);
     expect(controls.hasCoopExtracts.value).toBe(true);
+    expect(controls.hasPmcExtracts.value).toBe(false);
+    expect(controls.hasScavExtracts.value).toBe(false);
+    expect(controls.hasSharedExtracts.value).toBe(false);
+    expect(controls.hasUnknownFactionExtracts.value).toBe(true);
     controls.mapZoomSpeed.value = 9;
     controls.mapPanSpeed.value = -4;
     controls.mapZoneOpacity.value = 9;
