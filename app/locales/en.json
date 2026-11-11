@@ -646,6 +646,19 @@
       "regular": "Regular",
       "pinned": "Pinned"
     },
+    "objective_icons": {
+      "legend_title": "Objective icons",
+      "kinds": {
+        "visit": "Visit or locate",
+        "plant": "Plant or stash",
+        "find": "Find or pick up",
+        "mark": "Mark",
+        "shoot": "Eliminate",
+        "use": "Use item",
+        "extract": "Extract",
+        "other": "Other objective"
+      }
+    },
     "tooltips": {
       "zoom_in": "Zoom in",
       "zoom_out": "Zoom out",

@@ -512,6 +512,16 @@ zoomed in at least one level past the whole-map fit, or always when **Always sho
 badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
 out of it. The map surface keeps its own keyboard controls.
 
+Objective markers are 20 px dots in the task category color (Regular, Pinned, Team); a zone
+also gets one at its centre. A white glyph on each dot names the action the objective's upstream
+`type` asks for: visit or locate (eye), plant, stash or install (tray with a down arrow), find or
+pick up (magnifier), mark with an MS2000 Marker (beacon), eliminate (pistol), use an item such as
+a signal flare (pointing hand), extract (the extract pins' exit glyph), and a flag for any other
+type. `app/features/maps/utils/objectiveGlyphs.ts` owns the type mapping, path data, and glyph
+markup. Glyphs are non-interactive Leaflet markers in their own pane above the dots and below the
+extract pins, so hover, click, selection and the stacked-objective hit test all stay on the dots.
+A glyph fades with its dot when the objective is on another floor.
+
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
 controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
 `app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
@@ -527,7 +537,8 @@ visible when either faction's extracts start visible; extracts without a known f
 Shared row, which is listed whenever such extracts exist. Extracts are visible by default. The
 panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
 in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
-containers narrower than 30rem.
+containers narrower than 30rem. Below the rows, collapsible **Objective icons** and **Extract
+icons** keys list every objective glyph and extract requirement badge.
 
 The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
 the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That

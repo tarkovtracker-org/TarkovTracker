@@ -10,6 +10,8 @@ export interface MapMarkLocation {
 }
 export interface MapMark {
   id?: string;
+  /** Upstream objective type; it picks the glyph drawn on the marker. */
+  type?: string;
   zones: MapZone[];
   possibleLocations?: MapMarkLocation[];
   users?: string[];
@@ -75,6 +77,7 @@ const markLocationHashes = (mark: MapMark, mapId: string): number[] =>
     .sort((a, b) => a - b);
 const hashMark = (hash: number, mark: MapMark, mapId: string): number => {
   let next = updateFnv1a(hash, mark.id ?? '');
+  next = updateFnv1a(next, mark.type ?? '');
   next = updateFnv1a(next, mark.pinned ? '1' : '0');
   next = hashSortedValues(next, [...(mark.users ?? [])].sort(compareCodeUnits));
   next = hashSortedValues(next, markZoneHashes(mark, mapId));
