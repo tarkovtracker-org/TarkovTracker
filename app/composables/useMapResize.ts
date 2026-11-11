@@ -24,6 +24,8 @@ export interface UseMapResizeReturn {
 const MAP_HEIGHT_MIN = 320;
 const MAP_HEIGHT_MAX_FALLBACK = 1200;
 const MAP_HEIGHT_STEP = 24;
+/** Pointer travel before a press on the handle counts as a resize, so a click keeps auto height. */
+const RESIZE_DRAG_THRESHOLD = 3;
 /** Share of the window an untouched map fills, leaving room for its header and legend. */
 const MAP_HEIGHT_AUTO_RATIO = 0.75;
 /** Used before the window is measured (SSR) and as the old fixed tasks map default. */
@@ -117,6 +119,7 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
     startY: number;
     startHeight: number;
     pointerId: number;
+    dragging: boolean;
   } | null>(null);
   const savedUserSelect = ref('');
   const isResizing = computed(() => resizeState.value !== null);
@@ -125,6 +128,8 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
     if (!state) return;
     if (state.pointerId !== event.pointerId) return;
     const delta = event.clientY - state.startY;
+    if (!state.dragging && Math.abs(delta) < RESIZE_DRAG_THRESHOLD) return;
+    state.dragging = true;
     mapHeight.value = Math.round(state.startHeight + delta);
   };
   const stopResize = (event?: PointerEvent) => {
@@ -154,6 +159,7 @@ export function useMapResize(options: UseMapResizeOptions = {}): UseMapResizeRet
       startY: event.clientY,
       startHeight: mapHeight.value,
       pointerId: event.pointerId,
+      dragging: false,
     };
     savedUserSelect.value = document.body.style.userSelect;
     document.body.style.userSelect = 'none';

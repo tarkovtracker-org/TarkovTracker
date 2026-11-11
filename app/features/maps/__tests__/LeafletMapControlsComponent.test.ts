@@ -300,7 +300,7 @@ describe('LeafletMap controls', () => {
     clicks[1]!();
     expect(pins[0]!.classList.contains('is-open')).toBe(false);
     expect(pins[1]!.classList.contains('is-open')).toBe(true);
-    // Pin clicks bubble to the map; only a click outside every pin closes the open name.
+    // Only a click outside every pin closes the open name.
     const mapClick = mockMapInstance.on.mock.calls
       .filter(([event]) => event === 'click')
       .at(-1)?.[1] as (event: { originalEvent: { target: EventTarget } }) => void;

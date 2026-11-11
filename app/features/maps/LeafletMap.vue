@@ -1827,7 +1827,8 @@
     if (openPin && openPin !== pin) openPin.classList.remove('is-open');
     openPin = pin.classList.toggle('is-open') ? pin : null;
   }
-  /** A map click outside every pin closes the open name; clicks on a pin bubble here too. */
+  /** A map click outside every pin closes the open name. Pin clicks do not reach the map
+   * (Leaflet markers default to `bubblingMouseEvents: false`); the guard covers any that do. */
   function closeOpenPin(event?: L.LeafletMouseEvent): void {
     const target = event?.originalEvent?.target;
     if (target instanceof Element && target.closest('.map-pin')) return;
@@ -1854,7 +1855,7 @@
     const marker = leafletApi.marker([latLng.lat, latLng.lng], {
       icon,
       // Interactive for hover and tap; keyboard stays on the map surface instead of every pin.
-      // Mouse events still bubble so double-click zoom and idle detection work over pins.
+      // Pins listen only for click, so double-click zoom still reaches the map over a pin.
       interactive: true,
       keyboard: false,
       zIndexOffset: 1000,

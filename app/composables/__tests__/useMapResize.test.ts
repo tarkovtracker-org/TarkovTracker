@@ -76,6 +76,27 @@ describe('useMapResize', () => {
     expect(other.defaultPrevented).toBe(false);
     scope.stop();
   });
+  it('keeps the automatic height for a click on the handle and saves a real drag', async () => {
+    const { scope, mapHeight, isAutoHeight, resizeHandleRef, startResize } = setup();
+    const handle = document.createElement('div');
+    Object.assign(handle, { setPointerCapture: () => {}, hasPointerCapture: () => false });
+    resizeHandleRef.value = handle;
+    const pointer = (type: string, clientY: number) =>
+      Object.assign(new Event(type, { cancelable: true }), { clientY, pointerId: 1, button: 0 });
+    startResize(pointer('pointerdown', 500) as PointerEvent);
+    window.dispatchEvent(pointer('pointermove', 502));
+    window.dispatchEvent(pointer('pointerup', 502));
+    await nextTick();
+    expect(isAutoHeight.value).toBe(true);
+    expect(localStorage.getItem('tasks_map_height_choice')).toBeNull();
+    startResize(pointer('pointerdown', 500) as PointerEvent);
+    window.dispatchEvent(pointer('pointermove', 540));
+    window.dispatchEvent(pointer('pointerup', 540));
+    await nextTick();
+    expect(isAutoHeight.value).toBe(false);
+    expect(mapHeight.value).toBe(790);
+    scope.stop();
+  });
   it('uses a fixed default height when one is given', () => {
     localStorage.setItem('tasks_graph_height', '620');
     const { scope, mapHeight, isAutoHeight } = setup({
