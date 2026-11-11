@@ -53,4 +53,26 @@ describe('extract rule data', () => {
     expect(data.value).toBe(BUNDLED_EXTRACT_RULE_DATA);
     expect(isCoopExtract({ id: 'new-coop', name: 'Gate' })).toBe(false);
   });
+  it('classifies co-op extracts per game mode from the same rules the details show', async () => {
+    mockTarkovApiFetch.mockResolvedValue({
+      data: {
+        requirements: {
+          sources: {
+            regular: overlayData.requirements.sources.regular,
+            'pvp-season': overlayData.requirements.sources.regular,
+          },
+          maps: { map: { split: { name: 'split', pvp: [{ type: 'coop' }], seasonal: [] } } },
+        },
+        cues: {},
+      },
+    });
+    useExtractRuleData();
+    await flush();
+    const extract = { id: 'split', name: 'Gate' };
+    expect(isCoopExtract(extract, 'pvp')).toBe(true);
+    expect(isCoopExtract(extract, 'pve')).toBe(true);
+    expect(isCoopExtract(extract, 'seasonal')).toBe(false);
+    // The name fallback still covers extracts the data does not describe.
+    expect(isCoopExtract({ id: 'other', name: 'Scav Co-Op Exfil' }, 'seasonal')).toBe(true);
+  });
 });

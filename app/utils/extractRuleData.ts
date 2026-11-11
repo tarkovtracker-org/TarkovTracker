@@ -67,13 +67,26 @@ const NUMERIC_FIELDS = [
 ] as const;
 const optionalNumber = (value: unknown) =>
   value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+const optionalPercent = (value: unknown) =>
+  optionalNumber(value) && (value === undefined || (value as number) <= 100);
 const optionalString = (value: unknown) => value === undefined || nonEmpty(value);
+/** Fields a rule is meaningless without; e.g. a transfer with no item or count. */
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  transfer: ['item', 'count'],
+  item: ['item'],
+  key: ['item'],
+  empty: ['slot'],
+};
+const hasRequiredFields = (rule: JsonRecord): boolean =>
+  (REQUIRED_FIELDS[rule.type as string] ?? []).every((field) => rule[field] !== undefined);
 function validRule(value: unknown, types: Set<string>): boolean {
   if (!isRecord(value) || !types.has(value.type as string)) return false;
   return [
     NUMERIC_FIELDS.every((field) => optionalNumber(value[field])),
+    optionalPercent(value.percent) && optionalPercent(value.percentPve),
     optionalString(value.item) && optionalString(value.slot),
     value.vehicle === undefined || typeof value.vehicle === 'boolean',
+    hasRequiredFields(value),
   ].every(Boolean);
 }
 const validRuleList = (value: unknown, types: Set<string>) =>
@@ -94,17 +107,54 @@ const validCueEntry = (value: unknown): boolean =>
 const validNestedRecords = (value: unknown, entry: (value: unknown) => boolean): boolean =>
   isRecord(value) &&
   Object.values(value).every((map) => isRecord(map) && Object.values(map).every(entry));
+/** Published rules must describe at least one extract; an empty catalog is not data. */
+const hasExtracts = (maps: unknown): boolean =>
+  isRecord(maps) && Object.values(maps).some((map) => isRecord(map) && Object.keys(map).length);
+const SHA256 = /^[0-9a-f]{64}$/;
 const validSource = (value: unknown): boolean =>
-  isRecord(value) && nonEmpty(value.clientBuild) && nonEmpty(value.definitionsSha256);
+  isRecord(value) &&
+  nonEmpty(value.clientBuild) &&
+  typeof value.definitionsSha256 === 'string' &&
+  SHA256.test(value.definitionsSha256);
 function validSources(value: unknown): boolean {
   if (!isRecord(value) || !validSource(value.regular)) return false;
   return value['pvp-season'] === undefined || validSource(value['pvp-season']);
 }
 export const isExtractRequirementsSection = (value: unknown): value is ExtractRequirementsSection =>
-  isRecord(value) && validSources(value.sources) && validNestedRecords(value.maps, validEntry);
+  isRecord(value) &&
+  validSources(value.sources) &&
+  validNestedRecords(value.maps, validEntry) &&
+  hasExtracts(value.maps);
 export const isExtractCuesSection = (value: unknown): value is ExtractCuesSection =>
   validNestedRecords(value, validCueEntry);
 export const isExtractRuleData = (value: unknown): value is ExtractRuleData =>
   isRecord(value) &&
   isExtractRequirementsSection(value.requirements) &&
   isExtractCuesSection(value.cues);
+/** The capture mode behind an app game mode; PvE reads the regular definitions' PvE values. */
+const captureMode = (mode: string): 'regular' | 'pvp-season' =>
+  mode === 'seasonal' ? 'pvp-season' : 'regular';
+const SUPPORTED_MODES = new Set(['pvp', 'pve', 'seasonal']);
+/** The capture behind an app game mode; undefined for unsupported or uncaptured modes. */
+export function extractRuleSource(
+  data: ExtractRuleData,
+  mode: string
+): ExtractRuleSource | undefined {
+  return SUPPORTED_MODES.has(mode) ? data.requirements.sources[captureMode(mode)] : undefined;
+}
+/**
+ * The rule list for one extract in one app game mode: shared rules, else the mode's own list.
+ * A mode without a capture has no rules, even when shared rules exist.
+ */
+export function extractRulesForMode(
+  data: ExtractRuleData,
+  ids: { mapId: string; extractId: string },
+  mode: string
+): ExtractRule[] | undefined {
+  if (!extractRuleSource(data, mode)) return undefined;
+  const maps = data.requirements.maps;
+  const map = Object.hasOwn(maps, ids.mapId) ? maps[ids.mapId] : undefined;
+  const entry = map && Object.hasOwn(map, ids.extractId) ? map[ids.extractId] : undefined;
+  if (entry?.rules) return entry.rules;
+  return mode === 'seasonal' ? entry?.seasonal : entry?.pvp;
+}

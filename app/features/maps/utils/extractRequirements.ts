@@ -3,13 +3,13 @@ import {
   MAP_REQUIREMENT_ICON_PATHS,
   MAP_REQUIREMENT_LEGEND_KEYS,
 } from '@/features/maps/utils/mapIcons';
-import type { MapExtract } from '@/types/tarkov';
-import type {
-  ExtractRule,
-  ExtractRuleData,
-  ExtractRuleEntry,
-  ExtractRuleSource,
+import {
+  extractRuleSource,
+  extractRulesForMode,
+  type ExtractRule,
+  type ExtractRuleData,
 } from '@/utils/extractRuleData';
+import type { MapExtract } from '@/types/tarkov';
 type Rule = ExtractRule & { itemName?: string };
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 export type ExtractRequirementTag = { key: string; label: string };
@@ -65,13 +65,6 @@ function itemLabel(options: Options, id: string, suppliedName?: string): string 
   const key = own(CURRENCY_KEYS, id) ?? own(ITEM_KEYS, id);
   if (key) return text(options, key);
   return suppliedName ?? options.itemName?.(id) ?? text(options, 'unknown_item', { id });
-}
-const SUPPORTED_MODES = ['pvp', 'pve', 'seasonal'];
-/** Shared rules, else the mode's own list; PvE reads the regular list's PvE values. */
-function capturedRules(entry: ExtractRuleEntry | undefined, mode: string): Rule[] | undefined {
-  if (!SUPPORTED_MODES.includes(mode)) return undefined;
-  if (entry?.rules) return entry.rules;
-  return mode === 'seasonal' ? entry?.seasonal : entry?.pvp;
 }
 function fallbackTransfer(extract: MapExtract): Rule[] {
   const transfer = extract.transferItem;
@@ -183,7 +176,7 @@ function appendRule(
 /** Game-definition rules, then curated cues; absence never means an extract is open. */
 function extractRules(options: Options): Rule[] {
   const { data, mapId, extract } = options;
-  const captured = capturedRules(own(own(data.requirements.maps, mapId), extract.id), options.mode);
+  const captured = extractRulesForMode(data, { mapId, extractId: extract.id }, options.mode);
   const cues = own(own(data.cues, mapId), extract.id)?.cues ?? [];
   const rules: Rule[] = [...(captured ?? [{ type: 'unknown' }]), ...cues];
   if (!rules.some((rule) => rule.type === 'transfer')) rules.push(...fallbackTransfer(extract));
@@ -197,19 +190,13 @@ export function getExtractRequirements(options: Options): ExtractRequirements {
   if (!details.length) details.push({ text: text(options, 'no_additional_data') });
   return { tags: [...tags.values()], details };
 }
-/** PvE reads the regular definitions' PvE fields, so it shares the regular capture. */
-function modeSource(data: ExtractRuleData, mode: string): ExtractRuleSource | undefined {
-  return mode === 'seasonal'
-    ? data.requirements.sources['pvp-season']
-    : data.requirements.sources.regular;
-}
 /** The game capture behind a map's requirement rules; undefined when the map has none. */
 export function getExtractDataSource(
   mapId: string,
   mode: string,
   data: ExtractRuleData
 ): ExtractDataSource | undefined {
-  const source = SUPPORTED_MODES.includes(mode) ? modeSource(data, mode) : undefined;
+  const source = extractRuleSource(data, mode);
   if (!source || !own(data.requirements.maps, mapId)) return undefined;
   return {
     clientVersion: source.clientBuild.split('.').slice(0, 4).join('.'),

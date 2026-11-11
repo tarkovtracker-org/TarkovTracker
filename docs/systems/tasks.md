@@ -474,8 +474,7 @@ reads the same data. The bundled copy is a fallback for rollout and local runs w
 Rules shared by the Regular and Seasonal captures sit in `rules`; otherwise `pvp` and `seasonal`
 keep their own lists, and a mode without a capture has no rules (an unknown-requirements cue).
 PvE has no session of its own, so it reads the regular definitions' `countPve` / `percentPve` /
-`minPve` / `maxPve` values. A chance that is 100% in the current mode shows nothing; Terminal's
-car, for example, is always open in PvP but never in PvE. Never join translated names or assume a
+`minPve` / `maxPve` values. A chance that is 100% in the current mode shows nothing, so an exit closed only in PvE shows its chance only in PvE. Never join translated names or assume a
 same-named exit on another map has the same requirements. Unmatched or incomplete exits keep an
 unknown-requirements cue, and raw switch references alone do not imply a power requirement.
 

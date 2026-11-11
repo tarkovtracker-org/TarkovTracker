@@ -749,6 +749,7 @@
   const router = useRouter();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  const currentGameMode = computed(() => metadataStore.currentGameMode ?? 'pvp');
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
   const fullscreenToggleLabel = computed(() =>
@@ -837,6 +838,7 @@
     showPmcExtracts: props.showPmcExtracts,
     showPmcSpawns: props.showPmcSpawns,
     showScavExtracts: props.showScavExtracts,
+    gameMode: currentGameMode,
     t,
   });
   const mapColorsOpen = ref(false);
@@ -916,7 +918,8 @@
   const anyExtractsVisible = computed(() =>
     mapExtracts.value.some(
       (extract) =>
-        Boolean(extract.position) && extractVisibility.value[getExtractGlyphKind(extract)]
+        Boolean(extract.position) &&
+        extractVisibility.value[getExtractGlyphKind(extract, currentGameMode.value)]
     )
   );
   /** One map-level line names the requirement data source and that it is not live status. */
@@ -1864,7 +1867,7 @@
     extractLayer.value.clearLayers();
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
-      const kind = getExtractGlyphKind(extract);
+      const kind = getExtractGlyphKind(extract, currentGameMode.value);
       if (!extractVisibility.value[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       const requirements = getExtractRequirements({

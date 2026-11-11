@@ -28,9 +28,9 @@ export const MAP_MARKER_GLYPH_COLOR_KEYS: Record<MapMarkerGlyphKind, MapMarkerCo
   transit: 'TRANSIT',
   extract: 'DEFAULT_EXTRACT',
 };
-/** Classify an extract by who can use it; unknown factions keep the generic exit glyph. */
-export function getExtractGlyphKind(extract: MapExtract): MapMarkerGlyphKind {
-  if (extract.faction === 'shared') return isCoopExtract(extract) ? 'coop' : 'shared';
+/** Classify an extract by who can use it in mode; unknown factions keep the generic exit glyph. */
+export function getExtractGlyphKind(extract: MapExtract, mode = 'pvp'): MapMarkerGlyphKind {
+  if (extract.faction === 'shared') return isCoopExtract(extract, mode) ? 'coop' : 'shared';
   return extract.faction === 'pmc' || extract.faction === 'scav' ? extract.faction : 'extract';
 }
 // Pins are plain Leaflet DOM, so their Tailwind utilities live here (Tailwind scans this file).
