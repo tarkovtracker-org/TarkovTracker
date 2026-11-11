@@ -27,7 +27,15 @@ type TaggedDetail = ExtractRequirementDetail & { tag: string };
 export type ExtractRequirements = {
   tags: ExtractRequirementTag[];
   details: ExtractRequirementDetail[];
-  capturedAt?: string;
+};
+/** Where a map's requirement rules come from, shown once per map instead of in every popup. */
+export type ExtractDataSource = {
+  capturedAt: string;
+  /** Four-part game version, e.g. `1.3.0.0`; the build number stays in `clientBuild`. */
+  clientVersion: string;
+  clientBuild: string;
+  /** Some rules on this map are curated scene cues rather than game definitions. */
+  curatedCues: boolean;
 };
 type Options = {
   mapId: string;
@@ -66,7 +74,7 @@ function itemLabel(options: Options, id: string, suppliedName?: string): string 
   return suppliedName ?? options.itemName?.(id) ?? text(options, 'unknown_item', { id });
 }
 function capturedRules(profile: Profile | undefined, mode: string): Rule[] | undefined {
-  if (!['pvp', 'pve', 'seasonal'].includes(mode)) return undefined;
+  if (!SUPPORTED_MODES.includes(mode)) return undefined;
   if (profile?.rules) return profile.rules;
   return mode === 'seasonal' ? profile?.seasonal : profile?.pvp;
 }
@@ -176,12 +184,44 @@ export function getExtractRequirements(options: Options): ExtractRequirements {
   const addTag = (key: string) => tags.set(key, { key, label: text(options, `tags.${key}`) });
   rules.forEach((rule) => appendRule(rule, options, addTag, details));
   if (!details.length) details.push({ text: text(options, 'no_additional_data') });
-  const source =
-    options.mode === 'seasonal' ? snapshot.sources['pvp-season'] : snapshot.sources.pvp;
+  return { tags: [...tags.values()], details };
+}
+const SUPPORTED_MODES = ['pvp', 'pve', 'seasonal'];
+/** PvE reads the regular definitions' PvE fields, so it shares the regular capture. */
+function modeSource(mode: string) {
+  return mode === 'seasonal' ? snapshot.sources['pvp-season'] : snapshot.sources.pvp;
+}
+/** The game capture behind a map's requirement rules; undefined when the map has none. */
+export function getExtractDataSource(mapId: string, mode: string): ExtractDataSource | undefined {
+  const mapProfiles = own(profiles, mapId);
+  if (!mapProfiles || !SUPPORTED_MODES.includes(mode)) return undefined;
+  const source = modeSource(mode);
+  const build = source.version.replace(/^EFT Client\s*/, '');
   return {
-    tags: [...tags.values()],
-    details,
-    capturedAt: captured ? source.capturedAt : undefined,
+    capturedAt: source.capturedAt,
+    clientVersion: build.split('.').slice(0, 4).join('.'),
+    clientBuild: build,
+    curatedCues: Object.values(mapProfiles).some((profile) => Boolean(profile.extra?.length)),
+  };
+}
+/**
+ * The visible source line and its fuller hover text. Curated cues are named whenever the map uses
+ * any, so game definitions and third-party additions are never presented as one source.
+ */
+export function describeExtractSource(
+  source: ExtractDataSource,
+  t: Translate,
+  formatDate: (iso: string) => string
+): { label: string; detail: string } {
+  const key = source.curatedCues ? 'source_curated' : 'source';
+  const detail = [t('maps.extract_requirements.source_detail', { build: source.clientBuild })];
+  if (source.curatedCues) detail.push(t('maps.extract_requirements.curated_detail'));
+  return {
+    label: t(`maps.extract_requirements.${key}`, {
+      version: source.clientVersion,
+      date: formatDate(source.capturedAt),
+    }),
+    detail: detail.join(' '),
   };
 }
 const POPUP_ICON_CLASS = 'mt-px size-4 shrink-0 text-amber-300 light:text-amber-700';
@@ -204,26 +244,12 @@ function detailRow(entry: ExtractRequirementDetail): HTMLLIElement {
   row.append(body);
   return row;
 }
-function sourceNote(requirements: ExtractRequirements, t: Translate): HTMLDivElement {
-  const parts = [t('maps.extract_requirements.raid_notice')];
-  if (requirements.capturedAt) {
-    const date = requirements.capturedAt.slice(0, 10);
-    parts.push(t('maps.extract_requirements.reference_date', { date }));
-  }
-  return textBlock(
-    'mt-2.5 border-t border-white/10 pt-2 text-[11px] leading-snug text-surface-400 light:border-black/10',
-    parts.join(' · ')
-  );
-}
 /**
- * Compact click-through details: the name, one icon row per requirement and a one-line source
- * note. Plain DOM keeps Leaflet popups safe: upstream names and item labels are text, never HTML.
+ * Compact click-through details: the name and one icon row per requirement. The source and the
+ * not-live notice are shown once per map, not in each popup. Plain DOM keeps Leaflet popups safe:
+ * upstream names and item labels are text, never HTML.
  */
-export function createExtractDetails(
-  name: string,
-  requirements: ExtractRequirements,
-  t: Translate
-): HTMLElement {
+export function createExtractDetails(name: string, requirements: ExtractRequirements): HTMLElement {
   const panel = document.createElement('section');
   panel.className = 'text-sm';
   const title = document.createElement('h3');
@@ -232,7 +258,7 @@ export function createExtractDetails(
   const list = document.createElement('ul');
   list.className = 'mt-2 space-y-1.5';
   list.append(...requirements.details.map(detailRow));
-  panel.append(title, list, sourceNote(requirements, t));
+  panel.append(title, list);
   return panel;
 }
 /** Icons beyond this count collapse into "+N"; the popup always lists every requirement. */

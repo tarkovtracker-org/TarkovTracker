@@ -306,7 +306,16 @@ describe('LeafletMap controls', () => {
     expect(marker.mock.calls.at(-1)?.[1]).toMatchObject({ keyboard: true });
     const details = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
     expect(details.textContent).toContain(`Pay ${new Intl.NumberFormat().format(20000)} roubles`);
-    expect(details.textContent).toContain('Not live raid status');
+    expect(details.textContent).not.toContain('Not live raid status');
+    // The popup opens above the pin head so the pin and its name stay visible.
+    expect(markerInstance.bindPopup.mock.calls.at(-1)![1]).toMatchObject({ offset: [0, -28] });
+    // The source and not-live notice appear once for the map, not in every popup.
+    const source = wrapper.get('[data-testid="map-extract-source"]');
+    expect(source.text()).toMatch(
+      /^Requirements: game data, EFT 1\.3\.0\.0 \(.+\), plus curated cues · Not live raid status$/
+    );
+    expect(source.attributes('title')).toContain('EFT 1.3.0.0.48484');
+    expect(wrapper.findAll('[data-testid="map-extract-source"]')).toHaveLength(1);
     const openPopup = markerInstance.on.mock.calls.find(([event]) => event === 'popupopen')![1];
     mockMapInstance.size = { x: 286, y: 320 };
     openPopup({ popup });

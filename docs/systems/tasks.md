@@ -441,9 +441,12 @@ or guaranteed in-game access. Raw coordinates and their upstream provenance rema
 Extract pins show always-visible requirement icons beside the pin head, ahead of the on-demand
 name label, in the Layers panel's "Extract icons" key order. Up to three icons show, then `+N`;
 the co-op handshake is skipped on co-op pins because the glyph already shows it. Selecting an
-extract (or pressing Enter on its marker) opens a compact plain-text popup: one icon row per
-requirement with a short instruction and an optional qualifier (price variance, train window),
-then a one-line note that the data is not live raid status, with the snapshot date. Money, item
+extract (or pressing Enter on its marker) opens a compact plain-text popup above the pin head, so
+the pin and its name stay visible: one icon row per requirement with a short instruction and an
+optional qualifier (price variance, train window). The data source and the not-live notice appear
+once per map, in a line at the map's lower-left corner, instead of in every popup. It names the
+game client version and capture date for the current mode, says when the map also uses curated
+cues, and gives the full client build and curation note on hover. Money, item
 handover, keys, gear, empty backpack/armor slots, flares, activation, green smoke, train, timer,
 conditional availability, and unknown requirements have distinct icons. These cues supplement
 faction glyphs and floor badges; they never indicate live raid availability or replace the
@@ -452,10 +455,11 @@ in-raid extraction list.
 `extractRequirements.ts` combines the public catalog's `transferItem` with a reviewed compact
 snapshot in `app/data/extractRules.json`. The supplemental snapshot is necessary because the
 public static API omits equipment restrictions, opening chances, timers, and requirement
-references. Its source is RequestExtract's read-only `/api/<mode>/locations` and
-`/api/<mode>/globals` responses, with capture timestamps and client versions recorded in the
-file. No session tokens, profile/account data, private LAN addresses, or live-session requests
-are shipped. Production does not contact RequestExtract.
+references. Its source is the official game backend's `/client/locations` and `/client/globals`
+definitions, captured through the private RemoteSession worker (formerly part of RequestExtract),
+with capture timestamps and client versions recorded in the file. The map labels this "game
+data" and names curated cues separately. No session tokens, profile/account data, private LAN
+addresses, or live-session requests are shipped. Production does not contact the capture tooling.
 
 The regular snapshot was captured on November 6, 2026 (1.3.0.0.48484) and was stale when reviewed;
 the Seasonal snapshot was captured on November 11 (1.3.0.1.48558). Their rules are collapsed only
@@ -491,7 +495,7 @@ When refreshing the snapshot, inspect the capture version/date and mode, resolve
 review current public map/name joins and mode differences, and preserve independently sourced
 scene additions. Read only the location/global definitions; never read, persist, or commit the
 RequestExtract session-state file. Update the capture provenance and regression cases alongside
-changed facts. Popup reference dates expose capture age without disclosing session metadata.
+changed facts. The map-level source line exposes capture age without disclosing session metadata.
 
 ## Map markers, legend, and sizing
 

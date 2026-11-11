@@ -4,6 +4,8 @@ import snapshot from '@/data/extractRules.json';
 import {
   appendExtractRequirementTags,
   createExtractDetails,
+  describeExtractSource,
+  getExtractDataSource,
   getExtractRequirements,
   type ExtractRequirements,
 } from '@/features/maps/utils/extractRequirements';
@@ -155,14 +157,41 @@ describe('extract requirements', () => {
     expect(strip?.title).toBe('Money, Conditional');
     expect(strip?.className).not.toContain('hidden');
     expect(pin.getAttribute('aria-label')).toBe('Vehicle, Money, Conditional');
-    const panel = createExtractDetails('<img src=x onerror=alert(1)>', requirements, t);
+    const panel = createExtractDetails('<img src=x onerror=alert(1)>', requirements);
     expect(panel.querySelector('h3')?.textContent).toContain('<img');
     expect(panel.querySelector('img')).toBeNull();
     // One icon row per requirement: the payment and the vehicle condition.
     expect(panel.querySelectorAll('li')).toHaveLength(2);
     expect(panel.querySelectorAll('li svg')).toHaveLength(2);
     expect(panel.textContent).toContain(`Pay ${amount(20000)} roubles`);
-    expect(panel.textContent).toContain('Not live raid status · Data from 2026-11-06');
+    // The source and not-live notice are map-level, so popups do not repeat them.
+    expect(panel.textContent).not.toContain('Not live raid status');
+    expect(panel.textContent).not.toContain('game data');
+  });
+  it('names the game capture for each mode and flags maps that use curated cues', () => {
+    const date = (iso: string) => iso.slice(0, 10);
+    const regular = getExtractDataSource(groundZero, 'pvp');
+    expect(regular).toEqual({
+      capturedAt: snapshot.sources.pvp.capturedAt,
+      clientVersion: '1.3.0.0',
+      clientBuild: '1.3.0.0.48484',
+      curatedCues: true,
+    });
+    // PvE reads the regular definitions' PvE fields, so it shares the regular capture.
+    expect(getExtractDataSource(groundZero, 'pve')).toEqual(regular);
+    expect(getExtractDataSource(groundZero, 'seasonal')?.clientBuild).toBe('1.3.0.1.48558');
+    expect(describeExtractSource(regular!, t, date)).toEqual({
+      label: 'Requirements: game data, EFT 1.3.0.0 (2026-11-06), plus curated cues',
+      detail:
+        "From the EFT 1.3.0.0.48484 client's location and global definitions. Base values only; check the in-raid extraction list. Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
+    });
+    const plain = { ...regular!, curatedCues: false };
+    expect(describeExtractSource(plain, t, date).label).toBe(
+      'Requirements: game data, EFT 1.3.0.0 (2026-11-06)'
+    );
+    expect(describeExtractSource(plain, t, date).detail).not.toContain('tarkov.help');
+    expect(getExtractDataSource('unknown-map', 'pvp')).toBeUndefined();
+    expect(getExtractDataSource(groundZero, 'arena')).toBeUndefined();
   });
   it('orders pin icons by the legend, skips glyph-redundant ones, and collapses overflow', () => {
     const pin = document.createElement('div');

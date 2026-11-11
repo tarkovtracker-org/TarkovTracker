@@ -484,6 +484,14 @@
           :class="props.fill ? 'h-full' : 'h-100 sm:h-125 lg:h-150'"
           :style="mapHeightStyle"
         />
+        <p
+          v-if="extractSource"
+          data-testid="map-extract-source"
+          class="text-surface-300 absolute bottom-2 left-2 z-650 max-w-[calc(100%-4rem)] rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
+          :title="extractSource.detail"
+        >
+          {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
+        </p>
         <div
           v-if="showKeyboardCursor"
           aria-hidden="true"
@@ -590,6 +598,7 @@
   import 'leaflet/dist/leaflet.css';
   import { useElementSize, useStorage } from '@vueuse/core';
   import { createApp } from 'vue';
+  import { useSafeLocale } from '@/composables/i18nHelpers';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
@@ -612,6 +621,8 @@
   import {
     appendExtractRequirementTags,
     createExtractDetails,
+    describeExtractSource,
+    getExtractDataSource,
     getExtractRequirements,
     type ExtractRequirements,
   } from '@/features/maps/utils/extractRequirements';
@@ -891,6 +902,24 @@
     })
   );
   const hiddenLayerCount = computed(() => countHiddenLayers(layerGroups.value));
+  const locale = useSafeLocale();
+  const formatCaptureDate = (iso: string) =>
+    new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(
+      new Date(iso)
+    );
+  const anyExtractsVisible = computed(
+    () =>
+      mapExtracts.value.length > 0 &&
+      [showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts].some(
+        (visible) => visible.value
+      )
+  );
+  /** One map-level line names the requirement data source and that it is not live status. */
+  const extractSource = computed(() => {
+    const source = getExtractDataSource(props.map.id, metadataStore.currentGameMode ?? 'pvp');
+    if (!source || !anyExtractsVisible.value) return null;
+    return describeExtractSource(source, t, formatCaptureDate);
+  });
   const toggleLayer = (item: MapLayerItem) => {
     item.visible.value = !item.visible.value;
   };
@@ -1947,9 +1976,11 @@
       zIndexOffset: 1000,
     });
     if (requirements) {
-      marker.bindPopup(createExtractDetails(label, requirements, t), {
+      marker.bindPopup(createExtractDetails(label, requirements), {
         className:
           'map-extract-popup [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10',
+        // Open above the pin head (36 px, scaled up while open) so the pin and its name stay visible.
+        offset: [0, -28],
       });
       marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
     }
