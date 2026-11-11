@@ -3,6 +3,7 @@ import type { MapExtract } from '@/types/tarkov';
 type Rule = {
   type: string;
   item?: string;
+  itemName?: string;
   count?: number;
   countPve?: number;
   vehicle?: boolean;
@@ -44,10 +45,10 @@ const text = (options: Options, key: string, params?: Record<string, string | nu
 function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
   return record && Object.hasOwn(record, key) ? record[key] : undefined;
 }
-function itemLabel(options: Options, id: string): string {
+function itemLabel(options: Options, id: string, suppliedName?: string): string {
   const key = own(CURRENCY_KEYS, id) ?? own(ITEM_KEYS, id);
   if (key) return text(options, key);
-  return options.itemName?.(id) ?? text(options, 'unknown_item', { id });
+  return suppliedName ?? options.itemName?.(id) ?? text(options, 'unknown_item', { id });
 }
 function capturedRules(profile: Profile | undefined, mode: string): Rule[] | undefined {
   if (!['pvp', 'pve', 'seasonal'].includes(mode)) return undefined;
@@ -57,8 +58,20 @@ function capturedRules(profile: Profile | undefined, mode: string): Rule[] | und
 function fallbackTransfer(extract: MapExtract): Rule[] {
   const transfer = extract.transferItem;
   if (!transfer || !Number.isFinite(transfer.count) || transfer.count <= 0) return [];
-  const id = typeof transfer.item === 'string' ? transfer.item : transfer.item?.id;
-  return id ? [{ type: 'transfer', item: id, count: transfer.count }] : [];
+  return transferRule(transfer);
+}
+function transferRule(transfer: NonNullable<MapExtract['transferItem']>): Rule[] {
+  const item = typeof transfer.item === 'string' ? { id: transfer.item } : transfer.item;
+  return item?.id
+    ? [
+        {
+          type: 'transfer',
+          item: item.id,
+          itemName: item.name?.trim() || undefined,
+          count: transfer.count,
+        },
+      ]
+    : [];
 }
 function payment(rule: Rule, options: Options): { tag: string; detail: string } {
   const count = options.mode === 'pve' ? (rule.countPve ?? rule.count) : rule.count;
@@ -67,7 +80,7 @@ function payment(rule: Rule, options: Options): { tag: string; detail: string } 
     tag: currency ? 'money' : 'transfer',
     detail: text(options, currency ? 'base_cost' : 'hand_over', {
       count: count ?? 0,
-      item: itemLabel(options, rule.item ?? ''),
+      item: itemLabel(options, rule.item ?? '', rule.itemName),
     }),
   };
 }

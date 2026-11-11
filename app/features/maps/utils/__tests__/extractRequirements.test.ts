@@ -145,4 +145,23 @@ describe('extract requirements', () => {
     expect(panel.textContent).toContain('20000');
     expect(panel.textContent).toContain('2026-11-06');
   });
+  it('preserves a supplied transfer item name before consulting optional metadata', () => {
+    const item = { id: 'custom-item', name: 'Captured payment item' };
+    const options = {
+      mapId: 'unknown',
+      mode: 'pvp',
+      extract: {
+        id: 'adapted',
+        name: 'Item handover',
+        transferItem: { item, count: 2 },
+      },
+      itemName: () => 'Metadata payment item',
+      t,
+    };
+    const result = getExtractRequirements(options);
+    expect(result.details.join(' ')).toContain('2 × Captured payment item');
+    expect(result.details.join(' ')).not.toContain('Metadata payment item');
+    item.name = '   ';
+    expect(getExtractRequirements(options).details.join(' ')).toContain('Metadata payment item');
+  });
 });
