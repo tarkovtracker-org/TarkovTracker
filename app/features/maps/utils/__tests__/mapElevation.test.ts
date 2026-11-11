@@ -10,6 +10,39 @@ const groundZero = {
 } as TarkovMap;
 const at = (x: number, y: number, z: number) => ({ position: { x, y, z } });
 describe('source-map coordinate validation', () => {
+  it.each(
+    [
+      null,
+      [],
+      [null, [1, 1]],
+      Array(2),
+      [Array(2), [1, 1]],
+      [[0], [1, 1]],
+      [
+        [0, 0],
+        [Infinity, 1],
+      ],
+      [
+        ['0', 0],
+        [1, 1],
+      ],
+    ].map((bounds) => ({ bounds }))
+  )('rejects malformed render bounds without throwing: %j', ({ bounds }) => {
+    const position = { x: 0, z: 0 };
+    const svgMap = {
+      ...groundZero,
+      svg: { ...maps.groundzero.svg, bounds },
+    } as unknown as TarkovMap;
+    expect(() => isDrawableMapPosition(svgMap, position)).not.toThrow();
+    expect(isDrawableMapPosition(svgMap, position)).toBe(false);
+    const tileMap = {
+      ...groundZero,
+      svg: undefined,
+      tile: { ...maps.lab.tile, bounds },
+    } as unknown as TarkovMap;
+    expect(() => isDrawableMapPosition(tileMap, position)).not.toThrow();
+    expect(isDrawableMapPosition(tileMap, position)).toBe(false);
+  });
   it('rejects all three contaminated Ground Zero records but preserves their real maps', () => {
     for (const position of [
       { x: -527.87, y: 1.68, z: 288.23 },

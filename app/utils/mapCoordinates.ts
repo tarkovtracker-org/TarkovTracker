@@ -203,11 +203,13 @@ export function getLeafletMapOptions(
     scrollWheelZoom: false, // Disabled default scroll zoom to allow Shift+Scroll interaction
   } as L.MapOptions;
 }
-/**
- * Validates map SVG configuration.
- * @param svg Map SVG configuration object
- * @returns True if configuration is valid
- */
+function isBoundPair(pair: unknown): boolean {
+  return Array.isArray(pair) && pair.length === 2 && [pair[0], pair[1]].every(Number.isFinite);
+}
+function isMapBounds(bounds: unknown): boolean {
+  return Array.isArray(bounds) && bounds.length === 2 && [bounds[0], bounds[1]].every(isBoundPair);
+}
+/** Validates the complete SVG bounds before any coordinate consumer indexes them. */
 export function isValidMapSvgConfig(svg: unknown): svg is MapSvgConfig {
   if (!svg || typeof svg !== 'object') return false;
   const config = svg as Record<string, unknown>;
@@ -217,8 +219,7 @@ export function isValidMapSvgConfig(svg: unknown): svg is MapSvgConfig {
     config.floors.length > 0 &&
     typeof config.defaultFloor === 'string' &&
     typeof config.coordinateRotation === 'number' &&
-    Array.isArray(config.bounds) &&
-    config.bounds.length >= 2
+    isMapBounds(config.bounds)
   );
 }
 export function isValidMapTileConfig(tile: unknown): tile is MapTileConfig {
@@ -231,8 +232,7 @@ export function isValidMapTileConfig(tile: unknown): tile is MapTileConfig {
   return (
     typeof config.tilePath === 'string' &&
     typeof config.coordinateRotation === 'number' &&
-    Array.isArray(config.bounds) &&
-    config.bounds.length >= 2 &&
+    isMapBounds(config.bounds) &&
     hasValidFallbacks
   );
 }
