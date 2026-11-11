@@ -496,8 +496,9 @@ people), co-op (handshake), transit (transfer), and an exit glyph for an unknown
 colors come from the customizable marker palette. A pin's name appears beside it on hover, when
 it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
 zoomed in at least one level past the whole-map fit, or always when **Always show names** is on
-(`map_always_show_names`). The name is also the pin's accessible label. Pins stay out of the
-keyboard tab order; the map surface keeps its own keyboard controls.
+(`map_always_show_names`). The accessible label includes the name, floor direction, and requirement
+badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
+out of it. The map surface keeps its own keyboard controls.
 
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
 controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by

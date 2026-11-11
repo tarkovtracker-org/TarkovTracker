@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nextTick, ref } from 'vue';
 import maps from '@/data/maps.json';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
+import { getExtractGlyphKind } from '@/features/maps/utils/markerGlyphs';
 import type { TarkovMap } from '@/types/tarkov';
 const createPreferencesStore = () => {
   const state = {
@@ -53,6 +54,22 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
+  it('keeps translated co-op extracts under the same glyph and layer toggle', () => {
+    const extract = {
+      id: '44bd9f5882e7a6044c3d6e15abb6560306575d96',
+      name: 'Scav Camp (Koop)',
+      faction: 'shared' as const,
+      position: { x: 0, y: 0, z: 0 },
+    };
+    const controls = useLeafletMapControls({
+      map: ref({ id: '5714dbc024597771384a510d', name: 'Interchange', extracts: [extract] }),
+      preferencesStore: createPreferencesStore(),
+      t: (key) => key,
+    });
+    expect(getExtractGlyphKind(extract)).toBe('coop');
+    expect(controls.hasCoopExtracts.value).toBe(true);
+    expect(controls.hasSharedExtracts.value).toBe(false);
+  });
   it('uses the same source-map validation for layer availability and drawn locations', () => {
     const native = {
       id: 'native',
