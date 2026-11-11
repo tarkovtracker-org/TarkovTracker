@@ -6,6 +6,7 @@ const task = (id: string) =>
 const metadataStore = {
   tasks: [
     task('available'),
+    task('hidden-active'),
     task('hidden-available'),
     task('hidden-locked'),
     task('hidden-done'),
@@ -27,6 +28,7 @@ const progressStore = {
   playerFaction: { self: 'USEC' },
   unlockedTasks: {
     available: { self: true },
+    'hidden-active': { self: true },
     'hidden-available': { self: true },
     'hidden-done': { self: true },
     'hidden-failed': { self: true },
@@ -34,6 +36,12 @@ const progressStore = {
   tasksCompletions: { 'hidden-done': { self: true }, 'hidden-failed': { self: true } },
   tasksFailed: { 'hidden-failed': { self: true } },
   invalidTasks: {},
+  getTaskStatus: (_teamId: string, taskId: string) => {
+    if (taskId === 'hidden-active') return 'active';
+    if (taskId === 'hidden-failed') return 'failed';
+    if (taskId === 'hidden-done') return 'completed';
+    return 'incomplete';
+  },
 };
 vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => metadataStore }));
 vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferencesStore }));
@@ -47,7 +55,8 @@ describe('useTaskCounts hidden tasks', () => {
   });
   it('counts every task when nothing is hidden', () => {
     expect(useTaskCounts().calculateStatusCounts('self')).toEqual({
-      all: 5,
+      all: 6,
+      active: 1,
       available: 2,
       locked: 1,
       completed: 1,
@@ -56,6 +65,7 @@ describe('useTaskCounts hidden tasks', () => {
   });
   it('leaves hidden tasks out of to-do counts but keeps them once completed', () => {
     preferencesStore.getHiddenTaskIds = [
+      'hidden-active',
       'hidden-available',
       'hidden-locked',
       'hidden-done',
@@ -64,11 +74,13 @@ describe('useTaskCounts hidden tasks', () => {
     const { calculateStatusCounts, calculateTraderCounts } = useTaskCounts();
     expect(calculateStatusCounts('self')).toEqual({
       all: 1,
+      active: 0,
       available: 1,
       locked: 0,
       completed: 1,
       failed: 1,
     });
+    expect(calculateTraderCounts('self', 'active')).toEqual({ 'trader-1': 0 });
     expect(calculateTraderCounts('self', 'available')).toEqual({ 'trader-1': 1 });
     expect(calculateTraderCounts('self', 'locked')).toEqual({ 'trader-1': 0 });
     expect(calculateTraderCounts('self', 'all')).toEqual({ 'trader-1': 1 });
@@ -77,6 +89,7 @@ describe('useTaskCounts hidden tasks', () => {
   });
   it('applies the same rule in the all-users view', () => {
     preferencesStore.getHiddenTaskIds = [
+      'hidden-active',
       'hidden-available',
       'hidden-locked',
       'hidden-done',
@@ -84,6 +97,7 @@ describe('useTaskCounts hidden tasks', () => {
     ];
     expect(useTaskCounts().calculateStatusCounts('all')).toMatchObject({
       all: 1,
+      active: 0,
       available: 1,
       locked: 0,
       completed: 1,

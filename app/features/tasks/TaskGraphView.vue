@@ -439,6 +439,7 @@
   );
   const legendItems = computed(() => [
     { label: t('common.completed'), colorClass: 'bg-success-500' },
+    { label: t('common.active'), colorClass: 'bg-primary-500' },
     { label: t('common.available'), colorClass: 'bg-info-500' },
     { label: t('common.locked'), colorClass: 'bg-locked-500' },
     { label: t('common.failed'), colorClass: 'bg-error-500' },
@@ -446,6 +447,7 @@
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
   ]);
   const MINIMAP_STATUS_COLORS: Record<TaskNodeStatus, string> = {
+    active: 'var(--color-primary-500)',
     completed: 'var(--color-success-500)',
     available: 'var(--color-info-500)',
     locked: 'var(--color-locked-500)',

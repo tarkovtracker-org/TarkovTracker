@@ -6,7 +6,7 @@ import {
   otherRequirementsSignature,
 } from '@/utils/taskOtherRequirements';
 import { compareRequirement } from '@/utils/taskRequirements';
-import { isTaskComplete } from '@/utils/taskStatus';
+import { isTaskActive, isTaskComplete } from '@/utils/taskStatus';
 import type { TaskAvailabilityTeamData, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task, TaskCounterDerivation, TaskOtherRequirement } from '@/types/tarkov';
 type TaskServerGateData = Pick<
@@ -15,7 +15,9 @@ type TaskServerGateData = Pick<
 >;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+/** The game only lets a task be accepted once its start gates are met, so acceptance confirms them. */
 const confirmedRequirements = (task: Task, data: TaskServerGateData): boolean =>
+  isTaskActive(data.completions[task.id]) ||
   isAvailabilityConfirmed(
     data.confirmations?.[task.id],
     data.completions[task.id],

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { reactive, watch } from 'vue';
 import {
   actions,
   getters,
@@ -7,6 +8,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
@@ -59,6 +61,164 @@ describe('progressState getters task completion compatibility', () => {
     const state = createStateWithTaskCompletion({ complete: true, failed: true });
     expect(getters.isTaskComplete(state)('task-1')).toBe(false);
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
+  });
+  it('reads active completions and defaults missing or explicitly false flags to inactive', () => {
+    const activeState = createStateWithTaskCompletion({
+      active: true,
+      complete: false,
+      failed: false,
+    });
+    const inactiveState = createStateWithTaskCompletion({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+    const legacyState = createStateWithTaskCompletion({ complete: false, failed: false });
+    expect(getters.isTaskActive(activeState)('task-1')).toBe(true);
+    expect(getters.isTaskActive(inactiveState)('task-1')).toBe(false);
+    expect(getters.isTaskActive(legacyState)('task-1')).toBe(false);
+  });
+});
+describe('progressState task lifecycle', () => {
+  it.each([
+    { previous: 5000, confirmation: undefined, expected: 5001 },
+    { previous: 9000, confirmation: 8000, expected: 9001 },
+    { previous: 5000, confirmation: 10000, expected: 10001 },
+    {
+      previous: 5000,
+      confirmation: MAX_CONFIRMATION_TIMESTAMP,
+      expected: MAX_CONFIRMATION_TIMESTAMP,
+    },
+  ])(
+    'restores unknown acceptance atomically after clocks $previous/$confirmation',
+    ({ previous, confirmation, expected }) => {
+      const state = reactive(
+        createStateWithTaskCompletion({
+          active: true,
+          complete: false,
+          failed: false,
+          timestamp: previous,
+        })
+      );
+      if (confirmation !== undefined)
+        state.pvp.taskAvailability = {
+          'task-1': { timestamp: confirmation, requirements: 'gate' },
+        };
+      const observed: Array<{ active: boolean | undefined; timestamp: number | undefined }> = [];
+      const stop = watch(
+        () => state.pvp.taskCompletions['task-1'],
+        (row) => observed.push({ active: row?.active, timestamp: row?.timestamp }),
+        { flush: 'sync' }
+      );
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        actions.setTaskAcceptanceUnknown.call(state, 'task-1');
+        expect(state.pvp.taskCompletions['task-1']).not.toHaveProperty('active');
+        expect(observed).toEqual([{ active: undefined, timestamp: expected }]);
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it('rejects unknown restoration at a saturated status clock without mutating it', () => {
+    const state = reactive(
+      createStateWithTaskCompletion({
+        active: true,
+        complete: false,
+        failed: false,
+        timestamp: MAX_CONFIRMATION_TIMESTAMP,
+      })
+    );
+    const original = state.pvp.taskCompletions['task-1'];
+    const observed = vi.fn();
+    const stop = watch(() => state.pvp.taskCompletions['task-1'], observed, { flush: 'sync' });
+    try {
+      expect(() => actions.setTaskAcceptanceUnknown.call(state, 'task-1')).toThrow(
+        'Task acceptance clock cannot advance'
+      );
+      expect(state.pvp.taskCompletions['task-1']).toBe(original);
+      expect(observed).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
+  });
+  const statusWriters = [
+    { name: 'accept', write: actions.setTaskActive },
+    { name: 'complete', write: actions.setTaskComplete },
+    { name: 'fail', write: actions.setTaskFailed },
+    { name: 'uncomplete', write: actions.setTaskUncompleted },
+  ];
+  it.each(statusWriters)(
+    'orders $name after existing task and confirmation clocks',
+    ({ write }) => {
+      const state = createStateWithTaskCompletion({ timestamp: 20000 });
+      state.pvp.taskAvailability = { 'task-1': { timestamp: 10000, requirements: 'gate' } };
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        write.call(state, 'task-1');
+        expect(state.pvp.taskCompletions['task-1']?.timestamp).toBe(20001);
+        write.call(state, 'task-1');
+        expect(state.pvp.taskCompletions['task-1']?.timestamp).toBe(20002);
+      } finally {
+        now.mockRestore();
+      }
+    }
+  );
+  it.each(statusWriters)(
+    'preserves ordinary $name writes at the persistable clock ceiling',
+    ({ name, write }) => {
+      const state = createStateWithTaskCompletion({ timestamp: MAX_CONFIRMATION_TIMESTAMP });
+      state.pvp.taskAvailability = {
+        'task-1': { timestamp: MAX_CONFIRMATION_TIMESTAMP, requirements: 'gate' },
+      };
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        expect(() => write.call(state, 'task-1')).not.toThrow();
+        expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+          active: name === 'accept',
+          complete: ['complete', 'fail'].includes(name),
+          failed: name === 'fail',
+          timestamp: MAX_CONFIRMATION_TIMESTAMP,
+        });
+      } finally {
+        now.mockRestore();
+      }
+    }
+  );
+  it('writes canonical active, completed, failed, and neutral states', () => {
+    const state = createBaseState();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
+    try {
+      actions.setTaskActive.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toEqual({
+        active: true,
+        complete: false,
+        failed: false,
+        manual: false,
+        timestamp: 5000,
+      });
+      actions.setTaskComplete.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: false,
+      });
+      actions.setTaskFailed.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: true,
+      });
+      actions.setTaskUncompleted.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: false,
+        failed: false,
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
 describe('task availability confirmations', () => {

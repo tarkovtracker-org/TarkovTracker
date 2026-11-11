@@ -171,13 +171,14 @@
   );
   const statusViewVisibility = computed<Record<TaskSecondaryView, boolean>>(() => ({
     all: showAllStatusButton.value,
+    active: !isGraphView.value && preferencesStore.getShowAvailableFilter,
     available: !isGraphView.value && preferencesStore.getShowAvailableFilter,
     locked: !isGraphView.value && preferencesStore.getShowLockedFilter,
     completed: !isGraphView.value && preferencesStore.getShowCompletedFilter,
     failed: !isGraphView.value && preferencesStore.getShowFailedFilter,
   }));
   const visibleStatusViews = computed<TaskSecondaryView[]>(() => {
-    return (['all', 'available', 'locked', 'completed', 'failed'] as const).filter(
+    return (['all', 'active', 'available', 'locked', 'completed', 'failed'] as const).filter(
       (view) => statusViewVisibility.value[view]
     );
   });
@@ -194,6 +195,7 @@
     tone: StatusTone;
   }> = [
     { value: 'all', labelKey: 'common.all', icon: ALL_TAB_ICON, tone: 'neutral' },
+    { value: 'active', labelKey: 'common.active', icon: 'i-mdi-play-circle', tone: 'primary' },
     {
       value: 'available',
       labelKey: 'common.available',

@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive, ref } from 'vue';
-import { TASK_ID_REGISTRY } from '@/utils/constants';
+import { TASK_ID_REGISTRY, TASK_STATE } from '@/utils/constants';
 import type { UserProgressData } from '@/types/progress';
 import type { StoryChapter } from '@/types/tarkov';
 type TraderProgress = Record<string, { level?: number; reputation?: number }>;
@@ -151,6 +151,32 @@ describe('useProgressStore', () => {
     const { useProgressStore } = await import('@/stores/useProgress');
     const store = useProgressStore();
     expect(store.tasksFailed['task-1']).toEqual({ self: true, 'teammate-1': false });
+  });
+  it('distinguishes explicitly active tasks from available legacy tasks', async () => {
+    setupMocks({
+      selfCompletions: {
+        'task-active': { active: true, complete: false, failed: false },
+        'task-inactive': { active: false, complete: false, failed: false },
+        'task-legacy': { complete: false, failed: false },
+      },
+      teammateCompletions: {
+        'task-active': { active: true, complete: false, failed: false },
+        'task-inactive': { active: false, complete: false, failed: false },
+        'task-legacy': { complete: false, failed: false },
+      },
+      tasks: [
+        { id: 'task-active', factionName: 'Any', name: 'Active Task' },
+        { id: 'task-inactive', factionName: 'Any', name: 'Inactive Task' },
+        { id: 'task-legacy', factionName: 'Any', name: 'Legacy Task' },
+      ],
+    });
+    const { useProgressStore } = await import('@/stores/useProgress');
+    const store = useProgressStore();
+    expect(store.tasksState['task-active']).toBe(TASK_STATE.ACTIVE);
+    expect(store.tasksState['task-legacy']).toBe(TASK_STATE.AVAILABLE);
+    expect(store.getTaskStatus('teammate-1', 'task-active')).toBe('active');
+    expect(store.getTaskStatus('teammate-1', 'task-inactive')).toBe('incomplete');
+    expect(store.getTaskStatus('teammate-1', 'task-legacy')).toBe('incomplete');
   });
   it('reacts when teammate stores are added after progress store initialization', async () => {
     const { teammateStore, teammateStores } = setupMocks({

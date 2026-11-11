@@ -15,6 +15,7 @@ const mountBadges = (props: Partial<InstanceType<typeof TaskCardBadges>['$props'
       isPinned: false,
       isHidden: false,
       locationTooltip: 'Any map',
+      isActive: false,
       isFailed: false,
       isInvalid: false,
       showRequiredLabels: false,
@@ -41,6 +42,10 @@ describe('TaskCardBadges', () => {
   it('renders failed and blocked labels from the common namespace', () => {
     expect(mountBadges({ isFailed: true }).text()).toContain('common.failed');
     expect(mountBadges({ isInvalid: true }).text()).toContain('common.blocked');
+  });
+  it('renders active independently from available', () => {
+    expect(mountBadges({ isActive: true }).text()).toContain('common.active');
+    expect(mountBadges().text()).not.toContain('common.active');
   });
   it('exposes hide and copy link as inline buttons with no overflow menu', async () => {
     const wrapper = mountBadges();

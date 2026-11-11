@@ -30,7 +30,9 @@ type SetupOptions = {
   traderCounts?: Record<string, number>;
   mapTaskTotals?: Record<string, number>;
   mapTaskTotalsHideCompleted?: Record<string, number>;
-  statusCounts?: Partial<Record<'all' | 'available' | 'locked' | 'completed' | 'failed', number>>;
+  statusCounts?: Partial<
+    Record<'all' | 'active' | 'available' | 'locked' | 'completed' | 'failed', number>
+  >;
   drawerOpen?: boolean;
 };
 const setup = async (options: SetupOptions = {}) => {
@@ -66,6 +68,7 @@ const setup = async (options: SetupOptions = {}) => {
   const mapTaskTotals = options.mapTaskTotals ?? { 'map-1': 2 };
   const mapTaskTotalsHideCompleted = options.mapTaskTotalsHideCompleted ?? { 'map-1': 1 };
   const statusCounts = {
+    active: 0,
     all: 2,
     available: 1,
     locked: 0,
@@ -150,6 +153,23 @@ const findTraderButton = (wrapper: FilterBarWrapper, name: string) =>
 const traderButtonNames = (wrapper: FilterBarWrapper) =>
   wrapper.findAll('button img').map((image) => image.attributes('alt'));
 describe('TaskFilterBar', () => {
+  it('renders active separately from available', async () => {
+    const { TaskFilterBar } = await setup({ statusCounts: { active: 2, available: 1 } });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const buttonTexts = wrapper.findAll('button').map((button) => button.text());
+    expect(buttonTexts.some((text) => text.includes('active2'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('available1'))).toBe(true);
+  });
+  it('switches to the active task view when its status filter is selected', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup();
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const activeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('active'));
+    expect(activeButton).toBeTruthy();
+    await activeButton!.trigger('click');
+    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('active');
+  });
   it('lands the maps route on the first map when none is picked', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({
       preferencesStore: { getTaskPrimaryView: 'maps' },
@@ -240,7 +260,7 @@ describe('TaskFilterBar', () => {
     const { TaskFilterBar } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
-      searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
+      searchStatusCounts: { all: 1, active: 0, available: 0, completed: 0, failed: 0, locked: 1 },
     });
     const findStatusButton = (label: string) =>
       wrapper.findAll('button').find((button) => button.text().startsWith(label));
@@ -253,7 +273,7 @@ describe('TaskFilterBar', () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
-      searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
+      searchStatusCounts: { all: 1, active: 0, available: 0, completed: 0, failed: 0, locked: 1 },
     });
     const lockedButton = wrapper
       .findAll('button')
@@ -261,6 +281,27 @@ describe('TaskFilterBar', () => {
     await lockedButton!.trigger('click');
     expect(wrapper.emitted('pin-status')).toEqual([['locked']]);
     expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
+  });
+  it('keeps Active clickable during search and highlights the shown status', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup({
+      preferencesStore: { getTaskSecondaryView: 'active' },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'all' });
+    const activeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('active'))!;
+    expect(activeButton.attributes('disabled')).toBeUndefined();
+    expect(activeButton.attributes('aria-pressed')).toBe('false');
+    expect(activeButton.classes()).not.toContain('border-primary-500/45');
+    await activeButton.trigger('click');
+    expect(wrapper.emitted('pin-status')).toEqual([['active']]);
+    expect(preferencesStore.setTaskSecondaryView).not.toHaveBeenCalled();
+    const pinnedWrapper = mountTaskFilterBar(TaskFilterBar, true, { activeStatusView: 'active' });
+    const pinnedButton = pinnedWrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('active'))!;
+    expect(pinnedButton.attributes('aria-pressed')).toBe('true');
+    expect(pinnedButton.classes()).toContain('border-primary-500/45');
   });
   it('saves a status picked with no search active', async () => {
     const { TaskFilterBar, preferencesStore } = await setup();
@@ -276,7 +317,7 @@ describe('TaskFilterBar', () => {
     const { TaskFilterBar, preferencesStore } = await setup();
     const wrapper = mountTaskFilterBar(TaskFilterBar, true, {
       activeStatusView: 'all',
-      searchStatusCounts: { all: 1, available: 0, completed: 0, failed: 0, locked: 1 },
+      searchStatusCounts: { all: 1, active: 0, available: 0, completed: 0, failed: 0, locked: 1 },
     });
     const allButton = wrapper.findAll('button').find((button) => button.text().startsWith('all'));
     expect(allButton!.attributes('disabled')).toBeUndefined();

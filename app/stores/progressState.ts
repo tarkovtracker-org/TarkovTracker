@@ -23,6 +23,7 @@ import {
 } from '@/utils/progressSanitizers';
 import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import {
+  isTaskActive as isTaskCompletionActive,
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
@@ -200,6 +201,8 @@ export const getters = {
     isTaskCompletionComplete(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskFailed: (state: UserState) => (taskId: string) =>
     isTaskCompletionFailed(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
+  isTaskActive: (state: UserState) => (taskId: string) =>
+    isTaskCompletionActive(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskObjectiveComplete: (state: UserState) => (objectiveId: string) =>
     getCurrentData(state)?.taskObjectives?.[objectiveId]?.complete ?? false,
   isHideoutPartComplete: (state: UserState) => (objectiveId: string) =>
@@ -231,10 +234,11 @@ export const getters = {
     getCurrentData(state)?.storyChapters?.[chapterId]?.objectives?.[objectiveId]?.complete ?? false,
 } as const satisfies _GettersTree<UserState>;
 // Helper functions for common operations
-const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
+const createCompletion = (complete: boolean, failed = false, active = false, manual?: boolean) => {
   const completion: TaskCompletion = {
     complete,
     failed,
+    active,
     timestamp: Date.now(),
   };
   if (typeof manual === 'boolean') {
@@ -278,16 +282,15 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
   // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
   confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
 };
-/**
- * A status change must retire the task's current confirmation even when that confirmation carries a
- * clock from a device that runs ahead, so the status timestamp is advanced past it.
- */
+/** Status changes must follow the earlier task/Undo clock and retire live confirmations. */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
-  const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
-  const timestamp =
-    confirmationTs === undefined
-      ? completion.timestamp
-      : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
+  const data = getCurrentData(state);
+  const previousTimestamp = data.taskCompletions[taskId]?.timestamp ?? 0;
+  const confirmationTimestamp = data.taskAvailability?.[taskId]?.timestamp ?? 0;
+  const timestamp = Math.max(
+    completion.timestamp ?? 0,
+    nextClock(previousTimestamp, confirmationTimestamp)
+  );
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
 };
 // Simplified actions
@@ -373,13 +376,28 @@ export const actions = {
     setAvailabilityConfirmation(this, taskId, requirements);
   },
   setTaskComplete(this: UserState, taskId: string) {
-    setTaskStatus(this, taskId, createCompletion(true, false, false));
+    setTaskStatus(this, taskId, createCompletion(true, false, false, false));
+  },
+  setTaskActive(this: UserState, taskId: string) {
+    setTaskStatus(this, taskId, createCompletion(false, false, true, false));
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
-    setTaskStatus(this, taskId, createCompletion(true, true, failOptions?.manual));
+    setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
+  },
+  setTaskAcceptanceUnknown(this: UserState, taskId: string) {
+    const data = getCurrentData(this);
+    const previous = data.taskCompletions[taskId];
+    const previousTimestamp = previous?.timestamp ?? 0;
+    const timestamp = nextClock(previousTimestamp, data.taskAvailability?.[taskId]?.timestamp ?? 0);
+    // A newer unknown write must beat the server's equal-time acceptance carry.
+    if (timestamp <= previousTimestamp) throw new Error('Task acceptance clock cannot advance');
+    const restored = { ...previous, ...createCompletion(false, false, false, false), timestamp };
+    delete restored.active;
+    // Replace atomically so sync observers never see an intermediate active: false.
+    data.taskCompletions[taskId] = restored;
   },
   setTaskUncompleted(this: UserState, taskId: string) {
-    setTaskStatus(this, taskId, createCompletion(false, false, false));
+    setTaskStatus(this, taskId, createCompletion(false, false, false, false));
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {

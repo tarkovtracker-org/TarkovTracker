@@ -85,10 +85,7 @@
         :disabled="collector.status === 'locked'"
         @click="onToggleCollector"
       >
-        <UIcon v-if="collector.status === 'complete'" name="i-mdi-check-bold" class="h-3 w-3" />
-        <UIcon v-else-if="collector.status === 'failed'" name="i-mdi-close-thick" class="h-3 w-3" />
-        <UIcon v-else-if="collector.status === 'locked'" name="i-mdi-lock" class="h-3 w-3" />
-        <UIcon v-else name="i-mdi-flag-checkered" class="h-3 w-3" />
+        <UIcon :name="collectorIcon" class="h-3 w-3" />
       </button>
     </div>
   </div>
@@ -114,8 +111,17 @@
   function getCollectorTask(): Task {
     return props.collector!.task;
   }
-  const { markTaskComplete, markTaskUncomplete, markTaskAvailable } =
-    useTaskActions(getCollectorTask);
+  const { markTaskActive, markTaskComplete, markTaskUncomplete } = useTaskActions(getCollectorTask);
+  const COLLECTOR_STATUS_ICONS: Record<KappaRowEntry['status'], string> = {
+    complete: 'i-mdi-check-bold',
+    failed: 'i-mdi-close-thick',
+    locked: 'i-mdi-lock',
+    active: 'i-mdi-play-circle-outline',
+    available: 'i-mdi-flag-checkered',
+  };
+  const collectorIcon = computed(
+    () => COLLECTOR_STATUS_ICONS[props.collector?.status ?? 'available'] ?? 'i-mdi-flag-checkered'
+  );
   const taskHref = computed(() =>
     props.collector ? `/tasks?task=${props.collector.task.id}` : ''
   );
@@ -171,6 +177,10 @@
         return t('page.kappa.row.action_uncomplete', 'Mark uncomplete') + `: ${name}`;
       case 'failed':
         return t('page.kappa.row.action_reset_failed', 'Reset failed') + `: ${name}`;
+      case 'active':
+        return t('common.mark_complete', 'Mark complete') + `: ${name}`;
+      case 'available':
+        return t('common.accept', 'Accept') + `: ${name}`;
       case 'locked':
         return t('common.locked', 'Locked') + `: ${name}`;
       default:
@@ -185,9 +195,9 @@
       return;
     }
     if (props.collector.status === 'available') {
-      markTaskComplete();
+      markTaskActive();
       return;
     }
-    markTaskAvailable();
+    markTaskComplete();
   }
 </script>
