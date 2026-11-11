@@ -1,4 +1,9 @@
 import snapshot from '@/data/extractRules.json';
+import {
+  createMapIconSvg,
+  MAP_REQUIREMENT_ICON_PATHS,
+  MAP_REQUIREMENT_LEGEND_KEYS,
+} from '@/features/maps/utils/mapIcons';
 import type { MapExtract } from '@/types/tarkov';
 type Rule = {
   type: string;
@@ -16,9 +21,12 @@ type Rule = {
 type Profile = { rules?: Rule[]; pvp?: Rule[]; seasonal?: Rule[]; extra?: Rule[] };
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 export type ExtractRequirementTag = { key: string; label: string };
+/** One popup row: the requirement's icon, a short instruction and an optional qualifier. */
+export type ExtractRequirementDetail = { tag?: string; text: string; hint?: string };
+type TaggedDetail = ExtractRequirementDetail & { tag: string };
 export type ExtractRequirements = {
   tags: ExtractRequirementTag[];
-  details: string[];
+  details: ExtractRequirementDetail[];
   capturedAt?: string;
 };
 type Options = {
@@ -42,6 +50,10 @@ const ITEM_KEYS: Record<string, string> = {
 };
 const text = (options: Options, key: string, params?: Record<string, string | number>) =>
   options.t(`maps.extract_requirements.${key}`, params);
+const formatCount = (count: number): string => new Intl.NumberFormat().format(count);
+/** Seconds after raid start as m:ss, the way the in-raid timer reads. */
+const clock = (seconds: number): string =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
   return record && Object.hasOwn(record, key) ? record[key] : undefined;
 }
@@ -77,15 +89,16 @@ function transferRule(transfer: NonNullable<MapExtract['transferItem']>): Rule[]
       ]
     : [];
 }
-function payment(rule: Rule, options: Options): { tag: string; detail: string } {
+function payment(rule: Rule, options: Options): TaggedDetail {
   const count = options.mode === 'pve' ? (rule.countPve ?? rule.count) : rule.count;
   const currency = Boolean(own(CURRENCY_KEYS, rule.item ?? ''));
   return {
     tag: currency ? 'money' : 'transfer',
-    detail: text(options, currency ? 'base_cost' : 'hand_over', {
-      count: count ?? 0,
+    text: text(options, currency ? 'base_cost' : 'hand_over', {
+      count: formatCount(count ?? 0),
       item: itemLabel(options, rule.item ?? '', rule.itemName),
     }),
+    hint: currency ? text(options, 'base_cost_hint') : undefined,
   };
 }
 function slotTag(slot?: string): string {
@@ -113,7 +126,10 @@ function availability(rule: Rule, options: Options): number {
 }
 const DETAIL_BUILDERS: Record<string, (rule: Rule, options: Options) => string> = {
   item: (rule, options) =>
-    text(options, 'bring', { count: rule.count ?? 1, item: itemLabel(options, rule.item ?? '') }),
+    text(options, 'bring', {
+      count: formatCount(rule.count ?? 1),
+      item: itemLabel(options, rule.item ?? ''),
+    }),
   key: (rule, options) =>
     text(options, 'key_detail', { item: itemLabel(options, rule.item ?? '') }),
   empty: (rule, options) => text(options, 'empty_slot', { slot: slotLabel(rule, options) }),
@@ -124,29 +140,30 @@ function detail(rule: Rule, options: Options): string {
   const build = own(DETAIL_BUILDERS, rule.type);
   return build ? build(rule, options) : text(options, `${rule.type}_detail`);
 }
-function timingDetail(rule: Rule, options: Options): string {
-  return text(options, 'window_detail', { min: rule.min ?? 0, max: rule.max ?? 0 });
+/** Trains and timed extracts carry their configured window as the row's qualifier. */
+function timingHint(rule: Rule, options: Options): string | undefined {
+  if (!['train', 'timer'].includes(rule.type) || rule.max === undefined) return undefined;
+  return text(options, 'window_detail', { min: clock(rule.min ?? 0), max: clock(rule.max) });
 }
-function extraDetails(rule: Rule, options: Options): string[] {
-  if (rule.vehicle) return [text(options, 'vehicle_detail')];
-  return ['train', 'timer'].includes(rule.type) ? [timingDetail(rule, options)] : [];
+function ruleDetail(rule: Rule, options: Options): TaggedDetail {
+  return { tag: ruleTag(rule), text: detail(rule, options), hint: timingHint(rule, options) };
 }
 function appendRule(
   rule: Rule,
   options: Options,
   addTag: (tag: string) => void,
-  details: string[]
+  details: ExtractRequirementDetail[]
 ): void {
-  if (rule.type === 'transfer') {
-    const result = payment(rule, options);
-    addTag(result.tag);
-    details.push(result.detail);
-  } else {
-    addTag(ruleTag(rule));
-    details.push(detail(rule, options));
-  }
-  if (rule.vehicle) addTag('conditional');
-  details.push(...extraDetails(rule, options));
+  const entry = rule.type === 'transfer' ? payment(rule, options) : ruleDetail(rule, options);
+  addTag(entry.tag);
+  details.push(entry);
+  if (!rule.vehicle) return;
+  addTag('conditional');
+  details.push({
+    tag: 'conditional',
+    text: text(options, 'vehicle_detail'),
+    hint: text(options, 'vehicle_hint'),
+  });
 }
 /** Combine captured rules with reviewed scene cues; absence never means an extract is open. */
 export function getExtractRequirements(options: Options): ExtractRequirements {
@@ -156,10 +173,10 @@ export function getExtractRequirements(options: Options): ExtractRequirements {
   if (!rules.some((rule) => rule.type === 'transfer'))
     rules.push(...fallbackTransfer(options.extract));
   const tags = new Map<string, ExtractRequirementTag>();
-  const details: string[] = [];
+  const details: ExtractRequirementDetail[] = [];
   const addTag = (key: string) => tags.set(key, { key, label: text(options, `tags.${key}`) });
   rules.forEach((rule) => appendRule(rule, options, addTag, details));
-  if (!details.length) details.push(text(options, 'no_additional_data'));
+  if (!details.length) details.push({ text: text(options, 'no_additional_data') });
   const source =
     options.mode === 'seasonal' ? snapshot.sources['pvp-season'] : snapshot.sources.pvp;
   return {
@@ -168,56 +185,101 @@ export function getExtractRequirements(options: Options): ExtractRequirements {
     capturedAt: captured ? source.capturedAt : undefined,
   };
 }
-/** Plain DOM keeps Leaflet popups safe: upstream names and item labels are text, never HTML. */
+const POPUP_ICON_CLASS = 'mt-px size-4 shrink-0 text-amber-300 light:text-amber-700';
+/** Leaflet styles `p` inside popups with large margins, so popup text uses plain blocks. */
+function textBlock(className: string, content: string): HTMLDivElement {
+  const element = document.createElement('div');
+  element.className = className;
+  element.textContent = content;
+  return element;
+}
+function detailRow(entry: ExtractRequirementDetail): HTMLLIElement {
+  const row = document.createElement('li');
+  row.className = 'flex items-start gap-2';
+  const path = own(MAP_REQUIREMENT_ICON_PATHS, entry.tag ?? '');
+  if (path) row.append(createMapIconSvg(path, POPUP_ICON_CLASS));
+  const body = document.createElement('div');
+  body.className = 'min-w-0';
+  body.append(textBlock('text-[13px] leading-snug text-surface-100', entry.text));
+  if (entry.hint) body.append(textBlock('text-xs leading-snug text-surface-400', entry.hint));
+  row.append(body);
+  return row;
+}
+function sourceNote(requirements: ExtractRequirements, t: Translate): HTMLDivElement {
+  const parts = [t('maps.extract_requirements.raid_notice')];
+  if (requirements.capturedAt) {
+    const date = requirements.capturedAt.slice(0, 10);
+    parts.push(t('maps.extract_requirements.reference_date', { date }));
+  }
+  return textBlock(
+    'mt-2.5 border-t border-white/10 pt-2 text-[11px] leading-snug text-surface-400 light:border-black/10',
+    parts.join(' · ')
+  );
+}
+/**
+ * Compact click-through details: the name, one icon row per requirement and a one-line source
+ * note. Plain DOM keeps Leaflet popups safe: upstream names and item labels are text, never HTML.
+ */
 export function createExtractDetails(
   name: string,
   requirements: ExtractRequirements,
   t: Translate
 ): HTMLElement {
   const panel = document.createElement('section');
-  panel.className =
-    'max-w-72 space-y-2 rounded-lg border border-surface-600 bg-surface-900 p-3 text-sm text-surface-100 shadow-xl';
+  panel.className = 'text-sm';
   const title = document.createElement('h3');
-  title.className = 'font-semibold';
+  title.className = 'm-0 pr-5 text-sm leading-tight font-semibold text-surface-100';
   title.textContent = name;
   const list = document.createElement('ul');
-  list.className = 'list-disc space-y-1 pl-4';
-  for (const detail of requirements.details) {
-    const item = document.createElement('li');
-    item.textContent = detail;
-    list.append(item);
-  }
-  const note = document.createElement('p');
-  note.className = 'text-xs text-surface-400';
-  note.textContent = t('maps.extract_requirements.raid_notice');
-  panel.append(title, list, note);
-  if (requirements.capturedAt) {
-    const date = document.createElement('p');
-    date.className = 'text-xs text-surface-400';
-    date.textContent = t('maps.extract_requirements.reference_date', {
-      date: requirements.capturedAt.slice(0, 10),
-    });
-    panel.append(date);
-  }
+  list.className = 'mt-2 space-y-1.5';
+  list.append(...requirements.details.map(detailRow));
+  panel.append(title, list, sourceNote(requirements, t));
   return panel;
 }
-/** Requirements stay visible independently of the zoom/hover-only name label. */
+/** Icons beyond this count collapse into "+N"; the popup always lists every requirement. */
+const MAX_PIN_ICONS = 3;
+const legendRank = (key: string): number => {
+  const rank = (MAP_REQUIREMENT_LEGEND_KEYS as readonly string[]).indexOf(key);
+  return rank < 0 ? MAP_REQUIREMENT_LEGEND_KEYS.length : rank;
+};
+function overflowCount(hidden: number): HTMLElement[] {
+  if (hidden < 1) return [];
+  const more = document.createElement('span');
+  more.className = 'px-px text-[10px] leading-none font-bold';
+  more.textContent = `+${hidden}`;
+  return [more];
+}
+function requirementIcons(tags: ExtractRequirementTag[]): HTMLElement {
+  const strip = document.createElement('span');
+  strip.className =
+    'map-extract-requirements inline-flex h-4.5 shrink-0 items-center gap-0.5 rounded-full bg-black/85 px-1 text-amber-300 shadow-[0_1px_3px_rgba(0,0,0,0.7)] ring-1 ring-white/25';
+  strip.dataset.tags = tags.map((tag) => tag.key).join(' ');
+  strip.title = tags.map((tag) => tag.label).join(', ');
+  const icons = tags
+    .slice(0, MAX_PIN_ICONS)
+    .map((tag) =>
+      createMapIconSvg(
+        own(MAP_REQUIREMENT_ICON_PATHS, tag.key) ?? MAP_REQUIREMENT_ICON_PATHS.unknown!,
+        'size-3 shrink-0'
+      )
+    );
+  strip.append(...icons, ...overflowCount(tags.length - MAX_PIN_ICONS));
+  return strip;
+}
+/**
+ * Always-visible requirement icons beside the pin head, ahead of the on-demand name label, in
+ * legend order. `redundant` skips requirements the pin glyph already shows (the co-op handshake).
+ */
 export function appendExtractRequirementTags(
   pin: HTMLElement,
-  requirements: ExtractRequirements
+  requirements: ExtractRequirements,
+  redundant: string[] = []
 ): void {
   if (!requirements.tags.length) return;
-  const badges = document.createElement('span');
-  badges.className =
-    'map-extract-requirements pointer-events-none absolute -top-2 left-5 flex w-max max-w-48 flex-wrap gap-0.5 rounded bg-surface-950/95 px-1 py-0.5 text-[10px] leading-tight font-semibold text-amber-200 shadow light:text-amber-900';
-  for (const tag of requirements.tags) {
-    const badge = document.createElement('span');
-    badge.textContent = tag.label;
-    badge.className = 'whitespace-nowrap px-0.5';
-    badge.title = requirements.details.join(' ');
-    badges.append(badge);
-  }
-  pin.append(badges);
+  const shown = requirements.tags
+    .filter((tag) => !redundant.includes(tag.key))
+    .sort((a, b) => legendRank(a.key) - legendRank(b.key));
+  if (shown.length) (pin.querySelector('.map-pin-side') ?? pin).prepend(requirementIcons(shown));
   pin.setAttribute(
     'aria-label',
     `${pin.getAttribute('aria-label')}, ${requirements.tags.map((tag) => tag.label).join(', ')}`

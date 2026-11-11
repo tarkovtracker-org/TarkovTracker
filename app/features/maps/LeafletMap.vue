@@ -627,6 +627,7 @@
   } from '@/features/maps/utils/mapLayerGroups';
   import {
     createMapPinElement,
+    dimOffFloorPin,
     getExtractGlyphKind,
     MAP_MARKER_GLYPH_COLOR_KEYS,
     MAP_PIN_ICON_CLASS,
@@ -1855,26 +1856,29 @@
       );
     });
   }
-  function elevationIndicator(elevation: MapElevation): HTMLElement | null {
+  function elevationIndicator(elevation: MapElevation, onPin = true): HTMLElement | null {
     const delta = getMapFloorDelta(props.map, selectedFloor.value, elevation);
     return createElevationIndicator(
       delta,
-      t(delta > 0 ? 'maps.elevation.above' : 'maps.elevation.below', { count: Math.abs(delta) })
+      t(delta > 0 ? 'maps.elevation.above' : 'maps.elevation.below', { count: Math.abs(delta) }),
+      onPin
     );
   }
-  function appendElevation(element: HTMLElement, elevation: MapElevation): void {
+  function appendElevation(element: HTMLElement, elevation: MapElevation): boolean {
     const indicator = elevationIndicator(elevation);
-    if (!indicator) return;
+    if (!indicator) return false;
     element.setAttribute(
       'aria-label',
       `${element.getAttribute('aria-label')}, ${indicator.getAttribute('aria-label')}`
     );
     element.appendChild(indicator);
+    return true;
   }
+  /** Objective dots on another floor fade like pins; their floor badge stays opaque beside them. */
   function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): void {
-    const indicator = elevationIndicator(elevation);
+    const indicator = elevationIndicator(elevation, false);
     if (!indicator) return;
-    indicator.classList.remove('absolute', '-top-7', 'right-5');
+    layer.setStyle({ opacity: 0.55, fillOpacity: 0.4 });
     layer.bindTooltip(indicator, {
       permanent: true,
       direction: 'left',
@@ -1900,7 +1904,7 @@
   function fitExtractPopup(popup: L.Popup): void {
     const size = mapInstance.value?.getSize();
     if (!size) return;
-    const maxWidth = Math.max(80, Math.min(320, size.x - 60));
+    const maxWidth = Math.max(80, Math.min(280, size.x - 60));
     Object.assign(popup.options, {
       maxWidth,
       minWidth: Math.min(200, maxWidth),
@@ -1920,8 +1924,10 @@
   ): L.Marker {
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
-    appendElevation(pin, elevation);
-    if (requirements) appendExtractRequirementTags(pin, requirements);
+    const offFloor = appendElevation(pin, elevation);
+    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
+    if (requirements) appendExtractRequirementTags(pin, requirements, [kind]);
+    if (offFloor) dimOffFloorPin(pin);
     const icon = leafletApi.divIcon({
       className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
@@ -1939,7 +1945,8 @@
     });
     if (requirements) {
       marker.bindPopup(createExtractDetails(label, requirements, t), {
-        className: 'map-extract-popup',
+        className:
+          'map-extract-popup [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10',
       });
       marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
     }

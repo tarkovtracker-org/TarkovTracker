@@ -1,4 +1,5 @@
 import floorData from '@/data/mapFloors.json';
+import { createMapIconSvg, MAP_ELEVATION_ARROW_PATHS } from '@/features/maps/utils/mapIcons';
 import type { TarkovMap } from '@/types/tarkov';
 type Bounds = number[][];
 type Extent = { height: number[]; bounds?: Bounds[] };
@@ -89,13 +90,34 @@ export function getMapFloorDelta(
   if (!config || !position || ![position.x, position.z].every(Number.isFinite)) return 0;
   return floorDistance(config.order.indexOf(selectedFloor), floorIndices(config, marker));
 }
-/** Always-visible arrow count; the translated description is also available to screen readers. */
-export function createElevationIndicator(delta: number, label: string): HTMLElement | null {
+/** Floor badge position on a pin: on the head's upper-left shoulder, growing away from the head. */
+const PIN_BADGE_POSITION_CLASS = 'absolute -top-11 right-2';
+/** One level is clear from the arrow alone; more levels add the count beside it. */
+function levelCount(delta: number): HTMLElement[] {
+  if (Math.abs(delta) < 2) return [];
+  const count = document.createElement('span');
+  count.className = 'pr-0.5';
+  count.textContent = String(Math.abs(delta));
+  return [count];
+}
+/**
+ * Always-visible floor badge: a solid arrow toward the marker's floor, plus the number of levels
+ * when it is more than one. The translated description is the badge's accessible name.
+ */
+export function createElevationIndicator(
+  delta: number,
+  label: string,
+  onPin = true
+): HTMLElement | null {
   if (!delta) return null;
+  const direction = delta > 0 ? 'up' : 'down';
   const indicator = document.createElement('span');
-  indicator.className =
-    'map-elevation pointer-events-none absolute -top-7 right-5 rounded bg-surface-950/90 px-1 text-sm leading-none font-bold whitespace-nowrap text-white shadow';
-  indicator.textContent = (delta > 0 ? '↑' : '↓').repeat(Math.abs(delta));
+  indicator.className = `map-elevation pointer-events-none inline-flex h-4.5 min-w-4.5 items-center justify-center gap-px rounded-full bg-black/85 px-0.5 text-[11px] leading-none font-bold text-white tabular-nums shadow-[0_1px_3px_rgba(0,0,0,0.7)] ring-1 ring-white/80 ${onPin ? PIN_BADGE_POSITION_CLASS : ''}`;
+  indicator.dataset.direction = direction;
+  indicator.append(
+    createMapIconSvg(MAP_ELEVATION_ARROW_PATHS[direction], 'size-3.5 shrink-0'),
+    ...levelCount(delta)
+  );
   indicator.setAttribute('role', 'img');
   indicator.setAttribute('aria-label', label);
   indicator.title = label;

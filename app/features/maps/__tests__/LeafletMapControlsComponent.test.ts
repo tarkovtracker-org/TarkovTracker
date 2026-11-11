@@ -299,12 +299,14 @@ describe('LeafletMap controls', () => {
     const wrapper = await mountMap({ map: extractMap });
     await wrapper.setProps({ map: { ...extractMap } });
     const pin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
-    expect(pin.querySelector('.map-extract-requirements')?.textContent).toBe('MoneyConditional');
+    const strip = pin.querySelector<HTMLElement>('.map-pin-side > .map-extract-requirements');
+    expect(strip?.dataset.tags).toBe('money conditional');
+    expect(strip?.nextElementSibling?.classList).toContain('map-pin-label');
     expect(pin.getAttribute('aria-label')).toContain('Money, Conditional');
     expect(marker.mock.calls.at(-1)?.[1]).toMatchObject({ keyboard: true });
     const details = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
-    expect(details.textContent).toContain('20000');
-    expect(details.textContent).toContain('does not show live extract availability');
+    expect(details.textContent).toContain(`Pay ${new Intl.NumberFormat().format(20000)} roubles`);
+    expect(details.textContent).toContain('Not live raid status');
     const openPopup = markerInstance.on.mock.calls.find(([event]) => event === 'popupopen')![1];
     mockMapInstance.size = { x: 286, y: 320 };
     openPopup({ popup });
@@ -434,19 +436,32 @@ describe('LeafletMap controls', () => {
     await nextTick();
     expect(pins()).toHaveLength(2);
     for (const pin of pins()) {
-      expect(pin.querySelector('.map-elevation')?.textContent).toBe('↓↓');
+      const badge = pin.querySelector<HTMLElement>('.map-elevation');
+      expect(badge?.dataset.direction).toBe('down');
+      expect(badge?.textContent).toBe('2');
       expect(pin.getAttribute('aria-label')).toMatch(/Go down 2 levels/);
+      // Off-floor pins fade their head; the floor badge itself is not faded.
+      expect(pin.classList).toContain('map-pin--off-floor');
+      expect(pin.querySelector('.map-pin-head')?.classList).toContain('opacity-55');
+      expect(badge?.className).not.toContain('opacity-55');
     }
     divIcon.mockClear();
     vm.setFloor('Garage');
     await nextTick();
     expect(pins()).toHaveLength(2);
-    for (const pin of pins()) expect(pin.querySelector('.map-elevation')?.textContent).toBe('↑');
+    for (const pin of pins()) {
+      const badge = pin.querySelector<HTMLElement>('.map-elevation');
+      expect(badge?.dataset.direction).toBe('up');
+      expect(badge?.textContent).toBe('');
+    }
     divIcon.mockClear();
     vm.setFloor('Ground_Level');
     await nextTick();
     expect(pins()).toHaveLength(2);
-    for (const pin of pins()) expect(pin.querySelector('.map-elevation')).toBeNull();
+    for (const pin of pins()) {
+      expect(pin.querySelector('.map-elevation')).toBeNull();
+      expect(pin.classList).not.toContain('map-pin--off-floor');
+    }
     wrapper.unmount();
   });
   it('renders transit locations safely, toggles independently, and clears on map changes', async () => {

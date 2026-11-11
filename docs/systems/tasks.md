@@ -429,17 +429,24 @@ scoped spatial exceptions before the base layer. A volume spanning several level
 nearest supported level toward the selected floor; a selected floor within that span needs no
 arrow. Task-zone positions and vertical bounds survive mark construction and participate in
 mark hashes. Legacy two-dimensional GPS has unknown height, never a fabricated zero.
-Extract/transit pins and task markers update arrows on floor changes; directions also have
-translated accessible descriptions. Arrow counts describe displayed levels, not stair routes
+Extract/transit pins and task markers update floor badges on floor changes: a solid up/down arrow,
+plus the level count when it is more than one, with translated accessible descriptions. Markers
+on another floor stay visible but fade and desaturate (pins return to full strength on hover or
+tap); their floor badge keeps full contrast. Counts describe displayed levels, not stair routes
 or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
 
 ## Extract requirement cues and details
 
-Extract pins show compact, always-visible requirement badges independently of their name labels.
-Selecting an extract (or pressing Enter on its marker) opens a plain-text requirement popup.
-Money, flare, gear, empty backpack/armor slots, conditional availability, activation, co-op,
-and timed/train extracts have distinct labels. These cues supplement faction glyphs and floor
-arrows; they never indicate live raid availability or replace the in-raid extraction list.
+Extract pins show always-visible requirement icons beside the pin head, ahead of the on-demand
+name label, in the Layers panel's "Extract icons" key order. Up to three icons show, then `+N`;
+the co-op handshake is skipped on co-op pins because the glyph already shows it. Selecting an
+extract (or pressing Enter on its marker) opens a compact plain-text popup: one icon row per
+requirement with a short instruction and an optional qualifier (price variance, train window),
+then a one-line note that the data is not live raid status, with the snapshot date. Money, item
+handover, keys, gear, empty backpack/armor slots, flares, activation, green smoke, train, timer,
+conditional availability, and unknown requirements have distinct icons. These cues supplement
+faction glyphs and floor badges; they never indicate live raid availability or replace the
+in-raid extraction list.
 
 `extractRequirements.ts` combines the public catalog's `transferItem` with a reviewed compact
 snapshot in `app/data/extractRules.json`. The supplemental snapshot is necessary because the

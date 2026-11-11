@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import maps from '@/data/maps.json';
 import { createElevationIndicator, getMapFloorDelta } from '@/features/maps/utils/mapElevation';
+import { MAP_ELEVATION_ARROW_PATHS } from '@/features/maps/utils/mapIcons';
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import type { TarkovMap } from '@/types/tarkov';
 const groundZero = {
@@ -106,11 +107,19 @@ describe('floor-relative elevation', () => {
     const terminal = { id: 'terminal', name: 'Terminal', svg: maps.terminal.svg } as TarkovMap;
     expect(getMapFloorDelta(terminal, '2nd Floor', at(0, 30, 0))).toBe(0);
   });
-  it('renders exactly one arrow per level with an accessible direction', () => {
+  it('renders a solid arrow toward the floor, with the level count beyond one level', () => {
     const indicator = createElevationIndicator(-4, 'Go down 4 levels');
-    expect(indicator?.textContent).toBe('↓↓↓↓');
+    expect(indicator?.dataset.direction).toBe('down');
+    expect(indicator?.querySelector('path')?.getAttribute('d')).toBe(
+      MAP_ELEVATION_ARROW_PATHS.down
+    );
+    expect(indicator?.textContent).toBe('4');
     expect(indicator?.getAttribute('aria-label')).toBe('Go down 4 levels');
-    expect(createElevationIndicator(2, 'Go up 2 levels')?.textContent).toBe('↑↑');
+    expect(indicator?.classList).toContain('absolute');
+    const single = createElevationIndicator(1, 'Go up 1 level', false);
+    expect(single?.dataset.direction).toBe('up');
+    expect(single?.textContent).toBe('');
+    expect(single?.classList).not.toContain('absolute');
     expect(createElevationIndicator(0, '')).toBeNull();
   });
   it('supports Labs tile floors without applying their heights to unrelated tiles', () => {

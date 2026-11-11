@@ -5,6 +5,7 @@ import {
   appendExtractRequirementTags,
   createExtractDetails,
   getExtractRequirements,
+  type ExtractRequirements,
 } from '@/features/maps/utils/extractRequirements';
 import en from '@/locales/en.json';
 import type { MapExtract } from '@/types/tarkov';
@@ -22,16 +23,20 @@ const vehicle: MapExtract = {
 };
 const inspect = (mapId: string, extract: MapExtract, mode = 'pvp') =>
   getExtractRequirements({ mapId, extract, mode, t });
+/** Every popup row's instruction and qualifier, as one searchable string. */
+const copy = (result: ExtractRequirements) =>
+  result.details.map((entry) => [entry.text, entry.hint].join(' ')).join(' ');
+const amount = (count: number) => new Intl.NumberFormat().format(count);
 describe('extract requirements', () => {
   it('uses captured PvE costs instead of copying the PvP transfer price', () => {
     const pvp = inspect(groundZero, vehicle);
     const pve = inspect(groundZero, vehicle, 'pve');
     expect(pvp.tags.map((tag) => tag.key)).toEqual(['money', 'conditional']);
-    expect(pvp.details.join(' ')).toContain('20000');
-    expect(pve.details.join(' ')).toContain('5000');
-    expect(pve.details.join(' ')).not.toContain('20000');
-    expect(pve.details.join(' ')).toContain('price may vary with reputation');
-    expect(inspect(groundZero, vehicle, 'seasonal').details.join(' ')).toContain('20000');
+    expect(copy(pvp)).toContain(`Pay ${amount(20000)} roubles`);
+    expect(copy(pve)).toContain(amount(5000));
+    expect(copy(pve)).not.toContain(amount(20000));
+    expect(copy(pve)).toContain('Price varies with reputation');
+    expect(copy(inspect(groundZero, vehicle, 'seasonal'))).toContain(amount(20000));
   });
   it('resolves Red Rebel, Paracord, and the exact empty armor slot from reference rules', () => {
     const result = inspect('5704e5fad2720bc05b8b4567', {
@@ -39,10 +44,10 @@ describe('extract requirements', () => {
       name: 'Cliff Descent',
     });
     expect(result.tags.map((tag) => tag.key)).toEqual(['gear', 'no_armor']);
-    expect(result.details.join(' ')).toContain('Paracord');
-    expect(result.details.join(' ')).toContain('Red Rebel ice pick');
-    expect(result.details.join(' ')).toContain('body armor / armor vest slot empty');
-    expect(result.details.join(' ')).not.toContain('backpack slot empty');
+    expect(copy(result)).toContain('Paracord');
+    expect(copy(result)).toContain('Red Rebel ice pick');
+    expect(copy(result)).toContain('No body armor equipped');
+    expect(copy(result)).not.toContain('No backpack equipped');
   });
   it('keeps per-extract PvE prices instead of assigning a universal vehicle fee', () => {
     const mapId = '5714dbc024597771384a510d';
@@ -51,8 +56,8 @@ describe('extract requirements', () => {
     );
     expect(entry).toBeDefined();
     const result = inspect(mapId, { id: entry![0], name: 'Power Station V-Ex' }, 'pve');
-    expect(result.details.join(' ')).toContain('20000');
-    expect(result.details.join(' ')).not.toContain('5000');
+    expect(copy(result)).toContain(amount(20000));
+    expect(copy(result)).not.toContain(amount(5000));
   });
   it('supplements backend rules with reviewed door keys and smoke cues on the correct extract', () => {
     const woods = inspect('5704e3c2d2720bac5b8b4567', {
@@ -60,7 +65,7 @@ describe('extract requirements', () => {
       name: 'ZB-014',
     });
     expect(woods.tags.map((tag) => tag.key)).toEqual(['conditional', 'green_smoke', 'key']);
-    expect(woods.details.join(' ')).toContain('ZB-014 key');
+    expect(copy(woods)).toContain('ZB-014 key');
     const scav = inspect('56f40101d2720b2a4d8b45d6', {
       id: 'd2cefbb74bd24ffc53a1a3a148069483c5fae6cb',
       name: 'Old Gas Station',
@@ -73,7 +78,7 @@ describe('extract requirements', () => {
       name: 'Sewer Manhole',
     });
     expect(result.tags.map((tag) => tag.key)).toEqual(['no_backpack']);
-    expect(result.details).toEqual(['Keep the backpack slot empty.']);
+    expect(result.details).toEqual([{ tag: 'no_backpack', text: 'No backpack equipped' }]);
   });
   it('keeps a green-flare requirement when names are translated', () => {
     const result = inspect(groundZero, {
@@ -81,8 +86,10 @@ describe('extract requirements', () => {
       name: 'Мира',
     });
     expect(result.tags.map((tag) => tag.key)).toEqual(['flare']);
-    expect(result.details.join(' ')).toContain('green signal flare');
-    expect(result.details.join(' ')).toContain('designated signal area');
+    expect(result.details[0]).toMatchObject({
+      tag: 'flare',
+      text: 'Fire a green flare in the signal area first',
+    });
   });
   it('distinguishes chance and a smoke availability cue from a flare that must be brought', () => {
     const result = inspect('5704e3c2d2720bac5b8b4567', {
@@ -90,9 +97,9 @@ describe('extract requirements', () => {
       name: 'ZB-016',
     });
     expect(result.tags.map((tag) => tag.key)).toEqual(['conditional', 'green_smoke']);
-    expect(result.details.join(' ')).toContain('66%');
-    expect(result.details.join(' ')).toContain('not the current raid status');
-    expect(result.details.join(' ')).not.toContain('Fire a');
+    expect(copy(result)).toContain('66%');
+    expect(result.details.map((entry) => entry.tag)).toEqual(['conditional', 'green_smoke']);
+    expect(copy(result)).not.toContain('Fire a');
   });
   it('does not interpret an unrelated upstream switch reference as an activation requirement', () => {
     const result = inspect('56f40101d2720b2a4d8b45d6', {
@@ -101,7 +108,7 @@ describe('extract requirements', () => {
       switches: ['bogus'],
     } as MapExtract);
     expect(result.tags).toEqual([]);
-    expect(result.details.join(' ')).toContain('does not guarantee');
+    expect(copy(result)).toContain('not guaranteed');
   });
   it('does not treat the train timer count as an item cost', () => {
     const entry = Object.entries(snapshot.maps['5704e5fad2720bc05b8b4567']).find(
@@ -110,19 +117,24 @@ describe('extract requirements', () => {
     expect(entry).toBeDefined();
     const result = inspect('5704e5fad2720bc05b8b4567', { id: entry![0], name: 'Armored Train' });
     expect(result.tags.map((tag) => tag.key)).toEqual(['train']);
-    expect(result.details.join(' ')).toContain('1450–1700 seconds');
-    expect(result.details.join(' ')).not.toContain('Base cost');
+    expect(result.details).toEqual([
+      {
+        tag: 'train',
+        text: 'Board before the train leaves',
+        hint: 'Window: 24:10–28:20 into the raid',
+      },
+    ]);
   });
   it('keeps incomplete sources explicit and safely handles string and embedded item references', () => {
     const unknown = inspect('unknown', { id: 'missing', name: 'Unknown' });
     expect(unknown.tags.map((tag) => tag.key)).toEqual(['unknown']);
-    expect(unknown.details.join(' ')).not.toContain('always open');
+    expect(copy(unknown)).not.toContain('always open');
     const embedded = inspect('unknown', {
       id: 'missing',
       name: 'Unknown',
       transferItem: { item: { id: '5449016a4bdc2d6f028b456f' }, count: 8000 },
     });
-    expect(embedded.details.join(' ')).toContain('8000 × roubles');
+    expect(copy(embedded)).toContain(`Pay ${amount(8000)} roubles`);
     expect(
       inspect('unknown', {
         id: 'missing',
@@ -131,19 +143,47 @@ describe('extract requirements', () => {
       }).tags.map((tag) => tag.key)
     ).toEqual(['unknown']);
   });
-  it('shows badges without hover and creates safe click-through details with a live-status warning', () => {
+  it('shows requirement icons without hover and creates safe compact details with a live-status note', () => {
     const requirements = inspect(groundZero, vehicle);
     const pin = document.createElement('div');
     pin.setAttribute('aria-label', 'Vehicle');
     appendExtractRequirementTags(pin, requirements);
-    expect(pin.querySelector('.map-extract-requirements')?.textContent).toBe('MoneyConditional');
-    expect(pin.querySelector('.map-extract-requirements')?.className).not.toContain('hidden');
+    const strip = pin.querySelector<HTMLElement>('.map-extract-requirements');
+    expect(strip?.dataset.tags).toBe('money conditional');
+    expect(strip?.querySelectorAll('svg')).toHaveLength(2);
+    expect(strip?.textContent).toBe('');
+    expect(strip?.title).toBe('Money, Conditional');
+    expect(strip?.className).not.toContain('hidden');
+    expect(pin.getAttribute('aria-label')).toBe('Vehicle, Money, Conditional');
     const panel = createExtractDetails('<img src=x onerror=alert(1)>', requirements, t);
     expect(panel.querySelector('h3')?.textContent).toContain('<img');
     expect(panel.querySelector('img')).toBeNull();
-    expect(panel.textContent).toContain('does not show live extract availability');
-    expect(panel.textContent).toContain('20000');
-    expect(panel.textContent).toContain('2026-11-06');
+    // One icon row per requirement: the payment and the vehicle condition.
+    expect(panel.querySelectorAll('li')).toHaveLength(2);
+    expect(panel.querySelectorAll('li svg')).toHaveLength(2);
+    expect(panel.textContent).toContain(`Pay ${amount(20000)} roubles`);
+    expect(panel.textContent).toContain('Not live raid status · Data from 2026-11-06');
+  });
+  it('orders pin icons by the legend, skips glyph-redundant ones, and collapses overflow', () => {
+    const pin = document.createElement('div');
+    pin.setAttribute('aria-label', 'Gate');
+    const tag = (key: string) => ({ key, label: key });
+    appendExtractRequirementTags(
+      pin,
+      {
+        tags: ['conditional', 'coop', 'flare', 'key', 'money'].map(tag),
+        details: [],
+      },
+      ['coop']
+    );
+    const strip = pin.querySelector<HTMLElement>('.map-extract-requirements');
+    expect(strip?.dataset.tags).toBe('money key flare conditional');
+    expect(strip?.querySelectorAll('svg')).toHaveLength(3);
+    expect(strip?.textContent).toBe('+1');
+    expect(pin.getAttribute('aria-label')).toContain('coop');
+    const coopOnly = document.createElement('div');
+    appendExtractRequirementTags(coopOnly, { tags: [tag('coop')], details: [] }, ['coop']);
+    expect(coopOnly.querySelector('.map-extract-requirements')).toBeNull();
   });
   it('preserves a supplied transfer item name before consulting optional metadata', () => {
     const item = { id: 'custom-item', name: 'Captured payment item' };
@@ -159,10 +199,10 @@ describe('extract requirements', () => {
       t,
     };
     const result = getExtractRequirements(options);
-    expect(result.details.join(' ')).toContain('2 × Captured payment item');
-    expect(result.details.join(' ')).not.toContain('Metadata payment item');
+    expect(copy(result)).toContain('2 × Captured payment item');
+    expect(copy(result)).not.toContain('Metadata payment item');
     item.name = '   ';
-    expect(getExtractRequirements(options).details.join(' ')).toContain('Metadata payment item');
+    expect(copy(getExtractRequirements(options))).toContain('Metadata payment item');
   });
   it('ignores malformed external item names without interrupting requirement rendering', () => {
     for (const name of [123, {}, [], true, null]) {
@@ -177,7 +217,7 @@ describe('extract requirements', () => {
         } as unknown as MapExtract,
         itemName: () => 'Metadata payment item',
       });
-      expect(result.details.join(' ')).toContain('2 × Metadata payment item');
+      expect(copy(result)).toContain('2 × Metadata payment item');
     }
   });
   it('rejects invalid external item IDs rather than producing a handover rule', () => {

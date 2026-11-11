@@ -55,6 +55,41 @@
           </span>
         </button>
       </div>
+      <details
+        class="group/key mt-1.5 border-t border-white/8 px-2 pt-2 pb-1 text-[10px] leading-snug"
+      >
+        <summary
+          class="text-surface-400 hover:text-surface-200 flex cursor-pointer list-none items-center gap-1 font-semibold uppercase [&::-webkit-details-marker]:hidden"
+        >
+          <UIcon
+            name="i-mdi-chevron-right"
+            class="h-3 w-3 shrink-0 transition-transform group-open/key:rotate-90"
+          />
+          {{ t('maps.extract_requirements.legend_title') }}
+        </summary>
+        <ul class="text-surface-300 mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1">
+          <li v-for="key in MAP_REQUIREMENT_LEGEND_KEYS" :key="key" class="flex items-center gap-1">
+            <span
+              class="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-black/85 text-amber-300 ring-1 ring-white/25"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-2.5">
+                <path fill="currentColor" :d="MAP_REQUIREMENT_ICON_PATHS[key]" />
+              </svg>
+            </span>
+            <span class="truncate">{{ t(`maps.extract_requirements.tags.${key}`) }}</span>
+          </li>
+          <li class="col-span-2 flex items-center gap-1">
+            <span
+              class="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-black/85 text-white ring-1 ring-white/80"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-3">
+                <path fill="currentColor" :d="MAP_ELEVATION_ARROW_PATHS.up" />
+              </svg>
+            </span>
+            <span>{{ t('maps.elevation.legend') }}</span>
+          </li>
+        </ul>
+      </details>
     </div>
     <button
       v-if="hiddenCount > 0"
@@ -65,13 +100,15 @@
     >
       {{ t('maps.layers.show_all') }}
     </button>
-    <p class="text-surface-400 border-surface-700 border-t px-2 pt-2 text-[10px] leading-snug">
-      {{ t('maps.extract_requirements.help') }}
-    </p>
   </div>
 </template>
 <script setup lang="ts">
   import MapLayerRow from '@/features/maps/MapLayerRow.vue';
+  import {
+    MAP_ELEVATION_ARROW_PATHS,
+    MAP_REQUIREMENT_ICON_PATHS,
+    MAP_REQUIREMENT_LEGEND_KEYS,
+  } from '@/features/maps/utils/mapIcons';
   import {
     countHiddenLayers,
     type MapLayerGroup,

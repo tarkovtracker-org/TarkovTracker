@@ -1,4 +1,5 @@
 import { isCoopExtract } from '@/features/maps/composables/useLeafletMapControls';
+import { createMapIconSvg } from '@/features/maps/utils/mapIcons';
 import type { MapExtract } from '@/types/tarkov';
 import type { MapMarkerColorKey } from '@/utils/theme-colors';
 /** Marker categories that render an icon chip on the map and in the legend. */
@@ -32,23 +33,13 @@ export function getExtractGlyphKind(extract: MapExtract): MapMarkerGlyphKind {
   if (extract.faction === 'shared') return isCoopExtract(extract) ? 'coop' : 'shared';
   return extract.faction === 'pmc' || extract.faction === 'scav' ? extract.faction : 'extract';
 }
-const SVG_NS = 'http://www.w3.org/2000/svg';
-function createGlyphSvg(kind: MapMarkerGlyphKind): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('fill', 'currentColor');
-  path.setAttribute('d', MAP_MARKER_GLYPH_PATHS[kind]);
-  svg.appendChild(path);
-  return svg;
-}
 // Pins are plain Leaflet DOM, so their Tailwind utilities live here (Tailwind scans this file).
 // The pin is a teardrop: a 30px square with three rounded corners, turned 45deg so the square
 // corner points down. Its tip (36px below the top of the head box) is the marker position. A
 // highlight, inner shading, a white border with a dark outer ring and a drop shadow keep it
-// readable on light and dark map areas; a small ground shadow sits under the tip. The name label is
-// hidden until the pin is hovered, tapped open (`is-open`), or the map shows all names
+// readable on light and dark map areas; a small ground shadow sits under the tip. Beside the head,
+// a side row holds always-visible extract requirement icons followed by the name label. The label
+// is hidden until the pin is hovered, tapped open (`is-open`), or the map shows all names
 // (`map-names-visible` on an ancestor).
 /** Shared look of the pin body on the map and in the Layers legend. */
 export const MAP_PIN_BODY_SKIN_CLASS =
@@ -62,8 +53,22 @@ const PIN_HEAD_CLASS =
   'map-pin-head absolute -top-9 -left-3.75 h-9 w-7.5 origin-bottom drop-shadow-[0_3px_3px_rgba(0,0,0,0.6)] transition-transform duration-150 group-hover/pin:scale-115 group-[.is-open]/pin:scale-115';
 const PIN_BODY_CLASS = `map-pin-body absolute top-0 left-0 size-7.5 border-2 ${MAP_PIN_BODY_SKIN_CLASS}`;
 const PIN_GLYPH_CLASS = `absolute top-1.5 left-1.5 size-4.5 ${MAP_PIN_GLYPH_SKIN_CLASS}`;
+// The side row is as tall as the label, so icons stay put when the label appears.
+const PIN_SIDE_CLASS = 'map-pin-side absolute -top-8 left-4.5 flex h-6 items-center gap-1';
 const PIN_LABEL_CLASS =
-  'map-pin-label absolute -top-8 left-5 hidden rounded-full border-2 border-(--pin-color) bg-surface-900 px-2 py-1 text-xs leading-none font-semibold whitespace-nowrap text-surface-100 shadow-md group-hover/pin:block group-[.is-open]/pin:block in-[.map-names-visible]:block';
+  'map-pin-label hidden rounded-full border-2 border-(--pin-color) bg-surface-900 px-2 py-1 text-xs leading-none font-semibold whitespace-nowrap text-surface-100 shadow-md group-hover/pin:block group-[.is-open]/pin:block in-[.map-names-visible]:block';
+/**
+ * A pin whose marker is on another floor fades and desaturates so the selected floor reads first;
+ * its floor arrow stays fully opaque. Hovering or opening the pin restores it.
+ */
+const OFF_FLOOR_CLASSES = [
+  'opacity-55',
+  'saturate-50',
+  'group-hover/pin:opacity-100',
+  'group-hover/pin:saturate-100',
+  'group-[.is-open]/pin:opacity-100',
+  'group-[.is-open]/pin:saturate-100',
+];
 /** Leaflet's marker wrapper: lift a hovered or opened pin and its name above its neighbours. */
 export const MAP_PIN_ICON_CLASS = 'hover:z-100000! has-[.is-open]:z-100000!';
 /**
@@ -86,12 +91,21 @@ export function createMapPinElement(
   head.className = PIN_HEAD_CLASS;
   const body = document.createElement('span');
   body.className = PIN_BODY_CLASS;
-  const svg = createGlyphSvg(kind);
-  svg.setAttribute('class', PIN_GLYPH_CLASS);
-  head.append(body, svg);
+  head.append(body, createMapIconSvg(MAP_MARKER_GLYPH_PATHS[kind], PIN_GLYPH_CLASS));
+  const side = document.createElement('span');
+  side.className = PIN_SIDE_CLASS;
   const text = document.createElement('span');
   text.className = kind === 'transit' ? `${PIN_LABEL_CLASS} border-dashed` : PIN_LABEL_CLASS;
   text.textContent = label;
-  pin.append(shadow, head, text);
+  side.append(text);
+  pin.append(shadow, head, side);
   return pin;
+}
+/** Fade a pin's body, shadow and requirement icons; added indicators such as the floor arrow
+ * keep full contrast. */
+export function dimOffFloorPin(pin: HTMLElement): void {
+  pin.classList.add('map-pin--off-floor');
+  pin
+    .querySelectorAll('.map-pin-head, .map-pin-shadow, .map-extract-requirements')
+    .forEach((part) => part.classList.add(...OFF_FLOOR_CLASSES));
 }
