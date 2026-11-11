@@ -381,10 +381,12 @@ describe('LeafletMap controls', () => {
     divIcon.mockClear();
     vm.setFloor('Garage');
     await nextTick();
+    expect(pins()).toHaveLength(2);
     for (const pin of pins()) expect(pin.querySelector('.map-elevation')?.textContent).toBe('↑');
     divIcon.mockClear();
     vm.setFloor('Ground_Level');
     await nextTick();
+    expect(pins()).toHaveLength(2);
     for (const pin of pins()) expect(pin.querySelector('.map-elevation')).toBeNull();
     wrapper.unmount();
   });

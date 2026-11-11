@@ -943,6 +943,26 @@ describe('useLeafletMap', () => {
       expect(mockMapInstance.fitBounds).not.toHaveBeenCalled();
       wrapper.unmount();
     });
+    it('refits on window resize without Leaflet moving the center before the observer', async () => {
+      const actualCoordinates =
+        await vi.importActual<typeof import('@/utils/mapCoordinates')>('@/utils/mapCoordinates');
+      const coordinates = await import('@/utils/mapCoordinates');
+      vi.mocked(coordinates.getLeafletMapOptions).mockImplementationOnce((leaflet) =>
+        actualCoordinates.getLeafletMapOptions(leaflet)
+      );
+      const { wrapper, view, resize } = await mountWithResizeObserver({ lat: 50, lng: 50 });
+      mockMapInstance.fitBounds.mockClear();
+      const leafletModule = await import('leaflet');
+      const options = vi.mocked(leafletModule.default.map).mock.calls.at(-1)?.[1];
+      // Leaflet's default window resize handler invalidates size on an animation frame,
+      // before our debounced observer, and pixel rounding can shift the center.
+      if (options?.trackResize !== false) view.lat += 0.001;
+      resize();
+      expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(expect.anything(), {
+        animate: false,
+      });
+      wrapper.unmount();
+    });
   });
   describe('cleanup', () => {
     it('destroy removes map instance', async () => {

@@ -467,8 +467,11 @@ choice persists in `tasks_map_height_choice`; double-clicking the handle or pres
 returns to the automatic height. On first load, a value in the old `tasks_map_height` key moves
 to the new key unless it equals the old default `520`, which the old code wrote on first visit
 and therefore means "never resized"; the old key is then removed. An untouched view refits the
-map bounds whenever its container resizes; a panned or zoomed view is kept. In containers narrower
-than 30rem, the toolbar and floor picker stack above the map instead of covering it.
+map bounds whenever its container resizes; a panned or zoomed view is kept.
+Leaflet's native window-resize handler is disabled so the ResizeObserver can decide whether to
+refit before invalidating size and changing the center.
+In containers narrower than 30rem, the toolbar and floor picker stack above the map instead of
+covering it.
 
 ## Map objective visibility and required items
 

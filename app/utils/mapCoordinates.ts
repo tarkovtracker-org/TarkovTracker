@@ -183,6 +183,9 @@ export function getLeafletMapOptions(
   const crs = config ? createMapCRS(L, config) : L.CRS.Simple;
   return {
     crs,
+    // ResizeObserver owns invalidation/refitting; Leaflet's window handler can shift
+    // the center first and make an untouched map appear user-panned.
+    trackResize: false,
     minZoom: config?.minZoom ?? 1,
     maxZoom: config?.maxZoom ?? 6,
     zoomSnap: 0.25,
