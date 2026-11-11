@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-350">
+      <div class="mx-auto" :class="pageWidthClass">
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
@@ -672,6 +672,10 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
+  // The map needs the room, so Maps widens past the other views on large screens.
+  const pageWidthClass = computed(() =>
+    getTaskPrimaryView.value === 'maps' ? 'max-w-350 xl:max-w-440 2xl:max-w-560' : 'max-w-350'
+  );
   const taskCardGapClass = 'pb-2';
   const taskSectionGapClass = 'mb-4';
   const showGraphView = computed(() => {

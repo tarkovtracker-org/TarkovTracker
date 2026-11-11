@@ -19,7 +19,12 @@ the focused task remains visible after route preferences synchronize.
 
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
 tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
-tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. Tabs in the
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The Maps
+view widens past the other views on large screens (`xl` and `2xl`) so the map gets the room. Its
+map picker (`TaskFilterBar.vue`) wraps every map and its count onto as many rows as needed from
+`sm` up; below `sm` it stays one scrolling row and scrolls the selected map into view. The selected
+map and trader use the accent fill and border (`getPickerTabClass` in `app/utils/statusTones.ts`),
+and the selected map also shows a marker icon. Tabs in the
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without

@@ -217,6 +217,18 @@ describe('TaskFilterBar', () => {
     await wrapper.find('button[data-icon="i-mdi-sort-ascending"]').trigger('click');
     expect(preferencesStore.setTaskSortDirection).toHaveBeenCalledWith('desc');
   });
+  it('marks the selected map clearly and wraps every map on wider screens', async () => {
+    const { TaskFilterBar } = await setup({
+      preferencesStore: { getTaskPrimaryView: 'maps', getTaskMapView: 'map-1' },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const picker = wrapper.get('[data-testid="task-map-picker"]');
+    expect(picker.get('div').classes()).toContain('sm:flex-wrap');
+    const selected = picker.get('button[aria-pressed="true"]');
+    expect(selected.text()).toContain('Map One');
+    expect(selected.classes()).toContain('bg-primary-500/20');
+    expect(selected.classes()).toContain('border-primary-400/80');
+  });
   it('hides completed map objectives from map counts when the preference is enabled', async () => {
     const { TaskFilterBar } = await setup({
       preferencesStore: {
