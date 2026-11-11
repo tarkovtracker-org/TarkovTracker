@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { nextTick, ref } from 'vue';
+import maps from '@/data/maps.json';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
 import type { TarkovMap } from '@/types/tarkov';
 const createPreferencesStore = () => {
@@ -52,6 +53,42 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
+  it('uses the same source-map validation for layer availability and drawn locations', () => {
+    const native = {
+      id: 'native',
+      name: 'Emercom Checkpoint',
+      faction: 'shared' as const,
+      position: { x: 151.63, y: 24.66, z: -97.46 },
+    };
+    const foreign = {
+      id: 'foreign',
+      name: 'Scav Bunker',
+      faction: 'scav' as const,
+      position: { x: 220.43, y: 20.54, z: -705.8 },
+    };
+    const transit = {
+      id: '1',
+      description: 'Transit to Streets',
+      map: 'streets',
+      position: { x: 229.6, y: 16.99, z: 65.36 },
+    };
+    const controls = useLeafletMapControls({
+      map: ref({
+        id: '653e6760052c01c1c805532f',
+        name: 'Ground Zero',
+        svg: maps.groundzero.svg,
+        extracts: [native, foreign, { ...foreign, position: undefined }],
+        transits: [transit, { ...transit, id: 'bad', position: foreign.position }],
+      } as TarkovMap),
+      preferencesStore: createPreferencesStore(),
+      t: (key) => key,
+    });
+    expect(controls.mapExtracts.value).toEqual([native]);
+    expect(controls.hasScavExtracts.value).toBe(false);
+    expect(controls.hasSharedExtracts.value).toBe(true);
+    expect(controls.mapTransits.value).toEqual([transit]);
+    expect(controls.hasTransits.value).toBe(true);
+  });
   it('keeps transits independent and updates them when the map changes', async () => {
     const map = ref<TarkovMap>({ id: 'empty', name: 'Empty' });
     const controls = useLeafletMapControls({

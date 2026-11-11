@@ -610,6 +610,11 @@
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import {
+    createElevationIndicator,
+    getMapFloorDelta,
+    type MapElevation,
+  } from '@/features/maps/utils/mapElevation';
+  import {
     buildMapLayerGroups,
     countHiddenLayers,
     type MapLayerItem,
@@ -1728,6 +1733,7 @@
           color: mapColors.value.MARKER_BORDER,
           weight: 2,
         });
+        addObjectiveElevation(marker, { position: pos });
         pointEntries.push({ marker, objectiveId });
       });
       mark.zones.forEach((zone) => {
@@ -1753,6 +1759,7 @@
           weight: 1.5,
           opacity: 1,
         });
+        addObjectiveElevation(centerMarker, zone);
         const area = calculateZoneArea(zone.outline);
         zoneEntries.push({ polygon, centerMarker, latLngs: polygonLatLngs, area, objectiveId });
       });
@@ -1817,8 +1824,35 @@
       if (!extractVisibility[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       extractLayer.value!.addLayer(
-        createPinMarker(L, kind, extractName, extract.position, 'extract-marker')
+        createPinMarker(L, kind, extractName, extract.position, 'extract-marker', extract)
       );
+    });
+  }
+  function elevationIndicator(elevation: MapElevation): HTMLElement | null {
+    const delta = getMapFloorDelta(props.map, selectedFloor.value, elevation);
+    return createElevationIndicator(
+      delta,
+      t(delta > 0 ? 'maps.elevation.above' : 'maps.elevation.below', { count: Math.abs(delta) })
+    );
+  }
+  function appendElevation(element: HTMLElement, elevation: MapElevation): void {
+    const indicator = elevationIndicator(elevation);
+    if (!indicator) return;
+    element.setAttribute(
+      'aria-label',
+      `${element.getAttribute('aria-label')}, ${indicator.getAttribute('aria-label')}`
+    );
+    element.appendChild(indicator);
+  }
+  function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): void {
+    const indicator = elevationIndicator(elevation);
+    if (!indicator) return;
+    indicator.classList.remove('absolute', '-top-7', 'right-5');
+    layer.bindTooltip(indicator, {
+      permanent: true,
+      direction: 'left',
+      className: 'map-elevation-tooltip border-0! bg-transparent! p-0! shadow-none! before:hidden',
+      opacity: 1,
     });
   }
   let openPin: HTMLElement | null = null;
@@ -1840,11 +1874,13 @@
     leafletApi: NonNullable<typeof leaflet.value>,
     kind: MapMarkerGlyphKind,
     label: string,
-    position: { x: number; z: number },
-    className: string
+    position: { x: number; y?: number; z: number },
+    className: string,
+    elevation: MapElevation = { position }
   ): L.Marker {
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
+    appendElevation(pin, elevation);
     const icon = leafletApi.divIcon({
       className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
@@ -1881,7 +1917,8 @@
           'transit',
           transit.description,
           transit.position,
-          'extract-marker transit-marker'
+          'extract-marker transit-marker',
+          transit
         )
       );
     });

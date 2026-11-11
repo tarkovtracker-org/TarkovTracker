@@ -18,4 +18,30 @@ describe('getMarksHash', () => {
     const marksB: MapMark[] = [{ ...baseMark, pinned: true }];
     expect(getMarksHash(marksA, 'customs')).toBe(getMarksHash(marksB, 'customs'));
   });
+  it('invalidates markers when only elevation changes', () => {
+    const point = {
+      ...baseMark,
+      possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 1, y: 2, z: 3 }] }],
+    };
+    const elevated = {
+      ...point,
+      possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 1, y: 6, z: 3 }] }],
+    };
+    expect(getMarksHash([point], 'customs')).not.toBe(getMarksHash([elevated], 'customs'));
+    const zone = {
+      ...baseMark,
+      zones: [
+        {
+          map: { id: 'customs' },
+          outline: [{ x: 1, z: 3 }],
+          position: { x: 1, y: 2, z: 3 },
+          bottom: 0,
+          top: 3,
+        },
+      ],
+    };
+    expect(getMarksHash([zone], 'customs')).not.toBe(
+      getMarksHash([{ ...zone, zones: [{ ...zone.zones[0]!, top: 6 }] }], 'customs')
+    );
+  });
 });

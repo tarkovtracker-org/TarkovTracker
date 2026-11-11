@@ -552,6 +552,10 @@
     }
   },
   "maps": {
+    "elevation": {
+      "above": "Go up {count} level | Go up {count} levels",
+      "below": "Go down {count} level | Go down {count} levels"
+    },
     "tooltip_density": "Tooltips",
     "map_settings": "Map settings",
     "not_available_title": "Map Not Available",

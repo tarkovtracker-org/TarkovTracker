@@ -1,3 +1,4 @@
+import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
@@ -45,11 +46,15 @@ export function useLeafletMapControls({
   t,
 }: UseLeafletMapControlsOptions) {
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
-  const mapExtracts = computed<MapExtract[]>(() => map.value?.extracts ?? []);
+  const mapExtracts = computed<MapExtract[]>(() =>
+    (map.value?.extracts ?? []).filter((extract) =>
+      isDrawableMapPosition(map.value, extract.position)
+    )
+  );
   const mapTransits = computed(() =>
     (map.value?.transits ?? []).filter(
       (transit): transit is MapTransit & { position: MapPosition } =>
-        [transit.position?.x, transit.position?.z].every(Number.isFinite)
+        isDrawableMapPosition(map.value, transit.position)
     )
   );
   const hasTransits = computed(() => mapTransits.value.length > 0);

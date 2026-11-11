@@ -397,13 +397,41 @@ The map's independent **Transit** layer shows transit locations from the active 
 map has transit coordinates. Labels use upstream localized descriptions (with the existing
 English fallback), the transit glyph, and a dashed border; the marker color is configurable
 alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
-Like extract labels, transit labels remain visible across floors: named map floors have no
-height ranges for matching upstream vertical bounds. Transit conditions are not displayed;
+Extract and transit labels remain visible across floors. Elevation arrows point toward the
+marker from the selected floor, one arrow per selectable level; no arrow is shown for unknown
+height or a volume spanning the selected floor. Transit conditions are not displayed;
 this layer identifies locations, not whether a particular player can use them in a raid.
 No overlay additions or additional upstream requests are required.
 
 `app/features/maps/LeafletMap.vue` renders the layer and `useLeafletMapControls` derives its
 visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
+
+## Map location accuracy and elevation
+
+`mapLocations.ts` rejects missing/non-finite horizontal positions for extracts and transits
+before layer availability and rendering. Ground Zero also checks its render bounds: upstream
+`regular`, `pve`, and `pvp-season` catalogs checked on 2026-11-10 incorrectly included UN Roadblock,
+Scav Bunker (Woods), and Pinewood Basement (Streets). Their coordinates are not repaired or moved.
+Transits belong to their containing source map; their `map` field identifies the destination.
+Other maps retain edge extracts outside artwork bounds. Existing cached catalogs receive the
+same presentation validation, without waiting for a server cache refresh.
+
+`app/data/mapFloors.json` contains reviewed height ranges and spatial extents from
+[the-hideout/tarkov-dev maps.json at a7cb849](https://github.com/the-hideout/tarkov-dev/blob/a7cb849a9c881bb1fa12ffb666c20e46aa5d1038/src/data/maps.json).
+The `order` is lowest to highest **selectable** floor, independent of SVG stacking order.
+Layer names map to our existing floor IDs (Labs `Second Level` becomes `Second_Level`).
+Keep spatial bounds with the heights when refreshing this metadata: low outdoor Ground Zero
+locations are not necessarily in Garage, and the showroom has a local second-floor exception.
+Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
+
+`mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
+scoped spatial exceptions before the base layer. A volume spanning several levels uses the
+nearest supported level toward the selected floor; a selected floor within that span needs no
+arrow. Task-zone positions and vertical bounds survive mark construction and participate in
+mark hashes. Legacy two-dimensional GPS has unknown height, never a fabricated zero.
+Extract/transit pins and task markers update arrows on floor changes; directions also have
+translated accessible descriptions. Arrow counts describe displayed levels, not stair routes
+or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
 
 ## Map markers, legend, and sizing
 

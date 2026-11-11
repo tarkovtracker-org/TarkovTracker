@@ -212,6 +212,8 @@ export interface TaskObjective {
     map?: { id: string };
     outline?: Array<{ x: number; y: number; z: number }>;
     position?: { x: number; y: number; z: number };
+    top?: number;
+    bottom?: number;
   }>;
   possibleLocations?: Array<{
     map?: { id: string };
@@ -351,6 +353,8 @@ export interface MapTransit {
   description: string;
   map: string;
   position?: MapPosition;
+  top?: number;
+  bottom?: number;
 }
 export interface MapSpawn {
   zoneName?: string;

@@ -1,6 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
+import maps from '@/data/maps.json';
 import type { TarkovMap } from '@/types/tarkov';
 const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
   const instance = {
@@ -70,10 +71,11 @@ vi.mock('@/composables/useLeafletMap', () => ({
   },
   useLeafletMap: (options: unknown) => {
     useLeafletMapOptionsSpy(options);
+    const selectedFloor = ref('');
     return {
       mapInstance: shallowRef(mockMapInstance),
       leaflet: shallowRef(mapState.leaflet),
-      selectedFloor: ref(''),
+      selectedFloor,
       floors: ref([]),
       hasMultipleFloors: ref(mapState.hasMultipleFloors),
       isLoading: ref(mapState.isLoading),
@@ -83,7 +85,10 @@ vi.mock('@/composables/useLeafletMap', () => ({
       extractLayer: shallowRef(mapState.extractLayer),
       spawnLayer: shallowRef(mapState.spawnLayer),
       transitLayer: shallowRef(mapState.transitLayer),
-      setFloor: setFloorSpy,
+      setFloor: (floor: string) => {
+        setFloorSpy(floor);
+        selectedFloor.value = floor;
+      },
       refreshView: refreshViewSpy,
       getFitZoom: () => mapState.fitZoom,
       clearMarkers: vi.fn(),
@@ -333,6 +338,54 @@ describe('LeafletMap controls', () => {
     expect(names.attributes('aria-checked')).toBe('true');
     expect(viewport.classes()).toContain('map-names-visible');
     expect(localStorage.getItem('map_always_show_names')).toBe('true');
+    wrapper.unmount();
+  });
+  it('redraws extract and transit arrows with accessible directions when the selected floor changes', async () => {
+    const divIcon = vi.fn((options) => options);
+    const marker = vi.fn(() => ({ on: vi.fn() }));
+    mapState.leaflet = { divIcon, marker };
+    mapState.extractLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    mapState.transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    const map = {
+      id: '653e6760052c01c1c805532f',
+      name: 'Ground Zero',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'native',
+          name: 'Emercom',
+          faction: 'shared',
+          position: { x: 151.63, y: 24.66, z: -97.46 },
+        },
+      ],
+      transits: [
+        {
+          id: '1',
+          description: 'Streets transit',
+          map: 'streets',
+          position: { x: 229.6, y: 16.99, z: 65.36 },
+        },
+      ],
+    } as TarkovMap;
+    const wrapper = await mountMap({ map });
+    const vm = wrapper.vm as unknown as { setFloor: (floor: string) => void };
+    const pins = () => divIcon.mock.calls.map(([options]) => options.html as HTMLElement);
+    divIcon.mockClear();
+    vm.setFloor('3rd Floor');
+    await nextTick();
+    expect(pins()).toHaveLength(2);
+    for (const pin of pins()) {
+      expect(pin.querySelector('.map-elevation')?.textContent).toBe('↓↓');
+      expect(pin.getAttribute('aria-label')).toMatch(/Go down 2 levels/);
+    }
+    divIcon.mockClear();
+    vm.setFloor('Garage');
+    await nextTick();
+    for (const pin of pins()) expect(pin.querySelector('.map-elevation')?.textContent).toBe('↑');
+    divIcon.mockClear();
+    vm.setFloor('Ground_Level');
+    await nextTick();
+    for (const pin of pins()) expect(pin.querySelector('.map-elevation')).toBeNull();
     wrapper.unmount();
   });
   it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
