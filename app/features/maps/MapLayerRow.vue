@@ -7,7 +7,7 @@
     @click="emit('toggle', item)"
   >
     <span
-      class="flex h-4.5 w-4.5 shrink-0 items-center justify-center transition"
+      class="flex h-6 w-6 shrink-0 items-center justify-center transition"
       :class="visible ? '' : 'opacity-35 grayscale'"
       aria-hidden="true"
     >

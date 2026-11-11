@@ -38,6 +38,8 @@ describe('markerGlyphs', () => {
     expect(pin.getAttribute('aria-label')).toBe('Transit to <Reserve>');
     expect(pin.style.getPropertyValue('--pin-color')).toBe('#cf5959');
     const head = pin.querySelector('.map-pin-head');
+    expect(head?.querySelector('.map-pin-body')).not.toBeNull();
+    expect(pin.querySelector('.map-pin-shadow')).not.toBeNull();
     expect(head?.querySelector('path')?.getAttribute('d')).toBe(MAP_MARKER_GLYPH_PATHS.transit);
     const label = pin.querySelector('.map-pin-label');
     expect(label?.textContent).toBe('Transit to <Reserve>');

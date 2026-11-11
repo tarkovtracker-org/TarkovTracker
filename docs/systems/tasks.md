@@ -402,8 +402,10 @@ visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
 
 ## Map markers, legend, and sizing
 
-Extract and transit markers are pins: a colored glyph head on a short tail whose tip is the exact
-map position. The glyph names who can use the location: PMC (shield), Scav (skull), shared (two
+Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
+ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
+teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
+white glyph inside names who can use the location: PMC (shield), Scav (skull), shared (two
 people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
 `app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
 colors come from the customizable marker palette. A pin's name appears beside it on hover, when
