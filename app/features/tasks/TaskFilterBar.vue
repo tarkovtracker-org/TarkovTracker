@@ -116,6 +116,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useResizeObserver } from '@vueuse/core';
   import ActiveFilterChips from '@/components/ui/ActiveFilterChips.vue';
   import SettingsButton from '@/components/ui/SettingsButton.vue';
   import SortControl from '@/components/ui/SortControl.vue';
@@ -325,8 +326,9 @@
       preferencesStore.setTaskMapView(selected.value);
     }
   };
-  // In the single scrolling row on phones, keep the selected map in view. Wrapped rows never
-  // overflow, so this is a no-op there.
+  // In the single scrolling row on phones, keep the selected map in view, including after a resize
+  // or rotation switches between the wrapped and scrolling layouts. Wrapped rows never overflow,
+  // so this is a no-op there.
   const mapPickerRef = ref<HTMLElement | null>(null);
   const scrollSelectedMapIntoView = () => {
     const picker = mapPickerRef.value;
@@ -340,6 +342,7 @@
     () => nextTick(scrollSelectedMapIntoView),
     { flush: 'post' }
   );
+  useResizeObserver(mapPickerRef, scrollSelectedMapIntoView);
   watch(
     [isTraderView, traders, () => preferencesStore.getTaskTraderView],
     ([showsTrader, visibleTraders, selectedTrader]) => {
