@@ -316,6 +316,10 @@ describe('LeafletMap controls', () => {
     );
     expect(source.attributes('title')).toContain('EFT 1.3.0.0.48484');
     expect(wrapper.findAll('[data-testid="map-extract-source"]')).toHaveLength(1);
+    // Hiding the only drawn extract's category also removes its source line.
+    const row = await openLayersPanel(wrapper);
+    await row('pmc').trigger('click');
+    expect(wrapper.find('[data-testid="map-extract-source"]').exists()).toBe(false);
     const openPopup = markerInstance.on.mock.calls.find(([event]) => event === 'popupopen')![1];
     mockMapInstance.size = { x: 286, y: 320 };
     openPopup({ popup });

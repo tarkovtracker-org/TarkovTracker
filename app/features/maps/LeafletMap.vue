@@ -907,12 +907,21 @@
     new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(
       new Date(iso)
     );
-  const anyExtractsVisible = computed(
-    () =>
-      mapExtracts.value.length > 0 &&
-      [showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts].some(
-        (visible) => visible.value
-      )
+  /** Which extract glyph categories are drawn; markers and the source line share this rule. */
+  const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
+    pmc: showPmcExtracts.value,
+    scav: showScavExtracts.value,
+    shared: showSharedExtracts.value,
+    coop: showCoopExtracts.value,
+    // Extracts without a known faction follow the Shared row, the closest legend entry.
+    extract: showSharedExtracts.value,
+    transit: false,
+  }));
+  const anyExtractsVisible = computed(() =>
+    mapExtracts.value.some(
+      (extract) =>
+        Boolean(extract.position) && extractVisibility.value[getExtractGlyphKind(extract)]
+    )
   );
   /** One map-level line names the requirement data source and that it is not live status. */
   const extractSource = computed(() => {
@@ -1853,19 +1862,10 @@
     const L = leaflet.value;
     if (!isValidMapSvgConfig(props.map.svg) && !isValidMapTileConfig(props.map.tile)) return;
     extractLayer.value.clearLayers();
-    const extractVisibility: Record<MapMarkerGlyphKind, boolean> = {
-      pmc: showPmcExtracts.value,
-      scav: showScavExtracts.value,
-      shared: showSharedExtracts.value,
-      coop: showCoopExtracts.value,
-      // Extracts without a known faction follow the Shared row, the closest legend entry.
-      extract: showSharedExtracts.value,
-      transit: false,
-    };
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
       const kind = getExtractGlyphKind(extract);
-      if (!extractVisibility[kind]) return;
+      if (!extractVisibility.value[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       const requirements = getExtractRequirements({
         mapId: props.map.id,

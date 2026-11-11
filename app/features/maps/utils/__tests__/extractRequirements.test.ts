@@ -179,7 +179,13 @@ describe('extract requirements', () => {
     });
     // PvE reads the regular definitions' PvE fields, so it shares the regular capture.
     expect(getExtractDataSource(groundZero, 'pve')).toEqual(regular);
-    expect(getExtractDataSource(groundZero, 'seasonal')?.clientBuild).toBe('1.3.0.1.48558');
+    expect(getExtractDataSource(groundZero, 'seasonal')).toEqual({
+      capturedAt: snapshot.sources['pvp-season'].capturedAt,
+      clientVersion: '1.3.0.1',
+      clientBuild: '1.3.0.1.48558',
+      curatedCues: true,
+    });
+    expect(snapshot.sources['pvp-season'].capturedAt).not.toBe(snapshot.sources.pvp.capturedAt);
     expect(describeExtractSource(regular!, t, date)).toEqual({
       label: 'Requirements: game data, EFT 1.3.0.0 (2026-11-06), plus curated cues',
       detail:
