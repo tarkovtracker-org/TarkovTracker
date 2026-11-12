@@ -19,7 +19,7 @@ const OBJECTIVE_TYPE_GLYPHS: Record<string, MapObjectiveGlyphKind> = {
 };
 /**
  * 24x24 Material Design Icons path data (Apache-2.0, @iconify-json/mdi). Solid shapes with
- * distinct outlines, so each action still reads at the 12 px size inside an objective dot.
+ * distinct outlines, so each action still reads at the 16 px size inside an objective chip.
  */
 export const MAP_OBJECTIVE_GLYPH_PATHS: Record<MapObjectiveGlyphKind, string> = {
   // mdi:eye - visit or locate a place
@@ -58,21 +58,46 @@ export const MAP_OBJECTIVE_GLYPH_LEGEND_KINDS = [
 export const getObjectiveGlyphKind = (type: string | undefined): MapObjectiveGlyphKind =>
   (type && Object.hasOwn(OBJECTIVE_TYPE_GLYPHS, type) ? OBJECTIVE_TYPE_GLYPHS[type] : undefined) ??
   'other';
-// Glyphs are plain Leaflet DOM, so their Tailwind utilities live here (Tailwind scans this file).
-const GLYPH_CLASS =
-  'map-objective-glyph pointer-events-none flex size-full items-center justify-center text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]';
+// Chips are plain Leaflet DOM, so their Tailwind utilities live here (Tailwind scans this file).
 /**
- * The decorative glyph drawn over an objective dot. It never takes pointer input, so hover,
- * click and the stacked-objective hit test keep using the dot underneath.
+ * Raised-coin look shared by the map chip, the Layers rows and the legend: a top highlight, an
+ * inner bottom shade, a dark outline that separates it from light map areas, and a drop shadow.
+ */
+export const MAP_OBJECTIVE_CHIP_SKIN_CLASS =
+  'rounded-full border-white bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.7),rgba(255,255,255,0)_58%)] shadow-[inset_0_-3px_4px_rgba(0,0,0,0.45),0_0_0_1px_rgba(0,0,0,0.75),0_2px_3px_rgba(0,0,0,0.65)]';
+const CHIP_CLASS = `map-objective-glyph pointer-events-none flex size-full items-center justify-center border-2 bg-(--chip-color) text-white transition-[scale,opacity,filter] duration-150 [&.is-hovered]:scale-115 [&.is-selected]:scale-115 [&.is-selected]:bg-(--chip-selected) ${MAP_OBJECTIVE_CHIP_SKIN_CLASS}`;
+const OFF_FLOOR_CLASSES = [
+  'opacity-70',
+  'saturate-50',
+  '[&.is-hovered]:opacity-100',
+  '[&.is-hovered]:saturate-100',
+];
+const GLYPH_CLASS = 'size-4 drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]';
+/** Chip diameter in px; the hit-test dot under it uses half of this as its radius. */
+export const OBJECTIVE_CHIP_SIZE = 26;
+export type ObjectiveChipOptions = {
+  /** Task category color (Regular, Pinned or Team). */
+  color: string;
+  /** Color while the objective's popup is pinned open. */
+  selectedColor: string;
+  offFloor?: boolean;
+};
+/**
+ * The raised chip drawn for an objective: its category color and its action glyph. It never
+ * takes pointer input, so hover, click and the stacked-objective hit test use the dot under it;
+ * the map toggles `is-hovered` and `is-selected` on it from the dot's events.
  */
 export function createObjectiveGlyphElement(
   kind: MapObjectiveGlyphKind,
-  offFloor = false
+  { color, selectedColor, offFloor = false }: ObjectiveChipOptions
 ): HTMLElement {
-  const glyph = document.createElement('span');
-  glyph.className = `${GLYPH_CLASS} map-objective-glyph--${kind}${offFloor ? ' opacity-55' : ''}`;
-  glyph.dataset.kind = kind;
-  glyph.setAttribute('aria-hidden', 'true');
-  glyph.append(createMapIconSvg(MAP_OBJECTIVE_GLYPH_PATHS[kind], 'size-3'));
-  return glyph;
+  const chip = document.createElement('span');
+  chip.className = `${CHIP_CLASS} map-objective-glyph--${kind}`;
+  if (offFloor) chip.classList.add('map-objective-glyph--off-floor', ...OFF_FLOOR_CLASSES);
+  chip.style.setProperty('--chip-color', color);
+  chip.style.setProperty('--chip-selected', selectedColor);
+  chip.dataset.kind = kind;
+  chip.setAttribute('aria-hidden', 'true');
+  chip.append(createMapIconSvg(MAP_OBJECTIVE_GLYPH_PATHS[kind], GLYPH_CLASS));
+  return chip;
 }

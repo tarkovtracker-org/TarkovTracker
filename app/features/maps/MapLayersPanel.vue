@@ -75,9 +75,10 @@
             class="flex items-center gap-1"
           >
             <span
-              class="bg-surface-600 inline-flex size-4 shrink-0 items-center justify-center rounded-full text-white ring-1 ring-white/80"
+              class="bg-surface-500 inline-flex size-4.5 shrink-0 items-center justify-center border text-white"
+              :class="MAP_OBJECTIVE_CHIP_SKIN_CLASS"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-2.5">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-3">
                 <path fill="currentColor" :d="MAP_OBJECTIVE_GLYPH_PATHS[kind]" />
               </svg>
             </span>
@@ -145,6 +146,7 @@
     type MapLayerItem,
   } from '@/features/maps/utils/mapLayerGroups';
   import {
+    MAP_OBJECTIVE_CHIP_SKIN_CLASS,
     MAP_OBJECTIVE_GLYPH_LEGEND_KINDS,
     MAP_OBJECTIVE_GLYPH_PATHS,
   } from '@/features/maps/utils/objectiveGlyphs';

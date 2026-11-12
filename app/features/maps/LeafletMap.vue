@@ -648,6 +648,7 @@
   import {
     createObjectiveGlyphElement,
     getObjectiveGlyphKind,
+    OBJECTIVE_CHIP_SIZE,
     type MapObjectiveGlyphKind,
   } from '@/features/maps/utils/objectiveGlyphs';
   import {
@@ -804,8 +805,10 @@
   });
   const ZONE_HOVER_DELTA = 0.16;
   const ZONE_HOVER_MAX = 0.6;
-  /** Objective dots frame a 12 px action glyph; zone centres use the same size. */
-  const OBJECTIVE_DOT_RADIUS = 10;
+  /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
+  const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
+  /** Hit-test dots are invisible: the chip above them is the visible marker. */
+  const OBJECTIVE_HIT_DOT_STYLE = { opacity: 0, fillOpacity: 0 } as const;
   /** Glyphs sit above objective dots and below extract pins; pointer input reaches the dots. */
   const OBJECTIVE_GLYPH_PANE = 'objectiveGlyphs';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
@@ -1529,12 +1532,17 @@
   const attachHoverPinPopup = (
     layer: L.Layer,
     objectiveId: string,
-    getLatLng: () => L.LatLngExpression
+    getLatLng: () => L.LatLngExpression,
+    chip: HTMLElement | null = null
   ): ObjectivePopupControl | null => {
     if (!leaflet.value || !mapInstance.value) return null;
     const popup = leaflet.value.popup({
       ...popupOptions,
       className: 'map-objective-popup',
+      // The tip touches the top of the chip instead of covering its glyph.
+      offset: [0, 7 - OBJECTIVE_DOT_RADIUS],
+      maxWidth: 344,
+      minWidth: 256,
     });
     let isPinned = false;
     let isHovering = false;
@@ -1546,6 +1554,7 @@
     const originalStrokeColor = styledLayer.options?.color || mapColors.value.SELF_OBJECTIVE;
     const isCircleMarker = 'getRadius' in styledLayer;
     const setLayerSelected = (selected: boolean) => {
+      chip?.classList.toggle('is-selected', selected);
       if (!('setStyle' in styledLayer)) return;
       if (selected) {
         if (isCircleMarker) {
@@ -1749,22 +1758,27 @@
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
+      chip: HTMLElement | null;
       latLngs: L.LatLngExpression[];
       area: number;
       objectiveId: string;
     }> = [];
     const pointEntries: Array<{
       marker: L.CircleMarker;
+      chip: HTMLElement | null;
       objectiveId: string;
     }> = [];
     const glyphMarkers: L.Marker[] = [];
     const addGlyph = (
       latLng: L.LatLngExpression,
       kind: MapObjectiveGlyphKind,
+      color: string,
       offFloor: boolean
-    ) => {
-      const glyph = createObjectiveGlyph(L, latLng, kind, offFloor);
-      if (glyph) glyphMarkers.push(glyph);
+    ): HTMLElement | null => {
+      const glyph = createObjectiveGlyph(L, latLng, kind, { color, offFloor });
+      if (!glyph) return null;
+      glyphMarkers.push(glyph.marker);
+      return glyph.chip;
     };
     const calculateZoneArea = (outline: Array<{ x: number; z: number }>): number => {
       if (outline.length < 3) return 0;
@@ -1804,13 +1818,13 @@
         const marker = L.circleMarker([latLng.lat, latLng.lng], {
           radius: OBJECTIVE_DOT_RADIUS,
           fillColor: markerColor,
-          fillOpacity: 0.9,
           color: mapColors.value.MARKER_BORDER,
           weight: 2,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
         const offFloor = addObjectiveElevation(marker, { position: pos });
-        addGlyph([latLng.lat, latLng.lng], glyphKind, offFloor);
-        pointEntries.push({ marker, objectiveId });
+        const chip = addGlyph([latLng.lat, latLng.lng], glyphKind, markerColor, offFloor);
+        pointEntries.push({ marker, chip, objectiveId });
       });
       mark.zones.forEach((zone) => {
         if (zone.map.id !== props.map.id) return;
@@ -1830,25 +1844,34 @@
         const centerMarker = L.circleMarker([center.lat, center.lng], {
           radius: OBJECTIVE_DOT_RADIUS,
           fillColor: zoneColor,
-          fillOpacity: 0.95,
           color: mapColors.value.MARKER_BORDER,
           weight: 1.5,
-          opacity: 1,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
         const offFloor = addObjectiveElevation(centerMarker, zone);
-        addGlyph(center, glyphKind, offFloor);
+        const chip = addGlyph(center, glyphKind, zoneColor, offFloor);
         const area = calculateZoneArea(zone.outline);
-        zoneEntries.push({ polygon, centerMarker, latLngs: polygonLatLngs, area, objectiveId });
+        zoneEntries.push({
+          polygon,
+          centerMarker,
+          chip,
+          latLngs: polygonLatLngs,
+          area,
+          objectiveId,
+        });
       });
     });
     zoneEntries
       .sort((a, b) => b.area - a.area)
-      .forEach(({ polygon, centerMarker, latLngs, area, objectiveId }) => {
+      .forEach(({ polygon, centerMarker, chip, latLngs, area, objectiveId }) => {
         if (objectiveId) {
-          const zoneControl = attachHoverPinPopup(polygon, objectiveId, () =>
-            polygon.getBounds().getCenter()
+          const zoneControl = attachHoverPinPopup(
+            polygon,
+            objectiveId,
+            () => polygon.getBounds().getCenter(),
+            chip
           );
-          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng());
+          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng(), chip);
           if (zoneControl) {
             objectiveHitSources.push({
               kind: 'zone',
@@ -1870,17 +1893,26 @@
         polygon.on('mouseout', () =>
           polygon.setStyle({ fillOpacity: mapZoneOpacity.value, weight: 2.25 })
         );
+        liftChipOnHover(polygon, chip);
+        liftChipOnHover(centerMarker, chip);
         objectiveLayer.value!.addLayer(polygon);
         objectiveLayer.value!.addLayer(centerMarker);
       });
-    pointEntries.forEach(({ marker, objectiveId }) => {
+    pointEntries.forEach(({ marker, chip, objectiveId }) => {
       if (objectiveId) {
-        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng());
+        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng(), chip);
         if (control) objectiveHitSources.push({ kind: 'point', objectiveId, marker, control });
       }
+      liftChipOnHover(marker, chip);
       objectiveLayer.value!.addLayer(marker);
     });
     glyphMarkers.forEach((glyph) => objectiveLayer.value!.addLayer(glyph));
+  }
+  /** The chip cannot take pointer input, so the dot or zone under it raises it on hover. */
+  function liftChipOnHover(layer: L.Layer, chip: HTMLElement | null): void {
+    if (!chip) return;
+    layer.on('mouseover', () => chip.classList.add('is-hovered'));
+    layer.on('mouseout', () => chip.classList.remove('is-hovered'));
   }
   function createExtractMarkers(): void {
     if (!leaflet.value || !extractLayer.value || !props.map) return;
@@ -1933,17 +1965,16 @@
     return true;
   }
   /**
-   * Objective dots on another floor fade like pins; their floor badge stays opaque beside them.
-   * Returns whether the objective is off the selected floor, so its glyph fades too.
+   * An objective on another floor gets a floor badge beside it; its chip fades like an
+   * off-floor pin. Returns whether the objective is off the selected floor.
    */
   function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): boolean {
     const indicator = elevationIndicator(elevation, false);
     if (!indicator) return false;
-    layer.setStyle({ opacity: 0.55, fillOpacity: 0.4 });
     layer.bindTooltip(indicator, {
       permanent: true,
       direction: 'left',
-      // Leaflet anchors the badge at the dot's centre; keep it clear of the dot's glyph.
+      // Leaflet anchors the badge at the dot's centre; keep it beside the chip's glyph.
       offset: [8 - OBJECTIVE_DOT_RADIUS, 0],
       className: 'map-elevation-tooltip border-0! bg-transparent! p-0! shadow-none! before:hidden',
       opacity: 1,
@@ -1958,28 +1989,34 @@
     pane.style.pointerEvents = 'none';
     return OBJECTIVE_GLYPH_PANE;
   }
-  /** A non-interactive glyph centred on an objective dot, naming the action it asks for. */
+  /** A non-interactive chip centred on an objective dot, naming the action it asks for. */
   function createObjectiveGlyph(
     leafletApi: NonNullable<typeof leaflet.value>,
     latLng: L.LatLngExpression,
     kind: MapObjectiveGlyphKind,
-    offFloor: boolean
-  ): L.Marker | null {
+    { color, offFloor }: { color: string; offFloor: boolean }
+  ): { marker: L.Marker; chip: HTMLElement } | null {
     const map = mapInstance.value;
     if (!map) return null;
-    const size = OBJECTIVE_DOT_RADIUS * 2;
+    const size = OBJECTIVE_CHIP_SIZE;
+    const chip = createObjectiveGlyphElement(kind, {
+      color,
+      selectedColor: mapColors.value.SELECTED,
+      offFloor,
+    });
     const icon = leafletApi.divIcon({
       className: 'map-objective-glyph-icon',
-      html: createObjectiveGlyphElement(kind, offFloor),
+      html: chip,
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
     });
-    return leafletApi.marker(latLng, {
+    const marker = leafletApi.marker(latLng, {
       icon,
       interactive: false,
       keyboard: false,
       pane: objectiveGlyphPane(map),
     });
+    return { marker, chip };
   }
   let openPin: HTMLElement | null = null;
   /** Tap or click shows one pin's name until another pin or the map is clicked. */

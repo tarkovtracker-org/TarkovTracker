@@ -38,13 +38,24 @@ describe('objective glyphs', () => {
     expect(new Set(Object.values(MAP_OBJECTIVE_GLYPH_PATHS)).size).toBe(kinds.length);
     expect(MAP_OBJECTIVE_GLYPH_PATHS.extract).toBe(MAP_MARKER_GLYPH_PATHS.extract);
   });
-  it('builds a decorative glyph that fades with off-floor objectives', () => {
-    const glyph = createObjectiveGlyphElement('plant');
+  it('builds a raised chip in the category color that fades with off-floor objectives', () => {
+    const glyph = createObjectiveGlyphElement('plant', {
+      color: '#f59e0b',
+      selectedColor: '#7c3bed',
+    });
     expect(glyph.dataset.kind).toBe('plant');
     expect(glyph.getAttribute('aria-hidden')).toBe('true');
     expect(glyph.classList).toContain('pointer-events-none');
-    expect(glyph.classList).not.toContain('opacity-55');
+    expect(glyph.style.getPropertyValue('--chip-color')).toBe('#f59e0b');
+    expect(glyph.style.getPropertyValue('--chip-selected')).toBe('#7c3bed');
+    expect(glyph.classList).not.toContain('opacity-70');
     expect(glyph.querySelector('path')?.getAttribute('d')).toBe(MAP_OBJECTIVE_GLYPH_PATHS.plant);
-    expect(createObjectiveGlyphElement('shoot', true).classList).toContain('opacity-55');
+    const offFloor = createObjectiveGlyphElement('shoot', {
+      color: '#f59e0b',
+      selectedColor: '#7c3bed',
+      offFloor: true,
+    });
+    expect(offFloor.classList).toContain('opacity-70');
+    expect(offFloor.classList).toContain('map-objective-glyph--off-floor');
   });
 });

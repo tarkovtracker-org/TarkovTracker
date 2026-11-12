@@ -1,71 +1,57 @@
 <template>
-  <div :class="isCompact ? 'min-w-40' : 'min-w-55'">
-    <div class="flex items-center justify-between gap-2">
-      <div class="flex min-w-0 flex-1 items-center gap-1">
-        <component
-          :is="taskTitleComponent"
-          v-bind="taskTitleProps"
-          :class="taskTitleClass"
-          @click.stop
-        >
-          <span class="truncate">{{ taskName }}</span>
-          <UIcon
-            v-if="taskWikiUrl"
-            name="i-mdi-open-in-new"
-            class="h-3.5 w-3.5 shrink-0"
-            aria-hidden="true"
-          />
-        </component>
-        <a
-          v-if="taskTarkovDevUrl"
-          :href="taskTarkovDevUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          :class="linkButtonClass"
-          :title="translate('common.view_on_tarkov_dev')"
-          :aria-label="translate('common.view_on_tarkov_dev')"
-          @click.stop
-        >
-          <img
-            src="/img/logos/tarkovdevlogo.webp"
-            alt="tarkov.dev"
-            aria-hidden="true"
-            class="h-4 w-4"
-          />
-        </a>
-      </div>
-      <div class="flex shrink-0 gap-1">
-        <button
-          type="button"
-          :class="isCompact ? compactButtonClass : defaultButtonClass"
-          :aria-label="translate('maps.tooltip.go_to_in_task_list')"
-          :title="translate('maps.tooltip.go_to')"
-          @click.stop="scrollToObjective"
-        >
-          <UIcon
-            name="i-mdi-arrow-down-circle-outline"
-            :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
-          />
-        </button>
-        <button
-          v-if="!readOnly"
-          type="button"
-          :class="[
-            isCompact ? compactButtonClass : defaultButtonClass,
-            isToggleDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10',
-          ]"
-          :aria-label="
-            isComplete ? translate('maps.tooltip.uncomplete') : translate('maps.tooltip.complete')
-          "
-          :aria-pressed="isComplete"
-          :disabled="isToggleDisabled"
-          @click.stop="toggleObjective"
-        >
-          <UIcon
-            :name="isComplete ? 'i-mdi-check-circle' : 'i-mdi-circle-outline'"
-            :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
-          />
-        </button>
+  <div data-testid="objective-popup" class="flex flex-col text-left" :class="rootClass">
+    <ObjectivePopupHeader
+      :task-name="taskName"
+      :wiki-url="taskWikiUrl"
+      :tarkov-dev-url="taskTarkovDevUrl"
+      :trader-name="trader.name"
+      :trader-image="trader.image"
+      :level-label="levelLabel"
+      :compact="isCompact"
+      :translate="translate"
+      @close="emitClose"
+    />
+    <div v-if="!objective" class="text-surface-400 text-xs">
+      {{ translate('maps.tooltip.objective_unavailable') }}
+    </div>
+    <ObjectivePopupDetails
+      v-else
+      :glyph-kind="glyphKind"
+      :description="objective.description ?? ''"
+      :complete="isComplete"
+      :found-in-raid="objective.foundInRaid === true"
+      :item="itemDetails"
+      :key-labels="keyLabels"
+      :progress="readOnly ? null : progress"
+      :compact="isCompact"
+      :translate="translate"
+    />
+    <div class="flex items-center gap-1.5">
+      <button
+        v-if="!readOnly"
+        type="button"
+        data-testid="objective-complete-toggle"
+        :class="completeButtonClass"
+        :aria-label="completeToggle.ariaLabel"
+        :aria-pressed="isComplete"
+        :disabled="isToggleDisabled"
+        @click.stop="toggleObjective"
+      >
+        <UIcon :name="completeToggle.icon" class="h-4 w-4 shrink-0" />
+        <span v-if="!isCompact">{{ completeToggle.label }}</span>
+      </button>
+      <button
+        type="button"
+        data-testid="objective-go-to"
+        :class="secondaryButtonClass"
+        :aria-label="translate('maps.tooltip.go_to_in_task_list')"
+        :title="translate('maps.tooltip.go_to_in_task_list')"
+        @click.stop="scrollToObjective"
+      >
+        <UIcon name="i-mdi-format-list-checks" class="h-4 w-4 shrink-0" />
+        <span v-if="!isCompact">{{ translate('maps.tooltip.task_list') }}</span>
+      </button>
+      <div class="ml-auto flex shrink-0 gap-1">
         <LeafletObjectiveTaskActions
           :task-id="taskId"
           :actions="taskVisibilityActions"
@@ -73,27 +59,6 @@
           :translate="translate"
           @close="emitClose"
         />
-        <button
-          type="button"
-          data-testid="objective-close-button"
-          class="inline-flex items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
-          :class="isCompact ? 'h-5 w-5' : 'h-7 w-7'"
-          :aria-label="translate('common.close')"
-          @click.stop="emitClose"
-        >
-          <UIcon name="i-mdi-close" :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'" />
-        </button>
-      </div>
-    </div>
-    <div :class="isCompact ? 'mt-0.5' : 'mt-1'">
-      <div v-if="!objective" class="text-xs text-gray-400">
-        {{ translate('maps.tooltip.objective_unavailable') }}
-      </div>
-      <div v-else :class="isCompact ? 'text-xs text-gray-200' : 'text-sm text-gray-200'">
-        <div class="text-gray-300">{{ objective.description }}</div>
-        <div v-if="!readOnly && requiredCount > 1" class="mt-1 text-[11px] text-gray-400">
-          {{ currentCount }}/{{ requiredCount }}
-        </div>
       </div>
     </div>
   </div>
@@ -102,11 +67,22 @@
   import { useI18n, type Composer } from 'vue-i18n';
   import { useWikiLink } from '@/composables/useWikiLink';
   import LeafletObjectiveTaskActions from '@/features/maps/LeafletObjectiveTaskActions.vue';
+  import ObjectivePopupDetails from '@/features/maps/ObjectivePopupDetails.vue';
+  import ObjectivePopupHeader from '@/features/maps/ObjectivePopupHeader.vue';
+  import { getObjectiveGlyphKind } from '@/features/maps/utils/objectiveGlyphs';
+  import {
+    describeObjectiveItem,
+    getObjectiveKeyLabels,
+    getObjectivePopupItem,
+    getObjectiveProgress,
+    getPopupTrader,
+  } from '@/features/maps/utils/objectivePopup';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import type { MapTaskVisibilityActions } from '@/features/maps/utils/mapTaskVisibility';
+  import type { TarkovItem } from '@/types/tarkov';
   import type { Router } from 'vue-router';
   const props = withDefaults(
     defineProps<{
@@ -155,13 +131,12 @@
   const preferencesStore = usePreferencesStore();
   const { toWikiUrl } = useWikiLink();
   const isCompact = computed(() => preferencesStore.getMapTooltipDensity === 'compact');
-  const defaultButtonClass =
-    'inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200';
-  const compactButtonClass =
-    'inline-flex h-5 w-5 items-center justify-center rounded border border-white/10 bg-white/5 text-gray-200';
+  const rootClass = computed(() => (isCompact.value ? 'w-64 gap-1.5' : 'w-80 gap-2'));
   const objective = computed(() => {
     return metadataStore.objectives.find((o) => o.id === props.objectiveId);
   });
+  const requiredCount = computed(() => objective.value?.count ?? 1);
+  const currentCount = computed(() => tarkovStore.getObjectiveCount(props.objectiveId));
   const task = computed(() => {
     const taskId = objective.value?.taskId;
     if (!taskId) return null;
@@ -169,38 +144,55 @@
   });
   const taskId = computed(() => task.value?.id);
   const taskName = computed(() => task.value?.name ?? translate('common.task'));
-  const taskTarkovDevUrl = computed(() => {
-    if (!task.value?.id) return '';
-    return `https://tarkov.dev/task/${task.value.id}`;
+  const trader = computed(() => getPopupTrader(task.value));
+  const levelLabel = computed(() => {
+    const level = task.value?.minPlayerLevel ?? 0;
+    return level > 1 ? translate('common.lvl_level', { level }) : '';
   });
-  const taskWikiUrl = computed(() => toWikiUrl(task.value?.wikiLink));
-  const taskTitleComponent = computed(() => (taskWikiUrl.value ? 'a' : 'div'));
-  const taskTitleProps = computed(() => {
-    if (taskWikiUrl.value) {
-      return {
-        href: taskWikiUrl.value,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-      };
-    }
-    return {};
+  const glyphKind = computed(() => getObjectiveGlyphKind(objective.value?.type));
+  const itemName = (item: TarkovItem): string =>
+    item.name ?? metadataStore.itemsById?.get(item.id)?.name ?? item.shortName ?? '';
+  const itemDetails = computed(() => {
+    const entry = objective.value ? getObjectivePopupItem(objective.value) : undefined;
+    return entry ? describeObjectiveItem(entry, itemName(entry.item), requiredCount.value) : null;
   });
-  const taskTitleClass = computed(() => {
-    const base = 'flex min-w-0 max-w-full items-center gap-1 text-sm leading-snug font-semibold';
-    if (taskWikiUrl.value) {
-      return `${base} text-link hover:text-link-hover no-underline`;
-    }
-    return `${base} text-gray-100`;
-  });
-  const linkButtonClass = [
-    'inline-flex items-center justify-center rounded p-1 transition-colors',
-    'text-surface-400 hover:text-surface-200 hover:bg-white/10',
-    'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900',
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-  ];
+  const keyLabels = computed(() =>
+    objective.value ? getObjectiveKeyLabels(objective.value, itemName) : []
+  );
+  const progress = computed(() => getObjectiveProgress(currentCount.value, requiredCount.value));
+  const taskTarkovDevUrl = computed(() =>
+    task.value?.id ? `https://tarkov.dev/task/${task.value.id}` : ''
+  );
+  const taskWikiUrl = computed(() => toWikiUrl(task.value?.wikiLink) ?? '');
   const isComplete = computed(() => tarkovStore.isTaskObjectiveComplete(props.objectiveId));
-  const requiredCount = computed(() => objective.value?.count ?? 1);
-  const currentCount = computed(() => tarkovStore.getObjectiveCount(props.objectiveId));
+  const completeToggle = computed(() =>
+    isComplete.value
+      ? {
+          icon: 'i-mdi-check-circle',
+          label: translate('common.completed'),
+          ariaLabel: translate('maps.tooltip.uncomplete'),
+        }
+      : {
+          icon: 'i-mdi-circle-outline',
+          label: translate('common.mark_complete'),
+          ariaLabel: translate('maps.tooltip.complete'),
+        }
+  );
+  const BUTTON_BASE =
+    'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50';
+  const buttonSize = computed(() => (isCompact.value ? 'h-7 w-7' : 'h-8 px-2.5'));
+  const secondaryButtonClass = computed(() => [
+    BUTTON_BASE,
+    buttonSize.value,
+    'border border-white/12 bg-white/5 text-surface-100 hover:bg-white/10',
+  ]);
+  const completeButtonClass = computed(() => [
+    BUTTON_BASE,
+    buttonSize.value,
+    isComplete.value
+      ? 'border border-success-500/50 bg-success-900/40 text-success-300 enabled:hover:bg-success-900/60'
+      : 'border border-primary-400/60 bg-primary-500/25 text-primary-100 enabled:hover:bg-primary-500/40',
+  ]);
   // Check if parent task is complete or failed (locked state)
   const isParentTaskLocked = computed(() => {
     const taskId = objective.value?.taskId;

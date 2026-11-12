@@ -4,8 +4,15 @@ type MockTask = {
   id: string;
   name: string;
   wikiLink?: string | null;
+  minPlayerLevel?: number;
+  trader?: { id: string; name?: string; imageLink?: string };
 };
-const setup = async (task: MockTask, extraProps: Record<string, unknown> = {}) => {
+const setup = async (
+  task: MockTask,
+  extraProps: Record<string, unknown> = {},
+  objectiveOverrides: Record<string, unknown> = {},
+  progress = { complete: false, count: 0 }
+) => {
   const metadataStore = {
     objectives: [
       {
@@ -13,13 +20,14 @@ const setup = async (task: MockTask, extraProps: Record<string, unknown> = {}) =
         taskId: task.id,
         description: 'Find the location',
         count: 1,
+        ...objectiveOverrides,
       },
     ],
     tasks: [task],
   };
   const tarkovStore = {
-    isTaskObjectiveComplete: vi.fn(() => false),
-    getObjectiveCount: vi.fn(() => 0),
+    isTaskObjectiveComplete: vi.fn(() => progress.complete),
+    getObjectiveCount: vi.fn(() => progress.count),
     isTaskComplete: vi.fn(() => false),
     isTaskFailed: vi.fn(() => false),
     setTaskObjectiveUncomplete: vi.fn(),
@@ -63,7 +71,7 @@ const setup = async (task: MockTask, extraProps: Record<string, unknown> = {}) =
       },
     },
   });
-  return { onClose, wrapper };
+  return { onClose, wrapper, tarkovStore };
 };
 describe('LeafletObjectiveTooltip', () => {
   beforeEach(() => {
@@ -129,5 +137,78 @@ describe('LeafletObjectiveTooltip', () => {
     await wrapper.find('[data-testid="objective-hide-task"]').trigger('click');
     expect(onClose).toHaveBeenCalled();
     expect(taskVisibilityActions.hideTask).toHaveBeenCalledWith('task-1');
+  });
+  it('shows the trader, the full task name and the objective action (#1394)', async () => {
+    const { wrapper } = await setup({
+      id: 'task-1',
+      name: 'The Survivalist Path - Unprotected but Dangerous',
+      minPlayerLevel: 15,
+      trader: { id: 'jaeger', name: 'Jaeger', imageLink: 'https://assets.tarkov.dev/jaeger.webp' },
+    });
+    const image = wrapper.get('[data-testid="objective-trader-image"]');
+    expect(image.attributes('src')).toBe('https://assets.tarkov.dev/jaeger.webp');
+    expect(image.attributes('alt')).toBe('Jaeger');
+    expect(wrapper.get('[data-testid="objective-trader-name"]').text()).toBe('Jaeger');
+    const title = wrapper.get('[data-testid="objective-task-title"]');
+    expect(title.text()).toBe('The Survivalist Path - Unprotected but Dangerous');
+    expect(title.classes()).not.toContain('truncate');
+    expect(wrapper.text()).toContain('common.lvl_level');
+    expect(wrapper.get('[data-testid="objective-action"]').text()).toBe(
+      'maps.objective_icons.kinds.other'
+    );
+  });
+  it('falls back to a trader placeholder when the task has no trader image', async () => {
+    const { wrapper } = await setup({ id: 'task-1', name: 'Task', trader: { id: 'x' } });
+    expect(wrapper.find('[data-testid="objective-trader-image"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="objective-trader-name"]').exists()).toBe(false);
+  });
+  it('lists the item, FIR, required keys and progress for the objective', async () => {
+    const { wrapper } = await setup(
+      { id: 'task-1', name: 'Task' },
+      {},
+      {
+        type: 'plantItem',
+        count: 3,
+        foundInRaid: true,
+        item: {
+          id: 'shemagh',
+          name: 'Shemagh (Green)',
+          iconLink: 'https://assets.tarkov.dev/s.webp',
+        },
+        requiredKeys: [[{ id: 'k1', name: 'Dorm room 314 marked key' }]],
+      },
+      { complete: false, count: 1 }
+    );
+    expect(wrapper.get('[data-testid="objective-action"]').text()).toBe(
+      'maps.objective_icons.kinds.plant'
+    );
+    const item = wrapper.get('[data-testid="objective-item"]');
+    expect(item.text()).toContain('Shemagh (Green) ×3');
+    expect(item.text()).toContain('common.fir');
+    expect(item.get('img').attributes('src')).toBe('https://assets.tarkov.dev/s.webp');
+    expect(wrapper.get('[data-testid="objective-key"]').text()).toBe('maps.tooltip.key');
+    const bar = wrapper.get('[data-testid="objective-progress"] [role="progressbar"]');
+    expect(bar.attributes('aria-valuenow')).toBe('1');
+    expect(bar.attributes('aria-valuemax')).toBe('3');
+  });
+  it('labels the completion toggle and completes a counted objective in full', async () => {
+    const { wrapper, tarkovStore } = await setup({ id: 'task-1', name: 'Task' }, {}, { count: 2 });
+    const toggle = wrapper.get('[data-testid="objective-complete-toggle"]');
+    expect(toggle.text()).toContain('common.mark_complete');
+    expect(toggle.attributes('aria-pressed')).toBe('false');
+    await toggle.trigger('click');
+    expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-1');
+    expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-1', 2);
+  });
+  it('shows a completed objective as done and hides editing in read-only popups', async () => {
+    const done = await setup({ id: 'task-1', name: 'Task' }, {}, {}, { complete: true, count: 0 });
+    expect(done.wrapper.find('[data-testid="objective-complete-badge"]').exists()).toBe(true);
+    expect(done.wrapper.get('[data-testid="objective-complete-toggle"]').text()).toContain(
+      'common.completed'
+    );
+    vi.resetModules();
+    const readOnly = await setup({ id: 'task-1', name: 'Task' }, { readOnly: true }, { count: 3 });
+    expect(readOnly.wrapper.find('[data-testid="objective-complete-toggle"]').exists()).toBe(false);
+    expect(readOnly.wrapper.find('[data-testid="objective-progress"]').exists()).toBe(false);
   });
 });

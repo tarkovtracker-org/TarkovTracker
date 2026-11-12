@@ -516,15 +516,31 @@ zoomed in at least one level past the whole-map fit, or always when **Always sho
 badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
 out of it. The map surface keeps its own keyboard controls.
 
-Objective markers are 20 px dots in the task category color (Regular, Pinned, Team); a zone
-also gets one at its centre. A white glyph on each dot names the action the objective's upstream
-`type` asks for: visit or locate (eye), plant, stash or install (tray with a down arrow), find or
-pick up (magnifier), mark with an MS2000 Marker (beacon), eliminate (pistol), use an item such as
-a signal flare (pointing hand), extract (the extract pins' exit glyph), and a flag for any other
-type. `app/features/maps/utils/objectiveGlyphs.ts` owns the type mapping, path data, and glyph
-markup. Glyphs are non-interactive Leaflet markers in their own pane above the dots and below the
-extract pins, so hover, click, selection and the stacked-objective hit test all stay on the dots.
-A glyph fades with its dot when the objective is on another floor.
+Objective markers are 26 px raised chips in the task category color (Regular, Pinned, Team): a
+white border, a top highlight, an inner bottom shade, a dark outline and a drop shadow keep them
+readable on light and dark map areas. A zone also gets one at its centre. The white glyph on each
+chip names the action the objective's upstream `type` asks for: visit or locate (eye), plant,
+stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000 Marker
+(beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract (the
+extract pins' exit glyph), and a flag for any other type. `app/features/maps/utils/objectiveGlyphs.ts`
+owns the type mapping, path data, and chip markup. Chips are non-interactive Leaflet markers in
+their own pane above the overlay pane and below the extract pins. Under each chip sits an
+invisible dot of the same size that takes hover, click and the stacked-objective hit test; the
+dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
+when the objective is on another floor and returns to full strength on hover.
+
+Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
+`app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
+(#1394), the full task name (a wiki link when one is trusted), the minimum player level when above
+1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
+description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
+stash, otherwise the first accepted item and how many alternatives exist) with its icon, count and
+a FIR badge, each required key group (`A / B` when any one works), and a progress bar when the
+objective counts more than one. The footer has a labeled **Mark complete** / **Completed** toggle,
+a **Task list** button that scrolls to and highlights the objective, and the show-only and hide
+quest buttons. Compact tooltip density keeps the layout and makes the footer buttons icon-only.
+Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
+portrait with the action chip on it.
 
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
 controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by

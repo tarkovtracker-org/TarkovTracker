@@ -696,12 +696,14 @@
       "tooltip_density": "Tooltip density"
     },
     "tooltip": {
-      "go_to": "Go to objective",
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
       "objective_unavailable": "Objective unavailable.",
-      "stacked_objectives": "{count} objectives here"
+      "stacked_objectives": "{count} objectives here",
+      "task_list": "Task list",
+      "key": "Key: {key}",
+      "progress": "Progress"
     }
   },
   "page": {

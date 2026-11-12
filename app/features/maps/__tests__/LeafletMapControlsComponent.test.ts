@@ -860,6 +860,17 @@ describe('LeafletMap controls', () => {
     expect(glyphs.every((glyph) => glyph.getAttribute('aria-hidden') === 'true')).toBe(true);
     expect(marker.mock.calls.map(([, options]) => options.interactive)).toEqual([false, false]);
     expect(objectiveLayer.addLayer).toHaveBeenCalledWith(marker.mock.results[0]?.value);
+    // The chip is the visible marker in the category color; the dot under it only takes input.
+    expect(glyphs.map((glyph) => glyph.style.getPropertyValue('--chip-color'))).toEqual([
+      '#111111',
+      '#111111',
+    ]);
+    expect(circleMarker.mock.calls.map(([, options]) => options.fillOpacity)).toEqual([0, 0]);
+    const zoneLayer = createdLayers[0]!;
+    zoneLayer.handlers.get('mouseover')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).toContain('is-hovered');
+    zoneLayer.handlers.get('mouseout')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).not.toContain('is-hovered');
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();
