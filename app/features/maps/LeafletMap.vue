@@ -2045,7 +2045,7 @@
       minWidth: Math.min(256, maxWidth),
       maxHeight: Math.max(160, size.y - 60),
     });
-    if (popup.isOpen()) popup.update();
+    if (mapInstance.value?.hasLayer(popup)) popup.update();
   }
   /** Keep requirement details inside the current map, including after viewport changes. */
   function fitExtractPopup(popup: L.Popup): void {

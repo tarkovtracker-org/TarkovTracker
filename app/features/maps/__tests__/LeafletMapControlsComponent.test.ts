@@ -745,6 +745,7 @@ describe('LeafletMap controls', () => {
       element: HTMLElement;
       isOpen: boolean;
       options: Record<string, unknown>;
+      update: ReturnType<typeof vi.fn>;
       setContent: (content: HTMLElement) => void;
       setLatLng: ReturnType<typeof vi.fn>;
       getElement: () => HTMLElement;
@@ -766,6 +767,7 @@ describe('LeafletMap controls', () => {
         element,
         isOpen: false,
         options: {} as Record<string, unknown>,
+        update: vi.fn(),
         setContent(content: HTMLElement) {
           element.replaceChildren(content);
         },
