@@ -744,6 +744,7 @@ describe('LeafletMap controls', () => {
     const popups: Array<{
       element: HTMLElement;
       isOpen: boolean;
+      options: Record<string, unknown>;
       setContent: (content: HTMLElement) => void;
       setLatLng: ReturnType<typeof vi.fn>;
       getElement: () => HTMLElement;
@@ -764,6 +765,7 @@ describe('LeafletMap controls', () => {
       const popup = {
         element,
         isOpen: false,
+        options: {} as Record<string, unknown>,
         setContent(content: HTMLElement) {
           element.replaceChildren(content);
         },

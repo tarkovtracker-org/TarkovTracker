@@ -809,6 +809,8 @@
   const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
   /** Hit-test dots are invisible: the chip above them is the visible marker. */
   const OBJECTIVE_HIT_DOT_STYLE = { opacity: 0, fillOpacity: 0 } as const;
+  /** Content width of objective popups (`w-80`); Leaflet's limit must not cut it off. */
+  const OBJECTIVE_POPUP_WIDTH = 320;
   /** Glyphs sit above objective dots and below extract pins; pointer input reaches the dots. */
   const OBJECTIVE_GLYPH_PANE = 'objectiveGlyphs';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
@@ -1541,7 +1543,7 @@
       className: 'map-objective-popup',
       // The tip touches the top of the chip instead of covering its glyph.
       offset: [0, 7 - OBJECTIVE_DOT_RADIUS],
-      maxWidth: 344,
+      maxWidth: OBJECTIVE_POPUP_WIDTH,
       minWidth: 256,
     });
     let isPinned = false;
@@ -1637,6 +1639,7 @@
       currentMountedComponent = mountLayerPopup(pinned, entries);
       const mountedComponent = currentMountedComponent;
       popup.setContent(currentMountedComponent.element);
+      fitObjectivePopup(popup);
       popup.setLatLng(getLatLng());
       const popupIsOpen = map.hasLayer(popup);
       focusStackWhenPopupAttached(pinned, entries, popupIsOpen, mountedComponent);
@@ -2031,6 +2034,17 @@
     if (target instanceof Element && target.closest('.map-pin')) return;
     openPin?.classList.remove('is-open');
     openPin = null;
+  }
+  /** Objective popups are 320 px wide, narrowing (and scrolling) inside small maps. */
+  function fitObjectivePopup(popup: L.Popup): void {
+    const size = mapInstance.value?.getSize();
+    if (!size) return;
+    const maxWidth = Math.max(200, Math.min(OBJECTIVE_POPUP_WIDTH, size.x - 24));
+    Object.assign(popup.options, {
+      maxWidth,
+      minWidth: Math.min(256, maxWidth),
+      maxHeight: Math.max(160, size.y - 60),
+    });
   }
   /** Keep requirement details inside the current map, including after viewport changes. */
   function fitExtractPopup(popup: L.Popup): void {

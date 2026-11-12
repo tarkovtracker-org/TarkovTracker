@@ -32,7 +32,8 @@
         type="button"
         data-testid="objective-complete-toggle"
         :class="completeButtonClass"
-        :aria-label="completeToggle.ariaLabel"
+        :aria-label="completeToggle.label"
+        :title="isCompact ? completeToggle.label : undefined"
         :aria-pressed="isComplete"
         :disabled="isToggleDisabled"
         @click.stop="toggleObjective"
@@ -131,7 +132,9 @@
   const preferencesStore = usePreferencesStore();
   const { toWikiUrl } = useWikiLink();
   const isCompact = computed(() => preferencesStore.getMapTooltipDensity === 'compact');
-  const rootClass = computed(() => (isCompact.value ? 'w-64 gap-1.5' : 'w-80 gap-2'));
+  const rootClass = computed(() =>
+    isCompact.value ? 'w-64 max-w-full gap-1.5' : 'w-80 max-w-full gap-2'
+  );
   const objective = computed(() => {
     return metadataStore.objectives.find((o) => o.id === props.objectiveId);
   });
@@ -170,12 +173,10 @@
       ? {
           icon: 'i-mdi-check-circle',
           label: translate('common.completed'),
-          ariaLabel: translate('maps.tooltip.uncomplete'),
         }
       : {
           icon: 'i-mdi-circle-outline',
           label: translate('common.mark_complete'),
-          ariaLabel: translate('maps.tooltip.complete'),
         }
   );
   const BUTTON_BASE =

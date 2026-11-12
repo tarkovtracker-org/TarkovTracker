@@ -50,6 +50,10 @@ describe('LeafletObjectiveStack', () => {
     expect(entries[1]!.get('img').attributes('src')).toBe('https://assets.tarkov.dev/p.webp');
     expect(entries[1]!.get('img').attributes('alt')).toBe('Prapor');
     expect(entries[0]!.find('img').exists()).toBe(false);
+    // The action chip names the action for screen readers, even when descriptions are hidden.
+    expect(entries[0]!.get('[role="img"]').attributes('aria-label')).toBe(
+      'maps.objective_icons.kinds.other'
+    );
   });
   it('selects the clicked objective', async () => {
     const { wrapper, onSelect } = await setup();

@@ -8,16 +8,17 @@ const single = (item: TarkovItem | undefined): ObjectivePopupItem | undefined =>
   item ? { item, alternatives: 0 } : undefined;
 /**
  * The item worth showing in a map popup: the MS2000 Marker for a mark, the quest item for a
- * quest pickup or stash, otherwise the accepted item (the first of several, e.g. flares).
+ * quest pickup or stash, otherwise the accepted items (the first of several, e.g. flares), and
+ * last the weapon or gear an elimination must be done with.
  */
 export function getObjectivePopupItem(objective: TaskObjective): ObjectivePopupItem | undefined {
   if (objective.type === 'mark') return single(objective.markerItem ?? objective.item);
-  return (
-    single(objective.questItem ?? objective.item) ??
-    firstOf(objective.items) ??
-    firstOf(objective.useAny)
-  );
+  return single(objective.questItem) ?? acceptedItem(objective) ?? equipmentItem(objective);
 }
+const acceptedItem = (objective: TaskObjective) =>
+  firstOf(objective.items) ?? firstOf(objective.useAny) ?? single(objective.item);
+const equipmentItem = (objective: TaskObjective) =>
+  single(objective.usingWeapon) ?? firstOf(objective.wearing);
 /** Each required key group as one label; any key in a group opens the way ("A / B"). */
 export function getObjectiveKeyLabels(
   objective: TaskObjective,

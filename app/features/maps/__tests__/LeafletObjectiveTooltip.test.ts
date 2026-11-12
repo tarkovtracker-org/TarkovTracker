@@ -147,7 +147,8 @@ describe('LeafletObjectiveTooltip', () => {
     });
     const image = wrapper.get('[data-testid="objective-trader-image"]');
     expect(image.attributes('src')).toBe('https://assets.tarkov.dev/jaeger.webp');
-    expect(image.attributes('alt')).toBe('Jaeger');
+    // The name is shown beside the portrait, so the portrait itself is decorative.
+    expect(image.attributes('alt')).toBe('');
     expect(wrapper.get('[data-testid="objective-trader-name"]').text()).toBe('Jaeger');
     const title = wrapper.get('[data-testid="objective-task-title"]');
     expect(title.text()).toBe('The Survivalist Path - Unprotected but Dangerous');
@@ -195,6 +196,7 @@ describe('LeafletObjectiveTooltip', () => {
     const { wrapper, tarkovStore } = await setup({ id: 'task-1', name: 'Task' }, {}, { count: 2 });
     const toggle = wrapper.get('[data-testid="objective-complete-toggle"]');
     expect(toggle.text()).toContain('common.mark_complete');
+    expect(toggle.attributes('aria-label')).toBe('common.mark_complete');
     expect(toggle.attributes('aria-pressed')).toBe('false');
     await toggle.trigger('click');
     expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-1');

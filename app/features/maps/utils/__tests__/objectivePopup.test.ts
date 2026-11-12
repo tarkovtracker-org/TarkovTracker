@@ -21,7 +21,18 @@ describe('objective popup details', () => {
     ];
     const use = { id: 'o', type: 'useItem', useAny: flares } as TaskObjective;
     expect(getObjectivePopupItem(use)).toEqual({ item: flares[0], alternatives: 1 });
+    // Accepted alternatives win over the singular item, so none are hidden.
+    const stash = { id: 'o', type: 'plantItem', items: flares, item: flares[0] } as TaskObjective;
+    expect(getObjectivePopupItem(stash)).toEqual({ item: flares[0], alternatives: 1 });
     expect(getObjectivePopupItem({ id: 'o', type: 'visit' })).toBeUndefined();
+  });
+  it('shows the weapon or gear an elimination must be done with', () => {
+    const rifle = { id: 'ash12', name: 'ASh-12' };
+    const shoot = { id: 'o', type: 'shoot', usingWeapon: rifle } as TaskObjective;
+    expect(getObjectivePopupItem(shoot)).toEqual({ item: rifle, alternatives: 0 });
+    const gear = [{ id: 'helmet', name: 'Helmet' }];
+    const worn = { id: 'o', type: 'shoot', wearing: gear } as TaskObjective;
+    expect(getObjectivePopupItem(worn)?.item).toBe(gear[0]);
   });
   it('joins each key group as alternatives and skips unnamed groups', () => {
     const objective = {

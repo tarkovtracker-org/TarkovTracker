@@ -7,7 +7,7 @@
       v-if="image"
       data-testid="objective-trader-image"
       :src="image"
-      :alt="name"
+      :alt="alt"
       :width="pixels"
       :height="pixels"
       loading="lazy"
@@ -18,7 +18,10 @@
   </span>
 </template>
 <script setup lang="ts">
-  /** The task giver's portrait in map popups (#1394); a generic avatar when there is no image. */
-  const props = defineProps<{ name: string; image: string; large?: boolean }>();
+  /**
+   * The task giver's portrait in map popups (#1394); a generic avatar when there is no image.
+   * The alt text is empty where the trader's name is already shown as text beside it.
+   */
+  const props = defineProps<{ alt: string; image: string; large?: boolean }>();
   const pixels = computed(() => (props.large ? 40 : 28));
 </script>

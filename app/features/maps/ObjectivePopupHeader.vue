@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-start gap-2.5">
-    <ObjectiveTraderAvatar :name="traderName" :image="traderImage" :large="!compact" />
+    <ObjectiveTraderAvatar alt="" :image="traderImage" :large="!compact" />
     <div class="min-w-0 flex-1">
       <component
         :is="wikiUrl ? 'a' : 'div'"

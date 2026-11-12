@@ -22,13 +22,14 @@
           @click.stop="emit('select', entry.id)"
         >
           <span class="relative shrink-0">
-            <ObjectiveTraderAvatar :name="entry.traderName" :image="entry.traderImage" />
+            <ObjectiveTraderAvatar :alt="entry.traderName" :image="entry.traderImage" />
             <span
               class="bg-surface-500 absolute -right-1 -bottom-1 inline-flex size-4 items-center justify-center border text-white"
               :class="MAP_OBJECTIVE_CHIP_SKIN_CLASS"
-              aria-hidden="true"
+              role="img"
+              :aria-label="t(`maps.objective_icons.kinds.${entry.glyphKind}`)"
             >
-              <svg viewBox="0 0 24 24" class="size-2.5">
+              <svg viewBox="0 0 24 24" class="size-2.5" aria-hidden="true">
                 <path fill="currentColor" :d="MAP_OBJECTIVE_GLYPH_PATHS[entry.glyphKind]" />
               </svg>
             </span>
@@ -69,7 +70,7 @@
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const isCompact = computed(() => preferencesStore.getMapTooltipDensity === 'compact');
-  const rootClass = computed(() => (isCompact.value ? 'w-64' : 'w-80'));
+  const rootClass = computed(() => (isCompact.value ? 'w-64 max-w-full' : 'w-80 max-w-full'));
   const entryButtons = ref<HTMLButtonElement[]>([]);
   const entries = computed(() =>
     props.objectiveIds.map((id) => {

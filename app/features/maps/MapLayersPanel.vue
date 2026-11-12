@@ -75,7 +75,7 @@
             class="flex items-center gap-1"
           >
             <span
-              class="bg-surface-500 inline-flex size-4.5 shrink-0 items-center justify-center border text-white"
+              class="bg-surface-500 inline-flex size-4.5 shrink-0 items-center justify-center border-2 text-white"
               :class="MAP_OBJECTIVE_CHIP_SKIN_CLASS"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" class="size-3">
