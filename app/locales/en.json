@@ -649,14 +649,14 @@
     "objective_icons": {
       "legend_title": "Objective icons",
       "kinds": {
-        "visit": "Visit or locate",
-        "plant": "Plant or stash",
-        "find": "Find or pick up",
+        "visit": "Visit / locate",
+        "plant": "Plant / stash",
+        "find": "Find / pick up",
         "mark": "Mark",
         "shoot": "Eliminate",
         "use": "Use item",
         "extract": "Extract",
-        "other": "Other objective"
+        "other": "Other"
       }
     },
     "tooltips": {
