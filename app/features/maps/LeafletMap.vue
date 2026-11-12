@@ -2039,12 +2039,13 @@
   function fitObjectivePopup(popup: L.Popup): void {
     const size = mapInstance.value?.getSize();
     if (!size) return;
-    const maxWidth = Math.max(200, Math.min(OBJECTIVE_POPUP_WIDTH, size.x - 24));
+    const maxWidth = Math.max(120, Math.min(OBJECTIVE_POPUP_WIDTH, size.x - 24));
     Object.assign(popup.options, {
       maxWidth,
       minWidth: Math.min(256, maxWidth),
       maxHeight: Math.max(160, size.y - 60),
     });
+    if (popup.isOpen()) popup.update();
   }
   /** Keep requirement details inside the current map, including after viewport changes. */
   function fitExtractPopup(popup: L.Popup): void {
