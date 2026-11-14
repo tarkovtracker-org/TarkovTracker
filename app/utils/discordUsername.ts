@@ -13,15 +13,20 @@ const usernameFromMetadata = (metadata: Record<string, unknown>): string | null 
       ?.replace(/#0$/, '') ?? null
   );
 };
-export const getLinkedDiscordUsername = (
+export const getLinkedDiscordIdentity = (
   identities: UserIdentity[],
   discordUserId: string
-): string | null => {
-  const identity = identities.find((candidate) => {
+): UserIdentity | undefined =>
+  identities.find((candidate) => {
     if (candidate.provider !== 'discord') return false;
     const metadata = candidate.identity_data ?? {};
     const identityId = nonEmptyString(metadata.provider_id) ?? nonEmptyString(metadata.sub);
     return identityId === discordUserId;
   });
+export const getLinkedDiscordUsername = (
+  identities: UserIdentity[],
+  discordUserId: string
+): string | null => {
+  const identity = getLinkedDiscordIdentity(identities, discordUserId);
   return usernameFromMetadata(identity?.identity_data ?? {});
 };

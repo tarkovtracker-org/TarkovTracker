@@ -244,6 +244,64 @@ describe('DiscordLinkCard', () => {
     );
     expect(wrapper.text()).toContain('settings.discord_link.link_account');
   });
+  it.each([{ provider_id: 'discord-123' }, { sub: 'discord-123' }])(
+    'unlinks the displayed Discord account when another identity comes first (%j)',
+    async (metadata) => {
+      const linkedIdentity = {
+        id: 'identity-linked',
+        provider: 'discord',
+        identity_data: { ...metadata, full_name: 'linked-user' },
+      };
+      maybeSingleMock.mockResolvedValue({ data: { discord_user_id: 'discord-123' }, error: null });
+      userGetMock.mockResolvedValue({
+        data: {
+          user: {
+            identities: [
+              {
+                id: 'identity-other',
+                provider: 'discord',
+                identity_data: { provider_id: 'discord-other', full_name: 'wrong-user' },
+              },
+              linkedIdentity,
+              { id: 'identity-email', provider: 'email' },
+            ],
+          },
+        },
+        error: null,
+      });
+      const wrapper = await mountCard();
+      expect(wrapper.text()).toContain('Linked as linked-user');
+      await wrapper.findAll('button')[1]!.trigger('click');
+      await flushPromises();
+      expect(invokeMock).toHaveBeenCalledWith('discord-unlink', { body: {} });
+      expect(unlinkIdentityMock).toHaveBeenCalledWith(linkedIdentity);
+      expect(wrapper.text()).toContain('settings.discord_link.link_account');
+    }
+  );
+  it('keeps the link when its matching Discord identity is missing', async () => {
+    maybeSingleMock.mockResolvedValue({ data: { discord_user_id: 'discord-123' }, error: null });
+    userGetMock.mockResolvedValue({
+      data: {
+        user: {
+          identities: [
+            {
+              id: 'identity-other',
+              provider: 'discord',
+              identity_data: { provider_id: 'discord-other' },
+            },
+            { id: 'identity-email', provider: 'email' },
+          ],
+        },
+      },
+      error: null,
+    });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
+  });
   it('restores the Linked role when identity unlinking fails', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_user_id: 'discord-123' },
@@ -286,7 +344,17 @@ describe('DiscordLinkCard', () => {
       error: null,
     });
     userGetMock.mockResolvedValue({
-      data: { user: { identities: [{ id: 'identity-1', provider: 'discord' }] } },
+      data: {
+        user: {
+          identities: [
+            {
+              id: 'identity-1',
+              provider: 'discord',
+              identity_data: { provider_id: 'discord-123' },
+            },
+          ],
+        },
+      },
       error: null,
     });
     const wrapper = await mountCard();

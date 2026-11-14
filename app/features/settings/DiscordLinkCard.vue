@@ -79,7 +79,7 @@
 </template>
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
-  import { getLinkedDiscordUsername } from '@/utils/discordUsername';
+  import { getLinkedDiscordIdentity, getLinkedDiscordUsername } from '@/utils/discordUsername';
   import { logger } from '@/utils/logger';
   interface DiscordAccountLink {
     discord_user_id: string;
@@ -203,7 +203,7 @@
       const { data: userData, error: userError } = await $supabase.client.auth.getUser();
       if (userError) throw userError;
       const identities = userData.user?.identities ?? [];
-      const discordIdentity = identities.find((identity) => identity.provider === 'discord');
+      const discordIdentity = getLinkedDiscordIdentity(identities, link.value.discord_user_id);
       if (!discordIdentity) {
         throw new Error('Discord identity was not found');
       }

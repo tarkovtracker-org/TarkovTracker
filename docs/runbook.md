@@ -297,6 +297,8 @@ The Settings Discord card reads the unique username from the matching Discord au
 the display name or cached `discord_username` (which may contain a numeric ID or display name).
 If the username is unavailable, the card shows "Discord account linked" and keeps role sync and
 unlink available.
+The same provider-and-ID lookup selects the identity to unlink; if it is missing, the link stays
+active and no roles are revoked.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
