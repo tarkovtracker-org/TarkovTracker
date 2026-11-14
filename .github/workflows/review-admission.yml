@@ -61,6 +61,7 @@ jobs:
     name: Review admission controller
     outputs:
       release_promotion: ${{ steps.publish.outputs.release_promotion }}
+      admission_run_attempt: ${{ steps.publish.outputs.admission_run_attempt }}
     needs: filter
     if: >-
       needs.filter.outputs.relevant == 'true' && (
@@ -140,6 +141,7 @@ jobs:
             const publisher = await createReviewPublisher({ github, context, core });
             const releasePromotion = await publishReviewScope({ github: publisher, context, head: process.env.ADMISSION_SHA, queued: process.env.QUEUE_SHA });
             core.setOutput('release_promotion', String(releasePromotion));
+            core.setOutput('admission_run_attempt', process.env.GITHUB_RUN_ATTEMPT);
   request-promotion:
     name: Request reviewed release promotion
     needs: admission
@@ -152,9 +154,14 @@ jobs:
     steps:
       - name: Dispatch promotion from trusted main
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ADMISSION_RUN_ATTEMPT: ${{ needs.admission.outputs.admission_run_attempt }}
         with:
           retries: 3
           script: |
+            if (!process.env.ADMISSION_RUN_ATTEMPT || process.env.ADMISSION_RUN_ATTEMPT !== process.env.GITHUB_RUN_ATTEMPT) {
+              throw new Error('Promotion dispatch needs freshly published admission for this attempt; rerun all jobs or dispatch Review Admission again.');
+            }
             await github.rest.actions.createWorkflowDispatch({
               ...context.repo,
               workflow_id: 'release-promotion-queue.yml',

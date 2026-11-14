@@ -38,7 +38,9 @@ protected App key remain unchanged. [GitHub permits job-token workflow dispatche
 The dispatch retries transient API failures up to three times. If dispatch still fails, or the
 source admission attempt fails or is superseded, dispatch a fresh admission with
 `gh workflow run review-admission.yml --ref main -f pull_request=<PR>`; it rechecks current approval
-and creates new run/attempt locators. The controller waits at most 60 seconds for that exact source
+and creates new run/attempt locators. Rerunning all admission jobs is also safe. Rerunning only a failed
+dispatch job is rejected before creating a promotion run because its preserved receipts belong to
+the earlier admission attempt. The controller waits at most 60 seconds for that exact source
 attempt to finish successfully before reading receipts. Failure, timeout or supersession cannot
 authorize enqueue. Rerun a failed promotion only for a transient controller error or a wait timeout
 after confirming its source admission attempt succeeded. The completed Release wakeup remains as a

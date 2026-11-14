@@ -124,16 +124,28 @@ test('only published release admission requests promotion with isolated dispatch
   assert.doesNotMatch(job, /secrets\.|environment:|checkout@/);
   const admission = jobBlock(workflow, 'admission');
   assert.match(admission, /release_promotion: \$\{\{ steps.publish.outputs.release_promotion \}\}/);
+  assert.match(
+    admission,
+    /admission_run_attempt: \$\{\{ steps.publish.outputs.admission_run_attempt \}\}/
+  );
   const publish = workflowStep(admission, 'Publish verified admission after evidence upload');
   assert.match(publish, /id: publish/);
   assert.match(publish, /const releasePromotion = await publishReviewScope/);
   assert.match(publish, /core.setOutput\('release_promotion', String\(releasePromotion\)\)/);
+  assert.match(
+    publish,
+    /core.setOutput\('admission_run_attempt', process.env.GITHUB_RUN_ATTEMPT\)/
+  );
   const calls = [];
   const github = {
     rest: { actions: { createWorkflowDispatch: async (args) => calls.push(args) } },
   };
   const dispatch = workflowStep(job, 'Dispatch promotion from trusted main');
   assert.match(dispatch, /^ {10}retries: 3$/m);
+  assert.match(
+    dispatch,
+    /ADMISSION_RUN_ATTEMPT: \$\{\{ needs.admission.outputs.admission_run_attempt \}\}/
+  );
   const script = dispatch.split('script: |\n')[1];
   const execute = new Function(
     'github',
@@ -154,7 +166,7 @@ test('only published release admission requests promotion with isolated dispatch
       await execute(
         github,
         { repo: { owner: 'example', repo: 'repo' }, runId: 123 },
-        { env: { GITHUB_RUN_ATTEMPT: '2' } }
+        { env: { GITHUB_RUN_ATTEMPT: '2', ADMISSION_RUN_ATTEMPT: '2' } }
       );
   }
   assert.deepEqual(calls, [
@@ -166,6 +178,17 @@ test('only published release admission requests promotion with isolated dispatch
       inputs: { admission_run_id: '123', admission_run_attempt: '2' },
     },
   ]);
+  for (const attempt of ['1', undefined]) {
+    await assert.rejects(
+      execute(
+        github,
+        { repo: { owner: 'example', repo: 'repo' }, runId: 123 },
+        { env: { GITHUB_RUN_ATTEMPT: '2', ADMISSION_RUN_ATTEMPT: attempt } }
+      ),
+      /freshly published admission/
+    );
+    assert.equal(calls.length, 1);
+  }
 });
 function sourceRun(path, fields = {}) {
   const github = event('workflow_run');
