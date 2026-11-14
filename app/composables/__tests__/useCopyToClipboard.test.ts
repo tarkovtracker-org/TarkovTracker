@@ -74,9 +74,11 @@ describe('useCopyToClipboard', () => {
       const item = write.mock.calls[0]![0][0]!;
       await expect((await item.getType('text/plain')).text()).resolves.toBe('late report');
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
-      expect(mockToast.add).toHaveBeenCalledWith(
-        expect.objectContaining({ description: undefined })
-      );
+      expect(mockToast.add).toHaveBeenCalledWith({
+        color: 'success',
+        description: undefined,
+        title: 'toast.clipboard_copied.title',
+      });
     });
     it('falls back to a text write when deferred writes are unsupported', async () => {
       vi.stubGlobal('ClipboardItem', undefined);

@@ -507,17 +507,19 @@ type DebugAuthUser = {
   createdAt?: string | null;
   lastLoginAt?: string | null;
 };
+const orNull = <T>(value: T | null | undefined): T | null => value ?? null;
+const copyStrings = (value: unknown): string[] => (Array.isArray(value) ? [...value] : []);
 async function buildDebugAuthContext(
   user: DebugAuthUser,
   authStorageKeyCount: number
 ): Promise<DebugExportAuthContext> {
   return {
     loggedIn: user.loggedIn,
-    provider: user.provider ?? null,
-    providers: Array.isArray(user.providers) ? [...user.providers] : [],
-    userIdFingerprint: await fingerprintValue(user.id ?? null),
-    createdAt: user.createdAt ?? null,
-    lastLoginAt: user.lastLoginAt ?? null,
+    provider: orNull(user.provider),
+    providers: copyStrings(user.providers),
+    userIdFingerprint: await fingerprintValue(orNull(user.id)),
+    createdAt: orNull(user.createdAt),
+    lastLoginAt: orNull(user.lastLoginAt),
     hasAuthSessionHint: authStorageKeyCount > 0,
   };
 }
@@ -527,10 +529,10 @@ function buildDebugRuntimeContext(): DebugExportRuntimeContext {
     // URL query and fragment values may contain credentials or private identifiers.
     query: '',
     hash: '',
-    language: navigator.language ?? null,
-    languages: Array.isArray(navigator.languages) ? [...navigator.languages] : [],
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-    userAgent: navigator.userAgent ?? null,
+    language: orNull(navigator.language),
+    languages: copyStrings(navigator.languages),
+    timeZone: orNull(Intl.DateTimeFormat().resolvedOptions().timeZone),
+    userAgent: orNull(navigator.userAgent),
   };
 }
 async function readDebugProgressStorage(): Promise<string | null> {
@@ -836,6 +838,13 @@ export function useDataBackup(): UseDataBackupReturn {
       copies: copies.map(({ ownerId: _ownerId, ...copy }) => copy),
     });
   }
+  function buildDebugSummary(currentMode: GameMode, tarkovState: UserState): DebugTaskSummary {
+    const metadataStore = useMetadataStore();
+    return buildDebugTaskSummary(currentMode, tarkovState[currentMode], metadataStore.tasks ?? [], {
+      gameMode: metadataStore.currentGameMode,
+      loading: metadataStore.loading,
+    });
+  }
   async function buildDebugSnapshot(): Promise<DebugExportPayload> {
     const runtimeConfig = useRuntimeConfig();
     const currentUserId = $supabase.user.id ?? null;
@@ -857,11 +866,7 @@ export function useDataBackup(): UseDataBackupReturn {
         analyticsConsent: cloneStateSnapshot(analyticsConsent.state.value),
       },
       storage,
-      summary: buildDebugTaskSummary(
-        currentMode,
-        tarkovState[currentMode],
-        useMetadataStore().tasks ?? []
-      ),
+      summary: buildDebugSummary(currentMode, tarkovState),
     };
   }
   /** Builds the sanitized debug snapshot and records a user-facing error when it cannot be built. */

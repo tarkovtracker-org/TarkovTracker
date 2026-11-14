@@ -50,7 +50,7 @@ async function writeDeferredToClipboard(text: Promise<string>): Promise<boolean>
       await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
       return true;
     } catch (error) {
-      logger.warn('[Clipboard] Deferred clipboard write failed, trying text write:', error);
+      logger.warn('[Clipboard] Deferred clipboard write failed:', error);
     }
   }
   return writeToClipboard(await text);

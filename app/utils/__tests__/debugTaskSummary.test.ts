@@ -9,6 +9,7 @@ const tasks = [
 ] as unknown as Task[];
 const progress = (taskCompletions: UserProgressData['taskCompletions']) =>
   ({ taskCompletions }) as UserProgressData;
+const catalog = { gameMode: 'pve', loading: false };
 describe('buildDebugTaskSummary', () => {
   it('reports each recorded task with prerequisite states and settled sources', () => {
     const summary = buildDebugTaskSummary(
@@ -18,7 +19,8 @@ describe('buildDebugTaskSummary', () => {
         'follow-up': { complete: true, failed: true, manual: false },
         'chain-end': { complete: false },
       }),
-      tasks
+      tasks,
+      catalog
     );
     expect(summary).toMatchObject({
       gameMode: 'pve',
@@ -26,7 +28,8 @@ describe('buildDebugTaskSummary', () => {
       completedTaskCount: 1,
       failedTaskCount: 1,
       manualTaskCount: 1,
-      importedTaskCount: 1,
+      automaticTaskCount: 1,
+      catalog: { gameMode: 'pve', loading: false, taskCount: 3 },
     });
     expect(summary.tasks).toEqual([
       expect.objectContaining({ id: 'intro', name: 'Intro', complete: true, prerequisiteIds: [] }),
@@ -46,9 +49,12 @@ describe('buildDebugTaskSummary', () => {
   });
   it('falls back to task ids and empty data when metadata or progress is missing', () => {
     expect(
-      buildDebugTaskSummary('pvp', progress({ unknown: { complete: true } }), []).tasks
+      buildDebugTaskSummary('pvp', progress({ unknown: { complete: true } }), [], catalog).tasks
     ).toEqual([expect.objectContaining({ id: 'unknown', name: 'unknown', prerequisiteIds: [] })]);
-    expect(buildDebugTaskSummary('seasonal', undefined, tasks)).toMatchObject({
+    expect(
+      buildDebugTaskSummary('seasonal', undefined, tasks, { gameMode: 'pvp', loading: true })
+    ).toMatchObject({
+      catalog: { gameMode: 'pvp', loading: true, taskCount: 3 },
       taskCount: 0,
       tasks: [],
     });

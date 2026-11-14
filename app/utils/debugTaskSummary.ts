@@ -1,8 +1,9 @@
+import { isTaskComplete, isTaskFailed } from '@/utils/taskStatus';
 import type { TaskCompletion, UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 type TaskStatus = { complete: boolean; failed: boolean };
-type TaskSource = 'manual' | 'imported' | 'normal';
+type TaskSource = 'manual' | 'automatic' | 'normal';
 export interface DebugTaskEntry extends TaskStatus {
   id: string;
   name: string;
@@ -10,23 +11,34 @@ export interface DebugTaskEntry extends TaskStatus {
   prerequisiteIds: string[];
   prerequisiteStates: Record<string, TaskStatus>;
 }
+/**
+ * The task catalog the names and prerequisites came from. While `loading` is true after a mode
+ * switch, they may still describe the previous mode's catalog.
+ */
+export interface DebugTaskCatalog {
+  gameMode: string;
+  loading: boolean;
+  taskCount: number;
+}
 /** Task completions for the current mode, with prerequisite states, for reproducing bug reports. */
 export interface DebugTaskSummary {
   gameMode: GameMode;
+  catalog: DebugTaskCatalog;
   taskCount: number;
   completedTaskCount: number;
   failedTaskCount: number;
   manualTaskCount: number;
-  importedTaskCount: number;
+  /** Settled tasks the app marked itself (`manual: false`), such as progress repair. */
+  automaticTaskCount: number;
   tasks: DebugTaskEntry[];
 }
 const toStatus = (completion: TaskCompletion | undefined): TaskStatus => ({
-  complete: Boolean(completion?.complete && !completion?.failed),
-  failed: Boolean(completion?.failed),
+  complete: isTaskComplete(completion),
+  failed: isTaskFailed(completion),
 });
 const classifySource = (completion: TaskCompletion): TaskSource => {
   if (completion.manual === true) return 'manual';
-  if (completion.manual === false) return 'imported';
+  if (completion.manual === false) return 'automatic';
   return 'normal';
 };
 const prerequisiteIdsOf = (task: Task | undefined): string[] =>
@@ -62,7 +74,8 @@ const countSettledBySource = (
 export function buildDebugTaskSummary(
   gameMode: GameMode,
   modeData: UserProgressData | undefined,
-  tasks: readonly Task[]
+  tasks: readonly Task[],
+  catalog: Omit<DebugTaskCatalog, 'taskCount'>
 ): DebugTaskSummary {
   const completions: Record<string, TaskCompletion> = modeData?.taskCompletions ?? {};
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
@@ -71,11 +84,12 @@ export function buildDebugTaskSummary(
   );
   return {
     gameMode,
+    catalog: { ...catalog, taskCount: tasks.length },
     taskCount: entries.length,
     completedTaskCount: entries.filter((entry) => entry.complete).length,
     failedTaskCount: entries.filter((entry) => entry.failed).length,
     manualTaskCount: countSettledBySource(completions, 'manual'),
-    importedTaskCount: countSettledBySource(completions, 'imported'),
+    automaticTaskCount: countSettledBySource(completions, 'automatic'),
     tasks: entries,
   };
 }

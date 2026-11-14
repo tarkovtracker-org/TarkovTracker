@@ -689,6 +689,8 @@ describe('DataManagementCard', () => {
     );
     const copy = findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!;
     expect(copy.attributes('disabled')).toBeDefined();
+    // Exercise the in-flight guard itself, not only the disabled attribute.
+    copy.element.removeAttribute('disabled');
     await copy.trigger('click');
     expect(backupFns.serializeDebugSnapshot).not.toHaveBeenCalled();
     finish();

@@ -150,6 +150,8 @@ vi.mock('@/stores/useTarkov', () => ({
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
+    currentGameMode: 'pvp',
+    loading: false,
     tasks: [
       { id: 'task1', name: 'Debut', taskRequirements: [{ task: { id: 'task0' } }] },
       { id: 'task0', name: 'Prologue' },
@@ -729,11 +731,12 @@ describe('useDataBackup', () => {
         expect(debugJson._version).toBe(2);
         expect(debugJson.summary).toEqual({
           gameMode: 'pvp',
+          catalog: { gameMode: 'pvp', loading: false, taskCount: 2 },
           taskCount: 1,
           completedTaskCount: 1,
           failedTaskCount: 0,
           manualTaskCount: 0,
-          importedTaskCount: 0,
+          automaticTaskCount: 0,
           tasks: [
             {
               id: 'task1',
