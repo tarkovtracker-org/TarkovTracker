@@ -7,7 +7,7 @@ function assertStatusBoundary(workflow) {
   assert.match(job, /^ {4}timeout-minutes: 15$/m);
   assert.match(
     job,
-    /^ {4}concurrency:\n {6}group: ci-result-\$\{\{ github\.event_name == 'workflow_dispatch' && github\.sha \|\| github\.run_id \}\}\n {6}queue: max\n {6}cancel-in-progress: false$/m
+    /^ {4}concurrency:\n {6}group: ci-result-\$\{\{ github\.event_name == 'workflow_dispatch' && 'publication' \|\| github\.run_id \}\}\n {6}queue: max\n {6}cancel-in-progress: false$/m
   );
   const permissions = permissionsBlock(job, '    ')
     .trim()
@@ -39,7 +39,7 @@ function assertStatusBoundary(workflow) {
   );
   assert.match(
     report,
-    /^ {12}await reportDispatchedCi\(\{ github, context, outcome: process\.env\.VALIDATION_OUTCOME \}\);$/m
+    /^ {12}await reportDispatchedCi\(\{ github, context, outcome: process\.env\.VALIDATION_OUTCOME, serialized: true \}\);$/m
   );
   assert.ok(
     job.indexOf('name: Require all selected jobs') < job.indexOf('name: Report dispatched CI')
@@ -89,6 +89,8 @@ test('status publication contracts reject misleading configuration changes', () 
     ],
     ['id: validation', 'id: validation-other'],
     ['await reportDispatchedCi({', 'await unusedReporter({'],
+    ['serialized: true', 'serialized: false'],
+    [', serialized: true', ''],
     ['scripts/ci/report-dispatched-ci.mjs', 'scripts/unrelated.mjs'],
   ];
   for (const [before, after] of mutations) {

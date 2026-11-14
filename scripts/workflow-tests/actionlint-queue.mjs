@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { normalizeQueueWorkflow, normalizePublisherEnvironment } from '../ci/actionlint-queue.mjs';
 const path = '.github/workflows/preview-retention.yml';
-test('CI status serialization is per SHA for dispatches and per run for other events', () => {
+test('CI status serialization shares all dispatch targets and is per run for other events', () => {
   const filename = '.github/workflows/ci.yml';
   const source = readFileSync(filename, 'utf8');
   const normalized = normalizeQueueWorkflow(source, filename);
@@ -17,8 +17,8 @@ test('CI status serialization rejects missing, cancelled, foreign or broadened l
   const mutations = [
     source.replace('  ci-result:', '  other-result:'),
     source.replace(
-      "github.event_name == 'workflow_dispatch' && github.sha",
-      "github.event_name == 'workflow_dispatch' && github.ref"
+      "github.event_name == 'workflow_dispatch' && 'publication'",
+      "github.event_name == 'workflow_dispatch' && github.sha"
     ),
     source.replace('queue: max', 'queue: single'),
     source.replace('      queue: max\n', ''),

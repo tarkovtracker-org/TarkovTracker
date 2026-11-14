@@ -47,7 +47,7 @@ function normalizeCiWorkflow(source, filename) {
     source,
     filename,
     'ci-result',
-    "ci-result-${{ github.event_name == 'workflow_dispatch' && github.sha || github.run_id }}",
+    "ci-result-${{ github.event_name == 'workflow_dispatch' && 'publication' || github.run_id }}",
     2
   );
 }

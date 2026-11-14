@@ -403,7 +403,7 @@ jobs:
       security-events: write
   ci-result:
     concurrency:
-      group: ci-result-${{ github.event_name == 'workflow_dispatch' && github.sha || github.run_id }}
+      group: ci-result-${{ github.event_name == 'workflow_dispatch' && 'publication' || github.run_id }}
       queue: max
       cancel-in-progress: false
     permissions:
@@ -453,4 +453,4 @@ jobs:
         with:
           script: |
             const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`);
-            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME });
+            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME, serialized: true });

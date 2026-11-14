@@ -20,6 +20,7 @@ function fixture() {
       runId: 123,
     },
     outcome: 'success',
+    serialized: true,
   };
 }
 function localesFixture() {
@@ -99,6 +100,13 @@ function retryClock(f) {
   return f;
 }
 describe('rate-limited CI status publication', () => {
+  it('fails closed when an older workflow does not declare the serialization protocol', async () => {
+    const f = fixture();
+    delete f.serialized;
+    await expect(reportDispatchedCi(f)).rejects.toThrow('serialized');
+    expect(f.github.paginate).not.toHaveBeenCalled();
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
   it.each([
     [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000090' }, 'quota', 91_000],
     [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000380' }, 'quota', 381_000],
@@ -231,6 +239,38 @@ function reportedStatus(f, run = 124, creator = {}) {
   };
 }
 describe('superseded dispatch publication', () => {
+  it('does not overwrite a newer merge-SHA report when publishing from a locales head', async () => {
+    const f = localesFixture();
+    f.github.paginate.mockImplementation(async (_method, options) =>
+      options.ref === f.pull.merge_commit_sha ? [reportedStatus(f)] : []
+    );
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sha: f.context.sha, state: 'success' })
+    );
+  });
+  it('does not overwrite a newer locales-derived report when publishing directly to its merge SHA', async () => {
+    const f = fixture();
+    f.context.sha = 'c'.repeat(40);
+    f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('rechecks the merge target after a partial publication waits for quota', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.paginate.mockImplementation(async (_method, options) =>
+        options.ref === f.pull.merge_commit_sha ? [reportedStatus(f)] : []
+      );
+    });
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(3);
+    expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ sha: f.context.sha }));
+  });
   it.each(['success', 'failure'])(
     'does not overwrite a newer %s when an older validation finishes last',
     async (state) => {

@@ -136,6 +136,7 @@ async function requiredMergeSha(github, context, state) {
   return mergeSha;
 }
 async function reportLocalesMergeCi(github, context, targetUrl, mergeSha, state) {
+  if (await supersededRun(github, context, mergeSha)) return;
   await github.rest.repos.createCommitStatus({
     ...context.repo,
     sha: mergeSha,
@@ -180,13 +181,16 @@ function newerReport(status, context) {
   const run = reportedRunId(status, context);
   return run !== null && run > BigInt(context.runId);
 }
-async function supersededRun(github, context) {
+async function supersededRun(github, context, sha = context.sha) {
   const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
     ...context.repo,
-    ref: context.sha,
+    ref: sha,
     per_page: 100,
   });
-  return statuses.some((status) => newerReport(status, context));
+  const superseded = statuses.some((status) => newerReport(status, context));
+  if (superseded)
+    console.log(`Skipping CI status on ${sha} for superseded workflow run ${context.runId}.`);
+  return superseded;
 }
 async function reportDispatchedCiOnce({
   github,
@@ -194,12 +198,9 @@ async function reportDispatchedCiOnce({
   outcome,
   admissionAppId = process.env.REVIEW_ADMISSION_APP_ID,
 }) {
-  // ci-result holds a non-cancelling per-SHA lock across this read, all waits, and both writes.
+  // ci-result holds one non-cancelling dispatch lock across all target SHAs, waits, and writes.
   // Run ordering also suppresses an older-run rerun after a newer dispatch has reported.
-  if (await supersededRun(github, context)) {
-    console.log(`Skipping CI status publication for superseded workflow run ${context.runId}.`);
-    return;
-  }
+  if (await supersededRun(github, context)) return;
   const { state, description } = validationStatus(outcome);
   const targetUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
   const headOnly = await queueHeadOnly(github, context, admissionAppId);
@@ -216,5 +217,8 @@ async function reportDispatchedCiOnce({
 }
 export async function reportDispatchedCi(options) {
   if (options.context.eventName !== 'workflow_dispatch') return;
+  // The trusted helper can be newer than the caller's workflow on a historical ref.
+  if (options.serialized !== true)
+    throw new Error('CI status publication requires the updated serialized workflow.');
   return withGitHubRateLimitRetry(() => reportDispatchedCiOnce(options), options.retry);
 }
