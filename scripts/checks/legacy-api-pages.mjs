@@ -177,6 +177,38 @@ test('compiled static assets retain the original Request and ASSETS binding', as
   assert.equal(response.headers.get('X-Test-Body-Reads'), '0');
   assert.equal(response.headers.get('X-Test-Assets-Read'), 'true');
 });
+test('compiled unknown Tarkov paths return uncacheable JSON instead of the SPA', async () => {
+  for (const path of [
+    '/api/tarkov/',
+    '/api/tarkov/missing',
+    '/api/tarkov/missing/nested',
+    '/api/tarkov/missing/?lang=en',
+  ]) {
+    for (const method of ['GET', 'HEAD', 'POST']) {
+      const response = await harness.fetch(`https://tarkovtracker.org${path}`, {
+        method,
+        headers: { Accept: 'text/html' },
+      });
+      assert.equal(response.status, 404, `${method} ${path}`);
+      assert.equal(response.headers.get('Cache-Control'), 'no-store');
+      assert.match(response.headers.get('Content-Type'), /^application\/json/);
+      if (method === 'HEAD') assert.equal(await response.text(), '');
+      else assert.equal((await response.json()).statusCode, 404);
+    }
+  }
+  assert.deepEqual(outbound, []);
+});
+test('compiled known Tarkov route takes precedence over the fallback', async () => {
+  for (const method of ['GET', 'HEAD']) {
+    const response = await harness.fetch('https://tarkovtracker.org/api/tarkov/access-check', {
+      method,
+    });
+    assert.equal(response.status, 200);
+    if (method === 'HEAD') assert.equal(await response.text(), '');
+    else assert.deepEqual(await response.json(), { ok: true });
+  }
+  assert.deepEqual(outbound, []);
+});
 test('compiled normal API paths and other hosts keep their existing protection', async () => {
   for (const url of [
     'https://tarkovtracker.org/api/v20',

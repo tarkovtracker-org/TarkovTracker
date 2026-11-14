@@ -20,6 +20,15 @@ const languages = [
 ];
 const modes = ['regular', 'pve', 'pvp-season'];
 const origins = ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
+Deno.test('purges the public extract requirements URL once for each cache origin', () => {
+  const targets = buildTarkovCacheUrls(origins);
+  const extractTargets = targets.filter((url) => url.includes('extract-requirements'));
+  assertEquals(
+    extractTargets.sort(),
+    origins.map((origin) => `${origin}/api/tarkov/extract-requirements`).sort()
+  );
+  assertEquals(buildTarkovCacheUrls([]), []);
+});
 Deno.test('current non-task purge targets match live handler key scopes', async () => {
   const urls = buildTarkovCacheUrls(origins);
   const targets = new Set(urls);

@@ -12,6 +12,14 @@ from the community-maintained `json.tarkov.dev` static JSON API. The browser nev
 client expects, and (for most endpoints) applies corrections (see [Overlay](./overlay-and-precompute.md#overlay-corrections))
 before returning it.
 
+Unknown `/api/tarkov/*` paths terminate with HTTP 404 JSON and `Cache-Control: no-store`,
+including requests that accept HTML. They never fall through to the SPA renderer. Specific
+endpoint handlers take precedence over this namespace fallback.
+
+The admin **Tarkov data** purge includes `/api/tarkov/extract-requirements` on each authorized
+cache origin, alongside the current and retired synthetic `/__edge-cache/tarkov/*` keys. This
+also removes a stale CDN response cached at that public URL before its handler was deployed.
+
 > **Note on upstream endpoints.** `json.tarkov.dev` is the static JSON API TarkovTracker uses for
 > all Tarkov.dev game data. TarkovTracker no longer uses the older `api.tarkov.dev` GraphQL API;
 > do not use it for new TarkovTracker functionality. The current static endpoint list is available
