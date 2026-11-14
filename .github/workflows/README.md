@@ -53,7 +53,15 @@ or merge the locale PR. Untranslated strings use the English fallback until then
 workflow manually when translations must ship sooner. It never uploads local translations. The
 existing `locales` branch supplies translation PRs targeting `main`.
 
-Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
+Environment secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` in `merge-queue` authenticate
+to Crowdin only. GitHub must restrict that environment to the exact `main` branch (no tag rules).
+No repository or inherited organization copies may remain: a branch can remove any inline ref
+guard or environment reference from its workflow. Move the existing values into this protected
+environment before removing the repository copies; do not print or commit them. Run
+`node scripts/ci/crowdin-secret-boundary.mjs` with administrative metadata access to verify the
+cutover. The check reads names and deployment rules only, fails on incomplete/API-error responses,
+and does not replace GitHub's source-independent environment enforcement. Rotate the Crowdin
+token after migration if historical exposure cannot be excluded.
 Synchronization, branch updates, CI dispatch, and a strict-mode merge use the built-in
 `GITHUB_TOKEN`; queue submission uses the
 [Queue Submitter App](../../docs/merge-queue-rollout.md#queue-submitter-provisioning).
