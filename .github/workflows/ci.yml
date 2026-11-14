@@ -362,7 +362,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Validate Supabase migrations
-        run: pnpm run supabase:check
+        run: node scripts/checks/check-supabase-ci.mjs
   systems-drift:
     name: Systems drift check
     runs-on: ubuntu-24.04
