@@ -30,6 +30,11 @@ const {
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
+    serializeDebugSnapshot: vi.fn(async () => '{"_format":"tarkovtracker-debug-export"}'),
+    copyToClipboard: vi.fn(async (text: string | Promise<string>, _options?: unknown) => {
+      await text;
+      return true;
+    }),
     exportProgress: vi.fn(async () => undefined),
     exportDeviceProgressRecovery: vi.fn(async () => {
       backupState.recoveryExportPending.value = true;
@@ -133,6 +138,7 @@ vi.mock('@/composables/useTurnstile', () => ({
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
+    serializeDebugSnapshot: backupFns.serializeDebugSnapshot,
     debugExportError: backupState.debugExportError,
     exportProgress: backupFns.exportProgress,
     exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
@@ -152,6 +158,9 @@ vi.mock('@/composables/useDataBackup', () => ({
     confirmBackupImport: backupFns.confirmBackupImport,
     resetImport: backupFns.resetImport,
   }),
+}));
+vi.mock('@/composables/useCopyToClipboard', () => ({
+  useCopyToClipboard: () => ({ copyToClipboard: backupFns.copyToClipboard }),
 }));
 vi.mock('@/composables/useTarkovDevImport', () => ({
   useTarkovDevImport: () => ({
@@ -239,6 +248,10 @@ describe('DataManagementCard', () => {
   beforeEach(() => {
     backupFns.confirmBackupImport.mockReset();
     backupFns.exportDebugSnapshot.mockReset();
+    backupFns.serializeDebugSnapshot
+      .mockReset()
+      .mockResolvedValue('{"_format":"tarkovtracker-debug-export"}');
+    backupFns.copyToClipboard.mockClear();
     backupFns.exportProgress.mockReset();
     backupState.recoveryExportPending = ref(false);
     backupState.recoveryArchiveEntries = ref([]);
@@ -584,13 +597,14 @@ describe('DataManagementCard', () => {
     ).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeUndefined();
     expect(
-      findButtonByText(wrapper, 'settings.data_management.debug_export_button')
+      findButtonByText(wrapper, 'settings.data_management.bug_report_download')
     ).toBeUndefined();
   });
   it('limits the backup view to backup and debug actions', () => {
     const wrapper = createWrapper({ view: 'backup' });
     expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeTruthy();
-    expect(findButtonByText(wrapper, 'settings.data_management.debug_export_button')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.bug_report_download')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.bug_report_copy')).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
     expect(
       findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
@@ -619,16 +633,66 @@ describe('DataManagementCard', () => {
       throw new Error('debug export failed');
     });
     const wrapper = createWrapper();
-    const exportButton = findButtonByText(wrapper, 'settings.data_management.debug_export_button');
+    const exportButton = findButtonByText(wrapper, 'settings.data_management.bug_report_download');
     expect(exportButton).toBeTruthy();
     await exportButton!.trigger('click');
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',
         description: 'Debug export failed',
-        title: 'settings.data_management.debug_export_error_title',
+        title: 'settings.data_management.bug_report_error_title',
       })
     );
+  });
+  it('copies the sanitized bug report without revealing it in a toast', async () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!.trigger('click');
+    await vi.waitFor(() => expect(backupFns.copyToClipboard).toHaveBeenCalledOnce());
+    const [text, options] = backupFns.copyToClipboard.mock.calls[0]!;
+    // Passed unresolved so Safari keeps the clipboard write inside the click.
+    expect(text).toBeInstanceOf(Promise);
+    await expect(text).resolves.toBe('{"_format":"tarkovtracker-debug-export"}');
+    expect(options).toEqual({ revealValue: false });
+    expect(backupFns.exportDebugSnapshot).not.toHaveBeenCalled();
+  });
+  it('shows toast when copying the bug report fails', async () => {
+    backupState.debugExportError.value = 'Debug export failed';
+    backupFns.serializeDebugSnapshot.mockRejectedValue(new Error('debug export failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!.trigger('click');
+    await vi.waitFor(() =>
+      expect(toastAddMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          color: 'error',
+          description: 'Debug export failed',
+          title: 'settings.data_management.bug_report_error_title',
+        })
+      )
+    );
+  });
+  it('disables both bug report actions during an import', () => {
+    backupState.importState.value = 'parsing';
+    const wrapper = createWrapper({ view: 'backup' });
+    for (const label of ['bug_report_download', 'bug_report_copy']) {
+      const button = findButtonByText(wrapper, `settings.data_management.${label}`);
+      expect(button?.attributes('disabled')).toBeDefined();
+    }
+  });
+  it('runs one bug report action at a time', async () => {
+    let finish!: () => void;
+    backupFns.exportDebugSnapshot.mockImplementation(
+      () => new Promise<undefined>((resolve) => (finish = () => resolve(undefined)))
+    );
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_download')!.trigger(
+      'click'
+    );
+    const copy = findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!;
+    expect(copy.attributes('disabled')).toBeDefined();
+    await copy.trigger('click');
+    expect(backupFns.serializeDebugSnapshot).not.toHaveBeenCalled();
+    finish();
+    await vi.waitFor(() => expect(copy.attributes('disabled')).toBeUndefined());
   });
   it('confirms backup import and shows success toast', async () => {
     backupState.importState.value = 'preview';
