@@ -16,9 +16,12 @@ Unknown `/api/tarkov/*` paths terminate with HTTP 404 JSON and `Cache-Control: n
 including requests that accept HTML. They never fall through to the SPA renderer. Specific
 endpoint handlers take precedence over this namespace fallback.
 
-The `access-check` clearance probe explicitly handles GET and HEAD. Both return JSON response
-headers with `Cache-Control: no-store`; HEAD returns no body. The explicit HEAD handler keeps
-the installed Nitro router from falling through to the SPA for that method.
+Every GET endpoint explicitly registers a HEAD handler that reuses its GET implementation.
+HEAD preserves the route's JSON, cache, and overlay response headers without a body. These
+explicit handlers keep the installed Nitro router from falling through to the SPA for HEAD.
+The compiled Worker regression discovers every GET endpoint and checks both methods, so a new
+route without working HEAD support fails validation. The `access-check` clearance probe uses
+`Cache-Control: no-store` for both methods.
 
 The admin **Tarkov data** purge includes `/api/tarkov/extract-requirements` on each authorized
 cache origin, alongside the current and retired synthetic `/__edge-cache/tarkov/*` keys. This
