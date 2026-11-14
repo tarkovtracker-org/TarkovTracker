@@ -43,6 +43,17 @@ Deno.serve(async (req) => {
   try {
     const methodError = validateMethod(req, ['POST']); // invoked via POST
     if (methodError) return methodError;
+    // Temporary cutover gate: remove only with the billing-safe deletion handler.
+    // No limiter, job claim, team mutation, or Auth deletion may run during rollout.
+    if (req.method === 'POST') {
+      const response = createErrorResponse(
+        'Account deletion is temporarily unavailable. Please try again shortly.',
+        503,
+        req
+      );
+      response.headers.set('Retry-After', '60');
+      return response;
+    }
     const authResult = await authenticateUser(req);
     if ('error' in authResult) {
       return createErrorResponse(authResult.error, authResult.status, req);

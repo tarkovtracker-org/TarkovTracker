@@ -253,6 +253,29 @@ integration fails or is unavailable, not the normal path.
 9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
+### Billing deletion cutover
+
+Before merging the billing-safe deletion migration/handler, deploy the prerequisite
+`account-delete` maintenance gate as a separate release. It returns HTTP 503 with
+`Retry-After: 60` before authentication, limiter writes, job claims, team changes, or Auth
+deletion, and requires no new database objects. Account deletion is temporarily unavailable.
+
+Record the prerequisite merge SHA and the production `account-delete` active version/source
+revision from Supabase (not a preview or merely a green CI check). Using a disposable test
+account's valid session, POST to the production function and verify HTTP 503, the retry header,
+and the maintenance error. Confirm that its teams, Auth user, deletion jobs, and limiter state
+remain unchanged. Do not log the session token. Wait for requests already running the old
+function version to drain before proceeding; record the observed rollout/drain evidence.
+
+Only then merge the billing-safe release. Migrations and Edge Functions may deploy in either
+order: the already-active gate prevents the old team-first handler from running against the
+new Auth deletion guard. Verify the expected migration and new active function version, then
+smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
+If rollout fails, keep/redeploy the maintenance gate; never roll back to the old team-first
+handler after the billing guard migration. Remove the gate only in the billing-safe handler
+release. This prerequisite does not pause an already-running deletion worker; inspect/drain
+existing deletion jobs separately before the migration.
+
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
 trigger deletes the corresponding `discord_account_links` row and clears the denormalized supporter
