@@ -529,7 +529,7 @@ invisible dot of the same size that takes hover, click and the stacked-objective
 dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
 when the objective is on another floor and returns to full strength on hover. Its floor badge sits
 2 px to the left of the chip. A zone's outline and fill are drawn only while the zone is at least
-1.5 chips (39 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their
+2 chips (52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their
 chip, so no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
 (`app/features/maps/utils/objectiveZoneOutline.ts`).
 

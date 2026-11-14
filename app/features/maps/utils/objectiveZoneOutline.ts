@@ -1,9 +1,9 @@
 import { OBJECTIVE_CHIP_SIZE } from '@/features/maps/utils/objectiveGlyphs';
 /**
  * A zone's outline is drawn only once it is clearly larger on screen than the chip at its centre
- * (1.5 chips, 39 px). Smaller zones would only peek out around the chip as a box.
+ * (2 chips, 52 px). A smaller zone would only show as a thin frame around the chip.
  */
-export const ZONE_OUTLINE_MIN_PX = Math.round(OBJECTIVE_CHIP_SIZE * 1.5);
+export const ZONE_OUTLINE_MIN_PX = OBJECTIVE_CHIP_SIZE * 2;
 const ZONE_WEIGHT = 2.25;
 const ZONE_HOVER_WEIGHT = 3;
 const ZONE_OPACITY = 0.95;

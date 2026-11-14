@@ -23,7 +23,7 @@ describe('objective zone outlines', () => {
     expect(zoneScreenSize([])).toBe(0);
   });
   it('hides zones that would only peek out around the chip', () => {
-    expect(ZONE_OUTLINE_MIN_PX).toBe(Math.round(OBJECTIVE_CHIP_SIZE * 1.5));
+    expect(ZONE_OUTLINE_MIN_PX).toBe(OBJECTIVE_CHIP_SIZE * 2);
     expect(zoneOutlineStyle(ZONE_OUTLINE_MIN_PX - 1, false, 0.24)).toEqual({
       opacity: 0,
       fillOpacity: 0,
