@@ -74,6 +74,136 @@ function queueFixture() {
     .mockResolvedValueOnce({ data: { tree: { sha: 'e'.repeat(40) } } });
   return f;
 }
+function rateLimited(status, headers = {}, message = 'API rate limit exceeded for installation') {
+  return Object.assign(new Error(message), { status, response: { headers, data: { message } } });
+}
+function retryClock(f) {
+  let time = 1_800_000_000_000;
+  f.retry = {
+    now: () => time,
+    sleep: vi.fn(async (delay) => {
+      time += delay;
+    }),
+    warn: vi.fn(),
+  };
+  return f;
+}
+describe('rate-limited CI status publication', () => {
+  it.each([
+    [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000090' }, 'quota', 91_000],
+    [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000380' }, 'quota', 381_000],
+    [429, { 'retry-after': '7' }, 'rate limit', 7_000],
+    [403, {}, 'You have exceeded a secondary rate limit.', 60_000],
+    [
+      403,
+      { 'retry-after': '120', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000090' },
+      'quota',
+      120_000,
+    ],
+  ])('honors rate-limit instructions for HTTP %i', async (status, headers, message, delay) => {
+    const f = retryClock(fixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(status, headers, message));
+    await reportDispatchedCi(f);
+    expect(f.retry.sleep).toHaveBeenCalledExactlyOnceWith(delay);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls[1]).toEqual(publish.mock.calls[0]);
+    expect(publish.mock.calls[1][0]).toMatchObject({ sha: f.context.sha, state: 'success' });
+  });
+  it('still reports failed validation as failure after a rate-limit retry', async () => {
+    const f = retryClock(fixture());
+    f.outcome = 'failure';
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls.every(([request]) => request.state === 'failure')).toBe(true);
+  });
+  it('fails after three retries with increasing secondary-rate-limit backoff', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {}, 'You have exceeded a secondary rate limit.');
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[60_000], [120_000], [240_000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(4);
+  });
+  it('fails without retrying earlier than a reset outside the eight-minute budget', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': '1800000600',
+    });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(1);
+  });
+  it('caps short Retry-After responses at three retries', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(429, { 'retry-after': '1' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[1000], [1000], [1000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(4);
+  });
+  it('bounds the cumulative wait across repeated Retry-After responses', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(429, { 'retry-after': '300' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[300_000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(2);
+  });
+  it.each([401, 403, 500])('does not retry a non-rate-limit HTTP %i error', async (status) => {
+    const f = retryClock(fixture());
+    const error = Object.assign(new Error('Forbidden'), { status });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it('does not trust malformed primary reset headers', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': 'invalid',
+    });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it('does not retry authentication errors even when a Retry-After header is present', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(401, { 'retry-after': '1' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it('rechecks the locales head before publishing after a wait', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.rest.pulls.list.mockResolvedValue({
+        data: [{ ...f.pull, head: { ...f.pull.head, sha: 'e'.repeat(40) } }],
+      });
+    });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.pulls.list).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+  it('rechecks main after a delayed locales merge-status publication', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: 'e'.repeat(40) } } });
+    });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
+});
 describe('verified Crowdin integration queue admission', () => {
   it.each(['success', 'failure'])(
     'reports only exact behind head %s without attesting a merge tree',

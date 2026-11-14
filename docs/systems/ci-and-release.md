@@ -193,6 +193,11 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   `pull-requests: read` for Crowdin merge attestation. That job checks out
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
+  Rate-limited publication retries at most three times within an eight-minute elapsed budget,
+  honoring both `Retry-After` and primary reset headers; secondary limits without a header use
+  increasing waits starting at one minute. Every retry repeats the revision and policy checks.
+  Resets beyond that budget and persistent or non-rate-limit errors fail the job. The result job
+  has a fifteen-minute timeout to leave room for those waits and the attestation lookups.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
   the trusted contract before it can gate. The `security` gate is selected by every plan. For the
   required jobs in `fullJobs` (`scripts/ci/validation-plan.mjs`), every selected job must report

@@ -423,7 +423,7 @@ jobs:
         security,
       ]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout trusted CI aggregation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

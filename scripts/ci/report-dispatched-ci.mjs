@@ -1,6 +1,7 @@
 // Dispatch-created job checks are excluded from branch-rule evaluation by GitHub.
 // Publish the aggregate validator outcome as a commit status on the same immutable SHA.
 import { dispatchedQueuePolicy } from './dispatched-queue-policy.mjs';
+import { withGitHubRateLimitRetry } from './github-rate-limit.mjs';
 const LOCALES_REF = 'refs/heads/locales';
 const SHA = /^[0-9a-f]{40}$/;
 const MERGE_LOOKUP_ATTEMPTS = 12;
@@ -158,7 +159,7 @@ async function reportMergeStatus(github, context, targetUrl, mergeSha, state) {
   if (reportedMergeSha)
     await reportLocalesMergeCi(github, context, targetUrl, reportedMergeSha, state);
 }
-export async function reportDispatchedCi({
+async function reportDispatchedCiOnce({
   github,
   context,
   outcome,
@@ -178,4 +179,7 @@ export async function reportDispatchedCi({
     target_url: targetUrl,
   });
   if (!headOnly) await reportMergeStatus(github, context, targetUrl, mergeSha, state);
+}
+export async function reportDispatchedCi(options) {
+  return withGitHubRateLimitRetry(() => reportDispatchedCiOnce(options), options.retry);
 }

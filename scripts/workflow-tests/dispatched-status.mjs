@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 function assertStatusBoundary(workflow) {
   const job = jobBlock(workflow, 'ci-result');
+  assert.match(job, /^ {4}timeout-minutes: 15$/m);
   const permissions = permissionsBlock(job, '    ')
     .trim()
     .split('\n')
@@ -51,6 +52,13 @@ function withStatusCheckoutRef(workflow, ref) {
 }
 test('only the trusted aggregate CI job reports dispatched validation to branch rules', () => {
   assertStatusBoundary(readFileSync('.github/workflows/ci.yml', 'utf8'));
+});
+test('the publication job leaves time for the bounded rate-limit waits', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const job = jobBlock(workflow, 'ci-result');
+  const shortened = workflow.replace(job, job.replace('timeout-minutes: 15', 'timeout-minutes: 5'));
+  assert.notEqual(shortened, workflow);
+  assert.throws(() => assertStatusBoundary(shortened));
 });
 test('another job cannot receive status-write permissions', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
