@@ -179,6 +179,7 @@ test('compiled static assets retain the original Request and ASSETS binding', as
 });
 test('compiled unknown Tarkov paths return uncacheable JSON instead of the SPA', async () => {
   for (const path of [
+    '/api/tarkov',
     '/api/tarkov/',
     '/api/tarkov/missing',
     '/api/tarkov/missing/nested',
