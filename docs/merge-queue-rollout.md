@@ -478,7 +478,7 @@ Receipt helpers run in Ubuntu/WSL and require Node and `unzip`; workflow tests a
 In `queue`/`strict-queue` mode, verified Crowdin translation PRs are exempt from requesting
 independent review through Review Admission. This admission exemption
 requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
-GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to supported non-English locales, and an immutable
+GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to the pinned non-English locales in `review-admission-policy.mjs`, and an immutable
 GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
 modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
 review. The policy additionally requires a head-owned validation receipt uploaded by this
@@ -502,7 +502,9 @@ that accepted dispatch and its exact-head receipt, then performs normal guarded 
 Legacy `strict` mode is unchanged: its merge step uses the broader flat non-English JSON scope, does not
 wait for Review Admission, and retains guarded `gh pr merge --match-head-commit` plus post-merge main-CI
 dispatch. It does not enforce or attest the new queue-admission exemption described above; it must
-not be used as its commissioning path. Unsupported locales in queue modes retain normal review. The admission helper allows at most 120 pending polls with five-second sleeps,
+not be used as its commissioning path. Locales outside the pinned list in `review-admission-policy.mjs` retain normal review in queue modes.
+The list can include a Crowdin target the app does not load yet: `tr` is listed while its
+translations are in progress and joins `SUPPORTED_LOCALES` separately. The admission helper allows at most 120 pending polls with five-second sleeps,
 plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
 bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
 limits. No additional privileged trigger, promotion workflow or scanner exception is needed.

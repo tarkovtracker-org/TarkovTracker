@@ -15,9 +15,10 @@ export function isCrowdinRepository(repository) {
     repository?.id === CROWDIN_REPOSITORY.id,
   ].every(Boolean);
 }
-// Deliberately pinned: new locale codes require an explicit review of exemption scope.
+// Deliberately pinned: new locale codes require an explicit review of exemption scope. A code may
+// be listed before the app loads it (`tr` is a Crowdin target awaiting translations).
 const CROWDIN_TRANSLATIONS = new Set(
-  ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'uk', 'zh'].map(
+  ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'tr', 'uk', 'zh'].map(
     (code) => `app/locales/${code}.json`
   )
 );
