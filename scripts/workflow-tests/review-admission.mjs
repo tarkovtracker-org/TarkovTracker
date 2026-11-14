@@ -1701,6 +1701,12 @@ test('review signals bind service-owned PR identity independently of signal comm
         f.f.reviews = [];
       },
       (f) => {
+        f.f.reviews = [
+          human('APPROVED', { submitted_at: '2026-11-14T00:00:00Z' }),
+          human('DISMISSED', { id: 21, submitted_at: '2026-11-14T00:01:00Z' }),
+        ];
+      },
+      (f) => {
         f.f.reviews.push(human('CHANGES_REQUESTED'));
       },
       (f) => {
@@ -2379,7 +2385,7 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(job, /persist-credentials: false/);
   assert.match(job, /if-no-files-found: error/);
   assert.ok(!workflow.includes('pnpm install'));
-  assert.match(job, /environment:\n      name: review-admission\n      deployment: false/);
+  assert.match(job, /environment:\n {6}name: review-admission\n {6}deployment: false/);
   assert.equal(
     (
       job.match(
