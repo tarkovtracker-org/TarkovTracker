@@ -53,7 +53,10 @@ vi.mock('@/composables/useDataBackup', () => ({
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${JSON.stringify(params)}` : key,
+  }),
 }));
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -203,8 +206,16 @@ describe('DeviceDataCard', () => {
     saveSupersededProgressCopy('user-1', 'pvp', null, createDefaultOwnedProgressData(), 100);
     await nextTick();
     expect(wrapper.get('[data-testid="device-data-recovery-copies"]').text()).toBe(
-      'settings.device_data.recovery_copies_warning'
+      'settings.device_data.recovery_copies_warning:{"count":1}'
     );
+    // Older-tab copies are removed too, so they count toward the warning.
+    const { legacyProgressRecoveryCount } = await import('@/stores/tarkov/progressAuthority');
+    legacyProgressRecoveryCount.value = 2;
+    await nextTick();
+    expect(wrapper.get('[data-testid="device-data-recovery-copies"]').text()).toContain(
+      '{"count":3}'
+    );
+    legacyProgressRecoveryCount.value = 0;
     reactiveUser.id = 'user-2';
     await nextTick();
     await wrapper.get('[data-testid="device-data-remove"]').trigger('click');

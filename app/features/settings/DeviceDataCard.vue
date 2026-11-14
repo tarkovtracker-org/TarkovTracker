@@ -63,7 +63,7 @@
       <div class="space-y-3 text-sm">
         <p class="text-surface-200">{{ t('settings.device_data.confirm_description') }}</p>
         <p
-          v-if="recoveryCopies.length"
+          v-if="recoveryCopyCount"
           class="text-warning-300"
           data-testid="device-data-recovery-copies"
         >
@@ -140,6 +140,7 @@
     isDeviceDataRemovalPending,
     retryIncompleteDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
+  import { legacyProgressRecoveryCount } from '@/stores/tarkov/progressAuthority';
   import {
     hasPendingCloudChanges,
     hasUnsavedProgressChanges,
@@ -152,12 +153,15 @@
   const { exportProgress } = useDataBackup();
   const { signOutNow, signOutThisDevice, lastFailure } = useSignOut();
   /** Removal deletes these too; they are reviewed and downloaded under Backup & Restore. */
-  const { copies: recoveryCopies } = useSupersededCopies();
+  const { copies: supersededCopies } = useSupersededCopies();
+  const recoveryCopyCount = computed(
+    () => supersededCopies.value.length + legacyProgressRecoveryCount.value
+  );
   const recoveryCopiesWarning = computed(() =>
     t(
       'settings.device_data.recovery_copies_warning',
-      { count: recoveryCopies.value.length },
-      recoveryCopies.value.length
+      { count: recoveryCopyCount.value },
+      recoveryCopyCount.value
     )
   );
   const confirmOpen = ref(false);

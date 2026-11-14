@@ -2258,7 +2258,7 @@
       "recovery_archive_older": "Older edit {index}",
       "recovery_copies_title": "Recovery copies",
       "recovery_copies_description": "When a reset, a Seasonal rollover, or an older tab replaces progress that could otherwise be lost, such as changes that had not reached the cloud yet, TarkovTracker keeps a copy here. Copies are never restored on their own. Restore, download, or discard them here.",
-      "device_recovery_archive_link": "Download everything saved in this browser (device recovery archive)",
+      "device_recovery_archive_link": "Download the progress saved in this browser (device recovery archive)",
       "superseded_copy_label": "{mode} · replaced {date}",
       "superseded_copy_label_season": "{mode} season {season} · replaced {date}",
       "superseded_copy_summary": "Level {level} · {count} task | Level {level} · {count} tasks",

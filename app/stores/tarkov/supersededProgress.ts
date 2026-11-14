@@ -57,7 +57,9 @@ export const saveSupersededProgressCopy = (
   mode: GameMode,
   seasonNumber: number | null,
   progress: UserProgressData,
-  supersededAt = Date.now()
+  supersededAt = Date.now(),
+  /** A restored file's copy keeps its exported id; new copies get a fresh one. */
+  copyId = `${supersededAt}_${Math.random().toString(36).slice(2)}`
 ): SupersededProgressCopy | null => {
   const existing = listSupersededProgressCopies(ownerId).find(
     (copy) =>
@@ -67,7 +69,7 @@ export const saveSupersededProgressCopy = (
   );
   if (existing) return existing;
   const copy: SupersededProgressCopy = {
-    id: `${supersededAt}_${Math.random().toString(36).slice(2)}`,
+    id: copyId,
     ownerId,
     mode,
     seasonNumber: mode === 'seasonal' ? seasonNumber : null,

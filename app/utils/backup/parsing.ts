@@ -357,6 +357,8 @@ export function buildPreview(
 export type ValidatedBackup = Extract<ReturnType<typeof validateBackup>, { ok: true }>['data'];
 /** One copy from a superseded-progress file, sanitized like any restored backup mode. */
 export type SupersededArchiveCopy = {
+  /** The exported copy's id, kept so restoring the same file twice does not duplicate it. */
+  id: string | null;
   mode: GameMode;
   seasonNumber: number | null;
   supersededAt: number;
@@ -367,8 +369,13 @@ export function isSupersededArchive(json: unknown): json is Record<string, unkno
 }
 const hasValidCopySeason = (mode: GameMode, seasonNumber: unknown): boolean =>
   mode === GAME_MODES.SEASONAL ? isValidBackupSeasonNumber(seasonNumber) : seasonNumber === null;
+// The largest time value a Date can represent; later values cannot be shown as a capture date.
+const MAX_DATE_MS = 8_640_000_000_000_000;
 const isValidCopyTime = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= MAX_DATE_MS;
+const COPY_ID_PATTERN = /^[A-Za-z0-9_-]{1,96}$/;
+const copyIdOf = (value: unknown): string | null =>
+  typeof value === 'string' && COPY_ID_PATTERN.test(value) ? value : null;
 const hasValidCopyIdentity = (
   raw: Record<string, unknown>
 ): raw is Record<string, unknown> & {
@@ -383,6 +390,7 @@ function parseSupersededArchiveCopy(raw: unknown): SupersededArchiveCopy | null 
   const progress = sanitizeProgressData(raw.progress);
   if (!progress.ok) return null;
   return {
+    id: copyIdOf(raw.id),
     mode: raw.mode,
     seasonNumber: raw.mode === GAME_MODES.SEASONAL ? (raw.seasonNumber as number) : null,
     supersededAt: raw.supersededAt,

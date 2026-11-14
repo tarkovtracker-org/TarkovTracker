@@ -172,8 +172,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   discarded, or restored after confirmation. A restore replaces only the copy's mode with a fresh reset
   epoch, refuses Seasonal copies from another season, and first keeps that mode's current progress as a
   new copy; when that copy cannot be saved, or while active progress writes are blocked, nothing changes.
-  Restoring a downloaded superseded-progress file adds its copies back to the list instead of applying
-  them, skipping copies already present with the same mode, season and capture time.
+  Restoring a downloaded superseded-progress file validates its format and allow-listed entries,
+  rejects files over 16 MiB and guests, and adds valid copies back to the list instead of applying them.
+  Copies keep their exported ids, so restoring the same file again skips copies already present.
+  Restore and discard are disabled while any import is parsing or awaiting confirmation.
   Delayed signed-in reset responses are fenced by session generation and owner identity before
   applying local state, acknowledging the save, or clearing active storage, including A→B→A switches.
   Guest Settings resets instead replace the guest envelope in one write under the shared Web Lock.
@@ -226,9 +228,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   These guarantees require the current client; an older cached client that writes raw envelopes
   does not participate in this reconciliation. Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
-  original mode and season, are available from Settings → Account for export, and are never loaded
-  into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
-  removal.
+  original mode and season, are listed under Settings → Backup & Restore → Recovery copies for download
+  (an old-season copy cannot be restored into the current season), and are never loaded into the
+  tracker or sent to Supabase automatically. They are removed only by an explicit discard or that
+  account's device-data removal.
 - **Storage pressure.** `relieveProgressStoragePressure` removes only legacy backups that are
   byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
   deliberate resets do not delete account recovery copies or unique legacy backups automatically.

@@ -49,10 +49,14 @@ const saveCopy = async (mode: 'pvp' | 'seasonal', seasonNumber: number | null, a
   const progress = { ...createDefaultOwnedProgressData(), level: 12 + at };
   return saveSupersededProgressCopy('user-1', mode, seasonNumber, progress, at)!;
 };
-const mountPanel = async (options: { attachTo?: HTMLElement } = {}) => {
+const mountPanel = async (options: { attachTo?: HTMLElement; locked?: boolean } = {}) => {
   const { default: Panel } = await import('@/features/settings/RecoveryCopiesPanel.vue');
   return mount(Panel, {
-    props: { backup: backup as unknown as UseDataBackupReturn, parsing: false },
+    props: {
+      backup: backup as unknown as UseDataBackupReturn,
+      parsing: false,
+      locked: options.locked ?? false,
+    },
     attachTo: options.attachTo,
     global: {
       mocks: {
@@ -141,6 +145,30 @@ describe('RecoveryCopiesPanel', () => {
     await cancel.trigger('click');
     await nextTick();
     expect(document.activeElement).toBe(item().get('[data-testid="superseded-discard"]').element);
+    wrapper.unmount();
+  });
+  it('locks restore and discard while an import is active', async () => {
+    const copy = await saveCopy('pvp', null);
+    const wrapper = await mountPanel({ locked: true });
+    const item = wrapper.get(`[data-testid="superseded-copy-${copy.id}"]`);
+    expect(item.get('[data-testid="superseded-restore"]').attributes('disabled')).toBeDefined();
+    expect(item.get('[data-testid="superseded-discard"]').attributes('disabled')).toBeDefined();
+    expect(item.get('[data-testid="superseded-download"]').attributes('disabled')).toBeUndefined();
+  });
+  it('keeps keyboard focus in the panel after a copy is discarded', async () => {
+    const { removeSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+    backup.discardSupersededProgress.mockImplementation((id: string) => {
+      removeSupersededProgressCopy('user-1', id);
+    });
+    const first = await saveCopy('pvp', null, 100);
+    await saveCopy('pvp', null, 200);
+    const wrapper = await mountPanel({ attachTo: document.body });
+    const item = wrapper.get(`[data-testid="superseded-copy-${first.id}"]`);
+    await item.get('[data-testid="superseded-discard"]').trigger('click');
+    await item.get('[data-testid="superseded-confirm"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find(`[data-testid="superseded-copy-${first.id}"]`).exists()).toBe(false);
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="recovery-copies"]').element);
     wrapper.unmount();
   });
   it('reports why a restore was refused', async () => {

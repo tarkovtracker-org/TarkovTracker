@@ -61,7 +61,7 @@ _Avoid_: Pending cloud changes, current progress, automatic restore
 - A deliberate reset or Seasonal rollover remains authoritative; older changes must not undo the fresh start or enter a different season.
 - Changes displaced by that reset or rollover stop being **Pending cloud changes**: stop retrying them and explain why they were superseded rather than reporting them as cloud-saved.
 - Retain superseded changes separately as an owner-only **Superseded recovery copy**, labeled with the original mode and season. It is never restored or synchronized automatically.
-- The owner may restore a **Superseded recovery copy** after confirming the replacement. A restore replaces only the copy's mode, is refused for a Seasonal copy from another season, and first keeps that mode's current progress as another **Superseded recovery copy**; if that copy cannot be saved, nothing is restored.
+- The owner may restore a **Superseded recovery copy** after confirming the replacement. A restore replaces only the copy's mode, is refused for a Seasonal copy from another season, and first keeps that mode's current progress as another **Superseded recovery copy**; if that copy cannot be saved or active progress writes are blocked, nothing is restored.
 - A **Superseded recovery copy** is not a promise of durable recovery unless its local save succeeds; the same truthful-save policy applies as for current progress.
 - The app must not automatically expire or delete the only recovery copy of unacknowledged changes to free storage; automatic cleanup is limited to copies proven redundant or safely cloud-saved.
 - Storage or saving failures must explain which destination failed, what progress is affected, and whether a confirmed recoverable copy exists.

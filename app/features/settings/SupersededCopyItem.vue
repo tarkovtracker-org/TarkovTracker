@@ -18,6 +18,7 @@
           ref="confirmButton"
           size="sm"
           :color="pending === 'restore' ? 'primary' : 'error'"
+          :disabled="locked"
           data-testid="superseded-confirm"
           @click="confirmPending"
         >
@@ -37,6 +38,7 @@
         variant="soft"
         icon="i-mdi-restore"
         :aria-describedby="labelId"
+        :disabled="locked"
         data-testid="superseded-restore"
         @click="open('restore')"
       >
@@ -60,6 +62,7 @@
         variant="ghost"
         icon="i-mdi-delete-outline"
         :aria-describedby="labelId"
+        :disabled="locked"
         data-testid="superseded-discard"
         @click="open('discard')"
       >
@@ -87,8 +90,11 @@
       UseDataBackupReturn,
       'discardSupersededProgress' | 'exportSupersededProgress' | 'restoreSupersededProgress'
     >;
+    /** True while an import could still overwrite the progress a restore or discard acts on. */
+    locked: boolean;
   }>();
-  const { t } = useI18n({ useScope: 'global' });
+  const emit = defineEmits<{ discarded: [] }>();
+  const { t, locale } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const pending = ref<PendingAction | null>(null);
@@ -99,7 +105,7 @@
   const restorable = computed(() => isRestorableSupersededCopy(props.copy));
   const modeLabel = computed(() => t(getGameModeLabel(props.copy.mode)));
   const capturedAt = computed(() =>
-    new Date(props.copy.supersededAt).toLocaleString(undefined, {
+    new Date(props.copy.supersededAt).toLocaleString(locale?.value || undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     })
@@ -162,6 +168,8 @@
   function discard() {
     try {
       props.backup.discardSupersededProgress(props.copy.id);
+      // This item leaves the list, so the panel takes over keyboard focus.
+      emit('discarded');
     } catch (error) {
       reportFailure(error, 'settings.data_management.superseded_discard_failed');
     }
@@ -174,8 +182,8 @@
       void focusAfterRender(restoreButton);
       return;
     }
-    // A discarded copy leaves the list; a failed discard keeps it and its focus target.
     discard();
+    // Only a failed discard leaves this item in place.
     void focusAfterRender(discardButton);
   }
   async function handleDownload() {

@@ -701,7 +701,7 @@ describe('useDataBackup', () => {
         })
       );
     const fileCopy = (overrides: Record<string, unknown> = {}) => ({
-      id: 'exported-id',
+      id: `exported-${String(overrides.mode ?? 'pvp')}-${String(overrides.supersededAt ?? 500)}`,
       mode: 'pvp',
       seasonNumber: null,
       supersededAt: 500,
@@ -735,6 +735,21 @@ describe('useDataBackup', () => {
       expect(second.recoveryCopiesImport.value).toEqual({ added: 1, alreadyPresent: 2 });
       const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
       expect(listSupersededProgressCopies('user-123')).toHaveLength(3);
+    });
+    it('keeps the exported id and skips repeated ids in one file', async () => {
+      const backup = await loadComposable();
+      await backup.parseBackupFile(
+        supersededFile([
+          fileCopy(),
+          fileCopy({ progress: { ...tarkovStore.$state.pvp, level: 60 } }),
+          fileCopy({ id: '../bad id', mode: 'pve' }),
+        ])
+      );
+      expect(backup.recoveryCopiesImport.value).toEqual({ added: 2, alreadyPresent: 1 });
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      const ids = listSupersededProgressCopies('user-123').map((copy) => copy.id);
+      expect(ids).toContain('exported-pvp-500');
+      expect(ids).not.toContain('../bad id');
     });
     it('reports how many copies fit when browser storage fills up', async () => {
       const retained = await import('@/stores/tarkov/supersededProgress');
@@ -778,6 +793,8 @@ describe('useDataBackup', () => {
       ['an unknown mode', [fileCopy({ mode: 'arena' })]],
       ['a Seasonal copy without a season', [fileCopy({ mode: 'seasonal' })]],
       ['invalid progress', [fileCopy({ progress: { pmcFaction: 'SCAV' } })]],
+      ['a capture time past the Date range', [fileCopy({ supersededAt: 8_640_000_000_000_001 })]],
+      ['a fractional capture time', [fileCopy({ supersededAt: 1.5 })]],
     ])('rejects a file with %s', async (_label, copies) => {
       const backup = await loadComposable();
       await backup.parseBackupFile(supersededFile(copies));

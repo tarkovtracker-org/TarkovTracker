@@ -686,32 +686,45 @@ export function useDataBackup(): UseDataBackupReturn {
     importState.value = 'error';
     importError.value = t(messageKey, params);
   }
-  /** Exported copies keep their capture time, so re-importing a file skips copies already here. */
-  const isSameCapture = (left: SupersededArchiveCopy, right: SupersededArchiveCopy): boolean =>
-    left.mode === right.mode &&
-    left.seasonNumber === right.seasonNumber &&
-    left.supersededAt === right.supersededAt;
+  /** Skips ids already kept here and repeated ids within the same file. */
+  function copiesNotYetKept(
+    copies: SupersededArchiveCopy[],
+    kept: SupersededProgressCopy[]
+  ): SupersededArchiveCopy[] {
+    const seen = new Set(kept.map((copy) => copy.id));
+    return copies.filter((copy) => {
+      if (copy.id === null) return true;
+      if (seen.has(copy.id)) return false;
+      seen.add(copy.id);
+      return true;
+    });
+  }
   const saveAdoptedCopy = (owner: string, copy: SupersededArchiveCopy): boolean =>
     saveSupersededProgressCopy(
       owner,
       copy.mode,
       copy.seasonNumber,
       copy.progress,
-      copy.supersededAt
+      copy.supersededAt,
+      copy.id ?? undefined
     ) !== null;
-  /** Superseded-progress files are restored into this browser's recovery copies, not applied. */
+  /**
+   * Superseded-progress files are restored into this browser's recovery copies, not applied.
+   * Exported ids skip copies already here; identical progress is also merged when saving.
+   */
   function adoptSupersededCopies(copies: SupersededArchiveCopy[], owner: string | null): void {
     resetImport();
     if (!owner) return failImport('settings.data_management.recovery_copies_sign_in');
-    const existing = listSupersededProgressCopies(owner);
-    const fresh = copies.filter((copy) => !existing.some((kept) => isSameCapture(kept, copy)));
-    const added = fresh.filter((copy) => saveAdoptedCopy(owner, copy)).length;
-    if (added < fresh.length) {
+    const before = listSupersededProgressCopies(owner);
+    const fresh = copiesNotYetKept(copies, before);
+    const failed = fresh.filter((copy) => !saveAdoptedCopy(owner, copy)).length;
+    if (failed > 0) {
       return failImport('settings.data_management.recovery_copies_add_failed', {
-        added,
+        added: fresh.length - failed,
         total: fresh.length,
       });
     }
+    const added = listSupersededProgressCopies(owner).length - before.length;
     recoveryCopiesImport.value = { added, alreadyPresent: copies.length - added };
   }
   function applyWorkerReply(reply: BackupReply, owner: string | null): void {

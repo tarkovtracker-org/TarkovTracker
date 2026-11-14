@@ -861,6 +861,7 @@
           <RecoveryCopiesPanel
             :backup="dataManagementSession.backup"
             :parsing="backupImportState === 'parsing'"
+            :locked="isAnyImportActive"
           />
           <div class="flex items-center gap-3">
             <output data-testid="backup-reading-status" class="text-surface-300 text-sm">
