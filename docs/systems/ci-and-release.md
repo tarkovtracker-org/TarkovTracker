@@ -236,6 +236,8 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   requirements fail closed. Candidate CI/preview waits remain bounded.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
+- Supabase validation must use an isolated local CI project and available port without omitting
+  database checks. See [the CI wrapper contract](../../scripts/checks/README.md#supabase-ci-isolation).
 
 ### Crowdin automatic merges
 

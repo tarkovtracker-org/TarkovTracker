@@ -14,10 +14,15 @@ start_local_db() {
   if pnpm exec supabase db start; then
     return 0
   fi
+  node scripts/checks/check-supabase-ci.mjs --diagnose || true
   echo 'supabase db start failed; stopping the partial stack and retrying once.' >&2
   pnpm exec supabase stop --no-backup >/dev/null 2>&1 || true
   sleep 5
-  pnpm exec supabase db start
+  if pnpm exec supabase db start; then
+    return 0
+  fi
+  node scripts/checks/check-supabase-ci.mjs --diagnose || true
+  return 1
 }
 if ! pnpm exec supabase status >/dev/null 2>&1; then
   started_local_stack=true
