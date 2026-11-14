@@ -29,4 +29,5 @@ pnpm run supabase:test:task-identity-concurrency
 pnpm run supabase:test:concurrency
 pnpm run supabase:test:one-time-concurrency
 pnpm run supabase:test:owner-only-concurrency
+pnpm run supabase:test:deletion-billing-concurrency
 pnpm exec supabase db lint --schema public --fail-on error

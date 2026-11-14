@@ -7,6 +7,9 @@ let failUpstream = false;
 let failOutcome = false;
 let failAttribution = false;
 let supporterWrites = 0;
+let deletedAccount = false;
+let cancellationFailure = false;
+let cancellations = 0;
 const denials = new Map<string, string>();
 let writeHeaders: Headers | undefined;
 let handler: (req: Request) => Promise<Response>;
@@ -25,14 +28,23 @@ const supporter = {
   retention_history_verified: true,
 };
 let row: Record<string, unknown> = { ...supporter };
-function stripeResponse(url: URL): Response {
+function stripeResponse(request: Request, url: URL): Response {
   upstreamAttempts++;
   if (failUpstream) return reply({ error: 'isolated Stripe outage' }, 503);
+  if (request.method === 'DELETE') {
+    cancellations++;
+    return reply({ id: 'sub_test', status: 'canceled' }, cancellationFailure ? 503 : 200);
+  }
   if (url.pathname.startsWith('/v1/charges/')) {
     if (failAttribution) return reply({ error: 'isolated attribution outage' }, 503);
     return reply({ customer: 'cus_test', metadata: { user_id: userId } });
   }
-  return reply({ id: 'sub_test', status: 'canceled', ended_at: 1_700_000_000 });
+  return reply({
+    id: 'sub_test',
+    status: deletedAccount ? 'active' : 'canceled',
+    ...(deletedAccount ? { metadata: { user_id: userId } } : {}),
+    ended_at: 1_700_000_000,
+  });
 }
 async function supporterResponse(request: Request, url: URL): Promise<Response> {
   const matches = [...url.searchParams]
@@ -59,7 +71,7 @@ async function disqualifyResponse(request: Request): Promise<Response> {
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Supabase-Api-Version': '2024-01-01' },
   });
 }
 function claim(params: Record<string, string>): Response {
@@ -86,14 +98,18 @@ function finish(params: Record<string, string>): Response {
 async function fakeFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
   const request = new Request(input, init);
   const url = new URL(request.url);
-  if (url.hostname === 'api.stripe.com') return stripeResponse(url);
+  if (url.hostname === 'api.stripe.com') return stripeResponse(request, url);
   assertEquals(url.hostname, 'supabase.invalid');
   if (url.pathname.endsWith('/claim_stripe_event')) return claim(await request.json());
   if (url.pathname.endsWith('/finish_stripe_event')) return finish(await request.json());
+  if (url.pathname.endsWith('/record_account_billing_subscription')) return reply(null);
   if (url.pathname.endsWith('/supporters')) return supporterResponse(request, url);
   if (url.pathname.endsWith('/disqualify_supporter_customer')) return disqualifyResponse(request);
   if (url.pathname.endsWith('/discord_account_links')) return reply(null);
-  if (url.pathname.includes('/auth/v1/')) return reply({ user: { identities: [] } });
+  if (url.pathname.includes('/auth/v1/'))
+    return deletedAccount
+      ? reply({ message: 'User not found', code: 'user_not_found' }, 404)
+      : reply({ user: { identities: [] } });
   throw new Error(`Unexpected isolated request: ${request.method} ${url.pathname}`);
 }
 async function signedRequest(
@@ -197,6 +213,7 @@ Deno.test(
         assertEquals(denials.size, 1);
         const denialDate = row.supporter_disqualified_at;
         assertEquals(row.has_ever_supported, false);
+        assertEquals(row.stripe_subscription_id, 'sub_test');
         failAttribution = false;
         assertEquals(
           (await handler(await signedRequest('evt_dispute', 'charge.dispute.created', dispute)))
@@ -208,6 +225,35 @@ Deno.test(
         assertEquals(row.supporter_disqualified_at, denialDate);
         assertEquals(row.has_ever_supported, false);
         assertEquals(writeHeaders?.get('x-stripe-event-id'), 'evt_dispute');
+      });
+      await test.step('late subscription for a deleted account cancels before completing its receipt', async () => {
+        deletedAccount = true;
+        row = {};
+        cancellationFailure = true;
+        const writes = supporterWrites;
+        const subscription = { id: 'sub_test' };
+        assertEquals(
+          (
+            await handler(
+              await signedRequest('evt_orphan', 'customer.subscription.updated', subscription)
+            )
+          ).status,
+          500
+        );
+        assertEquals(supporterWrites, writes);
+        cancellationFailure = false;
+        assertEquals(
+          (
+            await handler(
+              await signedRequest('evt_orphan', 'customer.subscription.updated', subscription)
+            )
+          ).status,
+          200
+        );
+        assertEquals(receipts.get('evt_orphan')?.state, 'completed');
+        assertEquals(cancellations, 2);
+        assertEquals(supporterWrites, writes);
+        deletedAccount = false;
       });
       await test.step('unknown historical receipt is not acknowledged or replayed', async () => {
         receipts.set('evt_legacy', { state: 'legacy_unknown', token: '', expires: 0 });

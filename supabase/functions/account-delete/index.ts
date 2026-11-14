@@ -17,6 +17,12 @@ import {
   type AccountDeletionClient,
   type DeletionTransitionResult,
 } from '../_shared/account-deletion-lifecycle.ts';
+import {
+  clearEndedDeletionSubscription,
+  DeletionBillingError,
+  endedDeletionSubscription,
+} from '../_shared/account-deletion-billing.ts';
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const createLeaseLostResponse = (req: Request) =>
   createSuccessResponse(
     {
@@ -68,6 +74,8 @@ Deno.serve(async (req) => {
         req
       );
     }
+    // Denial must precede job creation and team transfers; it is not a queued deletion request.
+    const verifiedBilling = await endedDeletionSubscription(supabase, user.id, STRIPE_SECRET_KEY);
     const claim = await claimDeletionJob(supabase, user.id, true);
     if (claim.error) {
       console.error('[account-delete] FATAL: Failed to initialize deletion job tracking:', {
@@ -94,6 +102,7 @@ Deno.serve(async (req) => {
         req
       );
     }
+    await clearEndedDeletionSubscription(supabase, user.id, verifiedBilling, claim.claimToken);
     const { data: ownedTeams, error: teamQueryError } = await supabase
       .from('teams')
       .select('id')
@@ -243,7 +252,12 @@ Deno.serve(async (req) => {
       req
     );
   } catch (error) {
-    console.error('[account-delete] Unexpected error:', error);
-    return createErrorResponse('Internal server error', 500, req);
+    return accountDeletionError(error, req);
   }
 });
+function accountDeletionError(error: unknown, req: Request): Response {
+  if (error instanceof DeletionBillingError)
+    return createErrorResponse(error.code, error.status, req);
+  console.error('[account-delete] Unexpected error:', error);
+  return createErrorResponse('Internal server error', 500, req);
+}

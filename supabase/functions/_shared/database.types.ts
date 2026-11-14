@@ -34,6 +34,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_billing_subscriptions: {
+        Row: { user_id: string; stripe_subscription_id: string }
+        Insert: { user_id: string; stripe_subscription_id: string }
+        Update: { user_id?: string; stripe_subscription_id?: string }
+        Relationships: []
+      }
       account_deletion_attempts: {
         Row: {
           attempted_at: string
@@ -978,6 +984,14 @@ export type Database = {
           p_summary: Json
           p_tarkov_uid: number | null
         }
+        Returns: undefined
+      }
+      clear_ended_deletion_subscription: {
+        Args: { p_claim_token: string; p_subscription_id: string | null; p_customer_id: string | null; p_subscription_ids: string[]; p_user_id: string }
+        Returns: boolean
+      }
+      record_account_billing_subscription: {
+        Args: { p_user_id: string; p_subscription_id: string }
         Returns: undefined
       }
       claim_account_deletion_job: {
