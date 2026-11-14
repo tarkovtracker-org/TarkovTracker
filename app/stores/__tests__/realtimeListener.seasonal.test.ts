@@ -243,7 +243,9 @@ describe('seasonal progress realtime synchronization', () => {
       state.pvp.prestigeLevel = 4;
       state.pvp.progressEpoch = 1;
       await setupRealtimeListener(store);
-      handlers.get('user_game_mode_progress')?.({
+      const handler = handlers.get('user_game_mode_progress');
+      expect(handler).toBeDefined();
+      handler?.({
         new: {
           game_mode: 'pvp',
           season_number: 0,
@@ -251,7 +253,7 @@ describe('seasonal progress realtime synchronization', () => {
           updated_at: '2026-10-05T12:00:00Z',
         },
       });
-      expect(state.pvp.prestigeLevel).toBe(4);
+      expect(state.pvp).toMatchObject({ level: 2, prestigeLevel: 4 });
     }
   );
   it.each(['pvp', 'pve'] as const)('accepts an explicit live %s prestige clear', async (mode) => {
