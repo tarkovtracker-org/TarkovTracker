@@ -206,9 +206,10 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   Actions-owned preview, and opens a generated version PR. The successful source Release run
   retains the candidate/source/version receipt and GitHub-only notes. No version tag or GitHub
   release is published during preparation.
-- The trusted Release Promotion Queue controller wakes after completed Release or Review Admission
-  runs (admissions for ordinary PR branches are prefiltered by their display-only run name;
-  provider-suite admissions stay unscoped to preserve promotion wakeups),
+- The trusted Release Promotion Queue controller wakes after completed Release runs or an explicit
+  main dispatch from published release admission. Ordinary, held and integration admissions create
+  no promotion run; display titles do not affect intake. The dispatch carries only run/attempt
+  locators, and the controller waits for successful source completion before reading receipts. It
   authenticates the source receipt, assets, exact-head admission, CI and preview, and requests
   an ordinary head-pinned squash merge. It uses neither a bypass nor an approving review. Queue
   admission requires the version candidate's sole parent to equal the queue group's main base,

@@ -703,6 +703,9 @@ function adaptTraderRequirements(
     traderRequirements: onlyIfPopulated(traderRequirements),
   };
 }
+/** Upstream reports "no delay" as 0 or omits the field; only a real delay is carried. */
+const positiveSeconds = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
   return compactObject({
     id: stringId(raw) ?? '',
@@ -715,6 +718,8 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
     wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
+    availableDelaySecondsMin: positiveSeconds(raw.availableDelaySecondsMin),
+    availableDelaySecondsMax: positiveSeconds(raw.availableDelaySecondsMax),
     requiredPrestige: resolveRequiredPrestige(raw.requiredPrestige),
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))

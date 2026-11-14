@@ -10,7 +10,7 @@ import { setOverlayResponseHeaders } from '~/server/utils/overlayResponseHeaders
 /**
  * Overlay extract rules and curated cues for every mode. Both sections are needed together: a
  * cue only means something beside its extract's rules. `data` is null until the overlay
- * publishes valid sections, so the client keeps its bundled fallback.
+ * publishes valid sections; the map then shows every extract's requirements as unknown.
  */
 const projectExtractRuleData = (overlay: OverlayData): ExtractRuleData | null =>
   isExtractRequirementsSection(overlay.extractRequirements) &&

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import bundledCues from '@/data/extractCues.json';
-import bundledRequirements from '@/data/extractRequirements.json';
+import fixture from '@/utils/__tests__/fixtures/extractRuleData.json';
 import {
   extractRuleSource,
   extractRulesForMode,
   isExtractCuesSection,
   isExtractRequirementsSection,
+  isExtractRuleData,
   type ExtractRuleData,
 } from '@/utils/extractRuleData';
 const source = { clientBuild: '1.3.0.0.48484', definitionsSha256: 'a'.repeat(64) };
@@ -14,9 +14,10 @@ const section = (rules: unknown[], sources: unknown = { regular: source }) => ({
   maps: { map: { exit: { name: 'exit', rules } } },
 });
 describe('extract rule data validation', () => {
-  it('accepts the bundled sections', () => {
-    expect(isExtractRequirementsSection(bundledRequirements)).toBe(true);
-    expect(isExtractCuesSection(bundledCues)).toBe(true);
+  it('accepts sections copied from a published overlay', () => {
+    expect(isExtractRequirementsSection(fixture.requirements)).toBe(true);
+    expect(isExtractCuesSection(fixture.cues)).toBe(true);
+    expect(isExtractRuleData(fixture)).toBe(true);
   });
   it.each([
     ['a non-hex definitions hash', section([], { regular: { ...source, definitionsSha256: 'x' } })],

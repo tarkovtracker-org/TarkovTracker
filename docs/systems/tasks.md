@@ -322,10 +322,29 @@ instead of showing a raw ID.
 Players can recover a missing configured unlock task from explicit completion notifications through
 the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
 
+Time gates are information only. `tarkov-json.ts` carries upstream `availableDelaySecondsMin/Max`
+onto the task core only when positive and finite (upstream reports no delay as `0`). The card header
+shows the stated delay ("Unlocks 10h after prerequisites are complete", or a min–max range) on
+unfinished tasks through `TaskTimeGateNote.vue` and `task-time-gate.ts`. It explains why the game
+can still withhold a task the tracker shows as available. The evaluator, sorting and Mark available
+ignore it, and there is no countdown: tracker completion times cannot reconstruct when the
+prerequisite was finished in game (#922). The fields are additive to `tasks-core-json-v3`, so cache
+keys stay unchanged and they appear once the scheduled precompute and browser caches refresh.
+
 Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
 current profile's edition, prestige and faction eligibility. Ineligible children contribute no
 “Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
 do not remove an otherwise eligible follow-up from that count.
+
+Up next also shows one continuation for an incomplete auto-started or already-progressed Storyline
+chapter from the current mode's catalog. “Next tracked step” follows the existing timeline, skips
+automatic tutorial completion and optional steps, and does not claim in-game availability. Unresolved
+route choices link to the chapter without selecting a branch; missing/exhausted objective data asks
+the player to review the chapter rather than inferring completion. Benefits retain source qualifiers;
+“Opens” counts only eligible pending tasks whose every remaining gate is that exact story objective.
+The unfiltered, non-searching personal Available list reuses this guidance when empty. Known story
+objective blockers deep-link to that objective; unknown references retain the task requirements link.
+Search, content filters, teammate views and other task statuses keep their existing empty states.
 
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
@@ -463,13 +482,14 @@ the capture tooling.
 `GET /api/tarkov/extract-requirements` serves both sections together for every mode
 ([overlay ownership](./overlay-and-precompute.md#endpoint-ownership-and-precedence)). Its `data`
 is null until the overlay publishes valid sections, and the route returns 503 without an overlay.
-`useExtractRuleData` starts from a bundled copy of the same sections in `app/data/`
-(`extractRequirements.json`, `extractCues.json`), requests the route once per page load, and
-replaces the copy only with a payload that passes the shared `app/utils/extractRuleData.ts`
-checks. The map redraws extract pins and the source line when it does. Co-op classification
-reads the same data. The bundled copy is a fallback for rollout and local runs without
-`OVERLAY_TOKEN`; it is removed once production serves the overlay sections
-([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)).
+`useExtractRuleData` requests the route once per page load and holds no rule data until a
+payload passes the shared `app/utils/extractRuleData.ts` checks; the app ships no bundled copy
+([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)). Without rule data
+(still loading, a null `data`, a malformed payload, or an unavailable overlay, including local
+runs without `OVERLAY_TOKEN`) every extract shows the unknown-requirements cue plus any tarkov.dev
+transfer cost, never the "No requirements listed" line, and the map omits the source line. Co-op
+classification then falls back to the extract name. The map redraws extract pins and the source
+line when the data arrives.
 
 Rules shared by the Regular and Seasonal captures sit in `rules`; otherwise `pvp` and `seasonal`
 keep their own lists, and a mode without a capture has no rules (an unknown-requirements cue).
@@ -498,8 +518,7 @@ unconfirmed color for Path to River; green smoke for
 [Old Gas Station](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point);
 and the Factory emergency exit key beside ZB-013's activation requirement. Smoke is an
 availability signal, not a flare the player must bring. Additional activation steps and cues are
-not invented when data is missing. Refresh both sections in the overlay, never by hand-editing
-the app's bundled copy.
+not invented when data is missing. Refresh both sections in the overlay; the app keeps no copy.
 
 ## Map markers, legend, and sizing
 

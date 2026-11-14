@@ -2,7 +2,9 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, shallowRef } from 'vue';
 import maps from '@/data/maps.json';
+import { resetExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
 import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
+import extractRuleFixture from '@/utils/__tests__/fixtures/extractRuleData.json';
 import type { TarkovMap } from '@/types/tarkov';
 // Saved Layers rows, shared by every map the test mounts and reactive like the real store. The
 // preferences mock reads it lazily, after module evaluation.
@@ -60,6 +62,8 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
     },
   };
 });
+const { mockTarkovApiFetch } = vi.hoisted(() => ({ mockTarkovApiFetch: vi.fn() }));
+vi.mock('@/utils/tarkovApiFetch', () => ({ tarkovApiFetch: mockTarkovApiFetch }));
 const refreshViewSpy = vi.fn();
 const setFloorSpy = vi.fn();
 const useLeafletMapOptionsSpy = vi.fn();
@@ -196,6 +200,9 @@ describe('LeafletMap controls', () => {
     mapState.fitZoom = null;
     localStorage.clear();
     savedLayers.value = {};
+    resetExtractRuleData();
+    mockTarkovApiFetch.mockReset();
+    mockTarkovApiFetch.mockResolvedValue({ data: null });
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
     useLeafletMapOptionsSpy.mockClear();
@@ -407,8 +414,22 @@ describe('LeafletMap controls', () => {
         },
       ],
     } as TarkovMap;
+    let answerRules!: (response: unknown) => void;
+    mockTarkovApiFetch.mockImplementation(() => new Promise((resolve) => (answerRules = resolve)));
     const wrapper = await mountMap({ map: extractMap });
     await wrapper.setProps({ map: { ...extractMap } });
+    // Until the overlay rules answer, the pin claims nothing: unknown requirements, no source line.
+    const pendingPin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
+    expect(pendingPin.querySelector<HTMLElement>('.map-extract-requirements')?.dataset.tags).toBe(
+      'unknown'
+    );
+    const pendingDetails = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
+    expect(pendingDetails.textContent).toContain('Requirements unknown. Check in raid.');
+    expect(pendingDetails.textContent).not.toContain('No requirements listed');
+    expect(wrapper.find('[data-testid="map-extract-source"]').exists()).toBe(false);
+    answerRules({ data: extractRuleFixture });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
     const pin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
     const strip = pin.querySelector<HTMLElement>('.map-pin-side > .map-extract-requirements');
     expect(strip?.dataset.tags).toBe('money conditional');

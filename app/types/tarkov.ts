@@ -311,6 +311,12 @@ export interface Task {
   /** In-game trader task-list group from the overlay; absent when unknown. Never a gate. */
   traderTaskGroup?: TraderTaskGroup;
   minPlayerLevel?: number;
+  /**
+   * Upstream in-game delay, in seconds, between the prerequisites completing and the task being
+   * offered. Present only when positive. Displayed as static information; never a gate or timer.
+   */
+  availableDelaySecondsMin?: number;
+  availableDelaySecondsMax?: number;
   requiredPrestige?: TaskPrestigeReference;
   /**
    * Declared gates dropped because they could not be interpreted. The evaluator turns each one
