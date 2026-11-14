@@ -20,7 +20,9 @@ import {
   isRestorableSupersededCopy,
   listSupersededProgressCopies,
   removeSupersededProgressCopy,
+  saveSupersededProgressCopies,
   saveSupersededProgressCopy,
+  type SupersededCopyInput,
   type SupersededProgressCopy,
 } from '@/stores/tarkov/supersededProgress';
 import { useMetadataStore } from '@/stores/useMetadata';
@@ -699,15 +701,10 @@ export function useDataBackup(): UseDataBackupReturn {
       return true;
     });
   }
-  const saveAdoptedCopy = (owner: string, copy: SupersededArchiveCopy): boolean =>
-    saveSupersededProgressCopy(
-      owner,
-      copy.mode,
-      copy.seasonNumber,
-      copy.progress,
-      copy.supersededAt,
-      copy.id ?? undefined
-    ) !== null;
+  const toCopyInput = ({ id, ...copy }: SupersededArchiveCopy): SupersededCopyInput => ({
+    ...copy,
+    copyId: id ?? undefined,
+  });
   /**
    * Superseded-progress files are restored into this browser's recovery copies, not applied.
    * Exported ids skip copies already here; identical progress is also merged when saving.
@@ -717,7 +714,7 @@ export function useDataBackup(): UseDataBackupReturn {
     if (!owner) return failImport('settings.data_management.recovery_copies_sign_in');
     const before = listSupersededProgressCopies(owner);
     const fresh = copiesNotYetKept(copies, before);
-    const failed = fresh.filter((copy) => !saveAdoptedCopy(owner, copy)).length;
+    const failed = saveSupersededProgressCopies(owner, fresh.map(toCopyInput));
     if (failed > 0) {
       return failImport('settings.data_management.recovery_copies_add_failed', {
         added: fresh.length - failed,

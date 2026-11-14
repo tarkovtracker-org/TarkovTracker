@@ -48,9 +48,40 @@ const comparableProgress = (progress: UserProgressData): string => {
   const { progressEpoch: _epoch, manualActivityEpoch: _manualEpoch, ...rest } = progress;
   return JSON.stringify(rest);
 };
+export type SupersededCopyInput = Pick<
+  SupersededProgressCopy,
+  'mode' | 'seasonNumber' | 'progress' | 'supersededAt'
+> & {
+  /** A restored file's copy keeps its exported id; new copies get a fresh one. */
+  copyId?: string;
+};
+const isSameProgress = (copy: SupersededProgressCopy, input: SupersededCopyInput): boolean =>
+  copy.mode === input.mode &&
+  copy.seasonNumber === (input.mode === 'seasonal' ? input.seasonNumber : null) &&
+  comparableProgress(copy.progress) === comparableProgress(input.progress);
+/** Writes one copy unless `kept` already holds the same progress; callers announce the change. */
+const retainCopy = (
+  ownerId: string,
+  input: SupersededCopyInput,
+  kept: SupersededProgressCopy[]
+): { copy: SupersededProgressCopy; written: boolean } | null => {
+  const existing = kept.find((copy) => isSameProgress(copy, input));
+  if (existing) return { copy: existing, written: false };
+  const copy: SupersededProgressCopy = {
+    id: input.copyId ?? `${input.supersededAt}_${Math.random().toString(36).slice(2)}`,
+    ownerId,
+    mode: input.mode,
+    seasonNumber: input.mode === 'seasonal' ? input.seasonNumber : null,
+    supersededAt: input.supersededAt,
+    progress: input.progress,
+  };
+  if (safeSetItem(copyKey(copy), JSON.stringify(copy))) return { copy, written: true };
+  logger.error('[ProgressRecovery] Could not retain superseded progress');
+  return null;
+};
 /**
  * Retains progress displaced by an intentional reset or a season change. Copies are never restored
- * automatically; the owner may export, restore (see isRestorableSupersededCopy) or discard them.
+ * automatically; the owner may export, restore (see `isRestorableSupersededCopy`) or discard them.
  */
 export const saveSupersededProgressCopy = (
   ownerId: string,
@@ -58,32 +89,30 @@ export const saveSupersededProgressCopy = (
   seasonNumber: number | null,
   progress: UserProgressData,
   supersededAt = Date.now(),
-  /** A restored file's copy keeps its exported id; new copies get a fresh one. */
-  copyId = `${supersededAt}_${Math.random().toString(36).slice(2)}`
+  copyId?: string
 ): SupersededProgressCopy | null => {
-  const existing = listSupersededProgressCopies(ownerId).find(
-    (copy) =>
-      copy.mode === mode &&
-      copy.seasonNumber === (mode === 'seasonal' ? seasonNumber : null) &&
-      comparableProgress(copy.progress) === comparableProgress(progress)
-  );
-  if (existing) return existing;
-  const copy: SupersededProgressCopy = {
-    id: copyId,
-    ownerId,
-    mode,
-    seasonNumber: mode === 'seasonal' ? seasonNumber : null,
-    supersededAt,
-    progress,
-  };
-  if (safeSetItem(copyKey(copy), JSON.stringify(copy))) {
-    notifyCopyChange();
-    return copy;
-  }
-  logger.error('[ProgressRecovery] Could not retain superseded progress');
-  return null;
+  const input = { mode, seasonNumber, progress, supersededAt, copyId };
+  const result = retainCopy(ownerId, input, listSupersededProgressCopies(ownerId));
+  if (result?.written) notifyCopyChange();
+  return result?.copy ?? null;
 };
-/** Superseded copies are listed only for their owning account. */
+/**
+ * Saves many copies, such as a restored file, reading the stored list once instead of per copy.
+ * Returns how many could not be saved.
+ */
+export const saveSupersededProgressCopies = (
+  ownerId: string,
+  inputs: readonly SupersededCopyInput[]
+): number => {
+  const kept = listSupersededProgressCopies(ownerId);
+  const failed = inputs.filter((input) => {
+    const result = retainCopy(ownerId, input, kept);
+    if (result?.written) kept.push(result.copy);
+    return result === null;
+  }).length;
+  notifyCopyChange();
+  return failed;
+}; /** Superseded copies are listed only for their owning account. */
 export const listSupersededProgressCopies = (ownerId: string): SupersededProgressCopy[] =>
   (storageKeys() ?? [])
     .filter((key) => key.startsWith(ownerPrefix(ownerId)))

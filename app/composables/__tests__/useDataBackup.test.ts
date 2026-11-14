@@ -751,13 +751,26 @@ describe('useDataBackup', () => {
       expect(ids).toContain('exported-pvp-500');
       expect(ids).not.toContain('../bad id');
     });
+    it('accepts a genuine export with more copies than the older-tab limit', async () => {
+      const copies = Array.from({ length: 80 }, (_, index) =>
+        fileCopy({
+          supersededAt: 1000 + index,
+          progress: { ...tarkovStore.$state.pvp, level: 1 + index },
+        })
+      );
+      const backup = await loadComposable();
+      await backup.parseBackupFile(supersededFile(copies));
+      expect(backup.recoveryCopiesImport.value).toEqual({ added: 80, alreadyPresent: 0 });
+    });
     it('reports how many copies fit when browser storage fills up', async () => {
       const retained = await import('@/stores/tarkov/supersededProgress');
-      const save = retained.saveSupersededProgressCopy;
+      const saveAll = retained.saveSupersededProgressCopies;
+      // Storage accepts the first copy and refuses the rest.
       const spy = vi
-        .spyOn(retained, 'saveSupersededProgressCopy')
-        .mockImplementationOnce((...args) => save(...args))
-        .mockReturnValueOnce(null);
+        .spyOn(retained, 'saveSupersededProgressCopies')
+        .mockImplementationOnce(
+          (owner, inputs) => saveAll(owner, inputs.slice(0, 1)) + inputs.length - 1
+        );
       try {
         const backup = await loadComposable();
         await backup.parseBackupFile(supersededFile([fileCopy(), fileCopy({ mode: 'pve' })]));

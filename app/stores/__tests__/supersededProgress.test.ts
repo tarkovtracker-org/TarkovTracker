@@ -5,6 +5,7 @@ import {
   listSupersededProgressCopies,
   removeSupersededProgressCopies,
   removeSupersededProgressCopy,
+  saveSupersededProgressCopies,
   saveSupersededProgressCopy,
 } from '@/stores/tarkov/supersededProgress';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
@@ -42,6 +43,26 @@ describe('superseded progress copies', () => {
     );
     expect(restoredAgain).toEqual(first);
     expect(listSupersededProgressCopies('owner-1')).toHaveLength(1);
+  });
+  it('saves a batch with one stored-list read and one change notice', () => {
+    const existing = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;
+    const changed = vi.fn();
+    window.addEventListener('tt:superseded-progress-change', changed);
+    try {
+      const failed = saveSupersededProgressCopies('owner-1', [
+        { mode: 'pvp', seasonNumber: null, progress, supersededAt: 300, copyId: 'same-progress' },
+        { mode: 'pve', seasonNumber: null, progress, supersededAt: 400, copyId: 'kept-id' },
+        { mode: 'pve', seasonNumber: null, progress, supersededAt: 500 },
+      ]);
+      expect(failed).toBe(0);
+    } finally {
+      window.removeEventListener('tt:superseded-progress-change', changed);
+    }
+    expect(changed).toHaveBeenCalledOnce();
+    expect(listSupersededProgressCopies('owner-1').map((copy) => copy.id)).toEqual([
+      existing.id,
+      'kept-id',
+    ]);
   });
   it('discards one copy for its owner and announces the change', () => {
     const kept = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;
