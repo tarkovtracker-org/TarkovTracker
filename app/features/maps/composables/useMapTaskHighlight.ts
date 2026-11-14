@@ -8,7 +8,9 @@ interface MapTaskHighlightOptions {
 /**
  * Two-way quest highlight between the quest legend and the map (#920). Hovering or focusing a
  * legend entry, or hovering one of the quest's markers, highlights that quest; clicking a legend
- * entry keeps it highlighted until it is clicked again, which also covers touch screens.
+ * entry keeps it highlighted until it is clicked again, which also covers touch screens. A lock
+ * ends when its quest is hidden or leaves the map, or quest coloring is turned off; it does not
+ * come back by itself when the quest returns.
  */
 export function useMapTaskHighlight({ shownTaskIds, enabled }: MapTaskHighlightOptions) {
   const hoveredTaskId = ref<string | null>(null);
@@ -20,6 +22,13 @@ export function useMapTaskHighlight({ shownTaskIds, enabled }: MapTaskHighlightO
   );
   const activeLockedTaskId = computed<string | null>(() =>
     isAvailable(lockedTaskId.value) ? lockedTaskId.value : null
+  );
+  watch(
+    activeLockedTaskId,
+    (active) => {
+      if (active === null) lockedTaskId.value = null;
+    },
+    { flush: 'sync' }
   );
   const setHoveredTask = (taskId: string | null) => {
     hoveredTaskId.value = taskId;

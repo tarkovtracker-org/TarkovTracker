@@ -19,7 +19,7 @@
         type="button"
         :data-testid="`map-objective-color-mode-${mode}`"
         :aria-pressed="colorMode === mode"
-        class="focus-visible:ring-primary-500 rounded px-2 py-1 text-[11px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
+        class="focus-visible:ring-primary-500 rounded px-2 py-1 text-[11px] font-medium transition-colors focus:outline-hidden focus-visible:ring-2"
         :class="
           colorMode === mode
             ? 'bg-surface-600 text-surface-50'
@@ -44,7 +44,7 @@
           type="button"
           :data-testid="`map-objective-palette-${key}`"
           :aria-pressed="palette === key"
-          class="focus-visible:ring-primary-500 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2"
+          class="focus-visible:ring-primary-500 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus:outline-hidden focus-visible:ring-2"
           :class="
             palette === key
               ? 'border-primary-500/60 bg-primary-500/10'

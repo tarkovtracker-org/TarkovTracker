@@ -13,16 +13,12 @@
         :aria-label="
           t('page.tasks.map.raid_plan.legend_highlight_named', { name: entry.task.name })
         "
-        class="focus-visible:ring-primary-500 flex h-6 max-w-48 items-center gap-1.5 rounded-full border px-2 text-xs transition-colors focus:outline-none focus-visible:ring-2"
-        :class="
-          highlightedTaskId === entry.task.id
-            ? 'text-surface-50 border-white/60 bg-white/10'
-            : 'text-surface-300 border-white/10 hover:bg-white/5'
-        "
-        @mouseenter="emit('highlight', entry.task.id)"
-        @mouseleave="emit('highlight', null)"
-        @focus="emit('highlight', entry.task.id)"
-        @blur="emit('highlight', null)"
+        class="focus-visible:ring-primary-500 flex h-6 max-w-48 items-center gap-1.5 rounded-full border px-2 text-xs transition-colors focus:outline-hidden focus-visible:ring-2"
+        :class="entryClass(entry.task.id)"
+        @mouseenter="setPointer(entry.task.id)"
+        @mouseleave="setPointer(null)"
+        @focus="setFocus(entry.task.id)"
+        @blur="setFocus(null)"
         @click="emit('toggle-highlight-lock', entry.task.id)"
       >
         <span
@@ -41,7 +37,7 @@
    * Quest color key above the Tasks map (#920). Hovering or focusing an entry highlights that
    * quest's markers; clicking keeps the highlight until it is clicked again.
    */
-  defineProps<{
+  const props = defineProps<{
     entries: Array<{ task: Pick<Task, 'id' | 'name'>; color: string }>;
     highlightedTaskId: string | null;
     lockedTaskId: string | null;
@@ -51,4 +47,35 @@
     'toggle-highlight-lock': [taskId: string];
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  // Pointer and keyboard focus are tracked apart, so moving the mouse off one entry does not drop
+  // the highlight of the entry that still has focus.
+  const pointerTaskId = ref<string | null>(null);
+  const focusTaskId = ref<string | null>(null);
+  const report = () => emit('highlight', pointerTaskId.value ?? focusTaskId.value);
+  const setPointer = (taskId: string | null) => {
+    pointerTaskId.value = taskId;
+    report();
+  };
+  const setFocus = (taskId: string | null) => {
+    focusTaskId.value = taskId;
+    report();
+  };
+  // An unmounted legend (closing the fullscreen map) never fires mouseleave or blur.
+  onBeforeUnmount(() => {
+    if (pointerTaskId.value === null && focusTaskId.value === null) return;
+    pointerTaskId.value = null;
+    focusTaskId.value = null;
+    report();
+  });
+  /** The highlighted entry lights up; the locked one keeps a primary border while another is hovered. */
+  const borderClass = (taskId: string): string => {
+    if (props.lockedTaskId === taskId) return 'border-primary-400';
+    return props.highlightedTaskId === taskId ? 'border-white/60' : 'border-white/10';
+  };
+  const entryClass = (taskId: string) => [
+    props.highlightedTaskId === taskId
+      ? 'text-surface-50 bg-white/10'
+      : 'text-surface-300 hover:bg-white/5',
+    borderClass(taskId),
+  ];
 </script>

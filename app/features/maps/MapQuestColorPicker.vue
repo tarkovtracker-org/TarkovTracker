@@ -33,7 +33,7 @@
    * user commits a color, so dragging through the picker does not redraw the map on every step.
    */
   /** Renders nothing without a color, i.e. outside the quest color mode. */
-  defineProps<{ taskName: Task['name']; color: string | undefined; hasOverride: boolean }>();
+  defineProps<{ taskName: Task['name']; color?: string | undefined; hasOverride: boolean }>();
   const emit = defineEmits<{ change: [color: string]; reset: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const onChange = (event: Event) => {

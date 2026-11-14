@@ -559,9 +559,11 @@ shows (#920): the task **Category** (Regular, Pinned, Team colors; the default),
 the **Objective type**. Quest and type colors come from a color-blind-safe palette: Okabe-Ito (7
 colors, the default), Tol bright (6) or Tol muted (9). A test keeps every pair of palette colors
 apart under simulated protanopia, deuteranopia and tritanopia. In Quest mode `assignTaskColors`
-gives each quest the palette slot its task ID hashes to, or the least-used slot after it, over
-`mapTaskIds` (before hiding), so colors only repeat once a map has more quests than the palette has
-colors, and hiding or "show only" never changes them. Type mode colors the seven action types in
+assigns automatic colors over `mapTaskIds` (before hiding): they repeat only once a map has more
+quests than the palette has colors, and hiding or "show only" never changes them. Completing,
+unlocking or filtering quests changes `mapTaskIds` and may move automatic colors. A picked quest
+color never changes and never moves another quest's color, though it may match one. Type mode
+colors the seven action types in
 legend order and keeps the generic flag pale grey; the Layers panel's Objective icons key shows
 those colors. Outside Category mode the Regular, Pinned and Team rows still filter markers but show
 a neutral swatch. `app/features/maps/utils/objectiveColors.ts` owns the modes, palettes and
@@ -653,8 +655,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    quests only) and a color picker per quest under **Choose quests**; a picked color replaces the
    automatic one until it is reset. Hovering or focusing a legend entry, or hovering one of the
    quest's markers, highlights that quest: its chips grow, its zone outlines show and every other
-   chip fades. Clicking a legend entry keeps the highlight until it is clicked again (for touch
-   screens). `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
+   chip fades. Clicking a legend entry keeps the highlight (for touch screens) until it is clicked
+   again or the quest leaves the map. The map releases a hover it reported when it redraws its
+   markers or unmounts, since neither fires mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
    and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
 
 ### Files
@@ -671,8 +674,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/maps/utils/mapTaskVisibility.ts` — hidden-quest helpers and popup action type.
 - `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
   — hide / "show only" controls above the map and on task cards (via `mapTaskVisibilityKey`).
-- `app/features/maps/utils/objectiveColors.ts`, `MapObjectiveColorControls.vue` and
-  `composables/useMapTaskHighlight.ts` — objective color modes, quest colors and quest highlight.
+- `app/features/maps/utils/objectiveColors.ts`, `app/features/maps/MapObjectiveColorControls.vue`,
+  `app/features/maps/MapQuestLegend.vue` and `app/features/maps/composables/useMapTaskHighlight.ts` — objective color modes, quest colors and quest highlight.
 - `app/features/tasks/MapHiddenTasksSection.vue` — collapsed list section for hidden map quests.
 
 ### Invariants

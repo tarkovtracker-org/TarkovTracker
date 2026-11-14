@@ -1790,6 +1790,7 @@
     objectiveHitSources = [];
     zoneOutlines = [];
     taskChips.clear();
+    releaseMarkerHover();
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
@@ -1984,12 +1985,25 @@
   function liftChipOnHover(layer: L.Layer, chip: HTMLElement | null, taskId?: string): void {
     layer.on('mouseover', () => {
       chip?.classList.add('is-hovered');
-      if (taskId) emit('objective-hover', taskId);
+      if (taskId) reportMarkerHover(taskId);
     });
     layer.on('mouseout', () => {
       chip?.classList.remove('is-hovered');
-      if (taskId) emit('objective-hover', null);
+      if (taskId) reportMarkerHover(null);
     });
+  }
+  /** The quest this map last reported from a marker hover; the legend owns its own hover. */
+  let markerHoverTaskId: string | null = null;
+  function reportMarkerHover(taskId: string | null): void {
+    markerHoverTaskId = taskId;
+    emit('objective-hover', taskId);
+  }
+  /**
+   * A removed or redrawn layer, or an unmounted map, never fires mouseout, so release a hover the
+   * markers reported. A legend hover or a locked highlight is not this map's to clear.
+   */
+  function releaseMarkerHover(): void {
+    if (markerHoverTaskId !== null) reportMarkerHover(null);
   }
   /** Objective chips by quest, rebuilt with the markers, so a highlight never redraws them. */
   const taskChips = new Map<string, HTMLElement[]>();
@@ -2489,6 +2503,8 @@
     getFloor,
     setFloor,
   });
+  // Emit before teardown, while the parent still listens.
+  onBeforeUnmount(releaseMarkerHover);
   onUnmounted(() => {
     window.removeEventListener('keydown', onGlobalMapKeydown);
     window.removeEventListener('keyup', onGlobalMapKeyup);

@@ -121,8 +121,9 @@ describe('MapTaskVisibilityPanel', () => {
       mockPreferencesStore.getMapTaskColors = { 'task-b': '#0072b2', 'other-map-task': '#111111' };
       const wrapper = mountPanel([], { taskColors });
       const picker = wrapper.findAll('[data-testid="map-raid-plan-row-color"]')[0]!;
+      // setValue dispatches input and change; only change saves, so the pick commits once.
       await picker.setValue('#123456');
-      await picker.trigger('change');
+      expect(mockPreferencesStore.setMapTaskColor).toHaveBeenCalledTimes(1);
       expect(mockPreferencesStore.setMapTaskColor).toHaveBeenCalledWith('task-a', '#123456');
       const resets = wrapper.findAll('[data-testid="map-raid-plan-row-color-reset"]');
       expect(resets).toHaveLength(1);

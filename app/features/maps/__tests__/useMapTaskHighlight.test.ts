@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useMapTaskHighlight } from '@/features/maps/composables/useMapTaskHighlight';
 const setup = () => {
   const shown = ref(new Set(['task-a', 'task-b']));
@@ -31,20 +31,28 @@ describe('useMapTaskHighlight', () => {
     toggleLockedTask('task-b');
     expect(lockedTaskId.value).toBe('task-b');
   });
-  it('ignores quests that are hidden or gone, and everything outside quest coloring', () => {
-    const { shown, enabled, highlightedTaskId, lockedTaskId, setHoveredTask, toggleLockedTask } =
-      setup();
+  it('ends a lock when its quest is hidden and does not restore it when the quest returns', async () => {
+    const { shown, highlightedTaskId, lockedTaskId, toggleLockedTask } = setup();
     toggleLockedTask('task-a');
     shown.value = new Set(['task-b']);
     expect(lockedTaskId.value).toBeNull();
     expect(highlightedTaskId.value).toBeNull();
-    // A later click on the hidden quest starts a fresh highlight once it is shown again.
-    toggleLockedTask('task-a');
+    await nextTick();
     shown.value = new Set(['task-a', 'task-b']);
-    expect(lockedTaskId.value).toBe('task-a');
+    expect(lockedTaskId.value).toBeNull();
+    expect(highlightedTaskId.value).toBeNull();
+  });
+  it('drops every highlight outside quest coloring and keeps none after it returns', async () => {
+    const { enabled, highlightedTaskId, lockedTaskId, setHoveredTask, toggleLockedTask } = setup();
+    toggleLockedTask('task-a');
     setHoveredTask('task-b');
     enabled.value = false;
     expect(highlightedTaskId.value).toBeNull();
     expect(lockedTaskId.value).toBeNull();
+    await nextTick();
+    setHoveredTask(null);
+    enabled.value = true;
+    expect(lockedTaskId.value).toBeNull();
+    expect(highlightedTaskId.value).toBeNull();
   });
 });

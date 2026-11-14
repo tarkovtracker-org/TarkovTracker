@@ -144,8 +144,10 @@ function locationItems({
   ];
 }
 /**
- * One list for both the legend and the layer toggles: every row shows the marker exactly as the
- * map draws it and toggles exactly that marker type. Layers the current map lacks are omitted.
+ * One list for both the legend and the layer toggles: every row toggles exactly one marker type
+ * and shows it as the map draws it, except that the Regular, Pinned and Team rows show a neutral
+ * swatch while chips are colored by quest or objective type. Layers the current map lacks are
+ * omitted.
  */
 export function buildMapLayerGroups(input: MapLayerGroupsInput): MapLayerGroup[] {
   const groups: MapLayerGroup[] = [

@@ -367,7 +367,9 @@ export function useMapObjectiveMarks({
   );
   const palette = computed(() => MAP_OBJECTIVE_PALETTES[preferencesStore.getMapObjectivePalette]);
   const colorMode = computed(() => preferencesStore.getMapObjectiveColorMode);
-  // Assigned over every quest on the map before hiding, so hiding or focusing keeps colors.
+  // Assigned over the quests drawn on this map before the hidden list applies, so hiding or
+  // "show only" keeps colors. Completing, unlocking or filtering quests changes that set and may
+  // move automatic colors; a picked color stays put.
   const mapTaskColors = computed<ReadonlyMap<string, string>>(() =>
     colorMode.value === 'task'
       ? assignTaskColors(mapTaskIds.value, palette.value, preferencesStore.getMapTaskColors)

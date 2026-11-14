@@ -1122,7 +1122,11 @@ describe('LeafletMap controls', () => {
       point('objective-b', 'task-b', '#0072b2'),
       point('objective-c', 'task-a', '#f0e442'),
     ];
+    let unmounted = false;
+    // emitted() is not kept past unmount, so the unmount check listens through the prop.
+    const onObjectiveHover = vi.fn();
     const wrapper = await mountMap({
+      onObjectiveHover,
       map: {
         ...mapData,
         svg: {
@@ -1177,8 +1181,20 @@ describe('LeafletMap controls', () => {
       await wrapper.setProps({ highlightedTaskId: null });
       expect(chips.some((chip) => chip.classList.contains('is-task-highlighted'))).toBe(false);
       expect(divIcon.mock.calls.length).toBe(drawn);
-    } finally {
+      // A redraw removes the hovered dot without a mouseout, so the map releases its hover.
+      dotB.handlers.get('mouseover')?.forEach((handler) => handler());
+      await wrapper.setProps({ marks: [marks[0]!, marks[2]!] });
+      await nextTick();
+      expect(wrapper.emitted('objective-hover')?.slice(-2)).toEqual([['task-b'], [null]]);
+      // Unmounting releases a hover too, but only one the markers reported.
+      const lastDot = dots[dots.length - 1]!;
+      lastDot.handlers.get('mouseover')?.forEach((handler) => handler());
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual(['task-a']);
       wrapper.unmount();
+      unmounted = true;
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual([null]);
+    } finally {
+      if (!unmounted) wrapper.unmount();
     }
   });
 });
