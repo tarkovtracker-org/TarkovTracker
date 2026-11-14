@@ -35,10 +35,14 @@ canonical generated release PR without a queue-integration receipt. Ordinary, he
 admissions create no promotion run. An isolated job with only `actions: write` dispatches the main
 controller using the admission run ID and attempt as locators; the publisher's permissions and
 protected App key remain unchanged. [GitHub permits job-token workflow dispatches](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
-The controller waits at most 60 seconds for that exact source attempt to finish successfully before
-reading receipts. Failure, timeout or supersession cannot authorize enqueue. Rerun the failed
-promotion run to retry; a superseded attempt needs a new admission. The completed Release wakeup
-remains as a fallback when admission races preparation.
+The dispatch retries transient API failures up to three times. If dispatch still fails, or the
+source admission attempt fails or is superseded, dispatch a fresh admission with
+`gh workflow run review-admission.yml --ref main -f pull_request=<PR>`; it rechecks current approval
+and creates new run/attempt locators. The controller waits at most 60 seconds for that exact source
+attempt to finish successfully before reading receipts. Failure, timeout or supersession cannot
+authorize enqueue. Rerun a failed promotion only for a transient controller error or a wait timeout
+after confirming its source admission attempt succeeded. The completed Release wakeup remains as a
+fallback when admission races preparation.
 
 Admission wakeups authenticate the source workflow and attempt before reading its receipt, then
 prove the receipt's `workflowSourceSha` belongs to main history before reading a PR. The event's

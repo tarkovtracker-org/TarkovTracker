@@ -132,7 +132,9 @@ test('only published release admission requests promotion with isolated dispatch
   const github = {
     rest: { actions: { createWorkflowDispatch: async (args) => calls.push(args) } },
   };
-  const script = workflowStep(job, 'Dispatch promotion from trusted main').split('script: |\n')[1];
+  const dispatch = workflowStep(job, 'Dispatch promotion from trusted main');
+  assert.match(dispatch, /^ {10}retries: 3$/m);
+  const script = dispatch.split('script: |\n')[1];
   const execute = new Function(
     'github',
     'context',
