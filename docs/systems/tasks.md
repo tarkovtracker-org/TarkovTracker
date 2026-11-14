@@ -327,6 +327,16 @@ current profile's edition, prestige and faction eligibility. Ineligible children
 “Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
 do not remove an otherwise eligible follow-up from that count.
 
+Up next also shows one continuation for an incomplete auto-started or already-progressed Storyline
+chapter from the current mode's catalog. “Next tracked step” follows the existing timeline, skips
+automatic tutorial completion and optional steps, and does not claim in-game availability. Unresolved
+route choices link to the chapter without selecting a branch; missing/exhausted objective data asks
+the player to review the chapter rather than inferring completion. Benefits retain source qualifiers;
+“Opens” counts only eligible pending tasks whose every remaining gate is that exact story objective.
+The unfiltered, non-searching personal Available list reuses this guidance when empty. Known story
+objective blockers deep-link to that objective; unknown references retain the task requirements link.
+Search, content filters, teammate views and other task statuses keep their existing empty states.
+
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
@@ -527,7 +537,11 @@ owns the type mapping, path data, and chip markup. Chips are non-interactive Lea
 their own pane above the overlay pane and below the extract pins. Under each chip sits an
 invisible dot of the same size that takes hover, click and the stacked-objective hit test; the
 dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
-when the objective is on another floor and returns to full strength on hover.
+when the objective is on another floor and returns to full strength on hover. Its floor badge sits
+2 px to the left of the chip. A zone's outline and fill are drawn only while the zone is at least
+2 chips (52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their
+chip, so no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
+(`app/features/maps/utils/objectiveZoneOutline.ts`).
 
 Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
 `app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name

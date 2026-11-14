@@ -664,6 +664,7 @@
     type ObjectivePopupControl,
     type ObjectiveStackEntry,
   } from '@/features/maps/utils/objectiveStack';
+  import { zoneOutlineStyle, zoneScreenSize } from '@/features/maps/utils/objectiveZoneOutline';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
@@ -804,8 +805,6 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
-  const ZONE_HOVER_DELTA = 0.16;
-  const ZONE_HOVER_MAX = 0.6;
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
   const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
   /** Hit-test dots are invisible: the chip above them is the visible marker. */
@@ -1768,6 +1767,7 @@
     objectiveLayer.value.clearLayers();
     objectiveMarkers.clear();
     objectiveHitSources = [];
+    zoneOutlines = [];
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
@@ -1849,9 +1849,7 @@
         const polygon = L.polygon(polygonLatLngs, {
           color: zoneColor,
           fillColor: zoneColor,
-          fillOpacity: mapZoneOpacity.value,
-          weight: 2.25,
-          opacity: 0.95,
+          ...zoneOutlineStyle(Number.POSITIVE_INFINITY, false, mapZoneOpacity.value),
         });
         const center = polygon.getBounds().getCenter();
         const centerMarker = L.circleMarker([center.lat, center.lng], {
@@ -1897,15 +1895,7 @@
             });
           }
         }
-        polygon.on('mouseover', () =>
-          polygon.setStyle({
-            fillOpacity: Math.min(mapZoneOpacity.value + ZONE_HOVER_DELTA, ZONE_HOVER_MAX),
-            weight: 3,
-          })
-        );
-        polygon.on('mouseout', () =>
-          polygon.setStyle({ fillOpacity: mapZoneOpacity.value, weight: 2.25 })
-        );
+        trackZoneOutline(polygon, latLngs, [polygon, centerMarker]);
         liftChipOnHover(polygon, chip);
         liftChipOnHover(centerMarker, chip);
         objectiveLayer.value!.addLayer(polygon);
@@ -1920,6 +1910,37 @@
       objectiveLayer.value!.addLayer(marker);
     });
     glyphMarkers.forEach((glyph) => objectiveLayer.value!.addLayer(glyph));
+    refreshZoneOutlines();
+  }
+  type ZoneOutline = { polygon: L.Polygon; ring: L.LatLngExpression[]; hovered: boolean };
+  let zoneOutlines: ZoneOutline[] = [];
+  /** Draws or hides one zone's outline from its current on-screen size and hover state. */
+  function applyZoneOutline(zone: ZoneOutline): void {
+    const map = mapInstance.value;
+    const size = map
+      ? zoneScreenSize(zone.ring.map((latLng) => map.latLngToContainerPoint(latLng)))
+      : Number.POSITIVE_INFINITY;
+    zone.polygon.setStyle(zoneOutlineStyle(size, zone.hovered, mapZoneOpacity.value));
+  }
+  function refreshZoneOutlines(): void {
+    zoneOutlines.forEach(applyZoneOutline);
+  }
+  /** Hovering the zone or the chip at its centre shows the outline, even on a small zone. */
+  function trackZoneOutline(
+    polygon: L.Polygon,
+    ring: L.LatLngExpression[],
+    hoverTargets: L.Layer[]
+  ): void {
+    const zone: ZoneOutline = { polygon, ring, hovered: false };
+    zoneOutlines.push(zone);
+    const setHovered = (hovered: boolean) => {
+      zone.hovered = hovered;
+      applyZoneOutline(zone);
+    };
+    hoverTargets.forEach((layer) => {
+      layer.on('mouseover', () => setHovered(true));
+      layer.on('mouseout', () => setHovered(false));
+    });
   }
   /** The chip cannot take pointer input, so the dot or zone under it raises it on hover. */
   function liftChipOnHover(layer: L.Layer, chip: HTMLElement | null): void {
@@ -1987,8 +2008,9 @@
     layer.bindTooltip(indicator, {
       permanent: true,
       direction: 'left',
-      // Leaflet anchors the badge at the dot's centre; keep it beside the chip's glyph.
-      offset: [8 - OBJECTIVE_DOT_RADIUS, 0],
+      // Leaflet anchors the badge at the dot's centre, 6 px left of it for a left tooltip; this
+      // puts its right edge 2 px clear of the chip's edge.
+      offset: [4 - OBJECTIVE_DOT_RADIUS, 0],
       className: 'map-elevation-tooltip border-0! bg-transparent! p-0! shadow-none! before:hidden',
       opacity: 1,
     });
@@ -2332,6 +2354,7 @@
       if (oldInstance && oldInstance !== instance) {
         oldInstance.off('zoomend', handleSpawnZoomChange);
         oldInstance.off('zoomend', updateCurrentMapZoom);
+        oldInstance.off('zoomend', refreshZoneOutlines);
         oldInstance.off('resize', updateCurrentMapZoom);
         oldInstance.off('click', closeOpenPin);
       }
@@ -2348,6 +2371,8 @@
       instance.on('zoomend', handleSpawnZoomChange);
       instance.off('zoomend', updateCurrentMapZoom);
       instance.on('zoomend', updateCurrentMapZoom);
+      instance.off('zoomend', refreshZoneOutlines);
+      instance.on('zoomend', refreshZoneOutlines);
       // A resize changes the whole-map fit zoom that the names threshold is measured from.
       instance.off('resize', updateCurrentMapZoom);
       instance.on('resize', updateCurrentMapZoom);
@@ -2414,6 +2439,7 @@
     if (mapInstance.value) {
       mapInstance.value.off('zoomend', handleSpawnZoomChange);
       mapInstance.value.off('zoomend', updateCurrentMapZoom);
+      mapInstance.value.off('zoomend', refreshZoneOutlines);
       mapInstance.value.off('resize', updateCurrentMapZoom);
       mapInstance.value.off('click', closeOpenPin);
     }
@@ -2422,6 +2448,7 @@
     }
     objectiveMarkers.clear();
     objectiveHitSources = [];
+    zoneOutlines = [];
     clearMarkers();
   });
 </script>

@@ -986,6 +986,20 @@ describe('LeafletMap controls', () => {
     expect(glyphs[0]!.classList).toContain('is-hovered');
     zoneLayer.handlers.get('mouseout')?.forEach((handler) => handler({}));
     expect(glyphs[0]!.classList).not.toContain('is-hovered');
+    // The mocked map projects every point to one pixel, so this zone is far smaller than its
+    // chip: its outline is hidden, and hovering its chip (the centre dot) shows it.
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0, fillOpacity: 0 })
+    );
+    const zoneCentre = createdLayers[1]!;
+    zoneCentre.handlers.get('mouseover')?.forEach((handler) => handler({}));
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0.95, weight: 3 })
+    );
+    zoneCentre.handlers.get('mouseout')?.forEach((handler) => handler({}));
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0, fillOpacity: 0 })
+    );
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();

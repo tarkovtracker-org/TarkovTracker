@@ -2,6 +2,7 @@ import {
   normalizeRequirementStatuses,
   requiresCompletionOrActive,
 } from '@tarkovtracker/progress-contracts/requirementStatus';
+import type { StorylineTarget } from '@/features/storyline/nextStep';
 import type { TaskAvailabilityResult, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 export type UpNextReason =
@@ -28,6 +29,7 @@ export interface UpNextItem {
   opens: number;
   traderName?: string;
   blocker?: TaskBlocker;
+  storylineTarget?: StorylineTarget;
 }
 export type EvaluationLookup = (taskId: string) => TaskAvailabilityResult | undefined;
 export interface UpNextContext {
