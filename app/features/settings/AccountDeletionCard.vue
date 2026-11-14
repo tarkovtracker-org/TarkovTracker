@@ -260,6 +260,14 @@
           }
           if (typeof body === 'object' && 'error' in body) {
             const bodyError = (body as { error?: unknown }).error;
+            if (bodyError === 'account_deletion_subscription_active') {
+              errorMessage = t('settings.account_data.subscription_active');
+              return true;
+            }
+            if (bodyError === 'account_deletion_billing_unavailable') {
+              errorMessage = t('settings.account_data.billing_unavailable');
+              return true;
+            }
             if (bodyError) {
               errorMessage = String(bodyError);
               return true;

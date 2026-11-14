@@ -154,6 +154,31 @@ describe('account deletion device removal', () => {
       wrapper.unmount();
     }
   );
+  it.each([
+    ['account_deletion_subscription_active', 'subscription_active', 409],
+    ['account_deletion_billing_unavailable', 'billing_unavailable', 503],
+  ] as const)(
+    'preserves the account and device data when deletion returns %s',
+    async (code, key, status) => {
+      invoke.mockResolvedValueOnce({
+        data: null,
+        error: { context: new Response(JSON.stringify({ error: code }), { status }) },
+      });
+      const wrapper = mountCard();
+      await clickText(wrapper, 'settings.account.begin_deletion');
+      await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+      await clickText(wrapper, 'settings.account_data.delete_forever');
+      expect(wrapper.findAll('u-alert-stub').map((alert) => alert.attributes('title'))).toContain(
+        `settings.account_data.${key}`
+      );
+      expect(remove).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+      expect(signOut).not.toHaveBeenCalled();
+      expect(reset).not.toHaveBeenCalled();
+      expect(reactiveUser.id).toBe('deleted-owner');
+      wrapper.unmount();
+    }
+  );
   it('preserves a new account that signs in after deletion succeeds', async () => {
     const wrapper = mountCard();
     await clickText(wrapper, 'settings.account.begin_deletion');

@@ -338,6 +338,9 @@ and recovers stale `in_progress` jobs after that lease, but a fencing token prev
 from overwriting its replacement. Each failed retry rolls back and consumes one attempt. Only an
 explicit user request can reset and revive dead-lettered work.
 
+Billing prerequisites, shared deletion guards and rollout order are documented in
+[Account retention — requested deletion](./account-retention.md#requested-account-deletion-with-billing).
+
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.
 

@@ -12,9 +12,14 @@ export interface AccountDeletionFilterBuilder<T> {
   order(column: string, options?: unknown): AccountDeletionFilterBuilder<T>;
   or(filter: string): AccountDeletionFilterBuilder<T>;
   limit(count: number): AccountDeletionFilterBuilder<T>;
-  then<TResult1 = { data: T[] | null; error: unknown }>(
+  then<TResult1 = { data: T[] | null; error: unknown; count?: number | null }>(
     onfulfilled?:
-      ((value: { data: T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null
+      | ((value: {
+          data: T[] | null;
+          error: unknown;
+          count?: number | null;
+        }) => TResult1 | PromiseLike<TResult1>)
+      | null
   ): PromiseLike<TResult1>;
 }
 interface AccountDeletionTransformBuilder extends PromiseLike<{ error: unknown }> {
@@ -26,7 +31,10 @@ export interface AccountDeletionClient {
   from<T extends keyof Database['public']['Tables']>(
     table: T
   ): {
-    select(columns?: string): AccountDeletionFilterBuilder<Database['public']['Tables'][T]['Row']>;
+    select(
+      columns?: string,
+      options?: { count: 'exact' }
+    ): AccountDeletionFilterBuilder<Database['public']['Tables'][T]['Row']>;
     update(values: unknown): AccountDeletionTransformBuilder;
     delete(): AccountDeletionTransformBuilder;
   };

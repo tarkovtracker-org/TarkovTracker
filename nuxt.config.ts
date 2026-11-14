@@ -389,16 +389,16 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxtjs/i18n',
     process.env.NODE_ENV === 'test' ? undefined : '@nuxtjs/sitemap',
-    // A fork pull request has no org secrets, so `secrets.CODECOV_TOKEN`
-    // expands to an empty string rather than being absent. Require a non-empty
-    // value so the plugin cannot load without a usable upload token.
-    process.env.CODECOV_TOKEN
+    // Main Actions builds report with short-lived GitHub identity, never an upload token.
+    // Anonymous previews and local builds leave this flag empty.
+    process.env.CODECOV_USE_OIDC === 'true'
       ? ([
           '@codecov/nuxt-plugin',
           {
             enableBundleAnalysis: true,
             bundleName: 'tarkovtracker',
-            uploadToken: process.env.CODECOV_TOKEN,
+            gitService: 'github',
+            oidc: { useGitHubOIDC: true },
             uploadOverrides: {
               slug: 'tarkovtracker-org/TarkovTracker',
             },
