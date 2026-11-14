@@ -1,8 +1,18 @@
 name: Release Promotion Queue
 on:
   workflow_run:
-    workflows: [Review Admission, Release]
+    workflows: [Release]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      admission_run_id:
+        description: Review Admission run that published the release receipt
+        required: true
+        type: string
+      admission_run_attempt:
+        description: Exact attempt of the Review Admission run
+        required: true
+        type: string
 permissions: {}
 env:
   REVIEW_ADMISSION_APP_ID: ${{ vars.REVIEW_ADMISSION_APP_ID }}
@@ -11,17 +21,14 @@ env:
 jobs:
   enqueue:
     name: Enqueue reviewed version PR
-    # Coarse intake only: admissions for ordinary PR branches cannot enqueue a generated version
-    # PR, so they never reach the serialized queue. The controller still authenticates every
-    # retained source run and receipt.
+    # Only approved release candidates dispatch admission wakeups. Inputs are locators, never
+    # authority: the controller still authenticates the completed source attempt and receipts.
     if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.path == '.github/workflows/release.yml' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.repository.full_name == github.repository &&
-      (github.event.workflow_run.path != '.github/workflows/review-admission.yml' ||
-      contains(github.event.workflow_run.display_title, 'wip/release-') ||
-      contains(github.event.workflow_run.display_title, 'gh-readonly-queue/') ||
-      endsWith(github.event.workflow_run.display_title, ' unscoped') ||
-      !startsWith(github.event.workflow_run.display_title, 'Review Admission '))
+      github.event.workflow_run.repository.full_name == github.repository)
     concurrency:
       group: release-promotion-queue
       queue: max

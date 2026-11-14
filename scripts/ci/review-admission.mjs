@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
+import { promotionBranch } from '../release/release-promotion.mjs';
 import { approvalCommandPrefix, currentAdminAttestation } from './review-admission-attestation.mjs';
 import {
   activeQueueGroup,
@@ -176,7 +177,7 @@ async function currentReceiptDecision(github, context, result) {
   if (group) await requireReleaseSource(github, context.repo, pr, group, live.files);
   const decision = admissionDecision(live);
   await publicationRevision(github, context, pr, group);
-  return decision;
+  return { decision, pr };
 }
 async function publicationGroup(github, context, pr, result) {
   if (result.statusSha === pr.head.sha) return null;
@@ -219,9 +220,10 @@ export async function publishReviewAdmission({ github, context, sha }) {
   requireEvidence(SHA.test(sha), 'Publication requires exact admission SHA.');
   try {
     const result = await uploadedReceipt(github, context, sha);
-    const decision = await currentReceiptDecision(github, context, result);
+    const { decision, pr } = await currentReceiptDecision(github, context, result);
     requireSameDecision(result, decision);
     await status(github, context, sha, 'success', admissionSummary(decision));
+    return pr;
   } catch (error) {
     await status(github, context, sha, 'failure', error.message);
     throw error;
@@ -520,10 +522,16 @@ function receiptOutput(outputs) {
 }
 export async function publishReviewScope({ github, context, head, queued }) {
   const shas = [head, queued].filter(Boolean);
+  const published = [];
   try {
-    for (const sha of shas) await publishReviewAdmission({ github, context, sha });
+    for (const sha of shas) published.push(await publishReviewAdmission({ github, context, sha }));
+    return requestPromotion(published[0], queued, context.repo);
   } catch (error) {
     await scopeStatuses(github, context, shas, 'failure', error.message);
     throw error;
   }
+}
+function requestPromotion(pr, queued, repo) {
+  if (!pr || queued) return false;
+  return Boolean(promotionBranch(pr, repo));
 }

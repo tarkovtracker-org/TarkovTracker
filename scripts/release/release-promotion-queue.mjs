@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { candidateEvidence, promotionBranch } from './release-promotion.mjs';
@@ -23,17 +24,37 @@ function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
 function requireTrigger(context) {
+  if (context.eventName === 'workflow_dispatch') return dispatchSource(context);
   requireCondition(
     context.eventName === 'workflow_run',
     'Release enqueue only accepts trusted workflow completion.'
   );
-  const event = context.payload.workflow_run;
+  return completionSource(context.payload.workflow_run);
+}
+function completionSource(event) {
   requireCondition(Number.isSafeInteger(event?.id) && event.id > 0, 'Missing source run identity.');
   requireCondition(
     Number.isSafeInteger(event.run_attempt) && event.run_attempt > 0,
     'Missing source run attempt.'
   );
   return event;
+}
+function dispatchSource(context) {
+  requireCondition(context.ref === 'refs/heads/main', 'Promotion dispatch must use trusted main.');
+  const inputs = context.payload.inputs ?? {};
+  return {
+    id: positiveInput(inputs.admission_run_id),
+    run_attempt: positiveInput(inputs.admission_run_attempt),
+    path: ADMISSION_PATH,
+  };
+}
+function positiveInput(value) {
+  requireCondition(
+    typeof value === 'string' && /^[1-9]\d*$/.test(value),
+    'Invalid admission run/attempt locator.'
+  );
+  requireCondition(Number.isSafeInteger(Number(value)), 'Admission locator exceeds integer range.');
+  return Number(value);
 }
 function requireRunIdentity(run, repo, event) {
   requireCondition(run.id === event.id, 'Source run ID changed.');
@@ -45,6 +66,7 @@ function requireRunIdentity(run, repo, event) {
     [ADMISSION_PATH, RELEASE_PATH].includes(run.path),
     'Unknown release enqueue source workflow.'
   );
+  requireCondition(!event.path || run.path === event.path, 'Source workflow identity changed.');
   requireCondition(FULL_SHA.test(run.head_sha), 'Missing immutable source run revision.');
 }
 function requireMainSource(run, repo) {
@@ -71,15 +93,38 @@ function requireSourceEvent(run, repo) {
   if (run.event === 'workflow_dispatch') requireMainSource(run, repo);
   return true;
 }
-async function sourceWakeup(github, context) {
+async function sourceWakeup(github, context, sleep) {
   const event = requireTrigger(context);
   const repo = context.repo;
-  const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: event.id });
-  requireRunIdentity(run, repo, event);
-  if (!requireSourceEvent(run, repo)) return null;
+  const run = await triggeredSource(github, context, event, sleep);
+  if (!run) return null;
   if (!completedAttempt(run, event)) return null;
   if (run.path === RELEASE_PATH) await requirePolicySource(github, repo, run.head_sha);
   return run;
+}
+async function triggeredSource(github, context, event, sleep) {
+  const read = () => readSource(github, context.repo, event);
+  const run = await read();
+  if (context.eventName !== 'workflow_dispatch') return run;
+  return completedDispatch(run, event, read, sleep);
+}
+async function readSource(github, repo, event) {
+  const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: event.id });
+  requireRunIdentity(run, repo, event);
+  return requireSourceEvent(run, repo) ? run : null;
+}
+async function completedDispatch(run, event, read, sleep) {
+  // The requesting job must finish before its source workflow can be successful. Wait only
+  // for this exact authenticated attempt; never treat dispatch or an unfinished run as approval.
+  for (let remaining = 12; ; remaining--) {
+    if (run.run_attempt !== event.run_attempt || run.status === 'completed') return run;
+    requireCondition(
+      remaining > 0,
+      'Admission source did not complete within 60 seconds; retry promotion.'
+    );
+    await sleep(5000);
+    run = await read();
+  }
 }
 function completedAttempt(run, event) {
   if (run.run_attempt > event.run_attempt) return false;
@@ -341,8 +386,9 @@ export async function queueReleasePromotion({
   github,
   context,
   operations = queueOperations(context.repo),
+  sleep = delay,
 }) {
-  const run = await sourceWakeup(github, context);
+  const run = await sourceWakeup(github, context, sleep);
   if (!run) return skip('Source wakeup is unfinished or superseded.');
   const repo = context.repo;
   const pr = await discoveredCandidate(github, repo, run);
