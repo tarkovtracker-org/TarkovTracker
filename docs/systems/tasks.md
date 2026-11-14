@@ -660,7 +660,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    return by itself when the quest comes back. The legend and the map report their hovers
    separately (a marker hover wins over a legend hover or focus, which wins over the lock), so
    leaving one never clears the other. The map releases a hover it reported when it redraws its
-   markers or unmounts, and the legend forgets an entry that leaves it, since neither fires
+   markers or unmounts, `tasks.vue` drops the marker hover when the fullscreen map opens or
+   closes over it, and the legend forgets an entry that leaves it, since none of these fires
    mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
    and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
 

@@ -924,6 +924,8 @@
       fullscreenMapView.value = inlineMap.getViewState();
       fullscreenInitialFloor.value = inlineMap.getFloor();
     }
+    // The overlay covers whichever marker was hovered, which then never fires mouseout.
+    setMarkerMapTask(null);
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {
@@ -932,6 +934,9 @@
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
     fullscreenInitialFloor.value = undefined;
+    // The overlay unmounts only after its leave transition, so release its marker hover now. Only
+    // the marker source is cleared; a legend hover or a locked quest is kept.
+    setMarkerMapTask(null);
     restoreInlineMapFloor(overlayFloor);
     if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };
