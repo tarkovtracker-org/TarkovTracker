@@ -8,6 +8,7 @@ import * as billing from './stripeBilling.ts';
 import * as retention from './stripeRetention.ts';
 import * as oneTime from './stripeOneTime.ts';
 import * as tiers from './stripeTier.ts';
+import * as deletionBilling from './account-deletion-billing.ts';
 type Row = Record<string, unknown>;
 const userId = '0bcd1234-1234-1234-1234-123456789abc';
 const contributionAt = '2026-09-01T12:00:00.000Z';
@@ -117,6 +118,8 @@ function createHarness(
           createClient: () => ({
             from,
             rpc: (name: string, params: Row) => {
+              if (name === 'record_account_billing_subscription')
+                return Promise.resolve({ data: null, error: null });
               if (name === 'refund_one_time_supporter') {
                 refundCalls.push(params);
                 if (options.refundError)
@@ -153,7 +156,12 @@ function createHarness(
               row = { ...row, supporter_disqualified_at: '2026-09-29T12:00:00Z' };
               return Promise.resolve({ error: null });
             },
-            auth: { admin: { getUserById: () => Promise.resolve({ data: null }) } },
+            auth: {
+              admin: {
+                getUserById: () =>
+                  Promise.resolve({ data: { user: { id: userId, identities: [] } }, error: null }),
+              },
+            },
           }),
         };
       }
@@ -161,6 +169,7 @@ function createHarness(
       if (name.endsWith('stripeRetention.ts')) return retention;
       if (name.endsWith('stripeOneTime.ts')) return oneTime;
       if (name.endsWith('stripeTier.ts')) return tiers;
+      if (name.endsWith('account-deletion-billing.ts')) return deletionBilling;
       if (name.endsWith('cors.ts')) return {};
       return {
         isDiscordNotInGuildError: (error: unknown) =>
@@ -609,7 +618,7 @@ describe('subscription grace contribution fence', () => {
         status: 'cancelled',
         tier: 'supporter',
         has_ever_supported: false,
-        stripe_subscription_id: null,
+        stripe_subscription_id: 'sub_1',
       });
       expect(harness.roles.size).toBe(0);
       expect(new Date(String(harness.current().expires_at)).getTime()).toBeLessThanOrEqual(
