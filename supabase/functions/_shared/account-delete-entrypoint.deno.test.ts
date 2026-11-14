@@ -16,6 +16,7 @@ Deno.test(
     let clears = 0;
     let teamReads = 0;
     let clearanceAllowed = true;
+    let failures = 0;
     const env = stub(Deno.env, 'get', (name) =>
       name === 'SUPABASE_URL' ? 'https://supabase.invalid' : 'isolated-test-key'
     );
@@ -26,7 +27,7 @@ Deno.test(
     const fetchStub = stub(
       globalThis,
       'fetch',
-      (input: string | URL | Request, init?: RequestInit) => {
+      async (input: string | URL | Request, init?: RequestInit) => {
         const req = new Request(input, init);
         const url = new URL(req.url);
         if (url.hostname === 'api.stripe.com')
@@ -72,8 +73,17 @@ Deno.test(
           deletes++;
           return Promise.resolve(json({ user: { id: userId } }));
         }
-        if (url.pathname.endsWith('/account_deletion_jobs'))
-          return Promise.resolve(json([{ user_id: userId }]));
+        if (url.pathname.endsWith('/account_deletion_jobs')) {
+          if (req.method === 'PATCH') {
+            const update = await req.json();
+            if (update.last_error === 'billing_verification_changed') {
+              assertEquals(update.status, 'failed');
+              assertEquals(update.claim_token, null);
+              failures++;
+            }
+          }
+          return Promise.resolve(json([{ user_id: userId, attempts: 0, max_attempts: 5 }]));
+        }
         if (req.method === 'DELETE') return Promise.resolve(json(null));
         throw new Error(`Unexpected test request ${req.method} ${url.pathname}`);
       }
@@ -94,10 +104,14 @@ Deno.test(
       });
     try {
       await import('../account-delete/index.ts');
-      assertEquals((await handler!(request())).status, 409);
+      const denied = await handler!(request());
+      assertEquals(denied.status, 409);
+      assertEquals((await denied.json()).error, 'account_deletion_subscription_active');
       assertEquals([claims, deletes, clears, teamReads], [0, 0, 0, 0]);
       subscriptionStatus = 'outage';
-      assertEquals((await handler!(request())).status, 503);
+      const unavailable = await handler!(request());
+      assertEquals(unavailable.status, 503);
+      assertEquals((await unavailable.json()).error, 'account_deletion_billing_unavailable');
       assertEquals([claims, deletes, clears, teamReads], [0, 0, 0, 0]);
       subscriptionStatus = 'canceled';
       assertEquals((await handler!(request())).status, 200);
@@ -105,6 +119,7 @@ Deno.test(
       clearanceAllowed = false;
       assertEquals((await handler!(request())).status, 503);
       assertEquals([claims, deletes, clears, teamReads], [2, 1, 2, 1]);
+      assertEquals(failures, 1);
     } finally {
       fetchStub.restore();
       serve.restore();

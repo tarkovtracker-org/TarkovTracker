@@ -11,7 +11,8 @@ function client(
   id: string | null,
   error: unknown = null,
   customerId: string | null = null,
-  retained: string[] = []
+  retained: string[] = [],
+  ledgerResult: { count?: number; error?: unknown } = {}
 ) {
   const query = {
     select: () => query,
@@ -27,8 +28,8 @@ function client(
     eq: () =>
       Promise.resolve({
         data: retained.map((id) => ({ stripe_subscription_id: id })),
-        count: retained.length,
-        error: null,
+        count: ledgerResult.count ?? retained.length,
+        error: ledgerResult.error ?? null,
       }),
   };
   return {
@@ -96,18 +97,60 @@ test('missing keys, lookup errors, Stripe failures and mismatched identities fai
     );
   }
 });
-test('a replaced lease or changed subscription cannot clear the retained billing reference', async () => {
-  const stale = {
-    rpc: () => Promise.resolve({ data: false, error: null }),
-  } as unknown as AccountDeletionClient;
+test('failed clearance rejects deletion and current clearance sends the complete fenced snapshot', async () => {
+  const clearance = (data: boolean, token: string) =>
+    ({
+      rpc: (name: string, args: unknown) => {
+        assertEquals(name, 'clear_ended_deletion_subscription');
+        assertEquals(args, {
+          p_user_id: 'user',
+          p_subscription_id: 'sub_1',
+          p_customer_id: null,
+          p_subscription_ids: [],
+          p_claim_token: token,
+        });
+        return Promise.resolve({ data, error: null });
+      },
+    }) as unknown as AccountDeletionClient;
+  const stale = clearance(false, 'old-claim');
   await assertRejects(
     () => clearEndedDeletionSubscription(stale, 'user', billing, 'old-claim'),
     DeletionBillingError
   );
-  const current = {
-    rpc: () => Promise.resolve({ data: true, error: null }),
-  } as unknown as AccountDeletionClient;
+  const current = clearance(true, 'current-claim');
   await clearEndedDeletionSubscription(current, 'user', billing, 'current-claim');
+});
+test('incomplete or unavailable billing ledgers fail closed', async () => {
+  for (const ledgerResult of [{ count: 1 }, { error: new Error('ledger outage') }])
+    await assertRejects(
+      () => endedDeletionSubscription(client(null, null, null, [], ledgerResult), 'user', 'test'),
+      DeletionBillingError,
+      'account_deletion_billing_unavailable'
+    );
+});
+test('customer verification continues past ten pages and rejects a repeated cursor', async () => {
+  let pages = 0;
+  await endedDeletionSubscription(client(null, null, 'cus_1'), 'user', 'test', () => {
+    pages++;
+    return Promise.resolve(
+      response({ data: [{ id: `sub_${pages}`, status: 'canceled' }], has_more: pages < 12 })
+    );
+  });
+  assertEquals(pages, 12);
+  let repeatedPages = 0;
+  await assertRejects(
+    () =>
+      endedDeletionSubscription(client(null, null, 'cus_1'), 'user', 'test', () => {
+        repeatedPages++;
+        if (repeatedPages > 2) return Promise.resolve(response({}, 503));
+        return Promise.resolve(
+          response({ data: [{ id: 'sub_same', status: 'canceled' }], has_more: true })
+        );
+      }),
+    DeletionBillingError,
+    'account_deletion_billing_unavailable'
+  );
+  assertEquals(repeatedPages, 2);
 });
 test('a replaced subscription on another customer remains a deletion blocker', async () => {
   const seen: string[] = [];
@@ -164,7 +207,8 @@ test('customer history catches cleared legacy references and checks every subscr
 test('late Checkout subscriptions are cancelled only for a confirmed deleted account', async () => {
   const subscription = { id: 'sub_1', status: 'active' };
   let cancellations = 0;
-  const cancel: typeof fetch = (_input, init) => {
+  const cancel: typeof fetch = (input, init) => {
+    assertEquals(String(input), 'https://api.stripe.com/v1/subscriptions/sub_1');
     assertEquals(init?.method, 'DELETE');
     cancellations++;
     return Promise.resolve(response({ id: 'sub_1', status: 'canceled' }));

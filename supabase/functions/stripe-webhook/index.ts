@@ -634,18 +634,29 @@ async function reconcileSubscriptionWithVerifiedHistory(
   contributionDate: string | null = null
 ): Promise<void> {
   const supporter = await findSubscriptionSupporter(subscription);
-  const userId = supporter?.user_id || getSubscriptionUserId(subscription);
-  if (
-    userId &&
-    (await cancelDeletedUserSubscription(eventClient(), userId, subscription, STRIPE_SECRET_KEY))
-  )
-    return;
-  if (userId) await recordBillingSubscription(userId, subscription.id);
+  if (!(await retainSubscriptionIdentity(subscription, supporter))) return;
   if (isSupporterDisqualified(supporter)) {
     await revokeSupporter(supporter, true, 'disqualified subscription');
     return;
   }
   await reconcileEligibleSubscription(subscription, supporter, contributionDate);
+}
+async function retainSubscriptionIdentity(
+  subscription: StripeSubscription,
+  supporter: SupporterRow | null
+): Promise<boolean> {
+  const userId = subscriptionBillingUserId(subscription, supporter);
+  if (!userId) return true;
+  if (await cancelDeletedUserSubscription(eventClient(), userId, subscription, STRIPE_SECRET_KEY))
+    return false;
+  await recordBillingSubscription(userId, subscription.id);
+  return true;
+}
+function subscriptionBillingUserId(
+  subscription: StripeSubscription,
+  supporter: SupporterRow | null
+): string | null {
+  return supporter?.user_id || getSubscriptionUserId(subscription);
 }
 async function reconcileEligibleSubscription(
   subscription: StripeSubscription,
@@ -842,9 +853,9 @@ async function removeDeniedStripeRoles(discordUserId: string): Promise<void> {
 }
 // deno-lint-ignore no-explicit-any
 async function handleSubscriptionDeleted(subscription: any): Promise<void> {
-  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
-  if (!supporter) return;
   const currentSubscription = await fetchLatestSubscription(subscription.id);
+  const supporter = await retainedDeletedSupporter(currentSubscription);
+  if (!supporter) return;
   if (hasSubscriptionAccess(currentSubscription)) return;
   if (!(await expireDeletedSubscription(supporter, currentSubscription))) return;
   const current = await findSupporterBy('user_id', supporter.user_id);
@@ -854,6 +865,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
       discordUserId: null,
     });
   console.info(`[stripe-webhook] Subscription expired: ${supporter.user_id}`);
+}
+async function retainedDeletedSupporter(
+  subscription: StripeSubscription
+): Promise<SupporterRow | null> {
+  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
+  return (await retainSubscriptionIdentity(subscription, supporter)) ? supporter : null;
 }
 function hasSubscriptionAccess(subscription: StripeSubscription): boolean {
   return ['active', 'trialing', 'past_due'].includes(String(subscription.status));

@@ -2295,7 +2295,7 @@
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
       "go_to_dashboard": "Go to Dashboard",
       "session_changed": "Your signed-in account changed. No further action will be taken in this session.",
-      "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage Billing to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
+      "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
       "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later."
     },
     "discord_link": {

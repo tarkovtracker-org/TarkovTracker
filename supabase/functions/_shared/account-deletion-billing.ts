@@ -128,24 +128,22 @@ async function verifyCustomerSubscriptions(
   customerId: string,
   stripeKey: string,
   fetchImpl: typeof fetch,
-  after = '',
-  pagesLeft = 10
+  after = ''
 ): Promise<void> {
-  if (pagesLeft === 0) throw unavailable();
   const params = new URLSearchParams({ customer: customerId, status: 'all', limit: '100' });
   if (after) params.set('starting_after', after);
   const page = subscriptionPage(
     await requestStripe(`/subscriptions?${params}`, stripeKey, 'GET', fetchImpl)
   );
   verifyEndedPage(page);
-  if (page.has_more)
-    await verifyCustomerSubscriptions(
-      customerId,
-      stripeKey,
-      fetchImpl,
-      page.data.at(-1)!.id,
-      pagesLeft - 1
-    );
+  const cursor = nextPageCursor(page, after);
+  if (cursor) await verifyCustomerSubscriptions(customerId, stripeKey, fetchImpl, cursor);
+}
+function nextPageCursor(page: SubscriptionPage, previous: string): string | null {
+  if (!page.has_more) return null;
+  const cursor = page.data.at(-1)!.id;
+  if (cursor === previous) throw unavailable();
+  return cursor;
 }
 /** Read-only Stripe verification: scheduled cancellation is still a live subscription. */
 export async function endedDeletionSubscription(

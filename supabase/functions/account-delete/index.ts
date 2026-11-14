@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
         req
       );
     }
-    await clearEndedDeletionSubscription(supabase, user.id, verifiedBilling, claim.claimToken);
+    await clearClaimedBilling(supabase, user.id, verifiedBilling, claim.claimToken);
     const { data: ownedTeams, error: teamQueryError } = await supabase
       .from('teams')
       .select('id')
@@ -255,6 +255,26 @@ Deno.serve(async (req) => {
     return accountDeletionError(error, req);
   }
 });
+async function clearClaimedBilling(
+  client: AccountDeletionClient,
+  userId: string,
+  billing: Awaited<ReturnType<typeof endedDeletionSubscription>>,
+  claimToken: string
+): Promise<void> {
+  try {
+    await clearEndedDeletionSubscription(client, userId, billing, claimToken);
+  } catch (error) {
+    await recordDeletionFailure(
+      client,
+      userId,
+      claimToken,
+      'billing_verification_changed',
+      { stage: 'billing', error: serializeError(error) },
+      '[account-delete]'
+    );
+    throw error;
+  }
+}
 function accountDeletionError(error: unknown, req: Request): Response {
   if (error instanceof DeletionBillingError)
     return createErrorResponse(error.code, error.status, req);

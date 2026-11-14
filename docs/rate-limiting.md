@@ -326,29 +326,6 @@ Important:
 
 `account-delete` currently uses a **dedicated** path:
 
-Before claiming a deletion job or transferring teams, the Edge Function verifies every retained
-subscription and every page of the linked customer's subscription history through Stripe. Only permanently ended `canceled` or
-`incomplete_expired` subscriptions can proceed; scheduling cancellation at period end, expired
-local benefits, past-due payments and disqualification do not authorize deletion. Lookup errors
-fail closed. Active subscribers keep their account and paid time and are directed to Manage
-Billing on the Supporter page; they can return after the subscription ends.
-
-An Auth `BEFORE DELETE` trigger protects every deletion caller, including nightly SQL retry and
-inactive cleanup, whenever a customer or subscription identity is still recorded. A service-only
-subscription ledger retains replaced references across different customers and entitlement
-revocations. After Stripe verifies termination, a service-role-only RPC compares and clears the
-complete identity snapshot under the current unexpired deletion claim. Billing activation and
-job claims serialize on the Auth row; activation retries while the deletion claim is live. A
-changed identity, incomplete query, or replaced lease fails before any team cleanup. This schema must deploy
-before the updated Edge Functions. Previously issued Checkout sessions may finish after Auth
-deletion; subscription webhooks verify account existence and cancel only subscriptions whose
-account is confirmed deleted. Auth/Stripe outages retry without assuming absence, and FK races
-are rechecked before compensating. No normal account deletion cancels an active subscription.
-The ledger captures identities from deployment onward; previously discarded references on
-different Stripe customers require a separate historical reconciliation before claiming those
-old orphaned subscriptions are repaired. The current customer is checked even when its local
-subscription reference was already cleared. This schema performs no production data backfill.
-
 1. Call `consume_account_deletion_attempt` to serialize each user's requests in Postgres
 2. Allow and record max **3 attempts / 60s** in the same transaction
 3. Atomically claim the deletion job through `claim_account_deletion_job`
@@ -360,6 +337,9 @@ Both RPCs are service-role-only. A job claim holds a 15-minute lease; the daily
 and recovers stale `in_progress` jobs after that lease, but a fencing token prevents the stale worker
 from overwriting its replacement. Each failed retry rolls back and consumes one attempt. Only an
 explicit user request can reset and revive dead-lettered work.
+
+Billing prerequisites, shared deletion guards and rollout order are documented in
+[Account retention — requested deletion](./account-retention.md#requested-account-deletion-with-billing).
 
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.
