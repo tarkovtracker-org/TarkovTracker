@@ -224,6 +224,16 @@ replaces the key with the translated string.
 - Unsupported paths are logged with a warning and skipped; the data under them stays untouched.
 - Primary language wins; English is the fallback when a key is missing in the primary language.
 
+The items-lite fetcher omits only exact translation declarations for fields its projection
+discards: item descriptions and the top-level flea market, armor materials, skills, item
+categories, and handbook categories. Names, all retained properties, and default presets still
+use the normal translator and English fallback. Unfamiliar or overlapping declarations retain
+the full translation path. Filtering copies the envelope rather than changing upstream data
+shared by concurrent full/lite or locale requests. The lite adapter also returns before expanding
+full-only categories and contained items. Full-items output and the fetch/cache/overlay order
+are unchanged. See the [cold-path CPU evidence](../evidence/items-lite-cpu-2026-11-14.md) for
+production reproduction, controlled measurements and their limits.
+
 ### Files
 
 - `app/server/utils/tarkov-json.ts` — fetch, retry, dedup, adapt, translate.
