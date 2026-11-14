@@ -524,7 +524,10 @@ glyph/color and the generic exit glyph/default color; it controls either-faction
 whose faction was not supplied without implying that unknown factions are shared. Shared and co-op
 extracts have their own toggles and start
 visible when either faction's extracts start visible; extracts without a known faction follow the
-Shared row, which is listed whenever such extracts exist. Extracts are visible by default. The
+Shared row, which is listed whenever such extracts exist. Extracts start visible or hidden from
+**Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`);
+if that preference changes while a map is open, it applies to every extract row not changed in that
+session. The
 panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
 in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
 containers narrower than 30rem.
