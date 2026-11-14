@@ -194,11 +194,12 @@ integration fails or is unavailable, not the normal path.
    Verify the object itself landed, not just the version row; for a constraint, check
    `pg_constraint` (`convalidated = false` is expected for `NOT VALID`).
 
-   **Ordering caveat:** migrations, Workers and Edge Functions all deploy from the same merge and
-   you cannot control the order between them. Code that depends on a new DB object (e.g. a worker
-   calling the `merge_progress_data` RPC) can briefly run against a database that does not have it
-   yet. When the dependency matters, land the migration in an **earlier release** than the code
-   that uses it; adding a DB object ahead of its caller is safe, the reverse is not.
+   **Deployment ordering:** the [Supabase GitHub integration](https://supabase.com/docs/guides/deployment/branching/github-integration#what-runs-on-each-push)
+   applies config, migrations, seed, then Edge Functions. The old deployed function remains
+   active while migrations run, so migrations must be compatible with that old handler until
+   the new function version is active. Workers deploy independently and can reach a new DB
+   object before its migration; land required objects in an earlier release when that dependency
+   matters. Adding a DB object ahead of its caller is safe; the reverse is not.
 
    **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
    that an Edge Function also enforces in application code (e.g.
@@ -265,12 +266,14 @@ revision from Supabase (not a preview or merely a green CI check). Using a dispo
 account's valid session, POST to the production function and verify HTTP 503, the retry header,
 and the maintenance error. Confirm that its teams, Auth user, deletion jobs, and limiter state
 remain unchanged. Do not log the session token. Wait for requests already running the old
-function version to drain before proceeding; record the observed rollout/drain evidence.
+function version to drain before proceeding. Record the active version and matching deployed
+source, absence of old-version invocations in logs, and bounded-runtime evidence; a deploy
+success alone does not prove old invocations finished.
 
-Only then merge the billing-safe release. Migrations and Edge Functions may deploy in either
-order: the already-active gate prevents the old team-first handler from running against the
-new Auth deletion guard. Verify the expected migration and new active function version, then
-smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
+Only then merge the billing-safe release. Supabase applies migrations before deploying Edge
+Functions: the already-active gate prevents the old team-first handler from running against
+the new Auth deletion guard during that interval. Verify the expected migration and new active
+function version, then smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
 If rollout fails, keep/redeploy the maintenance gate; never roll back to the old team-first
 handler after the billing guard migration. Remove the gate only in the billing-safe handler
 release. This prerequisite does not pause an already-running deletion worker; inspect/drain
