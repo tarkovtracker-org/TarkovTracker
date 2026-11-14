@@ -1,19 +1,21 @@
 <template>
   <li
     class="space-y-2 rounded-md border border-white/10 p-3"
+    :aria-labelledby="labelId"
     :data-testid="`superseded-copy-${copy.id}`"
   >
     <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p class="text-surface-100 text-sm font-semibold">{{ label }}</p>
+      <p :id="labelId" class="text-surface-100 text-sm font-semibold">{{ label }}</p>
       <p class="text-surface-400 text-xs">{{ describe(copy.progress) }}</p>
     </div>
     <p v-if="!restorable" class="text-surface-400 text-xs">
       {{ $t('settings.data_management.superseded_other_season') }}
     </p>
-    <div v-if="pending" class="space-y-2" role="group">
+    <div v-if="pending" class="space-y-2" role="group" :aria-labelledby="labelId">
       <p class="text-surface-300 text-sm">{{ confirmation }}</p>
       <div class="flex flex-wrap gap-2">
         <UButton
+          ref="confirmButton"
           size="sm"
           :color="pending === 'restore' ? 'primary' : 'error'"
           data-testid="superseded-confirm"
@@ -21,7 +23,7 @@
         >
           {{ $t(`settings.data_management.superseded_${pending}_confirm`, { mode: modeLabel }) }}
         </UButton>
-        <UButton size="sm" color="neutral" variant="soft" @click="pending = null">
+        <UButton size="sm" color="neutral" variant="soft" @click="cancelPending">
           {{ $t('common.cancel') }}
         </UButton>
       </div>
@@ -29,12 +31,14 @@
     <div v-else class="flex flex-wrap gap-2">
       <UButton
         v-if="restorable"
+        ref="restoreButton"
         size="sm"
         color="primary"
         variant="soft"
         icon="i-mdi-restore"
+        :aria-describedby="labelId"
         data-testid="superseded-restore"
-        @click="pending = 'restore'"
+        @click="open('restore')"
       >
         {{ $t('settings.data_management.superseded_restore') }}
       </UButton>
@@ -43,18 +47,21 @@
         color="neutral"
         variant="soft"
         icon="i-mdi-download"
+        :aria-describedby="labelId"
         data-testid="superseded-download"
         @click="handleDownload"
       >
         {{ $t('settings.data_management.superseded_download') }}
       </UButton>
       <UButton
+        ref="discardButton"
         size="sm"
         color="neutral"
         variant="ghost"
         icon="i-mdi-delete-outline"
+        :aria-describedby="labelId"
         data-testid="superseded-discard"
-        @click="pending = 'discard'"
+        @click="open('discard')"
       >
         {{ $t('settings.data_management.superseded_discard') }}
       </UButton>
@@ -73,6 +80,7 @@
   import type { UseDataBackupReturn } from '@/composables/useDataBackup';
   import type { UserProgressData } from '@/types/progress';
   type PendingAction = 'restore' | 'discard';
+  type FocusableButton = { $el?: HTMLElement } | null;
   const props = defineProps<{
     copy: SupersededProgressCopy;
     backup: Pick<
@@ -84,6 +92,10 @@
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const pending = ref<PendingAction | null>(null);
+  const confirmButton = ref<FocusableButton>(null);
+  const restoreButton = ref<FocusableButton>(null);
+  const discardButton = ref<FocusableButton>(null);
+  const labelId = computed(() => `superseded-copy-${props.copy.id}-label`);
   const restorable = computed(() => isRestorableSupersededCopy(props.copy));
   const modeLabel = computed(() => t(getGameModeLabel(props.copy.mode)));
   const capturedAt = computed(() =>
@@ -104,11 +116,14 @@
           date: capturedAt.value,
         })
   );
-  const describe = (progress: UserProgressData | undefined) =>
-    t('settings.data_management.superseded_copy_summary', {
-      level: progress?.level ?? 1,
-      count: Object.keys(progress?.taskCompletions ?? {}).length,
-    });
+  const describe = (progress: UserProgressData | undefined) => {
+    const count = Object.keys(progress?.taskCompletions ?? {}).length;
+    return t(
+      'settings.data_management.superseded_copy_summary',
+      { level: progress?.level ?? 1, count },
+      count
+    );
+  };
   const confirmation = computed(() =>
     pending.value === 'restore'
       ? t('settings.data_management.superseded_restore_confirmation', {
@@ -117,6 +132,18 @@
         })
       : t('settings.data_management.superseded_discard_confirmation')
   );
+  /** Swapping the action row for its confirmation would otherwise drop keyboard focus. */
+  const focusAfterRender = (button: Ref<FocusableButton>) =>
+    nextTick(() => button.value?.$el?.focus());
+  function open(action: PendingAction) {
+    pending.value = action;
+    void focusAfterRender(confirmButton);
+  }
+  function cancelPending() {
+    const action = pending.value;
+    pending.value = null;
+    void focusAfterRender(action === 'restore' ? restoreButton : discardButton);
+  }
   function reportFailure(error: unknown, fallbackKey: string) {
     logger.error('SupersededCopyItem: recovery copy action failed', error);
     toast.add({ title: recoveryErrorMessage(t, error, fallbackKey), color: 'error' });
@@ -140,9 +167,16 @@
     }
   }
   function confirmPending() {
-    const action = pending.value === 'restore' ? restore : discard;
+    const action = pending.value;
     pending.value = null;
-    action();
+    if (action === 'restore') {
+      restore();
+      void focusAfterRender(restoreButton);
+      return;
+    }
+    // A discarded copy leaves the list; a failed discard keeps it and its focus target.
+    discard();
+    void focusAfterRender(discardButton);
   }
   async function handleDownload() {
     try {

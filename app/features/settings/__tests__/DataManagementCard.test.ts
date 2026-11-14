@@ -51,7 +51,10 @@ const {
     selectedRecoveryArchiveEntry: {} as Ref<number | null>,
     legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
     legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
-    recoveryCopiesAdded: { __v_isRef: true as const, value: 0 },
+    recoveryCopiesImport: {
+      __v_isRef: true as const,
+      value: null as { added: number; alreadyPresent: number } | null,
+    },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -151,7 +154,7 @@ vi.mock('@/composables/useDataBackup', () => ({
     reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
     legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
-    recoveryCopiesAdded: backupState.recoveryCopiesAdded,
+    recoveryCopiesImport: backupState.recoveryCopiesImport,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -264,7 +267,7 @@ describe('DataManagementCard', () => {
     });
     backupState.legacyProgressRecoveryCount.value = 0;
     backupState.legacyProgressRecoveryOverflow.value = false;
-    backupState.recoveryCopiesAdded.value = 0;
+    backupState.recoveryCopiesImport.value = null;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -1399,7 +1402,7 @@ describe('DataManagementCard', () => {
   });
   it('announces recovery copies added from a superseded-progress file', async () => {
     backupFns.parseBackupFile.mockImplementation(async () => {
-      backupState.recoveryCopiesAdded.value = 2;
+      backupState.recoveryCopiesImport.value = { added: 2, alreadyPresent: 0 };
     });
     const wrapper = createWrapper({ view: 'backup' });
     await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
@@ -1413,6 +1416,21 @@ describe('DataManagementCard', () => {
         title: 'settings.data_management.recovery_copies_added:{"count":2}',
       })
     );
+  });
+  it('says so when a superseded-progress file adds nothing new', async () => {
+    backupFns.parseBackupFile.mockImplementation(async () => {
+      backupState.recoveryCopiesImport.value = { added: 0, alreadyPresent: 3 };
+    });
+    const wrapper = createWrapper({ view: 'backup' });
+    await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
+      wrapper.vm
+    ).handleBackupFileChange({
+      target: { files: [new File(['{}'], 'copies.json')], value: 'selected' },
+    } as unknown as Event);
+    expect(toastAddMock).toHaveBeenCalledWith({
+      color: 'info',
+      title: 'settings.data_management.recovery_copies_already_present',
+    });
   });
   it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
     backupState.legacyProgressRecoveryOverflow.value = true;

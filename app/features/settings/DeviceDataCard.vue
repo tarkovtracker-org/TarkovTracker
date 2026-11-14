@@ -62,6 +62,13 @@
     <template #body>
       <div class="space-y-3 text-sm">
         <p class="text-surface-200">{{ t('settings.device_data.confirm_description') }}</p>
+        <p
+          v-if="recoveryCopies.length"
+          class="text-warning-300"
+          data-testid="device-data-recovery-copies"
+        >
+          {{ recoveryCopiesWarning }}
+        </p>
         <UAlert
           v-if="pendingCloudChanges"
           icon="i-mdi-cloud-alert"
@@ -122,6 +129,7 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useDataBackup } from '@/composables/useDataBackup';
   import { useSignOut } from '@/composables/useSignOut';
+  import { useSupersededCopies } from '@/features/settings/useRecoveryCopies';
   import {
     clearDeviceDataRemoval,
     incompleteDeviceDataRemovalOwner,
@@ -143,6 +151,15 @@
   const { $supabase } = useNuxtApp();
   const { exportProgress } = useDataBackup();
   const { signOutNow, signOutThisDevice, lastFailure } = useSignOut();
+  /** Removal deletes these too; they are reviewed and downloaded under Backup & Restore. */
+  const { copies: recoveryCopies } = useSupersededCopies();
+  const recoveryCopiesWarning = computed(() =>
+    t(
+      'settings.device_data.recovery_copies_warning',
+      { count: recoveryCopies.value.length },
+      recoveryCopies.value.length
+    )
+  );
   const confirmOpen = ref(false);
   const confirmationOwner = ref<string | null>(null);
   const removing = ref(false);

@@ -31,6 +31,18 @@ describe('superseded progress copies', () => {
     expect(listSupersededProgressCopies('owner-1')).toEqual([copy]);
     expect(listSupersededProgressCopies('owner-2')).toEqual([]);
   });
+  it('treats copies that differ only in reset clocks as the same progress', () => {
+    const first = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100);
+    const restoredAgain = saveSupersededProgressCopy(
+      'owner-1',
+      'pvp',
+      null,
+      { ...progress, progressEpoch: 9, manualActivityEpoch: 4 },
+      200
+    );
+    expect(restoredAgain).toEqual(first);
+    expect(listSupersededProgressCopies('owner-1')).toHaveLength(1);
+  });
   it('discards one copy for its owner and announces the change', () => {
     const kept = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;
     const discarded = saveSupersededProgressCopy('owner-1', 'pve', null, progress, 200)!;

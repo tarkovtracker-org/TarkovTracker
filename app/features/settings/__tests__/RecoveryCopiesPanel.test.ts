@@ -49,10 +49,11 @@ const saveCopy = async (mode: 'pvp' | 'seasonal', seasonNumber: number | null, a
   const progress = { ...createDefaultOwnedProgressData(), level: 12 + at };
   return saveSupersededProgressCopy('user-1', mode, seasonNumber, progress, at)!;
 };
-const mountPanel = async () => {
+const mountPanel = async (options: { attachTo?: HTMLElement } = {}) => {
   const { default: Panel } = await import('@/features/settings/RecoveryCopiesPanel.vue');
   return mount(Panel, {
     props: { backup: backup as unknown as UseDataBackupReturn, parsing: false },
+    attachTo: options.attachTo,
     global: {
       mocks: {
         $t: (key: string, params?: Record<string, unknown>) =>
@@ -122,6 +123,25 @@ describe('RecoveryCopiesPanel', () => {
         title: expect.stringContaining('settings.data_management.superseded_restored'),
       })
     );
+  });
+  it('moves focus into the confirmation and back when it is cancelled', async () => {
+    const copy = await saveCopy('pvp', null);
+    const wrapper = await mountPanel({ attachTo: document.body });
+    const item = () => wrapper.get(`[data-testid="superseded-copy-${copy.id}"]`);
+    expect(item().attributes('aria-labelledby')).toBe(`superseded-copy-${copy.id}-label`);
+    await item().get('[data-testid="superseded-discard"]').trigger('click');
+    await nextTick();
+    expect(document.activeElement).toBe(item().get('[data-testid="superseded-confirm"]').element);
+    expect(item().get('[role="group"]').attributes('aria-labelledby')).toBe(
+      `superseded-copy-${copy.id}-label`
+    );
+    const cancel = item()
+      .findAll('button')
+      .find((button) => button.text() === 'common.cancel')!;
+    await cancel.trigger('click');
+    await nextTick();
+    expect(document.activeElement).toBe(item().get('[data-testid="superseded-discard"]').element);
+    wrapper.unmount();
   });
   it('reports why a restore was refused', async () => {
     const copy = await saveCopy('pvp', null);

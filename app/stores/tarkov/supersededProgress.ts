@@ -43,6 +43,11 @@ const notifyCopyChange = (): void => {
   if (typeof window !== 'undefined')
     window.dispatchEvent(new Event('tt:superseded-progress-change'));
 };
+/** Reset clocks change on every restore, so two copies differing only in them hold the same progress. */
+const comparableProgress = (progress: UserProgressData): string => {
+  const { progressEpoch: _epoch, manualActivityEpoch: _manualEpoch, ...rest } = progress;
+  return JSON.stringify(rest);
+};
 /**
  * Retains progress displaced by an intentional reset or a season change. Copies are never restored
  * automatically; the owner may export, restore (see isRestorableSupersededCopy) or discard them.
@@ -58,7 +63,7 @@ export const saveSupersededProgressCopy = (
     (copy) =>
       copy.mode === mode &&
       copy.seasonNumber === (mode === 'seasonal' ? seasonNumber : null) &&
-      JSON.stringify(copy.progress) === JSON.stringify(progress)
+      comparableProgress(copy.progress) === comparableProgress(progress)
   );
   if (existing) return existing;
   const copy: SupersededProgressCopy = {

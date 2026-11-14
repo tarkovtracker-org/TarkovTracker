@@ -11,6 +11,8 @@ export const MAX_RECOVERY_ARCHIVE_SIZE = 128 * 1024 * 1024;
 export const MAX_RECOVERY_OLDER_ENTRIES = 64;
 export const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
 export const SUPERSEDED_ARCHIVE_FORMAT = 'tarkovtracker-superseded-progress' as const;
+// Copies come from this browser's localStorage, so a genuine export stays well below this.
+export const MAX_SUPERSEDED_ARCHIVE_SIZE = 16 * 1024 * 1024;
 const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
 export interface TarkovTrackerExport {

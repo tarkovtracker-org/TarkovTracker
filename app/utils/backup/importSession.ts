@@ -2,6 +2,7 @@ import { BackupImportError } from '@/utils/backup/errors';
 import {
   MAX_BACKUP_SIZE,
   MAX_RECOVERY_ARCHIVE_SIZE,
+  MAX_SUPERSEDED_ARCHIVE_SIZE,
   validateBackup,
   resolveRecoveryArchive,
   defaultArchiveEntryIndex,
@@ -39,9 +40,18 @@ export type BackupReply =
 const fail = (message: string): never => {
   throw new BackupImportError(message);
 };
-const isRecoveryArchive = (value: unknown): boolean =>
-  isDeviceRecoveryArchiveV1(value) || isSupersededArchive(value);
-function supersededReply(value: Record<string, unknown>): BackupReply {
+const fileSizeError = (size: number, value: unknown): string | null => {
+  if (isDeviceRecoveryArchiveV1(value)) return null;
+  if (isSupersededArchive(value)) {
+    return size > MAX_SUPERSEDED_ARCHIVE_SIZE
+      ? 'settings.data_management.superseded_archive_too_large'
+      : null;
+  }
+  return size > MAX_BACKUP_SIZE ? 'Backup file is too large (max 5 MB)' : null;
+};
+/** Copies belong to an account, so a guest file is refused before its copies are parsed. */
+function supersededReply(value: Record<string, unknown>, owner: string | null): BackupReply {
+  if (owner === null) return fail('settings.data_management.recovery_copies_sign_in');
   const copies = parseSupersededArchive(value);
   return copies
     ? { supersededCopies: copies }
@@ -100,8 +110,8 @@ export function createBackupImportSession() {
     if (file.size > MAX_RECOVERY_ARCHIVE_SIZE)
       return fail('settings.data_management.recovery_archive_too_large');
     const value = parseJson(await file.text());
-    if (file.size > MAX_BACKUP_SIZE && !isRecoveryArchive(value))
-      return fail('Backup file is too large (max 5 MB)');
+    const sizeError = fileSizeError(file.size, value);
+    if (sizeError) return fail(sizeError);
     return value;
   }
   async function open(file: File, owner: string | null): Promise<BackupReply> {
@@ -109,7 +119,7 @@ export function createBackupImportSession() {
     selected = undefined;
     stream = undefined;
     const value = await readFile(file);
-    if (isSupersededArchive(value)) return supersededReply(value);
+    if (isSupersededArchive(value)) return supersededReply(value, owner);
     const result = resolveRecoveryArchive(value, owner);
     if (!result.ok) return fail(`settings.data_management.${result.error}`);
     if (!result.entries) return summarize(result.value, null);

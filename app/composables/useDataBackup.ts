@@ -5,7 +5,7 @@ import {
   type UserProgressData,
   type UserState,
 } from '@/stores/progressState';
-import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
+import { areActiveProgressWritesBlocked, cloneStateSnapshot } from '@/stores/tarkov/localStorage';
 import {
   readCommittedProgressAuthority,
   ownedLegacyUpdates,
@@ -65,6 +65,7 @@ export type {
   RecoveryArchiveEntry,
 } from '@/utils/backup/parsing';
 export type BackupImportState = 'idle' | 'parsing' | 'preview' | 'success' | 'error';
+export type RecoveryCopiesImport = { added: number; alreadyPresent: number };
 interface DebugExportAuthContext {
   loggedIn: boolean;
   provider: string | null;
@@ -126,8 +127,8 @@ export interface UseDataBackupReturn {
   /** Replaces one mode with a superseded copy after keeping that mode's current progress as a copy. */
   restoreSupersededProgress: (copyId: string) => void;
   discardSupersededProgress: (copyId: string) => void;
-  /** Recovery copies added to this browser by the last restored superseded-progress file. */
-  recoveryCopiesAdded: Ref<number>;
+  /** Outcome of the last restored superseded-progress file, whose copies join this browser's list. */
+  recoveryCopiesImport: Ref<RecoveryCopiesImport | null>;
   exportDeviceProgressRecovery: () => Promise<void>;
   confirmRecoveryArchiveSaved: () => Promise<void>;
   recoveryExportPending: Ref<boolean>;
@@ -609,7 +610,7 @@ export function useDataBackup(): UseDataBackupReturn {
   const importPreview = ref<BackupPreviewData | null>(null);
   const importError = ref<string | null>(null);
   const recoveryExportPending = ref(false);
-  const recoveryCopiesAdded = ref(0);
+  const recoveryCopiesImport = ref<RecoveryCopiesImport | null>(null);
   let recoveryExportReceipt: { owner: string | null; copies: string[] } | null = null;
   const recoveryArchiveEntries = ref<RecoveryArchiveEntry[]>([]);
   const selectedRecoveryArchiveEntry = ref<number | null>(null);
@@ -639,7 +640,7 @@ export function useDataBackup(): UseDataBackupReturn {
     clearParsedImport();
     recoveryArchiveEntries.value = [];
     selectedRecoveryArchiveEntry.value = null;
-    recoveryCopiesAdded.value = 0;
+    recoveryCopiesImport.value = null;
   }
   function applyBackupPreview(value: unknown): void {
     const result = validateBackup(value);
@@ -681,27 +682,37 @@ export function useDataBackup(): UseDataBackupReturn {
     rejectChangedImportOwner();
     return false;
   }
-  function failImport(messageKey: string): void {
+  function failImport(messageKey: string, params: Record<string, number> = {}): void {
     importState.value = 'error';
-    importError.value = t(messageKey);
+    importError.value = t(messageKey, params);
   }
+  /** Exported copies keep their capture time, so re-importing a file skips copies already here. */
+  const isSameCapture = (left: SupersededArchiveCopy, right: SupersededArchiveCopy): boolean =>
+    left.mode === right.mode &&
+    left.seasonNumber === right.seasonNumber &&
+    left.supersededAt === right.supersededAt;
+  const saveAdoptedCopy = (owner: string, copy: SupersededArchiveCopy): boolean =>
+    saveSupersededProgressCopy(
+      owner,
+      copy.mode,
+      copy.seasonNumber,
+      copy.progress,
+      copy.supersededAt
+    ) !== null;
   /** Superseded-progress files are restored into this browser's recovery copies, not applied. */
   function adoptSupersededCopies(copies: SupersededArchiveCopy[], owner: string | null): void {
     resetImport();
     if (!owner) return failImport('settings.data_management.recovery_copies_sign_in');
-    const kept = copies.filter(
-      (copy) =>
-        saveSupersededProgressCopy(
-          owner,
-          copy.mode,
-          copy.seasonNumber,
-          copy.progress,
-          copy.supersededAt
-        ) !== null
-    );
-    if (kept.length < copies.length)
-      return failImport('settings.data_management.recovery_copies_add_failed');
-    recoveryCopiesAdded.value = kept.length;
+    const existing = listSupersededProgressCopies(owner);
+    const fresh = copies.filter((copy) => !existing.some((kept) => isSameCapture(kept, copy)));
+    const added = fresh.filter((copy) => saveAdoptedCopy(owner, copy)).length;
+    if (added < fresh.length) {
+      return failImport('settings.data_management.recovery_copies_add_failed', {
+        added,
+        total: fresh.length,
+      });
+    }
+    recoveryCopiesImport.value = { added, alreadyPresent: copies.length - added };
   }
   function applyWorkerReply(reply: BackupReply, owner: string | null): void {
     if ('supersededCopies' in reply) return adoptSupersededCopies(reply.supersededCopies, owner);
@@ -884,6 +895,9 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   function restoreSupersededProgress(copyId: string): void {
     const { ownerId, copy } = ownedSupersededCopy(copyId);
+    // A blocked browser would change memory only, which a reload would silently undo.
+    if (areActiveProgressWritesBlocked())
+      throw new Error('settings.data_management.superseded_restore_unavailable');
     if (!isRestorableSupersededCopy(copy))
       throw new Error('settings.data_management.superseded_other_season');
     keepProgressBeforeRestore(ownerId, copy.mode);
@@ -1067,7 +1081,7 @@ export function useDataBackup(): UseDataBackupReturn {
     exportSupersededProgress,
     restoreSupersededProgress,
     discardSupersededProgress,
-    recoveryCopiesAdded,
+    recoveryCopiesImport,
     exportDeviceProgressRecovery,
     confirmRecoveryArchiveSaved,
     recoveryExportPending,

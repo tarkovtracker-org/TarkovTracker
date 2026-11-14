@@ -171,8 +171,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   Settings > Backup & Restore lists the owner's copies under Recovery copies, where each can be downloaded,
   discarded, or restored after confirmation. A restore replaces only the copy's mode with a fresh reset
   epoch, refuses Seasonal copies from another season, and first keeps that mode's current progress as a
-  new copy; when that copy cannot be saved, nothing changes. Restoring a downloaded superseded-progress
-  file adds its copies back to the list instead of applying them.
+  new copy; when that copy cannot be saved, or while active progress writes are blocked, nothing changes.
+  Restoring a downloaded superseded-progress file adds its copies back to the list instead of applying
+  them, skipping copies already present with the same mode, season and capture time.
   Delayed signed-in reset responses are fenced by session generation and owner identity before
   applying local state, acknowledging the save, or clearing active storage, including A→B→A switches.
   Guest Settings resets instead replace the guest envelope in one write under the shared Web Lock.

@@ -639,6 +639,36 @@ describe('useDataBackup', () => {
         save.mockRestore();
       }
     });
+    it('refuses to restore while this browser cannot save progress', async () => {
+      const copy = await saveCopy('pve', { ...tarkovStore.$state.pve, level: 33 });
+      const storage = await import('@/stores/tarkov/localStorage');
+      const blocked = vi.spyOn(storage, 'areActiveProgressWritesBlocked').mockReturnValue(true);
+      try {
+        const { restoreSupersededProgress } = await loadComposable();
+        expect(() => restoreSupersededProgress(copy.id)).toThrow(
+          'settings.data_management.superseded_restore_unavailable'
+        );
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+        const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+        expect(listSupersededProgressCopies('user-123')).toHaveLength(1);
+      } finally {
+        blocked.mockRestore();
+      }
+    });
+    it('restores a Seasonal copy from the current season', async () => {
+      applyPatches();
+      const { ACTIVE_SEASON_NUMBER } = await import('@/utils/constants');
+      Object.assign(tarkovStore.$state, { seasonalSeasonNumber: ACTIVE_SEASON_NUMBER });
+      const copy = await saveCopy(
+        'seasonal',
+        { ...tarkovStore.$state.pve, level: 19 },
+        ACTIVE_SEASON_NUMBER
+      );
+      const { restoreSupersededProgress } = await loadComposable();
+      restoreSupersededProgress(copy.id);
+      expect(tarkovStore.$state.seasonal.level).toBe(19);
+      expect(tarkovStore.$state.pve.level).not.toBe(19);
+    });
     it('refuses copies from another season or account', async () => {
       const { ACTIVE_SEASON_NUMBER } = await import('@/utils/constants');
       const stale = await saveCopy('seasonal', tarkovStore.$state.pve, ACTIVE_SEASON_NUMBER - 1);
@@ -682,7 +712,7 @@ describe('useDataBackup', () => {
       const backup = await loadComposable();
       await backup.parseBackupFile(supersededFile([fileCopy(), fileCopy({ mode: 'pve' })]));
       expect(backup.importState.value).toBe('idle');
-      expect(backup.recoveryCopiesAdded.value).toBe(2);
+      expect(backup.recoveryCopiesImport.value).toEqual({ added: 2, alreadyPresent: 0 });
       expect(tarkovStore.$patch).not.toHaveBeenCalled();
       const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
       const copies = listSupersededProgressCopies('user-123');
@@ -690,6 +720,51 @@ describe('useDataBackup', () => {
         ['pvp', 500, 21],
         ['pve', 500, 21],
       ]);
+    });
+    it('skips copies already in this browser when the same file is restored again', async () => {
+      const first = await loadComposable();
+      await first.parseBackupFile(supersededFile([fileCopy(), fileCopy({ mode: 'pve' })]));
+      const second = await loadComposable();
+      await second.parseBackupFile(
+        supersededFile([
+          fileCopy(),
+          fileCopy({ mode: 'pve' }),
+          fileCopy({ supersededAt: 900, progress: { ...tarkovStore.$state.pvp, level: 55 } }),
+        ])
+      );
+      expect(second.recoveryCopiesImport.value).toEqual({ added: 1, alreadyPresent: 2 });
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      expect(listSupersededProgressCopies('user-123')).toHaveLength(3);
+    });
+    it('reports how many copies fit when browser storage fills up', async () => {
+      const retained = await import('@/stores/tarkov/supersededProgress');
+      const save = retained.saveSupersededProgressCopy;
+      const spy = vi
+        .spyOn(retained, 'saveSupersededProgressCopy')
+        .mockImplementationOnce((...args) => save(...args))
+        .mockReturnValueOnce(null);
+      try {
+        const backup = await loadComposable();
+        await backup.parseBackupFile(supersededFile([fileCopy(), fileCopy({ mode: 'pve' })]));
+        expect(backup.importState.value).toBe('error');
+        expect(backup.importError.value).toBe(
+          'settings.data_management.recovery_copies_add_failed'
+        );
+        expect(backup.recoveryCopiesImport.value).toBeNull();
+        expect(retained.listSupersededProgressCopies('user-123')).toHaveLength(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    it('refuses superseded files larger than a browser could have exported', async () => {
+      const backup = await loadComposable();
+      const file = supersededFile([fileCopy()]);
+      Object.defineProperty(file, 'size', { value: 17 * 1024 * 1024 });
+      await backup.parseBackupFile(file);
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importError.value).toBe(
+        'settings.data_management.superseded_archive_too_large'
+      );
     });
     it('requires a signed-in account', async () => {
       supabaseUser.id = '';

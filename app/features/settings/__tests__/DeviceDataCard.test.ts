@@ -194,6 +194,23 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="device-data-pending-warning"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="device-data-export"]').exists()).toBe(true);
   });
+  it('warns that removal also deletes the account recovery copies', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-recovery-copies"]').exists()).toBe(false);
+    const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
+    saveSupersededProgressCopy('user-1', 'pvp', null, createDefaultOwnedProgressData(), 100);
+    await nextTick();
+    expect(wrapper.get('[data-testid="device-data-recovery-copies"]').text()).toBe(
+      'settings.device_data.recovery_copies_warning'
+    );
+    reactiveUser.id = 'user-2';
+    await nextTick();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-recovery-copies"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('is unavailable while signed out', async () => {
     user.id = null;
     user.loggedIn = false;

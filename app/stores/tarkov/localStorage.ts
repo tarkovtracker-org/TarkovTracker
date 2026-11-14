@@ -548,6 +548,8 @@ type ActiveProgressRetentionGuard = (
   cloudHeld?: boolean
 ) => boolean;
 let activeProgressRetentionGuard: ActiveProgressRetentionGuard = (current) => !current;
+/** True while a failed retention keeps active progress from being saved in this browser. */
+export const areActiveProgressWritesBlocked = (): boolean => activeProgressWritesBlocked;
 export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
   if (blocked) invalidateActiveProgressWrites();
   activeProgressWritesBlocked = blocked;

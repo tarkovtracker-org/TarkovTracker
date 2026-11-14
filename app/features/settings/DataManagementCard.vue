@@ -1125,7 +1125,7 @@
     recoveryArchiveEntries,
     selectedRecoveryArchiveEntry,
     reviewRecoveryArchiveEntry,
-    recoveryCopiesAdded,
+    recoveryCopiesImport,
     exportError: backupExportError,
     importState: backupImportState,
     importPreview: backupPreview,
@@ -1162,6 +1162,23 @@
       });
     }
   }
+  /** A superseded-progress file adds copies to Recovery copies instead of opening a preview. */
+  function announceRecoveryCopiesImport() {
+    const result = recoveryCopiesImport.value;
+    if (!result) return;
+    toast.add(
+      result.added > 0
+        ? {
+            title: t(
+              'settings.data_management.recovery_copies_added',
+              { count: result.added },
+              result.added
+            ),
+            color: 'success',
+          }
+        : { title: t('settings.data_management.recovery_copies_already_present'), color: 'info' }
+    );
+  }
   async function handleBackupFileChange(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -1169,14 +1186,7 @@
     importTarget.value = 'all';
     await parseBackupFile(file);
     input.value = '';
-    if (recoveryCopiesAdded.value) {
-      toast.add({
-        title: t('settings.data_management.recovery_copies_added', {
-          count: recoveryCopiesAdded.value,
-        }),
-        color: 'success',
-      });
-    }
+    announceRecoveryCopiesImport();
   }
   const buildBackupImportSelection = (
     target: GameMode | 'all',
