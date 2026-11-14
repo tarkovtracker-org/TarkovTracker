@@ -4,6 +4,36 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { normalizeQueueWorkflow, normalizePublisherEnvironment } from '../ci/actionlint-queue.mjs';
 const path = '.github/workflows/preview-retention.yml';
+test('CI status serialization shares all dispatch targets and is per run for other events', () => {
+  const filename = '.github/workflows/ci.yml';
+  const source = readFileSync(filename, 'utf8');
+  const normalized = normalizeQueueWorkflow(source, filename);
+  assert.equal(normalized, source.replace('      queue: max', ''));
+  assert.equal(normalized.split('\n').length, source.split('\n').length);
+});
+test('CI status serialization rejects missing, cancelled, foreign or broadened locks', () => {
+  const filename = '.github/workflows/ci.yml';
+  const source = readFileSync(filename, 'utf8');
+  const mutations = [
+    source.replace('  ci-result:', '  other-result:'),
+    source.replace(
+      "github.event_name == 'workflow_dispatch' && 'publication'",
+      "github.event_name == 'workflow_dispatch' && github.sha"
+    ),
+    source.replace('queue: max', 'queue: single'),
+    source.replace('      queue: max\n', ''),
+    source.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
+    source.replace('github.event.pull_request.number || github.ref', 'github.sha'),
+    `${source}  decoy:\n    concurrency:\n      group: other\n      queue: max\n      cancel-in-progress: false\n`,
+  ];
+  for (const changed of mutations) {
+    assert.notEqual(changed, source);
+    assert.throws(
+      () => normalizeQueueWorkflow(changed, filename),
+      /(?:Invalid|Ambiguous) (?:serialized job|CI workflow) concurrency/
+    );
+  }
+});
 const block =
   'concurrency:\n  group: pages-preview-lifecycle\n  queue: max\n  cancel-in-progress: false\n';
 test('only the validated queue extension is blanked and line numbers remain unchanged', () => {
