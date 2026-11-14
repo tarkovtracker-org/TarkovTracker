@@ -1,10 +1,13 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { nextTick } from 'vue';
+import { nextTick, shallowRef } from 'vue';
 import maps from '@/data/maps.json';
 import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
 import type { TarkovMap } from '@/types/tarkov';
-const { mapState, mockMapInstance, resetMapMarkerColorsSpy, savedLayers } = vi.hoisted(() => {
+// Saved Layers rows, shared by every map the test mounts and reactive like the real store. The
+// preferences mock reads it lazily, after module evaluation.
+const savedLayers = shallowRef<Record<string, boolean>>({});
+const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
   const instance = {
     size: { x: 800, y: 600 },
     zoom: 4.25,
@@ -45,8 +48,6 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy, savedLayers } = vi.h
   return {
     mockMapInstance: mapInstance,
     resetMapMarkerColorsSpy: vi.fn(),
-    // Saved Layers rows, shared by every map the test mounts, like the real preferences store.
-    savedLayers: { value: {} as Record<string, boolean> },
     mapState: {
       hasMultipleFloors: false,
       isLoading: false,
@@ -288,10 +289,37 @@ describe('LeafletMap controls', () => {
     await second.setProps({ showExtracts: false });
     await second.setProps({ showExtracts: true });
     expect(row('scav').attributes('aria-pressed')).toBe('false');
-    // Show all layers is an explicit choice too, and is remembered.
+    // Show all layers is an explicit choice for every listed row, and is remembered.
     await second.get('[data-testid="map-layers-show-all"]').trigger('click');
-    expect(savedLayers.value).toEqual({ scav: true, transit: true });
+    expect(savedLayers.value).toEqual({ pmc: true, scav: true, transit: true });
     second.unmount();
+  });
+  it('restores a saved row over an explicit page value', async () => {
+    savedLayers.value = { pmc: false };
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [{ id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } }],
+      },
+      showPmcExtracts: true,
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+  it('follows a row saved by another map on the page, such as the full-screen map', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [{ id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } }],
+      },
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    savedLayers.value = { pmc: false };
+    await nextTick();
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
   });
   it('combines the legend and layer toggles in one panel that remembers being opened', async () => {
     const wrapper = await mountMap({

@@ -960,8 +960,9 @@
     layerGroups.value.forEach((group) => group.items.forEach(showLayer));
   };
   const showLayer = (item: MapLayerItem) => {
-    if (item.visible.value) return;
-    item.visible.value = true;
+    // Every row is saved, including ones already visible by default, so a later default change
+    // cannot hide what the user chose to show.
+    if (!item.visible.value) item.visible.value = true;
     rememberLayer(item);
   };
   // The panel opens by default where there is room beside the map, and stays closed on narrow
