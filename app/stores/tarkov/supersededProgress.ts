@@ -1,8 +1,8 @@
 import { safeGetItem, safeRemoveItem, safeSetItem } from '@/stores/tarkov/localStorage';
+import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData } from '@/stores/progressState';
-import type { GameMode } from '@/utils/constants';
 export type SupersededProgressCopy = {
   id: string;
   ownerId: string;
@@ -43,7 +43,10 @@ const notifyCopyChange = (): void => {
   if (typeof window !== 'undefined')
     window.dispatchEvent(new Event('tt:superseded-progress-change'));
 };
-/** Retains progress displaced by an intentional reset or a season change for export only. */
+/**
+ * Retains progress displaced by an intentional reset or a season change. Copies are never restored
+ * automatically; the owner may export, restore (see isRestorableSupersededCopy) or discard them.
+ */
 export const saveSupersededProgressCopy = (
   ownerId: string,
   mode: GameMode,
@@ -73,7 +76,7 @@ export const saveSupersededProgressCopy = (
   logger.error('[ProgressRecovery] Could not retain superseded progress');
   return null;
 };
-/** Superseded copies are listed only for their owning account and are never restored. */
+/** Superseded copies are listed only for their owning account. */
 export const listSupersededProgressCopies = (ownerId: string): SupersededProgressCopy[] =>
   (storageKeys() ?? [])
     .filter((key) => key.startsWith(ownerPrefix(ownerId)))
@@ -97,3 +100,13 @@ export const removeSupersededProgressCopies = (ownerId: string): boolean => {
   notifyCopyChange();
   return removed;
 };
+/** Deletes one of the owner's copies; true when it is gone (including when it was already gone). */
+export const removeSupersededProgressCopy = (ownerId: string, copyId: string): boolean => {
+  const removed = safeRemoveItem(`${ownerPrefix(ownerId)}${copyId}`);
+  notifyCopyChange();
+  return removed;
+};
+/** A Seasonal copy can only return to the season it was captured in; other modes have no season. */
+export const isRestorableSupersededCopy = (
+  copy: Pick<SupersededProgressCopy, 'mode' | 'seasonNumber'>
+): boolean => copy.mode !== GAME_MODES.SEASONAL || copy.seasonNumber === ACTIVE_SEASON_NUMBER;

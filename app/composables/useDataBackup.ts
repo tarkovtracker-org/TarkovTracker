@@ -15,7 +15,14 @@ import {
   exportableLegacyUpdates,
   legacyProgressRecoveryOverflow,
 } from '@/stores/tarkov/progressAuthority';
-import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
+import { hasRetainableModeProgress } from '@/stores/tarkov/progressMerge';
+import {
+  isRestorableSupersededCopy,
+  listSupersededProgressCopies,
+  removeSupersededProgressCopy,
+  saveSupersededProgressCopy,
+  type SupersededProgressCopy,
+} from '@/stores/tarkov/supersededProgress';
 import { useMetadataStore } from '@/stores/useMetadata';
 import {
   getPersistedPreferencesState,
@@ -29,6 +36,7 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { createBackupImportClient, BackupImportCancelled } from '@/utils/backup/importClient';
 import {
   BACKUP_FORMAT,
+  SUPERSEDED_ARCHIVE_FORMAT,
   MAX_RECOVERY_ARCHIVE_SIZE,
   MAX_RECOVERY_OLDER_ENTRIES,
   DEBUG_EXPORT_FORMAT,
@@ -42,6 +50,7 @@ import {
   type RecoveryArchiveEntry,
   type TarkovTrackerExport,
   type RecoveryArchiveResult,
+  type SupersededArchiveCopy,
 } from '@/utils/backup/parsing';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
 import { buildDebugTaskSummary, type DebugTaskSummary } from '@/utils/debugTaskSummary';
@@ -112,7 +121,13 @@ interface DebugExportPayload {
 }
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
-  exportSupersededProgress: () => Promise<void>;
+  /** Downloads one of the signed-in owner's superseded copies, or all of them without an id. */
+  exportSupersededProgress: (copyId?: string) => Promise<void>;
+  /** Replaces one mode with a superseded copy after keeping that mode's current progress as a copy. */
+  restoreSupersededProgress: (copyId: string) => void;
+  discardSupersededProgress: (copyId: string) => void;
+  /** Recovery copies added to this browser by the last restored superseded-progress file. */
+  recoveryCopiesAdded: Ref<number>;
   exportDeviceProgressRecovery: () => Promise<void>;
   confirmRecoveryArchiveSaved: () => Promise<void>;
   recoveryExportPending: Ref<boolean>;
@@ -594,6 +609,7 @@ export function useDataBackup(): UseDataBackupReturn {
   const importPreview = ref<BackupPreviewData | null>(null);
   const importError = ref<string | null>(null);
   const recoveryExportPending = ref(false);
+  const recoveryCopiesAdded = ref(0);
   let recoveryExportReceipt: { owner: string | null; copies: string[] } | null = null;
   const recoveryArchiveEntries = ref<RecoveryArchiveEntry[]>([]);
   const selectedRecoveryArchiveEntry = ref<number | null>(null);
@@ -623,6 +639,7 @@ export function useDataBackup(): UseDataBackupReturn {
     clearParsedImport();
     recoveryArchiveEntries.value = [];
     selectedRecoveryArchiveEntry.value = null;
+    recoveryCopiesAdded.value = 0;
   }
   function applyBackupPreview(value: unknown): void {
     const result = validateBackup(value);
@@ -664,7 +681,30 @@ export function useDataBackup(): UseDataBackupReturn {
     rejectChangedImportOwner();
     return false;
   }
+  function failImport(messageKey: string): void {
+    importState.value = 'error';
+    importError.value = t(messageKey);
+  }
+  /** Superseded-progress files are restored into this browser's recovery copies, not applied. */
+  function adoptSupersededCopies(copies: SupersededArchiveCopy[], owner: string | null): void {
+    resetImport();
+    if (!owner) return failImport('settings.data_management.recovery_copies_sign_in');
+    const kept = copies.filter(
+      (copy) =>
+        saveSupersededProgressCopy(
+          owner,
+          copy.mode,
+          copy.seasonNumber,
+          copy.progress,
+          copy.supersededAt
+        ) !== null
+    );
+    if (kept.length < copies.length)
+      return failImport('settings.data_management.recovery_copies_add_failed');
+    recoveryCopiesAdded.value = kept.length;
+  }
   function applyWorkerReply(reply: BackupReply, owner: string | null): void {
+    if ('supersededCopies' in reply) return adoptSupersededCopies(reply.supersededCopies, owner);
     if (!('summary' in reply)) throw new Error('Invalid backup worker response');
     previewOwner = owner;
     importPreview.value = reply.summary.preview;
@@ -826,13 +866,46 @@ export function useDataBackup(): UseDataBackupReturn {
     recoveryExportReceipt = null;
     recoveryExportPending.value = false;
   }
-  async function exportSupersededProgress(): Promise<void> {
+  function ownedSupersededCopy(copyId: string): { ownerId: string; copy: SupersededProgressCopy } {
+    const ownerId = $supabase.user.id;
+    if (!ownerId) throw new Error('settings.data_management.recovery_copies_sign_in');
+    const copy = listSupersededProgressCopies(ownerId).find((candidate) => candidate.id === copyId);
+    if (!copy) throw new Error('settings.data_management.superseded_copy_unavailable');
+    return { ownerId, copy };
+  }
+  const seasonNumberFor = (mode: GameMode): number | null =>
+    mode === GAME_MODES.SEASONAL ? (tarkovStore.$state.seasonalSeasonNumber ?? null) : null;
+  /** Keeps the progress a restore will replace, so the restore itself can be undone. */
+  function keepProgressBeforeRestore(ownerId: string, mode: GameMode): void {
+    const current = cloneStateSnapshot(tarkovStore.$state[mode]);
+    if (!hasRetainableModeProgress(current)) return;
+    if (saveSupersededProgressCopy(ownerId, mode, seasonNumberFor(mode), current)) return;
+    throw new Error('settings.data_management.superseded_restore_keep_failed');
+  }
+  function restoreSupersededProgress(copyId: string): void {
+    const { ownerId, copy } = ownedSupersededCopy(copyId);
+    if (!isRestorableSupersededCopy(copy))
+      throw new Error('settings.data_management.superseded_other_season');
+    keepProgressBeforeRestore(ownerId, copy.mode);
+    const restored = stripInternalSyncMetadata(cloneStateSnapshot(copy.progress));
+    tarkovStore.$patch((state: UserState) => {
+      state[copy.mode] = createImportedProgressData(restored, state[copy.mode]);
+    });
+  }
+  function discardSupersededProgress(copyId: string): void {
+    const { ownerId, copy } = ownedSupersededCopy(copyId);
+    if (!removeSupersededProgressCopy(ownerId, copy.id))
+      throw new Error('settings.data_management.superseded_discard_failed');
+  }
+  async function exportSupersededProgress(copyId?: string): Promise<void> {
     const ownerId = $supabase.user.id;
     if (!ownerId) throw new Error('Sign in to export superseded progress');
-    const copies = listSupersededProgressCopies(ownerId);
+    const copies = listSupersededProgressCopies(ownerId).filter(
+      (copy) => copyId === undefined || copy.id === copyId
+    );
     if (copies.length === 0) throw new Error('No superseded progress copies are available');
     await downloadJsonFile('tarkovtracker-superseded-progress', {
-      _format: 'tarkovtracker-superseded-progress',
+      _format: SUPERSEDED_ARCHIVE_FORMAT,
       _version: 1,
       exportedAt: Date.now(),
       copies: copies.map(({ ownerId: _ownerId, ...copy }) => copy),
@@ -992,6 +1065,9 @@ export function useDataBackup(): UseDataBackupReturn {
   return {
     exportProgress,
     exportSupersededProgress,
+    restoreSupersededProgress,
+    discardSupersededProgress,
+    recoveryCopiesAdded,
     exportDeviceProgressRecovery,
     confirmRecoveryArchiveSaved,
     recoveryExportPending,

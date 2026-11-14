@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  isRestorableSupersededCopy,
   listSupersededProgressCopies,
   removeSupersededProgressCopies,
+  removeSupersededProgressCopy,
   saveSupersededProgressCopy,
 } from '@/stores/tarkov/supersededProgress';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -22,11 +25,38 @@ describe('superseded progress copies', () => {
     vi.unstubAllGlobals();
   });
   beforeEach(() => localStorage.clear());
-  it('retains reset progress for its owner as export-only data', () => {
+  it('retains reset progress for its owner only', () => {
     const copy = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100);
     expect(copy).toMatchObject({ ownerId: 'owner-1', mode: 'pvp', seasonNumber: null });
     expect(listSupersededProgressCopies('owner-1')).toEqual([copy]);
     expect(listSupersededProgressCopies('owner-2')).toEqual([]);
+  });
+  it('discards one copy for its owner and announces the change', () => {
+    const kept = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;
+    const discarded = saveSupersededProgressCopy('owner-1', 'pve', null, progress, 200)!;
+    const foreign = saveSupersededProgressCopy('owner-2', 'pve', null, progress, 200)!;
+    const changed = vi.fn();
+    window.addEventListener('tt:superseded-progress-change', changed);
+    try {
+      expect(removeSupersededProgressCopy('owner-1', discarded.id)).toBe(true);
+      expect(removeSupersededProgressCopy('owner-1', foreign.id)).toBe(true);
+    } finally {
+      window.removeEventListener('tt:superseded-progress-change', changed);
+    }
+    expect(changed).toHaveBeenCalledTimes(2);
+    expect(listSupersededProgressCopies('owner-1')).toEqual([kept]);
+    expect(listSupersededProgressCopies('owner-2')).toEqual([foreign]);
+  });
+  it('restores Seasonal copies only into the season they came from', () => {
+    expect(isRestorableSupersededCopy({ mode: 'pvp', seasonNumber: null })).toBe(true);
+    expect(isRestorableSupersededCopy({ mode: 'pve', seasonNumber: null })).toBe(true);
+    expect(
+      isRestorableSupersededCopy({ mode: 'seasonal', seasonNumber: ACTIVE_SEASON_NUMBER })
+    ).toBe(true);
+    expect(
+      isRestorableSupersededCopy({ mode: 'seasonal', seasonNumber: ACTIVE_SEASON_NUMBER - 1 })
+    ).toBe(false);
+    expect(isRestorableSupersededCopy({ mode: 'seasonal', seasonNumber: null })).toBe(false);
   });
   it('keeps the original season and avoids duplicate copies on repeated hydration', () => {
     const first = saveSupersededProgressCopy('owner-1', 'seasonal', 4, progress, 100);

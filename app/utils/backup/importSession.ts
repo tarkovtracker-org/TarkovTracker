@@ -8,9 +8,12 @@ import {
   parseRecoveryProgress,
   buildPreview,
   isDeviceRecoveryArchiveV1,
+  isSupersededArchive,
+  parseSupersededArchive,
   type RecoveryArchiveEntry,
   type RawRecoveryArchiveEntry,
   type BackupPreviewData,
+  type SupersededArchiveCopy,
   type ValidatedBackup,
 } from '@/utils/backup/parsing';
 import { backupTokens, readBackupBatch, type BackupToken } from '@/utils/backup/transfer';
@@ -29,10 +32,21 @@ export type BackupCommand =
   | { op: 'open'; file: File; owner: string | null }
   | { op: 'select'; index: number }
   | { op: 'read' };
-export type BackupReply = { summary: BackupSummary } | { tokens: BackupToken[]; done: boolean };
+export type BackupReply =
+  | { summary: BackupSummary }
+  | { tokens: BackupToken[]; done: boolean }
+  | { supersededCopies: SupersededArchiveCopy[] };
 const fail = (message: string): never => {
   throw new BackupImportError(message);
 };
+const isRecoveryArchive = (value: unknown): boolean =>
+  isDeviceRecoveryArchiveV1(value) || isSupersededArchive(value);
+function supersededReply(value: Record<string, unknown>): BackupReply {
+  const copies = parseSupersededArchive(value);
+  return copies
+    ? { supersededCopies: copies }
+    : fail('settings.data_management.invalid_superseded_archive');
+}
 // Only one file and one selected normalized snapshot are retained by each disposable worker.
 export function createBackupImportSession() {
   let entries: RawRecoveryArchiveEntry[] = [];
@@ -86,7 +100,7 @@ export function createBackupImportSession() {
     if (file.size > MAX_RECOVERY_ARCHIVE_SIZE)
       return fail('settings.data_management.recovery_archive_too_large');
     const value = parseJson(await file.text());
-    if (file.size > MAX_BACKUP_SIZE && !isDeviceRecoveryArchiveV1(value))
+    if (file.size > MAX_BACKUP_SIZE && !isRecoveryArchive(value))
       return fail('Backup file is too large (max 5 MB)');
     return value;
   }
@@ -95,6 +109,7 @@ export function createBackupImportSession() {
     selected = undefined;
     stream = undefined;
     const value = await readFile(file);
+    if (isSupersededArchive(value)) return supersededReply(value);
     const result = resolveRecoveryArchive(value, owner);
     if (!result.ok) return fail(`settings.data_management.${result.error}`);
     if (!result.entries) return summarize(result.value, null);

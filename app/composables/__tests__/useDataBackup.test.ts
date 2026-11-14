@@ -550,6 +550,168 @@ describe('useDataBackup', () => {
       }
     });
   });
+  describe('superseded copy restore', () => {
+    const applyPatches = () =>
+      tarkovStore.$patch.mockImplementationOnce((mutator: unknown) =>
+        (mutator as (state: typeof tarkovStore.$state) => void)(tarkovStore.$state)
+      );
+    const saveCopy = async (
+      mode: 'pvp' | 'pve' | 'seasonal',
+      progress: UserProgressData,
+      seasonNumber: number | null = null,
+      at = 100
+    ) => {
+      const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+      return saveSupersededProgressCopy('user-123', mode, seasonNumber, progress, at)!;
+    };
+    it('downloads only the requested copy', async () => {
+      const first = await saveCopy('pvp', tarkovStore.$state.pvp, null, 100);
+      await saveCopy('pve', { ...tarkovStore.$state.pve, level: 40 }, null, 200);
+      let blob: Blob | undefined;
+      const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((value) => {
+        blob = value as Blob;
+        return 'blob:one-copy';
+      });
+      const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        const { exportSupersededProgress } = await loadComposable();
+        await exportSupersededProgress(first.id);
+        const payload = JSON.parse(await blob!.text());
+        expect(payload.copies).toHaveLength(1);
+        expect(payload.copies[0]).toMatchObject({ id: first.id, mode: 'pvp' });
+        await expect(exportSupersededProgress('missing')).rejects.toThrow('No superseded');
+      } finally {
+        create.mockRestore();
+        revoke.mockRestore();
+        click.mockRestore();
+      }
+    });
+    it('keeps the current mode as a copy, then replaces only that mode', async () => {
+      applyPatches();
+      const restoredProgress = {
+        ...tarkovStore.$state.pve,
+        level: 33,
+        progressEpoch: 2,
+        taskCompletions: { restored: { complete: true } },
+        apiUpdateHistory: [{ id: 'internal' }],
+      } as unknown as UserProgressData;
+      const copy = await saveCopy('pve', restoredProgress);
+      tarkovStore.$state.pve = {
+        ...tarkovStore.$state.pve,
+        level: 7,
+        progressEpoch: 5,
+        taskCompletions: { replaced: { complete: true } },
+      };
+      const pvpBefore = structuredClone(tarkovStore.$state.pvp);
+      const { restoreSupersededProgress } = await loadComposable();
+      restoreSupersededProgress(copy.id);
+      expect(tarkovStore.$state.pve.level).toBe(33);
+      expect(tarkovStore.$state.pve.taskCompletions).toEqual({ restored: { complete: true } });
+      expect(tarkovStore.$state.pve.progressEpoch).toBe(6);
+      expect(tarkovStore.$state.pve.apiUpdateHistory ?? []).toEqual([]);
+      expect(tarkovStore.$state.pvp).toEqual(pvpBefore);
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      const copies = listSupersededProgressCopies('user-123');
+      expect(copies).toHaveLength(2);
+      expect(copies.some((kept) => kept.progress.level === 7 && kept.mode === 'pve')).toBe(true);
+      expect(copies.some((kept) => kept.id === copy.id)).toBe(true);
+    });
+    it('changes nothing when the current progress cannot be kept first', async () => {
+      const copy = await saveCopy('pve', { ...tarkovStore.$state.pve, level: 33 });
+      tarkovStore.$state.pve = { ...tarkovStore.$state.pve, level: 7 };
+      const retained = await import('@/stores/tarkov/supersededProgress');
+      const save = vi.spyOn(retained, 'saveSupersededProgressCopy').mockReturnValue(null);
+      try {
+        const { restoreSupersededProgress } = await loadComposable();
+        expect(() => restoreSupersededProgress(copy.id)).toThrow(
+          'settings.data_management.superseded_restore_keep_failed'
+        );
+        expect(tarkovStore.$patch).not.toHaveBeenCalled();
+        expect(tarkovStore.$state.pve.level).toBe(7);
+        expect(save).toHaveBeenCalledWith(
+          'user-123',
+          'pve',
+          null,
+          expect.objectContaining({ level: 7 })
+        );
+      } finally {
+        save.mockRestore();
+      }
+    });
+    it('refuses copies from another season or account', async () => {
+      const { ACTIVE_SEASON_NUMBER } = await import('@/utils/constants');
+      const stale = await saveCopy('seasonal', tarkovStore.$state.pve, ACTIVE_SEASON_NUMBER - 1);
+      const { restoreSupersededProgress, discardSupersededProgress } = await loadComposable();
+      expect(() => restoreSupersededProgress(stale.id)).toThrow(
+        'settings.data_management.superseded_other_season'
+      );
+      expect(tarkovStore.$patch).not.toHaveBeenCalled();
+      supabaseUser.id = 'user-other';
+      expect(() => restoreSupersededProgress(stale.id)).toThrow(
+        'settings.data_management.superseded_copy_unavailable'
+      );
+      expect(() => discardSupersededProgress(stale.id)).toThrow(
+        'settings.data_management.superseded_copy_unavailable'
+      );
+      supabaseUser.id = 'user-123';
+      discardSupersededProgress(stale.id);
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      expect(listSupersededProgressCopies('user-123')).toEqual([]);
+    });
+  });
+  describe('restoring a superseded-progress file', () => {
+    const supersededFile = (copies: unknown[]) =>
+      createFile(
+        JSON.stringify({
+          _format: 'tarkovtracker-superseded-progress',
+          _version: 1,
+          exportedAt: 1,
+          copies,
+        })
+      );
+    const fileCopy = (overrides: Record<string, unknown> = {}) => ({
+      id: 'exported-id',
+      mode: 'pvp',
+      seasonNumber: null,
+      supersededAt: 500,
+      progress: { ...tarkovStore.$state.pvp, level: 21 },
+      ...overrides,
+    });
+    it('adds every copy to this browser for review instead of applying it', async () => {
+      const backup = await loadComposable();
+      await backup.parseBackupFile(supersededFile([fileCopy(), fileCopy({ mode: 'pve' })]));
+      expect(backup.importState.value).toBe('idle');
+      expect(backup.recoveryCopiesAdded.value).toBe(2);
+      expect(tarkovStore.$patch).not.toHaveBeenCalled();
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      const copies = listSupersededProgressCopies('user-123');
+      expect(copies.map((copy) => [copy.mode, copy.supersededAt, copy.progress.level])).toEqual([
+        ['pvp', 500, 21],
+        ['pve', 500, 21],
+      ]);
+    });
+    it('requires a signed-in account', async () => {
+      supabaseUser.id = '';
+      const backup = await loadComposable();
+      await backup.parseBackupFile(supersededFile([fileCopy()]));
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importError.value).toBe('settings.data_management.recovery_copies_sign_in');
+    });
+    it.each([
+      ['an empty copy list', []],
+      ['an unknown mode', [fileCopy({ mode: 'arena' })]],
+      ['a Seasonal copy without a season', [fileCopy({ mode: 'seasonal' })]],
+      ['invalid progress', [fileCopy({ progress: { pmcFaction: 'SCAV' } })]],
+    ])('rejects a file with %s', async (_label, copies) => {
+      const backup = await loadComposable();
+      await backup.parseBackupFile(supersededFile(copies));
+      expect(backup.importState.value).toBe('error');
+      expect(backup.importError.value).toBe('settings.data_management.invalid_superseded_archive');
+      const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+      expect(listSupersededProgressCopies('user-123')).toEqual([]);
+    });
+  });
   it('redacts malformed and anonymous retained-copy storage keys in debug exports', async () => {
     const keys = [
       STORAGE_KEYS.progressBackupPrefix + 'anonymous',
