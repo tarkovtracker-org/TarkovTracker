@@ -188,7 +188,8 @@ dispatch_ci() {
 request_preview_after_dispatched_ci() {
   local sha="$1" run_id="$DISPATCHED_CI_RUN_ID" run
   [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || { echo 'No dispatched CI run to preview.' >&2; return 1; }
-  timeout 60m gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+  # CI can take many minutes; avoid gh's three-second default and repeated full job polling.
+  timeout 60m gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
   run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
   jq -e --arg sha "$sha" '
     .event == "workflow_dispatch" and .head_sha == $sha and

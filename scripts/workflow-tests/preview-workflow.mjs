@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
@@ -294,6 +295,33 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
       jobBlock(read(`.github/workflows/${name}.yml`), name === 'crowdin' ? 'sync' : 'release'),
       /timeout-minutes: 90/
     );
+});
+test('dispatched CI watch polls every 30 seconds and preserves its timeout and failure status', () => {
+  const result = spawnSync('bash', ['-s'], {
+    encoding: 'utf8',
+    input: `set -euo pipefail
+source scripts/ci/github-ci-gate.sh
+GITHUB_REPOSITORY=tarkovtracker-org/TarkovTracker
+DISPATCHED_CI_RUN_ID=123
+# Capture the real watch invocation without calling GitHub or waiting.
+timeout() { printf '%s\\n' "$@"; return 17; }
+request_preview_after_dispatched_ci abc123
+`,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 17, result.stderr);
+  assert.deepEqual(result.stdout.trim().split('\n'), [
+    '60m',
+    'gh',
+    'run',
+    'watch',
+    '123',
+    '--repo',
+    'tarkovtracker-org/TarkovTracker',
+    '--interval',
+    '30',
+    '--exit-status',
+  ]);
 });
 function concurrencyValue(workflow, field, inputs) {
   const value = workflow.match(new RegExp(`^ {2}${field}: (.+)$`, 'm'))[1];
