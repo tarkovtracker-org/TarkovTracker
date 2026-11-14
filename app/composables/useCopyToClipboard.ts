@@ -1,6 +1,13 @@
 import { logger } from '@/utils/logger';
 export interface UseCopyToClipboardReturn {
-  copyToClipboard: (text: string, options?: CopyToClipboardOptions) => Promise<boolean>;
+  /**
+   * Pass a promise for text that is still being built: the browser receives the clipboard write
+   * inside the click, which Safari requires, and fills it when the text is ready.
+   */
+  copyToClipboard: (
+    text: string | Promise<string>,
+    options?: CopyToClipboardOptions
+  ) => Promise<boolean>;
 }
 export interface CopyToClipboardOptions {
   revealValue?: boolean;
@@ -31,6 +38,23 @@ async function writeToClipboard(text: string): Promise<boolean> {
     textarea?.remove();
   }
 }
+const supportsDeferredClipboard = (): boolean =>
+  typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
+/** Rejects with the text promise's error, so a failed build is reported by the caller. */
+async function writeDeferredToClipboard(text: Promise<string>): Promise<boolean> {
+  if (supportsDeferredClipboard()) {
+    try {
+      const blob = text.then((value) => new Blob([value], { type: 'text/plain' }));
+      // The caller observes a failed build through 	ext; this branch must not report it twice.
+      blob.catch(() => undefined);
+      await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+      return true;
+    } catch (error) {
+      logger.warn('[Clipboard] Deferred clipboard write failed:', error);
+    }
+  }
+  return writeToClipboard(await text);
+}
 export function useCopyToClipboard(): UseCopyToClipboardReturn {
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -53,12 +77,14 @@ export function useCopyToClipboard(): UseCopyToClipboardReturn {
     });
   };
   const copyToClipboard = async (
-    text: string,
+    text: string | Promise<string>,
     { revealValue = true, shouldNotify = () => true }: CopyToClipboardOptions = {}
   ): Promise<boolean> => {
-    const success = await writeToClipboard(text);
+    const success = await (typeof text === 'string'
+      ? writeToClipboard(text)
+      : writeDeferredToClipboard(text));
     if (!shouldNotify()) return success;
-    notifyClipboardResult(success, text, revealValue);
+    notifyClipboardResult(success, await text, revealValue);
     return success;
   };
   return { copyToClipboard };
