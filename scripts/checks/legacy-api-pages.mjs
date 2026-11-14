@@ -200,11 +200,13 @@ test('compiled unknown Tarkov paths return uncacheable JSON instead of the SPA',
   assert.deepEqual(outbound, []);
 });
 test('compiled known Tarkov route takes precedence over the fallback', async () => {
-  for (const method of ['GET', 'HEAD']) {
+  for (const method of ['GET', 'HEAD', 'GET', 'HEAD']) {
     const response = await harness.fetch('https://tarkovtracker.org/api/tarkov/access-check', {
       method,
     });
     assert.equal(response.status, 200);
+    assert.match(response.headers.get('Content-Type'), /^application\/json/);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
     if (method === 'HEAD') assert.equal(await response.text(), '');
     else assert.deepEqual(await response.json(), { ok: true });
   }
