@@ -18,6 +18,11 @@ import { crowdinEligibility } from './review-admission-crowdin.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
 import {
+  linkedReviewTarget,
+  recoverMergedReview,
+  unlinkedReview,
+} from './review-admission-merged-review.mjs';
+import {
   admissionDecision,
   AdmissionHeld,
   CONTEXT,
@@ -256,7 +261,9 @@ async function targets(github, context) {
 async function signalTargets(github, context) {
   const run = await validatedSignalRun(github, context);
   if (run.event === 'check_suite') return suiteTargets(github, context.repo, run);
-  return linkedPullTarget(run.pull_requests, context.repo);
+  if (unlinkedReview(run)) return [await recoverMergedReview(github, context, run)];
+  const [target] = linkedPullTarget(run.pull_requests, context.repo);
+  return [await linkedReviewTarget(github, context, run, target)];
 }
 function linkedPullTarget(pulls, repo) {
   requireEvidence(
@@ -479,6 +486,15 @@ export async function filterAdmission({ github, context }) {
   if (context.eventName === 'workflow_run') return successfulSignal(github, context);
   return true;
 }
+function obsoleteSignalNotice(selected) {
+  if (selected === null) {
+    return 'Provider suite on a merge-queue commit is not review evidence; no status changed.';
+  }
+  if (selected.length === 1 && selected[0].obsoleteMergedReview) {
+    return `Review signal for merged PR #${selected[0].number} is obsolete; no status changed.`;
+  }
+  return null;
+}
 export async function runReviewAdmission({ github, context, core }) {
   if (context.eventName === 'issue_comment' && !relevantComment(context.payload)) {
     core.notice('Unrelated issue comment does not affect review admission.');
@@ -488,10 +504,9 @@ export async function runReviewAdmission({ github, context, core }) {
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
   await requireSignal(github, context);
   const selected = await targets(github, context);
-  if (selected === null) {
-    core.notice(
-      'Provider suite on a merge-queue commit is not review evidence; no status changed.'
-    );
+  const obsolete = obsoleteSignalNotice(selected);
+  if (obsolete) {
+    core.notice(obsolete);
     return;
   }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');

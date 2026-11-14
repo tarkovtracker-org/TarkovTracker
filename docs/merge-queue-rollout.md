@@ -208,6 +208,14 @@ admission; an explicit trusted-main dispatch can recover once review evidence is
 controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
 and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).
 
+Late review signals for a service-linked, merged PR record an obsolete notice without changing
+statuses or producing receipts or promotion requests. If GitHub omits the link (`pull_requests: []`),
+recovery requires one merged PR from the full source-branch PR history, matching the authenticated
+run's exact source repository, branch and SHA and this repository's `main` base. The controller
+rejects active PRs sharing that source branch or SHA, then rereads the merged target. Missing,
+ambiguous, mismatched or unmerged targets and API failures remain errors. Run, attempt, workflow,
+event and signal-job authentication still precede recovery; branch names alone never authorize it.
+
 Review and review-comment signals are debounced per PR: each waits 45 seconds inside a per-PR
 `cancel-in-progress` group, so a review and its inline comments wake the serialized controller
 once. Cancelled signals are already ignored by the controller's success-only intake, and the
