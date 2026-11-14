@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { relevantComment } from '../ci/review-admission.mjs';
-import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 const repository = 'example/repo';
 const head = 'a'.repeat(40);
 const bot = { id: 136622811, type: 'Bot', login: 'coderabbitai[bot]' };
@@ -268,6 +273,21 @@ test('the admission locator preserves candidate branches and unscoped events', (
 });
 test('review withdrawals cannot be canceled or delayed by subsequent review edits', () => {
   const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');
+  for (const [name, types] of [
+    ['pull_request_review', ['submitted', 'edited', 'dismissed']],
+    ['pull_request_review_comment', ['created', 'edited', 'deleted']],
+  ]) {
+    const block = workflowEvent(signal, name);
+    const configured = block.match(/^ {4}types:\s*\[([^\]]+)\]/m);
+    assert.ok(configured, `${name} must configure its event types`);
+    assert.deepEqual(
+      configured[1]
+        .split(',')
+        .map((type) => type.trim())
+        .sort(),
+      types.sort()
+    );
+  }
   assert.doesNotMatch(signal, /^concurrency:/m);
   const job = jobBlock(signal, 'signal');
   assert.doesNotMatch(job, /sleep\s+\d|concurrency:/);
