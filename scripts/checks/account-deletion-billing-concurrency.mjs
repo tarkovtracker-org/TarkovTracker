@@ -214,9 +214,11 @@ async function leaseExpiryHistory() {
 }
 async function retainedHistoryWhileWaiting() {
   prepareBilling();
-  query(`DELETE FROM public.account_billing_subscriptions WHERE user_id='${user}'`);
+  query(`DELETE FROM public.account_billing_subscriptions WHERE user_id='${user}';
+    UPDATE public.supporters SET status='cancelled' WHERE user_id='${user}'`);
+  // Commit history first, then hold only the supporter row (not the Auth row).
   const holder = await heldTransaction(
-    `UPDATE public.supporters SET status='cancelled' WHERE user_id='${user}'`
+    `SELECT 1 FROM public.supporters WHERE user_id='${user}' FOR UPDATE`
   );
   const clearer = connection(
     `SET application_name='${waiterName}'; ${clearBilling('ARRAY[]::text[]')};`
