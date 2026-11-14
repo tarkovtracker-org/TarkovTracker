@@ -726,6 +726,15 @@
         "hidden_other": "{count} available tasks are hidden by your filters",
         "complete": "Every visible task is done.",
         "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
+        "storyline": {
+          "chapter": "Storyline · {chapter}",
+          "unlocks": "Unlocks {unlock}",
+          "objective_hint": "Next tracked step · Check Storyline for requirements",
+          "choice": "Review your route choices",
+          "choice_hint": "Open the chapter to compare the alternatives before continuing.",
+          "review": "Review chapter progress",
+          "review_hint": "No next main step is recorded. Check the chapter before marking it complete."
+        },
         "reason": {
           "unlock_trader": "Unlocks {trader}",
           "opens_one": "Opens 1 task",
@@ -1039,6 +1048,8 @@
         }
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
+      "no_available_tasks": "No available tasks right now",
+      "no_available_tasks_description": "Your tracked progress has no available tasks. Review the next steps and unmet requirements below.",
       "no_tasks_found_description": "Adjust your filters or level requirements to see available tasks.",
       "no_search_matches": "No tasks match your search.",
       "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",

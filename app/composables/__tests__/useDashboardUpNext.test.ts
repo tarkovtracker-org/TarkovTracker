@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildTaskEvaluations } from '@/stores/taskAvailability';
-import type { Task, Trader } from '@/types/tarkov';
+import type { StoryChapter, Task, Trader } from '@/types/tarkov';
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -54,6 +54,8 @@ const createTarkovStore = (
     getTraderReputation: () => overrides.fenceReputation ?? 0,
     isTaskComplete: (taskId: string) => completedTasks.has(taskId),
     isTaskFailed: (taskId: string) => failedTasks.has(taskId),
+    isStoryChapterComplete: () => false,
+    isStoryObjectiveComplete: () => false,
     isTaskObjectiveComplete:
       overrides.isTaskObjectiveComplete ??
       ((objectiveId: string) => completedObjectives.has(objectiveId)),
@@ -68,6 +70,7 @@ interface SetupOptions {
   tasks?: Task[];
   tarkovStore?: ReturnType<typeof createTarkovStore>;
   traders?: Trader[];
+  storyChapters?: StoryChapter[];
 }
 const setup = async (options: SetupOptions = {}) => {
   const tasks = options.tasks ?? [];
@@ -76,6 +79,8 @@ const setup = async (options: SetupOptions = {}) => {
   const preferencesStore = options.preferencesStore ?? createPreferencesStore();
   const tarkovStore = options.tarkovStore ?? createTarkovStore();
   const metadataStore = {
+    storyChapters: options.storyChapters ?? [],
+    storyChaptersGameMode: tarkovStore.getCurrentGameMode(),
     getExcludedTaskIdsForEdition: () => new Set(options.excludedTaskIds ?? []),
     prestigeTaskMap: options.prestigeTaskMap ?? new Map<string, number>(),
     sortedTraders: traders,
@@ -92,6 +97,7 @@ const setup = async (options: SetupOptions = {}) => {
           level: progressStore.getLevel('self'),
           faction: tarkovStore.getPMCFaction(),
           mode: tarkovStore.getCurrentGameMode(),
+          storyCatalog: options.storyChapters,
           completions: Object.fromEntries(
             tasks.map((task) => [
               task.id,
@@ -137,6 +143,41 @@ const setup = async (options: SetupOptions = {}) => {
 const flags = (ids: string[], value = false) =>
   Object.fromEntries(ids.map((id) => [id, { self: value }]));
 describe('useDashboardUpNext', () => {
+  it('connects a canonical trader story blocker to its catalog objective', async () => {
+    const storyChapters: StoryChapter[] = [
+      {
+        id: 'tour',
+        name: 'Tour',
+        normalizedName: 'tour',
+        wikiLink: '',
+        order: 1,
+        autoStart: true,
+        objectives: {
+          unlock: {
+            id: 'unlock',
+            order: 1,
+            type: 'main',
+            description: 'Talk to Skier',
+            unlocks: [{ type: 'trader', id: 'skier', name: 'Skier' }],
+          },
+        },
+      },
+    ];
+    const upNext = await setup({
+      storyChapters,
+      tasks: [{ id: 'task', name: 'Task', trader: { id: 'skier', name: 'Skier' } }],
+    });
+    expect(upNext.state.value).toBe('blocked');
+    expect(upNext.storyStep.value).toMatchObject({
+      chapterId: 'tour',
+      objectiveId: 'unlock',
+      unlocks: ['Skier'],
+    });
+    expect(upNext.items.value[0]).toMatchObject({
+      blocker: { type: 'trader_unlock' },
+      storylineTarget: { chapter: 'tour', objective: 'unlock' },
+    });
+  });
   it('ranks by follow-ups that completing the task actually opens', async () => {
     const tasks: Task[] = [
       {

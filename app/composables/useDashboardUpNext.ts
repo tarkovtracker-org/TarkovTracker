@@ -1,4 +1,5 @@
 import { useDashboardFilters } from '@/composables/useDashboardFilters';
+import { useStorylineChapters } from '@/composables/useStorylineChapters';
 import {
   lockedTraderUnlockTaskIds,
   pickClosestBlocked,
@@ -7,6 +8,7 @@ import {
   type UpNextItem,
   type UpNextState,
 } from '@/features/dashboard/upNext';
+import { nextStorylineStep, storylineBlockerTarget } from '@/features/storyline/nextStep';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -15,6 +17,7 @@ import { GAME_MODES, resolveTraderUnlockTaskIds } from '@/utils/constants';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import { rewardTraderUnlockTasks } from '@/utils/traderUnlockRewards';
 import type { ComputedRef } from '#imports';
+import type { StorylineNextStep } from '@/features/storyline/nextStep';
 import type { Task } from '@/types/tarkov';
 type Stores = {
   metadataStore: ReturnType<typeof useMetadataStore>;
@@ -67,7 +70,17 @@ function useUpNextTaskSets({
   });
   const hasTrackable = computed(() => filteredTasks.value.some(isTrackable));
   const eligibleTaskIds = computed(() => new Set(eligibleTasks.value.map((task) => task.id)));
-  return { available, eligibleTaskIds, hasTrackable, hiddenAvailableCount, pending };
+  const pendingEligibleIds = computed(() =>
+    eligibleTasks.value.filter(isPending).map((task) => task.id)
+  );
+  return {
+    available,
+    eligibleTaskIds,
+    hasTrackable,
+    hiddenAvailableCount,
+    pending,
+    pendingEligibleIds,
+  };
 }
 function useUpNextContext(
   { metadataStore, progressStore, tarkovStore }: Stores,
@@ -100,6 +113,7 @@ export function useDashboardUpNext(): {
   hiddenAvailableCount: ComputedRef<number>;
   items: ComputedRef<UpNextItem[]>;
   state: ComputedRef<UpNextState>;
+  storyStep: ComputedRef<StorylineNextStep | undefined>;
 } {
   const stores: Stores = {
     metadataStore: useMetadataStore(),
@@ -108,8 +122,15 @@ export function useDashboardUpNext(): {
     tarkovStore: useTarkovStore(),
   };
   const { hasDashboardFiltersActive: filtersActive } = useDashboardFilters(stores.preferencesStore);
-  const { available, eligibleTaskIds, hasTrackable, hiddenAvailableCount, pending } =
-    useUpNextTaskSets(stores);
+  const {
+    available,
+    eligibleTaskIds,
+    hasTrackable,
+    hiddenAvailableCount,
+    pending,
+    pendingEligibleIds,
+  } = useUpNextTaskSets(stores);
+  const { normalizedChapters } = useStorylineChapters();
   const context = useUpNextContext(stores, eligibleTaskIds);
   const state = computed<UpNextState>(() => {
     if (available.value.length) return 'actionable';
@@ -120,7 +141,13 @@ export function useDashboardUpNext(): {
   const items = computed<UpNextItem[]>(() => {
     if (state.value === 'actionable') return rankUpNext(available.value, context.value);
     if (state.value !== 'blocked') return [];
-    return pickClosestBlocked(pending.value, context.value);
+    return pickClosestBlocked(pending.value, context.value).map((item) => ({
+      ...item,
+      storylineTarget: storylineBlockerTarget(item.blocker, normalizedChapters.value),
+    }));
   });
-  return { filtersActive, hiddenAvailableCount, items, state };
+  const storyStep = computed(() =>
+    nextStorylineStep(normalizedChapters.value, pendingEligibleIds.value, context.value.evaluation)
+  );
+  return { filtersActive, hiddenAvailableCount, items, state, storyStep };
 }

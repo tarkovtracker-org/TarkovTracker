@@ -327,6 +327,16 @@ current profile's edition, prestige and faction eligibility. Ineligible children
 “Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
 do not remove an otherwise eligible follow-up from that count.
 
+Up next also shows one continuation for an incomplete auto-started or already-progressed Storyline
+chapter from the current mode's catalog. “Next tracked step” follows the existing timeline, skips
+automatic tutorial completion and optional steps, and does not claim in-game availability. Unresolved
+route choices link to the chapter without selecting a branch; missing/exhausted objective data asks
+the player to review the chapter rather than inferring completion. Benefits retain source qualifiers;
+“Opens” counts only eligible pending tasks whose every remaining gate is that exact story objective.
+The unfiltered, non-searching personal Available list reuses this guidance when empty. Known story
+objective blockers deep-link to that objective; unknown references retain the task requirements link.
+Search, content filters, teammate views and other task statuses keep their existing empty states.
+
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
