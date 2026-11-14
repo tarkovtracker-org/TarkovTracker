@@ -143,17 +143,18 @@ describe('DiscordLinkCard', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
   it('shows the unique Discord username instead of the stored ID or display name', async () => {
+    const numericId = '1'.repeat(18);
     maybeSingleMock.mockResolvedValue({
       data: {
         discord_user_id: 'discord-123',
-        discord_username: '123456789012345678',
+        discord_username: numericId,
         discord_display_name: 'Display Name',
       },
       error: null,
     });
     const wrapper = await mountCard();
     expect(wrapper.text()).toContain('Linked as linked-user');
-    expect(wrapper.text()).not.toContain('123456789012345678');
+    expect(wrapper.text()).not.toContain(numericId);
     expect(wrapper.text()).not.toContain('Display Name');
     expect(selectMock).toHaveBeenCalledWith('discord_user_id');
   });
