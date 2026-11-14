@@ -225,9 +225,9 @@ replaces the key with the translated string.
 - Primary language wins; English is the fallback when a key is missing in the primary language.
 
 The items-lite fetcher omits only exact translation declarations for fields its projection
-discards: item descriptions and the top-level flea market, armor materials, skills, item
-categories, and handbook categories. Names, all retained properties, and default presets still
-use the normal translator and English fallback. Unfamiliar or overlapping declarations retain
+discards. The declaration list is owned by `OMITTED_LITE_ITEM_TRANSLATIONS` in
+[`tarkov-json.ts`](../../app/server/utils/tarkov-json.ts). Names, all retained properties, and
+default presets still use the normal translator and English fallback. Unfamiliar or overlapping declarations retain
 the full translation path. Filtering copies the envelope rather than changing upstream data
 shared by concurrent full/lite or locale requests. The lite adapter also returns before expanding
 full-only categories and contained items. Full-items output and the fetch/cache/overlay order
