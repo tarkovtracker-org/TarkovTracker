@@ -1128,39 +1128,17 @@
         </div>
       </template>
     </GenericCard>
-    <GenericCard
+    <BugReportCard
       v-if="!isBlockedByOtherDataFlow"
-      icon="mdi-bug-outline"
-      icon-color="warning"
-      highlight-color="warning"
-      :fill-height="false"
-      :title="$t('settings.data_management.debug_section_title')"
-      title-classes="text-lg font-semibold"
-    >
-      <template #content>
-        <div class="space-y-3 px-4 py-4">
-          <p class="text-surface-400 text-sm">
-            {{ $t('settings.data_management.debug_export_description') }}
-          </p>
-          <UButton
-            icon="i-mdi-bug-outline"
-            block
-            :ui="{
-              base: 'bg-warning-900 light:bg-warning-50 hover:bg-warning-800 light:hover:bg-warning-100 active:bg-warning-700 light:active:bg-warning-100 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
-            }"
-            :disabled="isAnyImportActive"
-            @click="handleExportDebugSnapshot"
-          >
-            {{ $t('settings.data_management.debug_export_button') }}
-          </UButton>
-        </div>
-      </template>
-    </GenericCard>
+      :backup="dataManagementSession.backup"
+      :disabled="isAnyImportActive"
+    />
   </template>
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
+  import BugReportCard from '@/features/settings/BugReportCard.vue';
   import EftLogImportControls from '@/features/settings/EftLogImportControls.vue';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
   import {
@@ -1228,8 +1206,6 @@
     legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow,
     exportError: backupExportError,
-    exportDebugSnapshot,
-    debugExportError,
     importState: backupImportState,
     importPreview: backupPreview,
     importError: backupImportError,
@@ -1305,19 +1281,6 @@
       });
     } finally {
       recoveryCleanupRunning.value = false;
-    }
-  }
-  async function handleExportDebugSnapshot() {
-    try {
-      await exportDebugSnapshot();
-    } catch (err) {
-      logger.error('DataManagementCard: exportDebugSnapshot failed', err, debugExportError.value);
-      if (!debugExportError.value) return;
-      toast.add({
-        title: t('settings.data_management.debug_export_error_title'),
-        description: debugExportError.value,
-        color: 'error',
-      });
     }
   }
   async function handleBackupFileChange(event: Event) {

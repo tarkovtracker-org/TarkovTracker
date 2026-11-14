@@ -294,16 +294,27 @@ describe('usePreferencesStore', () => {
       expect(migratedValue?.data?.neededItemsHideOwned).toBe(true);
       expect(migratedValue?.data?.neededItemsHideCollected).toBeUndefined();
     });
-    it('should not override neededItemsHideOwned if both keys exist', () => {
+    it.each([
+      [false, false, false],
+      [false, true, true],
+      [true, false, true],
+      [true, true, true],
+    ])('preserves the combined legacy ownership filter (%s, %s)', (owned, collected, expected) => {
       const persistedState = {
-        neededItemsHideCollected: true,
-        neededItemsHideOwned: false,
+        neededItemsHideCollected: collected,
+        neededItemsHideOwned: owned,
       };
       localStorageMock.getItem.mockReturnValue(JSON.stringify(persistedState));
       const newPinia = createPinia();
       setActivePinia(newPinia);
       const store = usePreferencesStore();
-      expect(store.neededItemsHideOwned).toBe(false);
+      const migratedValue = localStorageMock.setItem.mock.calls
+        .filter(([key]) => key === STORAGE_KEYS.preferences)
+        .map(([, value]) => JSON.parse(value))
+        .at(-1);
+      expect(store.neededItemsHideOwned).toBe(expected);
+      expect(migratedValue?.data?.neededItemsHideOwned).toBe(expected);
+      expect(migratedValue?.data?.neededItemsHideCollected).toBeUndefined();
     });
     it('persists removal of retired hideout preferences on hydration', () => {
       localStorageMock.setItem(
