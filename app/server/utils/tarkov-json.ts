@@ -411,12 +411,12 @@ function applyTranslations<T>(
   return (translated as TarkovJsonEnvelope<T>).data;
 }
 const resolveLogger = (options: TarkovJsonOptions) => options.deps?.logger ?? logger;
-export async function fetchTarkovJsonEndpoint<T>(
+async function localizeEnvelope<T>(
+  baseResponse: TarkovJsonEnvelope<T>,
   endpoint: TarkovJsonEndpoint,
-  options: TarkovJsonOptions = {}
+  options: TarkovJsonOptions
 ): Promise<T> {
   const lang = options.lang?.trim() || ENGLISH_LANGUAGE;
-  const baseResponse = await fetchEnvelope<T>(buildPath(endpoint, options), options);
   if (!baseResponse.translations?.length) {
     return baseResponse.data;
   }
@@ -433,6 +433,13 @@ export async function fetchTarkovJsonEndpoint<T>(
     resolveLogger(options),
     endpoint === 'season'
   );
+}
+export async function fetchTarkovJsonEndpoint<T>(
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions = {}
+): Promise<T> {
+  const response = await fetchEnvelope<T>(buildPath(endpoint, options), options);
+  return localizeEnvelope(response, endpoint, options);
 }
 function adaptCategoryRef(value: unknown, context: AdapterContext) {
   const raw = readRecordRef(value, context.itemCategoriesById);
@@ -513,6 +520,8 @@ function adaptObjectiveItemRefs(
     .filter((item): item is TarkovItem => Boolean(item?.id));
 }
 function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): TarkovItem {
+  const base = adaptItemRef(raw, context);
+  if (lite) return base;
   const categories = Array.isArray(raw.categories)
     ? raw.categories.map((category) => adaptCategoryRef(category, context)).filter(Boolean)
     : undefined;
@@ -522,8 +531,6 @@ function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): Tark
         count: typeof entry.count === 'number' ? entry.count : 1,
       }))
     : undefined;
-  const base = adaptItemRef(raw, context);
-  if (lite) return base;
   return compactObject({
     ...raw,
     ...base,
@@ -1082,13 +1089,39 @@ export function createTarkovJsonBootstrapFetcher(options: TarkovJsonOptions) {
       (await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options)).data
     );
 }
+// Only exact declarations whose fields the lite adapter discards are omitted.
+// Unfamiliar/overlapping paths still use the full translator, including its guards.
+const OMITTED_LITE_ITEM_TRANSLATIONS = new Set([
+  '$.data.items.*.description',
+  '$.data.fleaMarket.*.name',
+  '$.data.armorMaterial.*.name',
+  '$.data.skills.*.name',
+  '$.data.itemCategories.*.name',
+  '$.data.handbookCategories.*.name',
+]);
+async function fetchItemsLitePayload(options: TarkovJsonOptions): Promise<JsonItemsPayload> {
+  const response = await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options);
+  // The upstream envelope may be shared by concurrent full/lite and locale requests.
+  return localizeEnvelope(
+    {
+      ...response,
+      translations: response.translations?.filter(
+        (path) => !OMITTED_LITE_ITEM_TRANSLATIONS.has(path)
+      ),
+    },
+    'items',
+    options
+  );
+}
 export function createTarkovJsonItemsFetcher(
   options: TarkovJsonOptions,
   adapterOptions: { lite?: boolean } = {}
 ) {
   return async () =>
     adaptItemsResponse(
-      await fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options),
+      await (adapterOptions.lite
+        ? fetchItemsLitePayload(options)
+        : fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options)),
       adapterOptions
     );
 }
