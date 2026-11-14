@@ -60,6 +60,22 @@
     focusTaskId.value = taskId;
     report();
   };
+  // An entry that leaves the legend (its quest was hidden or filtered out) never fires
+  // mouseleave or blur, so forget it; otherwise it would light up again when the quest returns.
+  const forgetIfGone = (tracked: Ref<string | null>, present: ReadonlySet<string>): boolean => {
+    if (tracked.value === null || present.has(tracked.value)) return false;
+    tracked.value = null;
+    return true;
+  };
+  watch(
+    () => props.entries.map((entry) => entry.task.id),
+    (taskIds) => {
+      const present = new Set(taskIds);
+      const pointerGone = forgetIfGone(pointerTaskId, present);
+      const focusGone = forgetIfGone(focusTaskId, present);
+      if (pointerGone || focusGone) report();
+    }
+  );
   // An unmounted legend (closing the fullscreen map) never fires mouseleave or blur.
   onBeforeUnmount(() => {
     if (pointerTaskId.value === null && focusTaskId.value === null) return;

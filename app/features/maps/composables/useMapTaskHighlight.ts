@@ -11,14 +11,19 @@ interface MapTaskHighlightOptions {
  * entry keeps it highlighted until it is clicked again, which also covers touch screens. A lock
  * ends when its quest is hidden or leaves the map, or quest coloring is turned off; it does not
  * come back by itself when the quest returns.
+ *
+ * The legend and the map report separately, so leaving a marker never clears a legend entry that
+ * still has hover or focus, and the other way round. A marker hover wins over the legend, which
+ * wins over the lock.
  */
 export function useMapTaskHighlight({ shownTaskIds, enabled }: MapTaskHighlightOptions) {
-  const hoveredTaskId = ref<string | null>(null);
+  const markerTaskId = ref<string | null>(null);
+  const legendTaskId = ref<string | null>(null);
   const lockedTaskId = ref<string | null>(null);
   const isAvailable = (taskId: string | null): taskId is string =>
     taskId !== null && enabled.value && shownTaskIds.value.has(taskId);
   const highlightedTaskId = computed<string | null>(
-    () => [hoveredTaskId.value, lockedTaskId.value].find(isAvailable) ?? null
+    () => [markerTaskId.value, legendTaskId.value, lockedTaskId.value].find(isAvailable) ?? null
   );
   const activeLockedTaskId = computed<string | null>(() =>
     isAvailable(lockedTaskId.value) ? lockedTaskId.value : null
@@ -30,8 +35,13 @@ export function useMapTaskHighlight({ shownTaskIds, enabled }: MapTaskHighlightO
     },
     { flush: 'sync' }
   );
-  const setHoveredTask = (taskId: string | null) => {
-    hoveredTaskId.value = taskId;
+  /** The quest of the marker under the pointer, from the map's `objective-hover`. */
+  const setMarkerTask = (taskId: string | null) => {
+    markerTaskId.value = taskId;
+  };
+  /** The legend entry under the pointer or with keyboard focus, from the legend's `highlight`. */
+  const setLegendTask = (taskId: string | null) => {
+    legendTaskId.value = taskId;
   };
   const toggleLockedTask = (taskId: string) => {
     lockedTaskId.value = activeLockedTaskId.value === taskId ? null : taskId;
@@ -39,7 +49,8 @@ export function useMapTaskHighlight({ shownTaskIds, enabled }: MapTaskHighlightO
   return {
     highlightedTaskId,
     lockedTaskId: activeLockedTaskId,
-    setHoveredTask,
+    setMarkerTask,
+    setLegendTask,
     toggleLockedTask,
   };
 }

@@ -36,6 +36,17 @@ describe('MapQuestLegend', () => {
     // Forced-colors mode keeps the outline that outline-hidden only makes transparent.
     expect(locked!.classes()).toContain('focus:outline-hidden');
   });
+  it('forgets an entry that leaves the legend, so its quest does not light up on return', async () => {
+    const wrapper = mountLegend();
+    await items(wrapper)[0]!.trigger('focus');
+    await items(wrapper)[1]!.trigger('mouseenter');
+    // Task B is hidden while hovered: no mouseleave fires, and focus on task A takes over.
+    await wrapper.setProps({ entries: [entries[0]!] });
+    expect(wrapper.emitted('highlight')!.at(-1)).toEqual(['task-a']);
+    await wrapper.setProps({ entries });
+    await items(wrapper)[0]!.trigger('blur');
+    expect(wrapper.emitted('highlight')!.at(-1)).toEqual([null]);
+  });
   it('releases its highlight when unmounted mid-hover, and stays quiet otherwise', async () => {
     // emitted() is not kept past unmount, so listen through the prop instead.
     const onHighlight = vi.fn();

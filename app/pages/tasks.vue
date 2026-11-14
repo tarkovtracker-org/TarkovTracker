@@ -126,7 +126,7 @@
                         :task-colors="mapTaskColors"
                         :highlighted-task-id="highlightedMapTaskId"
                         :locked-task-id="lockedMapTaskId"
-                        @highlight="setHoveredMapTask"
+                        @highlight="setLegendMapTask"
                         @toggle-highlight-lock="toggleLockedMapTask"
                       />
                       <LeafletMapComponent
@@ -140,7 +140,7 @@
                         :show-legend="true"
                         :show-fullscreen-toggle="true"
                         :height="mapHeight"
-                        @objective-hover="setHoveredMapTask"
+                        @objective-hover="setMarkerMapTask"
                         @toggle-fullscreen="openMapFullscreen"
                       />
                       <AppTooltip
@@ -529,7 +529,7 @@
               :task-colors="mapTaskColors"
               :highlighted-task-id="highlightedMapTaskId"
               :locked-task-id="lockedMapTaskId"
-              @highlight="setHoveredMapTask"
+              @highlight="setLegendMapTask"
               @toggle-highlight-lock="toggleLockedMapTask"
             />
           </div>
@@ -548,7 +548,7 @@
               fill
               :initial-view="fullscreenMapView"
               :initial-floor="fullscreenInitialFloor"
-              @objective-hover="setHoveredMapTask"
+              @objective-hover="setMarkerMapTask"
               @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
@@ -811,7 +811,8 @@
   const {
     highlightedTaskId: highlightedMapTaskId,
     lockedTaskId: lockedMapTaskId,
-    setHoveredTask: setHoveredMapTask,
+    setMarkerTask: setMarkerMapTask,
+    setLegendTask: setLegendMapTask,
     toggleLockedTask: toggleLockedMapTask,
   } = useMapTaskHighlight({
     shownTaskIds: computed(
@@ -931,8 +932,6 @@
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
     fullscreenInitialFloor.value = undefined;
-    // The fullscreen map unmounts without a mouseout, so drop the hovered quest it reported.
-    setHoveredMapTask(null);
     restoreInlineMapFloor(overlayFloor);
     if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };

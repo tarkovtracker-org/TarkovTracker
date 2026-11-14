@@ -656,8 +656,12 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    automatic one until it is reset. Hovering or focusing a legend entry, or hovering one of the
    quest's markers, highlights that quest: its chips grow, its zone outlines show and every other
    chip fades. Clicking a legend entry keeps the highlight (for touch screens) until it is clicked
-   again or the quest leaves the map. The map releases a hover it reported when it redraws its
-   markers or unmounts, since neither fires mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
+   again, the quest is hidden or leaves the map, or quest coloring is turned off; a lock does not
+   return by itself when the quest comes back. The legend and the map report their hovers
+   separately (a marker hover wins over a legend hover or focus, which wins over the lock), so
+   leaving one never clears the other. The map releases a hover it reported when it redraws its
+   markers or unmounts, and the legend forgets an entry that leaves it, since neither fires
+   mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
    and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
 
 ### Files
