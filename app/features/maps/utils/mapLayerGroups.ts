@@ -1,4 +1,5 @@
 import type { MapMarkerGlyphKind } from '@/features/maps/utils/markerGlyphs';
+import type { MapObjectiveColorMode } from '@/features/maps/utils/objectiveColors';
 import type { MapMarkerColors } from '@/utils/theme-colors';
 type TranslateFn = (key: string) => string;
 type Toggle = { value: boolean };
@@ -21,6 +22,8 @@ export interface MapLayerGroup {
 export interface MapLayerGroupsInput {
   t: TranslateFn;
   colors: MapMarkerColors;
+  /** Outside category mode the Regular, Pinned and Team rows filter but no longer set colors. */
+  objectiveColorMode?: MapObjectiveColorMode;
   objectives: { self: Toggle; pinned: Toggle; team: Toggle };
   extracts: { pmc: Toggle; scav: Toggle; shared: Toggle; coop: Toggle };
   transit: Toggle;
@@ -38,12 +41,21 @@ export interface MapLayerGroupsInput {
 type Candidate = MapLayerItem & { available: boolean };
 const keepAvailable = (items: Candidate[]): MapLayerItem[] =>
   items.filter((item) => item.available).map(({ available: _available, ...item }) => item);
-function objectiveItems({ t, colors, objectives }: MapLayerGroupsInput): Candidate[] {
+/** Neutral swatch for the category rows while chips are colored by quest or objective type. */
+export const NEUTRAL_OBJECTIVE_SWATCH = '#9ca3af';
+function objectiveItems({
+  t,
+  colors,
+  objectives,
+  objectiveColorMode = 'category',
+}: MapLayerGroupsInput): Candidate[] {
+  const swatch = (color: string) =>
+    objectiveColorMode === 'category' ? color : NEUTRAL_OBJECTIVE_SWATCH;
   return [
     {
       key: 'self',
       label: t('maps.legend.regular'),
-      color: colors.SELF_OBJECTIVE,
+      color: swatch(colors.SELF_OBJECTIVE),
       swatch: 'objective',
       visible: objectives.self,
       available: true,
@@ -51,7 +63,7 @@ function objectiveItems({ t, colors, objectives }: MapLayerGroupsInput): Candida
     {
       key: 'pinned',
       label: t('maps.legend.pinned'),
-      color: colors.PINNED_OBJECTIVE,
+      color: swatch(colors.PINNED_OBJECTIVE),
       swatch: 'objective',
       visible: objectives.pinned,
       available: true,
@@ -59,7 +71,7 @@ function objectiveItems({ t, colors, objectives }: MapLayerGroupsInput): Candida
     {
       key: 'team',
       label: t('common.team'),
-      color: colors.TEAM_OBJECTIVE,
+      color: swatch(colors.TEAM_OBJECTIVE),
       swatch: 'objective',
       visible: objectives.team,
       available: true,
@@ -132,8 +144,10 @@ function locationItems({
   ];
 }
 /**
- * One list for both the legend and the layer toggles: every row shows the marker exactly as the
- * map draws it and toggles exactly that marker type. Layers the current map lacks are omitted.
+ * One list for both the legend and the layer toggles: every row toggles exactly one marker type
+ * and shows it as the map draws it, except that the Regular, Pinned and Team rows show a neutral
+ * swatch while chips are colored by quest or objective type. Layers the current map lacks are
+ * omitted.
  */
 export function buildMapLayerGroups(input: MapLayerGroupsInput): MapLayerGroup[] {
   const groups: MapLayerGroup[] = [

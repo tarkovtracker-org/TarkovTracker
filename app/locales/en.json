@@ -1098,7 +1098,12 @@
           "hidden_section_title": "Hidden from map ({count})",
           "hidden_section_description": "Still tracked, just not drawn on the map.",
           "hidden_section_expand": "Show hidden quests",
-          "hidden_section_collapse": "Collapse hidden quests"
+          "hidden_section_collapse": "Collapse hidden quests",
+          "legend_label": "Quest colors",
+          "legend_highlight_named": "Highlight {name} on the map",
+          "quest_color_named": "Color for {name}",
+          "reset_quest_color_named": "Use the automatic color for {name}",
+          "reset_quest_colors": "Reset quest colors"
         }
       },
       "pinned_tasks_section": "Pinned Tasks",
@@ -2120,6 +2125,27 @@
           "selected": "Pinned Objective",
           "shared_extract": "Shared Extract",
           "coop_extract": "Co-op Extract"
+        },
+        "objective_colors": {
+          "title": "Objective colors",
+          "description": "Choose what an objective marker's color shows. Its icon always shows the objective type.",
+          "modes": {
+            "category": "Category",
+            "task": "Quest",
+            "type": "Objective type"
+          },
+          "mode_hints": {
+            "category": "Your, pinned and team objectives use the category colors below.",
+            "task": "Each quest gets its own color. Pick a quest's color under Choose quests on the Tasks map.",
+            "type": "Each objective type gets its own color, shown in the Layers panel's Objective icons key."
+          },
+          "palette": "Palette",
+          "palettes": {
+            "okabe_ito": "Okabe-Ito (7 colors)",
+            "tol_bright": "Tol bright (6 colors)",
+            "tol_muted": "Tol muted (9 colors)"
+          },
+          "palette_hint": "Each palette stays distinguishable with red-green and blue-yellow color blindness. Colors repeat once a map has more quests than the palette has colors."
         }
       },
       "links": {

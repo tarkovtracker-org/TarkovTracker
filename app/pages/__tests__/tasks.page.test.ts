@@ -67,6 +67,9 @@ const preferencesStoreMock = {
   getPinnedTaskIds: [] as string[],
   getHideCompletedMapObjectives: false,
   getMapHiddenTaskIds: [] as string[],
+  getMapObjectiveColorMode: 'category',
+  getMapObjectivePalette: 'okabe_ito',
+  getMapTaskColors: {} as Record<string, string>,
   getShowMapExtracts: true,
   getHiddenTaskIds: [] as string[],
   unhideTasks: vi.fn(),
@@ -285,8 +288,12 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
         type: Boolean,
         default: false,
       },
+      highlightedTaskId: {
+        type: String,
+        default: null,
+      },
     },
-    emits: ['toggle-fullscreen'],
+    emits: ['toggle-fullscreen', 'objective-hover'],
     setup(props, { expose }) {
       expose({
         activateObjectivePopup: () => true,
@@ -298,7 +305,12 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
       });
       return { props };
     },
-    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" :data-initial-floor="props.initialFloor ?? ''" :data-show-extracts="String(props.showExtracts)">
+    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" :data-initial-floor="props.initialFloor ?? ''" :data-show-extracts="String(props.showExtracts)" :data-highlighted-task="props.highlightedTaskId ?? ''">
+      <button
+        type="button"
+        data-testid="map-marker-hover"
+        @click="$emit('objective-hover', 'task-shown')"
+      />
       <button
         v-if="props.showFullscreenToggle"
         type="button"
@@ -397,6 +409,8 @@ describe('tasks page', () => {
     preferencesStoreMock.getShowMapExtracts = true;
     preferencesStoreMock.getHideCompletedMapObjectives = false;
     preferencesStoreMock.getMapHiddenTaskIds = [];
+    preferencesStoreMock.getMapObjectiveColorMode = 'category';
+    preferencesStoreMock.getMapTaskColors = {};
     preferencesStoreMock.getHiddenTaskIds = [];
     preferencesStoreMock.clearMapTaskVisibility.mockReset();
     preferencesStoreMock.mapTeamAllHidden = false;
@@ -1105,6 +1119,34 @@ describe('tasks page', () => {
     expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
     await section.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
     expect(preferencesStoreMock.clearMapTaskVisibility).toHaveBeenCalledWith(['task-hidden']);
+  });
+  it('drops a marker hover when the full screen map opens or closes over it (#920)', async () => {
+    visibleTasksRef.value = [
+      createDefaultTask({
+        id: 'task-shown',
+        name: 'Shown Task',
+        objectives: [createMapObjective({ id: 'obj-shown', taskId: 'task-shown' })],
+      }),
+    ];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getMapObjectiveColorMode = 'task';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = { 'task-shown': { self: true } };
+    await mountPage();
+    const inlineMap = () => wrapper.get('[data-testid="leaflet-map"]');
+    await inlineMap().get('[data-testid="map-marker-hover"]').trigger('click');
+    expect(inlineMap().attributes('data-highlighted-task')).toBe('task-shown');
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const fullscreenMap = () =>
+      wrapper.get('[data-testid="map-fullscreen-overlay"] [data-testid="leaflet-map"]');
+    expect(fullscreenMap().attributes('data-highlighted-task')).toBe('');
+    await fullscreenMap().get('[data-testid="map-marker-hover"]').trigger('click');
+    expect(fullscreenMap().attributes('data-highlighted-task')).toBe('task-shown');
+    await wrapper.get('[data-testid="map-fullscreen-exit"]').trigger('click');
+    await flushTransition();
+    expect(inlineMap().attributes('data-highlighted-task')).toBe('');
   });
   it('moves user-hidden tasks into their own section and off the map', async () => {
     const shownTask = createDefaultTask({
