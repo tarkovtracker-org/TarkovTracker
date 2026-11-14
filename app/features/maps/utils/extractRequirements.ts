@@ -33,8 +33,8 @@ type Options = {
   extract: MapExtract;
   mode: string;
   t: Translate;
-  /** Overlay extract rules and cues (or the bundled copy until the overlay answers). */
-  data: ExtractRuleData;
+  /** Overlay extract rules and cues; `null` until they load or while the overlay is unavailable. */
+  data: ExtractRuleData | null;
   itemName?: (id: string) => string | undefined;
   /** Formats counts in the app's selected locale; defaults to the runtime locale. */
   formatNumber?: (count: number) => string;
@@ -173,13 +173,22 @@ function appendRule(
   addTag('conditional');
   details.push({ tag: 'conditional', text: text(options, 'vehicle_detail') });
 }
-/** Game-definition rules, then curated cues; absence never means an extract is open. */
+/** Captured game rules; undefined without rule data or without a capture for the mode. */
+const capturedRules = ({ data, mapId, extract, mode }: Options): Rule[] | undefined =>
+  data ? extractRulesForMode(data, { mapId, extractId: extract.id }, mode) : undefined;
+const curatedCues = ({ data, mapId, extract }: Options): Rule[] =>
+  own(own(data?.cues, mapId), extract.id)?.cues ?? [];
+/**
+ * Game-definition rules, then curated cues; absence never means an extract is open. Without rule
+ * data (still loading, or the overlay is unavailable) every extract reads as unknown.
+ */
 function extractRules(options: Options): Rule[] {
-  const { data, mapId, extract } = options;
-  const captured = extractRulesForMode(data, { mapId, extractId: extract.id }, options.mode);
-  const cues = own(own(data.cues, mapId), extract.id)?.cues ?? [];
-  const rules: Rule[] = [...(captured ?? [{ type: 'unknown' }]), ...cues];
-  if (!rules.some((rule) => rule.type === 'transfer')) rules.push(...fallbackTransfer(extract));
+  const rules: Rule[] = [
+    ...(capturedRules(options) ?? [{ type: 'unknown' }]),
+    ...curatedCues(options),
+  ];
+  if (!rules.some((rule) => rule.type === 'transfer'))
+    rules.push(...fallbackTransfer(options.extract));
   return rules.filter((rule) => appliesInMode(rule, options));
 }
 export function getExtractRequirements(options: Options): ExtractRequirements {
@@ -194,8 +203,9 @@ export function getExtractRequirements(options: Options): ExtractRequirements {
 export function getExtractDataSource(
   mapId: string,
   mode: string,
-  data: ExtractRuleData
+  data: ExtractRuleData | null
 ): ExtractDataSource | undefined {
+  if (!data) return undefined;
   const source = extractRuleSource(data, mode);
   if (!source || !own(data.requirements.maps, mapId)) return undefined;
   return {

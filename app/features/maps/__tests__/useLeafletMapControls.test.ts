@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 import maps from '@/data/maps.json';
+import {
+  resetExtractRuleData,
+  useExtractRuleData,
+} from '@/features/maps/composables/useExtractRuleData';
 import { useLeafletMapControls } from '@/features/maps/composables/useLeafletMapControls';
 import { getExtractGlyphKind } from '@/features/maps/utils/markerGlyphs';
+import extractRuleFixture from '@/utils/__tests__/fixtures/extractRuleData.json';
 import type { TarkovMap } from '@/types/tarkov';
+const { mockTarkovApiFetch } = vi.hoisted(() => ({ mockTarkovApiFetch: vi.fn() }));
+vi.mock('@/utils/tarkovApiFetch', () => ({ tarkovApiFetch: mockTarkovApiFetch }));
+afterEach(() => {
+  resetExtractRuleData();
+  mockTarkovApiFetch.mockReset();
+});
 const createPreferencesStore = () => {
   const state = {
     mapPanSpeed: 1,
@@ -54,7 +65,7 @@ const createPreferencesStore = () => {
   };
 };
 describe('useLeafletMapControls', () => {
-  it('keeps translated co-op extracts under the same glyph and layer toggle', () => {
+  it('keeps translated co-op extracts under the same glyph and layer toggle', async () => {
     const extract = {
       id: '44bd9f5882e7a6044c3d6e15abb6560306575d96',
       name: 'Scav Camp (Koop)',
@@ -66,6 +77,11 @@ describe('useLeafletMapControls', () => {
       preferencesStore: createPreferencesStore(),
       t: (key) => key,
     });
+    // The translated name does not match the co-op pattern, so only the loaded rules classify it.
+    expect(getExtractGlyphKind(extract)).toBe('shared');
+    mockTarkovApiFetch.mockResolvedValue({ data: extractRuleFixture });
+    useExtractRuleData();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(getExtractGlyphKind(extract)).toBe('coop');
     expect(controls.hasCoopExtracts.value).toBe(true);
     expect(controls.hasSharedExtracts.value).toBe(false);

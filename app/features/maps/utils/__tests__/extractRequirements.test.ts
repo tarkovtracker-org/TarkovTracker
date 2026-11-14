@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createI18n } from 'vue-i18n';
-import bundledCues from '@/data/extractCues.json';
-import bundledRequirements from '@/data/extractRequirements.json';
 import {
   appendExtractRequirementTags,
   createExtractDetails,
@@ -11,6 +9,7 @@ import {
   type ExtractRequirements,
 } from '@/features/maps/utils/extractRequirements';
 import en from '@/locales/en.json';
+import fixture from '@/utils/__tests__/fixtures/extractRuleData.json';
 import type { MapExtract } from '@/types/tarkov';
 import type { ExtractRuleData } from '@/utils/extractRuleData';
 const i18n = createI18n<[typeof en], 'en', false>({
@@ -25,9 +24,14 @@ const vehicle: MapExtract = {
   name: 'Police Cordon V-Ex',
   transferItem: { item: '5449016a4bdc2d6f028b456f', count: 20000 },
 };
-const data = { requirements: bundledRequirements, cues: bundledCues } as ExtractRuleData;
-const inspect = (mapId: string, extract: MapExtract, mode = 'pvp', ruleData = data) =>
-  getExtractRequirements({ mapId, extract, mode, t, data: ruleData });
+/** A subset of a published overlay's extract sections, covering the extracts tested here. */
+const data = fixture as ExtractRuleData;
+const inspect = (
+  mapId: string,
+  extract: MapExtract,
+  mode = 'pvp',
+  ruleData: ExtractRuleData | null = data
+) => getExtractRequirements({ mapId, extract, mode, t, data: ruleData });
 /** Every popup row's instruction and qualifier, as one searchable string. */
 const copy = (result: ExtractRequirements) =>
   result.details.map((entry) => [entry.text, entry.hint].join(' ')).join(' ');
@@ -148,6 +152,26 @@ describe('extract requirements', () => {
       }).tags.map((tag) => tag.key)
     ).toEqual(['unknown']);
   });
+  it('reads every extract as unknown, never as unrestricted, before rule data is available', () => {
+    const cliff = { id: 'c22a209b9f46247ff2d5376595377db3908d53fa', name: 'Cliff Descent' };
+    const missing = inspect('5704e5fad2720bc05b8b4567', cliff, 'pvp', null);
+    expect(missing.tags.map((tag) => tag.key)).toEqual(['unknown']);
+    expect(missing.details).toEqual([
+      { tag: 'unknown', text: 'Requirements unknown. Check in raid.', hint: undefined },
+    ]);
+    expect(copy(missing)).not.toContain('No requirements listed');
+    // Curated cues arrive with the rules, so none show without them.
+    const sniper = { id: '22f281b913a76b31fe574b792b65c115fd8bb656', name: 'Mira Avenue' };
+    expect(inspect(groundZero, sniper, 'pvp', null).tags.map((tag) => tag.key)).toEqual([
+      'unknown',
+    ]);
+    // The tarkov.dev transfer cost still shows beside the unknown cue.
+    const priced = inspect(groundZero, vehicle, 'pvp', null);
+    expect(priced.tags.map((tag) => tag.key)).toEqual(['unknown', 'money']);
+    expect(copy(priced)).toContain(`Pay ${amount(20000)} roubles`);
+    // Without rule data there is no capture to name, so the map omits its source line.
+    expect(getExtractDataSource(groundZero, 'pvp', null)).toBeUndefined();
+  });
   it('shows requirement icons without hover and creates safe compact details with a live-status note', () => {
     const requirements = inspect(groundZero, vehicle);
     const pin = document.createElement('div');
@@ -175,14 +199,14 @@ describe('extract requirements', () => {
     const regular = getExtractDataSource(groundZero, 'pvp', data);
     expect(regular).toEqual({
       clientVersion: '1.3.0.0',
-      clientBuild: bundledRequirements.sources.regular.clientBuild,
+      clientBuild: fixture.requirements.sources.regular.clientBuild,
       curatedCues: true,
     });
     // PvE reads the regular definitions' PvE fields, so it shares the regular capture.
     expect(getExtractDataSource(groundZero, 'pve', data)).toEqual(regular);
     expect(getExtractDataSource(groundZero, 'seasonal', data)).toEqual({
       clientVersion: '1.3.0.1',
-      clientBuild: bundledRequirements.sources['pvp-season'].clientBuild,
+      clientBuild: fixture.requirements.sources['pvp-season'].clientBuild,
       curatedCues: true,
     });
     // Maps without curated cues say so; no capture dates are published.
