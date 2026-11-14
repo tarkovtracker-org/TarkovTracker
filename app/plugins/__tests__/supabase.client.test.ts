@@ -297,14 +297,17 @@ describe('supabase plugin', () => {
       vi.useRealTimers();
     }
   });
-  it('exchanges an oauth callback code when ready is called', async () => {
+  it.each([
+    ['/auth/callback', '?redirect=%2Ftasks', ''],
+    ['/settings', '?discord_linked=1', '#account'],
+  ])('exchanges an oauth callback code on %s when ready is called', async (path, query, hash) => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
       window.history.replaceState(
         null,
         '',
-        '/auth/callback?code=oauth-code&sb_flow_id=flow-id&redirect=%2Ftasks'
+        `${path}${query}&code=oauth-code&sb_flow_id=flow-id${hash}`
       );
       const exchangeCodeForSession = vi.fn().mockResolvedValue({
         data: { session: createSession('user-code') },
@@ -335,8 +338,9 @@ describe('supabase plugin', () => {
       expect(exchangeCodeForSession).toHaveBeenCalledWith('oauth-code', { flowId: 'flow-id' });
       expect(result?.provide.supabase.user.id).toBe('user-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
-      expect(window.location.pathname).toBe('/auth/callback');
-      expect(window.location.search).toBe('?redirect=%2Ftasks');
+      expect(window.location.pathname).toBe(path);
+      expect(window.location.search).toBe(query);
+      expect(window.location.hash).toBe(hash);
       await result?.provide.supabase.ready();
       expect(getSession).toHaveBeenCalledTimes(2);
       expect(result?.provide.supabase.user.id).toBe('user-refreshed');
@@ -402,11 +406,16 @@ describe('supabase plugin', () => {
       window.history.replaceState(null, '', '/');
     }
   });
-  it('ignores a team invite code outside the auth callback route', async () => {
+  it.each([
+    '/team?team=team-1&code=invite-code',
+    '/settings?code=invite-code',
+    '/settings?discord_linked=0&code=invite-code',
+    '/tasks?discord_linked=1&code=invite-code',
+  ])('ignores an unrelated code on %s', async (path) => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
-      window.history.replaceState(null, '', '/team?team=team-1&code=invite-code');
+      window.history.replaceState(null, '', path);
       const exchangeCodeForSession = vi.fn();
       const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
       mockAuthClient({

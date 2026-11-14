@@ -96,11 +96,14 @@ const createSupabaseUserState = () =>
 const OAUTH_CALLBACK_PATH = '/auth/callback';
 const OAUTH_HASH_TOKEN_KEYS = ['access_token', 'refresh_token', 'error'] as const;
 const currentSearchParams = () => new URLSearchParams(window.location.search || '');
+const isOAuthCodeCallback = (params: URLSearchParams): boolean =>
+  window.location.pathname === OAUTH_CALLBACK_PATH ||
+  (window.location.pathname === '/settings' && params.get('discord_linked') === '1');
 const readOAuthCallbackCode = (): OAuthCallbackCode | null => {
-  if (window.location.pathname !== OAUTH_CALLBACK_PATH) {
+  const searchParams = currentSearchParams();
+  if (!isOAuthCodeCallback(searchParams)) {
     return null;
   }
-  const searchParams = currentSearchParams();
   const code = searchParams.get('code');
   return code ? { code, flowId: searchParams.get('sb_flow_id') || undefined } : null;
 };
