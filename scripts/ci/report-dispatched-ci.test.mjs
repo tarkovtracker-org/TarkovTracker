@@ -197,6 +197,42 @@ describe('rate-limited CI status publication', () => {
     await expect(reportDispatchedCi(f)).rejects.toBe(error);
     expect(f.retry.sleep).not.toHaveBeenCalled();
   });
+  it.each([403, 429])(
+    'does not fall back to secondary retries for exhausted malformed primary quota (%i)',
+    async (status) => {
+      const f = retryClock(fixture());
+      const error = rateLimited(
+        status,
+        {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': 'invalid',
+        },
+        'You have exceeded a secondary rate limit.'
+      );
+      const publish = f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+      await expect(reportDispatchedCi(f)).rejects.toBe(error);
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(f.retry.sleep).not.toHaveBeenCalled();
+    }
+  );
+  it('honors valid Retry-After when an exhausted primary reset is malformed', async () => {
+    const f = retryClock(fixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(
+      rateLimited(
+        403,
+        {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': 'invalid',
+          'retry-after': '2',
+        },
+        'You have exceeded a secondary rate limit.'
+      )
+    );
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(f.retry.sleep).toHaveBeenCalledExactlyOnceWith(2000);
+  });
   it('does not retry authentication errors even when a Retry-After header is present', async () => {
     const f = retryClock(fixture());
     const error = rateLimited(401, { 'retry-after': '1' });

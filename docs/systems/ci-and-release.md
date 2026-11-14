@@ -193,11 +193,10 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   `pull-requests: read` for Crowdin merge attestation. That job checks out
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
-  Rate-limited publication retries at most three times within an eight-minute elapsed budget,
-  honoring both `Retry-After` and primary reset headers; secondary limits without a header use
-  increasing waits starting at one minute. Every retry repeats the revision and policy checks.
-  Resets beyond that budget and persistent or non-rate-limit errors fail the job. The result job
-  has a fifteen-minute timeout to leave room for those waits and the attestation lookups.
+  Rate-limited publication follows the bounded [retry and backoff policy](../../scripts/ci/github-rate-limit.mjs),
+  honoring provider wait instructions. Every retry repeats the revision and policy checks;
+  unsafe waits and persistent or non-rate-limit errors fail the job. The result job's timeout
+  is owned by [the CI workflow](../../.github/workflows/ci.yml).
   All dispatched publishers share one non-cancelling job lock, including all waits and both
   head/merge writes; other events use per-run locks. A shared lock also covers a derived locales
   merge SHA being validated directly by another dispatch. Under that lock, each actual target

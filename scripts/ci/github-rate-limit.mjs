@@ -20,13 +20,18 @@ function secondaryLimit(error) {
   const message = error.response?.data?.message ?? error.message;
   return error.status === 429 || /secondary rate limit|abuse detection/i.test(message);
 }
+function secondaryWait(error, attempt) {
+  // Exhausted primary quota needs a valid reset or Retry-After, never a guessed secondary wait.
+  if (header(error, 'x-ratelimit-remaining') === '0') return null;
+  return secondaryLimit(error) ? 60_000 * 2 ** attempt : null;
+}
 function retryDelay(error, now, attempt) {
   if (![403, 429].includes(error.status)) return null;
   const waits = [primaryWait(error, now), secondsHeader(error, 'retry-after')].filter(
     Number.isFinite
   );
   if (waits.length) return Math.max(1000, ...waits);
-  return secondaryLimit(error) ? 60_000 * 2 ** attempt : null;
+  return secondaryWait(error, attempt);
 }
 function mayRetry(attempt, delay, elapsed) {
   return [
