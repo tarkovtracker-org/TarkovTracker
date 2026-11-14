@@ -188,10 +188,14 @@ describe('seasonal progress realtime synchronization', () => {
     }
   );
   it.each(
-    GAME_MODE_VALUES.flatMap((mode) => [false, true].map((editLevel) => ({ mode, editLevel })))
+    GAME_MODE_VALUES.flatMap((mode) =>
+      (mode === 'seasonal' ? (['level'] as const) : (['level', 'prestigeLevel'] as const)).flatMap(
+        (field) => [false, true].map((editLevel) => ({ mode, field, editLevel }))
+      )
+    )
   )(
-    'accepts a lower reconnect level while preserving edits made during the read: $mode, edit=$editLevel',
-    async ({ mode, editLevel }) => {
+    'accepts a lower reconnect $field while preserving edits made during the read: $mode, edit=$editLevel',
+    async ({ mode, field, editLevel }) => {
       const { setupRealtimeListener, reconcileRemoteSnapshot } =
         await import('@/stores/tarkov/realtimeListener');
       const result = Promise.withResolvers<unknown>();
@@ -206,18 +210,18 @@ describe('seasonal progress realtime synchronization', () => {
               : result.promise,
         }),
       }));
-      state[mode].level = 7;
+      state[mode][field] = 4;
       state[mode].progressEpoch = 1;
       await setupRealtimeListener(store);
       const refresh = reconcileRemoteSnapshot();
       state[mode].displayName = 'edited during read';
-      if (editLevel) state[mode].level = 3;
+      if (editLevel) state[mode][field] = 3;
       result.resolve({
         data: [
           {
             game_mode: mode,
             season_number: getGameModeSeasonNumber(mode),
-            progress_data: { ...structuredClone(defaultState[mode]), level: 2, progressEpoch: 1 },
+            progress_data: { ...structuredClone(defaultState[mode]), [field]: 2, progressEpoch: 1 },
             updated_at: '2026-10-05T12:00:00Z',
             progress_updated_at: '2026-10-05T12:00:00Z',
           },
@@ -226,12 +230,49 @@ describe('seasonal progress realtime synchronization', () => {
       });
       await refresh;
       expect(state[mode]).toMatchObject({
-        level: editLevel ? 3 : 2,
+        [field]: editLevel ? 3 : 2,
         displayName: 'edited during read',
         progressEpoch: 1,
       });
     }
   );
+  it.each([{}, { prestigeLevel: null }, { prestigeLevel: '2' }])(
+    'does not turn incomplete prestige data into a correction: %j',
+    async (partial) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      state.pvp.prestigeLevel = 4;
+      state.pvp.progressEpoch = 1;
+      await setupRealtimeListener(store);
+      handlers.get('user_game_mode_progress')?.({
+        new: {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { level: 2, progressEpoch: 1, ...partial },
+          updated_at: '2026-10-05T12:00:00Z',
+        },
+      });
+      expect(state.pvp.prestigeLevel).toBe(4);
+    }
+  );
+  it.each(['pvp', 'pve'] as const)('accepts an explicit live %s prestige clear', async (mode) => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    state[mode].prestigeLevel = 4;
+    state[mode].progressEpoch = 1;
+    await setupRealtimeListener(store);
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: mode,
+        season_number: 0,
+        progress_data: {
+          ...structuredClone(defaultState[mode]),
+          prestigeLevel: 0,
+          progressEpoch: 1,
+        },
+        updated_at: '2026-10-05T12:00:00Z',
+      },
+    });
+    expect(state[mode]).toMatchObject({ prestigeLevel: 0, progressEpoch: 1 });
+  });
   it.each(['mode reset', 'metadata'])(
     'acknowledges a direct save when its matching %s echo precedes the RPC response',
     async (scope) => {
