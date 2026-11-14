@@ -53,6 +53,7 @@ function buildEntryUrls(
 export function buildTarkovCacheUrls(origins: string[]): string[] {
   const urls: string[] = [];
   for (const origin of origins) {
+    urls.push(`${origin}/api/tarkov/extract-requirements`);
     for (const entry of TARKOV_CACHE_KEYS)
       urls.push(...buildEntryUrls(`${origin}${EDGE_CACHE_PATH}`, entry));
   }
