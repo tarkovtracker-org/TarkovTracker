@@ -715,13 +715,14 @@ export function useDataBackup(): UseDataBackupReturn {
     const before = listSupersededProgressCopies(owner);
     const fresh = copiesNotYetKept(copies, before);
     const failed = saveSupersededProgressCopies(owner, fresh.map(toCopyInput));
+    // Copies matching stored progress are merged, so count what the list actually gained.
+    const added = listSupersededProgressCopies(owner).length - before.length;
     if (failed > 0) {
       return failImport('settings.data_management.recovery_copies_add_failed', {
-        added: fresh.length - failed,
-        total: fresh.length,
+        added,
+        total: added + failed,
       });
     }
-    const added = listSupersededProgressCopies(owner).length - before.length;
     recoveryCopiesImport.value = { added, alreadyPresent: copies.length - added };
   }
   function applyWorkerReply(reply: BackupReply, owner: string | null): void {

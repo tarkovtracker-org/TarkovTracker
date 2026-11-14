@@ -13,8 +13,6 @@ export const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
 export const SUPERSEDED_ARCHIVE_FORMAT = 'tarkovtracker-superseded-progress' as const;
 // Copies come from this browser's localStorage, so a genuine export stays well below this.
 export const MAX_SUPERSEDED_ARCHIVE_SIZE = 16 * 1024 * 1024;
-// The exporter has no count limit; the file size bounds the work, and this only rejects nonsense.
-const MAX_SUPERSEDED_ARCHIVE_COPIES = 10_000;
 const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
 export interface TarkovTrackerExport {
@@ -406,7 +404,8 @@ export function parseSupersededArchive(
   json: Record<string, unknown>
 ): SupersededArchiveCopy[] | null {
   const raw = supersededArchiveCopies(json);
-  if (!raw || raw.length === 0 || raw.length > MAX_SUPERSEDED_ARCHIVE_COPIES) return null;
+  // Like the exporter, no count limit applies; the file size limit bounds the work.
+  if (!raw || raw.length === 0) return null;
   const copies = raw.map(parseSupersededArchiveCopy);
   return copies.every((copy) => copy !== null) ? (copies as SupersededArchiveCopy[]) : null;
 }

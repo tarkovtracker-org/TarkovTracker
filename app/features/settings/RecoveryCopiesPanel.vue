@@ -19,7 +19,7 @@
     <ul v-if="copies.length" class="space-y-2">
       <SupersededCopyItem
         v-for="copy in copies"
-        :key="copy.id"
+        :key="`${copy.ownerId}:${copy.id}`"
         :copy="copy"
         :backup="backup"
         :locked="locked"

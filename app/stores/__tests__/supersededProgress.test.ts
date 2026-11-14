@@ -47,6 +47,7 @@ describe('superseded progress copies', () => {
   it('saves a batch with one stored-list read and one change notice', () => {
     const existing = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;
     const changed = vi.fn();
+    const reads = vi.spyOn(localStorage, 'getItem');
     window.addEventListener('tt:superseded-progress-change', changed);
     try {
       const failed = saveSupersededProgressCopies('owner-1', [
@@ -55,7 +56,13 @@ describe('superseded progress copies', () => {
         { mode: 'pve', seasonNumber: null, progress, supersededAt: 500 },
       ]);
       expect(failed).toBe(0);
+      // The one stored copy is read once, however many inputs are checked against it.
+      const copyReads = reads.mock.calls.filter(([key]) =>
+        String(key).startsWith(STORAGE_KEYS.progressSupersededPrefix)
+      );
+      expect(copyReads).toHaveLength(1);
     } finally {
+      reads.mockRestore();
       window.removeEventListener('tt:superseded-progress-change', changed);
     }
     expect(changed).toHaveBeenCalledOnce();
@@ -63,6 +70,22 @@ describe('superseded progress copies', () => {
       existing.id,
       'kept-id',
     ]);
+  });
+  it('does not announce a batch that only repeats stored progress', () => {
+    saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100);
+    const changed = vi.fn();
+    window.addEventListener('tt:superseded-progress-change', changed);
+    try {
+      expect(
+        saveSupersededProgressCopies('owner-1', [
+          { mode: 'pvp', seasonNumber: null, progress, supersededAt: 300 },
+        ])
+      ).toBe(0);
+      expect(saveSupersededProgressCopies('owner-1', [])).toBe(0);
+    } finally {
+      window.removeEventListener('tt:superseded-progress-change', changed);
+    }
+    expect(changed).not.toHaveBeenCalled();
   });
   it('discards one copy for its owner and announces the change', () => {
     const kept = saveSupersededProgressCopy('owner-1', 'pvp', null, progress, 100)!;

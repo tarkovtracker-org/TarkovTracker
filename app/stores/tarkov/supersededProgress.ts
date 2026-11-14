@@ -55,17 +55,22 @@ export type SupersededCopyInput = Pick<
   /** A restored file's copy keeps its exported id; new copies get a fresh one. */
   copyId?: string;
 };
-const isSameProgress = (copy: SupersededProgressCopy, input: SupersededCopyInput): boolean =>
-  copy.mode === input.mode &&
-  copy.seasonNumber === (input.mode === 'seasonal' ? input.seasonNumber : null) &&
-  comparableProgress(copy.progress) === comparableProgress(input.progress);
+/** Identifies a copy's progress, so duplicates are found with one lookup instead of a scan. */
+const fingerprintOf = (
+  copy: Pick<SupersededProgressCopy, 'mode' | 'seasonNumber' | 'progress'>
+): string =>
+  `${copy.mode}|${copy.mode === 'seasonal' ? copy.seasonNumber : null}|${comparableProgress(copy.progress)}`;
+type CopyIndex = Map<string, SupersededProgressCopy>;
+const indexCopies = (copies: SupersededProgressCopy[]): CopyIndex =>
+  new Map(copies.map((copy) => [fingerprintOf(copy), copy]));
 /** Writes one copy unless `kept` already holds the same progress; callers announce the change. */
 const retainCopy = (
   ownerId: string,
   input: SupersededCopyInput,
-  kept: SupersededProgressCopy[]
+  kept: CopyIndex
 ): { copy: SupersededProgressCopy; written: boolean } | null => {
-  const existing = kept.find((copy) => isSameProgress(copy, input));
+  const fingerprint = fingerprintOf(input);
+  const existing = kept.get(fingerprint);
   if (existing) return { copy: existing, written: false };
   const copy: SupersededProgressCopy = {
     id: input.copyId ?? `${input.supersededAt}_${Math.random().toString(36).slice(2)}`,
@@ -75,9 +80,12 @@ const retainCopy = (
     supersededAt: input.supersededAt,
     progress: input.progress,
   };
-  if (safeSetItem(copyKey(copy), JSON.stringify(copy))) return { copy, written: true };
-  logger.error('[ProgressRecovery] Could not retain superseded progress');
-  return null;
+  if (!safeSetItem(copyKey(copy), JSON.stringify(copy))) {
+    logger.error('[ProgressRecovery] Could not retain superseded progress');
+    return null;
+  }
+  kept.set(fingerprint, copy);
+  return { copy, written: true };
 };
 /**
  * Retains progress displaced by an intentional reset or a season change. Copies are never restored
@@ -92,7 +100,7 @@ export const saveSupersededProgressCopy = (
   copyId?: string
 ): SupersededProgressCopy | null => {
   const input = { mode, seasonNumber, progress, supersededAt, copyId };
-  const result = retainCopy(ownerId, input, listSupersededProgressCopies(ownerId));
+  const result = retainCopy(ownerId, input, indexCopies(listSupersededProgressCopies(ownerId)));
   if (result?.written) notifyCopyChange();
   return result?.copy ?? null;
 };
@@ -104,15 +112,12 @@ export const saveSupersededProgressCopies = (
   ownerId: string,
   inputs: readonly SupersededCopyInput[]
 ): number => {
-  const kept = listSupersededProgressCopies(ownerId);
-  const failed = inputs.filter((input) => {
-    const result = retainCopy(ownerId, input, kept);
-    if (result?.written) kept.push(result.copy);
-    return result === null;
-  }).length;
-  notifyCopyChange();
-  return failed;
-}; /** Superseded copies are listed only for their owning account. */
+  const kept = indexCopies(listSupersededProgressCopies(ownerId));
+  const results = inputs.map((input) => retainCopy(ownerId, input, kept));
+  if (results.some((result) => result?.written)) notifyCopyChange();
+  return results.filter((result) => result === null).length;
+};
+/** Superseded copies are listed only for their owning account. */
 export const listSupersededProgressCopies = (ownerId: string): SupersededProgressCopy[] =>
   (storageKeys() ?? [])
     .filter((key) => key.startsWith(ownerPrefix(ownerId)))
