@@ -28,7 +28,10 @@ test('CI status serialization rejects missing, cancelled, foreign or broadened l
   ];
   for (const changed of mutations) {
     assert.notEqual(changed, source);
-    assert.throws(() => normalizeQueueWorkflow(changed, filename));
+    assert.throws(
+      () => normalizeQueueWorkflow(changed, filename),
+      /(?:Invalid|Ambiguous) (?:serialized job|CI workflow) concurrency/
+    );
   }
 });
 const block =
