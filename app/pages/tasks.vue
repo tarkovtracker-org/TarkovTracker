@@ -931,6 +931,8 @@
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
     fullscreenInitialFloor.value = undefined;
+    // The fullscreen map unmounts without a mouseout, so drop the hovered quest it reported.
+    setHoveredMapTask(null);
     restoreInlineMapFloor(overlayFloor);
     if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };

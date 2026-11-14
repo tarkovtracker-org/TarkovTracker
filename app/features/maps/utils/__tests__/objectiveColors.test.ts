@@ -114,7 +114,15 @@ describe('assignTaskColors', () => {
     expect([...reordered.entries()].sort()).toEqual([...first.entries()].sort());
     expect(assignTaskColors([...taskIds, taskIds[0]!], palette)).toEqual(first);
   });
-  it('uses a picked color without spending a palette slot on it', () => {
+  it('recolors only the picked quest, even when another quest shares its preferred slot', () => {
+    const palette = MAP_OBJECTIVE_PALETTES.tol_bright;
+    // Both IDs hash to slot 1 of the six-color palette, so 'd' already moved to the next slot.
+    const automatic = assignTaskColors(['b', 'd'], palette);
+    expect([automatic.get('b'), automatic.get('d')]).toEqual([palette[1], palette[2]]);
+    const picked = assignTaskColors(['b', 'd'], palette, { b: '#123456' });
+    expect([picked.get('b'), picked.get('d')]).toEqual(['#123456', palette[2]]);
+  });
+  it('uses a picked color and keeps every other quest color', () => {
     const automatic = assignTaskColors(taskIds, palette);
     const picked = assignTaskColors(taskIds, palette, { [taskIds[0]!]: '#123456' });
     expect(picked.get(taskIds[0]!)).toBe('#123456');

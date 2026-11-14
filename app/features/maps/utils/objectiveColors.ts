@@ -43,16 +43,16 @@ export const normalizeMapObjectiveColorMode = (value: unknown): MapObjectiveColo
   MAP_OBJECTIVE_COLOR_MODES.find((mode) => mode === value) ?? DEFAULT_MAP_OBJECTIVE_COLOR_MODE;
 export const normalizeMapObjectivePalette = (value: unknown): MapObjectivePaletteKey =>
   MAP_OBJECTIVE_PALETTE_KEYS.find((key) => key === value) ?? DEFAULT_MAP_OBJECTIVE_PALETTE;
-/** Per-quest color picks keyed by task ID; drops malformed IDs and colors. */
-export const normalizeMapTaskColors = (value: unknown): Record<string, string> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const colors: Record<string, string> = {};
-  for (const [taskId, color] of Object.entries(value)) {
-    const hex = normalizeHexColor(color);
-    if (taskId.length > 0 && hex) colors[taskId] = hex;
-  }
-  return colors;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+/** One stored pick as `[taskId, #rrggbb]`, or nothing when the ID or color is malformed. */
+const normalizeTaskColorEntry = ([taskId, color]: [string, unknown]): [string, string][] => {
+  const hex = normalizeHexColor(color);
+  return taskId.length > 0 && hex ? [[taskId, hex]] : [];
 };
+/** Per-quest color picks keyed by task ID; drops malformed IDs and colors. */
+export const normalizeMapTaskColors = (value: unknown): Record<string, string> =>
+  isRecord(value) ? Object.fromEntries(Object.entries(value).flatMap(normalizeTaskColorEntry)) : {};
 /** 32-bit FNV-1a, so a quest's preferred palette slot is the same in every session. */
 const hashTaskId = (taskId: string): number => {
   let hash = 0x811c9dc5;
@@ -76,7 +76,8 @@ const compareCodeUnits = (a: string, b: string): number => (a < b ? -1 : Number(
  * One color per quest. Each quest prefers the palette slot its ID hashes to and takes the
  * least-used slot from there, so colors repeat only once the palette is used up. The result
  * depends only on the set of IDs (not their order), so hiding or focusing quests from the same
- * set keeps every color. A user's pick for a quest wins and does not take a palette slot.
+ * set keeps every color. A user's pick for a quest replaces only that quest's color: picked
+ * quests still hold their automatic slot, so picking or resetting one never recolors another.
  */
 export function assignTaskColors(
   taskIds: readonly string[],
@@ -86,14 +87,10 @@ export function assignTaskColors(
   const colors = new Map<string, string>();
   const uses = palette.map(() => 0);
   for (const taskId of [...new Set(taskIds)].sort(compareCodeUnits)) {
-    const override = Object.hasOwn(overrides, taskId) ? overrides[taskId] : undefined;
-    if (override) {
-      colors.set(taskId, override);
-      continue;
-    }
     const slot = pickPaletteSlot(uses, hashTaskId(taskId) % palette.length);
     uses[slot]! += 1;
-    colors.set(taskId, palette[slot]!);
+    const override = Object.hasOwn(overrides, taskId) ? overrides[taskId] : undefined;
+    colors.set(taskId, override ?? palette[slot]!);
   }
   return colors;
 }
