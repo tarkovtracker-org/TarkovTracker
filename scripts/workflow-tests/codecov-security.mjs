@@ -33,6 +33,21 @@ test('profile resolution cannot relay a reusable token, including trusted main b
     assert.equal(buildEnv.CODECOV_USE_OIDC, decision.profile === 'production' ? 'true' : '');
   }
 });
+test('reporting outages cannot disable authoritative test or coverage failures', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const tests = jobBlock(workflow, 'test');
+  for (const name of ['Upload coverage to Codecov', 'Upload test results to Codecov']) {
+    const upload = workflowStep(tests, name);
+    assert.match(upload, /^ {8}continue-on-error: true$/m);
+    assert.match(upload, /fail_ci_if_error: false/);
+  }
+  assert.doesNotMatch(tests, /^ {4}continue-on-error:/m);
+  assert.doesNotMatch(
+    workflowStep(tests, 'Run shard ${{ matrix.shard }}/${{ matrix.total }}'),
+    /continue-on-error:/
+  );
+  assert.doesNotMatch(jobBlock(workflow, 'coverage'), /continue-on-error:/);
+});
 test('bundle analysis uses supported OIDC without static credential fallback', () => {
   const config = readFileSync('nuxt.config.ts', 'utf8');
   assert.doesNotMatch(config, /process\.env\.CODECOV_TOKEN|uploadToken:/);

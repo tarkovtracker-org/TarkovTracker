@@ -246,6 +246,7 @@ jobs:
           retention-days: 1
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        continue-on-error: true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
@@ -254,6 +255,7 @@ jobs:
           fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
+        continue-on-error: true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
