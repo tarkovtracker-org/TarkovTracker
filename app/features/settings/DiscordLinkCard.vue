@@ -284,6 +284,11 @@
           userId: $supabase.user?.id,
           error,
         });
+        errorMessage.value = t(
+          'settings.discord_link.load_error',
+          'We could not load your Discord account link.'
+        );
+        return;
       }
       await loadLinkWithRetry();
       if (link.value) {

@@ -304,6 +304,8 @@ Discord identity linking returns to `/settings?discord_linked=1#account`. Supaba
 exchanges its PKCE `code` before the card loads the link or synchronizes roles, then removes
 `code` and `sb_flow_id` while preserving the link marker and account tab. Other Settings or team
 invite `code` parameters are not OAuth callbacks.
+If session readiness fails, the card keeps the complete callback URL for a reload/retry and
+does not load the link or synchronize roles with a stale session.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database

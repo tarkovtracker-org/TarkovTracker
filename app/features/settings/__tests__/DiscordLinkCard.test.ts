@@ -218,6 +218,16 @@ describe('DiscordLinkCard', () => {
     expect(replaceMock).toHaveBeenCalledWith({ query: { from: 'profile' }, hash: '#account' });
     expect(wrapper.text()).toContain('Linked as linked-user');
   });
+  it('preserves the complete callback for retry when session readiness fails', async () => {
+    routeState.query = { discord_linked: '1', code: 'unused-code', sb_flow_id: 'flow-id' };
+    routeState.hash = '#account';
+    readyMock.mockRejectedValueOnce(new Error('temporary initialization failure'));
+    const wrapper = await mountCard();
+    expect(maybeSingleMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.discord_link.load_error');
+  });
   it('shows a warning when the linked Discord account has not joined the server', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_user_id: 'discord-123' },
