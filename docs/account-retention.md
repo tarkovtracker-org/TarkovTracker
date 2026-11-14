@@ -64,6 +64,13 @@ recreation of account-owned data.
 
 ## Requested account deletion with billing
 
+Billing clearance serializes with signed subscription recording on the Auth user row and with
+deletion claims on the existing per-user advisory lock. It locks the supporter row before reading
+the complete retained subscription history and rechecks the lease after lock waits. If a mutation
+trigger waits past expiry, clearance raises a retryable error and rolls back its changes. New identities
+or expired claims cannot be silently cleared. Contention may produce a retryable database error;
+the handler keeps the account and returns billing verification unavailable.
+
 Before claiming a deletion job or transferring teams, the Edge Function verifies every retained
 subscription and every page of the linked customer's subscription history through Stripe. Only
 permanently ended `canceled` or `incomplete_expired` subscriptions can proceed. Scheduling
