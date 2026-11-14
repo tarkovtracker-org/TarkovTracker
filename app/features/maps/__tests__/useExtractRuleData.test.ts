@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  BUNDLED_EXTRACT_RULE_DATA,
   currentExtractRuleData,
   resetExtractRuleData,
   useExtractRuleData,
 } from '@/features/maps/composables/useExtractRuleData';
 import { isCoopExtract } from '@/features/maps/composables/useLeafletMapControls';
-import { isExtractRuleData } from '@/utils/extractRuleData';
 const { mockTarkovApiFetch } = vi.hoisted(() => ({ mockTarkovApiFetch: vi.fn() }));
 vi.mock('@/utils/tarkovApiFetch', () => ({ tarkovApiFetch: mockTarkovApiFetch }));
 const overlayData = {
@@ -22,11 +20,13 @@ afterEach(() => {
   mockTarkovApiFetch.mockReset();
 });
 describe('extract rule data', () => {
-  it('ships a valid bundled copy in the overlay format', () => {
-    expect(isExtractRuleData(BUNDLED_EXTRACT_RULE_DATA)).toBe(true);
-    expect(currentExtractRuleData()).toBe(BUNDLED_EXTRACT_RULE_DATA);
+  it('starts with no rule data instead of a bundled copy', () => {
+    expect(currentExtractRuleData()).toBeNull();
+    // Before the rules load, co-op classification falls back to the extract name.
+    expect(isCoopExtract({ id: 'new-coop', name: 'Gate' })).toBe(false);
+    expect(isCoopExtract({ id: 'new-coop', name: 'Scav Co-Op Exfil' })).toBe(true);
   });
-  it('requests the overlay copy once and replaces the bundled data with it', async () => {
+  it('requests the overlay copy once and uses it', async () => {
     mockTarkovApiFetch.mockResolvedValue({ data: overlayData });
     const data = useExtractRuleData();
     useExtractRuleData();
@@ -34,7 +34,7 @@ describe('extract rule data', () => {
     expect(mockTarkovApiFetch).toHaveBeenCalledTimes(1);
     expect(mockTarkovApiFetch).toHaveBeenCalledWith('/api/tarkov/extract-requirements');
     expect(data.value).toEqual(overlayData);
-    // Co-op classification follows the current data, not only the bundled copy.
+    // Co-op classification follows the loaded data.
     expect(isCoopExtract({ id: 'new-coop', name: 'Gate' })).toBe(true);
   });
   it.each([
@@ -46,11 +46,12 @@ describe('extract rule data', () => {
         throw new Error('503');
       },
     ],
-  ])('keeps the bundled data for %s', async (_case, response) => {
+  ])('leaves the rule data empty for %s', async (_case, response) => {
     mockTarkovApiFetch.mockImplementation(response);
     const data = useExtractRuleData();
     await flush();
-    expect(data.value).toBe(BUNDLED_EXTRACT_RULE_DATA);
+    expect(mockTarkovApiFetch).toHaveBeenCalledTimes(1);
+    expect(data.value).toBeNull();
     expect(isCoopExtract({ id: 'new-coop', name: 'Gate' })).toBe(false);
   });
   it('classifies co-op extracts per game mode from the same rules the details show', async () => {
