@@ -473,13 +473,14 @@ the capture tooling.
 `GET /api/tarkov/extract-requirements` serves both sections together for every mode
 ([overlay ownership](./overlay-and-precompute.md#endpoint-ownership-and-precedence)). Its `data`
 is null until the overlay publishes valid sections, and the route returns 503 without an overlay.
-`useExtractRuleData` starts from a bundled copy of the same sections in `app/data/`
-(`extractRequirements.json`, `extractCues.json`), requests the route once per page load, and
-replaces the copy only with a payload that passes the shared `app/utils/extractRuleData.ts`
-checks. The map redraws extract pins and the source line when it does. Co-op classification
-reads the same data. The bundled copy is a fallback for rollout and local runs without
-`OVERLAY_TOKEN`; it is removed once production serves the overlay sections
-([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)).
+`useExtractRuleData` requests the route once per page load and holds no rule data until a
+payload passes the shared `app/utils/extractRuleData.ts` checks; the app ships no bundled copy
+([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)). Without rule data
+(still loading, a null `data`, a malformed payload, or an unavailable overlay, including local
+runs without `OVERLAY_TOKEN`) every extract shows the unknown-requirements cue plus any tarkov.dev
+transfer cost, never the "No requirements listed" line, and the map omits the source line. Co-op
+classification then falls back to the extract name. The map redraws extract pins and the source
+line when the data arrives.
 
 Rules shared by the Regular and Seasonal captures sit in `rules`; otherwise `pvp` and `seasonal`
 keep their own lists, and a mode without a capture has no rules (an unknown-requirements cue).
@@ -508,8 +509,7 @@ unconfirmed color for Path to River; green smoke for
 [Old Gas Station](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point);
 and the Factory emergency exit key beside ZB-013's activation requirement. Smoke is an
 availability signal, not a flare the player must bring. Additional activation steps and cues are
-not invented when data is missing. Refresh both sections in the overlay, never by hand-editing
-the app's bundled copy.
+not invented when data is missing. Refresh both sections in the overlay; the app keeps no copy.
 
 ## Map markers, legend, and sizing
 
