@@ -62,6 +62,40 @@ security, deletion-audit, and limited backup records may have separate lawful re
 Auth deletion does not immediately invalidate an already issued JWT; account foreign keys prevent
 recreation of account-owned data.
 
+## Requested account deletion with billing
+
+Before claiming a deletion job or transferring teams, the Edge Function verifies every retained
+subscription and every page of the linked customer's subscription history through Stripe. Only
+permanently ended `canceled` or `incomplete_expired` subscriptions can proceed. Scheduling
+cancellation at period end, expired benefits, past-due payments and disqualification do not
+authorize deletion. Lookup errors fail closed. Active subscribers keep their account and paid
+time; they can select **Manage subscription** on the Supporter page and return after it ends.
+
+An Auth `BEFORE DELETE` trigger protects every caller, including SQL retry and inactive cleanup,
+while a customer or subscription identity remains. A service-only ledger retains replaced
+subscriptions across customers and entitlement revocation. Signed subscription events record
+identity even when they cannot replace the current entitlement. A service-only RPC compares and
+clears the complete verified identity under the current unexpired deletion claim before team
+cleanup. Changed identities and replaced leases fail closed; failed clearance records a fenced
+job failure so an explicit request can retry without waiting out a live claim.
+
+Claims and billing activation serialize on the Auth row. Existing supporter-row updates can
+already hold their row before reaching that lock, so PostgreSQL may abort a contending transaction
+with retryable `40P01`. Webhook failures remain retryable; Auth deletion retries and records failure
+when exhausted. The failed transaction cannot delete the account or discard its billing identity.
+The concurrency check exercises this outcome as well as both claim/activation orderings.
+
+Deploy the schema before the updated Edge Functions. Previously issued Checkout sessions can
+finish after Auth deletion; webhooks cancel those subscriptions only after Auth confirms absence.
+Auth/Stripe outages retry without assuming absence, and FK races are rechecked. Normal account
+deletion never cancels an active subscription. Customer verification follows all pages and rejects
+a non-advancing cursor; incomplete or failed verification preserves the account.
+
+The ledger captures identities from deployment onward. Previously discarded references on a
+different Stripe customer require separate historical reconciliation before claiming those old
+orphaned subscriptions are repaired. The current customer is checked even if its local subscription
+reference was already cleared. The schema performs no production data backfill.
+
 ## Rollout and operations
 
 Release and verify this change through the [deployment runbook](./runbook.md#deployment).

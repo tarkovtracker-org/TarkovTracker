@@ -35,6 +35,7 @@ import {
   withFreshStripeRoleGrant,
 } from '../_shared/stripeRetention.ts';
 import { oneTimePaymentDate } from '../_shared/stripeOneTime.ts';
+import { cancelDeletedUserSubscription } from '../_shared/account-deletion-billing.ts';
 import {
   getTierPriceConfig,
   isSupporterTier,
@@ -379,6 +380,9 @@ async function activateSubscriptionSupporter(
   discordUserId: string | null,
   source: string
 ): Promise<void> {
+  if (await cancelDeletedUserSubscription(eventClient(), userId, subscription, STRIPE_SECRET_KEY))
+    return;
+  await recordBillingSubscription(userId, subscription.id);
   const existing = await findSupporterBy('user_id', userId);
   const tier = resolveSubscriptionTier(subscription, resolveTier(session.metadata), TIER_PRICE_IDS);
   const record = {
@@ -397,7 +401,8 @@ async function activateSubscriptionSupporter(
     expires_at: null,
     updated_at: new Date().toISOString(),
   };
-  const activated = await upsertSubscriptionSupporter(record, userId);
+  const activated = await upsertSubscriptionSupporter(record, userId, subscription);
+  if (!activated) return;
   await syncActivatedSupporterRoles(activated, { userId, discordUserId, source });
   console.info(
     `[stripe-webhook] Supporter activated (${source}): ${userId} tier=${tier} type=subscription`
@@ -417,14 +422,32 @@ function checkoutCustomerId(
     ].find(Boolean) ?? null
   );
 }
-async function upsertSubscriptionSupporter(record: Record<string, unknown>, userId: string) {
+async function upsertSubscriptionSupporter(
+  record: Record<string, unknown>,
+  userId: string,
+  subscription: StripeSubscription
+) {
   const { data, error } = await eventClient()
     .from('supporters')
     .upsert(record, { onConflict: 'user_id' })
     .select('*')
     .single();
-  if (error) throw new Error(`Failed to upsert supporter for ${userId}: ${error.message}`);
+  if (error) {
+    if (
+      error.code === '23503' &&
+      (await cancelDeletedUserSubscription(eventClient(), userId, subscription, STRIPE_SECRET_KEY))
+    )
+      return null;
+    throw new Error(`Failed to upsert supporter for ${userId}: ${error.message}`);
+  }
   return data;
+}
+async function recordBillingSubscription(userId: string, subscriptionId: string): Promise<void> {
+  const { error } = await eventClient().rpc('record_account_billing_subscription', {
+    p_user_id: userId,
+    p_subscription_id: subscriptionId,
+  });
+  if (error) throw new Error(`Unable to retain subscription identity: ${error.message}`);
 }
 async function fulfillOneTimeSupporter(
   // deno-lint-ignore no-explicit-any
@@ -611,11 +634,29 @@ async function reconcileSubscriptionWithVerifiedHistory(
   contributionDate: string | null = null
 ): Promise<void> {
   const supporter = await findSubscriptionSupporter(subscription);
+  if (!(await retainSubscriptionIdentity(subscription, supporter))) return;
   if (isSupporterDisqualified(supporter)) {
     await revokeSupporter(supporter, true, 'disqualified subscription');
     return;
   }
   await reconcileEligibleSubscription(subscription, supporter, contributionDate);
+}
+async function retainSubscriptionIdentity(
+  subscription: StripeSubscription,
+  supporter: SupporterRow | null
+): Promise<boolean> {
+  const userId = subscriptionBillingUserId(subscription, supporter);
+  if (!userId) return true;
+  if (await cancelDeletedUserSubscription(eventClient(), userId, subscription, STRIPE_SECRET_KEY))
+    return false;
+  await recordBillingSubscription(userId, subscription.id);
+  return true;
+}
+function subscriptionBillingUserId(
+  subscription: StripeSubscription,
+  supporter: SupporterRow | null
+): string | null {
+  return supporter?.user_id || getSubscriptionUserId(subscription);
 }
 async function reconcileEligibleSubscription(
   subscription: StripeSubscription,
@@ -727,34 +768,29 @@ async function reconcileSubscription(
       : 'supporter';
   const hasEverSupported = supporter?.has_ever_supported === true || verifiedHistory;
   const discordUserId = await getDiscordUserId(userId);
-  const { data: reconciled, error } = await eventClient()
-    .from('supporters')
-    .upsert(
-      {
-        user_id: userId,
-        tier: entitlementTier,
-        status,
-        type: 'subscription',
-        stripe_customer_id:
-          getStripeReferenceId(subscription.customer) || supporter?.stripe_customer_id || null,
-        stripe_subscription_id: subscription.id,
-        has_ever_supported: hasEverSupported,
-        ...(verifiedHistory ? { retention_history_verified: true } : {}),
-        ...(contributionDate ? { last_contribution_at: contributionDate } : {}),
-        ...(endedAt ? { subscription_ended_at: endedAt } : {}),
-        discord_user_id: discordUserId || supporter?.discord_user_id || null,
-        amount_total: supporter?.amount_total || 0,
-        started_at: supporter?.started_at || new Date().toISOString(),
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    )
-    .select('*')
-    .single();
-  if (error) {
-    throw new Error(`Failed to update subscription for ${userId}: ${error.message}`);
-  }
+  const reconciled = await upsertSubscriptionSupporter(
+    {
+      user_id: userId,
+      tier: entitlementTier,
+      status,
+      type: 'subscription',
+      stripe_customer_id:
+        getStripeReferenceId(subscription.customer) || supporter?.stripe_customer_id || null,
+      stripe_subscription_id: subscription.id,
+      has_ever_supported: hasEverSupported,
+      ...(verifiedHistory ? { retention_history_verified: true } : {}),
+      ...(contributionDate ? { last_contribution_at: contributionDate } : {}),
+      ...(endedAt ? { subscription_ended_at: endedAt } : {}),
+      discord_user_id: discordUserId || supporter?.discord_user_id || null,
+      amount_total: supporter?.amount_total || 0,
+      started_at: supporter?.started_at || new Date().toISOString(),
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    },
+    userId,
+    subscription
+  );
+  if (!reconciled) return;
   await syncReconciledSubscriptionRoles(reconciled, supporter, {
     userId,
     discordUserId,
@@ -817,9 +853,9 @@ async function removeDeniedStripeRoles(discordUserId: string): Promise<void> {
 }
 // deno-lint-ignore no-explicit-any
 async function handleSubscriptionDeleted(subscription: any): Promise<void> {
-  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
-  if (!supporter) return;
   const currentSubscription = await fetchLatestSubscription(subscription.id);
+  const supporter = await retainedDeletedSupporter(currentSubscription);
+  if (!supporter) return;
   if (hasSubscriptionAccess(currentSubscription)) return;
   if (!(await expireDeletedSubscription(supporter, currentSubscription))) return;
   const current = await findSupporterBy('user_id', supporter.user_id);
@@ -829,6 +865,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
       discordUserId: null,
     });
   console.info(`[stripe-webhook] Subscription expired: ${supporter.user_id}`);
+}
+async function retainedDeletedSupporter(
+  subscription: StripeSubscription
+): Promise<SupporterRow | null> {
+  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
+  return (await retainSubscriptionIdentity(subscription, supporter)) ? supporter : null;
 }
 function hasSubscriptionAccess(subscription: StripeSubscription): boolean {
   return ['active', 'trialing', 'past_due'].includes(String(subscription.status));
@@ -1160,13 +1202,11 @@ async function revokeSupporter(
         has_ever_supported: false,
         tier: 'supporter',
         expires_at: new Date().toISOString(),
-        stripe_subscription_id: null,
       }
     : {
         status: 'expired',
         tier: 'supporter',
         expires_at: new Date().toISOString(),
-        stripe_subscription_id: null,
       };
   const { data, error } = await eventClient()
     .from('supporters')

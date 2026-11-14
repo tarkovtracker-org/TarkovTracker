@@ -17,6 +17,12 @@ import {
   type AccountDeletionClient,
   type DeletionTransitionResult,
 } from '../_shared/account-deletion-lifecycle.ts';
+import {
+  clearEndedDeletionSubscription,
+  DeletionBillingError,
+  endedDeletionSubscription,
+} from '../_shared/account-deletion-billing.ts';
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const createLeaseLostResponse = (req: Request) =>
   createSuccessResponse(
     {
@@ -37,24 +43,11 @@ const createTransitionResponse = async (
   if (result === 'lease_lost') return createLeaseLostResponse(req);
   return createErrorResponse('Failed to update account deletion status.', 500, req);
 };
-// Temporary unconditional maintenance response; remove with the billing-safe handler.
-// Keep the lifecycle below for the cutover without changing its mutation control flow.
-const maintenanceResponse = (req: Request): Response => {
-  const methodError = validateMethod(req, ['POST']);
-  if (methodError) return methodError;
-  const response = createErrorResponse(
-    'Account deletion is temporarily unavailable. Please try again shortly.',
-    503,
-    req
-  );
-  response.headers.set('Retry-After', '60');
-  return response;
-};
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
   try {
-    const methodError = maintenanceResponse(req);
+    const methodError = validateMethod(req, ['POST']); // invoked via POST
     if (methodError) return methodError;
     const authResult = await authenticateUser(req);
     if ('error' in authResult) {
@@ -81,6 +74,8 @@ Deno.serve(async (req) => {
         req
       );
     }
+    // Denial must precede job creation and team transfers; it is not a queued deletion request.
+    const verifiedBilling = await endedDeletionSubscription(supabase, user.id, STRIPE_SECRET_KEY);
     const claim = await claimDeletionJob(supabase, user.id, true);
     if (claim.error) {
       console.error('[account-delete] FATAL: Failed to initialize deletion job tracking:', {
@@ -107,6 +102,7 @@ Deno.serve(async (req) => {
         req
       );
     }
+    await clearClaimedBilling(supabase, user.id, verifiedBilling, claim.claimToken);
     const { data: ownedTeams, error: teamQueryError } = await supabase
       .from('teams')
       .select('id')
@@ -256,7 +252,32 @@ Deno.serve(async (req) => {
       req
     );
   } catch (error) {
-    console.error('[account-delete] Unexpected error:', error);
-    return createErrorResponse('Internal server error', 500, req);
+    return accountDeletionError(error, req);
   }
 });
+async function clearClaimedBilling(
+  client: AccountDeletionClient,
+  userId: string,
+  billing: Awaited<ReturnType<typeof endedDeletionSubscription>>,
+  claimToken: string
+): Promise<void> {
+  try {
+    await clearEndedDeletionSubscription(client, userId, billing, claimToken);
+  } catch (error) {
+    await recordDeletionFailure(
+      client,
+      userId,
+      claimToken,
+      'billing_verification_changed',
+      { stage: 'billing', error: serializeError(error) },
+      '[account-delete]'
+    );
+    throw error;
+  }
+}
+function accountDeletionError(error: unknown, req: Request): Response {
+  if (error instanceof DeletionBillingError)
+    return createErrorResponse(error.code, error.status, req);
+  console.error('[account-delete] Unexpected error:', error);
+  return createErrorResponse('Internal server error', 500, req);
+}
