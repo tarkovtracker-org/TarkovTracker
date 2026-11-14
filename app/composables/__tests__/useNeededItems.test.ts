@@ -213,6 +213,7 @@ const createTarkovStore = () => ({
     return counts[id] ?? 0;
   },
 });
+const neededIds = (items: { id: string }[]) => items.map((item) => item.id);
 const mountedWrappers: Array<ReturnType<typeof mount>> = [];
 afterEach(() => {
   for (const wrapper of mountedWrappers) {
@@ -480,55 +481,43 @@ describe('useNeededItems', () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededTypeView: 'completed' },
       });
-      const filtered = neededItems.filteredItems.value;
-      expect(
-        filtered.every((item) => {
-          if (item.needType === 'taskObjective') {
-            return (item as NeededItemTaskObjective).taskId === 'task-2';
-          }
-          return false;
-        })
-      ).toBe(true);
+      // task-2 (obj-3) is the only completed parent; no hideout module is completed.
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['obj-3']);
     });
     it('filters by tasks only', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededTypeView: 'tasks' },
       });
-      const filtered = neededItems.filteredItems.value;
-      expect(filtered.every((item) => item.needType === 'taskObjective')).toBe(true);
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['obj-1', 'obj-2', 'obj-4']);
     });
     it('filters by hideout only', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededTypeView: 'hideout' },
       });
-      const filtered = neededItems.filteredItems.value;
-      expect(filtered.every((item) => item.needType === 'hideoutModule')).toBe(true);
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['hideout-1', 'hideout-2']);
     });
     it('filters by FIR status', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededItemsFirFilter: 'fir' },
       });
-      const filtered = neededItems.filteredItems.value;
-      expect(filtered.every((item) => item.foundInRaid === true)).toBe(true);
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['obj-1', 'obj-4', 'hideout-2']);
     });
     it('filters by non-FIR status', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededItemsFirFilter: 'non-fir' },
       });
-      const filtered = neededItems.filteredItems.value;
-      expect(filtered.every((item) => !item.foundInRaid)).toBe(true);
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['obj-2', 'hideout-1']);
     });
     it('filters by kappa-required tasks', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededItemsKappaOnly: true },
       });
-      const filtered = neededItems.filteredItems.value;
-      const taskObjectives = filtered.filter((item) => item.needType === 'taskObjective');
-      expect(
-        taskObjectives.every((item) => {
-          return (item as NeededItemTaskObjective).taskId === 'task-kappa';
-        })
-      ).toBe(true);
+      // Hideout needs are not task-gated, so only non-kappa task objectives drop out.
+      expect(neededIds(neededItems.filteredItems.value)).toEqual([
+        'hideout-1',
+        'obj-4',
+        'hideout-2',
+      ]);
     });
     it('filters out task objectives hidden by prestige mapping', async () => {
       const { neededItems } = await setup({
@@ -552,25 +541,30 @@ describe('useNeededItems', () => {
           getShowNonSpecialTasks: false,
         },
       });
-      const filtered = neededItems.filteredItems.value;
-      const taskObjectives = filtered.filter((item) => item.needType === 'taskObjective');
-      expect(
-        taskObjectives.every((item) => (item as NeededItemTaskObjective).taskId === 'task-kappa')
-      ).toBe(true);
+      // Only task-kappa is a special (kappa) task; hideout needs are not task-type gated.
+      expect(neededIds(neededItems.filteredItems.value)).toEqual([
+        'hideout-1',
+        'obj-4',
+        'hideout-2',
+      ]);
     });
     it('filters by search term', async () => {
       const { neededItems, search } = await setup();
       search.value = 'bolts';
-      const filtered = neededItems.filteredItems.value;
-      expect(filtered.every((item) => item.item.name?.toLowerCase().includes('bolt'))).toBe(true);
+      // obj-3 also needs Bolts but belongs to the completed task-2.
+      expect(neededIds(neededItems.filteredItems.value)).toEqual(['obj-1', 'hideout-1']);
     });
     it('hides owned items when enabled', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededItemsHideOwned: true },
       });
-      const filtered = neededItems.filteredItems.value;
-      const fullyOwnedIds = ['obj-4'];
-      expect(filtered.every((item) => !fullyOwnedIds.includes(item.id))).toBe(true);
+      // obj-4 is the only need whose current count (4) meets its required count (4).
+      expect(neededIds(neededItems.filteredItems.value)).toEqual([
+        'obj-1',
+        'obj-2',
+        'hideout-1',
+        'hideout-2',
+      ]);
     });
     it('filters out team-owned items when hideTeamItems is enabled', async () => {
       const { neededItems } = await setup({
@@ -690,20 +684,18 @@ describe('useNeededItems', () => {
   });
   describe('sorting', () => {
     it('sorts by priority in descending order', async () => {
-      const { neededItems, progressStore } = await setup({
+      const { neededItems } = await setup({
         preferencesStore: { getNeededItemsSortBy: 'priority', getNeededItemsSortDirection: 'desc' },
       });
-      const filtered = neededItems.filteredItems.value;
-      const priorities = filtered.map((item) => {
-        if (item.needType === 'taskObjective') {
-          const state = progressStore.tasksState?.[item.taskId];
-          return state === TASK_STATE.ACTIVE ? 3 : state === TASK_STATE.AVAILABLE ? 1 : 0;
-        }
-        // Only station-1 level 1 is the next buildable level; station-2 level 2 is locked.
-        return item.hideoutModule.stationId === 'station-1' ? 2 : 0;
-      });
-      const sortedPriorities = [...priorities].sort((a, b) => b - a);
-      expect(priorities).toEqual(sortedPriorities);
+      // Active tasks (obj-1, obj-2) > buildable station-1 level 1 > available task-kappa >
+      // station-2 level 2, which is not the next level. Ties keep fixture order.
+      expect(neededIds(neededItems.filteredItems.value)).toEqual([
+        'obj-1',
+        'obj-2',
+        'hideout-1',
+        'obj-4',
+        'hideout-2',
+      ]);
     });
     describe('hideout priority', () => {
       const lockedByStation = () => {
@@ -762,18 +754,22 @@ describe('useNeededItems', () => {
         preferencesStore: { getNeededItemsSortBy: 'name', getNeededItemsSortDirection: 'asc' },
       });
       const filtered = neededItems.filteredItems.value;
-      const names = filtered.map((item) => item.item.name ?? '');
-      const sortedNames = [...names].sort((a, b) => a.localeCompare(b));
-      expect(names).toEqual(sortedNames);
+      expect(filtered.map((item) => item.item.name)).toEqual([
+        'Bolts',
+        'Bolts',
+        'CPU',
+        'Screws',
+        'Wires',
+      ]);
+      expect(neededIds(filtered)).toEqual(['obj-1', 'hideout-1', 'hideout-2', 'obj-2', 'obj-4']);
     });
     it('sorts by count in descending order', async () => {
       const { neededItems } = await setup({
         preferencesStore: { getNeededItemsSortBy: 'count', getNeededItemsSortDirection: 'desc' },
       });
       const filtered = neededItems.filteredItems.value;
-      const counts = filtered.map((item) => item.count);
-      const sortedCounts = [...counts].sort((a, b) => b - a);
-      expect(counts).toEqual(sortedCounts);
+      expect(filtered.map((item) => item.count)).toEqual([10, 5, 4, 3, 1]);
+      expect(neededIds(filtered)).toEqual(['hideout-1', 'obj-1', 'obj-4', 'obj-2', 'hideout-2']);
     });
   });
   describe('pooled accepted item objectives', () => {
