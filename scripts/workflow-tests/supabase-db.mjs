@@ -12,6 +12,7 @@ const validations = [
   'run supabase:test:concurrency',
   'run supabase:test:one-time-concurrency',
   'run supabase:test:owner-only-concurrency',
+  'run supabase:test:deletion-billing-concurrency',
   'exec supabase db lint --schema public --fail-on error',
 ];
 function assertDatabaseBoundary(workflow) {

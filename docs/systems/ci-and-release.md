@@ -237,9 +237,10 @@ checkout stays pinned to the validated SHA. The production build still runs in R
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
 - The Supabase DB job uses `scripts/checks/check-supabase-ci.mjs` to give its disposable checkout
-  a unique local project ID and an OS-assigned available TCP port. It verifies that Docker targets
+  a unique local project ID compatible with CLI container names and an OS-assigned available TCP port.
+  Project ID and database port environment overrides fail closed. It verifies that Docker targets
   the runner's local socket, records listener/PID and container ID/name/port ownership, then runs
-  the existing reset, database tests, four concurrency checks, and lint without omissions. Startup
+  the existing reset, database tests, all concurrency checks, and lint without omissions. Startup
   failures record ownership before the existing bounded stop/retry; cleanup targets that CI project.
   Normal and failed completion restore the original config byte for byte; unexpected concurrent
   edits are preserved and fail the check. The developer `pnpm run supabase:check` lifecycle is unchanged.

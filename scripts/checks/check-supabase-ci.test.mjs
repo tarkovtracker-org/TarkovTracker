@@ -46,7 +46,7 @@ describe('isolated CI database configuration', () => {
           const database = createServer();
           await listen(database, selected);
           await close(database);
-          expect(project(configured)).toMatch(/^ci-db-[a-f0-9-]+$/);
+          expect(project(configured)).toMatch(/^ci-[a-f0-9-]+$/);
           return 0;
         },
       });
@@ -79,6 +79,19 @@ describe('isolated CI database configuration', () => {
     expect(new Set(projects).size).toBe(2);
     expect(projects).not.toContain('existing-project');
     expect(await readFile(f.configPath, 'utf8')).toBe(f.source);
+  });
+  it('uses a project ID unchanged by the pinned CLI container-name sanitization', async () => {
+    const f = await configFixture();
+    await withCiDatabaseConfig({
+      ...f,
+      run: async () => {
+        const raw = project(await readFile(f.configPath, 'utf8'));
+        // CLI 2.122.0 docker-ids.ts caps IDs at 40 characters. Concurrency tests use the raw ID.
+        expect(raw.length).toBeLessThanOrEqual(40);
+        expect(raw).toMatch(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/);
+        return 0;
+      },
+    });
   });
   it.each([1, 17])('restores config after validation exits with code %i', async (code) => {
     const f = await configFixture();
@@ -156,6 +169,18 @@ describe('isolated CI database configuration', () => {
     expect(result.stderr).toContain('CI-only wrapper');
     expect(await readFile(f.configPath, 'utf8')).toBe(f.source);
   });
+  it.each(['SUPABASE_PROJECT_ID', 'SUPABASE_DB_PORT'])(
+    'rejects %s overrides before Docker or configuration access',
+    (name) => {
+      const result = spawnSync(process.execPath, ['scripts/checks/check-supabase-ci.mjs'], {
+        env: { ...process.env, CI: 'true', [name]: '12345' },
+        encoding: 'utf8',
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('CI database isolation forbids');
+    }
+  );
 });
 describe('CI Docker target verification', () => {
   it.each(['unix:///var/run/docker.sock', 'npipe:////./pipe/docker_engine'])(

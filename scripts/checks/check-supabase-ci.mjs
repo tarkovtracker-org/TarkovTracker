@@ -31,7 +31,7 @@ function ciConfig(source, port) {
   const database = replaceValue(section[0], DB_PORT, port, 'database port');
   const updated =
     source.slice(0, section.index) + database + source.slice(section.index + section[0].length);
-  return replaceValue(updated, PROJECT, `ci-db-${randomUUID()}`, 'local project ID');
+  return replaceValue(updated, PROJECT, `ci-${randomUUID()}`, 'local project ID');
 }
 function availablePort() {
   return new Promise((resolve, reject) => {
@@ -141,14 +141,21 @@ export async function withCiDatabaseConfig({
     await restoreConfig(configPath, updated, original);
   }
 }
+function requireCiEnvironment() {
+  if (process.env.CI !== 'true')
+    throw new Error('CI-only wrapper; use pnpm run supabase:check locally');
+  if (['SUPABASE_PROJECT_ID', 'SUPABASE_DB_PORT'].some((name) => process.env[name]))
+    throw new Error(
+      'CI database isolation forbids project ID or database port environment overrides'
+    );
+}
 async function main() {
   if (process.argv[2] === '--diagnose') {
     requireLocalDocker();
     return diagnosePort(configuredPort(await readFile(CONFIG, 'utf8')));
   }
   if (process.argv.length > 2) throw new Error('Unexpected Supabase CI argument');
-  if (process.env.CI !== 'true')
-    throw new Error('CI-only wrapper; use pnpm run supabase:check locally');
+  requireCiEnvironment();
   requireLocalDocker();
   process.exitCode = await withCiDatabaseConfig();
 }
