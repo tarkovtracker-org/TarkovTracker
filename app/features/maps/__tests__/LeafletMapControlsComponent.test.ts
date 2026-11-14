@@ -4,7 +4,7 @@ import { nextTick } from 'vue';
 import maps from '@/data/maps.json';
 import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
 import type { TarkovMap } from '@/types/tarkov';
-const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
+const { mapState, mockMapInstance, resetMapMarkerColorsSpy, savedLayers } = vi.hoisted(() => {
   const instance = {
     size: { x: 800, y: 600 },
     zoom: 4.25,
@@ -45,6 +45,8 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
   return {
     mockMapInstance: mapInstance,
     resetMapMarkerColorsSpy: vi.fn(),
+    // Saved Layers rows, shared by every map the test mounts, like the real preferences store.
+    savedLayers: { value: {} as Record<string, boolean> },
     mapState: {
       hasMultipleFloors: false,
       isLoading: false,
@@ -126,6 +128,12 @@ vi.mock('@/stores/usePreferences', () => ({
     setMapTooltipDensity: vi.fn(),
     setMapZoneOpacity: vi.fn(),
     setMapZoomSpeed: vi.fn(),
+    get getMapLayerVisibility() {
+      return savedLayers.value;
+    },
+    setMapLayerVisible: (key: string, visible: boolean) => {
+      savedLayers.value = { ...savedLayers.value, [key]: visible };
+    },
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
@@ -186,6 +194,7 @@ describe('LeafletMap controls', () => {
     mapState.transitLayer = null;
     mapState.fitZoom = null;
     localStorage.clear();
+    savedLayers.value = {};
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
     useLeafletMapOptionsSpy.mockClear();
@@ -235,6 +244,54 @@ describe('LeafletMap controls', () => {
     await wrapper.setProps({ showExtracts: true });
     expect(pressed()).toEqual(['true', 'false', 'true']);
     wrapper.unmount();
+  });
+  it('remembers extract and transit rows across a refresh or page change', async () => {
+    const map = {
+      id: '653e6760052c01c1c805532f',
+      name: 'Ground Zero',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'a',
+          name: 'Crossroads',
+          faction: 'pmc',
+          position: { x: 151.63, y: 24.66, z: -97.46 },
+        },
+        { id: 'b', name: 'Scav exit', faction: 'scav', position: { x: 150, y: 24.66, z: -90 } },
+      ],
+      transits: [
+        {
+          id: 't',
+          description: 'Streets transit',
+          map: 'streets',
+          position: { x: 229.6, y: 16.99, z: 65.36 },
+        },
+      ],
+    } as TarkovMap;
+    const first = await mountMap({ map });
+    const firstRow = await openLayersPanel(first);
+    await firstRow('scav').trigger('click');
+    await firstRow('transit').trigger('click');
+    expect(savedLayers.value).toEqual({ scav: false, transit: false });
+    first.unmount();
+    // The panel remembers being opened; reset that so the helper opens it again.
+    localStorage.removeItem('map_layers_panel_open');
+    // A new map instance stands in for the reload: it starts from the saved rows.
+    const second = await mountMap({ map });
+    const row = await openLayersPanel(second);
+    expect(['pmc', 'scav', 'transit'].map((key) => row(key).attributes('aria-pressed'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ]);
+    // A saved row is the user's choice, so a later default change leaves it alone.
+    await second.setProps({ showExtracts: false });
+    await second.setProps({ showExtracts: true });
+    expect(row('scav').attributes('aria-pressed')).toBe('false');
+    // Show all layers is an explicit choice too, and is remembered.
+    await second.get('[data-testid="map-layers-show-all"]').trigger('click');
+    expect(savedLayers.value).toEqual({ scav: true, transit: true });
+    second.unmount();
   });
   it('combines the legend and layer toggles in one panel that remembers being opened', async () => {
     const wrapper = await mountMap({

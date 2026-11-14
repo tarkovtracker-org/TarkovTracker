@@ -1427,6 +1427,26 @@ describe('usePreferencesStore', () => {
       store.setShowMapExtracts(false);
       expect(store.showMapExtracts).toBe(false);
     });
+    it('remembers Layers rows and lets the extracts default replace only extract rows', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapLayerVisibility).toEqual({});
+      store.setMapLayerVisible('scav', false);
+      store.setMapLayerVisible('transit', false);
+      store.setMapLayerVisible('spawns', true);
+      expect(store.getMapLayerVisibility).toEqual({ scav: false, transit: false, spawns: true });
+      // Changing Show Extracts by Default is an explicit choice, so extract rows follow it again.
+      store.setShowMapExtracts(false);
+      expect(store.getMapLayerVisibility).toEqual({ transit: false, spawns: true });
+    });
+    it('keeps only known boolean Layers rows from saved storage', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        mapLayerVisibility: { pmc: false, transit: 'no', self: false, constructor: true },
+      } as never);
+      expect(sanitized.mapLayerVisibility).toEqual({ pmc: false });
+      expect(
+        sanitizePersistedPreferencesState({ mapLayerVisibility: [] } as never).mapLayerVisibility
+      ).toEqual({});
+    });
     it('should set map zoom speed with valid value', () => {
       const store = usePreferencesStore();
       store.setMapZoomSpeed(2);

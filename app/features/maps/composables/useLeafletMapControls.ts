@@ -2,6 +2,7 @@ import { currentExtractRuleData } from '@/features/maps/composables/useExtractRu
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import { extractRulesForMode } from '@/utils/extractRuleData';
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
+import type { SavedMapLayerVisibility } from '@/features/maps/utils/mapLayerVisibility';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
 type RefLike<T> = { value: T };
@@ -12,6 +13,8 @@ type UseLeafletMapControlsOptions = {
     getMapTooltipDensity: 'default' | 'compact';
     getMapZoneOpacity: number;
     getMapZoomSpeed: number;
+    /** Layers rows the user turned on or off on an earlier visit. */
+    getMapLayerVisibility?: SavedMapLayerVisibility;
     mapPanSpeed?: number;
     setMapMarkerColor: (key: MapMarkerColorKey, value: string) => void;
     setMapPanSpeed: (value: number) => void;
@@ -75,7 +78,8 @@ export function useLeafletMapControls({
     )
   );
   const hasTransits = computed(() => mapTransits.value.length > 0);
-  const showTransits = ref(true);
+  const saved = preferencesStore.getMapLayerVisibility ?? {};
+  const showTransits = ref(saved.transit ?? true);
   const mapPmcSpawns = computed<MapSpawn[]>(() => {
     if (!map.value?.spawns) return [];
     return map.value.spawns.filter((spawn) => {
@@ -85,12 +89,15 @@ export function useLeafletMapControls({
       return Boolean(spawn.position) && Boolean(hasPmcAccess) && Boolean(isPlayerSpawn);
     });
   });
-  const showPmcExtracts = ref(initialShowPmcExtracts ?? showExtracts);
-  const showScavExtracts = ref(initialShowScavExtracts ?? showExtracts);
+  // An explicit page value wins, then the user's saved row, then the default.
+  const showPmcExtracts = ref(initialShowPmcExtracts ?? saved.pmc ?? showExtracts);
+  const showScavExtracts = ref(initialShowScavExtracts ?? saved.scav ?? showExtracts);
   // Shared and co-op extracts used to appear whenever either faction was shown; keep that default.
-  const showSharedExtracts = ref(showPmcExtracts.value || showScavExtracts.value);
-  const showCoopExtracts = ref(showSharedExtracts.value);
-  const showPmcSpawns = ref(initialShowPmcSpawns);
+  const sharedDefault =
+    (initialShowPmcExtracts ?? showExtracts) || (initialShowScavExtracts ?? showExtracts);
+  const showSharedExtracts = ref(saved.shared ?? sharedDefault);
+  const showCoopExtracts = ref(saved.coop ?? sharedDefault);
+  const showPmcSpawns = ref(saved.spawns ?? initialShowPmcSpawns);
   const hasPmcSpawns = computed(() => mapPmcSpawns.value.length > 0);
   // Layers rows mirror drawn markers, so availability only counts extracts with a position.
   const drawableExtracts = computed(() => mapExtracts.value.filter((extract) => extract.position));

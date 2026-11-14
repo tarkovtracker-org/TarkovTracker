@@ -556,9 +556,13 @@ whose faction was not supplied without implying that unknown factions are shared
 extracts have their own toggles and start
 visible when either faction's extracts start visible; extracts without a known faction follow the
 Shared row, which is listed whenever such extracts exist. Extracts start visible or hidden from
-**Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`);
-if that preference changes while a map is open, it applies to every extract row not changed in that
-session. The
+**Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`).
+Turning an extract, transit or spawn row on or off (or using **Show all layers**) is remembered
+across refreshes, page changes and the full-screen map in `mapLayerVisibility`, which is local
+only, like `mapHiddenTaskIds`; `app/features/maps/utils/mapLayerVisibility.ts` owns the row keys.
+A remembered row wins over the default. Changing **Show Extracts by Default** clears remembered
+extract rows so the new default applies; if the preference arrives from account sync while a map
+is open, it applies only to rows without a remembered choice. The
 panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
 in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
 containers narrower than 30rem. Below the rows, collapsible **Objective icons** and **Extract
