@@ -2321,7 +2321,7 @@
       "team_transfer_title": "Team Ownership Transfer",
       "team_transfer_description": "If you own any teams, ownership will be automatically transferred to the oldest member in each team. Teams without other members will be deleted.",
       "security_confirmation_title": "Security Confirmation",
-      "security_confirmation_description": "Account deletion requires typing the exact confirmation phrase below. This action is permanent and cannot be undone.",
+      "security_confirmation_description": "Sign in with your linked provider within five minutes, then type the exact confirmation phrase below. This action is permanent and cannot be undone.",
       "confirm_phrase_value": "DELETE MY ACCOUNT",
       "confirm_phrase_label": "Type \"{phrase}\" to confirm:",
       "confirm_phrase_error": "Please type exactly: {phrase}",
@@ -2340,7 +2340,9 @@
       "go_to_dashboard": "Go to Dashboard",
       "session_changed": "Your signed-in account changed. No further action will be taken in this session.",
       "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
-      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later."
+      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later.",
+      "recent_login_required": "Sign in again with your linked provider, then return to Settings and confirm deletion within five minutes. Your account and device data have been kept.",
+      "sign_in_again": "Sign in again"
     },
     "discord_link": {
       "title": "Discord Account",

@@ -1,4 +1,5 @@
 import type { Database } from './database.types.ts';
+import type { DeletionAuthorization } from './account-deletion-authorization.ts';
 const AUTH_DELETE_MAX_ATTEMPTS = 4;
 const AUTH_DELETE_BASE_DELAY_MS = 300;
 const AUTH_DELETE_MAX_DELAY_MS = 5000;
@@ -270,6 +271,23 @@ export const claimDeletionJob = async (
   const { data, error } = await supabase.rpc('claim_account_deletion_job', {
     p_user_id: userId,
     p_create_if_missing: createIfMissing,
+  });
+  const result = getRpcResult(data);
+  return {
+    claimed: getRpcBoolean(result, 'claimed'),
+    status: getRpcString(result, 'status'),
+    claimToken: getRpcString(result, 'claim_token'),
+    error,
+  };
+};
+export const claimRequestedDeletionJob = async (
+  supabase: AccountDeletionClient,
+  authorization: DeletionAuthorization
+) => {
+  const { data, error } = await supabase.rpc('claim_requested_account_deletion_job', {
+    p_user_id: authorization.userId,
+    p_session_id: authorization.sessionId,
+    p_authenticated_at: authorization.authenticatedAt,
   });
   const result = getRpcResult(data);
   return {
