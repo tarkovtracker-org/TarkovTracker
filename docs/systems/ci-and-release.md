@@ -198,6 +198,11 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   increasing waits starting at one minute. Every retry repeats the revision and policy checks.
   Resets beyond that budget and persistent or non-rate-limit errors fail the job. The result job
   has a fifteen-minute timeout to leave room for those waits and the attestation lookups.
+  Dispatch publication holds a non-cancelling per-commit job lock, including all waits and both
+  head/merge writes; other events use per-run locks. Under that lock, an authenticated GitHub
+  Actions `CI Result` pointing to a newer run of this repository supersedes the older reporter.
+  An older-run rerun remains superseded; rerun the newest dispatch to recover. This prevents a
+  delayed success from overwriting a newer failure, without changing workflow-level ref cancellation.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
   the trusted contract before it can gate. The `security` gate is selected by every plan. For the
   required jobs in `fullJobs` (`scripts/ci/validation-plan.mjs`), every selected job must report

@@ -5,6 +5,10 @@ import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blo
 function assertStatusBoundary(workflow) {
   const job = jobBlock(workflow, 'ci-result');
   assert.match(job, /^ {4}timeout-minutes: 15$/m);
+  assert.match(
+    job,
+    /^ {4}concurrency:\n {6}group: ci-result-\$\{\{ github\.event_name == 'workflow_dispatch' && github\.sha \|\| github\.run_id \}\}\n {6}queue: max\n {6}cancel-in-progress: false$/m
+  );
   const permissions = permissionsBlock(job, '    ')
     .trim()
     .split('\n')
