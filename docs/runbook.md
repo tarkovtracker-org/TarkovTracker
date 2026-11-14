@@ -293,6 +293,11 @@ Before the billing migration, inspect pending/in-progress deletion jobs and the 
 and investigate failures or unexpected activity. This prerequisite does not require manually
 disabling cron: any additional operational intervention needs evidence and separate authority.
 
+The Settings Discord card reads the unique username from the matching Discord auth identity, not
+the display name or cached `discord_username` (which may contain a numeric ID or display name).
+If the username is unavailable, the card shows "Discord account linked" and keeps role sync and
+unlink available.
+
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
 trigger deletes the corresponding `discord_account_links` row and clears the denormalized supporter
