@@ -13,6 +13,13 @@ describe('objective zone outlines', () => {
       { x: 30, y: 25 },
     ];
     expect(zoneScreenSize(ring)).toBe(40);
+    // A tall zone is measured by its height.
+    expect(
+      zoneScreenSize([
+        { x: 10, y: 10 },
+        { x: 14, y: 60 },
+      ])
+    ).toBe(50);
     expect(zoneScreenSize([])).toBe(0);
   });
   it('hides zones that would only peek out around the chip', () => {
