@@ -1,4 +1,10 @@
 import { storeToRefs } from 'pinia';
+import {
+  assignTaskColors,
+  getObjectiveTypeColors,
+  MAP_OBJECTIVE_PALETTES,
+} from '@/features/maps/utils/objectiveColors';
+import { getObjectiveGlyphKind } from '@/features/maps/utils/objectiveGlyphs';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -13,6 +19,10 @@ type MapObjectiveLocation = {
 };
 export type MapObjectiveMark = {
   id?: string;
+  /** Task the objective belongs to; the map highlights a quest's markers together. */
+  taskId?: string;
+  /** Chip fill for the quest or objective-type color modes; category mode leaves it unset. */
+  color?: string;
   /** Upstream objective type; the map draws a glyph for the action it asks for. */
   type?: string;
   zones: MapObjectiveZone[];
@@ -269,6 +279,7 @@ export function useMapObjectiveMarks({
   mapObjectiveVisibility: ComputedRef<ReadonlyMap<string, MapObjectiveVisibility>>;
   mapTaskIds: ComputedRef<string[]>;
   hiddenTaskIds: ComputedRef<ReadonlySet<string>>;
+  mapTaskColors: ComputedRef<ReadonlyMap<string, string>>;
 } {
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -354,8 +365,25 @@ export function useMapObjectiveMarks({
   const shownEntries = computed(() =>
     mapObjectiveEntries.value.filter((entry) => !hiddenTaskIds.value.has(entry.taskId))
   );
+  const palette = computed(() => MAP_OBJECTIVE_PALETTES[preferencesStore.getMapObjectivePalette]);
+  const colorMode = computed(() => preferencesStore.getMapObjectiveColorMode);
+  // Assigned over every quest on the map before hiding, so hiding or focusing keeps colors.
+  const mapTaskColors = computed<ReadonlyMap<string, string>>(() =>
+    colorMode.value === 'task'
+      ? assignTaskColors(mapTaskIds.value, palette.value, preferencesStore.getMapTaskColors)
+      : new Map()
+  );
+  const typeColors = computed(() => getObjectiveTypeColors(palette.value));
+  const markColor = (entry: MapObjectiveEntry): string | undefined => {
+    if (colorMode.value === 'task') return mapTaskColors.value.get(entry.taskId);
+    if (colorMode.value === 'type')
+      return typeColors.value[getObjectiveGlyphKind(entry.mark?.type)];
+    return undefined;
+  };
   const mapObjectiveMarks = computed(() =>
-    shownEntries.value.flatMap((entry) => (entry.mark ? [entry.mark] : []))
+    shownEntries.value.flatMap((entry) =>
+      entry.mark ? [{ ...entry.mark, taskId: entry.taskId, color: markColor(entry) }] : []
+    )
   );
   const mapObjectiveVisibility = computed(
     () => new Map(shownEntries.value.map((entry) => [entry.objectiveId, entry.visibility]))
@@ -365,5 +393,6 @@ export function useMapObjectiveMarks({
     mapObjectiveVisibility,
     mapTaskIds,
     hiddenTaskIds,
+    mapTaskColors,
   };
 }

@@ -535,22 +535,37 @@ zoomed in at least one level past the whole-map fit, or always when **Always sho
 badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
 out of it. The map surface keeps its own keyboard controls.
 
-Objective markers are 26 px raised chips in the task category color (Regular, Pinned, Team): a
-white border, a top highlight, an inner bottom shade, a dark outline and a drop shadow keep them
-readable on light and dark map areas. A zone also gets one at its centre. The white glyph on each
-chip names the action the objective's upstream `type` asks for: visit or locate (eye), plant,
-stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000 Marker
-(beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract (the
-extract pins' exit glyph), and a flag for any other type. `app/features/maps/utils/objectiveGlyphs.ts`
-owns the type mapping, path data, and chip markup. Chips are non-interactive Leaflet markers in
-their own pane above the overlay pane and below the extract pins. Under each chip sits an
-invisible dot of the same size that takes hover, click and the stacked-objective hit test; the
-dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
-when the objective is on another floor and returns to full strength on hover. Its floor badge sits
-2 px to the left of the chip. A zone's outline and fill are drawn only while the zone is at least
-2 chips (52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their
-chip, so no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
+Objective markers are 26 px raised chips: a white border, a top highlight, an inner bottom shade, a
+dark outline and a drop shadow keep them readable on light and dark map areas, whatever their fill
+(the outline doubles with `prefers-contrast: more`). A zone also gets one at its centre. The glyph
+on each chip names the action the objective's upstream `type` asks for: visit or locate (eye),
+plant, stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000
+Marker (beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract
+(the extract pins' exit glyph), and a flag for any other type.
+`app/features/maps/utils/objectiveGlyphs.ts` owns the type mapping, path data, and chip markup. The
+glyph is white or near-black, whichever has the higher WCAG contrast against the fill
+(`colorContrast.ts`), so a light fill never hides it. Chips are non-interactive Leaflet markers in
+their own pane above the overlay pane and below the extract pins. Under each chip sits an invisible
+dot of the same size that takes hover, click and the stacked-objective hit test; the dot (or its
+zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades when the
+objective is on another floor and returns to full strength on hover. Its floor badge sits 2 px to
+the left of the chip. A zone's outline and fill are drawn only while the zone is at least 2 chips
+(52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their chip, so
+no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
 (`app/features/maps/utils/objectiveZoneOutline.ts`).
+
+**Map Colors > Objective colors** (in the map toolbar and **Settings > Maps**) chooses what the fill
+shows (#920): the task **Category** (Regular, Pinned, Team colors; the default), the **Quest**, or
+the **Objective type**. Quest and type colors come from a color-blind-safe palette: Okabe-Ito (7
+colors, the default), Tol bright (6) or Tol muted (9). A test keeps every pair of palette colors
+apart under simulated protanopia, deuteranopia and tritanopia. In Quest mode `assignTaskColors`
+gives each quest the palette slot its task ID hashes to, or the least-used slot after it, over
+`mapTaskIds` (before hiding), so colors only repeat once a map has more quests than the palette has
+colors, and hiding or "show only" never changes them. Type mode colors the seven action types in
+legend order and keeps the generic flag pale grey; the Layers panel's Objective icons key shows
+those colors. Outside Category mode the Regular, Pinned and Team rows still filter markers but show
+a neutral swatch. `app/features/maps/utils/objectiveColors.ts` owns the modes, palettes and
+assignment.
 
 Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
 `app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
@@ -633,6 +648,14 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    (via `LeafletMap`'s `taskVisibilityActions`) edit the single `mapHiddenTaskIds` list. In map view
    `tasks.vue` moves hidden map quests out of the main list into the collapsed
    `MapHiddenTasksSection`, so the list matches the map.
+6. In Quest color mode, `useMapObjectiveMarks` returns `mapTaskColors` and sets each mark's `color`;
+   every mark also carries its `taskId`. `MapTaskVisibilityPanel` then shows a quest legend (shown
+   quests only) and a color picker per quest under **Choose quests**; a picked color replaces the
+   automatic one until it is reset. Hovering or focusing a legend entry, or hovering one of the
+   quest's markers, highlights that quest: its chips grow, its zone outlines show and every other
+   chip fades. Clicking a legend entry keeps the highlight until it is clicked again (for touch
+   screens). `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
+   and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
 
 ### Files
 
@@ -648,6 +671,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/maps/utils/mapTaskVisibility.ts` — hidden-quest helpers and popup action type.
 - `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
   — hide / "show only" controls above the map and on task cards (via `mapTaskVisibilityKey`).
+- `app/features/maps/utils/objectiveColors.ts`, `MapObjectiveColorControls.vue` and
+  `composables/useMapTaskHighlight.ts` — objective color modes, quest colors and quest highlight.
 - `app/features/tasks/MapHiddenTasksSection.vue` — collapsed list section for hidden map quests.
 
 ### Invariants
@@ -682,7 +707,10 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   current map's `mapTaskIds` and un-hides the chosen one; quests unlocked later are shown by
   default. "Show all" un-hides the current map's quests only.
 - `mapHiddenTaskIds` persists in user-scoped local preferences storage and is not part of the
-  Supabase `user_preferences` sync payload (no column exists).
+  Supabase `user_preferences` sync payload (no column exists). The same holds for
+  `mapObjectiveColorMode`, `mapObjectivePalette` and the per-quest `mapTaskColors`.
+- Color is never the only cue: the glyph names the objective type in every color mode, and the quest
+  legend names each quest beside its color.
 - Jumping to an objective of a hidden quest un-hides that quest first so its popup can open.
 - Hovering or clicking an objective marker hit-tests every visible zone and point in container
   pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked

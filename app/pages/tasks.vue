@@ -123,10 +123,16 @@
                       <MapTaskVisibilityPanel
                         :tasks="mapPlanTasks"
                         :hidden-task-ids="hiddenTaskIds"
+                        :task-colors="mapTaskColors"
+                        :highlighted-task-id="highlightedMapTaskId"
+                        :locked-task-id="lockedMapTaskId"
+                        @highlight="setHoveredMapTask"
+                        @toggle-highlight-lock="toggleLockedMapTask"
                       />
                       <LeafletMapComponent
                         ref="leafletMapRef"
                         :task-visibility-actions="mapTaskVisibilityActions"
+                        :highlighted-task-id="highlightedMapTaskId"
                         :map="selectedMapData"
                         :marks="mapObjectiveMarks"
                         :show-extracts="preferencesStore.getShowMapExtracts"
@@ -134,6 +140,7 @@
                         :show-legend="true"
                         :show-fullscreen-toggle="true"
                         :height="mapHeight"
+                        @objective-hover="setHoveredMapTask"
                         @toggle-fullscreen="openMapFullscreen"
                       />
                       <AppTooltip
@@ -516,12 +523,21 @@
             </AppTooltip>
           </div>
           <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
-            <MapTaskVisibilityPanel :tasks="mapPlanTasks" :hidden-task-ids="hiddenTaskIds" />
+            <MapTaskVisibilityPanel
+              :tasks="mapPlanTasks"
+              :hidden-task-ids="hiddenTaskIds"
+              :task-colors="mapTaskColors"
+              :highlighted-task-id="highlightedMapTaskId"
+              :locked-task-id="lockedMapTaskId"
+              @highlight="setHoveredMapTask"
+              @toggle-highlight-lock="toggleLockedMapTask"
+            />
           </div>
           <div v-if="selectedMapData" class="flex min-h-0 flex-1">
             <LeafletMapComponent
               ref="fullscreenLeafletMapRef"
               :task-visibility-actions="mapTaskVisibilityActions"
+              :highlighted-task-id="highlightedMapTaskId"
               :map="selectedMapData"
               :marks="mapObjectiveMarks"
               :show-extracts="preferencesStore.getShowMapExtracts"
@@ -532,6 +548,7 @@
               fill
               :initial-view="fullscreenMapView"
               :initial-floor="fullscreenInitialFloor"
+              @objective-hover="setHoveredMapTask"
               @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
@@ -560,6 +577,7 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
+  import { useMapTaskHighlight } from '@/features/maps/composables/useMapTaskHighlight';
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
   import {
     getHiddenMapTaskIds,
@@ -783,13 +801,24 @@
       (task) => !userHiddenMapTaskIds.value.has(task.id)
     )
   );
-  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds } =
+  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds, mapTaskColors } =
     useMapObjectiveMarks({
       mapId: selectedMapId,
       shouldShowCompletedObjectives,
       shouldShowLockedObjectives,
       tasks: sourceMapTasks,
     });
+  const {
+    highlightedTaskId: highlightedMapTaskId,
+    lockedTaskId: lockedMapTaskId,
+    setHoveredTask: setHoveredMapTask,
+    toggleLockedTask: toggleLockedMapTask,
+  } = useMapTaskHighlight({
+    shownTaskIds: computed(
+      () => new Set(mapTaskIds.value.filter((taskId) => !hiddenTaskIds.value.has(taskId)))
+    ),
+    enabled: computed(() => preferencesStore.getMapObjectiveColorMode === 'task'),
+  });
   const mapPlanTasks = computed(() => {
     const taskIds = new Set(mapTaskIds.value);
     return sourceMapTasks.value.filter((task) => taskIds.has(task.id));
