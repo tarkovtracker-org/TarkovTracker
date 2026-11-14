@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -21,6 +21,7 @@ const { AdmissionPending, admissionDecision, classifyRisk } =
 const { createReviewPublisher, publisherConfig, requireReceiptIssuer } =
   await import('../ci/review-admission-issuer.mjs');
 const { safeLockfileChange } = await import('../ci/review-admission-lock.mjs');
+const { recoverMergedReview } = await import('../ci/review-admission-merged-review.mjs');
 const {
   evaluateAdmission,
   publishReviewAdmission,
@@ -1431,6 +1432,268 @@ function signalFixture(f = publishingFixture()) {
   ];
   return { ...f, run };
 }
+function mergedSignalFixture(event = 'pull_request_review', linked = false) {
+  const f = signalFixture(queuedControlFixture());
+  const repository = {
+    id: 7,
+    full_name: 'example/repo',
+    url: 'https://api.github.com/repos/example/repo',
+  };
+  Object.assign(f.f.pr, {
+    url: 'https://api.github.com/repos/example/repo/pulls/1',
+    state: 'closed',
+    merged: true,
+    merged_at: '2026-11-01T00:00:00Z',
+  });
+  f.f.pr.head.repo = { ...repository };
+  f.f.pr.base.repo = { ...repository };
+  Object.assign(f.run, {
+    event,
+    head_branch: f.f.pr.head.ref,
+    head_repository: { ...repository },
+    repository: { ...repository },
+    pull_requests: linked ? [signalPull()] : [],
+  });
+  f.context.payload = { repository, workflow_run: { ...f.run } };
+  const lookup = { candidates: [structuredClone(f.f.pr)], active: [], reads: [] };
+  const paginate = f.github.paginate;
+  f.github.rest.pulls.list = 'pulls';
+  f.github.paginate = async (endpoint, params) => {
+    if (endpoint !== 'pulls') return paginate(endpoint, params);
+    lookup.reads.push(params);
+    assert.equal(params.base, 'main');
+    assert.equal(params.per_page, 100);
+    if (params.state === lookup.failState) throw new Error('lookup unavailable');
+    if (params.state === 'open') return lookup.active;
+    assert.equal(params.state, 'all');
+    assert.equal(
+      params.head,
+      `${f.run.head_repository.full_name.split('/')[0]}:${f.run.head_branch}`
+    );
+    return lookup.candidates;
+  };
+  return { ...f, lookup };
+}
+test('merged review signals are obsolete without changing statuses or receipts', async () => {
+  for (const event of ['pull_request_review', 'pull_request_review_comment']) {
+    for (const linked of [false, true]) {
+      const f = mergedSignalFixture(event, linked);
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      await withReceiptDirectory(async () => {
+        await runReviewAdmissionStep({ github: f.github, context: f.context, core });
+        assert.equal(existsSync('review-admission-evidence'), false);
+      });
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+      assert.match(core.notices.join('\n'), /merged PR #1.*obsolete/);
+    }
+  }
+});
+test('merged review recovery rejects absent, ambiguous, active and mismatched targets', async (t) => {
+  const sourceError = 'Merged review signal source identity mismatch.';
+  const targetError = 'Merged review signal PR identity mismatch.';
+  const countError = 'Merged review signal target is missing or ambiguous.';
+  const activeError = 'Merged review signal conflicts with an active PR.';
+  const changedError = 'Merged review signal target changed or was not merged.';
+  const cases = [
+    [
+      'missing repository',
+      'Missing review signal repository identity.',
+      (f) => delete f.context.payload.repository,
+    ],
+    ['foreign run repository ID', sourceError, (f) => (f.run.repository.id = 8)],
+    ['foreign run repository URL', sourceError, (f) => (f.run.repository.url += '-other')],
+    ['missing source repository', sourceError, (f) => delete f.run.head_repository],
+    ['invalid source repository ID', sourceError, (f) => (f.run.head_repository.id = 0)],
+    ['foreign source repository ID', targetError, (f) => (f.run.head_repository.id = 8)],
+    ['foreign source repository URL', sourceError, (f) => (f.run.head_repository.url += '-other')],
+    ['missing source branch', sourceError, (f) => delete f.run.head_branch],
+    ['wrong source branch', targetError, (f) => (f.run.head_branch = 'different')],
+    [
+      'synthetic source SHA',
+      targetError,
+      (f) => {
+        f.run.head_sha = 'd'.repeat(40);
+        f.context.payload.workflow_run.head_sha = f.run.head_sha;
+        f.f.jobs[0].head_sha = f.run.head_sha;
+      },
+    ],
+    ['missing target', countError, (f) => (f.lookup.candidates = [])],
+    [
+      'multiple targets',
+      countError,
+      (f) => f.lookup.candidates.push(structuredClone(f.lookup.candidates[0])),
+    ],
+    ['active target', targetError, (f) => (f.lookup.candidates[0].state = 'open')],
+    ['unmerged target', targetError, (f) => (f.lookup.candidates[0].merged_at = null)],
+    ['foreign target URL', targetError, (f) => (f.lookup.candidates[0].url += '-other')],
+    ['foreign base repository', targetError, (f) => (f.lookup.candidates[0].base.repo.id = 8)],
+    ['foreign source repository', targetError, (f) => (f.lookup.candidates[0].head.repo.id = 8)],
+    [
+      'wrong base branch',
+      'Admission only targets main.',
+      (f) => (f.lookup.candidates[0].base.ref = 'develop'),
+    ],
+    ['wrong target branch', targetError, (f) => (f.lookup.candidates[0].head.ref = 'different')],
+    ['wrong target SHA', targetError, (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
+    [
+      'reused active branch',
+      activeError,
+      (f) => {
+        const active = structuredClone(f.f.pr);
+        active.state = 'open';
+        active.head.sha = 'd'.repeat(40);
+        f.lookup.active.push(active);
+      },
+    ],
+    [
+      'same SHA on another active branch',
+      activeError,
+      (f) => {
+        const active = structuredClone(f.f.pr);
+        active.state = 'open';
+        active.head.ref = 'different';
+        f.lookup.active.push(active);
+      },
+    ],
+    ['fresh target reopened', targetError, (f) => (f.f.pr.state = 'open')],
+    ['fresh target unmerged', changedError, (f) => (f.f.pr.merged = false)],
+    [
+      'fresh target number changed',
+      changedError,
+      (f) => {
+        f.f.pr.number = 2;
+        f.f.pr.url = 'https://api.github.com/repos/example/repo/pulls/2';
+      },
+    ],
+    ['fresh target head changed', targetError, (f) => (f.f.pr.head.sha = 'd'.repeat(40))],
+    ['fresh target repository changed', targetError, (f) => (f.f.pr.head.repo.id = 8)],
+    ['lookup API failed', 'lookup unavailable', (f) => (f.lookup.failState = 'all'), ['all']],
+    [
+      'active PR API failed',
+      'lookup unavailable',
+      (f) => (f.lookup.failState = 'open'),
+      ['all', 'open'],
+    ],
+    [
+      'fresh PR API failed',
+      'PR unavailable',
+      (f) => {
+        f.github.rest.pulls.get = async () => {
+          throw new Error('PR unavailable');
+        };
+      },
+      ['all', 'open'],
+    ],
+  ];
+  for (const [name, message, change, expectedReads] of cases) {
+    await t.test(name, async () => {
+      const f = mergedSignalFixture();
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      change(f);
+      await withReceiptDirectory(async () => {
+        await assert.rejects(
+          runReviewAdmissionStep({ github: f.github, context: f.context, core }),
+          { message }
+        );
+        assert.equal(existsSync('review-admission-evidence'), false);
+      });
+      if (expectedReads)
+        assert.deepEqual(
+          f.lookup.reads.map((read) => read.state),
+          expectedReads
+        );
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+      assert.deepEqual(core.notices, []);
+    });
+  }
+});
+test('merged review recovery still authenticates the exact signal run and job first', async (t) => {
+  const cases = [
+    ['run ID', (f) => (f.run.id = 3)],
+    ['attempt', (f) => (f.run.run_attempt = 2)],
+    ['event', (f) => (f.run.event = 'pull_request')],
+    ['workflow', (f) => (f.run.path = '.github/workflows/other.yml')],
+    ['repository', (f) => (f.run.repository.full_name = 'foreign/repo')],
+    ['run conclusion', (f) => (f.run.conclusion = 'failure')],
+    ['job SHA', (f) => (f.f.jobs[0].head_sha = 'd'.repeat(40))],
+    ['job attempt', (f) => (f.f.jobs[0].run_attempt = 2)],
+    ['job run', (f) => (f.f.jobs[0].run_id = 3)],
+    ['missing job', (f) => (f.f.jobs = [])],
+    ['duplicate job', (f) => f.f.jobs.push({ ...f.f.jobs[0] })],
+    ['failed job', (f) => (f.f.jobs[0].conclusion = 'failure')],
+  ];
+  for (const [name, change] of cases) {
+    await t.test(name, async () => {
+      const f = mergedSignalFixture();
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      change(f);
+      await assert.rejects(
+        runReviewAdmissionStep({ github: f.github, context: f.context, core }),
+        /Admission signal/
+      );
+      assert.deepEqual(f.lookup.reads, []);
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+    });
+  }
+});
+test('merged review guard regressions fail when identity protections are removed', async () => {
+  const mutations = [
+    ['unlinkedReview(run)', (f) => (f.run.pull_requests = [signalPull()])],
+    [
+      'sameRepository(run.repository, repository)',
+      (f) => {
+        f.context.payload.repository = { ...f.context.payload.repository, id: 8 };
+      },
+    ],
+    [
+      'sameRepository(pr.base.repo, run.repository)',
+      (f) => {
+        f.lookup.candidates[0].base.repo.id = 8;
+      },
+    ],
+    [
+      'sameRepository(pr.head.repo, run.head_repository)',
+      (f) => {
+        f.lookup.candidates[0].head.repo.id = 8;
+      },
+    ],
+    ['pr.head.ref === run.head_branch', (f) => (f.lookup.candidates[0].head.ref = 'other')],
+    ['pr.head.sha === run.head_sha', (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
+    ["pr.state === 'closed'", (f) => (f.lookup.candidates[0].state = 'open')],
+    ['candidates.length === 1', (f) => f.lookup.candidates.push(structuredClone(f.f.pr))],
+    [
+      '!active.some((pr) => conflictsWithSignal(pr, run))',
+      (f) => {
+        f.lookup.active.push({ ...structuredClone(f.f.pr), state: 'open' });
+      },
+    ],
+    [
+      'current.number === candidate.number',
+      (f) => {
+        f.f.pr.number = 2;
+        f.f.pr.url = 'https://api.github.com/repos/example/repo/pulls/2';
+      },
+    ],
+    ['current.merged === true', (f) => (f.f.pr.merged = false)],
+  ];
+  for (const [guard, change] of mutations) {
+    const f = mergedSignalFixture();
+    change(f);
+    await assert.rejects(recoverMergedReview(f.github, f.context, f.run));
+    // Target the call rather than the function declaration for the event guard.
+    const before = guard === 'unlinkedReview(run)' ? 'requireEvidence(unlinkedReview(run),' : guard;
+    const after = guard === 'unlinkedReview(run)' ? 'requireEvidence(true,' : 'true';
+    const mutant = await importMutationSource('review-admission-merged-review.mjs', before, after);
+    const result = await mutant.recoverMergedReview(f.github, f.context, f.run);
+    assert.equal(result.obsoleteMergedReview, true, guard);
+  }
+});
 test('review signals bind service-owned PR identity independently of signal commit SHA', async () => {
   for (const event of ['pull_request_review', 'pull_request_review_comment']) {
     for (const change of [
@@ -1603,7 +1866,7 @@ test('workflow step still fails for integrity errors and for holds after a recei
       context: identity.context,
       core: stepCore(),
     }),
-    /Signal PR identity is missing or ambiguous/
+    /Missing review signal repository identity/
   );
   // Findings appear after the PR head was admitted but before the queue group is evaluated.
   const raced = signalFixture(queuedControlFixture());
@@ -1740,7 +2003,7 @@ test('provider suites on merge-queue commits select no target and leave every st
 test('signal regression controls detect synthetic-SHA targeting and provider identity bypass', async () => {
   const old = await importMutationSource(
     'review-admission.mjs',
-    'return linkedPullTarget(run.pull_requests, context.repo);',
+    'return [await linkedReviewTarget(github, context, run, target)];',
     'return run.pull_requests.filter(pr => pr.head.sha === run.head_sha).map(pr => ({ number: pr.number }));'
   );
   const f = signalFixture(queuedControlFixture());
