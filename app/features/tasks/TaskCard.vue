@@ -156,6 +156,7 @@
             }}
           </span>
         </div>
+        <TaskTimeGateNote :task="task" />
       </div>
       <!-- 2) Body: objectives (Full Width) -->
       <Transition
@@ -366,6 +367,7 @@
   import TaskCardSectionHeader from '@/features/tasks/TaskCardSectionHeader.vue';
   import TaskRequirementChips from '@/features/tasks/TaskRequirementChips.vue';
   import TaskRequirementSummary from '@/features/tasks/TaskRequirementSummary.vue';
+  import TaskTimeGateNote from '@/features/tasks/TaskTimeGateNote.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';

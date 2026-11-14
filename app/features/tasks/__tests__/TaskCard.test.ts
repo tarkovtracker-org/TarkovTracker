@@ -296,6 +296,31 @@ describe('TaskCard appearance and expansion controls', () => {
     }
     wrapper.unmount();
   });
+  it('shows the stated time-gate delay only for delayed, unfinished tasks', async () => {
+    const normal = await mountTaskCard();
+    expect(normal.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    normal.unmount();
+    const fixed = await mountTaskCard({
+      availableDelaySecondsMin: 36000,
+      availableDelaySecondsMax: 36000,
+    });
+    expect(fixed.get('[data-testid="task-time-gate"]').text()).toBe(
+      'Unlocks 10h after prerequisites are complete'
+    );
+    fixed.unmount();
+    const ranged = await mountTaskCard({
+      availableDelaySecondsMin: 1800,
+      availableDelaySecondsMax: 2100,
+    });
+    expect(ranged.get('[data-testid="task-time-gate"]').text()).toBe(
+      'Unlocks 30m–35m after prerequisites are complete'
+    );
+    ranged.unmount();
+    taskState.complete = true;
+    const completed = await mountTaskCard({ availableDelaySecondsMax: 36000 });
+    expect(completed.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    completed.unmount();
+  });
   it('renders no overflow menu button', async () => {
     const wrapper = await mountTaskCard();
     expect(wrapper.find('[aria-label="More"]').exists()).toBe(false);
