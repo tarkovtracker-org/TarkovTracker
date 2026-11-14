@@ -409,6 +409,38 @@ describe('fetchTarkovJsonEndpoint', () => {
       path: '$.data.items[?(@.name)].name',
     });
   });
+  it.each([null, 7, {}, [], false])('skips a non-string translation path %j', async (path) => {
+    const warn = vi.fn();
+    const items = { item1: { name: 'item.name' } };
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': {
+        data: { items },
+        translations: [path, '$.data.items.*.name'],
+      },
+      'https://json.tarkov.dev/regular/items_en': { data: { 'item.name': 'Bandage' } },
+    });
+    const result = await fetchTarkovJsonEndpoint<{ items: typeof items }>('items', {
+      deps: { fetcher, logger: { warn, error: vi.fn() } },
+    });
+    expect(result.items.item1.name).toBe('Bandage');
+    expect(items.item1.name).toBe('item.name');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unsupported'), { path });
+  });
+  it.each([null, 7, {}, [], false])(
+    'rejects a non-string required season path %j',
+    async (path) => {
+      const fetcher = createFetcher({
+        'https://json.tarkov.dev/regular/season': {
+          data: { name: 'season.name' },
+          translations: [path],
+        },
+        'https://json.tarkov.dev/regular/season_en': { data: { 'season.name': 'Season' } },
+      });
+      await expect(fetchTarkovJsonEndpoint('season', { deps: { fetcher } })).rejects.toThrow(
+        'Unsupported json.tarkov.dev season translation path'
+      );
+    }
+  );
   it('skips own __proto__ keys when walking wildcards', async () => {
     const items = JSON.parse('{"__proto__":{"name":"item.name"},"item1":{"name":"item.name"}}');
     const fetcher = createFetcher({

@@ -315,8 +315,8 @@ function tokenizeTranslationPath(rest: string): TranslationPathSegment[] | null 
 }
 const hasUnsafeName = (segment: TranslationPathSegment) =>
   segment.kind !== 'wildcard' && segment.names.some((name) => UNSAFE_TRANSLATION_KEYS.has(name));
-function parseTranslationPath(path: string): TranslationPathSegment[] | null {
-  if (!path.startsWith('$')) return null;
+function parseTranslationPath(path: unknown): TranslationPathSegment[] | null {
+  if (typeof path !== 'string' || !path.startsWith('$')) return null;
   const segments = tokenizeTranslationPath(path.slice(1));
   if (!segments || segments.some(hasUnsafeName)) return null;
   return segments;
