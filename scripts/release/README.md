@@ -22,13 +22,23 @@ Release now has two phases. `release-run.mjs` runs semantic-release preparation,
 validates the immutable staging head, and creates a version-only PR. It exits successfully
 without tags, publication, queue submission, or a review/queue wait. Normal review admission and
 GitHub's protected merge queue own the merge. `release-promotion-queue.yml` consumes completed
-trusted Review Admission or preparation runs, verifies run-owned receipts and the current reviewed
+preparation runs or explicit admission dispatches, verifies run-owned receipts and the current reviewed
 head, and submits the unchanged generated PR through normal protected merging. Already queued,
 closed, superseded and queue-integration receipts are skipped. Only an observed actual merge can
 dispatch main CI; queue submission is reported as QUEUED and never waits inside a workflow. Release explicitly dispatches trusted main Review
 Admission for the created PR because job-token PR events can be suppressed or need approval. A
 trigger failure reports a retry command; it never counts as approval and cannot authorize publication. The successful preparation run retains
 `release-promotion-<candidate-sha>` proof; PR body text cannot substitute for it.
+
+Review Admission requests promotion only after uploading receipts and publishing approval for a
+canonical generated release PR without a queue-integration receipt. Ordinary, held and integration
+admissions create no promotion run. An isolated job with only `actions: write` dispatches the main
+controller using the admission run ID and attempt as locators; the publisher's permissions and
+protected App key remain unchanged. [GitHub permits job-token workflow dispatches](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
+The controller waits at most 60 seconds for that exact source attempt to finish successfully before
+reading receipts. Failure, timeout or supersession cannot authorize enqueue. Rerun the failed
+promotion run to retry; a superseded attempt needs a new admission. The completed Release wakeup
+remains as a fallback when admission races preparation.
 
 Admission wakeups authenticate the source workflow and attempt before reading its receipt, then
 prove the receipt's `workflowSourceSha` belongs to main history before reading a PR. The event's

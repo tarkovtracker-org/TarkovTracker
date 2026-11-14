@@ -147,10 +147,11 @@ An intake condition also skips ordinary comments before allocating the read-only
 It is a coarse selector, never approval evidence: trusted main still verifies retained events.
 Both current and previous comment bodies are checked so approval edits/deletions and provider
 withdrawals still reach revocation.
-Release-promotion serialization is limited to successful same-repository source runs; the serialized
-job still authenticates receipts and skips runs without an eligible release PR. These no-op runs can
-delay promotions, but their separate lock cannot block admission publication. GitHub may still display
-skipped workflow records; these records perform no validation or publication work.
+Review Admission dispatches release promotion only after publishing approval for a canonical
+generated version PR without a queue-integration receipt. Ordinary, held and integration admissions
+create no promotion workflow run and take no promotion lock. Completed Release runs retain their
+fallback wakeup. The serialized controller authenticates the successful same-repository source
+attempt and receipts, then rechecks live head, main and approval before submission.
 Post-merge main CI remains required by release provenance checks even when queue CI used the same
 commit; it must not be removed without updating and validating those consumers.
 
@@ -211,11 +212,11 @@ Review and review-comment signals are debounced per PR: each waits 45 seconds in
 `cancel-in-progress` group, so a review and its inline comments wake the serialized controller
 once. Cancelled signals are already ignored by the controller's success-only intake, and the
 surviving signal still rereads live evidence, so no review state is lost. Queue and
-provider-suite signals keep unique groups. A coarse prefilter keeps follow-on controllers off
-the shared queue: Release Promotion Queue skips Review Admission runs whose display-only
-`run-name` names an ordinary branch (`wip/release-*`, queue refs, `unscoped` and pre-locator
-titles still wake it; provider-suite admissions stay `unscoped` because their signal runs on
-`main`). The title is not evidence; every retained run is authenticated as before.
+provider-suite signals keep unique groups. Release Promotion Queue no longer subscribes to
+Review Admission completion: a release-only job explicitly dispatches the trusted main controller
+after publication. Display titles do not affect promotion. The controller waits at most 60 seconds
+for the requesting attempt to complete successfully and authenticates its receipts as before;
+[release automation](../scripts/release/README.md#queue-promotion) owns retry and race handling.
 
 Crowdin validates its immutable translation diff without updating a behind branch when queue
 policy is active, as it is now. In `strict-queue` mode (strict freshness and the queue both

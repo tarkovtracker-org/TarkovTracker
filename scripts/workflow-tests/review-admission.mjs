@@ -1362,6 +1362,37 @@ test('publisher cannot turn failed/missing evidence upload into success', async 
     assert.ok(!f.statuses.some((status) => status.state === 'success'));
   });
 });
+function promotionPublishingFixture(kind) {
+  const f = publishingFixture();
+  f.f.pr.user = { id: 41898282, type: 'Bot' };
+  f.f.pr.head.ref = 'wip/release-1.2.4-123-1';
+  if (kind === 'ordinary') f.f.pr.head.ref = 'fix/app';
+  if (kind === 'wrong actor') f.f.pr.user.id = 999;
+  if (kind === 'malformed branch') f.f.pr.head.ref = 'wip/release-untrusted';
+  return f;
+}
+test('publication requests promotion only for a canonical release after every live approval check', async () => {
+  for (const kind of ['release', 'ordinary', 'wrong actor', 'malformed branch', 'revoked']) {
+    await withReceiptDirectory(async () => {
+      const f = promotionPublishingFixture(kind);
+      await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
+      f.context.payload = { pull_request: { number: 1 } };
+      f.f.artifacts = [{ name: `review-admission-${head}`, expired: false }];
+      f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+      if (kind === 'revoked') {
+        f.f.reviews.push(human('CHANGES_REQUESTED'));
+        await assert.rejects(publishReviewScope({ github: f.github, context: f.context, head }));
+        assert.equal(f.statuses.at(-1).state, 'failure');
+      } else {
+        assert.equal(
+          await publishReviewScope({ github: f.github, context: f.context, head }),
+          kind === 'release'
+        );
+        assert.equal(f.statuses.at(-1).state, 'success');
+      }
+    });
+  }
+});
 function signalPull() {
   return {
     number: 1,
@@ -1800,6 +1831,8 @@ test('revoked sensitive approval and changes requested invalidate an already-gre
 test('healthy PR evidence prepares and publishes separate authenticated head and queue receipts', async () => {
   await withReceiptDirectory(async () => {
     const f = queuedControlFixture();
+    f.f.pr.user = { id: 41898282, type: 'Bot' };
+    f.f.pr.head.ref = 'wip/release-1.2.4-123-1';
     const outputs = {};
     f.core.setOutput = (key, value) => {
       outputs[key] = value;
@@ -1812,7 +1845,10 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
       expired: false,
     }));
     f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
-    await publishReviewScope({ github: f.github, context: f.context, head, queued });
+    assert.equal(
+      await publishReviewScope({ github: f.github, context: f.context, head, queued }),
+      false
+    );
     assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'success');
     assert.equal(
       JSON.parse(readFileSync(`review-admission-evidence/${queued}.json`, 'utf8')).headSha,
@@ -1993,8 +2029,8 @@ function importMutationSource(filename, before, after) {
   const source = original
     .replace(before, after)
     .replace(
-      /from '(\.\/[^']+)'/g,
-      (match, path) => `from '${new URL(`../ci/${path.slice(2)}`, import.meta.url).href}'`
+      /from '(\.\.?\/[^']+)'/g,
+      (match, path) => `from '${new URL(path, new URL(`../ci/${filename}`, import.meta.url)).href}'`
     );
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
