@@ -26,12 +26,22 @@
   const confirmationError = ref(false);
   const deleteError = ref('');
   const isDeleting = ref(false);
+  const requiresRecentLogin = ref(false);
+  const deletionDisabled = computed(() =>
+    [!canDelete.value, isDeleting.value, requiresRecentLogin.value].some(Boolean)
+  );
+  const deletionErrorKeys = new Map<unknown, string>([
+    ['account_deletion_subscription_active', 'settings.account_data.subscription_active'],
+    ['account_deletion_billing_unavailable', 'settings.account_data.billing_unavailable'],
+    ['account_deletion_recent_login_required', 'settings.account_data.recent_login_required'],
+  ]);
   const clearDeletionConfirmation = (): void => {
     showConfirmationDialog.value = false;
     confirmationOwner.value = null;
     confirmationText.value = '';
     confirmationError.value = false;
     deleteError.value = '';
+    requiresRecentLogin.value = false;
   };
   watch(
     () => $supabase.user.id,
@@ -242,6 +252,7 @@
       assertRefreshedDeletionOwner(refreshedSession, requestedOwner);
       const { data, error } = await $supabase.client.functions.invoke('account-delete', {
         headers: { Authorization: `Bearer ${refreshedSession.access_token}` },
+        body: { action: 'delete_account' },
       });
       if (data?.success && !ownsDeletionSession(requestedOwner, requestedRevision)) {
         deviceCleanupFailed.value = !(await forgetAccountOnDevice(requestedOwner));
@@ -260,12 +271,10 @@
           }
           if (typeof body === 'object' && 'error' in body) {
             const bodyError = (body as { error?: unknown }).error;
-            if (bodyError === 'account_deletion_subscription_active') {
-              errorMessage = t('settings.account_data.subscription_active');
-              return true;
-            }
-            if (bodyError === 'account_deletion_billing_unavailable') {
-              errorMessage = t('settings.account_data.billing_unavailable');
+            const translationKey = deletionErrorKeys.get(bodyError);
+            if (translationKey) {
+              requiresRecentLogin.value = bodyError === 'account_deletion_recent_login_required';
+              errorMessage = t(translationKey);
               return true;
             }
             if (bodyError) {
@@ -689,6 +698,9 @@
           </div>
         </div>
         <UAlert v-if="deleteError" color="error" variant="soft" :title="deleteError" />
+        <UButton to="/login?redirect=%2Fsettings%23account" color="primary" :disabled="isDeleting">
+          {{ $t('settings.account_data.sign_in_again') }}
+        </UButton>
       </div>
     </template>
     <template #footer="{ close }">
@@ -700,7 +712,7 @@
           color="error"
           variant="solid"
           :loading="isDeleting"
-          :disabled="!canDelete || isDeleting"
+          :disabled="deletionDisabled"
           class="ml-3"
           @click="deletionAction"
         >

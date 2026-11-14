@@ -1447,6 +1447,43 @@ describe('usePreferencesStore', () => {
         sanitizePersistedPreferencesState({ mapLayerVisibility: [] } as never).mapLayerVisibility
       ).toEqual({});
     });
+    it('sets objective color mode and palette, rejecting unknown values', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapObjectiveColorMode).toBe('category');
+      expect(store.getMapObjectivePalette).toBe('okabe_ito');
+      store.setMapObjectiveColorMode('task');
+      store.setMapObjectivePalette('tol_muted');
+      expect(store.getMapObjectiveColorMode).toBe('task');
+      expect(store.getMapObjectivePalette).toBe('tol_muted');
+      store.setMapObjectiveColorMode('rainbow' as never);
+      store.setMapObjectivePalette('neon' as never);
+      expect(store.getMapObjectiveColorMode).toBe('category');
+      expect(store.getMapObjectivePalette).toBe('okabe_ito');
+    });
+    it('pins quest colors and resets one quest or all of them', () => {
+      const store = usePreferencesStore();
+      store.setMapTaskColor('task-a', '#AABBCC');
+      store.setMapTaskColor('task-b', '#010203');
+      store.setMapTaskColor('task-c', 'red');
+      store.setMapTaskColor('', '#010203');
+      expect(store.getMapTaskColors).toEqual({ 'task-a': '#aabbcc', 'task-b': '#010203' });
+      store.clearMapTaskColors(['task-a']);
+      expect(store.getMapTaskColors).toEqual({ 'task-b': '#010203' });
+      store.clearMapTaskColors();
+      expect(store.getMapTaskColors).toEqual({});
+    });
+    it('keeps only valid objective color preferences from saved storage', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        mapObjectiveColorMode: 'rainbow',
+        mapObjectivePalette: 'tol_bright',
+        mapTaskColors: { 'task-a': '#00FF00', 'task-b': 'blue' },
+      } as never);
+      expect(sanitized).toMatchObject({
+        mapObjectiveColorMode: 'category',
+        mapObjectivePalette: 'tol_bright',
+        mapTaskColors: { 'task-a': '#00ff00' },
+      });
+    });
     it('should set map zoom speed with valid value', () => {
       const store = usePreferencesStore();
       store.setMapZoomSpeed(2);

@@ -13,20 +13,22 @@ async function writeToClipboard(text: string): Promise<boolean> {
   } catch (error) {
     logger.warn('[Clipboard] Clipboard API failed, trying fallback:', error);
   }
+  let textarea: HTMLTextAreaElement | undefined;
   try {
-    const textarea = document.createElement('textarea');
+    textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.setAttribute('readonly', 'true');
+    textarea.setAttribute('data-clarity-mask', 'true');
     textarea.style.position = 'fixed';
     textarea.style.left = '-9999px';
     document.body.appendChild(textarea);
     textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return true;
+    return document.execCommand('copy');
   } catch (error) {
     logger.error('[Clipboard] Fallback copy failed:', error);
     return false;
+  } finally {
+    textarea?.remove();
   }
 }
 export function useCopyToClipboard(): UseCopyToClipboardReturn {

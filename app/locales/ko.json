@@ -552,6 +552,67 @@
     }
   },
   "maps": {
+    "extract_requirements": {
+      "raid_notice": "Not live raid status",
+      "source": "Requirements: game data, EFT {version}",
+      "source_curated": "Requirements: game data, EFT {version}, plus curated cues",
+      "source_detail": "From the EFT {build} client's location and global definitions. Base values only; check the in-raid extraction list.",
+      "curated_detail": "Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
+      "no_additional_data": "No requirements listed. Availability is not guaranteed.",
+      "unknown_detail": "Requirements unknown. Check in raid.",
+      "rubles": "roubles",
+      "dollars": "US dollars",
+      "euros": "euros",
+      "paracord": "Paracord",
+      "red_rebel": "Red Rebel ice pick",
+      "zb014_key": "ZB-014 key",
+      "factory_key": "Factory emergency exit key",
+      "key_detail": "Unlock with {item}",
+      "unknown_item": "Required item (name unavailable)",
+      "base_cost": "Pay {count} {item}",
+      "base_cost_hint": "Price varies with reputation",
+      "hand_over": "Hand over {count} × {item}",
+      "bring": "Bring {count} × {item}",
+      "empty_slot": "No {slot} equipped",
+      "equipment_slot": "restricted gear",
+      "backpack_slot": "backpack",
+      "armor_slot": "body armor",
+      "chance_detail": "{percent}% chance to be open",
+      "vehicle_detail": "Vehicle must still be there",
+      "coop_detail": "Needs a PMC and a Scav together",
+      "activation_detail": "Activate first (power, switch, or door)",
+      "green_flare_detail": "Fire a green flare in the signal area first",
+      "flare_detail": "Fire a signal flare first",
+      "green_smoke_detail": "Open when green smoke is visible",
+      "no_backpack_detail": "No backpack equipped",
+      "restriction_detail": "Gear restriction, see in-raid prompt",
+      "train_detail": "Board before the train leaves",
+      "timer_detail": "Opens on a timer",
+      "window_detail": "Window: {min}–{max} into the raid",
+      "legend_title": "Extract icons",
+      "tags": {
+        "key": "Key",
+        "money": "Money",
+        "transfer": "아이템",
+        "gear": "Gear",
+        "no_backpack": "No bag",
+        "no_armor": "No armor",
+        "restriction": "Restriction",
+        "conditional": "Conditional",
+        "coop": "Co-op",
+        "activation": "Activate",
+        "train": "Train",
+        "timer": "Timed",
+        "flare": "Flare",
+        "green_smoke": "Green smoke",
+        "unknown": "알 수 없음"
+      }
+    },
+    "elevation": {
+      "above": "Go up {count} level | Go up {count} levels",
+      "below": "Go down {count} level | Go down {count} levels",
+      "legend": "On another floor (number = floors away)"
+    },
     "tooltip_density": "툴팁",
     "map_settings": "지도 설정",
     "not_available_title": "지도 사용 불가",
@@ -565,13 +626,38 @@
       "pmc": "PMC"
     },
     "layers": {
-      "pmc_spawns": "PMC 스폰"
+      "always_show_names": "Always show names",
+      "coop": "Co-op",
+      "coop_hint": "PMC and Scav together",
+      "groups": {
+        "extracts": "Extracts",
+        "locations": "Locations"
+      },
+      "hidden_count": "{count} hidden",
+      "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
+      "pmc_spawns": "PMC 스폰",
+      "shared_or_unknown": "Shared / unknown",
+      "shared_or_unknown_hint": "Either faction, or faction not supplied",
+      "show_all": "Show all layers",
+      "title": "Layers",
+      "transit": "Transit"
     },
     "legend": {
       "regular": "일반",
-      "pinned": "고정됨",
-      "shared_extract": "공통 추출(양측 세력 모두 가능)",
-      "coop_extract": "협력 추출(PMC + Scav)"
+      "pinned": "고정됨"
+    },
+    "objective_icons": {
+      "legend_title": "Objective icons",
+      "kinds": {
+        "visit": "Visit / locate",
+        "plant": "Plant / stash",
+        "find": "Find / pick up",
+        "mark": "Mark",
+        "shoot": "Eliminate",
+        "use": "Use item",
+        "extract": "Extract",
+        "other": "기타"
+      }
     },
     "tooltips": {
       "zoom_in": "확대",
@@ -610,12 +696,12 @@
       "tooltip_density": "툴팁 표시 밀도"
     },
     "tooltip": {
-      "go_to": "목표로 이동",
       "go_to_in_task_list": "작업 목록에서 목표로 이동",
-      "complete": "목표 완료",
-      "uncomplete": "목표 미완료 처리",
       "objective_unavailable": "목표를 사용할 수 없습니다.",
-      "stacked_objectives": "여기에 목표 {count}개"
+      "stacked_objectives": "여기에 목표 {count}개",
+      "task_list": "Task list",
+      "key": "Key: {key}",
+      "progress": "진행도"
     }
   },
   "page": {
@@ -640,6 +726,15 @@
         "hidden_other": "{count} available tasks are hidden by your filters",
         "complete": "Every visible task is done.",
         "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
+        "storyline": {
+          "chapter": "Storyline · {chapter}",
+          "unlocks": "Unlocks {unlock}",
+          "objective_hint": "Next tracked step · Check Storyline for requirements",
+          "choice": "Review your route choices",
+          "choice_hint": "Open the chapter to compare the alternatives before continuing.",
+          "review": "Review chapter progress",
+          "review_hint": "No next main step is recorded. Check the chapter before marking it complete."
+        },
         "reason": {
           "unlock_trader": "Unlocks {trader}",
           "opens_one": "Opens 1 task",
@@ -953,6 +1048,8 @@
         }
       },
       "no_tasks_found": "작업을 찾을 수 없습니다. 필터를 변경하거나 레벨을 업데이트해 보세요.",
+      "no_available_tasks": "No available tasks right now",
+      "no_available_tasks_description": "Your tracked progress has no available tasks. Review the next steps and unmet requirements below.",
       "no_tasks_found_description": "사용 가능한 작업을 보려면 필터 또는 레벨 요구사항을 조정하세요.",
       "no_search_matches": "No tasks match your search.",
       "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
@@ -1083,6 +1180,13 @@
         "requires_tooltip_conflict": "\"{name}\"은(는) {current}이지만 {expected}이어야 합니다 — 이 작업은 영구적으로 잠길 수 있습니다",
         "objectives_hidden": "이 지도에 없는 목표 {count}개(미완료 {uncompleted}개)",
         "needed_by": "필요 대상: {names}",
+        "time_gate": "Unlocks {duration} after prerequisites are complete",
+        "time_gate_range": "Unlocks {min}–{max} after prerequisites are complete",
+        "time_gate_tooltip": "The game waits this long after the prerequisites are complete before offering this task, so it can look available here before it appears in game. TarkovTracker does not track the remaining time.",
+        "duration_seconds": "{seconds}s",
+        "duration_minutes": "{minutes}m",
+        "duration_hours": "{hours}h",
+        "duration_hours_minutes": "{hours}h {minutes}m",
         "unlocks_next_tooltip": "이 작업을 완료한 후 사용 가능해지는 작업 수",
         "impact_tooltip": "이 작업 완료에 의존하는 미완료 작업 수",
         "reward_items": "아이템:",

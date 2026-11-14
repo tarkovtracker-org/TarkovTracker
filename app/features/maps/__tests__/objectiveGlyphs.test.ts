@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DARK_GLYPH_INK, LIGHT_GLYPH_INK } from '@/features/maps/utils/colorContrast';
 import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
 import {
   createObjectiveGlyphElement,
@@ -57,5 +58,21 @@ describe('objective glyphs', () => {
     });
     expect(offFloor.classList).toContain('opacity-70');
     expect(offFloor.classList).toContain('map-objective-glyph--off-floor');
+  });
+  it('inks the glyph for contrast against the fill and the selected color', () => {
+    const light = createObjectiveGlyphElement('find', {
+      color: '#f0e442',
+      selectedColor: '#7c3bed',
+    });
+    expect(light.style.getPropertyValue('--chip-ink')).toBe(DARK_GLYPH_INK);
+    expect(light.style.getPropertyValue('--chip-ink-shadow')).toBe('rgba(255,255,255,0.55)');
+    expect(light.style.getPropertyValue('--chip-selected-ink')).toBe(LIGHT_GLYPH_INK);
+    const dark = createObjectiveGlyphElement('find', {
+      color: '#0072b2',
+      selectedColor: '#f0e442',
+    });
+    expect(dark.style.getPropertyValue('--chip-ink')).toBe(LIGHT_GLYPH_INK);
+    expect(dark.style.getPropertyValue('--chip-ink-shadow')).toBe('rgba(0,0,0,0.85)');
+    expect(dark.style.getPropertyValue('--chip-selected-ink')).toBe(DARK_GLYPH_INK);
   });
 });

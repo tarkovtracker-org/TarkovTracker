@@ -1002,6 +1002,14 @@ export type Database = {
           status: string
         }[]
       }
+      claim_requested_account_deletion_job: {
+        Args: { p_user_id: string; p_session_id: string; p_authenticated_at: string }
+        Returns: {
+          claim_token: string | null
+          claimed: boolean
+          status: string
+        }[]
+      }
       cleanup_old_deletion_attempts: {
         Args: { retention_days?: number }
         Returns: {

@@ -552,6 +552,67 @@
     }
   },
   "maps": {
+    "extract_requirements": {
+      "raid_notice": "Not live raid status",
+      "source": "Requirements: game data, EFT {version}",
+      "source_curated": "Requirements: game data, EFT {version}, plus curated cues",
+      "source_detail": "From the EFT {build} client's location and global definitions. Base values only; check the in-raid extraction list.",
+      "curated_detail": "Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
+      "no_additional_data": "No requirements listed. Availability is not guaranteed.",
+      "unknown_detail": "Requirements unknown. Check in raid.",
+      "rubles": "roubles",
+      "dollars": "US dollars",
+      "euros": "euros",
+      "paracord": "Paracord",
+      "red_rebel": "Red Rebel ice pick",
+      "zb014_key": "ZB-014 key",
+      "factory_key": "Factory emergency exit key",
+      "key_detail": "Unlock with {item}",
+      "unknown_item": "Required item (name unavailable)",
+      "base_cost": "Pay {count} {item}",
+      "base_cost_hint": "Price varies with reputation",
+      "hand_over": "Hand over {count} × {item}",
+      "bring": "Bring {count} × {item}",
+      "empty_slot": "No {slot} equipped",
+      "equipment_slot": "restricted gear",
+      "backpack_slot": "backpack",
+      "armor_slot": "body armor",
+      "chance_detail": "{percent}% chance to be open",
+      "vehicle_detail": "Vehicle must still be there",
+      "coop_detail": "Needs a PMC and a Scav together",
+      "activation_detail": "Activate first (power, switch, or door)",
+      "green_flare_detail": "Fire a green flare in the signal area first",
+      "flare_detail": "Fire a signal flare first",
+      "green_smoke_detail": "Open when green smoke is visible",
+      "no_backpack_detail": "No backpack equipped",
+      "restriction_detail": "Gear restriction, see in-raid prompt",
+      "train_detail": "Board before the train leaves",
+      "timer_detail": "Opens on a timer",
+      "window_detail": "Window: {min}–{max} into the raid",
+      "legend_title": "Extract icons",
+      "tags": {
+        "key": "Key",
+        "money": "Money",
+        "transfer": "Artykuł 1 1 0 – Ogółem",
+        "gear": "Gear",
+        "no_backpack": "No bag",
+        "no_armor": "No armor",
+        "restriction": "Restriction",
+        "conditional": "Conditional",
+        "coop": "Co-op",
+        "activation": "Activate",
+        "train": "Train",
+        "timer": "Timed",
+        "flare": "Flare",
+        "green_smoke": "Green smoke",
+        "unknown": "Nieznane"
+      }
+    },
+    "elevation": {
+      "above": "Go up {count} level | Go up {count} levels",
+      "below": "Go down {count} level | Go down {count} levels",
+      "legend": "On another floor (number = floors away)"
+    },
     "tooltip_density": "Podpowiedzi",
     "map_settings": "Ustawienia mapy",
     "not_available_title": "Mapa niedostępna",
@@ -565,13 +626,38 @@
       "pmc": "PMC"
     },
     "layers": {
-      "pmc_spawns": "Spawny PMC"
+      "always_show_names": "Always show names",
+      "coop": "Co-op",
+      "coop_hint": "PMC and Scav together",
+      "groups": {
+        "extracts": "Extracts",
+        "locations": "Locations"
+      },
+      "hidden_count": "{count} hidden",
+      "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
+      "pmc_spawns": "Spawny PMC",
+      "shared_or_unknown": "Shared / unknown",
+      "shared_or_unknown_hint": "Either faction, or faction not supplied",
+      "show_all": "Show all layers",
+      "title": "Layers",
+      "transit": "Transit"
     },
     "legend": {
       "regular": "Regularne",
-      "pinned": "Przypięte",
-      "shared_extract": "Ekstrakcja wspólna (dowolna frakcja)",
-      "coop_extract": "Ekstrakcja kooperacyjna (PMC + Scav)"
+      "pinned": "Przypięte"
+    },
+    "objective_icons": {
+      "legend_title": "Objective icons",
+      "kinds": {
+        "visit": "Visit / locate",
+        "plant": "Plant / stash",
+        "find": "Find / pick up",
+        "mark": "Mark",
+        "shoot": "Eliminate",
+        "use": "Use item",
+        "extract": "Extract",
+        "other": "Inni"
+      }
     },
     "tooltips": {
       "zoom_in": "Powiększ",
@@ -610,12 +696,12 @@
       "tooltip_density": "Gęstość podpowiedzi"
     },
     "tooltip": {
-      "go_to": "Przejdź do celu",
       "go_to_in_task_list": "Przejdź do celu na liście zadań",
-      "complete": "Ukończ cel",
-      "uncomplete": "Oznacz cel jako nieukończony",
       "objective_unavailable": "Cel jest niedostępny.",
-      "stacked_objectives": "Cele {count} tutaj"
+      "stacked_objectives": "Cele {count} tutaj",
+      "task_list": "Task list",
+      "key": "Key: {key}",
+      "progress": "Postęp"
     }
   },
   "page": {
@@ -640,6 +726,15 @@
         "hidden_other": "{count} available tasks are hidden by your filters",
         "complete": "Every visible task is done.",
         "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
+        "storyline": {
+          "chapter": "Storyline · {chapter}",
+          "unlocks": "Unlocks {unlock}",
+          "objective_hint": "Next tracked step · Check Storyline for requirements",
+          "choice": "Review your route choices",
+          "choice_hint": "Open the chapter to compare the alternatives before continuing.",
+          "review": "Review chapter progress",
+          "review_hint": "No next main step is recorded. Check the chapter before marking it complete."
+        },
         "reason": {
           "unlock_trader": "Unlocks {trader}",
           "opens_one": "Opens 1 task",
@@ -953,6 +1048,8 @@
         }
       },
       "no_tasks_found": "Nie znaleziono zadań. Spróbuj zmienić filtry lub zaktualizować poziom.",
+      "no_available_tasks": "No available tasks right now",
+      "no_available_tasks_description": "Your tracked progress has no available tasks. Review the next steps and unmet requirements below.",
       "no_tasks_found_description": "Dostosuj filtry lub wymagania poziomu, aby zobaczyć dostępne zadania.",
       "no_search_matches": "No tasks match your search.",
       "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
@@ -1083,6 +1180,13 @@
         "requires_tooltip_conflict": "\"{name}\" ma status {current}, ale wymaga {expected} — to zadanie może być trwale zablokowane",
         "objectives_hidden": "Cele poza tą mapą: {count} ({uncompleted} nieukończonych)",
         "needed_by": "Wymagane przez: {names}",
+        "time_gate": "Unlocks {duration} after prerequisites are complete",
+        "time_gate_range": "Unlocks {min}–{max} after prerequisites are complete",
+        "time_gate_tooltip": "The game waits this long after the prerequisites are complete before offering this task, so it can look available here before it appears in game. TarkovTracker does not track the remaining time.",
+        "duration_seconds": "{seconds}s",
+        "duration_minutes": "{minutes}m",
+        "duration_hours": "{hours}h",
+        "duration_hours_minutes": "{hours}h {minutes}m",
         "unlocks_next_tooltip": "Liczba zadań, które staną się dostępne po ukończeniu tego zadania",
         "impact_tooltip": "Liczba nieukończonych zadań zależnych od ukończenia tego zadania",
         "reward_items": "Przedmioty:",

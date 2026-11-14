@@ -256,12 +256,11 @@ export default defineEventHandler(async (event) => {
     const statusMessage = resolveStatusMessage(error);
     const isPrivateProfileError =
       statusCode === 403 && statusMessage === 'Profile is private for this mode';
-    const mappedStatusCode = statusCode === 403 && !isPrivateProfileError ? 503 : statusCode;
+    const mappedStatusCode = isPrivateProfileError ? 404 : statusCode === 403 ? 503 : statusCode;
     throw createError({
       statusCode: mappedStatusCode,
-      statusMessage: isPrivateProfileError
-        ? 'Profile is private for this mode'
-        : mappedStatusCode === 404
+      statusMessage:
+        mappedStatusCode === 404
           ? 'Profile not found'
           : mappedStatusCode === 503
             ? 'Shared profiles unavailable'

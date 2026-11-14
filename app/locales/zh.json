@@ -552,6 +552,67 @@
     }
   },
   "maps": {
+    "extract_requirements": {
+      "raid_notice": "Not live raid status",
+      "source": "Requirements: game data, EFT {version}",
+      "source_curated": "Requirements: game data, EFT {version}, plus curated cues",
+      "source_detail": "From the EFT {build} client's location and global definitions. Base values only; check the in-raid extraction list.",
+      "curated_detail": "Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
+      "no_additional_data": "No requirements listed. Availability is not guaranteed.",
+      "unknown_detail": "Requirements unknown. Check in raid.",
+      "rubles": "roubles",
+      "dollars": "US dollars",
+      "euros": "euros",
+      "paracord": "Paracord",
+      "red_rebel": "Red Rebel ice pick",
+      "zb014_key": "ZB-014 key",
+      "factory_key": "Factory emergency exit key",
+      "key_detail": "Unlock with {item}",
+      "unknown_item": "Required item (name unavailable)",
+      "base_cost": "Pay {count} {item}",
+      "base_cost_hint": "Price varies with reputation",
+      "hand_over": "Hand over {count} × {item}",
+      "bring": "Bring {count} × {item}",
+      "empty_slot": "No {slot} equipped",
+      "equipment_slot": "restricted gear",
+      "backpack_slot": "backpack",
+      "armor_slot": "body armor",
+      "chance_detail": "{percent}% chance to be open",
+      "vehicle_detail": "Vehicle must still be there",
+      "coop_detail": "Needs a PMC and a Scav together",
+      "activation_detail": "Activate first (power, switch, or door)",
+      "green_flare_detail": "Fire a green flare in the signal area first",
+      "flare_detail": "Fire a signal flare first",
+      "green_smoke_detail": "Open when green smoke is visible",
+      "no_backpack_detail": "No backpack equipped",
+      "restriction_detail": "Gear restriction, see in-raid prompt",
+      "train_detail": "Board before the train leaves",
+      "timer_detail": "Opens on a timer",
+      "window_detail": "Window: {min}–{max} into the raid",
+      "legend_title": "Extract icons",
+      "tags": {
+        "key": "Key",
+        "money": "Money",
+        "transfer": "物品",
+        "gear": "Gear",
+        "no_backpack": "No bag",
+        "no_armor": "No armor",
+        "restriction": "Restriction",
+        "conditional": "Conditional",
+        "coop": "Co-op",
+        "activation": "Activate",
+        "train": "Train",
+        "timer": "Timed",
+        "flare": "Flare",
+        "green_smoke": "Green smoke",
+        "unknown": "未知"
+      }
+    },
+    "elevation": {
+      "above": "Go up {count} level | Go up {count} levels",
+      "below": "Go down {count} level | Go down {count} levels",
+      "legend": "On another floor (number = floors away)"
+    },
     "tooltip_density": "工具提示",
     "map_settings": "地图设置",
     "not_available_title": "地图不可用",
@@ -565,13 +626,38 @@
       "pmc": "PMC"
     },
     "layers": {
-      "pmc_spawns": "PMC出生点"
+      "always_show_names": "Always show names",
+      "coop": "Co-op",
+      "coop_hint": "PMC and Scav together",
+      "groups": {
+        "extracts": "Extracts",
+        "locations": "Locations"
+      },
+      "hidden_count": "{count} hidden",
+      "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
+      "pmc_spawns": "PMC出生点",
+      "shared_or_unknown": "Shared / unknown",
+      "shared_or_unknown_hint": "Either faction, or faction not supplied",
+      "show_all": "Show all layers",
+      "title": "Layers",
+      "transit": "Transit"
     },
     "legend": {
       "regular": "常规的",
-      "pinned": "固定的",
-      "shared_extract": "共享撤离点（任一阵营）",
-      "coop_extract": "合作撤离点（PMC + Scav）"
+      "pinned": "固定的"
+    },
+    "objective_icons": {
+      "legend_title": "Objective icons",
+      "kinds": {
+        "visit": "Visit / locate",
+        "plant": "Plant / stash",
+        "find": "Find / pick up",
+        "mark": "Mark",
+        "shoot": "Eliminate",
+        "use": "Use item",
+        "extract": "Extract",
+        "other": "其他"
+      }
     },
     "tooltips": {
       "zoom_in": "缩放",
@@ -610,12 +696,12 @@
       "tooltip_density": "工具提示密度"
     },
     "tooltip": {
-      "go_to": "前往目标",
       "go_to_in_task_list": "在任务列表中前往目标",
-      "complete": "完成目标",
-      "uncomplete": "取消完成目标",
       "objective_unavailable": "目标不可用。",
-      "stacked_objectives": "此处有 {count} 个目标"
+      "stacked_objectives": "此处有 {count} 个目标",
+      "task_list": "Task list",
+      "key": "Key: {key}",
+      "progress": "进度"
     }
   },
   "page": {
@@ -640,6 +726,15 @@
         "hidden_other": "{count} available tasks are hidden by your filters",
         "complete": "Every visible task is done.",
         "none_ready": "Nothing is close to unlocking yet. Check the task list for what's still gated.",
+        "storyline": {
+          "chapter": "Storyline · {chapter}",
+          "unlocks": "Unlocks {unlock}",
+          "objective_hint": "Next tracked step · Check Storyline for requirements",
+          "choice": "Review your route choices",
+          "choice_hint": "Open the chapter to compare the alternatives before continuing.",
+          "review": "Review chapter progress",
+          "review_hint": "No next main step is recorded. Check the chapter before marking it complete."
+        },
         "reason": {
           "unlock_trader": "Unlocks {trader}",
           "opens_one": "Opens 1 task",
@@ -953,6 +1048,8 @@
         }
       },
       "no_tasks_found": "未找到任务，可尝试修改筛选条件或更新人物等级",
+      "no_available_tasks": "No available tasks right now",
+      "no_available_tasks_description": "Your tracked progress has no available tasks. Review the next steps and unmet requirements below.",
       "no_tasks_found_description": "调整筛选条件或等级要求以查看可用任务。",
       "no_search_matches": "No tasks match your search.",
       "no_search_matches_description": "Check the spelling, try a reward item name, or change the task type and map filters.",
@@ -1083,6 +1180,13 @@
         "requires_tooltip_conflict": "\"{name}\" 当前为 {current}，但需要 {expected} — 此任务可能会被永久锁定",
         "objectives_hidden": "其他地图中有 {count} 个任务目标({uncompleted} 个未完成)",
         "needed_by": "被以下任务依赖：{names}",
+        "time_gate": "Unlocks {duration} after prerequisites are complete",
+        "time_gate_range": "Unlocks {min}–{max} after prerequisites are complete",
+        "time_gate_tooltip": "The game waits this long after the prerequisites are complete before offering this task, so it can look available here before it appears in game. TarkovTracker does not track the remaining time.",
+        "duration_seconds": "{seconds}s",
+        "duration_minutes": "{minutes}m",
+        "duration_hours": "{hours}h",
+        "duration_hours_minutes": "{hours}h {minutes}m",
         "unlocks_next_tooltip": "完成此任务后可解锁的任务数量",
         "impact_tooltip": "依赖此任务完成的未完成任务数量",
         "reward_items": "奖励物品:",

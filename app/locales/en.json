@@ -1098,7 +1098,12 @@
           "hidden_section_title": "Hidden from map ({count})",
           "hidden_section_description": "Still tracked, just not drawn on the map.",
           "hidden_section_expand": "Show hidden quests",
-          "hidden_section_collapse": "Collapse hidden quests"
+          "hidden_section_collapse": "Collapse hidden quests",
+          "legend_label": "Quest colors",
+          "legend_highlight_named": "Highlight {name} on the map",
+          "quest_color_named": "Color for {name}",
+          "reset_quest_color_named": "Use the automatic color for {name}",
+          "reset_quest_colors": "Reset quest colors"
         }
       },
       "pinned_tasks_section": "Pinned Tasks",
@@ -2120,6 +2125,27 @@
           "selected": "Pinned Objective",
           "shared_extract": "Shared Extract",
           "coop_extract": "Co-op Extract"
+        },
+        "objective_colors": {
+          "title": "Objective colors",
+          "description": "Choose what an objective marker's color shows. Its icon always shows the objective type.",
+          "modes": {
+            "category": "Category",
+            "task": "Quest",
+            "type": "Objective type"
+          },
+          "mode_hints": {
+            "category": "Your, pinned and team objectives use the category colors below.",
+            "task": "Each quest gets its own color. Pick a quest's color under Choose quests on the Tasks map.",
+            "type": "Each objective type gets its own color, shown in the Layers panel's Objective icons key."
+          },
+          "palette": "Palette",
+          "palettes": {
+            "okabe_ito": "Okabe-Ito (7 colors)",
+            "tol_bright": "Tol bright (6 colors)",
+            "tol_muted": "Tol muted (9 colors)"
+          },
+          "palette_hint": "Each palette stays distinguishable with red-green and blue-yellow color blindness. Colors repeat once a map has more quests than the palette has colors."
         }
       },
       "links": {
@@ -2295,7 +2321,7 @@
       "team_transfer_title": "Team Ownership Transfer",
       "team_transfer_description": "If you own any teams, ownership will be automatically transferred to the oldest member in each team. Teams without other members will be deleted.",
       "security_confirmation_title": "Security Confirmation",
-      "security_confirmation_description": "Account deletion requires typing the exact confirmation phrase below. This action is permanent and cannot be undone.",
+      "security_confirmation_description": "Sign in with your linked provider within five minutes, then type the exact confirmation phrase below. This action is permanent and cannot be undone.",
       "confirm_phrase_value": "DELETE MY ACCOUNT",
       "confirm_phrase_label": "Type \"{phrase}\" to confirm:",
       "confirm_phrase_error": "Please type exactly: {phrase}",
@@ -2314,7 +2340,9 @@
       "go_to_dashboard": "Go to Dashboard",
       "session_changed": "Your signed-in account changed. No further action will be taken in this session.",
       "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
-      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later."
+      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later.",
+      "recent_login_required": "Sign in again with your linked provider, then return to Settings and confirm deletion within five minutes. Your account and device data have been kept.",
+      "sign_in_again": "Sign in again"
     },
     "discord_link": {
       "title": "Discord Account",

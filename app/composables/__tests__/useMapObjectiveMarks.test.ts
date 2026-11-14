@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computed, isRef, ref } from 'vue';
+import {
+  assignTaskColors,
+  getObjectiveTypeColors,
+  MAP_OBJECTIVE_PALETTES,
+} from '@/features/maps/utils/objectiveColors';
 import type { Task } from '@/types/tarkov';
 const objectiveCompletions = ref<Record<string, Record<string, boolean>>>({});
 const tasksCompletions = ref<Record<string, Record<string, boolean>>>({});
@@ -12,6 +17,9 @@ const mapTeamAllHidden = ref(false);
 const pinnedTaskIds = ref<string[]>([]);
 const mapHiddenTaskIds = ref<string[]>([]);
 const mapShowSelfObjectives = ref(true);
+const mapObjectiveColorMode = ref('category');
+const mapObjectivePalette = ref('okabe_ito');
+const mapTaskColors = ref<Record<string, string>>({});
 const completedObjectiveIds = ref<Set<string>>(new Set());
 const completedTaskIds = ref<Set<string>>(new Set());
 const failedTaskIds = ref<Set<string>>(new Set());
@@ -28,6 +36,9 @@ const setup = async () => {
   pinnedTaskIds.value = [];
   mapHiddenTaskIds.value = [];
   mapShowSelfObjectives.value = true;
+  mapObjectiveColorMode.value = 'category';
+  mapObjectivePalette.value = 'okabe_ito';
+  mapTaskColors.value = {};
   completedObjectiveIds.value = new Set();
   completedTaskIds.value = new Set();
   failedTaskIds.value = new Set();
@@ -64,6 +75,15 @@ const setup = async () => {
       },
       get getMapShowSelfObjectives() {
         return mapShowSelfObjectives.value;
+      },
+      get getMapObjectiveColorMode() {
+        return mapObjectiveColorMode.value;
+      },
+      get getMapObjectivePalette() {
+        return mapObjectivePalette.value;
+      },
+      get getMapTaskColors() {
+        return mapTaskColors.value;
       },
     }),
   }));
@@ -184,6 +204,85 @@ describe('useMapObjectiveMarks', () => {
       const result = await run();
       mapShowSelfObjectives.value = false;
       expect(result.mapTaskIds.value).toEqual([]);
+    });
+  });
+  describe('objective colors (#920)', () => {
+    const colorTasks: Task[] = [
+      {
+        id: 'task-a',
+        name: 'A',
+        objectives: [
+          { ...objectiveWithLocation('obj-a1', 'customs'), type: 'visit' },
+          { ...objectiveWithLocation('obj-a2', 'customs'), type: 'shoot' },
+        ],
+      },
+      {
+        id: 'task-b',
+        name: 'B',
+        objectives: [{ ...objectiveWithLocation('obj-b', 'customs'), type: 'flare' }],
+      },
+    ] as Task[];
+    const run = async () => {
+      const { useMapObjectiveMarks } = await setup();
+      unlockedTasks.value = { 'task-a': { self: true }, 'task-b': { self: true } };
+      return useMapObjectiveMarks({
+        mapId: computed(() => 'customs'),
+        shouldShowCompletedObjectives: computed(() => false),
+        tasks: computed(() => colorTasks),
+      });
+    };
+    const colorsById = (result: Awaited<ReturnType<typeof run>>) =>
+      Object.fromEntries(result.mapObjectiveMarks.value.map((mark) => [mark.id, mark.color]));
+    it('leaves category colors to the map and tags every mark with its quest', async () => {
+      const result = await run();
+      expect(result.mapObjectiveMarks.value.map((mark) => [mark.id, mark.taskId])).toEqual([
+        ['obj-a1', 'task-a'],
+        ['obj-a2', 'task-a'],
+        ['obj-b', 'task-b'],
+      ]);
+      expect(colorsById(result)).toEqual({
+        'obj-a1': undefined,
+        'obj-a2': undefined,
+        'obj-b': undefined,
+      });
+      expect(result.mapTaskColors.value.size).toBe(0);
+    });
+    it('gives each quest one palette color that survives hiding another quest', async () => {
+      const result = await run();
+      mapObjectiveColorMode.value = 'task';
+      const expected = assignTaskColors(['task-a', 'task-b'], MAP_OBJECTIVE_PALETTES.okabe_ito);
+      expect(colorsById(result)).toEqual({
+        'obj-a1': expected.get('task-a'),
+        'obj-a2': expected.get('task-a'),
+        'obj-b': expected.get('task-b'),
+      });
+      expect(expected.get('task-a')).not.toBe(expected.get('task-b'));
+      mapHiddenTaskIds.value = ['task-b'];
+      expect(colorsById(result)).toEqual({
+        'obj-a1': expected.get('task-a'),
+        'obj-a2': expected.get('task-a'),
+      });
+      expect(result.mapTaskColors.value.get('task-b')).toBe(expected.get('task-b'));
+    });
+    it('applies a picked quest color and the chosen palette', async () => {
+      const result = await run();
+      mapObjectiveColorMode.value = 'task';
+      mapObjectivePalette.value = 'tol_muted';
+      mapTaskColors.value = { 'task-b': '#123456' };
+      expect(result.mapTaskColors.value.get('task-b')).toBe('#123456');
+      expect(MAP_OBJECTIVE_PALETTES.tol_muted).toContain(result.mapTaskColors.value.get('task-a'));
+      expect(colorsById(result)['obj-b']).toBe('#123456');
+    });
+    it('colors by objective type, with unknown types in the neutral flag color', async () => {
+      const result = await run();
+      mapObjectiveColorMode.value = 'type';
+      const typeColors = getObjectiveTypeColors(MAP_OBJECTIVE_PALETTES.okabe_ito);
+      expect(colorsById(result)).toEqual({
+        'obj-a1': typeColors.visit,
+        'obj-a2': typeColors.shoot,
+        'obj-b': typeColors.other,
+      });
+      expect(result.mapTaskColors.value.size).toBe(0);
     });
   });
   describe('locked tasks under the Locked and All filters', () => {

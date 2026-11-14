@@ -1,3 +1,4 @@
+import { getGlyphInk, LIGHT_GLYPH_INK } from '@/features/maps/utils/colorContrast';
 import { createMapIconSvg } from '@/features/maps/utils/mapIcons';
 import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
 /** What the player does at an objective's map location; each action has one glyph. */
@@ -65,27 +66,35 @@ export const getObjectiveGlyphKind = (type: string | undefined): MapObjectiveGly
  */
 export const MAP_OBJECTIVE_CHIP_SKIN_CLASS =
   'rounded-full border-white bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.7),rgba(255,255,255,0)_58%)] shadow-[inset_0_-3px_4px_rgba(0,0,0,0.45),0_0_0_1px_rgba(0,0,0,0.75),0_2px_3px_rgba(0,0,0,0.65)]';
-const CHIP_CLASS = `map-objective-glyph pointer-events-none flex size-full items-center justify-center border-2 bg-(--chip-color) text-white transition-[scale,opacity,filter] duration-150 [&.is-hovered]:scale-115 [&.is-selected]:scale-115 [&.is-selected]:bg-(--chip-selected) ${MAP_OBJECTIVE_CHIP_SKIN_CLASS}`;
+/**
+ * A highlighted quest's chips grow and every other chip fades (#920); hovering a faded chip
+ * brings it back. With `prefers-contrast: more` the dark outline doubles in width.
+ */
+const CHIP_CLASS = `map-objective-glyph pointer-events-none flex size-full items-center justify-center border-2 bg-(--chip-color) text-(--chip-ink) transition-[scale,opacity,filter] duration-150 [&.is-hovered]:scale-115 [&.is-selected]:scale-115 [&.is-selected]:bg-(--chip-selected) [&.is-selected]:text-(--chip-selected-ink) [&.is-task-highlighted]:scale-115 [&.is-task-dimmed]:opacity-30! [&.is-task-dimmed.is-hovered]:opacity-100! ${MAP_OBJECTIVE_CHIP_SKIN_CLASS} contrast-more:shadow-[inset_0_-3px_4px_rgba(0,0,0,0.45),0_0_0_2px_rgba(0,0,0,1),0_2px_3px_rgba(0,0,0,0.65)]`;
 const OFF_FLOOR_CLASSES = [
   'opacity-70',
   'saturate-50',
   '[&.is-hovered]:opacity-100',
   '[&.is-hovered]:saturate-100',
 ];
-const GLYPH_CLASS = 'size-4 drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]';
+const GLYPH_CLASS = 'size-4 drop-shadow-[0_1px_1px_var(--chip-ink-shadow)]';
+/** A light glyph gets a dark shadow and a dark glyph a light one, so both lift off the fill. */
+const glyphInkShadow = (ink: string): string =>
+  ink === LIGHT_GLYPH_INK ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.55)';
 /** Chip diameter in px; the hit-test dot under it uses half of this as its radius. */
 export const OBJECTIVE_CHIP_SIZE = 26;
 export type ObjectiveChipOptions = {
-  /** Task category color (Regular, Pinned or Team). */
+  /** Fill: the task category, quest or objective-type color, depending on the color mode. */
   color: string;
   /** Color while the objective's popup is pinned open. */
   selectedColor: string;
   offFloor?: boolean;
 };
 /**
- * The raised chip drawn for an objective: its category color and its action glyph. It never
- * takes pointer input, so hover, click and the stacked-objective hit test use the dot under it;
- * the map toggles `is-hovered` and `is-selected` on it from the dot's events.
+ * The raised chip drawn for an objective: its fill color and its action glyph, inked white or
+ * near-black for the higher contrast. It never takes pointer input, so hover, click and the
+ * stacked-objective hit test use the dot under it; the map toggles `is-hovered`, `is-selected`
+ * and the quest highlight classes on it from the dot's events and the legend.
  */
 export function createObjectiveGlyphElement(
   kind: MapObjectiveGlyphKind,
@@ -94,8 +103,12 @@ export function createObjectiveGlyphElement(
   const chip = document.createElement('span');
   chip.className = `${CHIP_CLASS} map-objective-glyph--${kind}`;
   if (offFloor) chip.classList.add('map-objective-glyph--off-floor', ...OFF_FLOOR_CLASSES);
+  const ink = getGlyphInk(color);
   chip.style.setProperty('--chip-color', color);
+  chip.style.setProperty('--chip-ink', ink);
+  chip.style.setProperty('--chip-ink-shadow', glyphInkShadow(ink));
   chip.style.setProperty('--chip-selected', selectedColor);
+  chip.style.setProperty('--chip-selected-ink', getGlyphInk(selectedColor));
   chip.dataset.kind = kind;
   chip.setAttribute('aria-hidden', 'true');
   chip.append(createMapIconSvg(MAP_OBJECTIVE_GLYPH_PATHS[kind], GLYPH_CLASS));

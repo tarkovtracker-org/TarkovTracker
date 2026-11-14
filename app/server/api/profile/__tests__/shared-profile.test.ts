@@ -382,6 +382,36 @@ describe('Shared Profile API', () => {
       statusMessage: 'Profile not found',
     });
   });
+  it.each(['pvp', 'pve', 'seasonal'])(
+    'does not distinguish absent, private or missing %s mode profiles',
+    async (mode) => {
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'userId' ? '11111111-1111-4111-8111-111111111111' : mode
+      );
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      for (const state of ['absent', 'private', 'missing_mode']) {
+        mockFetch.mockReset();
+        if (mode === 'seasonal') mockFetch.mockResolvedValueOnce({ ok: true, json: async () => 2 });
+        mockFetch
+          .mockResolvedValueOnce(
+            state === 'absent' ? { ok: true, json: async () => [] } : progressResponse()
+          )
+          .mockResolvedValueOnce(
+            state === 'private'
+              ? modeProgressResponse({ displayName: 'PrivatePlayer', level: 42 }, false)
+              : { ok: true, json: async () => [] }
+          )
+          .mockResolvedValueOnce(preferencesResponse());
+        await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+          statusCode: 404,
+          statusMessage: 'Profile not found',
+          message: 'Profile not found',
+          data: undefined,
+        });
+        expect(mockOverlay).not.toHaveBeenCalled();
+      }
+    }
+  );
   it('returns public shared profile when mode is public', async () => {
     mockFetch
       .mockResolvedValueOnce(progressResponse())
@@ -411,7 +441,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
       .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
   it('returns empty progress for public normalized placeholders without reading legacy data', async () => {
@@ -447,7 +480,7 @@ describe('Shared Profile API', () => {
       visibility: 'public',
     });
   });
-  it('treats a missing Seasonal row as private instead of not found', async () => {
+  it('conceals a missing Seasonal row with the generic not-found response', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
       if (key === 'mode') return 'seasonal';
@@ -459,7 +492,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse());
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('returns an empty owner payload when the Seasonal row does not exist yet', async () => {
     mockGetRequestHeader.mockImplementation((_, key: string) => {
@@ -606,7 +642,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce(modeProgressResponse({ level: 17 }, false))
       .mockResolvedValueOnce(preferencesResponse());
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('allows owner to view private profile without service key', async () => {
     runtimeConfig.supabaseServiceKey = '';

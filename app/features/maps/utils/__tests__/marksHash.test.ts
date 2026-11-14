@@ -22,6 +22,13 @@ describe('getMarksHash', () => {
     const plant = getMarksHash([{ ...baseMark, type: 'plantItem' }], 'customs');
     expect(getMarksHash([{ ...baseMark, type: 'visit' }], 'customs')).not.toBe(plant);
   });
+  it('redraws when only the quest or the chip color differs (#920)', () => {
+    const questA = getMarksHash([{ ...baseMark, taskId: 'task-a' }], 'customs');
+    expect(getMarksHash([{ ...baseMark, taskId: 'task-b' }], 'customs')).not.toBe(questA);
+    const orange = getMarksHash([{ ...baseMark, color: '#e69f00' }], 'customs');
+    expect(getMarksHash([{ ...baseMark, color: '#0072b2' }], 'customs')).not.toBe(orange);
+    expect(getMarksHash([baseMark], 'customs')).not.toBe(orange);
+  });
   it('invalidates markers when only elevation changes', () => {
     const point = {
       ...baseMark,

@@ -127,6 +127,35 @@ describe('account deletion device removal', () => {
       reactiveUser.id = null;
     });
   });
+  it('requires a new explicit confirmation after returning from sign-in', async () => {
+    invoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: 'account_deletion_recent_login_required' }), {
+          status: 403,
+        }),
+      },
+    });
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(invoke).toHaveBeenCalledTimes(1);
+    reactiveUser.id = null;
+    reactiveUser.loggedIn = false;
+    await flushPromises();
+    wrapper.unmount();
+    reactiveUser.id = 'deleted-owner';
+    reactiveUser.loggedIn = true;
+    const returned = mountCard();
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(returned.find('input').exists()).toBe(false);
+    await clickText(returned, 'settings.account.begin_deletion');
+    expect(returned.get('input').element.value).toBe('');
+    expect(invoke).toHaveBeenCalledTimes(1);
+    returned.unmount();
+  });
   it.each([false, true])(
     'forgets only the deleted owner after sign-out (failure: %s)',
     async (fails) => {
@@ -140,6 +169,7 @@ describe('account deletion device removal', () => {
       await clickText(wrapper, 'settings.account_data.delete_forever');
       expect(invoke).toHaveBeenCalledWith('account-delete', {
         headers: { Authorization: 'Bearer deleted-owner-fixture-token' },
+        body: { action: 'delete_account' },
       });
       await clickText(wrapper, 'settings.account_data.go_to_dashboard');
       expect(signOut).toHaveBeenCalledWith('deleted-owner', 'local');
@@ -157,6 +187,7 @@ describe('account deletion device removal', () => {
   it.each([
     ['account_deletion_subscription_active', 'subscription_active', 409],
     ['account_deletion_billing_unavailable', 'billing_unavailable', 503],
+    ['account_deletion_recent_login_required', 'recent_login_required', 403],
   ] as const)(
     'preserves the account and device data when deletion returns %s',
     async (code, key, status) => {
@@ -176,6 +207,17 @@ describe('account deletion device removal', () => {
       expect(signOut).not.toHaveBeenCalled();
       expect(reset).not.toHaveBeenCalled();
       expect(reactiveUser.id).toBe('deleted-owner');
+      if (code === 'account_deletion_recent_login_required') {
+        expect(wrapper.get('button[to]').attributes('to')).toBe(
+          '/login?redirect=%2Fsettings%23account'
+        );
+        expect(
+          wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'settings.account_data.delete_forever')
+            ?.attributes('disabled')
+        ).toBeDefined();
+      }
       wrapper.unmount();
     }
   );

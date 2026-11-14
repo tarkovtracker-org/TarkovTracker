@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMapLayerGroups,
   countHiddenLayers,
+  NEUTRAL_OBJECTIVE_SWATCH,
   type MapLayerGroupsInput,
 } from '@/features/maps/utils/mapLayerGroups';
 import { MAP_MARKER_COLORS } from '@/utils/theme-colors';
@@ -57,5 +58,20 @@ describe('buildMapLayerGroups', () => {
   it('counts hidden rows', () => {
     expect(countHiddenLayers(buildMapLayerGroups(createInput()))).toBe(3);
     expect(countHiddenLayers(buildMapLayerGroups(createInput({ spawns: false })))).toBe(2);
+  });
+  it('shows task category colors only while chips are colored by category', () => {
+    const colorsOf = (objectiveColorMode?: MapLayerGroupsInput['objectiveColorMode']) =>
+      buildMapLayerGroups({ ...createInput(), objectiveColorMode })[0]!.items.map(
+        (item) => item.color
+      );
+    const categoryColors = [
+      MAP_MARKER_COLORS.SELF_OBJECTIVE,
+      MAP_MARKER_COLORS.PINNED_OBJECTIVE,
+      MAP_MARKER_COLORS.TEAM_OBJECTIVE,
+    ];
+    expect(colorsOf()).toEqual(categoryColors);
+    expect(colorsOf('category')).toEqual(categoryColors);
+    expect(colorsOf('task')).toEqual(Array(3).fill(NEUTRAL_OBJECTIVE_SWATCH));
+    expect(colorsOf('type')).toEqual(Array(3).fill(NEUTRAL_OBJECTIVE_SWATCH));
   });
 });

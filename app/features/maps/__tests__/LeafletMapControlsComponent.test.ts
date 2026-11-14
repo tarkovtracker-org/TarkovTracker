@@ -119,6 +119,10 @@ vi.mock('@/stores/usePreferences', () => ({
       TRANSIT: '#cf5959',
     },
     getMapTooltipDensity: 'comfortable',
+    getMapObjectiveColorMode: 'category',
+    getMapObjectivePalette: 'okabe_ito',
+    setMapObjectiveColorMode: vi.fn(),
+    setMapObjectivePalette: vi.fn(),
     getMapShowSelfObjectives: true,
     getMapShowPinnedObjectives: false,
     getMapShowTeamObjectives: false,
@@ -1047,6 +1051,150 @@ describe('LeafletMap controls', () => {
     } finally {
       wrapper.unmount();
       popups.forEach((popup) => popup.element.remove());
+    }
+  });
+  it('fills chips with quest colors, reports hovered quests and highlights one quest', async () => {
+    type FakeHandler = () => void;
+    const dots: Array<{ handlers: Map<string, FakeHandler[]> }> = [];
+    const createLayer = () => {
+      const handlers = new Map<string, FakeHandler[]>();
+      const layer = {
+        handlers,
+        options: {},
+        setStyle: vi.fn(),
+        getLatLng: () => ({ lat: 0, lng: 0 }),
+        getRadius: () => 13,
+        on(name: string, handler: FakeHandler) {
+          handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+          return layer;
+        },
+      };
+      dots.push(layer);
+      return layer;
+    };
+    const createPopup = () => {
+      const element = document.createElement('div');
+      const popup = {
+        options: {},
+        isOpen: false,
+        update: vi.fn(),
+        setContent: (content: HTMLElement) => element.replaceChildren(content),
+        setLatLng: vi.fn(),
+        getElement: () => element,
+        addTo: () => {
+          popup.isOpen = true;
+        },
+        remove: () => {
+          popup.isOpen = false;
+        },
+        on: vi.fn(),
+        once: vi.fn(),
+      };
+      return popup;
+    };
+    const divIcon = vi.fn((options: { html: HTMLElement }) => options);
+    const createLayerGroup = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    const mapPane = document.createElement('div');
+    mapPane.innerHTML = '<svg width="100" height="100"></svg>';
+    mockMapInstance.getPane.mockReturnValue(mapPane);
+    mockMapInstance.getContainer.mockReturnValue(mapPane);
+    mapState.leaflet = {
+      circleMarker: createLayer,
+      divIcon,
+      marker: (_position: unknown, options: Record<string, unknown>) => ({ options }),
+      popup: createPopup,
+      DomEvent: { stop: vi.fn() },
+    };
+    mapState.objectiveLayer = createLayerGroup();
+    mapState.extractLayer = createLayerGroup();
+    mapState.spawnLayer = createLayerGroup();
+    const point = (id: string, taskId: string, color: string) => ({
+      id,
+      taskId,
+      color,
+      type: 'visit',
+      users: ['self'],
+      zones: [],
+      possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
+    });
+    const marks = [
+      point('objective-a', 'task-a', '#f0e442'),
+      point('objective-b', 'task-b', '#0072b2'),
+      point('objective-c', 'task-a', '#f0e442'),
+    ];
+    let unmounted = false;
+    // emitted() is not kept past unmount, so the unmount check listens through the prop.
+    const onObjectiveHover = vi.fn();
+    const wrapper = await mountMap({
+      onObjectiveHover,
+      map: {
+        ...mapData,
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+      marks,
+      showExtracts: false,
+      showPmcSpawns: false,
+    });
+    try {
+      await wrapper.setProps({ marks: [...marks] });
+      await nextTick();
+      const chips = divIcon.mock.calls.map(([options]) => options.html).slice(-3);
+      // The mark's quest color replaces the category color; the light yellow gets a dark glyph.
+      expect(chips.map((chip) => chip.style.getPropertyValue('--chip-color'))).toEqual([
+        '#f0e442',
+        '#0072b2',
+        '#f0e442',
+      ]);
+      expect(chips.map((chip) => chip.style.getPropertyValue('--chip-ink'))).toEqual([
+        '#0a0a0b',
+        '#ffffff',
+        '#0a0a0b',
+      ]);
+      const dotB = dots[dots.length - 2]!;
+      dotB.handlers.get('mouseover')?.forEach((handler) => handler());
+      dotB.handlers.get('mouseout')?.forEach((handler) => handler());
+      expect(wrapper.emitted('objective-hover')).toEqual([['task-b'], [null]]);
+      await wrapper.setProps({ highlightedTaskId: 'task-a' });
+      expect(chips.map((chip) => chip.classList.contains('is-task-highlighted'))).toEqual([
+        true,
+        false,
+        true,
+      ]);
+      expect(chips.map((chip) => chip.classList.contains('is-task-dimmed'))).toEqual([
+        false,
+        true,
+        false,
+      ]);
+      // Highlighting only toggles classes; it never redraws the markers.
+      const drawn = divIcon.mock.calls.length;
+      await wrapper.setProps({ highlightedTaskId: 'task-gone' });
+      expect(chips.some((chip) => chip.classList.contains('is-task-dimmed'))).toBe(false);
+      await wrapper.setProps({ highlightedTaskId: null });
+      expect(chips.some((chip) => chip.classList.contains('is-task-highlighted'))).toBe(false);
+      expect(divIcon.mock.calls.length).toBe(drawn);
+      // A redraw removes the hovered dot without a mouseout, so the map releases its hover.
+      dotB.handlers.get('mouseover')?.forEach((handler) => handler());
+      await wrapper.setProps({ marks: [marks[0]!, marks[2]!] });
+      await nextTick();
+      expect(wrapper.emitted('objective-hover')?.slice(-2)).toEqual([['task-b'], [null]]);
+      // Unmounting releases a hover too, but only one the markers reported.
+      const lastDot = dots[dots.length - 1]!;
+      lastDot.handlers.get('mouseover')?.forEach((handler) => handler());
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual(['task-a']);
+      wrapper.unmount();
+      unmounted = true;
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual([null]);
+    } finally {
+      if (!unmounted) wrapper.unmount();
     }
   });
 });

@@ -81,4 +81,27 @@ describe('useCopyToClipboard', () => {
       title: 'toast.clipboard_error.title',
     });
   });
+  it.each(['false', 'throw'])(
+    'masks and removes the fallback textarea when execCommand returns %s',
+    async (outcome) => {
+      vi.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('denied'));
+      let observedMask: string | null | undefined;
+      let observedValue: string | undefined;
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        value: vi.fn(() => {
+          const textarea = document.querySelector('textarea');
+          observedMask = textarea?.getAttribute('data-clarity-mask');
+          observedValue = textarea?.value;
+          if (outcome === 'throw') throw new Error('copy failed');
+          return false;
+        }),
+      });
+      const { writeToClipboard } = await import('@/composables/useCopyToClipboard');
+      await expect(writeToClipboard('private snapshot')).resolves.toBe(false);
+      expect(observedMask).toBe('true');
+      expect(observedValue).toBe('private snapshot');
+      expect(document.querySelector('textarea')).toBeNull();
+    }
+  );
 });

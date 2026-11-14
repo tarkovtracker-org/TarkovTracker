@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { relevantComment } from '../ci/review-admission.mjs';
-import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 const repository = 'example/repo';
 const head = 'a'.repeat(40);
 const bot = { id: 136622811, type: 'Bot', login: 'coderabbitai[bot]' };
@@ -266,17 +271,44 @@ test('the admission locator preserves candidate branches and unscoped events', (
   ])
     assert.equal(admissionTitle(payload), `Review Admission ${branch}`);
 });
-test('review bursts collapse to one admission signal per pull request', () => {
+test('review withdrawals cannot be canceled or delayed by subsequent review edits', () => {
   const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');
-  assert.match(
-    signal,
-    /^concurrency:\n {2}group: review-admission-signal-\$\{\{ github\.event\.pull_request\.number && format\('pr-\{0\}', github\.event\.pull_request\.number\) \|\| format\('run-\{0\}', github\.run_id\) \}\}\n {2}cancel-in-progress: true$/m
-  );
+  for (const [name, types] of [
+    ['pull_request_review', ['submitted', 'edited', 'dismissed']],
+    ['pull_request_review_comment', ['created', 'edited', 'deleted']],
+  ]) {
+    const block = workflowEvent(signal, name);
+    const configured = block.match(/^ {4}types:\s*\[([^\]]+)\]/m);
+    assert.ok(configured, `${name} must configure its event types`);
+    assert.deepEqual(
+      configured[1]
+        .split(',')
+        .map((type) => type.trim())
+        .sort(),
+      types.sort()
+    );
+  }
+  assert.doesNotMatch(signal, /^concurrency:/m);
   const job = jobBlock(signal, 'signal');
-  const debounce = job.indexOf('Coalesce review burst');
-  assert.ok(debounce > 0 && debounce < job.indexOf('Notify trusted admission controller'));
-  assert.match(
-    job,
-    /if: github\.event_name == 'pull_request_review' \|\| github\.event_name == 'pull_request_review_comment'\n {8}run: sleep 45/
-  );
+  assert.doesNotMatch(job, /sleep\s+\d|concurrency:/);
+  assert.ok(job.includes('Notify trusted admission controller'));
+  for (const [name, action, state] of [
+    ['pull_request_review', 'dismissed', 'DISMISSED'],
+    ['pull_request_review', 'submitted', 'CHANGES_REQUESTED'],
+    ['pull_request_review', 'edited', 'COMMENTED'],
+    ['pull_request_review_comment', 'edited', 'COMMENTED'],
+  ]) {
+    assert.equal(
+      allows(
+        'review-admission-signal',
+        'signal',
+        event(name, {
+          action,
+          pull_request: { number: 7 },
+          review: { state },
+        })
+      ),
+      true
+    );
+  }
 });

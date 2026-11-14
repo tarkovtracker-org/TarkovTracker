@@ -64,6 +64,19 @@ recreation of account-owned data.
 
 ## Requested account deletion with billing
 
+User-requested deletion requires an explicit `delete_account` action and an OAuth sign-in within
+five minutes. Refreshing an old session does not satisfy this check: the Edge Function uses the
+verified OAuth authentication-method timestamp, and the service-only claim RPC checks the matching
+live Auth session and freshness again after lock waits. The accepted deletion job is the durable,
+idempotent intent; trusted retry/retention workers keep their existing claim path. Signing in again
+returns to Settings and never automatically deletes an account. Provider SSO can complete without
+password re-entry; this is recent OAuth sign-in, not MFA.
+
+The expected JWT issuer defaults to `SUPABASE_URL/auth/v1`. Local/self-hosted Edge runtimes that
+use an internal gateway URL must set the nonsecret `SUPABASE_AUTH_ISSUER` to their configured
+public Auth issuer (for example `http://127.0.0.1:54321/auth/v1`, matching `auth.jwt_issuer`).
+Do not derive this setting from request headers or client input.
+
 Billing clearance serializes with signed subscription recording on the Auth user row and with
 deletion claims on the existing per-user advisory lock. It locks the supporter row before reading
 the complete retained subscription history and rechecks the lease after lock waits. If a mutation

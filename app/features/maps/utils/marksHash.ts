@@ -12,6 +12,10 @@ export interface MapMark {
   id?: string;
   /** Upstream objective type; it picks the glyph drawn on the marker. */
   type?: string;
+  /** Task the objective belongs to, for the quest highlight. */
+  taskId?: string;
+  /** Chip fill from the quest or objective-type color mode; otherwise the category color. */
+  color?: string;
   zones: MapZone[];
   possibleLocations?: MapMarkLocation[];
   users?: string[];
@@ -78,6 +82,8 @@ const markLocationHashes = (mark: MapMark, mapId: string): number[] =>
 const hashMark = (hash: number, mark: MapMark, mapId: string): number => {
   let next = updateFnv1a(hash, mark.id ?? '');
   next = updateFnv1a(next, mark.type ?? '');
+  next = updateFnv1a(next, mark.taskId ?? '');
+  next = updateFnv1a(next, mark.color ?? '');
   next = updateFnv1a(next, mark.pinned ? '1' : '0');
   next = hashSortedValues(next, [...(mark.users ?? [])].sort(compareCodeUnits));
   next = hashSortedValues(next, markZoneHashes(mark, mapId));
