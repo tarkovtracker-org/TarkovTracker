@@ -527,7 +527,11 @@ owns the type mapping, path data, and chip markup. Chips are non-interactive Lea
 their own pane above the overlay pane and below the extract pins. Under each chip sits an
 invisible dot of the same size that takes hover, click and the stacked-objective hit test; the
 dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
-when the objective is on another floor and returns to full strength on hover.
+when the objective is on another floor and returns to full strength on hover. Its floor badge sits
+2 px to the left of the chip. A zone's outline and fill are drawn only while the zone is at least
+2 chips (52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their
+chip, so no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
+(`app/features/maps/utils/objectiveZoneOutline.ts`).
 
 Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
 `app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
