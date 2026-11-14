@@ -194,11 +194,13 @@ integration fails or is unavailable, not the normal path.
    Verify the object itself landed, not just the version row; for a constraint, check
    `pg_constraint` (`convalidated = false` is expected for `NOT VALID`).
 
-   **Ordering caveat:** migrations, Workers and Edge Functions all deploy from the same merge and
-   you cannot control the order between them. Code that depends on a new DB object (e.g. a worker
-   calling the `merge_progress_data` RPC) can briefly run against a database that does not have it
-   yet. When the dependency matters, land the migration in an **earlier release** than the code
-   that uses it; adding a DB object ahead of its caller is safe, the reverse is not.
+   **Deployment ordering:** the [Supabase GitHub integration](https://supabase.com/docs/guides/deployment/branching/github-integration#what-runs-on-each-push)
+   applies config, migrations, seed, then Edge Functions. The old deployed function remains
+   active while migrations run, so migrations must be compatible with that old handler until
+   the new function version is active. Workers deploy independently and can reach a new DB
+   object before its migration; land required objects in an earlier release when that dependency
+   matters. Adding backward-compatible DB objects ahead of callers can be safe; constraints
+   and behavior changes may require staged compatible callers first.
 
    **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
    that an Edge Function also enforces in application code (e.g.
@@ -252,6 +254,44 @@ integration fails or is unavailable, not the normal path.
    - `https://api.tarkovtracker.org/health`
 9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
+
+### Billing deletion cutover
+
+Before merging the billing-safe deletion migration/handler, deploy the prerequisite
+`account-delete` maintenance gate as a separate release. It returns HTTP 503 with
+`Retry-After: 60` before authentication, limiter writes, job claims, team changes, or Auth
+deletion, and requires no new database objects. Account deletion is temporarily unavailable.
+
+Record the prerequisite merge SHA and the production `account-delete` active version/source
+revision from Supabase (not a preview or merely a green CI check). Using a disposable test
+account's valid session, POST to the production function and verify HTTP 503, the retry header,
+and the maintenance error. Confirm that its teams, Auth user, deletion jobs, and limiter state
+remain unchanged. Do not log the session token. Wait for requests already running the old
+function version to drain before proceeding. Record the active version and matching deployed
+source, absence of old-version invocations in logs, and bounded-runtime evidence; a deploy
+success alone does not prove old invocations finished.
+
+Only then merge the billing-safe release. Supabase applies migrations before deploying Edge
+Functions: the already-active gate prevents the old team-first handler from running against
+the new Auth deletion guard during that interval. Verify the expected migration and new active
+function version, then smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
+If rollout fails, keep/redeploy the maintenance gate; never roll back to the old team-first
+handler after the billing guard migration. Remove the gate only in the billing-safe handler
+release.
+
+The HTTP gate does not pause the database cron jobs. Unlike the old HTTP handler's separate
+committed calls, `private.retry_account_deletion` and `private.delete_inactive_account` run
+team preparation and Auth deletion within one transaction. Their callers' per-account
+`BEGIN ... EXCEPTION` blocks roll back those changes when the Auth billing guard raises
+`23514`; failure accounting then runs after that rollback. See migrations
+`20261006120000_retry_failed_account_deletions.sql` and
+`20260930003202_automate_inactive_account_cleanup.sql`. These cron paths do not have the HTTP
+handler's partial team-change gap.
+
+Before the billing migration, inspect pending/in-progress deletion jobs and the latest/running
+`account-deletion-retry` and `inactive-account-cleanup` cron runs. Record the read-only evidence
+and investigate failures or unexpected activity. This prerequisite does not require manually
+disabling cron: any additional operational intervention needs evidence and separate authority.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
