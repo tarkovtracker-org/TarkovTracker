@@ -1139,6 +1139,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapZoomSpeed',
       'mapPanSpeed',
       'mapZoneOpacity',
+      'mapTooltipDensity',
       'pinnedTaskIds',
       'mapHiddenTaskIds',
       'mapLayerVisibility',
