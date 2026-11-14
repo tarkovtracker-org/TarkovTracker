@@ -217,13 +217,16 @@ describe('Streamer Kappa API', () => {
     const sinkBodies = logSinkFetch.mock.calls.map(([, init]) => String(init?.body)).join('\n');
     expect(sinkBodies).not.toContain(token);
   });
-  it('maps private shared profiles to a 403 response', async () => {
+  it('conceals legacy private shared profile errors with the generic not-found response', async () => {
     mockDollarFetch.mockRejectedValueOnce({
       statusCode: 403,
       statusMessage: 'Profile is private for this mode',
     });
     const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('maps non-private 403 shared profile errors to service unavailable', async () => {
     mockDollarFetch.mockRejectedValueOnce({ statusCode: 403, statusMessage: 'Forbidden' });

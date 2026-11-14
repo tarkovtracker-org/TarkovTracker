@@ -703,7 +703,7 @@ export default defineEventHandler(async (event) => {
   const isOwner = requesterUserId === userId;
   const isModePublic = modeProgressRow?.profile_public === true;
   if (!isOwner && !isModePublic) {
-    throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
+    throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
   const profileData = hasMaterializedProgress(modeProgressRow?.progress_data)
     ? modeProgressRow?.progress_data
