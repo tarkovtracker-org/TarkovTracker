@@ -17,3 +17,18 @@ most also run in CI or the pre-commit hook.
 | `check-supabase-db.sh`       | Rebuilds the **local** Supabase DB from migrations and lints the schema.                                                                                                                    | `supabase:check`                                          |
 | `check-supabase-ci.mjs`      | Gives CI an isolated local project and available port, restores configuration, and records bounded port ownership diagnostics.                                                              | `ci.yml`; startup diagnostics from `check-supabase-db.sh` |
 | `*.test.mjs`                 | Vitest tests for the scripts above.                                                                                                                                                         | `pnpm run test`                                           |
+
+## Supabase CI isolation
+
+The Supabase DB job uses `check-supabase-ci.mjs` in its disposable checkout. It selects a unique
+project ID compatible with CLI container names and an OS-assigned available TCP port, rejecting
+project ID and database port environment overrides. Docker children and diagnostics are pinned to
+the verified local socket with mutable context and TLS selectors removed.
+
+The existing reset, database tests, all concurrency checks, and lint remain required. Startup
+failures record listener/PID and container ID/name/port ownership before the bounded stop/retry;
+cleanup targets the unique CI project. Normal and failed completion restore the original config
+byte for byte. Content checks before replacement and restoration preserve detected unexpected edits
+and fail validation; they are not atomic locks against arbitrary external editors. This CI checkout
+has one config writer. The developer `pnpm run supabase:check` success path and exit status remain
+unchanged; failed startup also gains ownership diagnostics.

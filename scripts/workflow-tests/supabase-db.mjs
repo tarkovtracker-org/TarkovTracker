@@ -15,6 +15,7 @@ const validations = [
   'run supabase:test:deletion-billing-concurrency',
   'exec supabase db lint --schema public --fail-on error',
 ];
+const diagnostic = 'diagnostics scripts/checks/check-supabase-ci.mjs --diagnose';
 function assertDatabaseBoundary(workflow) {
   const step = workflowStep(jobBlock(workflow, 'supabase-db'), 'Validate Supabase migrations');
   assert.match(
@@ -64,7 +65,10 @@ esac
 if [[ "$*" == "$FAIL_COMMAND" ]]; then exit 17; fi
 exit 0`
   );
-  executable(join(bin, 'node'), 'printf \'diagnostics\\n\' >> "$TRACE"; exit "$DIAGNOSTIC_EXIT"');
+  executable(
+    join(bin, 'node'),
+    'printf \'diagnostics %s\\n\' "$*" >> "$TRACE"; exit "$DIAGNOSTIC_EXIT"'
+  );
   executable(join(bin, 'sleep'), 'exit 0');
   const env = {
     ...process.env,
@@ -106,7 +110,7 @@ test('startup retry records ownership before cleanup and still runs all validati
   assert.deepEqual(commands, [
     'exec supabase status',
     'exec supabase db start',
-    'diagnostics',
+    diagnostic,
     'exec supabase stop --no-backup',
     'exec supabase db start',
     ...validations,
@@ -116,7 +120,7 @@ test('startup retry records ownership before cleanup and still runs all validati
 test('persistent startup failure remains a failure even when diagnostics also fail', () => {
   const { result, commands } = fixture({ START_FAILURES: '2', DIAGNOSTIC_EXIT: '1' });
   assert.equal(result.status, 1, result.stderr);
-  assert.equal(commands.filter((command) => command === 'diagnostics').length, 2);
+  assert.equal(commands.filter((command) => command === diagnostic).length, 2);
   assert.equal(
     commands.filter((command) => command === 'exec supabase stop --no-backup').length,
     2

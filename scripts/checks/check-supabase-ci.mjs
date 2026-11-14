@@ -77,7 +77,12 @@ function contextEndpoint(env, run) {
 /** Port selection and Docker must refer to this runner, matching the concurrency-test boundary. */
 export function requireLocalDocker(env = process.env, run = runCommand) {
   if (env.DOCKER_HOST) requireLocalEndpoint(env.DOCKER_HOST);
-  requireLocalEndpoint(contextEndpoint(env, run));
+  const endpoint = contextEndpoint(env, run);
+  requireLocalEndpoint(endpoint);
+  return env.DOCKER_HOST || endpoint;
+}
+function localDockerEnvironment(env = process.env, inspect = runCommand) {
+  return { ...contextEnvironment(env), DOCKER_HOST: requireLocalDocker(env, inspect) };
 }
 function capture(binary, args, run) {
   const result = run(binary, args);
@@ -108,17 +113,31 @@ export function portDiagnostics(port, run = runCommand) {
     dockerOwners(port, run),
   ];
 }
-const diagnosePort = (port) => console.error(portDiagnostics(port).join('\n'));
-function runDatabaseChecks() {
+const diagnosePort = (port, env = localDockerEnvironment()) =>
+  console.error(
+    portDiagnostics(port, (binary, args) => runCommand(binary, args, { env })).join('\n')
+  );
+export function runDatabaseChecks({
+  env = process.env,
+  inspect = runCommand,
+  spawnChild = spawn,
+} = {}) {
+  const pinned = localDockerEnvironment(env, inspect);
   return new Promise((resolve, reject) => {
-    const child = spawn('bash', ['scripts/checks/check-supabase-db.sh'], { stdio: 'inherit' });
+    const child = spawnChild('bash', ['scripts/checks/check-supabase-db.sh'], {
+      stdio: 'inherit',
+      env: pinned,
+    });
     child.once('error', reject);
     child.once('exit', (code) => resolve(code ?? 1));
   });
 }
-async function restoreConfig(configPath, updated, original) {
-  if ((await readFile(configPath, 'utf8')) !== updated)
+async function requireUnchangedConfig(configPath, expected) {
+  if ((await readFile(configPath, 'utf8')) !== expected)
     throw new Error('Supabase config changed during CI; preserving the concurrent edit');
+}
+async function restoreConfig(configPath, updated, original) {
+  await requireUnchangedConfig(configPath, updated);
   await writeFile(configPath, original);
 }
 /** Isolate only the disposable CI checkout; the normal developer command remains unchanged. */
@@ -133,6 +152,7 @@ export async function withCiDatabaseConfig({
   diagnose(configuredPort(original));
   const port = await selectPort();
   const updated = ciConfig(original, port);
+  await requireUnchangedConfig(configPath, original);
   await writeFile(configPath, updated);
   try {
     log(`Supabase CI uses an isolated project on available port ${port}.`);
@@ -151,12 +171,15 @@ function requireCiEnvironment() {
 }
 async function main() {
   if (process.argv[2] === '--diagnose') {
-    requireLocalDocker();
-    return diagnosePort(configuredPort(await readFile(CONFIG, 'utf8')));
+    const env = localDockerEnvironment();
+    return diagnosePort(configuredPort(await readFile(CONFIG, 'utf8')), env);
   }
   if (process.argv.length > 2) throw new Error('Unexpected Supabase CI argument');
   requireCiEnvironment();
-  requireLocalDocker();
-  process.exitCode = await withCiDatabaseConfig();
+  const env = localDockerEnvironment();
+  process.exitCode = await withCiDatabaseConfig({
+    run: () => runDatabaseChecks({ env }),
+    diagnose: (port) => diagnosePort(port, env),
+  });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

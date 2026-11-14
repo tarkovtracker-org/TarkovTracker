@@ -1,11 +1,17 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { withCiDatabaseConfig, portDiagnostics, requireLocalDocker } from './check-supabase-ci.mjs';
+import {
+  withCiDatabaseConfig,
+  portDiagnostics,
+  requireLocalDocker,
+  runDatabaseChecks,
+} from './check-supabase-ci.mjs';
 const directories = [];
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
@@ -141,6 +147,23 @@ describe('isolated CI database configuration', () => {
     ).rejects.toThrow('changed');
     expect(await readFile(f.configPath, 'utf8')).toBe(concurrent);
   });
+  it('preserves an edit during asynchronous port selection without starting validation', async () => {
+    const f = await configFixture();
+    const concurrent = `${f.source}# edited during port selection\n`;
+    const run = vi.fn();
+    await expect(
+      withCiDatabaseConfig({
+        ...f,
+        run,
+        selectPort: async () => {
+          await writeFile(f.configPath, concurrent);
+          return 34567;
+        },
+      })
+    ).rejects.toThrow('changed');
+    expect(run).not.toHaveBeenCalled();
+    expect(await readFile(f.configPath, 'utf8')).toBe(concurrent);
+  });
   it.each([
     (source) => source.replace('[db]', '[other]'),
     (source) => `${source}[db]\nport = 54323\n`,
@@ -159,7 +182,7 @@ describe('isolated CI database configuration', () => {
     }
   );
   it('refuses the CI entrypoint locally before looking for Docker or changing config', async () => {
-    const f = await configFixture();
+    const source = await readFile('supabase/config.toml', 'utf8');
     const result = spawnSync(process.execPath, ['scripts/checks/check-supabase-ci.mjs'], {
       env: { ...process.env, CI: 'false' },
       encoding: 'utf8',
@@ -167,7 +190,7 @@ describe('isolated CI database configuration', () => {
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('CI-only wrapper');
-    expect(await readFile(f.configPath, 'utf8')).toBe(f.source);
+    expect(await readFile('supabase/config.toml', 'utf8')).toBe(source);
   });
   it.each(['SUPABASE_PROJECT_ID', 'SUPABASE_DB_PORT'])(
     'rejects %s overrides before Docker or configuration access',
@@ -210,6 +233,27 @@ describe('CI Docker target verification', () => {
   it('fails closed when Docker context inspection fails', () => {
     const run = vi.fn().mockReturnValue({ status: 1, stderr: 'failed' });
     expect(() => requireLocalDocker({}, run)).toThrow('Cannot verify');
+  });
+  it('pins the database child to the verified socket and removes mutable context and TLS selectors', async () => {
+    const env = {
+      DOCKER_CONTEXT: 'named-local',
+      DOCKER_TLS: '1',
+      DOCKER_TLS_VERIFY: '1',
+      DOCKER_CERT_PATH: 'private-cert-path',
+      KEEP: 'unchanged',
+    };
+    const inspect = vi.fn().mockReturnValue({ status: 0, stdout: 'unix:///verified/docker.sock' });
+    const spawnChild = vi.fn(() => {
+      const child = new EventEmitter();
+      queueMicrotask(() => child.emit('exit', 17));
+      return child;
+    });
+    expect(await runDatabaseChecks({ env, inspect, spawnChild })).toBe(17);
+    expect(spawnChild).toHaveBeenCalledWith('bash', ['scripts/checks/check-supabase-db.sh'], {
+      stdio: 'inherit',
+      env: { KEEP: 'unchanged', DOCKER_HOST: 'unix:///verified/docker.sock' },
+    });
+    expect(env.DOCKER_CONTEXT).toBe('named-local');
   });
 });
 describe('bounded database port diagnostics', () => {
