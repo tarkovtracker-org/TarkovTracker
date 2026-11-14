@@ -10,12 +10,8 @@ on:
   check_suite:
     types: [completed]
 permissions: {}
-# Review bursts (one review plus its inline comments) collapse to the newest signal per PR. A
-# cancelled signal never wakes the controller, and the surviving one makes it reread the live PR,
-# so dropping intermediate signals loses no evidence. Queue and provider-suite signals stay unique.
-concurrency:
-  group: review-admission-signal-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
-  cancel-in-progress: true
+# Each event must reach the trusted controller independently. A later author-controlled edit
+# must never cancel an approval withdrawal or postpone it behind a debounce window.
 jobs:
   signal:
     name: Admission signal
@@ -44,9 +40,5 @@ jobs:
           path: signal.json
           if-no-files-found: error
           retention-days: 1
-      # Debounce window: later events for the same PR cancel this run before it can complete.
-      - name: Coalesce review burst
-        if: github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment'
-        run: sleep 45
       - name: Notify trusted admission controller
         run: 'true'

@@ -1701,6 +1701,9 @@ test('review signals bind service-owned PR identity independently of signal comm
         f.f.reviews = [];
       },
       (f) => {
+        f.f.reviews = [human('DISMISSED')];
+      },
+      (f) => {
         f.f.reviews.push(human('CHANGES_REQUESTED'));
       },
       (f) => {

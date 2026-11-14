@@ -216,11 +216,11 @@ rejects active PRs sharing that source branch or SHA, then rereads the merged ta
 ambiguous, mismatched or unmerged targets and API failures remain errors. Run, attempt, workflow,
 event and signal-job authentication still precede recovery; branch names alone never authorize it.
 
-Review and review-comment signals are debounced per PR: each waits 45 seconds inside a per-PR
-`cancel-in-progress` group, so a review and its inline comments wake the serialized controller
-once. Cancelled signals are already ignored by the controller's success-only intake, and the
-surviving signal still rereads live evidence, so no review state is lost. Queue and
-provider-suite signals keep unique groups. Release Promotion Queue no longer subscribes to
+Review and review-comment signals run independently without cancellation groups or a debounce
+delay. In particular, later contributor edits cannot suppress an approval withdrawal. Each
+successful signal wakes the trusted controller, which serializes publication and rereads live
+evidence for the exact PR head and queue commit. Queue and provider-suite signals retain their
+existing identity checks. Release Promotion Queue no longer subscribes to
 Review Admission completion: a release-only job explicitly dispatches the trusted main controller
 after publication. Display titles do not affect promotion. The controller waits at most 60 seconds
 for the requesting attempt to complete successfully and authenticates its receipts as before;
