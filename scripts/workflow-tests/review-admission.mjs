@@ -1463,6 +1463,7 @@ function mergedSignalFixture(event = 'pull_request_review', linked = false) {
     lookup.reads.push(params);
     assert.equal(params.base, 'main');
     assert.equal(params.per_page, 100);
+    if (params.state === lookup.failState) throw new Error('lookup unavailable');
     if (params.state === 'open') return lookup.active;
     assert.equal(params.state, 'all');
     assert.equal(
@@ -1490,36 +1491,55 @@ test('merged review signals are obsolete without changing statuses or receipts',
   }
 });
 test('merged review recovery rejects absent, ambiguous, active and mismatched targets', async (t) => {
+  const sourceError = 'Merged review signal source identity mismatch.';
+  const targetError = 'Merged review signal PR identity mismatch.';
+  const countError = 'Merged review signal target is missing or ambiguous.';
+  const activeError = 'Merged review signal conflicts with an active PR.';
+  const changedError = 'Merged review signal target changed or was not merged.';
   const cases = [
-    ['missing repository', (f) => delete f.context.payload.repository],
-    ['foreign run repository ID', (f) => (f.run.repository.id = 8)],
-    ['foreign run repository URL', (f) => (f.run.repository.url += '-other')],
-    ['missing source repository', (f) => delete f.run.head_repository],
-    ['invalid source repository ID', (f) => (f.run.head_repository.id = 0)],
-    ['foreign source repository ID', (f) => (f.run.head_repository.id = 8)],
-    ['foreign source repository URL', (f) => (f.run.head_repository.url += '-other')],
-    ['missing source branch', (f) => delete f.run.head_branch],
-    ['wrong source branch', (f) => (f.run.head_branch = 'different')],
+    [
+      'missing repository',
+      'Missing review signal repository identity.',
+      (f) => delete f.context.payload.repository,
+    ],
+    ['foreign run repository ID', sourceError, (f) => (f.run.repository.id = 8)],
+    ['foreign run repository URL', sourceError, (f) => (f.run.repository.url += '-other')],
+    ['missing source repository', sourceError, (f) => delete f.run.head_repository],
+    ['invalid source repository ID', sourceError, (f) => (f.run.head_repository.id = 0)],
+    ['foreign source repository ID', targetError, (f) => (f.run.head_repository.id = 8)],
+    ['foreign source repository URL', sourceError, (f) => (f.run.head_repository.url += '-other')],
+    ['missing source branch', sourceError, (f) => delete f.run.head_branch],
+    ['wrong source branch', targetError, (f) => (f.run.head_branch = 'different')],
     [
       'synthetic source SHA',
+      targetError,
       (f) => {
         f.run.head_sha = 'd'.repeat(40);
         f.context.payload.workflow_run.head_sha = f.run.head_sha;
         f.f.jobs[0].head_sha = f.run.head_sha;
       },
     ],
-    ['missing target', (f) => (f.lookup.candidates = [])],
-    ['multiple targets', (f) => f.lookup.candidates.push(structuredClone(f.lookup.candidates[0]))],
-    ['active target', (f) => (f.lookup.candidates[0].state = 'open')],
-    ['unmerged target', (f) => (f.lookup.candidates[0].merged_at = null)],
-    ['foreign target URL', (f) => (f.lookup.candidates[0].url += '-other')],
-    ['foreign base repository', (f) => (f.lookup.candidates[0].base.repo.id = 8)],
-    ['foreign source repository', (f) => (f.lookup.candidates[0].head.repo.id = 8)],
-    ['wrong base branch', (f) => (f.lookup.candidates[0].base.ref = 'develop')],
-    ['wrong target branch', (f) => (f.lookup.candidates[0].head.ref = 'different')],
-    ['wrong target SHA', (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
+    ['missing target', countError, (f) => (f.lookup.candidates = [])],
+    [
+      'multiple targets',
+      countError,
+      (f) => f.lookup.candidates.push(structuredClone(f.lookup.candidates[0])),
+    ],
+    ['active target', targetError, (f) => (f.lookup.candidates[0].state = 'open')],
+    ['unmerged target', targetError, (f) => (f.lookup.candidates[0].merged_at = null)],
+    ['foreign target URL', targetError, (f) => (f.lookup.candidates[0].url += '-other')],
+    ['foreign base repository', targetError, (f) => (f.lookup.candidates[0].base.repo.id = 8)],
+    ['foreign source repository', targetError, (f) => (f.lookup.candidates[0].head.repo.id = 8)],
+    [
+      'wrong base branch',
+      'Admission only targets main.',
+      (f) => (f.lookup.candidates[0].base.ref = 'develop'),
+    ],
+    ['wrong target branch', targetError, (f) => (f.lookup.candidates[0].head.ref = 'different')],
+    ['wrong target SHA', targetError, (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
     [
       'reused active branch',
+      activeError,
       (f) => {
         const active = structuredClone(f.f.pr);
         active.state = 'open';
@@ -1529,6 +1549,7 @@ test('merged review recovery rejects absent, ambiguous, active and mismatched ta
     ],
     [
       'same SHA on another active branch',
+      activeError,
       (f) => {
         const active = structuredClone(f.f.pr);
         active.state = 'open';
@@ -1536,29 +1557,37 @@ test('merged review recovery rejects absent, ambiguous, active and mismatched ta
         f.lookup.active.push(active);
       },
     ],
-    ['fresh target reopened', (f) => (f.f.pr.state = 'open')],
-    ['fresh target unmerged', (f) => (f.f.pr.merged = false)],
-    ['fresh target number changed', (f) => (f.f.pr.number = 2)],
-    ['fresh target head changed', (f) => (f.f.pr.head.sha = 'd'.repeat(40))],
-    ['fresh target repository changed', (f) => (f.f.pr.head.repo.id = 8)],
+    ['fresh target reopened', targetError, (f) => (f.f.pr.state = 'open')],
+    ['fresh target unmerged', changedError, (f) => (f.f.pr.merged = false)],
     [
-      'lookup API failed',
+      'fresh target number changed',
+      changedError,
       (f) => {
-        f.github.paginate = async () => {
-          throw new Error('lookup unavailable');
-        };
+        f.f.pr.number = 2;
+        f.f.pr.url = 'https://api.github.com/repos/example/repo/pulls/2';
       },
+    ],
+    ['fresh target head changed', targetError, (f) => (f.f.pr.head.sha = 'd'.repeat(40))],
+    ['fresh target repository changed', targetError, (f) => (f.f.pr.head.repo.id = 8)],
+    ['lookup API failed', 'lookup unavailable', (f) => (f.lookup.failState = 'all'), ['all']],
+    [
+      'active PR API failed',
+      'lookup unavailable',
+      (f) => (f.lookup.failState = 'open'),
+      ['all', 'open'],
     ],
     [
       'fresh PR API failed',
+      'PR unavailable',
       (f) => {
         f.github.rest.pulls.get = async () => {
           throw new Error('PR unavailable');
         };
       },
+      ['all', 'open'],
     ],
   ];
-  for (const [name, change] of cases) {
+  for (const [name, message, change, expectedReads] of cases) {
     await t.test(name, async () => {
       const f = mergedSignalFixture();
       const core = stepCore();
@@ -1567,10 +1596,15 @@ test('merged review recovery rejects absent, ambiguous, active and mismatched ta
       await withReceiptDirectory(async () => {
         await assert.rejects(
           runReviewAdmissionStep({ github: f.github, context: f.context, core }),
-          /review signal|PR repository mismatch|Admission only targets main|Missing immutable PR head|lookup unavailable|PR unavailable/
+          { message }
         );
         assert.equal(existsSync('review-admission-evidence'), false);
       });
+      if (expectedReads)
+        assert.deepEqual(
+          f.lookup.reads.map((read) => read.state),
+          expectedReads
+        );
       assert.deepEqual(f.statuses, before);
       assert.deepEqual(core.outputs, {});
       assert.deepEqual(core.notices, []);
