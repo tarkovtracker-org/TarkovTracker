@@ -309,6 +309,9 @@ does not load the link or synchronize roles with a stale session.
 Callback readiness rejects after its time budget while the code exchange is still pending.
 An exchange failure remains visible to subsequent readiness callers until a page reload; a
 slow exchange that later succeeds can satisfy a later readiness call without exchanging twice.
+The normal `/auth/callback` page retains its five-second session-settle allowance after a
+pending readiness timeout, awaiting confirmed callback readiness before reporting success.
+A restored session alone does not complete the callback or count as a successful login.
 Navigating to an authenticated or admin route while the callback is pending cancels that
 navigation without clearing the existing session or discarding the callback URL. Access to
 the protected route remains blocked until readiness succeeds.
