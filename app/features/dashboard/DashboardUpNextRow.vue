@@ -1,6 +1,10 @@
 <template>
   <NuxtLink
-    :to="{ path: '/tasks', query: { task: item.taskId } }"
+    :to="
+      item.storylineTarget
+        ? { path: '/storyline', query: { ...item.storylineTarget } }
+        : { path: '/tasks', query: { task: item.taskId } }
+    "
     class="flex min-w-0 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/4"
     :data-testid="`up-next-item-${item.taskId}`"
     @click="onClick"
@@ -33,7 +37,10 @@
   import { useDashboardFocusAnalytics } from '@/composables/useDashboardFocusAnalytics';
   import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
   import type { UpNextItem, UpNextReason } from '@/features/dashboard/upNext';
-  const props = defineProps<{ item: UpNextItem; index: number }>();
+  const props = withDefaults(
+    defineProps<{ item: UpNextItem; index: number; trackClicks?: boolean }>(),
+    { trackClicks: true }
+  );
   const REASON_ICONS: Record<UpNextReason, string> = {
     'unlock-trader': 'i-mdi-lock-open-variant',
     opens: 'i-mdi-source-branch',
@@ -93,11 +100,13 @@
       'page.dashboard.up_next.left_other'
     );
   });
-  const onClick = () =>
+  const onClick = () => {
+    if (!props.trackClicks) return;
     trackRecommendationClick({
       recommendationId: `${props.item.reason === 'blocked' ? 'blocked' : 'available'}-${props.item.taskId}`,
       reason: props.item.reason,
       taskId: props.item.taskId,
       variant: props.index === 0 ? 'primary' : 'secondary',
     });
+  };
 </script>
