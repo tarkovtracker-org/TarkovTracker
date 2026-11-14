@@ -140,7 +140,6 @@
               :aria-label="$t('common.backup_restore')"
             >
               <DataManagementCard view="backup" :session="dataManagementSession" />
-              <DebugStateCard />
             </section>
             <section
               v-if="visitedTabs.api"
@@ -173,7 +172,6 @@
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
-  import DebugStateCard from '@/features/settings/DebugStateCard.vue';
   import DeviceDataCard from '@/features/settings/DeviceDataCard.vue';
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
