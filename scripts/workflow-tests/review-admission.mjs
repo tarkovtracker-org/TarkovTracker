@@ -3262,6 +3262,26 @@ test('deferred publisher uses its returned App client instead of the read-only c
     await assert.rejects(mutant.runReviewAdmission(args), /unwrapped status writer/);
   });
 });
+test('signal run metadata is read once per stage and freshly authenticated after queueing', async () => {
+  const f = signalFixture(queuedControlFixture());
+  let reads = 0;
+  const read = f.github.rest.actions.getWorkflowRunAttempt;
+  f.github.rest.actions.getWorkflowRunAttempt = async (...args) => {
+    reads += 1;
+    return read(...args);
+  };
+  assert.equal(await filterAdmission({ github: f.github, context: f.context }), true);
+  assert.equal(reads, 1);
+  await withReceiptDirectory(async () => {
+    await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+  });
+  assert.equal(reads, 2);
+  const before = structuredClone(f.statuses);
+  f.run.run_attempt += 1;
+  await assert.rejects(runReviewAdmission({ github: f.github, context: f.context, core: f.core }));
+  assert.equal(reads, 3);
+  assert.deepEqual(f.statuses, before);
+});
 test('permission lookup budget ignores inert participants while retaining live approval actors', async () => {
   const pr = fixture().pr;
   const comments = Array.from({ length: 100 }, (_, id) => ({

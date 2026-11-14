@@ -151,6 +151,8 @@ their events even for stale signal SHAs, drafts, findings or withdrawn approval.
 Actions, checks, contents and pull-request read scopes, without a protected environment or App key.
 The publisher repeats source/target authentication after waiting in the unchanged global
 `queue: max` lock, and initializes its App only when the target still needs evaluation.
+Each stage reuses its authenticated run record for target resolution; no run proof is cached
+between preflight, evaluation and publication.
 
 Permission lookups consider only current-head human approval reviews and exact-head approval
 commands. Every review, finding and comment still reaches policy evaluation; current roles are

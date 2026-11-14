@@ -250,16 +250,16 @@ async function groupForRun(github, repo, run) {
   const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: run.head_sha });
   return { ...run, base_ref: 'refs/heads/main', base_sha: commit.parents?.[0]?.sha };
 }
-async function targets(github, context) {
+async function targets(github, context, signal) {
   const queued = queueRun(context.payload);
   if (queued) return queueTarget(github, context.repo, queued);
   const direct = directNumber(context.payload);
   if (direct) return [{ number: direct }];
   if (context.eventName !== 'workflow_run') return [];
-  return signalTargets(github, context);
+  return signalTargets(github, context, signal);
 }
-async function signalTargets(github, context) {
-  const run = await validatedSignalRun(github, context);
+async function signalTargets(github, context, signal) {
+  const run = signal ?? (await validatedSignalRun(github, context));
   if (run.event === 'check_suite') return suiteTargets(github, context.repo, run);
   if (unlinkedReview(run)) return [await recoverMergedReview(github, context, run)];
   const [target] = linkedPullTarget(run.pull_requests, context.repo);
@@ -411,6 +411,7 @@ async function requireSignal(github, context) {
     ].every(Boolean),
     'Admission signal did not complete for this exact run attempt.'
   );
+  return run;
 }
 async function scopeStatuses(github, context, shas, state, description) {
   for (const sha of shas) await status(github, context, sha, state, description);
@@ -478,10 +479,10 @@ function relevantPrComment(payload) {
 }
 async function successfulSignal(github, context) {
   if (context.payload.workflow_run.conclusion !== 'success') return false;
-  await requireSignal(github, context);
+  const signal = await requireSignal(github, context);
   // Authenticate the target before joining the global publication queue. This only discards
   // signals already proven obsolete by the publisher; ambiguity and API errors still throw.
-  return !obsoleteSignalNotice(await targets(github, context));
+  return !obsoleteSignalNotice(await targets(github, context, signal));
 }
 export async function filterAdmission({ github, context }) {
   if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
@@ -507,8 +508,8 @@ export async function runReviewAdmission({ github, context, core, createPublishe
   }
   const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
-  await requireSignal(github, context);
-  const selected = await targets(github, context);
+  const signal = await requireSignal(github, context);
+  const selected = await targets(github, context, signal);
   const obsolete = obsoleteSignalNotice(selected);
   if (obsolete) {
     core.notice(obsolete);
