@@ -45,15 +45,18 @@ export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
 /**
  * A shared exit that needs a PMC and a Scav in `mode`, from the current extract rule data, using
- * the same rule list the requirement details show; the name fallback covers missing data.
+ * the same rule list the requirement details show; the name fallback covers missing data, including
+ * before the overlay rules load.
  */
 export const isCoopExtract = (extract: MapExtract, mode = 'pvp'): boolean => {
   const data = currentExtractRuleData();
-  const coop = Object.keys(data.requirements.maps).some((mapId) =>
-    extractRulesForMode(data, { mapId, extractId: extract.id }, mode)?.some(
-      (rule) => rule.type === 'coop'
-    )
-  );
+  const coop =
+    data !== null &&
+    Object.keys(data.requirements.maps).some((mapId) =>
+      extractRulesForMode(data, { mapId, extractId: extract.id }, mode)?.some(
+        (rule) => rule.type === 'coop'
+      )
+    );
   return coop || /\bco-?op\b/i.test(extract.name || '');
 };
 /** Derive available map locations and expose independent layer toggles and display controls. */

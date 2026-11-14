@@ -1,36 +1,31 @@
-import bundledCues from '@/data/extractCues.json';
-import bundledRequirements from '@/data/extractRequirements.json';
 import { isExtractRuleData, type ExtractRuleData } from '@/utils/extractRuleData';
 import { logger } from '@/utils/logger';
 import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
 /**
- * Bundled copy of the overlay's extract sections, used until `/api/tarkov/extract-requirements`
- * answers (and whenever the overlay is unavailable or has not published them yet).
+ * Overlay extract rules and cues from `/api/tarkov/extract-requirements`. `null` until the route
+ * answers with valid data, and whenever the overlay is unavailable or has not published them:
+ * the map then shows each extract's requirements as unknown and omits the source line.
  */
-export const BUNDLED_EXTRACT_RULE_DATA = {
-  requirements: bundledRequirements,
-  cues: bundledCues,
-} as ExtractRuleData;
-const ruleData = shallowRef<ExtractRuleData>(BUNDLED_EXTRACT_RULE_DATA);
+const ruleData = shallowRef<ExtractRuleData | null>(null);
 let request: Promise<void> | null = null;
 async function loadOverlayRuleData(): Promise<void> {
   try {
     const response = await tarkovApiFetch<{ data: unknown }>('/api/tarkov/extract-requirements');
     if (isExtractRuleData(response?.data)) ruleData.value = response.data;
   } catch (error) {
-    // The bundled rules stay in place; the map never blocks on this request.
-    logger.debug('[ExtractRules] Overlay extract rules unavailable, using bundled copy', error);
+    // The map never blocks on this request; extracts keep their unknown requirements.
+    logger.debug('[ExtractRules] Overlay extract rules unavailable', error);
   }
 }
 /** The current extract rule data without starting a request; reactive inside computeds. */
-export const currentExtractRuleData = (): ExtractRuleData => ruleData.value;
+export const currentExtractRuleData = (): ExtractRuleData | null => ruleData.value;
 /** Extract rule data for the map, requesting the overlay copy once per page load. */
-export function useExtractRuleData(): Readonly<Ref<ExtractRuleData>> {
+export function useExtractRuleData(): Readonly<Ref<ExtractRuleData | null>> {
   if (import.meta.client && !request) request = loadOverlayRuleData();
   return ruleData;
 }
-/** Test helper: restore the bundled data and allow a fresh request. */
+/** Test helper: clear the loaded data and allow a fresh request. */
 export function resetExtractRuleData(): void {
-  ruleData.value = BUNDLED_EXTRACT_RULE_DATA;
+  ruleData.value = null;
   request = null;
 }
