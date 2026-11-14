@@ -375,6 +375,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   Player level is an editable scalar: accepted live/reconnect rows can lower a clean local level,
   while a pending local level edit wins until acknowledged. Startup takes the level from the
   preferred mode snapshot, so a newer decrease is not replaced by an older maximum.
+  Prestige-level corrections follow the same live/reconnect scalar rule in PvP and PvE without
+  advancing the full-reset epoch; pending prestige edits and unrelated progress remain intact.
   Recovery composition also honors a known newer mode clock's level; an unknown-clock
   placeholder cannot lower existing progress using only its envelope write time. Owned snapshots
   with known mode clocks still reconcile a deliberate level decrease to the default level.
