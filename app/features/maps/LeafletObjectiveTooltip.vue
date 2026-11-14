@@ -157,7 +157,9 @@
     item.name ?? metadataStore.itemsById?.get(item.id)?.name ?? item.shortName ?? '';
   const itemDetails = computed(() => {
     const entry = objective.value ? getObjectivePopupItem(objective.value) : undefined;
-    return entry ? describeObjectiveItem(entry, itemName(entry.item), requiredCount.value) : null;
+    const name = entry ? itemName(entry.item) : '';
+    // An item without a resolvable name would render as a bare count, so it gets no row.
+    return entry && name ? describeObjectiveItem(entry, name, requiredCount.value) : null;
   });
   const keyLabels = computed(() =>
     objective.value ? getObjectiveKeyLabels(objective.value, itemName) : []

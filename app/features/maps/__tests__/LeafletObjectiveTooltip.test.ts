@@ -158,6 +158,14 @@ describe('LeafletObjectiveTooltip', () => {
       'maps.objective_icons.kinds.other'
     );
   });
+  it('omits the item row when the item has no name to show', async () => {
+    const { wrapper } = await setup(
+      { id: 'task-1', name: 'Task' },
+      {},
+      { type: 'shoot', count: 3, usingWeapon: { id: '' }, items: [{ id: 'unnamed' }] }
+    );
+    expect(wrapper.find('[data-testid="objective-item"]').exists()).toBe(false);
+  });
   it('falls back to a trader placeholder when the task has no trader image', async () => {
     const { wrapper } = await setup({ id: 'task-1', name: 'Task', trader: { id: 'x' } });
     expect(wrapper.find('[data-testid="objective-trader-image"]').exists()).toBe(false);

@@ -26,6 +26,14 @@ describe('objective popup details', () => {
     expect(getObjectivePopupItem(stash)).toEqual({ item: flares[0], alternatives: 1 });
     expect(getObjectivePopupItem({ id: 'o', type: 'visit' })).toBeUndefined();
   });
+  it('ignores empty item placeholders from adapted objectives', () => {
+    // A shoot objective with no weapon requirement arrives as `usingWeapon: { id: '' }`.
+    const shoot = { id: 'o', type: 'shoot', usingWeapon: { id: '' } } as TaskObjective;
+    expect(getObjectivePopupItem(shoot)).toBeUndefined();
+    const rifle = { id: 'ash12', name: 'ASh-12' };
+    const mixed = { id: 'o', type: 'shoot', items: [{ id: '' }, rifle] } as TaskObjective;
+    expect(getObjectivePopupItem(mixed)).toEqual({ item: rifle, alternatives: 0 });
+  });
   it('shows the weapon or gear an elimination must be done with', () => {
     const rifle = { id: 'ash12', name: 'ASh-12' };
     const shoot = { id: 'o', type: 'shoot', usingWeapon: rifle } as TaskObjective;

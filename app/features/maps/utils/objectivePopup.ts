@@ -2,10 +2,14 @@ import { getObjectiveGlyphKind } from '@/features/maps/utils/objectiveGlyphs';
 import type { TarkovItem, Task, TaskObjective } from '@/types/tarkov';
 /** The item a player brings, plants or picks up for an objective, with how many alternatives. */
 export type ObjectivePopupItem = { item: TarkovItem; alternatives: number };
-const firstOf = (items: TarkovItem[] | undefined): ObjectivePopupItem | undefined =>
-  items?.[0] ? { item: items[0], alternatives: items.length - 1 } : undefined;
+// Adapted objectives carry `{ id: '' }` placeholders for absent item refs; those are not items.
+const isRealItem = (item: TarkovItem | undefined): item is TarkovItem => Boolean(item?.id);
+const firstOf = (items: TarkovItem[] | undefined): ObjectivePopupItem | undefined => {
+  const real = (items ?? []).filter(isRealItem);
+  return real[0] ? { item: real[0], alternatives: real.length - 1 } : undefined;
+};
 const single = (item: TarkovItem | undefined): ObjectivePopupItem | undefined =>
-  item ? { item, alternatives: 0 } : undefined;
+  isRealItem(item) ? { item, alternatives: 0 } : undefined;
 /**
  * The item worth showing in a map popup: the MS2000 Marker for a mark, the quest item for a
  * quest pickup or stash, otherwise the accepted items (the first of several, e.g. flares), and
