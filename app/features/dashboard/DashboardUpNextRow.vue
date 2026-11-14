@@ -105,7 +105,7 @@
     trackRecommendationClick({
       recommendationId: `${props.item.reason === 'blocked' ? 'blocked' : 'available'}-${props.item.taskId}`,
       reason: props.item.reason,
-      taskId: props.item.taskId,
+      taskId: props.item.storylineTarget ? undefined : props.item.taskId,
       variant: props.index === 0 ? 'primary' : 'secondary',
     });
   };

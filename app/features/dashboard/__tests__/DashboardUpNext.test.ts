@@ -3,16 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import type { UpNextItem, UpNextState } from '@/features/dashboard/upNext';
 import type { StorylineNextStep } from '@/features/storyline/nextStep';
-const { useDashboardUpNextMock, trackRecommendationClickMock } = vi.hoisted(() => ({
-  useDashboardUpNextMock: vi.fn(),
-  trackRecommendationClickMock: vi.fn(),
-}));
+const { useDashboardUpNextMock, trackRecommendationClickMock, clearRecommendationAttributionMock } =
+  vi.hoisted(() => ({
+    useDashboardUpNextMock: vi.fn(),
+    trackRecommendationClickMock: vi.fn(),
+    clearRecommendationAttributionMock: vi.fn(),
+  }));
 vi.mock('@/composables/useDashboardUpNext', () => ({
   useDashboardUpNext: useDashboardUpNextMock,
 }));
 vi.mock('@/composables/useDashboardFocusAnalytics', () => ({
   useDashboardFocusAnalytics: () => ({
     trackRecommendationClick: trackRecommendationClickMock,
+    clearRecommendationAttribution: clearRecommendationAttributionMock,
   }),
 }));
 vi.mock('@/composables/useTaskBlockerText', () => ({
@@ -91,6 +94,7 @@ describe('DashboardUpNext', () => {
   beforeEach(() => {
     useDashboardUpNextMock.mockReset();
     trackRecommendationClickMock.mockReset();
+    clearRecommendationAttributionMock.mockReset();
   });
   it('renders ranked rows that link to their task', async () => {
     const wrapper = await mountWith('actionable', [
@@ -201,6 +205,30 @@ describe('DashboardUpNext', () => {
       JSON.stringify({ chapter: 'tour', objective: 'talk' })
     );
     await link.trigger('click');
+    expect(trackRecommendationClickMock).not.toHaveBeenCalled();
+  });
+  it('records dashboard Storyline blocker clicks without task-funnel attribution', async () => {
+    const wrapper = await mountWith('blocked', [
+      item({ reason: 'blocked', storylineTarget: { chapter: 'tour', objective: 'talk' } }),
+    ]);
+    await wrapper.get('[data-testid="up-next-item-task-1"]').trigger('click');
+    expect(trackRecommendationClickMock).toHaveBeenCalledWith({
+      recommendationId: 'blocked-task-1',
+      reason: 'blocked',
+      taskId: undefined,
+      variant: 'primary',
+    });
+  });
+  it('clears previous task attribution when opening the dashboard Storyline step', async () => {
+    const wrapper = await mountWith('actionable', [item()], { storyStep });
+    await wrapper.get('[data-testid="up-next-storyline"]').trigger('click');
+    expect(clearRecommendationAttributionMock).toHaveBeenCalledOnce();
+    expect(trackRecommendationClickMock).not.toHaveBeenCalled();
+  });
+  it('leaves dashboard analytics untouched when opening a task-list Storyline step', async () => {
+    const wrapper = await mountWith('blocked', [], { storyStep, inTaskList: true });
+    await wrapper.get('[data-testid="up-next-storyline"]').trigger('click');
+    expect(clearRecommendationAttributionMock).not.toHaveBeenCalled();
     expect(trackRecommendationClickMock).not.toHaveBeenCalled();
   });
 });

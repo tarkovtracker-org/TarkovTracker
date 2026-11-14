@@ -1,6 +1,8 @@
 <template>
   <ol class="divide-y divide-white/8 border-t border-white/8">
-    <li v-if="storyStep"><StorylineNextStepRow :item="storyStep" /></li>
+    <li v-if="storyStep">
+      <StorylineNextStepRow :item="storyStep" :track-clicks="trackClicks" />
+    </li>
     <li v-for="(item, index) in items" :key="item.taskId">
       <DashboardUpNextRow :item="item" :index="index" :track-clicks="trackClicks" />
     </li>

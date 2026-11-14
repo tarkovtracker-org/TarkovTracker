@@ -3,6 +3,7 @@
     :to="{ path: '/storyline', query: { chapter: item.chapterId, objective: item.objectiveId } }"
     class="focus-visible:ring-primary-400 flex min-w-0 items-start gap-3 px-4 py-3 transition-colors hover:bg-white/4 focus-visible:ring-2 focus-visible:ring-inset"
     data-testid="up-next-storyline"
+    @click="onClick"
   >
     <UIcon
       name="i-mdi-book-open-page-variant-outline"
@@ -31,9 +32,16 @@
   </NuxtLink>
 </template>
 <script setup lang="ts">
+  import { useDashboardFocusAnalytics } from '@/composables/useDashboardFocusAnalytics';
   import type { StorylineNextStep } from '@/features/storyline/nextStep';
-  const props = defineProps<{ item: StorylineNextStep }>();
+  const props = withDefaults(defineProps<{ item: StorylineNextStep; trackClicks?: boolean }>(), {
+    trackClicks: true,
+  });
   const { t } = useI18n({ useScope: 'global' });
+  const { clearRecommendationAttribution } = useDashboardFocusAnalytics();
+  const onClick = () => {
+    if (props.trackClicks) clearRecommendationAttribution();
+  };
   const label = computed(
     () => props.item.description ?? t(`page.dashboard.up_next.storyline.${props.item.kind}`)
   );
