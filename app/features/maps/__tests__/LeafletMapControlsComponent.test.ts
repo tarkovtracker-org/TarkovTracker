@@ -210,6 +210,27 @@ describe('LeafletMap controls', () => {
     await wrapper.get('[data-testid="map-layers-toggle"]').trigger('click');
     return (key: string) => wrapper.find(`[data-testid="map-layers-panel"] [data-layer="${key}"]`);
   };
+  it('starts extracts from the saved default and follows it when it changes', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+          { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+          { id: 'c', name: 'Railroad', faction: 'shared', position: { x: 3, y: 0, z: 3 } },
+        ],
+      },
+      showExtracts: false,
+    });
+    const row = await openLayersPanel(wrapper);
+    const pressed = () =>
+      ['pmc', 'scav', 'shared'].map((key) => row(key).attributes('aria-pressed'));
+    expect(pressed()).toEqual(['false', 'false', 'false']);
+    // The preference can arrive from account sync after the map mounted.
+    await wrapper.setProps({ showExtracts: true });
+    expect(pressed()).toEqual(['true', 'true', 'true']);
+    wrapper.unmount();
+  });
   it('combines the legend and layer toggles in one panel that remembers being opened', async () => {
     const wrapper = await mountMap({
       map: {

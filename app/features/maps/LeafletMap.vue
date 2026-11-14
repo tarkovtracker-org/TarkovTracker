@@ -2132,6 +2132,17 @@
     lastMarksHash.value = '';
     updateMarkers();
   });
+  // A changed default (e.g. the saved preference arriving from account sync after the map
+  // mounted) resets every extract layer to it; per-session toggles otherwise stay as set.
+  watch(
+    () => props.showExtracts,
+    (visible) => {
+      if (props.showPmcExtracts === undefined) showPmcExtracts.value = visible;
+      if (props.showScavExtracts === undefined) showScavExtracts.value = visible;
+      showSharedExtracts.value = showPmcExtracts.value || showScavExtracts.value;
+      showCoopExtracts.value = showSharedExtracts.value;
+    }
+  );
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
     createExtractMarkers()
   );
