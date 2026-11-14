@@ -229,6 +229,11 @@ describe('LeafletMap controls', () => {
     // The preference can arrive from account sync after the map mounted.
     await wrapper.setProps({ showExtracts: true });
     expect(pressed()).toEqual(['true', 'true', 'true']);
+    // A row the user changed keeps their choice through later default changes.
+    await row('scav').trigger('click');
+    await wrapper.setProps({ showExtracts: false });
+    await wrapper.setProps({ showExtracts: true });
+    expect(pressed()).toEqual(['true', 'false', 'true']);
     wrapper.unmount();
   });
   it('combines the legend and layer toggles in one panel that remembers being opened', async () => {

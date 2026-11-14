@@ -929,13 +929,17 @@
     if (!source || !anyExtractsVisible.value) return null;
     return describeExtractSource(source, t, formatCaptureDate);
   });
+  /** Extract rows the user changed this session; a later default never overrides them. */
+  const touchedLayers = new Set<string>();
   const toggleLayer = (item: MapLayerItem) => {
+    touchedLayers.add(item.key);
     item.visible.value = !item.visible.value;
   };
   const showAllLayers = () => {
     layerGroups.value.forEach((group) => group.items.forEach(showLayer));
   };
   const showLayer = (item: MapLayerItem) => {
+    touchedLayers.add(item.key);
     if (!item.visible.value) item.visible.value = true;
   };
   // The panel opens by default where there is room beside the map, and stays closed on narrow
@@ -2133,15 +2137,22 @@
     updateMarkers();
   });
   // A changed default (e.g. the saved preference arriving from account sync after the map
-  // mounted) resets every extract layer to it; per-session toggles otherwise stay as set.
+  // mounted) applies to every extract row the user has not changed this session and whose
+  // visibility the page did not set explicitly.
+  const defaultableExtractLayers = (): Array<[string, Ref<boolean>]> =>
+    (
+      [
+        ['pmc', showPmcExtracts, props.showPmcExtracts],
+        ['scav', showScavExtracts, props.showScavExtracts],
+        ['shared', showSharedExtracts, undefined],
+        ['coop', showCoopExtracts, undefined],
+      ] as const
+    )
+      .filter(([key, , explicit]) => explicit === undefined && !touchedLayers.has(key))
+      .map(([key, layer]) => [key, layer]);
   watch(
     () => props.showExtracts,
-    (visible) => {
-      if (props.showPmcExtracts === undefined) showPmcExtracts.value = visible;
-      if (props.showScavExtracts === undefined) showScavExtracts.value = visible;
-      showSharedExtracts.value = showPmcExtracts.value || showScavExtracts.value;
-      showCoopExtracts.value = showSharedExtracts.value;
-    }
+    (visible) => defaultableExtractLayers().forEach(([, layer]) => (layer.value = visible))
   );
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
     createExtractMarkers()
