@@ -143,6 +143,22 @@ The controller serializes relevant events at job scope, after its event filter. 
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
 including withdrawal of a command with leading whitespace.
 
+The read-only filter authenticates successful signal attempts, their jobs, locators and target
+identity before serialization. It skips only the publisher's existing proven-obsolete cases:
+merged review targets and provider suites on canonical queue commits without a linked PR.
+Missing or ambiguous identity, receipt and API failures fail the filter; active targets retain
+their events even for stale signal SHAs, drafts, findings or withdrawn approval. The filter has
+Actions, checks, contents and pull-request read scopes, without a protected environment or App key.
+The publisher repeats source/target authentication after waiting in the unchanged global
+`queue: max` lock, and initializes its App only when the target still needs evaluation.
+Each stage reuses its authenticated run record for target resolution; no run proof is cached
+between preflight, evaluation and publication.
+
+Permission lookups consider only current-head human approval reviews and exact-head approval
+commands. Every review, finding and comment still reaches policy evaluation; current roles are
+reread for each evaluation/publication, without a cross-event cache. This keeps discussion size
+from multiplying collaborator API calls across repeated head/queue evidence reads.
+
 An intake condition also skips ordinary comments before allocating the read-only filter runner.
 It is a coarse selector, never approval evidence: trusted main still verifies retained events.
 Both current and previous comment bodies are checked so approval edits/deletions and provider
