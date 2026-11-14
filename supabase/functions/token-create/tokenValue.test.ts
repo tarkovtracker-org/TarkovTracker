@@ -53,4 +53,10 @@ describe('isTokenValueForGameMode', () => {
     expect(isTokenValueForGameMode('PVP_0123456789ABCDEF01', 'pvp')).toBe(false);
     expect(isTokenValueForGameMode('pvp_0123456789abcdef01', 'pvp')).toBe(false);
   });
+  it.each([undefined, null, 7, true, [pvp], { toString: () => pvp }])(
+    'rejects a non-string token value without coercing it: %j',
+    (value) => {
+      expect(isTokenValueForGameMode(value, 'pvp')).toBe(false);
+    }
+  );
 });
