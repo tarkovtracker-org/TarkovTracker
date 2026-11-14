@@ -502,7 +502,9 @@ that accepted dispatch and its exact-head receipt, then performs normal guarded 
 Legacy `strict` mode is unchanged: its merge step uses the broader flat non-English JSON scope, does not
 wait for Review Admission, and retains guarded `gh pr merge --match-head-commit` plus post-merge main-CI
 dispatch. It does not enforce or attest the new queue-admission exemption described above; it must
-not be used as its commissioning path. Unsupported locales in queue modes retain normal review. The admission helper allows at most 120 pending polls with five-second sleeps,
+not be used as its commissioning path. Locales outside the pinned list in `review-admission-policy.mjs` retain normal review in queue modes.
+The list can include a Crowdin target the app does not load yet: `tr` is listed while its
+translations are in progress and joins `SUPPORTED_LOCALES` separately. The admission helper allows at most 120 pending polls with five-second sleeps,
 plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
 bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
 limits. No additional privileged trigger, promotion workflow or scanner exception is needed.
