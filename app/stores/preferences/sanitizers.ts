@@ -203,11 +203,9 @@ export const sanitizePersistedPreferencesState = (
   delete sanitizedState.hideoutSortReadyFirst;
   delete sanitizedState.hideoutCollapseCompleted;
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
-  if (
-    typeof sanitizedState.neededItemsHideOwned !== 'boolean' &&
-    typeof legacyHideCollected === 'boolean'
-  ) {
-    sanitizedState.neededItemsHideOwned = legacyHideCollected;
+  if (typeof legacyHideCollected === 'boolean') {
+    sanitizedState.neededItemsHideOwned =
+      sanitizedState.neededItemsHideOwned === true || legacyHideCollected;
   }
   if ('neededItemsHideCollected' in sanitizedState) {
     delete sanitizedState.neededItemsHideCollected;
