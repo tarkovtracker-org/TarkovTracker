@@ -47,6 +47,7 @@ test('reporting outages cannot disable authoritative test or coverage failures',
     /continue-on-error:/
   );
   assert.doesNotMatch(jobBlock(workflow, 'coverage'), /continue-on-error:/);
+  assert.doesNotMatch(workflowStep(tests, 'Run Deno tests'), /continue-on-error:/);
 });
 test('bundle analysis uses supported OIDC without static credential fallback', () => {
   const config = readFileSync('nuxt.config.ts', 'utf8');
