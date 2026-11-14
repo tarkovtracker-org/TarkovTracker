@@ -24,6 +24,8 @@ Deno.test(
     let cleanupFails = false;
     let transfers = 0;
     let teamDeletes = 0;
+    let ownsFailureTransition = true;
+    const oauthTime = Math.floor(Date.now() / 1000) - 60;
     const env = stub(Deno.env, 'get', (name) => {
       if (name === 'SUPABASE_URL') return 'http://kong:8000';
       if (name === 'SUPABASE_AUTH_ISSUER') return 'https://supabase.invalid/auth/v1';
@@ -62,6 +64,7 @@ Deno.test(
           const body = await req.json();
           assertEquals(body.p_user_id, userId);
           assertEquals(body.p_session_id, '00000000-0000-0000-0000-000000009502');
+          assertEquals(body.p_authenticated_at, new Date(oauthTime * 1000).toISOString());
           if (!liveSession)
             return json({ code: '28000', message: 'account_deletion_recent_login_required' }, 403);
           claims++;
@@ -124,6 +127,7 @@ Deno.test(
               assertEquals(update.status, 'failed');
               assertEquals(update.claim_token, null);
               failures++;
+              if (!ownsFailureTransition) return json([]);
             }
           }
           return Promise.resolve(json([{ user_id: userId, attempts: 0, max_attempts: 5 }]));
@@ -149,7 +153,7 @@ Deno.test(
           aud: 'authenticated',
           is_anonymous: false,
           session_id: '00000000-0000-0000-0000-000000009502',
-          amr: [{ method: 'oauth', timestamp: Math.floor(Date.now() / 1000) }],
+          amr: [{ method: 'oauth', timestamp: oauthTime }],
           ...overrides,
         },
       ]
@@ -213,9 +217,15 @@ Deno.test(
       assertEquals((await handler!(request())).status, 503);
       assertEquals([claims, deletes, clears, teamReads], [2, 1, 2, 1]);
       assertEquals(failures, 1);
+      ownsFailureTransition = false;
+      const lostLease = await handler!(request());
+      assertEquals(lostLease.status, 202);
+      assertEquals((await lostLease.json()).cleanupScheduled, true);
+      assertEquals([claims, deletes, clears, teamReads], [3, 1, 3, 1]);
+      ownsFailureTransition = true;
       liveSession = false;
       assertEquals((await handler!(request())).status, 403);
-      assertEquals([claims, deletes, clears, teamReads], [2, 1, 2, 1]);
+      assertEquals([claims, deletes, clears, teamReads], [3, 1, 3, 1]);
       liveSession = true;
       clearanceAllowed = true;
       for (const [mode, expectedStatus, deleted] of [

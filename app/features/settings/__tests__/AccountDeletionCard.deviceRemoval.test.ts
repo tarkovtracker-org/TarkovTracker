@@ -128,14 +128,33 @@ describe('account deletion device removal', () => {
     });
   });
   it('requires a new explicit confirmation after returning from sign-in', async () => {
+    invoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: 'account_deletion_recent_login_required' }), {
+          status: 403,
+        }),
+      },
+    });
     const wrapper = mountCard();
-    await flushPromises();
-    expect(invoke).not.toHaveBeenCalled();
-    expect(wrapper.find('input').exists()).toBe(false);
     await clickText(wrapper, 'settings.account.begin_deletion');
-    expect(wrapper.get('input').element.value).toBe('');
-    expect(invoke).not.toHaveBeenCalled();
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(invoke).toHaveBeenCalledTimes(1);
+    reactiveUser.id = null;
+    reactiveUser.loggedIn = false;
+    await flushPromises();
     wrapper.unmount();
+    reactiveUser.id = 'deleted-owner';
+    reactiveUser.loggedIn = true;
+    const returned = mountCard();
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(returned.find('input').exists()).toBe(false);
+    await clickText(returned, 'settings.account.begin_deletion');
+    expect(returned.get('input').element.value).toBe('');
+    expect(invoke).toHaveBeenCalledTimes(1);
+    returned.unmount();
   });
   it.each([false, true])(
     'forgets only the deleted owner after sign-out (failure: %s)',

@@ -34,6 +34,7 @@ const AUTH_ISSUER =
   `${(Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')}/auth/v1`;
 const recentLoginResponse = (req: Request) =>
   createErrorResponse('account_deletion_recent_login_required', 403, req);
+class DeletionLeaseLostError extends Error {}
 type AuthorizedDeletionRequest = AuthSuccess & { authorization: DeletionAuthorization };
 type DeletionRequestResult = AuthorizedDeletionRequest | { response: Response };
 const authorizeDeletionRequest = async (
@@ -300,7 +301,7 @@ async function clearClaimedBilling(
   try {
     await clearEndedDeletionSubscription(client, userId, billing, claimToken);
   } catch (error) {
-    await recordDeletionFailure(
+    const transition = await recordDeletionFailure(
       client,
       userId,
       claimToken,
@@ -308,10 +309,12 @@ async function clearClaimedBilling(
       { stage: 'billing', error: serializeError(error) },
       '[account-delete]'
     );
+    if (transition === 'lease_lost') throw new DeletionLeaseLostError();
     throw error;
   }
 }
 function accountDeletionError(error: unknown, req: Request): Response {
+  if (error instanceof DeletionLeaseLostError) return createLeaseLostResponse(req);
   if (error instanceof DeletionBillingError)
     return createErrorResponse(error.code, error.status, req);
   console.error('[account-delete] Unexpected error:', error);
