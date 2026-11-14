@@ -199,7 +199,8 @@ integration fails or is unavailable, not the normal path.
    active while migrations run, so migrations must be compatible with that old handler until
    the new function version is active. Workers deploy independently and can reach a new DB
    object before its migration; land required objects in an earlier release when that dependency
-   matters. Adding a DB object ahead of its caller is safe; the reverse is not.
+   matters. Adding backward-compatible DB objects ahead of callers can be safe; constraints
+   and behavior changes may require staged compatible callers first.
 
    **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
    that an Edge Function also enforces in application code (e.g.
@@ -276,8 +277,21 @@ the new Auth deletion guard during that interval. Verify the expected migration 
 function version, then smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
 If rollout fails, keep/redeploy the maintenance gate; never roll back to the old team-first
 handler after the billing guard migration. Remove the gate only in the billing-safe handler
-release. This prerequisite does not pause an already-running deletion worker; inspect/drain
-existing deletion jobs separately before the migration.
+release.
+
+The HTTP gate does not pause the database cron jobs. Unlike the old HTTP handler's separate
+committed calls, `private.retry_account_deletion` and `private.delete_inactive_account` run
+team preparation and Auth deletion within one transaction. Their callers' per-account
+`BEGIN ... EXCEPTION` blocks roll back those changes when the Auth billing guard raises
+`23514`; failure accounting then runs after that rollback. See migrations
+`20261006120000_retry_failed_account_deletions.sql` and
+`20260930003202_automate_inactive_account_cleanup.sql`. These cron paths do not have the HTTP
+handler's partial team-change gap.
+
+Before the billing migration, inspect pending/in-progress deletion jobs and the latest/running
+`account-deletion-retry` and `inactive-account-cleanup` cron runs. Record the read-only evidence
+and investigate failures or unexpected activity. This prerequisite does not require manually
+disabling cron: any additional operational intervention needs evidence and separate authority.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
