@@ -297,14 +297,59 @@ describe('supabase plugin', () => {
       vi.useRealTimers();
     }
   });
-  it('exchanges an oauth callback code when ready is called', async () => {
+  it('recovers a pending callback after delayed client creation', async () => {
+    vi.useFakeTimers();
+    const moduleReady = createDeferred<undefined>();
+    const exchangeCodeForSession = vi.fn().mockResolvedValue({
+      data: { session: createSession('linked-user') },
+      error: null,
+    });
+    vi.doMock('@supabase/supabase-js', async () => {
+      await moduleReady.promise;
+      return { createClient: mockCreateClient };
+    });
+    try {
+      window.history.replaceState(null, '', '/settings?discord_linked=1&code=delayed-code');
+      mockAuthClient({
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        exchangeCodeForSession,
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as unknown as SupabasePluginProvide;
+      await flushPlugin();
+      const timedOut = result.provide.supabase.ready().then(
+        () => null,
+        (error: unknown) => error
+      );
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(await timedOut).toBeInstanceOf(Error);
+      expect(window.location.search).toBe('?discord_linked=1&code=delayed-code');
+      moduleReady.resolve(undefined);
+      await flushPlugin();
+      await result.provide.supabase.ready();
+      expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+      expect(result.provide.supabase.user.id).toBe('linked-user');
+      expect(window.location.search).toBe('?discord_linked=1');
+    } finally {
+      moduleReady.resolve(undefined);
+      vi.doMock('@supabase/supabase-js', () => ({ createClient: mockCreateClient }));
+      window.history.replaceState(null, '', '/');
+      vi.useRealTimers();
+    }
+  });
+  it.each([
+    ['/auth/callback', '?redirect=%2Ftasks', ''],
+    ['/settings', '?discord_linked=1', '#account'],
+  ])('exchanges an oauth callback code on %s when ready is called', async (path, query, hash) => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
       window.history.replaceState(
         null,
         '',
-        '/auth/callback?code=oauth-code&sb_flow_id=flow-id&redirect=%2Ftasks'
+        `${path}${query}&code=oauth-code&sb_flow_id=flow-id${hash}`
       );
       const exchangeCodeForSession = vi.fn().mockResolvedValue({
         data: { session: createSession('user-code') },
@@ -335,8 +380,9 @@ describe('supabase plugin', () => {
       expect(exchangeCodeForSession).toHaveBeenCalledWith('oauth-code', { flowId: 'flow-id' });
       expect(result?.provide.supabase.user.id).toBe('user-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
-      expect(window.location.pathname).toBe('/auth/callback');
-      expect(window.location.search).toBe('?redirect=%2Ftasks');
+      expect(window.location.pathname).toBe(path);
+      expect(window.location.search).toBe(query);
+      expect(window.location.hash).toBe(hash);
       await result?.provide.supabase.ready();
       expect(getSession).toHaveBeenCalledTimes(2);
       expect(result?.provide.supabase.user.id).toBe('user-refreshed');
@@ -364,49 +410,95 @@ describe('supabase plugin', () => {
       window.history.replaceState(null, '', '/');
     }
   });
-  it('surfaces the exchange error through ready without aborting setup', async () => {
-    localStorage.removeItem('sb-test-auth-token');
-    window.history.replaceState(null, '', '/');
-    try {
-      window.history.replaceState(null, '', '/auth/callback?code=expired-code');
-      const exchangeError = new Error('invalid_grant');
-      const exchangeCodeForSession = vi.fn().mockResolvedValue({
-        data: { session: null },
-        error: exchangeError,
-      });
-      const getSession = vi
-        .fn()
-        .mockResolvedValueOnce({ data: { session: null }, error: null })
-        .mockResolvedValue({
-          data: { session: createSession('user-after-retry') },
-          error: null,
+  it.each(['/auth/callback?code=expired-code', '/settings?discord_linked=1&code=expired-code'])(
+    'keeps a failed callback exchange visible to every readiness caller on %s',
+    async (path) => {
+      localStorage.removeItem('sb-test-auth-token');
+      window.history.replaceState(null, '', '/');
+      try {
+        window.history.replaceState(null, '', path);
+        const exchangeError = new Error('invalid_grant');
+        const exchangeCodeForSession = vi.fn().mockResolvedValue({
+          data: { session: null },
+          error: exchangeError,
         });
+        const getSession = vi
+          .fn()
+          .mockResolvedValueOnce({ data: { session: null }, error: null })
+          .mockResolvedValue({
+            data: { session: createSession('user-after-retry') },
+            error: null,
+          });
+        mockAuthClient({
+          exchangeCodeForSession,
+          getSession,
+        });
+        const plugin = (await import('@/plugins/supabase.client')).default;
+        const result = (await plugin.setup?.(
+          {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+        )) as SupabasePluginProvide | undefined;
+        await flushPlugin();
+        await expect(result?.provide.supabase.ready()).rejects.toBe(exchangeError);
+        expect(window.location.search).toBe(path.slice(path.indexOf('?')));
+        expect(result?.provide.supabase.user.loggedIn).toBe(false);
+        await expect(result?.provide.supabase.ready()).rejects.toBe(exchangeError);
+        expect(getSession).toHaveBeenCalledTimes(1);
+        expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+        expect(result?.provide.supabase.user.loggedIn).toBe(false);
+      } finally {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  );
+  it('does not treat a callback readiness timeout as a consumed code', async () => {
+    vi.useFakeTimers();
+    const exchange = createDeferred<{
+      data: { session: ReturnType<typeof createSession> };
+      error: null;
+    }>();
+    try {
+      window.history.replaceState(null, '', '/settings?discord_linked=1&code=pending-code#account');
       mockAuthClient({
-        exchangeCodeForSession,
-        getSession,
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        exchangeCodeForSession: vi.fn(() => exchange.promise),
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
       const result = (await plugin.setup?.(
         {} as Parameters<NonNullable<typeof plugin.setup>>[0]
-      )) as SupabasePluginProvide | undefined;
+      )) as unknown as SupabasePluginProvide;
       await flushPlugin();
-      await expect(result?.provide.supabase.ready()).rejects.toThrow('invalid_grant');
-      expect(window.location.search).toBe('?code=expired-code');
-      expect(result?.provide.supabase.user.loggedIn).toBe(false);
-      await expect(result?.provide.supabase.ready()).resolves.toMatchObject({
-        user: { id: 'user-after-retry' },
+      const timedOut = result.provide.supabase.ready().then(
+        () => null,
+        (error: unknown) => error
+      );
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(await timedOut).toMatchObject({
+        name: 'SupabaseCallbackPendingError',
+        message: 'OAuth callback is still pending',
       });
-      expect(getSession).toHaveBeenCalledTimes(2);
-      expect(result?.provide.supabase.user.id).toBe('user-after-retry');
+      expect(window.location.search).toBe('?discord_linked=1&code=pending-code');
+      const retry = result.provide.supabase.ready();
+      exchange.resolve({ data: { session: createSession('linked-user') }, error: null });
+      await retry;
+      expect(result.provide.supabase.user.id).toBe('linked-user');
+      expect(window.location.search).toBe('?discord_linked=1');
+      expect(window.location.hash).toBe('#account');
     } finally {
+      exchange.resolve({ data: { session: null }, error: null });
       window.history.replaceState(null, '', '/');
+      vi.useRealTimers();
     }
   });
-  it('ignores a team invite code outside the auth callback route', async () => {
+  it.each([
+    '/team?team=team-1&code=invite-code',
+    '/settings?code=invite-code',
+    '/settings?discord_linked=0&code=invite-code',
+    '/tasks?discord_linked=1&code=invite-code',
+  ])('ignores an unrelated code on %s', async (path) => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
-      window.history.replaceState(null, '', '/team?team=team-1&code=invite-code');
+      window.history.replaceState(null, '', path);
       const exchangeCodeForSession = vi.fn();
       const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
       mockAuthClient({

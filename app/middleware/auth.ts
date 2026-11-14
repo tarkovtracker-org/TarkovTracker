@@ -1,8 +1,9 @@
-import { ensureSupabaseReadyForRoute } from '@/utils/supabaseGuard';
+import { ensureSupabaseReadyForRoute, handleSupabaseReadinessFailure } from '@/utils/supabaseGuard';
 export default defineNuxtRouteMiddleware(async () => {
   const { $supabase } = useNuxtApp();
-  if (!(await ensureSupabaseReadyForRoute($supabase, 'Auth middleware'))) {
-    return navigateTo('/login');
+  const readiness = await ensureSupabaseReadyForRoute($supabase, 'Auth middleware');
+  if (readiness !== 'ready') {
+    return handleSupabaseReadinessFailure(readiness);
   }
   if (!$supabase.user.loggedIn) {
     return navigateTo('/login');

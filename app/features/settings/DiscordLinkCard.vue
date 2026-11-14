@@ -270,6 +270,8 @@
     if (route.query.discord_linked !== '1') return;
     const query = { ...route.query };
     delete query.discord_linked;
+    delete query.code;
+    delete query.sb_flow_id;
     // Preserve the account tab hash so query cleanup does not bounce the tab.
     await router.replace({ query, hash: route.hash || '#account' });
   };
@@ -282,6 +284,11 @@
           userId: $supabase.user?.id,
           error,
         });
+        errorMessage.value = t(
+          'settings.discord_link.load_error',
+          'We could not load your Discord account link.'
+        );
+        return;
       }
       await loadLinkWithRetry();
       if (link.value) {

@@ -181,7 +181,12 @@ describe('DiscordLinkCard', () => {
     expect(wrapper.text()).toContain('settings.discord_link.link_account');
   });
   it('retries loading after OAuth return and then syncs roles', async () => {
-    routeState.query = { discord_linked: '1' };
+    routeState.query = {
+      discord_linked: '1',
+      code: 'consumed-code',
+      sb_flow_id: 'flow-id',
+      from: 'profile',
+    };
     routeState.hash = '#account';
     maybeSingleMock
       .mockResolvedValueOnce({ data: null, error: null })
@@ -210,8 +215,23 @@ describe('DiscordLinkCard', () => {
     expect(readyMock).toHaveBeenCalled();
     expect(maybeSingleMock).toHaveBeenCalledTimes(3);
     expect(invokeMock).toHaveBeenCalledWith('discord-role-sync', { body: {} });
-    expect(replaceMock).toHaveBeenCalledWith({ query: {}, hash: '#account' });
+    expect(replaceMock).toHaveBeenCalledWith({ query: { from: 'profile' }, hash: '#account' });
     expect(wrapper.text()).toContain('Linked as linked-user');
+  });
+  it('preserves the complete callback for retry when session readiness fails', async () => {
+    routeState.query = { discord_linked: '1', code: 'unused-code', sb_flow_id: 'flow-id' };
+    routeState.hash = '#account';
+    readyMock.mockRejectedValueOnce(new Error('temporary initialization failure'));
+    const wrapper = await mountCard();
+    expect(maybeSingleMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(routeState.query).toEqual({
+      discord_linked: '1',
+      code: 'unused-code',
+      sb_flow_id: 'flow-id',
+    });
+    expect(wrapper.text()).toContain('settings.discord_link.load_error');
   });
   it('shows a warning when the linked Discord account has not joined the server', async () => {
     maybeSingleMock.mockResolvedValue({

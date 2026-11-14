@@ -9,6 +9,7 @@ import {
   SupabaseSessionChangedError,
   supabaseAuthStorageKey,
 } from '@/utils/supabaseAuthFence';
+import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
 import { hydrateUserFromSession } from '@/utils/userHydration';
 /**
  * `signed_out_locally`: this browser's session ended, but the server did not confirm
@@ -96,11 +97,14 @@ const createSupabaseUserState = () =>
 const OAUTH_CALLBACK_PATH = '/auth/callback';
 const OAUTH_HASH_TOKEN_KEYS = ['access_token', 'refresh_token', 'error'] as const;
 const currentSearchParams = () => new URLSearchParams(window.location.search || '');
+const isOAuthCodeCallback = (params: URLSearchParams): boolean =>
+  window.location.pathname === OAUTH_CALLBACK_PATH ||
+  (window.location.pathname === '/settings' && params.get('discord_linked') === '1');
 const readOAuthCallbackCode = (): OAuthCallbackCode | null => {
-  if (window.location.pathname !== OAUTH_CALLBACK_PATH) {
+  const searchParams = currentSearchParams();
+  if (!isOAuthCodeCallback(searchParams)) {
     return null;
   }
-  const searchParams = currentSearchParams();
   const code = searchParams.get('code');
   return code ? { code, flowId: searchParams.get('sb_flow_id') || undefined } : null;
 };
@@ -470,14 +474,15 @@ export default defineNuxtPlugin({
       if (!oauthCallbackCode) {
         return false;
       }
-      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode).finally(() => {
+      if (!supabaseClient) throw new Error('Supabase client unavailable');
+      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode).then(() => {
         oauthCallbackCode = null;
       });
       await oauthExchangePromise;
       return true;
     };
     const ready = async (): Promise<Session | null> => {
-      return await awaitWithSessionBudget(
+      const session = await awaitWithSessionBudget(
         async () => {
           await ensureClientInitialized();
           if (await consumeOAuthCallbackCode()) {
@@ -488,6 +493,8 @@ export default defineNuxtPlugin({
         () => currentSession,
         '[Supabase] Session readiness exceeded the start-up budget; continuing'
       );
+      if (oauthCallbackCode) throw new SupabaseCallbackPendingError();
+      return session;
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
