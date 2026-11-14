@@ -148,6 +148,16 @@ const tarkovStore = {
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStore,
 }));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({
+    currentGameMode: 'pvp',
+    loading: false,
+    tasks: [
+      { id: 'task1', name: 'Debut', taskRequirements: [{ task: { id: 'task0' } }] },
+      { id: 'task0', name: 'Prologue' },
+    ],
+  }),
+}));
 vi.mock('@/stores/usePreferences', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/stores/usePreferences')>();
   return {
@@ -198,6 +208,8 @@ const createFile = (text: string): File =>
   }) as unknown as File;
 type DebugExportTestJson = {
   _format: string;
+  _version: number;
+  summary: unknown;
   auth: {
     hasAuthSessionHint: boolean;
   };
@@ -615,6 +627,35 @@ describe('useDataBackup', () => {
         }
       }
     );
+    it('copies the same sanitized snapshot without downloading a file', async () => {
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        const { serializeDebugSnapshot, debugExportError } = await loadComposable();
+        const text = await serializeDebugSnapshot();
+        const json = JSON.parse(text) as DebugExportTestJson;
+        expect(json._format).toBe('tarkovtracker-debug-export');
+        expect(json.state.tarkov.pvp.displayName).toBeNull();
+        expect(text).not.toContain('CurrentUser');
+        expect(text).not.toContain('user-123');
+        expect(click).not.toHaveBeenCalled();
+        expect(debugExportError.value).toBeNull();
+      } finally {
+        click.mockRestore();
+      }
+    });
+    it('records a debug export error when the snapshot cannot be built', async () => {
+      const { serializeDebugSnapshot, debugExportError } = await loadComposable();
+      const getCurrentGameMode = tarkovStore.getCurrentGameMode;
+      tarkovStore.getCurrentGameMode = vi.fn(() => {
+        throw new Error('store unavailable');
+      });
+      try {
+        await expect(serializeDebugSnapshot()).rejects.toThrow('store unavailable');
+        expect(debugExportError.value).toBe('Failed to export debug snapshot: store unavailable');
+      } finally {
+        tarkovStore.getCurrentGameMode = getCurrentGameMode;
+      }
+    });
     it('exports a sanitized debug snapshot without auth secrets or player identifiers', async () => {
       localStorage.setItem(
         STORAGE_KEYS.progress,
@@ -687,6 +728,27 @@ describe('useDataBackup', () => {
         const debugText = await backupBlob!.text();
         const debugJson = JSON.parse(debugText) as DebugExportTestJson;
         expect(debugJson._format).toBe('tarkovtracker-debug-export');
+        expect(debugJson._version).toBe(2);
+        expect(debugJson.summary).toEqual({
+          gameMode: 'pvp',
+          catalog: { gameMode: 'pvp', loading: false, taskCount: 2 },
+          taskCount: 1,
+          completedTaskCount: 1,
+          failedTaskCount: 0,
+          manualTaskCount: 0,
+          automaticTaskCount: 0,
+          tasks: [
+            {
+              id: 'task1',
+              name: 'Debut',
+              complete: true,
+              failed: false,
+              manual: undefined,
+              prerequisiteIds: ['task0'],
+              prerequisiteStates: { task0: { complete: false, failed: false } },
+            },
+          ],
+        });
         expect(debugJson.auth).toEqual(
           expect.objectContaining({
             hasAuthSessionHint: true,
