@@ -34,7 +34,7 @@ jobs:
     if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    # Main-only environment holds Crowdin credentials and the Queue Submitter key.
+    # Main-only environment must hold Crowdin credentials and the Queue Submitter key.
     # CROWDIN_* must have no repository/org-scoped copies: branch YAML can remove this environment.
     environment:
       name: merge-queue

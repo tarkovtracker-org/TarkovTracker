@@ -4,7 +4,10 @@ const CREDENTIALS = ['CROWDIN_PROJECT_ID', 'CROWDIN_PERSONAL_TOKEN'];
 function completeList(value, key) {
   if (!value) throw new Error(`Incomplete ${key} metadata`);
   if (!Array.isArray(value[key])) throw new Error(`Incomplete ${key} metadata`);
-  if (value.total_count !== value[key].length) throw new Error(`Incomplete ${key} metadata`);
+  if (value.total_count !== value[key].length)
+    throw new Error(
+      `Incomplete ${key} metadata: expected ${value.total_count} entries, received ${value[key].length}; paginated metadata is required beyond 100 entries`
+    );
   return value[key];
 }
 export function assertCrowdinSecretBoundary(snapshot) {
