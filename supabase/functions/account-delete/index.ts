@@ -37,11 +37,24 @@ const createTransitionResponse = async (
   if (result === 'lease_lost') return createLeaseLostResponse(req);
   return createErrorResponse('Failed to update account deletion status.', 500, req);
 };
+// Temporary unconditional maintenance response; remove with the billing-safe handler.
+// Keep the lifecycle below for the cutover without changing its mutation control flow.
+const maintenanceResponse = (req: Request): Response => {
+  const methodError = validateMethod(req, ['POST']);
+  if (methodError) return methodError;
+  const response = createErrorResponse(
+    'Account deletion is temporarily unavailable. Please try again shortly.',
+    503,
+    req
+  );
+  response.headers.set('Retry-After', '60');
+  return response;
+};
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
   try {
-    const methodError = validateMethod(req, ['POST']); // invoked via POST
+    const methodError = maintenanceResponse(req);
     if (methodError) return methodError;
     const authResult = await authenticateUser(req);
     if ('error' in authResult) {
