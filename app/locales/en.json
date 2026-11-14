@@ -2088,11 +2088,6 @@
     "account": {
       "begin_deletion": "Begin Account Deletion"
     },
-    "debug_state": {
-      "title": "Debug State",
-      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
-      "copy_button": "Copy Debug State"
-    },
     "general": {
       "title": "General Preferences",
       "privacy_mode": "Privacy Mode",
@@ -2185,8 +2180,6 @@
       "reset_confirm": "Reset Data",
       "export_description": "Download a backup of your progress data for PvP, PvE, and Seasonal PvP modes.",
       "export_button": "Export Progress Backup",
-      "debug_export_button": "Export Debug Snapshot",
-      "debug_export_description": "Download a sanitized account snapshot for debugging signed-in issues. This excludes auth tokens, email, and profile images.",
       "import_backup_button": "Import TarkovTracker Backup",
       "import_eft_logs_folder_button": "Import EFT Logs Folder",
       "recommended_badge": "Recommended",
@@ -2199,8 +2192,12 @@
       "tarkov_dev_section_description": "Import profile metadata including level, faction, and skills",
       "eft_logs_section_title": "EFT Game Logs Import",
       "eft_logs_section_description": "Import quest progress detected from your game log files",
+      "bug_report_title": "Bug Report File",
+      "bug_report_description": "If something looks wrong, download this file and attach it to a GitHub issue, or copy it and paste it into Discord, so the problem can be reproduced. It includes your progress, settings, and browser details, but not sign-in tokens, email, or profile images. Nothing is sent automatically.",
+      "bug_report_download": "Download Bug Report File",
+      "bug_report_copy": "Copy Bug Report",
+      "bug_report_error_title": "Could Not Create Bug Report",
       "backup_restore_section_description": "Export a backup or restore from a previously exported file",
-      "debug_section_title": "Debug Snapshot",
       "import_backup_title": "Restore from Backup",
       "import_backup_description": "Restore progress from a TarkovTracker backup file",
       "import_preview_exported_at": "Exported",
@@ -2219,7 +2216,6 @@
       "import_error_title": "Backup Import Failed",
       "import_error_description": "Your backup could not be imported. Please try again.",
       "export_error_title": "Export Failed",
-      "debug_export_error_title": "Debug Export Failed",
       "reset_title": "Reset Progress",
       "danger_zone_title": "Danger Zone",
       "danger_zone_hint": "Resetting all progress permanently deletes your data for PvP, PvE, and Seasonal PvP. This cannot be undone.",

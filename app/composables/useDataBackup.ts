@@ -16,6 +16,7 @@ import {
   legacyProgressRecoveryOverflow,
 } from '@/stores/tarkov/progressAuthority';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
+import { useMetadataStore } from '@/stores/useMetadata';
 import {
   getPersistedPreferencesState,
   preferencesDefaultState,
@@ -43,6 +44,7 @@ import {
   type RecoveryArchiveResult,
 } from '@/utils/backup/parsing';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
+import { buildDebugTaskSummary, type DebugTaskSummary } from '@/utils/debugTaskSummary';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedProgressData, sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
@@ -106,6 +108,7 @@ interface DebugExportPayload {
     analyticsConsent: AnalyticsConsentState;
   };
   storage: DebugExportStorageContext;
+  summary: DebugTaskSummary;
 }
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
@@ -121,6 +124,7 @@ export interface UseDataBackupReturn {
   reviewOlderTabProgress: (index: number) => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
+  serializeDebugSnapshot: () => Promise<string>;
   debugExportError: Ref<string | null>;
   importState: Ref<BackupImportState>;
   importPreview: Ref<BackupPreviewData | null>;
@@ -495,6 +499,65 @@ async function buildPreferencesStorageSnapshot(
     };
   }
 }
+type DebugAuthUser = {
+  loggedIn: boolean;
+  id?: string | null;
+  provider?: string | null;
+  providers?: unknown;
+  createdAt?: string | null;
+  lastLoginAt?: string | null;
+};
+const orNull = <T>(value: T | null | undefined): T | null => value ?? null;
+const copyStrings = (value: unknown): string[] => (Array.isArray(value) ? [...value] : []);
+async function buildDebugAuthContext(
+  user: DebugAuthUser,
+  authStorageKeyCount: number
+): Promise<DebugExportAuthContext> {
+  return {
+    loggedIn: user.loggedIn,
+    provider: orNull(user.provider),
+    providers: copyStrings(user.providers),
+    userIdFingerprint: await fingerprintValue(orNull(user.id)),
+    createdAt: orNull(user.createdAt),
+    lastLoginAt: orNull(user.lastLoginAt),
+    hasAuthSessionHint: authStorageKeyCount > 0,
+  };
+}
+function buildDebugRuntimeContext(): DebugExportRuntimeContext {
+  return {
+    path: window.location.pathname,
+    // URL query and fragment values may contain credentials or private identifiers.
+    query: '',
+    hash: '',
+    language: orNull(navigator.language),
+    languages: copyStrings(navigator.languages),
+    timeZone: orNull(Intl.DateTimeFormat().resolvedOptions().timeZone),
+    userAgent: orNull(navigator.userAgent),
+  };
+}
+async function readDebugProgressStorage(): Promise<string | null> {
+  try {
+    return (await readCommittedProgressAuthority(false)).raw;
+  } catch (error) {
+    logger.warn('[DataBackup] Progress authority unavailable for debug export:', error);
+    return null;
+  }
+}
+async function buildDebugStorageContext(
+  currentUserId: string | null
+): Promise<DebugExportStorageContext> {
+  const rawPreferencesStorage =
+    localStorage.getItem(STORAGE_KEYS.preferences) ??
+    localStorage.getItem(LEGACY_STORAGE_KEYS.preferences);
+  return {
+    authStorageKeyCount: getStorageKeys(localStorage).filter(isSupabaseAuthStorageKey).length,
+    localStorageKeys: await sanitizeStorageKeys(localStorage),
+    sessionStorageKeys: await sanitizeStorageKeys(sessionStorage),
+    progress: await buildProgressStorageSnapshot(await readDebugProgressStorage(), currentUserId),
+    preferences: await buildPreferencesStorageSnapshot(rawPreferencesStorage, currentUserId),
+    progressBackups: await buildProgressBackupSnapshots(localStorage),
+  };
+}
 async function downloadJsonFile(
   filenamePrefix: string,
   payload: unknown,
@@ -775,65 +838,42 @@ export function useDataBackup(): UseDataBackupReturn {
       copies: copies.map(({ ownerId: _ownerId, ...copy }) => copy),
     });
   }
-  async function exportDebugSnapshot(): Promise<void> {
+  function buildDebugSummary(currentMode: GameMode, tarkovState: UserState): DebugTaskSummary {
+    const metadataStore = useMetadataStore();
+    return buildDebugTaskSummary(currentMode, tarkovState[currentMode], metadataStore.tasks ?? [], {
+      gameMode: metadataStore.currentGameMode,
+      loading: metadataStore.loading,
+    });
+  }
+  async function buildDebugSnapshot(): Promise<DebugExportPayload> {
+    const runtimeConfig = useRuntimeConfig();
+    const currentUserId = $supabase.user.id ?? null;
+    const storage = await buildDebugStorageContext(currentUserId);
+    const tarkovState = await sanitizeTarkovStateForDebug(tarkovStore.$state);
+    const currentMode = tarkovStore.getCurrentGameMode();
+    return {
+      _format: DEBUG_EXPORT_FORMAT,
+      _version: 2,
+      exportedAt: Date.now(),
+      appVersion: String(runtimeConfig.public.appVersion ?? 'unknown'),
+      auth: await buildDebugAuthContext($supabase.user, storage.authStorageKeyCount),
+      runtime: buildDebugRuntimeContext(),
+      state: {
+        tarkov: tarkovState,
+        preferences: await sanitizePreferencesForDebug(
+          getPersistedPreferencesState(preferencesStore.$state)
+        ),
+        analyticsConsent: cloneStateSnapshot(analyticsConsent.state.value),
+      },
+      storage,
+      summary: buildDebugSummary(currentMode, tarkovState),
+    };
+  }
+  /** Builds the sanitized debug snapshot and records a user-facing error when it cannot be built. */
+  async function runDebugSnapshot<T>(use: (payload: DebugExportPayload) => Promise<T>): Promise<T> {
     debugExportError.value = null;
     try {
-      const runtimeConfig = useRuntimeConfig();
-      const currentUserId = $supabase.user.id ?? null;
-      const currentPreferences = await sanitizePreferencesForDebug(
-        getPersistedPreferencesState(preferencesStore.$state)
-      );
-      const rawProgressStorage = await readCommittedProgressAuthority(false)
-        .then((record) => record.raw)
-        .catch((error) => {
-          logger.warn('[DataBackup] Progress authority unavailable for debug export:', error);
-          return null;
-        });
-      const rawPreferencesStorage =
-        localStorage.getItem(STORAGE_KEYS.preferences) ??
-        localStorage.getItem(LEGACY_STORAGE_KEYS.preferences);
-      const authStorageKeyCount = getStorageKeys(localStorage).filter((key) =>
-        isSupabaseAuthStorageKey(key)
-      ).length;
-      const debugPayload: DebugExportPayload = {
-        _format: DEBUG_EXPORT_FORMAT,
-        _version: 1,
-        exportedAt: Date.now(),
-        appVersion: String(runtimeConfig.public.appVersion ?? 'unknown'),
-        auth: {
-          loggedIn: $supabase.user.loggedIn,
-          provider: $supabase.user.provider ?? null,
-          providers: Array.isArray($supabase.user.providers) ? [...$supabase.user.providers] : [],
-          userIdFingerprint: await fingerprintValue(currentUserId),
-          createdAt: $supabase.user.createdAt ?? null,
-          lastLoginAt: $supabase.user.lastLoginAt ?? null,
-          hasAuthSessionHint: authStorageKeyCount > 0,
-        },
-        runtime: {
-          path: window.location.pathname,
-          // URL query and fragment values may contain credentials or private identifiers.
-          query: '',
-          hash: '',
-          language: navigator.language ?? null,
-          languages: Array.isArray(navigator.languages) ? [...navigator.languages] : [],
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-          userAgent: navigator.userAgent ?? null,
-        },
-        state: {
-          tarkov: await sanitizeTarkovStateForDebug(tarkovStore.$state),
-          preferences: currentPreferences,
-          analyticsConsent: cloneStateSnapshot(analyticsConsent.state.value),
-        },
-        storage: {
-          authStorageKeyCount,
-          localStorageKeys: await sanitizeStorageKeys(localStorage),
-          sessionStorageKeys: await sanitizeStorageKeys(sessionStorage),
-          progress: await buildProgressStorageSnapshot(rawProgressStorage, currentUserId),
-          preferences: await buildPreferencesStorageSnapshot(rawPreferencesStorage, currentUserId),
-          progressBackups: await buildProgressBackupSnapshots(localStorage),
-        },
-      };
-      await downloadJsonFile('tarkovtracker-debug-export', debugPayload);
+      return await use(await buildDebugSnapshot());
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       debugExportError.value = `Failed to export debug snapshot: ${detail}`;
@@ -841,6 +881,10 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  const exportDebugSnapshot = (): Promise<void> =>
+    runDebugSnapshot((payload) => downloadJsonFile('tarkovtracker-debug-export', payload));
+  const serializeDebugSnapshot = (): Promise<string> =>
+    runDebugSnapshot(async (payload) => JSON.stringify(payload, null, 2));
   async function parseBackupFile(file: File): Promise<void> {
     resetImport();
     if (file.size > MAX_RECOVERY_ARCHIVE_SIZE) {
@@ -959,6 +1003,7 @@ export function useDataBackup(): UseDataBackupReturn {
     legacyProgressRecoveryOverflow,
     exportError,
     exportDebugSnapshot,
+    serializeDebugSnapshot,
     debugExportError,
     importState,
     importPreview,
