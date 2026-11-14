@@ -75,8 +75,12 @@
             class="flex items-center gap-1"
           >
             <span
-              class="bg-surface-500 inline-flex size-4.5 shrink-0 items-center justify-center border-2 text-white"
-              :class="MAP_OBJECTIVE_CHIP_SKIN_CLASS"
+              class="inline-flex size-4.5 shrink-0 items-center justify-center border-2"
+              :class="[
+                MAP_OBJECTIVE_CHIP_SKIN_CLASS,
+                objectiveKindColors ? '' : 'bg-surface-500 text-white',
+              ]"
+              :style="kindChipStyle(kind)"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" class="size-3">
                 <path fill="currentColor" :d="MAP_OBJECTIVE_GLYPH_PATHS[kind]" />
@@ -135,6 +139,7 @@
 </template>
 <script setup lang="ts">
   import MapLayerRow from '@/features/maps/MapLayerRow.vue';
+  import { getGlyphInk } from '@/features/maps/utils/colorContrast';
   import {
     MAP_ELEVATION_ARROW_PATHS,
     MAP_REQUIREMENT_ICON_PATHS,
@@ -149,11 +154,21 @@
     MAP_OBJECTIVE_CHIP_SKIN_CLASS,
     MAP_OBJECTIVE_GLYPH_LEGEND_KINDS,
     MAP_OBJECTIVE_GLYPH_PATHS,
+    type MapObjectiveGlyphKind,
   } from '@/features/maps/utils/objectiveGlyphs';
   /** Combined legend and visibility list; each row shows a marker type and toggles it. */
-  const props = defineProps<{ id: string; groups: MapLayerGroup[] }>();
+  const props = defineProps<{
+    id: string;
+    groups: MapLayerGroup[];
+    /** Objective-type chip colors while chips are colored by type; null keeps neutral chips. */
+    objectiveKindColors?: Record<MapObjectiveGlyphKind, string> | null;
+  }>();
   const emit = defineEmits<{ toggle: [item: MapLayerItem]; 'show-all': [] }>();
   const alwaysShowNames = defineModel<boolean>('alwaysShowNames', { required: true });
   const { t } = useI18n({ useScope: 'global' });
   const hiddenCount = computed(() => countHiddenLayers(props.groups));
+  const kindChipStyle = (kind: MapObjectiveGlyphKind) => {
+    const color = props.objectiveKindColors?.[kind];
+    return color ? { backgroundColor: color, color: getGlyphInk(color) } : undefined;
+  };
 </script>
