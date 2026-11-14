@@ -56,6 +56,37 @@
         </button>
       </div>
       <details
+        class="group/objectives mt-1.5 border-t border-white/8 px-2 pt-2 pb-1 text-[10px] leading-snug"
+        data-testid="map-objective-icon-legend"
+      >
+        <summary
+          class="text-surface-400 hover:text-surface-200 flex cursor-pointer list-none items-center gap-1 font-semibold uppercase [&::-webkit-details-marker]:hidden"
+        >
+          <UIcon
+            name="i-mdi-chevron-right"
+            class="h-3 w-3 shrink-0 transition-transform group-open/objectives:rotate-90"
+          />
+          {{ t('maps.objective_icons.legend_title') }}
+        </summary>
+        <ul class="text-surface-300 mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1">
+          <li
+            v-for="kind in MAP_OBJECTIVE_GLYPH_LEGEND_KINDS"
+            :key="kind"
+            class="flex items-center gap-1"
+          >
+            <span
+              class="bg-surface-500 inline-flex size-4.5 shrink-0 items-center justify-center border-2 text-white"
+              :class="MAP_OBJECTIVE_CHIP_SKIN_CLASS"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-3">
+                <path fill="currentColor" :d="MAP_OBJECTIVE_GLYPH_PATHS[kind]" />
+              </svg>
+            </span>
+            <span class="truncate">{{ t(`maps.objective_icons.kinds.${kind}`) }}</span>
+          </li>
+        </ul>
+      </details>
+      <details
         class="group/key mt-1.5 border-t border-white/8 px-2 pt-2 pb-1 text-[10px] leading-snug"
       >
         <summary
@@ -114,6 +145,11 @@
     type MapLayerGroup,
     type MapLayerItem,
   } from '@/features/maps/utils/mapLayerGroups';
+  import {
+    MAP_OBJECTIVE_CHIP_SKIN_CLASS,
+    MAP_OBJECTIVE_GLYPH_LEGEND_KINDS,
+    MAP_OBJECTIVE_GLYPH_PATHS,
+  } from '@/features/maps/utils/objectiveGlyphs';
   /** Combined legend and visibility list; each row shows a marker type and toggles it. */
   const props = defineProps<{ id: string; groups: MapLayerGroup[] }>();
   const emit = defineEmits<{ toggle: [item: MapLayerItem]; 'show-all': [] }>();

@@ -598,12 +598,12 @@
   import 'leaflet/dist/leaflet.css';
   import { useElementSize, useStorage } from '@vueuse/core';
   import { createApp } from 'vue';
-  import { useSafeLocale } from '@/composables/i18nHelpers';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
     type MapObjectiveCategory,
   } from '@/composables/useMapObjectiveMarks';
+  import { useExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
   import {
     MAP_BUTTON_ACTIVE_CLASS,
     MAP_BUTTON_INACTIVE_CLASS,
@@ -645,6 +645,12 @@
     type MapMarkerGlyphKind,
   } from '@/features/maps/utils/markerGlyphs';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
+  import {
+    createObjectiveGlyphElement,
+    getObjectiveGlyphKind,
+    OBJECTIVE_CHIP_SIZE,
+    type MapObjectiveGlyphKind,
+  } from '@/features/maps/utils/objectiveGlyphs';
   import {
     findObjectiveHitStackAtPoint,
     projectObjectiveHitShape,
@@ -749,6 +755,7 @@
   const router = useRouter();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  const currentGameMode = computed(() => metadataStore.currentGameMode ?? 'pvp');
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
   const fullscreenToggleLabel = computed(() =>
@@ -798,6 +805,14 @@
   });
   const ZONE_HOVER_DELTA = 0.16;
   const ZONE_HOVER_MAX = 0.6;
+  /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
+  const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
+  /** Hit-test dots are invisible: the chip above them is the visible marker. */
+  const OBJECTIVE_HIT_DOT_STYLE = { opacity: 0, fillOpacity: 0 } as const;
+  /** Content width of objective popups (`w-80`); Leaflet's limit must not cut it off. */
+  const OBJECTIVE_POPUP_WIDTH = 320;
+  /** Glyphs sit above objective dots and below extract pins; pointer input reaches the dots. */
+  const OBJECTIVE_GLYPH_PANE = 'objectiveGlyphs';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
   const SPAWN_CLUSTER_GRID_SIZE = 50;
   const SPAWN_CLUSTER_MIN_RADIUS = 6;
@@ -837,6 +852,7 @@
     showPmcExtracts: props.showPmcExtracts,
     showPmcSpawns: props.showPmcSpawns,
     showScavExtracts: props.showScavExtracts,
+    gameMode: currentGameMode,
     t,
   });
   const mapColorsOpen = ref(false);
@@ -902,11 +918,7 @@
     })
   );
   const hiddenLayerCount = computed(() => countHiddenLayers(layerGroups.value));
-  const locale = useSafeLocale();
-  const formatCaptureDate = (iso: string) =>
-    new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-      new Date(iso)
-    );
+  const extractRuleData = useExtractRuleData();
   /** Which extract glyph categories are drawn; markers and the source line share this rule. */
   const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
     pmc: showPmcExtracts.value,
@@ -920,14 +932,19 @@
   const anyExtractsVisible = computed(() =>
     mapExtracts.value.some(
       (extract) =>
-        Boolean(extract.position) && extractVisibility.value[getExtractGlyphKind(extract)]
+        Boolean(extract.position) &&
+        extractVisibility.value[getExtractGlyphKind(extract, currentGameMode.value)]
     )
   );
   /** One map-level line names the requirement data source and that it is not live status. */
   const extractSource = computed(() => {
-    const source = getExtractDataSource(props.map.id, metadataStore.currentGameMode ?? 'pvp');
+    const source = getExtractDataSource(
+      props.map.id,
+      metadataStore.currentGameMode ?? 'pvp',
+      extractRuleData.value
+    );
     if (!source || !anyExtractsVisible.value) return null;
-    return describeExtractSource(source, t, formatCaptureDate);
+    return describeExtractSource(source, t);
   });
   /** Extract rows the user changed this session; a later default never overrides them. */
   const touchedLayers = new Set<string>();
@@ -1521,12 +1538,17 @@
   const attachHoverPinPopup = (
     layer: L.Layer,
     objectiveId: string,
-    getLatLng: () => L.LatLngExpression
+    getLatLng: () => L.LatLngExpression,
+    chip: HTMLElement | null = null
   ): ObjectivePopupControl | null => {
     if (!leaflet.value || !mapInstance.value) return null;
     const popup = leaflet.value.popup({
       ...popupOptions,
       className: 'map-objective-popup',
+      // The tip touches the top of the chip instead of covering its glyph.
+      offset: [0, 7 - OBJECTIVE_DOT_RADIUS],
+      maxWidth: OBJECTIVE_POPUP_WIDTH,
+      minWidth: 256,
     });
     let isPinned = false;
     let isHovering = false;
@@ -1538,6 +1560,7 @@
     const originalStrokeColor = styledLayer.options?.color || mapColors.value.SELF_OBJECTIVE;
     const isCircleMarker = 'getRadius' in styledLayer;
     const setLayerSelected = (selected: boolean) => {
+      chip?.classList.toggle('is-selected', selected);
       if (!('setStyle' in styledLayer)) return;
       if (selected) {
         if (isCircleMarker) {
@@ -1620,6 +1643,7 @@
       currentMountedComponent = mountLayerPopup(pinned, entries);
       const mountedComponent = currentMountedComponent;
       popup.setContent(currentMountedComponent.element);
+      fitObjectivePopup(popup);
       popup.setLatLng(getLatLng());
       const popupIsOpen = map.hasLayer(popup);
       focusStackWhenPopupAttached(pinned, entries, popupIsOpen, mountedComponent);
@@ -1741,14 +1765,28 @@
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
+      chip: HTMLElement | null;
       latLngs: L.LatLngExpression[];
       area: number;
       objectiveId: string;
     }> = [];
     const pointEntries: Array<{
       marker: L.CircleMarker;
+      chip: HTMLElement | null;
       objectiveId: string;
     }> = [];
+    const glyphMarkers: L.Marker[] = [];
+    const addGlyph = (
+      latLng: L.LatLngExpression,
+      kind: MapObjectiveGlyphKind,
+      color: string,
+      offFloor: boolean
+    ): HTMLElement | null => {
+      const glyph = createObjectiveGlyph(L, latLng, kind, { color, offFloor });
+      if (!glyph) return null;
+      glyphMarkers.push(glyph.marker);
+      return glyph.chip;
+    };
     const calculateZoneArea = (outline: Array<{ x: number; z: number }>): number => {
       if (outline.length < 3) return 0;
       let sum = 0;
@@ -1776,6 +1814,7 @@
       const category = mapObjectiveCategory(mark.pinned === true, mark.users ?? []);
       if (!categoryEnabled[category]) return;
       const markerColor = categoryColors[category];
+      const glyphKind = getObjectiveGlyphKind(mark.type);
       mark.possibleLocations?.forEach((location) => {
         if (location.map.id !== props.map.id) return;
         const positions = location.positions;
@@ -1784,14 +1823,15 @@
         if (!pos) return;
         const latLng = gameToLatLng(pos.x, pos.z);
         const marker = L.circleMarker([latLng.lat, latLng.lng], {
-          radius: 8,
+          radius: OBJECTIVE_DOT_RADIUS,
           fillColor: markerColor,
-          fillOpacity: 0.8,
           color: mapColors.value.MARKER_BORDER,
           weight: 2,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
-        addObjectiveElevation(marker, { position: pos });
-        pointEntries.push({ marker, objectiveId });
+        const offFloor = addObjectiveElevation(marker, { position: pos });
+        const chip = addGlyph([latLng.lat, latLng.lng], glyphKind, markerColor, offFloor);
+        pointEntries.push({ marker, chip, objectiveId });
       });
       mark.zones.forEach((zone) => {
         if (zone.map.id !== props.map.id) return;
@@ -1809,26 +1849,36 @@
         });
         const center = polygon.getBounds().getCenter();
         const centerMarker = L.circleMarker([center.lat, center.lng], {
-          radius: 5,
+          radius: OBJECTIVE_DOT_RADIUS,
           fillColor: zoneColor,
-          fillOpacity: 0.95,
           color: mapColors.value.MARKER_BORDER,
           weight: 1.5,
-          opacity: 1,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
-        addObjectiveElevation(centerMarker, zone);
+        const offFloor = addObjectiveElevation(centerMarker, zone);
+        const chip = addGlyph(center, glyphKind, zoneColor, offFloor);
         const area = calculateZoneArea(zone.outline);
-        zoneEntries.push({ polygon, centerMarker, latLngs: polygonLatLngs, area, objectiveId });
+        zoneEntries.push({
+          polygon,
+          centerMarker,
+          chip,
+          latLngs: polygonLatLngs,
+          area,
+          objectiveId,
+        });
       });
     });
     zoneEntries
       .sort((a, b) => b.area - a.area)
-      .forEach(({ polygon, centerMarker, latLngs, area, objectiveId }) => {
+      .forEach(({ polygon, centerMarker, chip, latLngs, area, objectiveId }) => {
         if (objectiveId) {
-          const zoneControl = attachHoverPinPopup(polygon, objectiveId, () =>
-            polygon.getBounds().getCenter()
+          const zoneControl = attachHoverPinPopup(
+            polygon,
+            objectiveId,
+            () => polygon.getBounds().getCenter(),
+            chip
           );
-          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng());
+          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng(), chip);
           if (zoneControl) {
             objectiveHitSources.push({
               kind: 'zone',
@@ -1850,16 +1900,26 @@
         polygon.on('mouseout', () =>
           polygon.setStyle({ fillOpacity: mapZoneOpacity.value, weight: 2.25 })
         );
+        liftChipOnHover(polygon, chip);
+        liftChipOnHover(centerMarker, chip);
         objectiveLayer.value!.addLayer(polygon);
         objectiveLayer.value!.addLayer(centerMarker);
       });
-    pointEntries.forEach(({ marker, objectiveId }) => {
+    pointEntries.forEach(({ marker, chip, objectiveId }) => {
       if (objectiveId) {
-        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng());
+        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng(), chip);
         if (control) objectiveHitSources.push({ kind: 'point', objectiveId, marker, control });
       }
+      liftChipOnHover(marker, chip);
       objectiveLayer.value!.addLayer(marker);
     });
+    glyphMarkers.forEach((glyph) => objectiveLayer.value!.addLayer(glyph));
+  }
+  /** The chip cannot take pointer input, so the dot or zone under it raises it on hover. */
+  function liftChipOnHover(layer: L.Layer, chip: HTMLElement | null): void {
+    if (!chip) return;
+    layer.on('mouseover', () => chip.classList.add('is-hovered'));
+    layer.on('mouseout', () => chip.classList.remove('is-hovered'));
   }
   function createExtractMarkers(): void {
     if (!leaflet.value || !extractLayer.value || !props.map) return;
@@ -1868,7 +1928,7 @@
     extractLayer.value.clearLayers();
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
-      const kind = getExtractGlyphKind(extract);
+      const kind = getExtractGlyphKind(extract, currentGameMode.value);
       if (!extractVisibility.value[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       const requirements = getExtractRequirements({
@@ -1876,6 +1936,7 @@
         extract,
         mode: metadataStore.currentGameMode ?? 'pvp',
         t,
+        data: extractRuleData.value,
         itemName: (id) => metadataStore.itemsById?.get(id)?.name,
         formatNumber,
       });
@@ -1910,17 +1971,59 @@
     element.appendChild(indicator);
     return true;
   }
-  /** Objective dots on another floor fade like pins; their floor badge stays opaque beside them. */
-  function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): void {
+  /**
+   * An objective on another floor gets a floor badge beside it; its chip fades like an
+   * off-floor pin. Returns whether the objective is off the selected floor.
+   */
+  function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): boolean {
     const indicator = elevationIndicator(elevation, false);
-    if (!indicator) return;
-    layer.setStyle({ opacity: 0.55, fillOpacity: 0.4 });
+    if (!indicator) return false;
     layer.bindTooltip(indicator, {
       permanent: true,
       direction: 'left',
+      // Leaflet anchors the badge at the dot's centre; keep it beside the chip's glyph.
+      offset: [8 - OBJECTIVE_DOT_RADIUS, 0],
       className: 'map-elevation-tooltip border-0! bg-transparent! p-0! shadow-none! before:hidden',
       opacity: 1,
     });
+    return true;
+  }
+  function objectiveGlyphPane(map: L.Map): string {
+    if (map.getPane(OBJECTIVE_GLYPH_PANE)) return OBJECTIVE_GLYPH_PANE;
+    const pane = map.createPane(OBJECTIVE_GLYPH_PANE);
+    // Above the overlay pane's dots (400), below shadows (500) and extract pins (600).
+    pane.style.zIndex = '450';
+    pane.style.pointerEvents = 'none';
+    return OBJECTIVE_GLYPH_PANE;
+  }
+  /** A non-interactive chip centred on an objective dot, naming the action it asks for. */
+  function createObjectiveGlyph(
+    leafletApi: NonNullable<typeof leaflet.value>,
+    latLng: L.LatLngExpression,
+    kind: MapObjectiveGlyphKind,
+    { color, offFloor }: { color: string; offFloor: boolean }
+  ): { marker: L.Marker; chip: HTMLElement } | null {
+    const map = mapInstance.value;
+    if (!map) return null;
+    const size = OBJECTIVE_CHIP_SIZE;
+    const chip = createObjectiveGlyphElement(kind, {
+      color,
+      selectedColor: mapColors.value.SELECTED,
+      offFloor,
+    });
+    const icon = leafletApi.divIcon({
+      className: 'map-objective-glyph-icon',
+      html: chip,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+    const marker = leafletApi.marker(latLng, {
+      icon,
+      interactive: false,
+      keyboard: false,
+      pane: objectiveGlyphPane(map),
+    });
+    return { marker, chip };
   }
   let openPin: HTMLElement | null = null;
   /** Tap or click shows one pin's name until another pin or the map is clicked. */
@@ -1935,6 +2038,18 @@
     if (target instanceof Element && target.closest('.map-pin')) return;
     openPin?.classList.remove('is-open');
     openPin = null;
+  }
+  /** Objective popups are 320 px wide, narrowing (and scrolling) inside small maps. */
+  function fitObjectivePopup(popup: L.Popup): void {
+    const size = mapInstance.value?.getSize();
+    if (!size) return;
+    const maxWidth = Math.max(120, Math.min(OBJECTIVE_POPUP_WIDTH, size.x - 24));
+    Object.assign(popup.options, {
+      maxWidth,
+      minWidth: Math.min(256, maxWidth),
+      maxHeight: Math.max(160, size.y - 60),
+    });
+    if (mapInstance.value?.hasLayer(popup)) popup.update();
   }
   /** Keep requirement details inside the current map, including after viewport changes. */
   function fitExtractPopup(popup: L.Popup): void {
@@ -2157,7 +2272,7 @@
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
     createExtractMarkers()
   );
-  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById], () =>
+  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById, extractRuleData], () =>
     createExtractMarkers()
   );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());

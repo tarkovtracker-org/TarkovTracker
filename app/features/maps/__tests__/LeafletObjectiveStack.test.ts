@@ -8,7 +8,11 @@ const setup = async () => {
         { id: 'obj-point', taskId: 'task-point', description: 'Mark the car' },
       ],
       tasks: [
-        { id: 'task-zone', name: 'Area Task' },
+        {
+          id: 'task-zone',
+          name: 'Area Task',
+          trader: { id: 'prapor', name: 'Prapor', imageLink: 'https://assets.tarkov.dev/p.webp' },
+        },
         { id: 'task-point', name: 'Point Task' },
       ],
     }),
@@ -42,6 +46,14 @@ describe('LeafletObjectiveStack', () => {
     expect(entries[0]!.text()).toContain('Point Task');
     expect(entries[0]!.text()).toContain('Mark the car');
     expect(entries[1]!.text()).toContain('Area Task');
+    // Each entry shows its trader, so stacked tasks can be told apart at a glance.
+    expect(entries[1]!.get('img').attributes('src')).toBe('https://assets.tarkov.dev/p.webp');
+    expect(entries[1]!.get('img').attributes('alt')).toBe('Prapor');
+    expect(entries[0]!.find('img').exists()).toBe(false);
+    // The action chip names the action for screen readers, even when descriptions are hidden.
+    expect(entries[0]!.get('[role="img"]').attributes('aria-label')).toBe(
+      'maps.objective_icons.kinds.other'
+    );
   });
   it('selects the clicked objective', async () => {
     const { wrapper, onSelect } = await setup();

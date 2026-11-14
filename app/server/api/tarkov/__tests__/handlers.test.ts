@@ -367,21 +367,44 @@ describe('Tarkov API handlers', () => {
       expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
     }
   );
-  it.each(['editions', 'prestige'] as const)(
+  it.each(['editions', 'prestige', 'extract-requirements'] as const)(
     'fails closed when the %s overlay is unavailable',
     async (catalog) => {
       mockFetchOverlay.mockResolvedValueOnce({
         overlay: null as unknown as object,
         meta: { status: 'unavailable' },
       });
-      const { default: handler } =
-        catalog === 'editions'
-          ? await import('@/server/api/tarkov/editions.get')
-          : await import('@/server/api/tarkov/prestige.get');
+      const routes = {
+        editions: () => import('@/server/api/tarkov/editions.get'),
+        prestige: () => import('@/server/api/tarkov/prestige.get'),
+        'extract-requirements': () => import('@/server/api/tarkov/extract-requirements.get'),
+      };
+      const { default: handler } = await routes[catalog]();
       await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
       expect(mockCreateTarkovJsonPrestigeFetcher).not.toHaveBeenCalled();
     }
   );
+  it('serves valid overlay extract rules with their cues, and null until both are valid', async () => {
+    const extractRequirements = {
+      sources: { regular: { clientBuild: '1.3.0.0.48484', definitionsSha256: 'a'.repeat(64) } },
+      maps: { map: { exit: { name: 'exit', rules: [{ type: 'coop' }] } } },
+    };
+    const extractCues = {
+      map: { exit: { name: 'exit', cues: [{ type: 'flare' }], reference: 'https://example.com' } },
+    };
+    const meta = { status: 'fresh', sha256: 'overlay-sha' };
+    const { default: handler } = await import('@/server/api/tarkov/extract-requirements.get');
+    mockFetchOverlay.mockResolvedValueOnce({ overlay: { extractRequirements, extractCues }, meta });
+    const response = await handler(event);
+    expect(response).toEqual({
+      data: { requirements: extractRequirements, cues: extractCues },
+      dataOverlay: meta,
+    });
+    expect(mockSetHeader).toHaveBeenCalledWith(event, 'Cache-Control', 'no-cache');
+    expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, response);
+    mockFetchOverlay.mockResolvedValueOnce({ overlay: { extractRequirements }, meta });
+    expect((await handler(event)).data).toBeNull();
+  });
   describe('overlay-status', () => {
     const loadHandler = async () =>
       (await import('@/server/api/tarkov/overlay-status.get')).default;

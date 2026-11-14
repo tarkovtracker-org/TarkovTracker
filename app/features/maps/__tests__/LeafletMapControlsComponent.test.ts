@@ -337,8 +337,8 @@ describe('LeafletMap controls', () => {
     expect(markerInstance.bindPopup.mock.calls.at(-1)![1]).toMatchObject({ offset: [0, -28] });
     // The source and not-live notice appear once for the map, not in every popup.
     const source = wrapper.get('[data-testid="map-extract-source"]');
-    expect(source.text()).toMatch(
-      /^Requirements: game data, EFT 1\.3\.0\.0 \(.+\), plus curated cues · Not live raid status$/
+    expect(source.text()).toBe(
+      'Requirements: game data, EFT 1.3.0.0, plus curated cues · Not live raid status'
     );
     expect(source.attributes('title')).toContain('EFT 1.3.0.0.48484');
     expect(wrapper.findAll('[data-testid="map-extract-source"]')).toHaveLength(1);
@@ -770,6 +770,8 @@ describe('LeafletMap controls', () => {
     const popups: Array<{
       element: HTMLElement;
       isOpen: boolean;
+      options: Record<string, unknown>;
+      update: ReturnType<typeof vi.fn>;
       setContent: (content: HTMLElement) => void;
       setLatLng: ReturnType<typeof vi.fn>;
       getElement: () => HTMLElement;
@@ -790,6 +792,8 @@ describe('LeafletMap controls', () => {
       const popup = {
         element,
         isOpen: false,
+        options: {} as Record<string, unknown>,
+        update: vi.fn(),
         setContent(content: HTMLElement) {
           element.replaceChildren(content);
         },
@@ -819,8 +823,12 @@ describe('LeafletMap controls', () => {
       createLayer(options)
     );
     const objectiveLayer = createLayerGroup();
+    const divIcon = vi.fn((options: { html: HTMLElement }) => options);
+    const marker = vi.fn((_position: unknown, options: Record<string, unknown>) => ({ options }));
     mapState.leaflet = {
       circleMarker,
+      divIcon,
+      marker,
       polygon: (_positions: unknown, options: Record<string, unknown>) => createLayer(options),
       popup: createPopup,
       DomEvent: { stop: vi.fn() },
@@ -832,6 +840,7 @@ describe('LeafletMap controls', () => {
     const marks = [
       {
         id: 'objective-a',
+        type: 'plantItem',
         users: ['self'],
         zones: [
           {
@@ -847,6 +856,7 @@ describe('LeafletMap controls', () => {
       },
       {
         id: 'objective-b',
+        type: 'findQuestItem',
         users: ['self'],
         zones: [],
         possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
@@ -874,6 +884,23 @@ describe('LeafletMap controls', () => {
     await nextTick();
     expect(objectiveLayer.clearLayers).toHaveBeenCalled();
     expect(circleMarker).toHaveBeenCalled();
+    // Each dot carries a pass-through glyph for its objective's action.
+    const glyphs = divIcon.mock.calls.map(([options]) => options.html);
+    expect(glyphs.map((glyph) => glyph.dataset.kind)).toEqual(['plant', 'find']);
+    expect(glyphs.every((glyph) => glyph.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(marker.mock.calls.map(([, options]) => options.interactive)).toEqual([false, false]);
+    expect(objectiveLayer.addLayer).toHaveBeenCalledWith(marker.mock.results[0]?.value);
+    // The chip is the visible marker in the category color; the dot under it only takes input.
+    expect(glyphs.map((glyph) => glyph.style.getPropertyValue('--chip-color'))).toEqual([
+      '#111111',
+      '#111111',
+    ]);
+    expect(circleMarker.mock.calls.map(([, options]) => options.fillOpacity)).toEqual([0, 0]);
+    const zoneLayer = createdLayers[0]!;
+    zoneLayer.handlers.get('mouseover')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).toContain('is-hovered');
+    zoneLayer.handlers.get('mouseout')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).not.toContain('is-hovered');
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();

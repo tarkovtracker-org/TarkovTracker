@@ -13,6 +13,8 @@ type MapObjectiveLocation = {
 };
 export type MapObjectiveMark = {
   id?: string;
+  /** Upstream objective type; the map draws a glyph for the action it asks for. */
+  type?: string;
   zones: MapObjectiveZone[];
   possibleLocations?: MapObjectiveLocation[];
   users?: string[];
@@ -327,7 +329,9 @@ export function useMapObjectiveMarks({
             category: mapObjectiveCategory(pinned, users),
             selfNeedsObjective: selfState.selfNeedsObjective,
           },
-          mark: hasLocation ? { id: obj.id, zones, possibleLocations, users, pinned } : null,
+          mark: hasLocation
+            ? { id: obj.id, type: obj.type, zones, possibleLocations, users, pinned }
+            : null,
         });
       });
     });

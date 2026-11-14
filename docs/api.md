@@ -282,6 +282,17 @@ response is cached per language **and** game mode.
 
 ---
 
+### GET /api/tarkov/extract-requirements
+
+Returns the overlay's extract requirement rules (`extractRequirements`, generated from the game
+client's location and global definitions) and curated scene cues (`extractCues`) for every mode
+as `{ data: { requirements, cues } | null, dataOverlay }`. `data` is null until the overlay
+publishes both sections in a valid shape. Takes no query parameters. Returns `503` when no overlay
+is available; successful responses use `Cache-Control: no-cache`. Shapes:
+`app/utils/extractRuleData.ts`; consumer: [tasks](systems/tasks.md#extract-requirement-cues-and-details).
+
+---
+
 ### GET /api/tarkov/editions
 
 Fetches mode-scoped game editions and story chapters from the overlay. In `pvp-season`, seasonal

@@ -1,5 +1,6 @@
-import extractRules from '@/data/extractRules.json';
+import { currentExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
+import { extractRulesForMode } from '@/utils/extractRuleData';
 import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
 type TranslateFn = (key: string, fallback?: string) => string;
@@ -22,6 +23,8 @@ type UseLeafletMapControlsOptions = {
   showPmcExtracts?: boolean;
   showPmcSpawns?: boolean;
   showScavExtracts?: boolean;
+  /** App game mode (pvp, pve, seasonal); co-op classification follows its rules. */
+  gameMode?: RefLike<string | undefined>;
   t: TranslateFn;
 };
 export const ZOOM_SPEED_MIN = 0.5;
@@ -34,15 +37,19 @@ export const MAP_BUTTON_ACTIVE_CLASS =
   'border border-primary-400/60 bg-primary-500/15 text-primary-100 light:text-primary-900';
 export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
-const coopExtractIds = new Set(
-  Object.values(extractRules.maps).flatMap((map) =>
-    Object.entries(map)
-      .filter(([, profile]) => profile.rules.some((rule) => rule.type === 'coop'))
-      .map(([id]) => id)
-  )
-);
-export const isCoopExtract = (extract: MapExtract): boolean =>
-  coopExtractIds.has(extract.id) || /\bco-?op\b/i.test(extract.name || '');
+/**
+ * A shared exit that needs a PMC and a Scav in `mode`, from the current extract rule data, using
+ * the same rule list the requirement details show; the name fallback covers missing data.
+ */
+export const isCoopExtract = (extract: MapExtract, mode = 'pvp'): boolean => {
+  const data = currentExtractRuleData();
+  const coop = Object.keys(data.requirements.maps).some((mapId) =>
+    extractRulesForMode(data, { mapId, extractId: extract.id }, mode)?.some(
+      (rule) => rule.type === 'coop'
+    )
+  );
+  return coop || /\bco-?op\b/i.test(extract.name || '');
+};
 /** Derive available map locations and expose independent layer toggles and display controls. */
 export function useLeafletMapControls({
   map,
@@ -51,8 +58,10 @@ export function useLeafletMapControls({
   showPmcExtracts: initialShowPmcExtracts,
   showPmcSpawns: initialShowPmcSpawns = false,
   showScavExtracts: initialShowScavExtracts,
+  gameMode,
   t,
 }: UseLeafletMapControlsOptions) {
+  const isCoop = (extract: MapExtract) => isCoopExtract(extract, gameMode?.value ?? 'pvp');
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
   const mapExtracts = computed<MapExtract[]>(() =>
     (map.value?.extracts ?? []).filter((extract) =>
@@ -88,7 +97,7 @@ export function useLeafletMapControls({
   const hasDrawable = (predicate: (extract: MapExtract) => boolean) =>
     computed(() => drawableExtracts.value.some(predicate));
   const hasSharedExtracts = hasDrawable(
-    (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
+    (extract) => extract.faction === 'shared' && !isCoop(extract)
   );
   const hasPmcExtracts = hasDrawable((extract) => extract.faction === 'pmc');
   const hasScavExtracts = hasDrawable((extract) => extract.faction === 'scav');
@@ -96,9 +105,7 @@ export function useLeafletMapControls({
   const hasUnknownFactionExtracts = hasDrawable(
     (extract) => !['pmc', 'scav', 'shared'].includes(extract.faction ?? '')
   );
-  const hasCoopExtracts = hasDrawable(
-    (extract) => extract.faction === 'shared' && isCoopExtract(extract)
-  );
+  const hasCoopExtracts = hasDrawable((extract) => extract.faction === 'shared' && isCoop(extract));
   const mapZoomSpeed = computed({
     get: () => preferencesStore.getMapZoomSpeed,
     set: (value) => {

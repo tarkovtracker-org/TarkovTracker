@@ -445,57 +445,61 @@ extract (or pressing Enter on its marker) opens a compact plain-text popup above
 the pin and its name stay visible: one icon row per requirement with a short instruction and an
 optional qualifier (price variance, train window). The data source and the not-live notice appear
 once per map, in a line at the map's lower-left corner, instead of in every popup. It names the
-game client version and capture date for the current mode, says when the map also uses curated
-cues, and gives the full client build and curation note on hover. Money, item
-handover, keys, gear, empty backpack/armor slots, flares, activation, green smoke, train, timer,
-conditional availability, and unknown requirements have distinct icons. These cues supplement
-faction glyphs and floor badges; they never indicate live raid availability or replace the
-in-raid extraction list.
+game client version for the current mode, says when the map also uses curated cues, and gives
+the full client build and curation note on hover. Money, item handover, keys, gear, empty
+backpack/armor slots, flares, activation, green smoke, train, timer, conditional availability,
+and unknown requirements have distinct icons. These cues supplement faction glyphs and floor
+badges; they never indicate live raid availability or replace the in-raid extraction list.
 
-`extractRequirements.ts` combines the public catalog's `transferItem` with a reviewed compact
-snapshot in `app/data/extractRules.json`. The supplemental snapshot is necessary because the
-public static API omits equipment restrictions, opening chances, timers, and requirement
-references. Its source is the official game backend's `/client/locations` and `/client/globals`
-definitions, captured through the private RemoteSession worker (formerly part of RequestExtract),
-with capture timestamps and client versions recorded in the file. The map labels this "game
-data" and names curated cues separately. No session tokens, profile/account data, private LAN
-addresses, or live-session requests are shipped. Production does not contact the capture tooling.
+The rules come from the data overlay, because the public static API omits equipment
+restrictions, opening chances, timers, and requirement references. The overlay's `eft:extracts`
+generates its `extractRequirements` section from the game client's `/client/locations` and
+`/client/globals` definitions, read from the private RemoteSession worker, and keys each entry by
+map ID and the tarkov.dev extract ID matched on the raw exit name. Hand-curated scene cues live in
+its separate `extractCues` section, each with a public reference. Both record only client builds
+and a definitions hash, never capture dates, hosts, or session data. Production never contacts
+the capture tooling.
 
-The regular snapshot was captured on November 6, 2026 (1.3.0.0.48484) and was stale when reviewed;
-the Seasonal snapshot was captured on November 11 (1.3.0.1.48558). Their rules are collapsed only
-where both mode captures agree. PvE uses the explicit `CountPVE` / `ChancePVE` values in the
-regular location definitions; there was no independent PvE session capture. Match by containing
-map ID and exact raw exit name, then retain the public extract ID; never join translated names
-or assume a same-named exit on another map has the same requirements. Unmatched/incomplete
-records retain an unknown-requirements cue, and raw switch references alone do not imply a
-power requirement (the public catalog currently assigns the Customs ZB-013 switch too broadly).
+`GET /api/tarkov/extract-requirements` serves both sections together for every mode
+([overlay ownership](./overlay-and-precompute.md#endpoint-ownership-and-precedence)). Its `data`
+is null until the overlay publishes valid sections, and the route returns 503 without an overlay.
+`useExtractRuleData` starts from a bundled copy of the same sections in `app/data/`
+(`extractRequirements.json`, `extractCues.json`), requests the route once per page load, and
+replaces the copy only with a payload that passes the shared `app/utils/extractRuleData.ts`
+checks. The map redraws extract pins and the source line when it does. Co-op classification
+reads the same data. The bundled copy is a fallback for rollout and local runs without
+`OVERLAY_TOKEN`; it is removed once production serves the overlay sections
+([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)).
+
+Rules shared by the Regular and Seasonal captures sit in `rules`; otherwise `pvp` and `seasonal`
+keep their own lists, and a mode without a capture has no rules (an unknown-requirements cue).
+PvE has no session of its own, so it reads the regular definitions' `countPve` / `percentPve` /
+`minPve` / `maxPve` values. A chance that is 100% in the current mode shows nothing, so an exit closed only in PvE shows its chance only in PvE. Never join translated names or assume a
+same-named exit on another map has the same requirements. Unmatched or incomplete exits keep an
+unknown-requirements cue, and raw switch references alone do not imply a power requirement.
 
 `Reference` resolves through `globals.config.RequirementReferences`, including Alpinist's
 Paracord, Red Rebel, and empty `ArmorVest` slot. `Empty` uses its actual `RequiredSlot`.
-`TransferItem` is distinct from `HasItem`; train counts are never treated as money. Costs are
-base configuration amounts, not reputation-adjusted prices. In particular Ground Zero's vehicle
-is 20,000 roubles in regular/Seasonal and 5,000 in the regular definition's PvE field; Interchange's
-PvE base cost is still 20,000. A configured `Chance` is not a live status signal. Timers describe
-the configured arrival/activation window, not a guarantee an exit remains usable afterward.
+`TransferItem` is distinct from `HasItem`, and a shared-timer transfer is a vehicle. Train counts
+are never treated as money. Costs are base configuration amounts, not reputation-adjusted prices.
+In particular Ground Zero's vehicle is 20,000 roubles in regular/Seasonal and 5,000 in the PvE
+field; Interchange's PvE base cost is still 20,000. A configured `Chance` is not a live status
+signal. Timers describe the configured arrival/activation window, not a guarantee an exit remains
+usable afterward. Lighthouse's PvE train window differs from PvP's and is shown per mode.
 
-Hardcoded scene cues missing from backend definitions are small, explicitly referenced additions
-(`extra` / `reference`): [Mira Avenue](https://tarkov.help/en/map/ground-zero/home),
+Curated cues cover what the definitions do not describe: green flares for
+[Mira Avenue](https://tarkov.help/en/map/ground-zero/home),
 [Railroad Passage](https://tarkov.help/en/map/customs/home),
 [Power Line Passage](https://tarkov.help/en/map/woods/home), and
-[Klimov Street](https://tarkov.help/en/map/streets/extractions/extract-klimov-street) need a green
-flare. Path to River is marked as a flare extract from its public label without guessing color.
-[ZB-016 green smoke](https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point),
-[ZB-014 smoke and key](https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point), and
-[Old Gas Station smoke](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point)
-are independently reviewed scene cues; smoke is not a flare the player must bring. ZB-013 also
-shows the Factory emergency exit key alongside its captured activation requirement. Additional
-activation steps and cues are not invented when data is missing.
-
-When refreshing the snapshot, inspect the capture version/date and mode, resolve references,
-review current public map/name joins and mode differences, and preserve independently sourced
-scene additions. Read only the location/global definitions; never read, persist, or commit the
-RequestExtract session-state file. Update the capture provenance and regression cases alongside
-changed facts. The map-level source line exposes capture age without disclosing session metadata.
+[Klimov Street](https://tarkov.help/en/map/streets/extractions/extract-klimov-street); a flare of
+unconfirmed color for Path to River; green smoke for
+[ZB-016](https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point),
+[ZB-014](https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point) (with its key), and
+[Old Gas Station](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point);
+and the Factory emergency exit key beside ZB-013's activation requirement. Smoke is an
+availability signal, not a flare the player must bring. Additional activation steps and cues are
+not invented when data is missing. Refresh both sections in the overlay, never by hand-editing
+the app's bundled copy.
 
 ## Map markers, legend, and sizing
 
@@ -511,6 +515,33 @@ zoomed in at least one level past the whole-map fit, or always when **Always sho
 (`map_always_show_names`). The accessible label includes the name, floor direction, and requirement
 badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
 out of it. The map surface keeps its own keyboard controls.
+
+Objective markers are 26 px raised chips in the task category color (Regular, Pinned, Team): a
+white border, a top highlight, an inner bottom shade, a dark outline and a drop shadow keep them
+readable on light and dark map areas. A zone also gets one at its centre. The white glyph on each
+chip names the action the objective's upstream `type` asks for: visit or locate (eye), plant,
+stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000 Marker
+(beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract (the
+extract pins' exit glyph), and a flag for any other type. `app/features/maps/utils/objectiveGlyphs.ts`
+owns the type mapping, path data, and chip markup. Chips are non-interactive Leaflet markers in
+their own pane above the overlay pane and below the extract pins. Under each chip sits an
+invisible dot of the same size that takes hover, click and the stacked-objective hit test; the
+dot (or its zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades
+when the objective is on another floor and returns to full strength on hover.
+
+Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
+`app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
+(#1394), the full task name (a wiki link when one is trusted), the minimum player level when above
+1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
+description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
+stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
+accepted, the weapon or gear an elimination must use) with its icon, count and
+a FIR badge, each required key group (`A / B` when any one works), and a progress bar when the
+objective counts more than one. The footer has a labeled **Mark complete** / **Completed** toggle,
+a **Task list** button that scrolls to and highlights the objective, and the show-only and hide
+quest buttons. Compact tooltip density keeps the layout and makes the footer buttons icon-only.
+Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
+portrait with the action chip on it.
 
 The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
 controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
@@ -530,7 +561,8 @@ if that preference changes while a map is open, it applies to every extract row 
 session. The
 panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
 in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
-containers narrower than 30rem.
+containers narrower than 30rem. Below the rows, collapsible **Objective icons** and **Extract
+icons** keys list every objective glyph and extract requirement badge.
 
 The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
 the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That

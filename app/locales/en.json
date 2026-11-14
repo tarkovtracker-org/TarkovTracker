@@ -554,8 +554,8 @@
   "maps": {
     "extract_requirements": {
       "raid_notice": "Not live raid status",
-      "source": "Requirements: game data, EFT {version} ({date})",
-      "source_curated": "Requirements: game data, EFT {version} ({date}), plus curated cues",
+      "source": "Requirements: game data, EFT {version}",
+      "source_curated": "Requirements: game data, EFT {version}, plus curated cues",
       "source_detail": "From the EFT {build} client's location and global definitions. Base values only; check the in-raid extraction list.",
       "curated_detail": "Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
       "no_additional_data": "No requirements listed. Availability is not guaranteed.",
@@ -646,6 +646,19 @@
       "regular": "Regular",
       "pinned": "Pinned"
     },
+    "objective_icons": {
+      "legend_title": "Objective icons",
+      "kinds": {
+        "visit": "Visit / locate",
+        "plant": "Plant / stash",
+        "find": "Find / pick up",
+        "mark": "Mark",
+        "shoot": "Eliminate",
+        "use": "Use item",
+        "extract": "Extract",
+        "other": "Other"
+      }
+    },
     "tooltips": {
       "zoom_in": "Zoom in",
       "zoom_out": "Zoom out",
@@ -683,12 +696,12 @@
       "tooltip_density": "Tooltip density"
     },
     "tooltip": {
-      "go_to": "Go to objective",
       "go_to_in_task_list": "Go to objective in task list",
-      "complete": "Complete objective",
-      "uncomplete": "Uncomplete objective",
       "objective_unavailable": "Objective unavailable.",
-      "stacked_objectives": "{count} objectives here"
+      "stacked_objectives": "{count} objectives here",
+      "task_list": "Task list",
+      "key": "Key: {key}",
+      "progress": "Progress"
     }
   },
   "page": {

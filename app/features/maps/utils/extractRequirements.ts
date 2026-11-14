@@ -1,24 +1,16 @@
-import snapshot from '@/data/extractRules.json';
 import {
   createMapIconSvg,
   MAP_REQUIREMENT_ICON_PATHS,
   MAP_REQUIREMENT_LEGEND_KEYS,
 } from '@/features/maps/utils/mapIcons';
+import {
+  extractRuleSource,
+  extractRulesForMode,
+  type ExtractRule,
+  type ExtractRuleData,
+} from '@/utils/extractRuleData';
 import type { MapExtract } from '@/types/tarkov';
-type Rule = {
-  type: string;
-  item?: string;
-  itemName?: string;
-  count?: number;
-  countPve?: number;
-  vehicle?: boolean;
-  slot?: string;
-  percent?: number;
-  percentPve?: number;
-  min?: number;
-  max?: number;
-};
-type Profile = { rules?: Rule[]; pvp?: Rule[]; seasonal?: Rule[]; extra?: Rule[] };
+type Rule = ExtractRule & { itemName?: string };
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 export type ExtractRequirementTag = { key: string; label: string };
 /** One popup row: the requirement's icon, a short instruction and an optional qualifier. */
@@ -30,7 +22,6 @@ export type ExtractRequirements = {
 };
 /** Where a map's requirement rules come from, shown once per map instead of in every popup. */
 export type ExtractDataSource = {
-  capturedAt: string;
   /** Four-part game version, e.g. `1.3.0.0`; the build number stays in `clientBuild`. */
   clientVersion: string;
   clientBuild: string;
@@ -42,11 +33,12 @@ type Options = {
   extract: MapExtract;
   mode: string;
   t: Translate;
+  /** Overlay extract rules and cues (or the bundled copy until the overlay answers). */
+  data: ExtractRuleData;
   itemName?: (id: string) => string | undefined;
   /** Formats counts in the app's selected locale; defaults to the runtime locale. */
   formatNumber?: (count: number) => string;
 };
-const profiles: Record<string, Record<string, Profile>> = snapshot.maps;
 const CURRENCY_KEYS: Record<string, string> = {
   '5449016a4bdc2d6f028b456f': 'rubles',
   '5696686a4bdc2da3298b456a': 'dollars',
@@ -65,6 +57,7 @@ const formatCount = (options: Options, count: number): string =>
 /** Seconds after raid start as m:ss, the way the in-raid timer reads. */
 const clock = (seconds: number): string =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+const isPve = (options: Options) => options.mode === 'pve';
 function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
   return record && Object.hasOwn(record, key) ? record[key] : undefined;
 }
@@ -72,11 +65,6 @@ function itemLabel(options: Options, id: string, suppliedName?: string): string 
   const key = own(CURRENCY_KEYS, id) ?? own(ITEM_KEYS, id);
   if (key) return text(options, key);
   return suppliedName ?? options.itemName?.(id) ?? text(options, 'unknown_item', { id });
-}
-function capturedRules(profile: Profile | undefined, mode: string): Rule[] | undefined {
-  if (!SUPPORTED_MODES.includes(mode)) return undefined;
-  if (profile?.rules) return profile.rules;
-  return mode === 'seasonal' ? profile?.seasonal : profile?.pvp;
 }
 function fallbackTransfer(extract: MapExtract): Rule[] {
   const transfer = extract.transferItem;
@@ -101,7 +89,7 @@ function transferRule(transfer: NonNullable<MapExtract['transferItem']>): Rule[]
     : [];
 }
 function payment(rule: Rule, options: Options): TaggedDetail {
-  const count = options.mode === 'pve' ? (rule.countPve ?? rule.count) : rule.count;
+  const count = isPve(options) ? (rule.countPve ?? rule.count) : rule.count;
   const currency = Boolean(own(CURRENCY_KEYS, rule.item ?? ''));
   return {
     tag: currency ? 'money' : 'transfer',
@@ -132,9 +120,12 @@ function slotLabel(rule: Rule, options: Options): string {
     : (rule.slot ?? text(options, 'equipment_slot'));
 }
 function availability(rule: Rule, options: Options): number {
-  const percent = options.mode === 'pve' ? (rule.percentPve ?? rule.percent) : rule.percent;
+  const percent = isPve(options) ? (rule.percentPve ?? rule.percent) : rule.percent;
   return percent ?? 0;
 }
+/** A chance rule matters only in a mode where the exit is not always open. */
+const appliesInMode = (rule: Rule, options: Options): boolean =>
+  rule.type !== 'chance' || availability(rule, options) < 100;
 const DETAIL_BUILDERS: Record<string, (rule: Rule, options: Options) => string> = {
   item: (rule, options) =>
     text(options, 'bring', {
@@ -151,10 +142,20 @@ function detail(rule: Rule, options: Options): string {
   const build = own(DETAIL_BUILDERS, rule.type);
   return build ? build(rule, options) : text(options, `${rule.type}_detail`);
 }
+/** The configured window for the current mode; PvE has its own train schedule on some maps. */
+function timeWindow(rule: Rule, options: Options): { min: number; max?: number } {
+  const pve = isPve(options);
+  return {
+    min: (pve ? rule.minPve : undefined) ?? rule.min ?? 0,
+    max: (pve ? rule.maxPve : undefined) ?? rule.max,
+  };
+}
 /** Trains and timed extracts carry their configured window as the row's qualifier. */
 function timingHint(rule: Rule, options: Options): string | undefined {
-  if (!['train', 'timer'].includes(rule.type) || rule.max === undefined) return undefined;
-  return text(options, 'window_detail', { min: clock(rule.min ?? 0), max: clock(rule.max) });
+  if (!['train', 'timer'].includes(rule.type)) return undefined;
+  const window = timeWindow(rule, options);
+  if (window.max === undefined) return undefined;
+  return text(options, 'window_detail', { min: clock(window.min), max: clock(window.max) });
 }
 function ruleDetail(rule: Rule, options: Options): TaggedDetail {
   return { tag: ruleTag(rule), text: detail(rule, options), hint: timingHint(rule, options) };
@@ -172,36 +173,35 @@ function appendRule(
   addTag('conditional');
   details.push({ tag: 'conditional', text: text(options, 'vehicle_detail') });
 }
-/** Combine captured rules with reviewed scene cues; absence never means an extract is open. */
+/** Game-definition rules, then curated cues; absence never means an extract is open. */
+function extractRules(options: Options): Rule[] {
+  const { data, mapId, extract } = options;
+  const captured = extractRulesForMode(data, { mapId, extractId: extract.id }, options.mode);
+  const cues = own(own(data.cues, mapId), extract.id)?.cues ?? [];
+  const rules: Rule[] = [...(captured ?? [{ type: 'unknown' }]), ...cues];
+  if (!rules.some((rule) => rule.type === 'transfer')) rules.push(...fallbackTransfer(extract));
+  return rules.filter((rule) => appliesInMode(rule, options));
+}
 export function getExtractRequirements(options: Options): ExtractRequirements {
-  const profile = own(own(profiles, options.mapId), options.extract.id);
-  const captured = capturedRules(profile, options.mode);
-  const rules = [...(captured ?? [{ type: 'unknown' }]), ...(profile?.extra ?? [])];
-  if (!rules.some((rule) => rule.type === 'transfer'))
-    rules.push(...fallbackTransfer(options.extract));
   const tags = new Map<string, ExtractRequirementTag>();
   const details: ExtractRequirementDetail[] = [];
   const addTag = (key: string) => tags.set(key, { key, label: text(options, `tags.${key}`) });
-  rules.forEach((rule) => appendRule(rule, options, addTag, details));
+  extractRules(options).forEach((rule) => appendRule(rule, options, addTag, details));
   if (!details.length) details.push({ text: text(options, 'no_additional_data') });
   return { tags: [...tags.values()], details };
 }
-const SUPPORTED_MODES = ['pvp', 'pve', 'seasonal'];
-/** PvE reads the regular definitions' PvE fields, so it shares the regular capture. */
-function modeSource(mode: string) {
-  return mode === 'seasonal' ? snapshot.sources['pvp-season'] : snapshot.sources.pvp;
-}
 /** The game capture behind a map's requirement rules; undefined when the map has none. */
-export function getExtractDataSource(mapId: string, mode: string): ExtractDataSource | undefined {
-  const mapProfiles = own(profiles, mapId);
-  if (!mapProfiles || !SUPPORTED_MODES.includes(mode)) return undefined;
-  const source = modeSource(mode);
-  const build = source.version.replace(/^EFT Client\s*/, '');
+export function getExtractDataSource(
+  mapId: string,
+  mode: string,
+  data: ExtractRuleData
+): ExtractDataSource | undefined {
+  const source = extractRuleSource(data, mode);
+  if (!source || !own(data.requirements.maps, mapId)) return undefined;
   return {
-    capturedAt: source.capturedAt,
-    clientVersion: build.split('.').slice(0, 4).join('.'),
-    clientBuild: build,
-    curatedCues: Object.values(mapProfiles).some((profile) => Boolean(profile.extra?.length)),
+    clientVersion: source.clientBuild.split('.').slice(0, 4).join('.'),
+    clientBuild: source.clientBuild,
+    curatedCues: Object.keys(own(data.cues, mapId) ?? {}).length > 0,
   };
 }
 /**
@@ -210,17 +210,13 @@ export function getExtractDataSource(mapId: string, mode: string): ExtractDataSo
  */
 export function describeExtractSource(
   source: ExtractDataSource,
-  t: Translate,
-  formatDate: (iso: string) => string
+  t: Translate
 ): { label: string; detail: string } {
   const key = source.curatedCues ? 'source_curated' : 'source';
   const detail = [t('maps.extract_requirements.source_detail', { build: source.clientBuild })];
   if (source.curatedCues) detail.push(t('maps.extract_requirements.curated_detail'));
   return {
-    label: t(`maps.extract_requirements.${key}`, {
-      version: source.clientVersion,
-      date: formatDate(source.capturedAt),
-    }),
+    label: t(`maps.extract_requirements.${key}`, { version: source.clientVersion }),
     detail: detail.join(' '),
   };
 }

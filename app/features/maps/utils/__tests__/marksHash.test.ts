@@ -18,6 +18,10 @@ describe('getMarksHash', () => {
     const marksB: MapMark[] = [{ ...baseMark, pinned: true }];
     expect(getMarksHash(marksA, 'customs')).toBe(getMarksHash(marksB, 'customs'));
   });
+  it('redraws when only the objective type, and so its glyph, differs', () => {
+    const plant = getMarksHash([{ ...baseMark, type: 'plantItem' }], 'customs');
+    expect(getMarksHash([{ ...baseMark, type: 'visit' }], 'customs')).not.toBe(plant);
+  });
   it('invalidates markers when only elevation changes', () => {
     const point = {
       ...baseMark,
