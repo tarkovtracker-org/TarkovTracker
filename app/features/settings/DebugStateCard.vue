@@ -43,7 +43,7 @@
     isCopying.value = true;
     try {
       const json = exportDebugState();
-      await copyToClipboard(json);
+      await copyToClipboard(json, { revealValue: false });
     } finally {
       isCopying.value = false;
     }
