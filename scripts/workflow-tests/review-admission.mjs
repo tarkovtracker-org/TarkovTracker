@@ -7,8 +7,15 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fixture as automationFixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-const { activeQueueGroup, admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
-  await import('../ci/review-admission-api.mjs');
+import { countApiCalls } from './helpers/api-count.mjs';
+const {
+  activeQueueGroup,
+  admissionRun,
+  reviewThreads,
+  queueIdentity,
+  validateAdmissionReceipt,
+  trustedActors,
+} = await import('../ci/review-admission-api.mjs');
 const { readAdmissionArchive, requireReviewAdmission } =
   await import('../ci/review-admission-binding.mjs');
 const { safeDependencyManifests, dependencyEligibility } =
@@ -3047,7 +3054,12 @@ function assertAdmissionSecurity(workflow) {
   }
   const filter = jobBlock(workflow, 'filter');
   assert.doesNotMatch(filter, /statuses: write|secrets\.|environment:|concurrency:/);
-  assertPermissionMap(filter, ['actions: read', 'contents: read']);
+  assertPermissionMap(filter, [
+    'actions: read',
+    'checks: read',
+    'contents: read',
+    'pull-requests: read',
+  ]);
   assert.match(filter, /ref: main/);
   assert.match(filter, /filterAdmission\(\{ github, context \}\)/);
 }
@@ -3112,6 +3124,194 @@ test('Cubic event filtering skips unsuccessful signals and uses the exact commen
       relevantComment(payload)
     );
   }
+});
+test('admission preflight rejects only authenticated obsolete signals before publication', async () => {
+  for (const linked of [false, true]) {
+    const f = mergedSignalFixture('pull_request_review', linked);
+    const statuses = structuredClone(f.statuses);
+    assert.equal(await filterAdmission({ github: f.github, context: f.context }), false);
+    assert.deepEqual(f.statuses, statuses);
+  }
+  const queue = suiteSignalFixture();
+  Object.assign(queue.suite, {
+    head_sha: queued,
+    head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+    pull_requests: [],
+  });
+  assert.equal(await filterAdmission({ github: queue.github, context: queue.context }), false);
+  // Neither a stale signal SHA nor a current policy denial makes an active target obsolete.
+  const active = signalFixture(queuedControlFixture());
+  active.run.head_sha = 'd'.repeat(40);
+  active.context.payload.workflow_run = { ...active.run };
+  active.f.jobs[0].head_sha = active.run.head_sha;
+  active.f.reviews = [human('CHANGES_REQUESTED')];
+  assert.equal(await filterAdmission({ github: active.github, context: active.context }), true);
+  for (const action of ['created', 'edited', 'deleted']) {
+    assert.equal(
+      await filterAdmission({
+        context: {
+          eventName: 'issue_comment',
+          payload: {
+            ...commentPayload(),
+            action,
+            changes: { body: { from: `/approve ${head}` } },
+          },
+        },
+      }),
+      true
+    );
+  }
+});
+test('admission preflight fails closed on foreign, ambiguous, missing-receipt and API failures', async () => {
+  for (const change of [
+    (f) => {
+      f.suite.app.id = 15368;
+    },
+    (f) => {
+      f.suite.pull_requests.push(signalPull());
+    },
+    (f) => {
+      f.suite.pull_requests[0].url = 'https://api.github.com/repos/foreign/repo/pulls/1';
+    },
+    (f) => {
+      f.f.artifacts = [];
+    },
+    (f) => {
+      f.github.rest.checks.getSuite = async () => {
+        throw new Error('API unavailable');
+      };
+    },
+  ]) {
+    const f = suiteSignalFixture();
+    change(f);
+    const statuses = structuredClone(f.statuses);
+    await assert.rejects(filterAdmission({ github: f.github, context: f.context }));
+    assert.deepEqual(f.statuses, statuses);
+  }
+});
+test('publisher initialization follows fresh target authentication and skips obsolete queued work', async () => {
+  const obsolete = mergedSignalFixture('pull_request_review', true);
+  let initializations = 0;
+  const createPublisher = async () => {
+    initializations += 1;
+    throw new Error('publisher unavailable');
+  };
+  await runReviewAdmission({
+    github: obsolete.github,
+    context: obsolete.context,
+    core: obsolete.core,
+    createPublisher,
+  });
+  assert.equal(initializations, 0);
+  const active = signalFixture(queuedControlFixture());
+  await assert.rejects(
+    runReviewAdmission({
+      github: active.github,
+      context: active.context,
+      core: active.core,
+      createPublisher,
+    }),
+    /publisher unavailable/
+  );
+  assert.equal(initializations, 1);
+  const foreign = signalFixture();
+  foreign.run.repository.full_name = 'foreign/repo';
+  await assert.rejects(
+    runReviewAdmission({
+      github: foreign.github,
+      context: foreign.context,
+      core: foreign.core,
+      createPublisher,
+    })
+  );
+  assert.equal(initializations, 1);
+});
+test('deferred publisher uses its returned App client instead of the read-only client', async () => {
+  const f = signalFixture(queuedControlFixture());
+  const published = [];
+  const publisher = {
+    ...f.github,
+    rest: {
+      ...f.github.rest,
+      repos: {
+        ...f.github.rest.repos,
+        createCommitStatus: async (params) => {
+          published.push(params);
+        },
+      },
+    },
+  };
+  f.github.rest.repos.createCommitStatus = async () => {
+    throw new Error('unwrapped status writer');
+  };
+  const args = {
+    github: f.github,
+    context: f.context,
+    core: f.core,
+    createPublisher: async () => publisher,
+  };
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    'const publisher = await publicationClient(github, createPublisher);',
+    'const publisher = github;'
+  );
+  await withReceiptDirectory(async () => {
+    await runReviewAdmission(args);
+    assert.ok(published.some((item) => item.sha === head));
+    assert.ok(published.some((item) => item.sha === queued));
+    await assert.rejects(mutant.runReviewAdmission(args), /unwrapped status writer/);
+  });
+});
+test('permission lookup budget ignores inert participants while retaining live approval actors', async () => {
+  const pr = fixture().pr;
+  const comments = Array.from({ length: 100 }, (_, id) => ({
+    id,
+    body: 'ordinary discussion',
+    user: { id: id + 100, login: `commenter-${id}`, type: 'User' },
+  }));
+  comments.push({ body: `/approve ${head}`, user: human().user });
+  const reviews = Array.from({ length: 100 }, (_, id) =>
+    human('COMMENTED', {
+      id,
+      user: { id: id + 200, login: `reviewer-${id}`, type: 'User' },
+    })
+  );
+  reviews.push(human(), human('APPROVED', { commit_id: base }), human('CHANGES_REQUESTED'));
+  const github = {
+    rest: {
+      repos: { getCollaboratorPermissionLevel: async () => ({ data: { permission: 'write' } }) },
+    },
+    paginate: () => {},
+    graphql: () => {},
+  };
+  const counts = countApiCalls(github);
+  assert.deepEqual(
+    await trustedActors(github, repo, reviews, comments, pr),
+    new Set(['maintainer'])
+  );
+  assert.equal(counts.total, 1);
+  github.rest.repos.getCollaboratorPermissionLevel = async () => ({ data: { permission: 'read' } });
+  assert.deepEqual(await trustedActors(github, repo, reviews, comments, pr), new Set());
+});
+test('workflow defers App initialization and grants only read scopes to target preflight', () => {
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const evaluate = workflowStep(
+    jobBlock(source, 'admission'),
+    'Evaluate current immutable review evidence'
+  );
+  assert.match(
+    evaluate,
+    /createPublisher: \(\) => createReviewPublisher\(\{ github, context, core \}\)/
+  );
+  assert.doesNotMatch(evaluate, /await createReviewPublisher/);
+  const filter = jobBlock(source, 'filter');
+  assertPermissionMap(filter, [
+    'actions: read',
+    'checks: read',
+    'contents: read',
+    'pull-requests: read',
+  ]);
+  assert.doesNotMatch(filter, /secrets\.|environment:|concurrency:|statuses: write/);
 });
 test('Cubic guard mutations expose unknown peer names, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
   const peer = simpleLock()

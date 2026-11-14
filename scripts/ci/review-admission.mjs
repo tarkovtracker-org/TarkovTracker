@@ -56,7 +56,7 @@ async function evidence(github, repo, pr) {
     filter: 'latest',
   });
   const threads = await reviewThreads(github, repo, pr.number);
-  const trusted = await trustedActors(github, repo, reviews, comments);
+  const trusted = await trustedActors(github, repo, reviews, comments, pr);
   const crowdinSafe = await crowdinEligibility(github, pr, files);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
@@ -479,7 +479,9 @@ function relevantPrComment(payload) {
 async function successfulSignal(github, context) {
   if (context.payload.workflow_run.conclusion !== 'success') return false;
   await requireSignal(github, context);
-  return true;
+  // Authenticate the target before joining the global publication queue. This only discards
+  // signals already proven obsolete by the publisher; ambiguity and API errors still throw.
+  return !obsoleteSignalNotice(await targets(github, context));
 }
 export async function filterAdmission({ github, context }) {
   if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
@@ -495,7 +497,10 @@ function obsoleteSignalNotice(selected) {
   }
   return null;
 }
-export async function runReviewAdmission({ github, context, core }) {
+function publicationClient(github, createPublisher) {
+  return createPublisher ? createPublisher() : github;
+}
+export async function runReviewAdmission({ github, context, core, createPublisher }) {
   if (context.eventName === 'issue_comment' && !relevantComment(context.payload)) {
     core.notice('Unrelated issue comment does not affect review admission.');
     return;
@@ -510,14 +515,17 @@ export async function runReviewAdmission({ github, context, core }) {
     return;
   }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
-  await evaluateScope(github, context, core, selected[0], source);
+  // A relevant event may become obsolete while queued. Do not initialize the protected App
+  // until fresh source/target checks have established actual publication work.
+  const publisher = await publicationClient(github, createPublisher);
+  await evaluateScope(publisher, context, core, selected[0], source);
 }
 // Workflow entry point. A policy hold (draft or closed PR, review missing, open findings, sensitive approval
 // missing) has already failed every scope status, which is the actual gate, so the run ends green
 // with a notice instead of producing a red run for every review event. Integrity, identity and
 // API errors still fail the run. A hold after any receipt output was set stays a failure so later
 // upload/publication steps cannot run.
-export async function runReviewAdmissionStep({ github, context, core }) {
+export async function runReviewAdmissionStep({ github, context, core, createPublisher }) {
   const outputs = new Set();
   const tracked = Object.assign(Object.create(core), {
     setOutput(name, value) {
@@ -526,7 +534,7 @@ export async function runReviewAdmissionStep({ github, context, core }) {
     },
   });
   try {
-    await runReviewAdmission({ github, context, core: tracked });
+    await runReviewAdmission({ github, context, core: tracked, createPublisher });
   } catch (error) {
     if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;
     core.notice(`Review admission held: ${error.message}`);
