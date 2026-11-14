@@ -5,6 +5,7 @@ Progress API host: api.tarkovtracker.org (Bearer api_token auth).
 Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration surface).
 Team routes: /api/team/* (Supabase JWT auth).
 Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
+
 Game modes in API: regular (pvp), pve, pvp-season (seasonal).
 Rate limits: §Rate Limits. OpenAPI spec: [API source](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/openapi.ts).
 -->
@@ -13,6 +14,10 @@ Rate limits: §Rate Limits. OpenAPI spec: [API source](https://github.com/tarkov
 
 TarkovTracker provides internal API routes for fetching game data and team information. Game data is proxied through Nuxt server routes to `json.tarkov.dev` with caching and overlay corrections applied.
 Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatible `json.tarkov.dev` mirror.
+
+For nonowners, missing and nonpublic profiles return the same generic `404 Profile not found`
+response. Streamer/overlay consumers preserve that response so sharing endpoints do not expose
+whether a candidate account or private mode exists. Owners can still view their private progress.
 
 > **Upstream data source.** TarkovTracker consumes the static JSON endpoints at `json.tarkov.dev`.
 > The endpoint catalog lives at `https://json.tarkov.dev/endpoints`. The older `api.tarkov.dev`
