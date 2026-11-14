@@ -322,6 +322,15 @@ instead of showing a raw ID.
 Players can recover a missing configured unlock task from explicit completion notifications through
 the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
 
+Time gates are information only. `tarkov-json.ts` carries upstream `availableDelaySecondsMin/Max`
+onto the task core only when positive and finite (upstream reports no delay as `0`). The card header
+shows the stated delay ("Unlocks 10h after prerequisites are complete", or a min–max range) on
+unfinished tasks through `TaskTimeGateNote.vue` and `task-time-gate.ts`. It explains why the game
+can still withhold a task the tracker shows as available. The evaluator, sorting and Mark available
+ignore it, and there is no countdown: tracker completion times cannot reconstruct when the
+prerequisite was finished in game (#922). The fields are additive to `tasks-core-json-v3`, so cache
+keys stay unchanged and they appear once the scheduled precompute and browser caches refresh.
+
 Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
 current profile's edition, prestige and faction eligibility. Ineligible children contribute no
 “Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)

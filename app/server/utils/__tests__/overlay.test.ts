@@ -148,6 +148,33 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('keeps adapted time-gate delays on tasks the overlay patches', async () => {
+    vi.resetModules();
+    stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'delay-test-v1', generated: '2026-11-14', sha256: 'test-sha' },
+      tasks: { 'task-1': { minPlayerLevel: 12 } },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = {
+      data: {
+        tasks: [
+          {
+            id: 'task-1',
+            minPlayerLevel: 10,
+            availableDelaySecondsMin: 1800,
+            availableDelaySecondsMax: 2100,
+          },
+        ],
+      },
+    };
+    const result = await applyOverlay(payload, { gameMode: 'regular' });
+    expect(result.data?.tasks?.[0]).toMatchObject({
+      minPlayerLevel: 12,
+      availableDelaySecondsMin: 1800,
+      availableDelaySecondsMax: 2100,
+    });
+  });
   it('splits trader requirements on tasksAdd entries', async () => {
     const fetchMock = stubOverlayFetch({
       editions: testOverlayEditions,
