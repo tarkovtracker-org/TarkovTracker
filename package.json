@@ -8,7 +8,7 @@
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI.",
     "glob": "Pinned to 14.0.3 for GHSA-3g3m-2fjr-6pw4. The pnpm patch redirects upstream minified default exports to the published raw modules compared against the immutable source tag. Nitro/@vercel/nft CommonJS and ESM consumer tests enforce the reviewed raw entry points. Remove this patch only after vetting the replacement default artifacts or obtaining equivalent provenance."
   },
-  "version": "1.89.0",
+  "version": "1.90.0",
   "dependencies": {
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.122",

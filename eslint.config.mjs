@@ -187,6 +187,7 @@ export default withNuxt(
       'scripts/preview/controller.mjs',
       'scripts/workflow-tests/preview.mjs',
       'scripts/workflow-tests/preview-request.mjs',
+      'scripts/workflow-tests/codecov-security.mjs',
       'scripts/workflow-tests/review-admission.mjs',
       'scripts/workflow-tests/controller-events.mjs',
       'scripts/workflow-tests/dependency-security.mjs',
