@@ -30,11 +30,13 @@
             <UIcon name="i-mdi-link-variant" class="text-success-400 size-5" />
             <span class="text-surface-100 font-medium">
               {{
-                t(
-                  'settings.discord_link.linked_as',
-                  { username: link.discord_username },
-                  'Linked as {username}'
-                )
+                discordUsername
+                  ? t(
+                      'settings.discord_link.linked_as',
+                      { username: discordUsername },
+                      'Linked as {username}'
+                    )
+                  : t('settings.discord_link.linked', 'Discord account linked')
               }}
             </span>
           </div>
@@ -77,9 +79,10 @@
 </template>
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
+  import { getLinkedDiscordIdentity, getLinkedDiscordUsername } from '@/utils/discordUsername';
   import { logger } from '@/utils/logger';
   interface DiscordAccountLink {
-    discord_username: string;
+    discord_user_id: string;
   }
   interface RoleSyncResponse {
     reason?: string;
@@ -96,6 +99,7 @@
   const route = useRoute();
   const router = useRouter();
   const link = ref<DiscordAccountLink | null>(null);
+  const discordUsername = ref<string | null>(null);
   const loading = ref(false);
   const linking = ref(false);
   const syncing = ref(false);
@@ -109,20 +113,31 @@
   );
   const currentUserId = computed(() => $supabase.user?.id ?? null);
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const loadDiscordUsername = async (discordUserId: string) => {
+    try {
+      const { data, error } = await $supabase.client.auth.getUser();
+      if (error) throw error;
+      discordUsername.value = getLinkedDiscordUsername(data.user?.identities ?? [], discordUserId);
+    } catch (error) {
+      logger.warn('[DiscordLinkCard] Failed to load Discord username', { error });
+    }
+  };
   const loadLink = async () => {
     const userId = $supabase.user?.id;
     if (!userId) return;
     loading.value = true;
     errorMessage.value = null;
     alertTone.value = 'error';
+    discordUsername.value = null;
     try {
       const { data, error } = await $supabase.client
         .from('discord_account_links')
-        .select('discord_username')
+        .select('discord_user_id')
         .eq('user_id', userId)
         .maybeSingle<DiscordAccountLink>();
       if (error) throw error;
       link.value = data;
+      if (data) await loadDiscordUsername(data.discord_user_id);
     } catch (error) {
       logger.error('[DiscordLinkCard] Failed to load Discord account link', { userId, error });
       errorMessage.value = t(
@@ -188,7 +203,7 @@
       const { data: userData, error: userError } = await $supabase.client.auth.getUser();
       if (userError) throw userError;
       const identities = userData.user?.identities ?? [];
-      const discordIdentity = identities.find((identity) => identity.provider === 'discord');
+      const discordIdentity = getLinkedDiscordIdentity(identities, link.value.discord_user_id);
       if (!discordIdentity) {
         throw new Error('Discord identity was not found');
       }

@@ -1,0 +1,2 @@
+# Synthetic numeric Discord ID in the original regression fixture; not a credential.
+e6cc19ba2825e9d22c7e2dde38569efd509fe715:app/features/settings/__tests__/DiscordLinkCard.test.ts:discord-client-id:149

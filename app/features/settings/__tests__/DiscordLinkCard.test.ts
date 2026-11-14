@@ -101,7 +101,11 @@ describe('DiscordLinkCard', () => {
       data: {
         user: {
           identities: [
-            { id: 'identity-1', provider: 'discord' },
+            {
+              id: 'identity-1',
+              provider: 'discord',
+              identity_data: { provider_id: 'discord-123', full_name: 'linked-user' },
+            },
             { id: 'identity-2', provider: 'email' },
           ],
         },
@@ -130,13 +134,51 @@ describe('DiscordLinkCard', () => {
   };
   it('loads an existing Discord link on mount', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     const wrapper = await mountCard();
     expect(maybeSingleMock).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain('Linked as linked-user');
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+  it('shows the unique Discord username instead of the stored ID or display name', async () => {
+    const numericId = '1'.repeat(18);
+    maybeSingleMock.mockResolvedValue({
+      data: {
+        discord_user_id: 'discord-123',
+        discord_username: numericId,
+        discord_display_name: 'Display Name',
+      },
+      error: null,
+    });
+    const wrapper = await mountCard();
+    expect(wrapper.text()).toContain('Linked as linked-user');
+    expect(wrapper.text()).not.toContain(numericId);
+    expect(wrapper.text()).not.toContain('Display Name');
+    expect(selectMock).toHaveBeenCalledWith('discord_user_id');
+  });
+  it('keeps the link usable when the Discord username cannot be loaded', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_user_id: 'discord-123', discord_username: 'Display Name' },
+      error: null,
+    });
+    userGetMock.mockResolvedValue({ data: { user: null }, error: new Error('Auth unavailable') });
+    const wrapper = await mountCard();
+    expect(wrapper.text()).toContain('settings.discord_link.linked');
+    expect(wrapper.text()).not.toContain('Linked as');
+    expect(wrapper.text()).not.toContain('Display Name');
+    expect(wrapper.findAll('button')).toHaveLength(2);
+    expect(wrapper.findComponent(UAlert).exists()).toBe(false);
+  });
+  it('does not load a username when no Discord account is linked', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const wrapper = await mountCard();
+    expect(userGetMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.discord_link.link_account');
   });
   it('retries loading after OAuth return and then syncs roles', async () => {
     routeState.query = { discord_linked: '1' };
@@ -145,7 +187,7 @@ describe('DiscordLinkCard', () => {
       .mockResolvedValueOnce({ data: null, error: null })
       .mockResolvedValueOnce({ data: null, error: new Error('trigger lag') })
       .mockResolvedValueOnce({
-        data: { discord_username: 'linked-user' },
+        data: { discord_user_id: 'discord-123' },
         error: null,
       });
     const mountPromise = mount(DiscordLinkCard, {
@@ -173,7 +215,7 @@ describe('DiscordLinkCard', () => {
   });
   it('shows a warning when the linked Discord account has not joined the server', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     invokeMock.mockResolvedValue({
@@ -189,7 +231,7 @@ describe('DiscordLinkCard', () => {
   });
   it('unlinks the identity after revoking the Linked role', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     invokeMock.mockResolvedValue({ data: { revoked: true }, error: null });
@@ -197,12 +239,72 @@ describe('DiscordLinkCard', () => {
     await wrapper.findAll('button')[1]!.trigger('click');
     await flushPromises();
     expect(invokeMock).toHaveBeenCalledWith('discord-unlink', { body: {} });
-    expect(unlinkIdentityMock).toHaveBeenCalledWith({ id: 'identity-1', provider: 'discord' });
+    expect(unlinkIdentityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'identity-1', provider: 'discord' })
+    );
     expect(wrapper.text()).toContain('settings.discord_link.link_account');
+  });
+  it.each([{ provider_id: 'discord-123' }, { sub: 'discord-123' }])(
+    'unlinks the displayed Discord account when another identity comes first (%j)',
+    async (metadata) => {
+      const linkedIdentity = {
+        id: 'identity-linked',
+        provider: 'discord',
+        identity_data: { ...metadata, full_name: 'linked-user' },
+      };
+      maybeSingleMock.mockResolvedValue({ data: { discord_user_id: 'discord-123' }, error: null });
+      userGetMock.mockResolvedValue({
+        data: {
+          user: {
+            identities: [
+              {
+                id: 'identity-other',
+                provider: 'discord',
+                identity_data: { provider_id: 'discord-other', full_name: 'wrong-user' },
+              },
+              linkedIdentity,
+              { id: 'identity-email', provider: 'email' },
+            ],
+          },
+        },
+        error: null,
+      });
+      const wrapper = await mountCard();
+      expect(wrapper.text()).toContain('Linked as linked-user');
+      await wrapper.findAll('button')[1]!.trigger('click');
+      await flushPromises();
+      expect(invokeMock).toHaveBeenCalledWith('discord-unlink', { body: {} });
+      expect(unlinkIdentityMock).toHaveBeenCalledWith(linkedIdentity);
+      expect(wrapper.text()).toContain('settings.discord_link.link_account');
+    }
+  );
+  it('keeps the link when its matching Discord identity is missing', async () => {
+    maybeSingleMock.mockResolvedValue({ data: { discord_user_id: 'discord-123' }, error: null });
+    userGetMock.mockResolvedValue({
+      data: {
+        user: {
+          identities: [
+            {
+              id: 'identity-other',
+              provider: 'discord',
+              identity_data: { provider_id: 'discord-other' },
+            },
+            { id: 'identity-email', provider: 'email' },
+          ],
+        },
+      },
+      error: null,
+    });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
   });
   it('restores the Linked role when identity unlinking fails', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     invokeMock
@@ -220,7 +322,7 @@ describe('DiscordLinkCard', () => {
   });
   it('restores managed roles and keeps the identity linked when role revocation fails', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     invokeMock
@@ -238,11 +340,21 @@ describe('DiscordLinkCard', () => {
   });
   it('does not revoke roles when Discord is the only login identity', async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
+      data: { discord_user_id: 'discord-123' },
       error: null,
     });
     userGetMock.mockResolvedValue({
-      data: { user: { identities: [{ id: 'identity-1', provider: 'discord' }] } },
+      data: {
+        user: {
+          identities: [
+            {
+              id: 'identity-1',
+              provider: 'discord',
+              identity_data: { provider_id: 'discord-123' },
+            },
+          ],
+        },
+      },
       error: null,
     });
     const wrapper = await mountCard();

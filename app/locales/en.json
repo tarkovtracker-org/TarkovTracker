@@ -2350,6 +2350,7 @@
       "link_account": "Link Discord account",
       "login_to_link": "Log in to link Discord",
       "linked_as": "Linked as {username}",
+      "linked": "Discord account linked",
       "sync_roles": "Sync Discord roles",
       "error_title": "Discord link unavailable",
       "not_in_guild_title": "Join the Discord server",
