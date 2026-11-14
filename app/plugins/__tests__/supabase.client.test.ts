@@ -472,7 +472,10 @@ describe('supabase plugin', () => {
         (error: unknown) => error
       );
       await vi.advanceTimersByTimeAsync(8000);
-      expect(await timedOut).toMatchObject({ message: 'OAuth callback is still pending' });
+      expect(await timedOut).toMatchObject({
+        name: 'SupabaseCallbackPendingError',
+        message: 'OAuth callback is still pending',
+      });
       expect(window.location.search).toBe('?discord_linked=1&code=pending-code');
       const retry = result.provide.supabase.ready();
       exchange.resolve({ data: { session: createSession('linked-user') }, error: null });

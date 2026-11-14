@@ -2,7 +2,9 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import authMiddleware from '@/middleware/auth';
-const { loggerMock, navigateToMock, readyMock, state } = vi.hoisted(() => ({
+import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
+const { abortNavigationMock, loggerMock, navigateToMock, readyMock, state } = vi.hoisted(() => ({
+  abortNavigationMock: vi.fn(() => false as const),
   loggerMock: {
     error: vi.fn(),
   },
@@ -23,6 +25,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
   },
 }));
 mockNuxtImport('navigateTo', () => navigateToMock);
+mockNuxtImport('abortNavigation', () => abortNavigationMock);
 mockNuxtImport(
   'defineNuxtRouteMiddleware',
   () => (handler: (...args: unknown[]) => unknown) => handler
@@ -57,6 +60,27 @@ describe('auth middleware', () => {
     expect(navigateToMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
+  it.each([false, true])(
+    'cancels pending-callback navigation with loggedIn=%s',
+    async (loggedIn) => {
+      state.user.loggedIn = loggedIn;
+      state.user.id = loggedIn ? 'user-1' : null;
+      state.user.email = loggedIn ? 'user@example.com' : null;
+      const previousUser = { ...state.user };
+      window.history.replaceState(null, '', '/settings?discord_linked=1&code=pending#account');
+      readyMock.mockRejectedValueOnce(new SupabaseCallbackPendingError());
+      try {
+        expect(await runMiddleware()).toBe(false);
+        expect(abortNavigationMock).toHaveBeenCalledTimes(1);
+        expect(navigateToMock).not.toHaveBeenCalled();
+        expect(state.user).toEqual(previousUser);
+        expect(window.location.search).toBe('?discord_linked=1&code=pending');
+        expect(window.location.hash).toBe('#account');
+      } finally {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  );
   it('redirects to /login when Supabase bootstrap fails', async () => {
     const bootstrapError = new Error('bootstrap failed');
     state.user.loggedIn = true;

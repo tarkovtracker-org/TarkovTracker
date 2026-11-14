@@ -9,6 +9,7 @@ import {
   SupabaseSessionChangedError,
   supabaseAuthStorageKey,
 } from '@/utils/supabaseAuthFence';
+import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
 import { hydrateUserFromSession } from '@/utils/userHydration';
 /**
  * `signed_out_locally`: this browser's session ended, but the server did not confirm
@@ -492,7 +493,7 @@ export default defineNuxtPlugin({
         () => currentSession,
         '[Supabase] Session readiness exceeded the start-up budget; continuing'
       );
-      if (oauthCallbackCode) throw new Error('OAuth callback is still pending');
+      if (oauthCallbackCode) throw new SupabaseCallbackPendingError();
       return session;
     };
     const signInWithOAuth = async (
