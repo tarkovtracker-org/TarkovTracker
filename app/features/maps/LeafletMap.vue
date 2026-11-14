@@ -636,6 +636,7 @@
     countHiddenLayers,
     type MapLayerItem,
   } from '@/features/maps/utils/mapLayerGroups';
+  import { isSavedMapLayerKey } from '@/features/maps/utils/mapLayerVisibility';
   import {
     createMapPinElement,
     dimOffFloorPin,
@@ -946,18 +947,23 @@
     if (!source || !anyExtractsVisible.value) return null;
     return describeExtractSource(source, t);
   });
-  /** Extract rows the user changed this session; a later default never overrides them. */
-  const touchedLayers = new Set<string>();
+  /** Extract, transit and spawn rows remember the user's choice across visits. */
+  const rememberLayer = (item: MapLayerItem) => {
+    if (isSavedMapLayerKey(item.key))
+      preferencesStore.setMapLayerVisible(item.key, item.visible.value);
+  };
   const toggleLayer = (item: MapLayerItem) => {
-    touchedLayers.add(item.key);
     item.visible.value = !item.visible.value;
+    rememberLayer(item);
   };
   const showAllLayers = () => {
     layerGroups.value.forEach((group) => group.items.forEach(showLayer));
   };
   const showLayer = (item: MapLayerItem) => {
-    touchedLayers.add(item.key);
+    // Every row is saved, including ones already visible by default, so a later default change
+    // cannot hide what the user chose to show.
     if (!item.visible.value) item.visible.value = true;
+    rememberLayer(item);
   };
   // The panel opens by default where there is room beside the map, and stays closed on narrow
   // screens where it would push the map down. An explicit open/close choice is remembered.
@@ -2252,10 +2258,11 @@
     updateMarkers();
   });
   // A changed default (e.g. the saved preference arriving from account sync after the map
-  // mounted) applies to every extract row the user has not changed this session and whose
-  // visibility the page did not set explicitly.
-  const defaultableExtractLayers = (): Array<[string, Ref<boolean>]> =>
-    (
+  // mounted) applies to every extract row the user has not set and whose visibility the page did
+  // not set explicitly.
+  const defaultableExtractLayers = (): Ref<boolean>[] => {
+    const saved = preferencesStore.getMapLayerVisibility;
+    return (
       [
         ['pmc', showPmcExtracts, props.showPmcExtracts],
         ['scav', showScavExtracts, props.showScavExtracts],
@@ -2263,11 +2270,12 @@
         ['coop', showCoopExtracts, undefined],
       ] as const
     )
-      .filter(([key, , explicit]) => explicit === undefined && !touchedLayers.has(key))
-      .map(([key, layer]) => [key, layer]);
+      .filter(([key, , explicit]) => explicit === undefined && saved[key] === undefined)
+      .map(([, layer]) => layer);
+  };
   watch(
     () => props.showExtracts,
-    (visible) => defaultableExtractLayers().forEach(([, layer]) => (layer.value = visible))
+    (visible) => defaultableExtractLayers().forEach((layer) => (layer.value = visible))
   );
   watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
     createExtractMarkers()

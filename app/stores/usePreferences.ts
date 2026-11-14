@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
+import {
+  EXTRACT_LAYER_KEYS,
+  normalizeSavedMapLayerVisibility,
+  type SavedMapLayerKey,
+  type SavedMapLayerVisibility,
+} from '@/features/maps/utils/mapLayerVisibility';
 import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   normalizeNeededItemsCardStyle,
@@ -156,6 +162,8 @@ export interface PreferencesState {
   pinnedTaskIds: string[];
   // Quests the user hid from the Tasks map (#918); persisted locally only, not synced to Supabase
   mapHiddenTaskIds: string[];
+  // Layers rows the user turned on or off (extracts, transits, spawns); local only, like the above
+  mapLayerVisibility: SavedMapLayerVisibility;
   // Quests the user hid from every task list; view-only, never changes progress or unlocks
   hiddenTaskIds: string[];
   mapShowSelfObjectives: boolean;
@@ -245,6 +253,7 @@ export const preferencesDefaultState: PreferencesState = {
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
   mapHiddenTaskIds: [],
+  mapLayerVisibility: {},
   hiddenTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
@@ -632,6 +641,8 @@ export const usePreferencesStore = defineStore('preferences', {
     getMapHiddenTaskIds: (state) => {
       return state.mapHiddenTaskIds ?? [];
     },
+    getMapLayerVisibility: (state): SavedMapLayerVisibility =>
+      normalizeSavedMapLayerVisibility(state.mapLayerVisibility),
     getHiddenTaskIds: (state): string[] => {
       return normalizeTaskIdList(state.hiddenTaskIds);
     },
@@ -910,6 +921,16 @@ export const usePreferencesStore = defineStore('preferences', {
     // Map display actions
     setShowMapExtracts(show: boolean) {
       this.showMapExtracts = show;
+      // Changing the default is an explicit choice, so it replaces remembered extract rows.
+      this.mapLayerVisibility = Object.fromEntries(
+        Object.entries(this.getMapLayerVisibility).filter(
+          ([key]) => !EXTRACT_LAYER_KEYS.includes(key as SavedMapLayerKey)
+        )
+      );
+    },
+    /** Remembers a Layers row the user turned on or off. */
+    setMapLayerVisible(key: SavedMapLayerKey, visible: boolean) {
+      this.mapLayerVisibility = { ...this.getMapLayerVisibility, [key]: visible };
     },
     setMapMarkerColor(key: MapMarkerColorKey, color: string) {
       if (typeof color !== 'string' || color.trim().length === 0) return;
@@ -1073,6 +1094,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapZoneOpacity',
       'pinnedTaskIds',
       'mapHiddenTaskIds',
+      'mapLayerVisibility',
       'hiddenTaskIds',
       'taskFilterPresets',
       'skillSortMode',

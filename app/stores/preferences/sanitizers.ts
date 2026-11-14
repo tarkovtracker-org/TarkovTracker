@@ -1,3 +1,4 @@
+import { normalizeSavedMapLayerVisibility } from '@/features/maps/utils/mapLayerVisibility';
 import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   normalizeNeededItemsCardStyle,
@@ -176,6 +177,8 @@ const sanitizeMapTaskVisibilityIds = (state: PersistedPreferencesStateWithLegacy
   if ('mapHiddenTaskIds' in state)
     state.mapHiddenTaskIds = normalizeTaskIdList(state.mapHiddenTaskIds);
   if ('hiddenTaskIds' in state) state.hiddenTaskIds = normalizeTaskIdList(state.hiddenTaskIds);
+  if ('mapLayerVisibility' in state)
+    state.mapLayerVisibility = normalizeSavedMapLayerVisibility(state.mapLayerVisibility);
 };
 export const sanitizePersistedPreferencesState = (
   persistedState: PersistedPreferencesStateWithLegacy = {}
