@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { resolveProfileOutputs } from '../preview/build-profile.mjs';
-import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 test('candidate workflows never reference a reusable Codecov secret', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.doesNotMatch(workflow, /secrets\.CODECOV_TOKEN/);
   for (const name of ['test', 'validate']) {
-    assert.match(jobBlock(workflow, name), /id-token: write/);
+    assert.match(permissionsBlock(jobBlock(workflow, name), '    '), /^\s+id-token: write$/m);
   }
   const tests = jobBlock(workflow, 'test');
   for (const name of ['Upload coverage to Codecov', 'Upload test results to Codecov']) {
