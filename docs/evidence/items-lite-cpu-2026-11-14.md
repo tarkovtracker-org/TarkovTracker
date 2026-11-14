@@ -43,7 +43,7 @@ workerd processes, not elapsed request time. Six paired batches of eight cold op
 variant and locale alternated execution order. Profiles were collected separately from timed
 CPU trials. The numbers below are medians of per-operation batch CPU:
 
-| Cold complete route                |     Before |      After | Reduction |
+| Cold route handler through H3      |     Before |      After | Reduction |
 | ---------------------------------- | ---------: | ---------: | --------: |
 | English                            | 216.797 ms | 175.781 ms |     18.9% |
 | French, including English fallback | 277.344 ms | 216.797 ms |     21.8% |
@@ -58,7 +58,8 @@ The harness buffers bodies for comparison and includes proxy/GC CPU, so these sm
 measurements are not production streaming latency measurements.
 
 These are **local CPU measurements, not production billed CPU or a production savings estimate**.
-They exclude network waiting, real private-overlay download/validation and deployment startup.
+They exclude network waiting, production middleware, real private-overlay download/validation
+and deployment startup.
 The fix removes confirmed wasted work; legitimate cold decoding/localization/overlay work remains,
 so it does not guarantee elimination of every CPU spike.
 
