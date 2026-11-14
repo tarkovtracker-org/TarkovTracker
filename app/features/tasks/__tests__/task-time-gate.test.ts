@@ -44,6 +44,8 @@ describe('formatDelayDuration', () => {
     [3599, 'page.tasks.questcard.duration_hours', { hours: 1 }],
     [5, 'page.tasks.questcard.duration_seconds', { seconds: 5 }],
     [0.4, 'page.tasks.questcard.duration_seconds', { seconds: 1 }],
+    [59.5, 'page.tasks.questcard.duration_minutes', { minutes: 1 }],
+    [59, 'page.tasks.questcard.duration_seconds', { seconds: 59 }],
   ])('formats %d seconds', (seconds, key, params) => {
     expect(formatDelayDuration(seconds)).toEqual({ key, params });
   });

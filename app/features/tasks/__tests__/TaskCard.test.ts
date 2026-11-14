@@ -320,6 +320,11 @@ describe('TaskCard appearance and expansion controls', () => {
     const completed = await mountTaskCard({ availableDelaySecondsMax: 36000 });
     expect(completed.find('[data-testid="task-time-gate"]').exists()).toBe(false);
     completed.unmount();
+    taskState.complete = false;
+    taskState.failed = true;
+    const failed = await mountTaskCard({ availableDelaySecondsMax: 36000 });
+    expect(failed.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    failed.unmount();
   });
   it('renders no overflow menu button', async () => {
     const wrapper = await mountTaskCard();

@@ -25,11 +25,10 @@ function formatMinutes(totalMinutes: number): DurationMessage {
 }
 /** Compact h/m wording for a positive duration; sub-minute delays keep their seconds. */
 export function formatDelayDuration(seconds: number): DurationMessage {
-  if (seconds < 60) {
-    return {
-      key: 'page.tasks.questcard.duration_seconds',
-      params: { seconds: Math.ceil(seconds) },
-    };
+  // Branch on the shown value, so a delay that rounds up to a full minute reads as minutes.
+  const wholeSeconds = Math.ceil(seconds);
+  if (wholeSeconds < 60) {
+    return { key: 'page.tasks.questcard.duration_seconds', params: { seconds: wholeSeconds } };
   }
   return formatMinutes(Math.round(seconds / 60));
 }

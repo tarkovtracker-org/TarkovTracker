@@ -9,21 +9,22 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useTaskState } from '@/composables/useTaskState';
   import { formatDelayDuration, resolveTaskTimeGate } from '@/features/tasks/task-time-gate';
   import type { Task } from '@/types/tarkov';
+  // The parent card already tracks this task's state; it passes it in instead of recomputing it.
   const props = defineProps<{
-    task: Pick<Task, 'availableDelaySecondsMax' | 'availableDelaySecondsMin' | 'id'>;
+    task: Pick<Task, 'availableDelaySecondsMax' | 'availableDelaySecondsMin'>;
+    isComplete: boolean;
+    isFailed: boolean;
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { isComplete, isFailed } = useTaskState(() => props.task.id);
   const duration = (seconds: number): string => {
     const message = formatDelayDuration(seconds);
     return t(message.key, message.params);
   };
   // A finished task no longer waits on its gate, so the note is only shown while it matters.
   const gate = computed(() =>
-    isComplete.value || isFailed.value ? null : resolveTaskTimeGate(props.task)
+    props.isComplete || props.isFailed ? null : resolveTaskTimeGate(props.task)
   );
   const label = computed(() => {
     if (!gate.value) return '';

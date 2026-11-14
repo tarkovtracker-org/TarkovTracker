@@ -156,7 +156,7 @@
             }}
           </span>
         </div>
-        <TaskTimeGateNote :task="task" />
+        <TaskTimeGateNote :task="task" :is-complete="isComplete" :is-failed="isFailed" />
       </div>
       <!-- 2) Body: objectives (Full Width) -->
       <Transition
