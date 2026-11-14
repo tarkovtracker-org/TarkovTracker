@@ -14,5 +14,7 @@ export const generateToken = (gameMode: TokenGameMode): string => {
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${tokenPrefix(gameMode)}${hex}`;
 };
-export const isTokenValueForGameMode = (tokenValue: string, gameMode: TokenGameMode): boolean =>
-  TOKEN_VALUE_PATTERN.test(tokenValue) && tokenValue.startsWith(tokenPrefix(gameMode));
+export const isTokenValueForGameMode = (tokenValue: unknown, gameMode: TokenGameMode): boolean =>
+  typeof tokenValue === 'string' &&
+  TOKEN_VALUE_PATTERN.test(tokenValue) &&
+  tokenValue.startsWith(tokenPrefix(gameMode));
