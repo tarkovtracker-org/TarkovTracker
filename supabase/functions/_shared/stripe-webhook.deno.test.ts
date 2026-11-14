@@ -10,6 +10,7 @@ let supporterWrites = 0;
 let deletedAccount = false;
 let cancellationFailure = false;
 let cancellations = 0;
+let includeSubscriptionMetadata = true;
 const retainedSubscriptions: string[] = [];
 const denials = new Map<string, string>();
 let writeHeaders: Headers | undefined;
@@ -44,7 +45,7 @@ function stripeResponse(request: Request, url: URL): Response {
   return reply({
     id: 'sub_test',
     status: deletedAccount ? 'active' : 'canceled',
-    metadata: { user_id: userId },
+    ...(includeSubscriptionMetadata ? { metadata: { user_id: userId } } : {}),
     ended_at: 1_700_000_000,
   });
 }
@@ -270,6 +271,19 @@ Deno.test(
         assertEquals(retainedSubscriptions.length, retained + 1);
         assertEquals(retainedSubscriptions.at(-1), 'sub_test');
         assertEquals(supporterWrites, writes);
+      });
+      await test.step('unattributed subscriptions do not create an account billing link', async () => {
+        includeSubscriptionMetadata = false;
+        const retained = retainedSubscriptions.length;
+        try {
+          assertEquals(
+            (await handler(await signedRequest('evt_unattributed_deleted'))).status,
+            200
+          );
+          assertEquals(retainedSubscriptions.length, retained);
+        } finally {
+          includeSubscriptionMetadata = true;
+        }
       });
       await test.step('unknown historical receipt is not acknowledged or replayed', async () => {
         receipts.set('evt_legacy', { state: 'legacy_unknown', token: '', expires: 0 });
