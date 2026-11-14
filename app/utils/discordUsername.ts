@@ -17,9 +17,11 @@ export const getLinkedDiscordUsername = (
   identities: UserIdentity[],
   discordUserId: string
 ): string | null => {
-  const identity = identities.find((candidate) => candidate.provider === 'discord');
-  const metadata = identity?.identity_data ?? {};
-  const identityId = nonEmptyString(metadata.provider_id) ?? nonEmptyString(metadata.sub);
-  if (identityId !== discordUserId) return null;
-  return usernameFromMetadata(metadata);
+  const identity = identities.find((candidate) => {
+    if (candidate.provider !== 'discord') return false;
+    const metadata = candidate.identity_data ?? {};
+    const identityId = nonEmptyString(metadata.provider_id) ?? nonEmptyString(metadata.sub);
+    return identityId === discordUserId;
+  });
+  return usernameFromMetadata(identity?.identity_data ?? {});
 };

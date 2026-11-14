@@ -78,6 +78,20 @@ describe('getLinkedDiscordUsername', () => {
       getLinkedDiscordUsername([identity({ full_name: 'wrong-user' })], 'discord-other')
     ).toBeNull();
   });
+  it.each([{ provider_id: 'discord-123' }, { provider_id: '', sub: 'discord-123' }])(
+    'finds the linked account after another Discord identity (%j)',
+    (metadata) => {
+      expect(
+        getLinkedDiscordUsername(
+          [
+            identity({ provider_id: 'discord-other', full_name: 'wrong-user' }),
+            identity({ ...metadata, full_name: 'linked-user' }),
+          ],
+          'discord-123'
+        )
+      ).toBe('linked-user');
+    }
+  );
   it('returns no username when the Discord identity is missing', () => {
     expect(getLinkedDiscordUsername([], 'discord-123')).toBeNull();
   });
