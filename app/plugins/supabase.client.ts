@@ -473,14 +473,15 @@ export default defineNuxtPlugin({
       if (!oauthCallbackCode) {
         return false;
       }
-      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode).finally(() => {
+      if (!supabaseClient) throw new Error('Supabase client unavailable');
+      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode).then(() => {
         oauthCallbackCode = null;
       });
       await oauthExchangePromise;
       return true;
     };
     const ready = async (): Promise<Session | null> => {
-      return await awaitWithSessionBudget(
+      const session = await awaitWithSessionBudget(
         async () => {
           await ensureClientInitialized();
           if (await consumeOAuthCallbackCode()) {
@@ -491,6 +492,8 @@ export default defineNuxtPlugin({
         () => currentSession,
         '[Supabase] Session readiness exceeded the start-up budget; continuing'
       );
+      if (oauthCallbackCode) throw new Error('OAuth callback is still pending');
+      return session;
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,

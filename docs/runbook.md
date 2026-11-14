@@ -306,6 +306,9 @@ exchanges its PKCE `code` before the card loads the link or synchronizes roles, 
 invite `code` parameters are not OAuth callbacks.
 If session readiness fails, the card keeps the complete callback URL for a reload/retry and
 does not load the link or synchronize roles with a stale session.
+Callback readiness rejects after its time budget while the code exchange is still pending.
+An exchange failure remains visible to subsequent readiness callers until a page reload; a
+slow exchange that later succeeds can satisfy a later readiness call without exchanging twice.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database

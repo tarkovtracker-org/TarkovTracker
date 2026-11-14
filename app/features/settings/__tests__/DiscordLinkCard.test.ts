@@ -226,6 +226,11 @@ describe('DiscordLinkCard', () => {
     expect(maybeSingleMock).not.toHaveBeenCalled();
     expect(invokeMock).not.toHaveBeenCalled();
     expect(replaceMock).not.toHaveBeenCalled();
+    expect(routeState.query).toEqual({
+      discord_linked: '1',
+      code: 'unused-code',
+      sb_flow_id: 'flow-id',
+    });
     expect(wrapper.text()).toContain('settings.discord_link.load_error');
   });
   it('shows a warning when the linked Discord account has not joined the server', async () => {
