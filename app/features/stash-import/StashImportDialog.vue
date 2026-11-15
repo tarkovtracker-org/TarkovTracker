@@ -71,6 +71,8 @@
               <StashRegionEditor
                 v-if="pendingRegion"
                 v-model="pendingRegion"
+                :width="width"
+                :height="height"
                 @apply="applyRegion"
                 @cancel="pendingRegion = undefined"
               />
@@ -179,12 +181,16 @@
     try {
       return reviewedTotals(rows.value);
     } catch {
-      return [];
+      return undefined;
     }
   });
-  const availableTargets = computed(() => importer.targets(totals.value));
+  const availableTargets = computed(() => importer.targets(totals.value ?? []));
   const targetKeys = computed(() => availableTargets.value.map((target) => target.key).join('|'));
   function syncSelection() {
+    if (!totals.value) return;
+    reconcileSelection();
+  }
+  function reconcileSelection() {
     const keys = availableTargets.value.map((target) => target.key);
     if (!selectionInitialized && keys.length) {
       selected.value = keys;
@@ -193,7 +199,7 @@
     }
     selected.value = selected.value.filter((key) => keys.includes(key));
   }
-  watch(targetKeys, syncSelection, { immediate: true });
+  watch([targetKeys, () => Boolean(totals.value)], syncSelection, { immediate: true });
   const hasDecreases = computed(
     () => preview.value?.changes.some((change) => change.count < change.before) ?? false
   );

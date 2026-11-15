@@ -56,18 +56,27 @@ vi.mock('@/features/stash-import/useStashImport', () => ({
     prepare: mocks.prepare,
     commit: mocks.commit,
     recover: mocks.recover,
-    targets: (totals: { itemId: string }[]) => [
-      { key: 'hideout:need', itemId: 'item', label: 'Workbench', current: 3, need: { count: 4 } },
-      ...totals
-        .filter((total) => total.itemId === 'other')
-        .map(() => ({
-          key: 'hideout:other',
-          itemId: 'other',
-          label: 'Other',
-          current: 0,
-          need: { count: 1 },
-        })),
-    ],
+    targets: (totals: { itemId: string }[]) =>
+      totals.length
+        ? [
+            {
+              key: 'hideout:need',
+              itemId: 'item',
+              label: 'Workbench',
+              current: 3,
+              need: { count: 4 },
+            },
+            ...totals
+              .filter((total) => total.itemId === 'other')
+              .map(() => ({
+                key: 'hideout:other',
+                itemId: 'other',
+                label: 'Other',
+                current: 0,
+                need: { count: 1 },
+              })),
+          ]
+        : [],
   }),
 }));
 const button = (wrapper: ReturnType<typeof render>, key: string) => {
@@ -121,6 +130,21 @@ describe('stash import confirmation', () => {
     paste();
     expect(mocks.select).toHaveBeenCalledTimes(1);
   });
+  it.each([true, false])(
+    'preserves selected=%s through incomplete quantity review',
+    async (selected) => {
+      const wrapper = render();
+      const targets = wrapper.findComponent(StashImportTargets);
+      if (!selected) await targets.find('input[type=checkbox]').setValue(false);
+      const review = wrapper.findComponent(StashImportReview);
+      review.vm.$emit('change', { quantity: 2, reviewed: false });
+      await flushPromises();
+      review.vm.$emit('change', { reviewed: true });
+      await flushPromises();
+      expect(targets.props('modelValue')).toEqual(selected ? ['hideout:need'] : []);
+      wrapper.unmount();
+    }
+  );
   it('retains a deselection when corrected rows reveal another target', async () => {
     const wrapper = render();
     const targets = wrapper.findComponent(StashImportTargets);

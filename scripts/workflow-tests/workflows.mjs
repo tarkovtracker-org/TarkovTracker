@@ -9,9 +9,9 @@ import { fixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 const unconditionalOverrideNames = (overrides) =>
-  [...overrides.matchAll(/^ {2}'?([^:'\n]+?)'?:/gm)]
-    .map((match) => match[1])
-    .filter((key) => !key.includes('>') && !key.slice(1).includes('@'));
+  [...overrides.matchAll(/^ {2}(.+?):[ \t]/gm)]
+    .map((match) => match[1].replace(/^(['"])(.*)\1$/, '$2').replace(/@\*$/, ''))
+    .filter((key) => !/[>:]/.test(key) && !key.slice(1).includes('@'));
 test('only unconditional root overrides permanently pin direct dependencies', () => {
   const overrides = [
     "  sharp: '0.35.5'",
@@ -19,8 +19,18 @@ test('only unconditional root overrides permanently pin direct dependencies', ()
     "  'sharp@<0.35.5': '0.35.5'",
     "  '@nuxt/kit@<4.6.4': '4.6.4'",
     "  'parent>sharp': '0.35.5'",
+    "  'glob@*': '14.0.3'",
+    '  "@scope/wild@*": "1.0.0"',
+    '  production-only:prod: "1.0.0"',
+    "  'development-only:dev': '1.0.0'",
+    '  "optional-only:optional": "1.0.0"',
   ].join('\n');
-  assert.deepEqual(unconditionalOverrideNames(overrides), ['sharp', '@nuxt/kit']);
+  assert.deepEqual(unconditionalOverrideNames(overrides), [
+    'sharp',
+    '@nuxt/kit',
+    'glob',
+    '@scope/wild',
+  ]);
 });
 test('Dependabot waits only for the authoritative aggregates supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');

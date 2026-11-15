@@ -163,6 +163,15 @@ describe('region correction geometry', () => {
       ).toThrow(error('region_invalid'));
     }
   );
+  it.each([8, 14])('rejects splits with undersized parts for %spx regions', (size) => {
+    expect(() => splitRegion({ ...whole, width: size, height: size }, 2, 2)).toThrow(
+      error('region_invalid')
+    );
+  });
+  it('allows 8px parts on the minimum shared-border extent', () => {
+    const parts = splitRegion({ ...whole, width: 15, height: 15 }, 2, 2);
+    expect(parts.every((part) => part.width === 8 && part.height === 8)).toBe(true);
+  });
   it('splits row-major cells that share only their border pixels', () => {
     const parts = splitRegion(whole, 2, 2);
     expect(parts).toEqual([

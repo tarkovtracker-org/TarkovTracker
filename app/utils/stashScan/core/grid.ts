@@ -667,6 +667,33 @@ function overlaps(a: GridCell, b: GridCell, pitch: number): boolean {
     Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) > pitch / 2
   );
 }
+/** Conservative footprints: any pair with positive intersection shares a bucket. */
+function cellBuckets(cell: GridCell, pitch: number): string[] {
+  const keys: string[] = [];
+  const right = Math.floor((cell.x + cell.width) / pitch);
+  const bottom = Math.floor((cell.y + cell.height) / pitch);
+  for (let row = Math.floor(cell.y / pitch); row <= bottom; row++) {
+    for (let column = Math.floor(cell.x / pitch); column <= right; column++)
+      keys.push(`${column}:${row}`);
+  }
+  return keys;
+}
+function keepCell(
+  cell: GridCell,
+  pitch: number,
+  kept: GridCell[],
+  buckets: Map<string, GridCell[]>
+): void {
+  const keys = cellBuckets(cell, pitch);
+  const neighbors = new Set(keys.flatMap((key) => buckets.get(key) ?? []));
+  if ([...neighbors].some((other) => overlaps(cell, other, pitch))) return;
+  kept.push(cell);
+  for (const key of keys) {
+    const cells = buckets.get(key) ?? [];
+    cells.push(cell);
+    buckets.set(key, cells);
+  }
+}
 function keepCandidates(candidates: Candidate[], pitch: number): GridCell[] {
   candidates.sort(
     (a, b) =>
@@ -674,9 +701,10 @@ function keepCandidates(candidates: Candidate[], pitch: number): GridCell[] {
       a.cell.slotsWide * a.cell.slotsHigh - b.cell.slotsWide * b.cell.slotsHigh
   );
   const kept: GridCell[] = [];
-  for (const { cell } of candidates) {
-    if (!kept.some((other) => overlaps(cell, other, pitch))) kept.push(cell);
-  }
+  // Only retained, nonoverlapping cells occupy buckets. Item footprints span at most
+  // ten slots per axis; index the entire rectangle, including border buckets.
+  const buckets = new Map<string, GridCell[]>();
+  for (const { cell } of candidates) keepCell(cell, pitch, kept, buckets);
   return kept.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 function atLeast(segments: Segment[], length: number): Segment[] {

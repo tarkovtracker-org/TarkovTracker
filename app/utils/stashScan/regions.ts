@@ -4,12 +4,21 @@ function splitAxis(start: number, length: number, count: number, index: number):
   const to = Math.round(start + ((length - 1) * (index + 1)) / count);
   return [from, to - from + 1];
 }
+const validSplitCount = (count: number, slots: number): boolean =>
+  Number.isInteger(count) && count >= 1 && slots % count === 0;
+const canSplitAxis = (length: number, slots: number, count: number): boolean =>
+  validSplitCount(count, slots) &&
+  Number.isSafeInteger(length) &&
+  Math.floor((length - 1) / count) + 1 >= 8;
+export function canSplitRegion(rect: ScanRect, columns: number, rows: number): boolean {
+  return (
+    canSplitAxis(rect.width, rect.slotsWide, columns) &&
+    canSplitAxis(rect.height, rect.slotsHigh, rows)
+  );
+}
 /** Shared border pixels are intentional; interiors never overlap. */
 export function splitRegion(rect: ScanRect, columns: number, rows: number): ScanRect[] {
-  const valid = (count: number, slots: number) =>
-    Number.isInteger(count) && count >= 1 && slots % count === 0;
-  if (!valid(columns, rect.slotsWide) || !valid(rows, rect.slotsHigh))
-    throw scanError('region_invalid');
+  if (!canSplitRegion(rect, columns, rows)) throw scanError('region_invalid');
   return Array.from({ length: rows * columns }, (_, index) => {
     const [x, width] = splitAxis(rect.x, rect.width, columns, index % columns);
     const [y, height] = splitAxis(rect.y, rect.height, rows, Math.floor(index / columns));

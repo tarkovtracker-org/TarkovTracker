@@ -16,7 +16,9 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   and stack counts need correction. Quantities are units, never durability or remaining uses.
   FIR is user-confirmed; unknown FIR can fill only non-FIR requirements.
 - Users can search the indexed catalog, exclude regions, split merged detections, and draw a
-  manually sized item region when detection fails. Redrawing replaces overlapping regions.
+  manually sized item region when detection fails. Keyboard users can enter region coordinates
+  and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.
+  Redrawing replaces overlapping regions; quantity corrections preserve requirement selections.
 - Each import reconciles explicitly selected requirements using the existing Smart Fill
   priority/allocation policy. It does not add screenshot totals to existing counts. Physical
   observations are allocated once across the selection. Decreases require confirmation.
@@ -63,8 +65,8 @@ item catalog and English names. Only `assets.tarkov.dev` grid images are accepte
 manifest lists items with unusable templates; they remain available for manual correction.
 Each shard is written to a temporary file and atomically replaced; the manifest is replaced last,
 so an interrupted build preserves the last complete index. Successful publication prunes only
-obsolete content-addressed shard files; icon downloads
-are streamed with a 4 MB limit. Feature version 2 recenters cropped rotated-label templates.
+obsolete content-addressed shard files; icon downloads are streamed with a 4 MB limit.
+Feature version 2 recenters cropped rotated-label templates.
 Catalog files are content-addressed and loaded by detected slot size. This first catalog is
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.
 Accuracy across languages, game updates, compression, UI scaling, and tooltips must be

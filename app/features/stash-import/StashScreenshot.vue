@@ -7,6 +7,9 @@
       <UButton size="sm" :variant="drawing ? 'solid' : 'soft'" @click="drawing = !drawing">
         {{ $t('stash_import.draw_region') }}
       </UButton>
+      <UButton size="sm" variant="soft" @click="enterRegion">
+        {{ $t('stash_import.enter_region') }}
+      </UButton>
     </div>
     <p v-if="drawing" class="text-warning-300 text-sm">{{ $t('stash_import.draw_help') }}</p>
     <p v-if="paintError" role="alert" class="text-error-300 text-sm">
@@ -146,6 +149,18 @@
     drawing.value = false;
     if (rect.width >= 8 && rect.height >= 8)
       emit('region', { ...rect, slotsWide: 1, slotsHigh: 1 });
+  }
+  function enterRegion() {
+    drawing.value = false;
+    origin.value = null;
+    emit('region', {
+      x: 0,
+      y: 0,
+      width: props.width,
+      height: props.height,
+      slotsWide: 1,
+      slotsHigh: 1,
+    });
   }
   function pick(row: ReviewedCell) {
     if (!drawing.value) emit('select', row.cell.key);

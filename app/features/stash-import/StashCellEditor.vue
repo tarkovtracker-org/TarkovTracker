@@ -99,6 +99,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { canSplitRegion } from '@/utils/stashScan/regions';
   import { selectItem } from '@/utils/stashScan/review';
   import {
     SCAN_LIMITS,
@@ -148,13 +149,9 @@
       Number(props.row.quantity) >= 1 &&
       Number(props.row.quantity) <= maxQuantity.value
   );
-  const splitsAxis = (count: number, slots: number) =>
-    Number.isInteger(count) && count >= 1 && slots % count === 0;
   const canSplit = computed(
     () =>
-      splitsAxis(columns.value, props.row.cell.slotsWide) &&
-      splitsAxis(rows.value, props.row.cell.slotsHigh) &&
-      columns.value * rows.value > 1
+      canSplitRegion(props.row.cell, columns.value, rows.value) && columns.value * rows.value > 1
   );
   function choose(item: ScanItem) {
     const updated = { ...props.row };
