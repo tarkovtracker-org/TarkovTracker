@@ -66,7 +66,7 @@ const completedReceipt = (
   receipt: ImportReceipt | undefined
 ): ImportReceipt => {
   if (!receipt) throw scanError('stale');
-  if (outcome.error && receiptApplied(receipt)) throw scanError('stale');
+  if (outcome.error && receiptApplied(receipt)) throw scanError('save_unknown');
   return receipt;
 };
 const syncControls = () => {

@@ -5,7 +5,11 @@ import { reactive } from 'vue';
 import { useSupabaseSync, type SupabaseSyncReturn } from '@/composables/supabase/useSupabaseSync';
 import { useStashImport } from '@/features/stash-import/useStashImport';
 import { defaultState, type UserState } from '@/stores/progressState';
-import { clearAcknowledgedModes, recordAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
+import {
+  clearAcknowledgedModes,
+  recordAcknowledgedModes,
+  noteRemoteProgressApplied,
+} from '@/stores/tarkov/acknowledgedModes';
 import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import { createDeferred } from '@/utils/test-helpers';
 import type { NeededItemTaskObjective, TarkovItem } from '@/types/tarkov';
@@ -162,6 +166,32 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('reviewed stash import persistence', () => {
+  it('offers receipt recovery when realtime applies the import before its response', async () => {
+    const importer = useStashImport([need()]);
+    const preview = await importer.prepare('a'.repeat(64), total, [key()]);
+    h.rpc.mockImplementationOnce(async () => {
+      const receipt = applied();
+      const imported = copy(receipt.data.progress_data);
+      noteRemoteProgressApplied({ remote: { pvp: imported }, applied: { pvp: imported } });
+      state.pvp = imported;
+      state.pvp.level = 9;
+      store.notify();
+      return receipt;
+    });
+    await expect(importer.commit(preview, total, [key()])).rejects.toThrow(
+      'stash_import.errors.save_unknown'
+    );
+    expect(state.pvp.level).toBe(9);
+    expect(state.pvp.taskObjectives[objective]?.count).toBe(2);
+    h.rpc.mockResolvedValueOnce({ data: { status: 'found' }, error: null });
+    expect(await importer.recover(preview)).toBe(true);
+    expect(h.reconcile).toHaveBeenCalled();
+    expect(h.rpc.mock.calls.map(([name]) => name)).toEqual([
+      'commit_stash_item_import',
+      'get_stash_item_import',
+    ]);
+    expect(state.pvp.level).toBe(9);
+  });
   it('uses selected-scope Smart Fill and preserves unrelated progress', async () => {
     const importer = useStashImport([need(), need(unrelated)]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()]);
@@ -218,7 +248,7 @@ describe('reviewed stash import persistence', () => {
     }
   );
   it.each(['owner', 'mode', 'local'] as const)(
-    'rejects an in-flight %s change without overwriting newer state',
+    'offers receipt recovery after an in-flight %s change without overwriting newer state',
     async (change) => {
       const importer = useStashImport([need()]);
       const preview = await importer.prepare('a'.repeat(64), total, [key()]);
@@ -229,7 +259,7 @@ describe('reviewed stash import persistence', () => {
       if (change === 'mode') state.currentGameMode = 'pve';
       if (change === 'local') state.pvp.level = 9;
       request.resolve(applied());
-      await expect(saving).rejects.toThrow('stash_import.errors.stale');
+      await expect(saving).rejects.toThrow('stash_import.errors.save_unknown');
       expect(state.pvp.taskObjectives[objective]).toBeUndefined();
     }
   );
