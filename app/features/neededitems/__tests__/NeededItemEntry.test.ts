@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { computed, nextTick } from 'vue';
 import { createI18n } from 'vue-i18n';
 import {
@@ -93,6 +93,9 @@ const mountEntry = (
     },
   });
 describe.each(['row', 'tile'] as const)('NeededItemEntry %s', (layout) => {
+  afterEach(() => {
+    store.objectiveComplete = false;
+  });
   it('links the station once with its level', () => {
     const wrapper = mountEntry(hideoutNeed, layout);
     const links = wrapper.findAll('a');
@@ -146,7 +149,6 @@ describe.each(['row', 'tile'] as const)('NeededItemEntry %s', (layout) => {
   it('marks an objective handed over once the tracker records it', () => {
     store.objectiveComplete = true;
     const wrapper = mountEntry(taskNeed, layout, { currentCount: 3 });
-    store.objectiveComplete = false;
     expect(wrapper.text()).toContain('Handed over');
   });
   it('cues the hand-in once a quest item is collected', () => {

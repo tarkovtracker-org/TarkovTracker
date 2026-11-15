@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="focus-visible:ring-primary-400 inline-flex h-8 items-center justify-center gap-1.5 rounded-md border text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+    class="focus-visible:ring-primary-400 inline-flex h-8 items-center justify-center gap-1.5 rounded-md border text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
     :class="[
       wide ? 'w-full px-3' : 'w-8',
       collected

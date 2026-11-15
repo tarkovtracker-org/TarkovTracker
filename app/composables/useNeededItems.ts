@@ -546,23 +546,27 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     return false;
   };
   // Every view filter except ownership. The grouped details modal uses this set so its
-  // Smart Fill targets do not disappear while counts change.
-  const viewFilters = [
+  // Smart Fill targets do not disappear while counts change. The fuzzy search runs last.
+  const cheapViewFilters = [
     passesCompletionFilter,
     passesTypeFilter,
     passesFirFilter,
     passesSpecialEquipmentFilter,
     passesKappaToggleFilter,
     passesTeamToggleFilter,
-    passesSearchFilter,
   ];
+  const passesCheapViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    cheapViewFilters.every((passes) => passes(item));
   const passesViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
-    viewFilters.every((passes) => passes(item));
-  // One pass over the list instead of a chain of array copies.
+    passesCheapViewFilters(item) && passesSearchFilter(item);
+  // One pass over the list instead of a chain of array copies; owned needs skip the search.
   const filteredItems = computed(() => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const result = allItems.value.filter(
-      (item) => passesViewFilters(item) && passesOwnershipToggleFilter(item)
+      (item) =>
+        passesCheapViewFilters(item) &&
+        passesOwnershipToggleFilter(item) &&
+        passesSearchFilter(item)
     );
     const sorted = sortNeededItems(result);
     if (perfDebug.value) {

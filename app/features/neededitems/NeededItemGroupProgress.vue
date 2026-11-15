@@ -31,6 +31,6 @@
   const formatNumber = useLocaleNumberFormatter();
   const complete = computed(() => props.total > 0 && props.current >= props.total);
   const percent = computed(() =>
-    props.total > 0 ? Math.min(100, Math.round((props.current / props.total) * 100)) : 0
+    props.total > 0 ? Math.min(100, Math.floor((props.current / props.total) * 100)) : 0
   );
 </script>

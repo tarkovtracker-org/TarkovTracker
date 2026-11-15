@@ -15,7 +15,7 @@
     <AppTooltip v-if="isCraftable" :text="craftableTitleText">
       <button
         type="button"
-        class="inline-flex"
+        class="-m-0.5 inline-flex p-0.5"
         :aria-label="craftableTitleText"
         @click.stop="emit('craft')"
       >

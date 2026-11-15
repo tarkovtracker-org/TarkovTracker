@@ -101,16 +101,23 @@
   );
   /**
    * Items mode always explains the item/need totals. Needs mode only shows a count when
-   * search or filters make it differ from the selected tab's badge.
+   * search or filters make it differ from the selected tab's badge. Both parts pluralize.
    */
   const countLabel = computed(() => {
-    if (groupByItem.value)
-      return t('page.needed_items.unique_items_count', {
-        unique: props.totalCount,
-        total: props.ungroupedCount,
+    const needs = (count: number) => t('page.needed_items.needs_count', { count }, count);
+    if (groupByItem.value) {
+      const items = t(
+        'page.needed_items.items_count',
+        { count: props.totalCount },
+        props.totalCount
+      );
+      return t('page.needed_items.items_and_needs', {
+        items,
+        needs: needs(props.ungroupedCount),
       });
+    }
     if (props.totalCount === activeTabCount.value) return '';
-    return t('page.needed_items.items_count', { count: props.totalCount }, props.totalCount);
+    return needs(props.totalCount);
   });
   // Kappa only narrows task needs, so it does nothing on the Hideout tab.
   const isKappaDisabled = computed(() => filterType.value === 'hideout');

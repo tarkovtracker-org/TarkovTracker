@@ -6,8 +6,8 @@ export const INFINITE_SCROLL_BATCH_SIZE = 24;
 /** Root margin for infinite scroll intersection observer */
 export const INFINITE_SCROLL_MARGIN = '600px';
 /**
- * Entries rendered before scrolling: about two screens of list rows or four grid rows on
- * desktop. Narrow screens render half, which still fills the viewport.
+ * Entries rendered before scrolling: about two desktop screens of list rows, and whole rows of
+ * tiles at 2, 3, 4 and 6 columns. Narrow screens render half, which still fills the viewport.
  */
 export const INITIAL_RENDER_COUNT = { list: 30, grid: 24 } as const;
 /** Filter type options */

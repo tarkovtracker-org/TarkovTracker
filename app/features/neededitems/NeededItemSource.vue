@@ -28,6 +28,7 @@
         :hint="hiddenForSelfHint"
       />
       <RequirementInfo
+        v-if="hasLock"
         :level-required="levelRequired"
         :locked-before="lockedBefore"
         :player-level="playerLevel"
@@ -118,11 +119,9 @@
   const isLevelLocked = computed(
     () => props.levelRequired > 0 && props.levelRequired > playerLevel.value
   );
+  // Rendered only with content, so an empty lock row never takes a gap in centred tiles.
+  const hasLock = computed(() => isLevelLocked.value || props.lockedBefore > 0);
   const hasDetails = computed(
-    () =>
-      showStatus.value ||
-      isLevelLocked.value ||
-      props.lockedBefore > 0 ||
-      props.teamNeeds.length > 0
+    () => showStatus.value || hasLock.value || props.teamNeeds.length > 0
   );
 </script>

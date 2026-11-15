@@ -28,7 +28,15 @@ const i18n = createI18n({
   missingWarn: false,
   fallbackWarn: false,
   silentTranslationWarn: true,
-  messages: createTestLocaleMessages(),
+  messages: createTestLocaleMessages({
+    page: {
+      needed_items: {
+        items_count: '{count} item | {count} items',
+        needs_count: '{count} need | {count} needs',
+        items_and_needs: '{items} · {needs}',
+      },
+    },
+  }),
 });
 const setup = async () => {
   vi.resetModules();
@@ -169,9 +177,11 @@ describe('NeededItemsFilterBar', () => {
   });
   it.each([
     { groupByItem: false, totalCount: 3, expected: null },
-    { groupByItem: false, totalCount: 2, expected: 'page.needed_items.items_count' },
-    { groupByItem: true, totalCount: 3, expected: 'page.needed_items.unique_items_count' },
-  ])('shows a result count only when it adds information (%o)', async (props) => {
+    { groupByItem: false, totalCount: 2, expected: '2 needs' },
+    { groupByItem: false, totalCount: 1, expected: '1 need' },
+    { groupByItem: true, totalCount: 3, expected: '3 items · 3 needs' },
+    { groupByItem: true, totalCount: 1, ungroupedCount: 2, expected: '1 item · 2 needs' },
+  ])('shows a pluralized result count only when it adds information (%o)', async (props) => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: { ...createDefaultProps(), ...props },

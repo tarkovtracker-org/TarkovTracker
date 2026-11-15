@@ -67,6 +67,7 @@ vi.mock('@/stores/useMetadata', () => ({
     getTaskById: (id: string) => metadata.tasks.get(id),
     getStationById: (id: string) => metadata.stations.get(id),
     alternativeTasks: {},
+    alternativeTaskSources: {},
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({

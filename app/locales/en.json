@@ -1350,7 +1350,6 @@
       "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items_count": "{count} item | {count} items",
-      "unique_items_count": "{unique} items · {total} needs",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
       "filters": {
@@ -1400,7 +1399,9 @@
         "needs_hint": "One entry for every quest objective or hideout upgrade",
         "layout": "Layout"
       },
-      "teammates_needed": "Teammates need this"
+      "needs_count": "{count} need | {count} needs",
+      "items_and_needs": "{items} · {needs}",
+      "teammates_label": "Teammates:"
     },
     "settings": {
       "card": {

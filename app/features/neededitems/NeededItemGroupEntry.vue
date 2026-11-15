@@ -126,7 +126,7 @@
   // The whole entry opens the details; nested controls sit above this stretched target. The
   // thumbnail sits above it too so its context menu (wiki, tarkov.dev, copy name) still works.
   const openButtonClass =
-    'text-sm leading-snug font-semibold text-surface-50 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
+    'text-sm leading-snug font-semibold text-surface-50 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
   const isComplete = computed(() => props.group.currentCount >= props.group.total);
   const look = computed(() =>
     isComplete.value

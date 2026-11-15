@@ -114,7 +114,7 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const tarkovStore = useTarkovStore();
-  const context = inject(neededItemKey, createDefaultNeededItemContext());
+  const context = inject(neededItemKey, createDefaultNeededItemContext, true);
   const {
     item,
     imageItem,

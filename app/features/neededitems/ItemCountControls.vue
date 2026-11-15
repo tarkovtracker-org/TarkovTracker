@@ -94,7 +94,7 @@
       value: 'h-6 min-w-10',
       text: 'px-1 text-xs',
     },
-    // 32px targets: comfortable for touch and used by every Needed Items layout.
+    // 32px targets, comfortable for touch: the default stepper in Needed Items rows.
     md: {
       button: 'h-8 w-8',
       icon: 'h-4 w-4',

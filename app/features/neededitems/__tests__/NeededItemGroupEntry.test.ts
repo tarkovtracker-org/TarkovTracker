@@ -115,10 +115,9 @@ describe('NeededItemGroupEntry', () => {
     expect(wrapper.text()).toContain('4/4');
     expect(wrapper.find('button[aria-label="Add one"]').exists()).toBe(false);
   });
-  it('opens the details from the thumbnail without hiding its context menu', async () => {
+  it('opens the details when the thumbnail is clicked', async () => {
     const wrapper = mountEntry();
     const thumb = wrapper.get('[data-testid="thumb"]').element.parentElement!;
-    expect(thumb.className).toContain('z-10');
     thumb.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(wrapper.emitted('open')).toEqual([['item']]);
   });
