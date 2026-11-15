@@ -6,6 +6,7 @@ const mockStoreState = {
   tasks: new Map<string, { kappaRequired?: boolean; minPlayerLevel?: number }>(),
   objectiveCounts: {} as Record<string, number>,
   hideoutPartCounts: {} as Record<string, number>,
+  completeParts: new Set<string>(),
   taskObjectiveEntries: {} as Record<
     string,
     { count?: number; complete?: boolean; timestamp?: number }
@@ -31,6 +32,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getObjectiveCount: (id: string) => mockStoreState.objectiveCounts[id] ?? 0,
     getHideoutPartCount: (id: string) => mockStoreState.hideoutPartCounts[id] ?? 0,
+    isHideoutPartComplete: (id: string) => mockStoreState.completeParts.has(id),
     $patch: (fn: (state: unknown) => void) => {
       const state = {
         currentGameMode: 'pvp',
@@ -112,6 +114,7 @@ describe('useItemDistribution', () => {
     mockStoreState.tasks.clear();
     mockStoreState.objectiveCounts = {};
     mockStoreState.hideoutPartCounts = {};
+    mockStoreState.completeParts = new Set();
     mockStoreState.taskObjectiveEntries = {};
     mockStoreState.hideoutPartEntries = {};
     mockStoreState.patchedState = null;
@@ -294,6 +297,46 @@ describe('useItemDistribution', () => {
       expect(replaced.updates).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: 'over', count: 1 })])
       );
+    });
+    it('keeps FIR pools and hideout order when topping up additively', async () => {
+      mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems } = useItemDistribution();
+      const tasks = [
+        createTaskObjective('task-fir', 'task-1', { count: 3, foundInRaid: true }),
+        createTaskObjective('task-any', 'task-1', { count: 2, foundInRaid: false }),
+      ];
+      const hideout = [createHideoutModule('part', { count: 4, foundInRaid: false })];
+      mockStoreState.objectiveCounts['task-fir'] = 1;
+      mockStoreState.hideoutPartCounts.part = 1;
+      // 3 FIR + 2 non-FIR: FIR need takes 2 FIR, non-FIR task takes 2 non-FIR,
+      // the hideout part takes the last FIR unit as fallback.
+      const result = distributeItems(3, 2, tasks, hideout, { additive: true });
+      expect(result.updates).toEqual([
+        { id: 'task-fir', type: 'task', count: 3, needed: 3 },
+        { id: 'task-any', type: 'task', count: 2, needed: 2 },
+        { id: 'part', type: 'hideout', count: 2, needed: 4 },
+      ]);
+      expect(result).toMatchObject({ remainingFir: 0, remainingNonFir: 0 });
+    });
+    it('never routes non-FIR units to FIR-only needs when topping up', async () => {
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems } = useItemDistribution();
+      const hideout = [createHideoutModule('fir-part', { count: 2, foundInRaid: true })];
+      const result = distributeItems(0, 5, [], hideout, { additive: true });
+      expect(result.updates).toEqual([]);
+      expect(result.remainingNonFir).toBe(5);
+    });
+    it('treats a hideout part ticked complete without a count as full', async () => {
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems, getObjectiveCurrentCount } = useItemDistribution();
+      const part = createHideoutModule('done-part', { count: 5 });
+      mockStoreState.completeParts.add('done-part');
+      expect(getObjectiveCurrentCount(part)).toBe(5);
+      expect(distributeItems(0, 2, [], [part], { additive: true }).updates).toEqual([]);
+      expect(distributeItems(0, 2, [], [part]).updates).toEqual([
+        { id: 'done-part', type: 'hideout', count: 2, needed: 5 },
+      ]);
     });
     it('distributes FIR items to FIR task objectives first', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });

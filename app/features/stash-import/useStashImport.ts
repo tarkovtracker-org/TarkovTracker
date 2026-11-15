@@ -52,6 +52,8 @@ export interface ImportEstimate {
 }
 interface ImportReceipt {
   status: 'applied' | 'replayed' | 'duplicate' | 'conflict';
+  /** Server explanation for conflicts, e.g. `baseline_changed` or `progress_reset`. */
+  reason?: string;
   receipt_id: string | null;
   progress_data: unknown;
 }

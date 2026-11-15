@@ -72,7 +72,7 @@
     "no_search_results": "No items match this search.",
     "no_suggestions": "No suggestions. Search for the item above.",
     "quantity": "Amount in this stack",
-    "quantity_placeholder": "Number shown on the icon",
+    "quantity_placeholder": "e.g. 60",
     "stack_help": "Use the number in the corner of the icon. Uses or durability are not amounts.",
     "raid_status": "Found in raid",
     "unknown_help": "FIR items show a checkmark on their icon. Unknown items only count for non-FIR needs.",
@@ -150,8 +150,10 @@
       "save_unknown": "The cloud save response was interrupted. The import may have reached your cloud account. Check its receipt before trying another import; do not add the counts manually.",
       "receipt_missing": "No cloud import receipt was found. A delayed request may still finish. Your original review is retained; check again before starting another import. Reconciliation never adds counts on retry.",
       "clipboard_empty": "There is no image on your clipboard. Copy a screenshot first, then paste.",
-      "clipboard_denied": "The browser blocked clipboard access. Press Ctrl+V (⌘V on Mac) instead, or choose a file."
-    }
+      "clipboard_denied": "The browser blocked clipboard access. Press Ctrl+V (⌘V on Mac) instead, or choose a file.",
+      "reimport_blocked": "This screenshot was imported before your progress was reset, so it can’t be imported again. Take a new screenshot to import these items."
+    },
+    "go_back_for_image": "To use a different screenshot, go back to Check items first."
   },
   "admin": {
     "verifying_access": "Verifying admin access...",

@@ -20,7 +20,7 @@
         class="truncate"
         :class="[
           index === position ? 'text-surface-100 font-semibold' : 'text-surface-400',
-          index === position ? '' : 'hidden sm:inline',
+          index === position ? '' : 'sr-only sm:not-sr-only',
         ]"
       >
         {{ $t(`stash_import.step_${entry}`) }}

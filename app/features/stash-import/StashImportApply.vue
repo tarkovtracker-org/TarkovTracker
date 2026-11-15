@@ -85,6 +85,8 @@
     targets: ImportTarget[];
     totals: ObservedTotals[];
     estimates: Record<ImportMode, ImportEstimate>;
+    /** Requirements that would change with everything selected; keeps rows stable on toggle. */
+    relevant: Set<string>;
     itemName: (id: string) => string;
     thumbFor: (itemId: string) => ScanRect | undefined;
     bitmap?: ImageBitmap;
@@ -144,9 +146,10 @@
       before: target.current,
       after,
       delta: after - target.current,
+      relevant: props.relevant.has(changeKey(target)),
     };
   }
-  const byChange = (a: TargetRow, b: TargetRow) => Number(b.delta !== 0) - Number(a.delta !== 0);
+  const byRelevance = (a: TargetRow, b: TargetRow) => Number(b.relevant) - Number(a.relevant);
   function foundLabel(total: ObservedTotals) {
     const parts = [
       total.fir && t('stash_import.found_fir', { count: total.fir }),
@@ -160,7 +163,7 @@
       const rows = props.targets
         .filter((target) => target.itemId === total.itemId)
         .map(rowFor)
-        .sort(byChange);
+        .sort(byRelevance);
       if (!rows.length) return [];
       return [
         {

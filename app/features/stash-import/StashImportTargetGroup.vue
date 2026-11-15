@@ -43,10 +43,10 @@
   }>();
   defineEmits<{ toggle: [key: string] }>();
   const expanded = ref(false);
-  /** Requirements this import changes come first; the rest stay one click away. */
+  /** Requirements this import can change come first; the rest stay one click away. */
   const shown = computed(() => {
-    const changing = props.rows.filter((row) => row.delta !== 0);
-    return expanded.value || !changing.length ? props.rows : changing;
+    const relevant = props.rows.filter((row) => row.relevant);
+    return expanded.value || !relevant.length ? props.rows : relevant;
   });
   const hidden = computed(() => props.rows.length - shown.value.length);
 </script>

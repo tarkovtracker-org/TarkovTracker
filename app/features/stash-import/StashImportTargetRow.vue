@@ -44,6 +44,8 @@
     before: number;
     after: number;
     delta: number;
+    /** Would change if selected; decides visibility independently of the checkbox. */
+    relevant: boolean;
   }
   const props = defineProps<{ row: TargetRow; locked: boolean }>();
   defineEmits<{ toggle: [] }>();

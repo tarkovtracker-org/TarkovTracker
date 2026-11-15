@@ -40,7 +40,12 @@
         <div class="border-b border-white/10 px-4 py-2.5 sm:px-5">
           <StashImportSteps :current="step" />
         </div>
-        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5" :inert="bodyInert">
+        <div
+          ref="body"
+          tabindex="-1"
+          class="min-h-0 flex-1 overflow-y-auto px-4 py-4 outline-none sm:px-5"
+          :inert="bodyInert"
+        >
           <div v-if="banner" class="mb-4">
             <UAlert
               :role="banner.role"
@@ -53,7 +58,7 @@
           <StashImportIntake
             v-if="step === 'intake'"
             :busy="busy"
-            :disabled="intakeLocked"
+            :disabled="!canIntake"
             :dragging="dragging"
             :stage="stage"
             :completed="completed"
@@ -112,6 +117,7 @@
             :targets="availableTargets"
             :totals="applyData.totals"
             :estimates="applyData.estimates"
+            :relevant="applyData.relevant"
             :item-name="itemName"
             :thumb-for="thumbFor"
             :bitmap="bitmap"
@@ -193,7 +199,10 @@
     next,
   } = useStashScanSession();
   const importer = useStashImport(() => props.needs);
-  const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(image);
+  // Decode for display only once the worker has finished, so the two decodes never overlap.
+  const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(() =>
+    result.value ? image.value : undefined
+  );
   const step = ref<Step>('intake');
   const importMode = ref<ImportMode>('replace');
   const selected = ref<string[]>([]);
@@ -201,15 +210,22 @@
   const saving = ref(false);
   const uncertain = ref(false);
   const conflicted = ref(false);
+  /** The server refuses this screenshot for good (imported before a progress reset). */
+  const blockedSource = ref(false);
   let selectionInitialized = false;
   const finished = ref('');
   const importError = ref('');
   const notice = ref('');
   const dragging = ref(false);
   let dragDepth = 0;
-  const displayError = computed(() => error.value || importError.value);
-  const intakeLocked = computed(() => saving.value || (busy.value && step.value !== 'intake'));
-  const applyLocked = computed(() => saving.value || uncertain.value || conflicted.value);
+  // Scan errors belong to the screenshot steps; save errors must never be hidden behind them.
+  const displayError = computed(() =>
+    ['intake', 'review'].includes(step.value) ? error.value || importError.value : importError.value
+  );
+  const canIntake = computed(() => !saving.value && step.value !== 'apply');
+  const applyLocked = computed(
+    () => saving.value || uncertain.value || conflicted.value || blockedSource.value
+  );
   const modeLabels = { pvp: 'common.pvp', pve: 'common.pve', seasonal: 'common.seasonal_pvp' };
   const modeLabel = computed(() => t(modeLabels[store.currentGameMode]));
   const allowDecreases = ref(false);
@@ -247,12 +263,26 @@
   const liveChanges = computed<ImportChange[]>(
     () => estimates.value?.[importMode.value].changes ?? []
   );
-  const decreaseCount = computed(
-    () => liveChanges.value.filter((change) => change.count < change.before).length
+  const decreasing = computed(() =>
+    liveChanges.value.filter((change) => change.count < change.before)
   );
-  // A changed plan needs a fresh acknowledgement, never one given for different numbers.
-  watch([importMode, decreaseCount], () => {
+  const decreaseCount = computed(() => decreasing.value.length);
+  const decreaseSignature = computed(() =>
+    JSON.stringify([
+      importMode.value,
+      decreasing.value.map(({ type, id, before, count }) => [type, id, before, count]),
+    ])
+  );
+  // An acknowledgement covers exactly the decreases it was given for, never different numbers.
+  watch(decreaseSignature, () => {
     allowDecreases.value = false;
+  });
+  /** Change keys that would update if every requirement were selected, for stable row lists. */
+  const relevantKeys = computed(() => {
+    if (!totals.value) return new Set<string>();
+    const all = availableTargets.value.map((target) => target.key);
+    const plan = importer.estimate(totals.value, all, importMode.value);
+    return new Set(plan.changes.map((change) => `${change.type}:${change.id}`));
   });
   const canContinue = computed(() => !busy.value && remaining.value === 0 && Boolean(totals.value));
   const reviewHint = computed(() => {
@@ -319,7 +349,7 @@
         label: t('stash_import.other_image'),
         icon: 'i-mdi-arrow-left',
         disabled: busy.value,
-        run: startOver,
+        run: guarded(startOver),
       },
       hint: reviewHint.value,
       hintTone: reviewHintTone.value,
@@ -328,7 +358,7 @@
         trailingIcon: 'i-mdi-arrow-right',
         testid: 'stash-continue',
         disabled: !canContinue.value,
-        run: goToApply,
+        run: guarded(goToApply),
       },
     };
   }
@@ -339,7 +369,7 @@
       testid: 'stash-save',
       loading: saving.value,
       disabled: !canSave.value,
-      run: save,
+      run: guarded(save),
     };
   }
   function applyPrimary(): FooterAction {
@@ -366,7 +396,7 @@
         label: t('stash_import.back'),
         icon: 'i-mdi-arrow-left',
         disabled: saving.value,
-        run: backToReview,
+        run: guarded(backToReview),
       },
       hint: applyHint.value,
       hintTone: applyHintTone.value,
@@ -378,9 +408,9 @@
       back: {
         label: t('stash_import.import_another'),
         icon: 'i-mdi-image-plus-outline',
-        run: startOver,
+        run: guarded(startOver),
       },
-      primary: { label: t('common.close'), run: () => emit('close') },
+      primary: { label: t('common.close'), run: guarded(() => emit('close')) },
     };
   }
   const footers = {
@@ -392,12 +422,27 @@
   const footer = computed(() => footers[step.value]());
   const applyData = computed(() => {
     if (step.value !== 'apply' || !totals.value || !estimates.value) return undefined;
-    return { totals: totals.value, estimates: estimates.value };
+    return { totals: totals.value, estimates: estimates.value, relevant: relevantKeys.value };
   });
-  const dropOverlay = computed(
-    () => dragging.value && ['review', 'done'].includes(step.value) && !intakeLocked.value
-  );
+  const dropOverlay = computed(() => dragging.value && canIntake.value && step.value !== 'intake');
   const bodyInert = computed(() => saving.value || undefined);
+  /**
+   * Footer buttons keep their position across steps. Ignore activations right after a step
+   * change, so a double-click on Continue cannot save and a double-click on Back cannot
+   * discard the review. Focus moves to the new step, so a repeated Enter does nothing.
+   */
+  const STEP_SETTLE_MS = 400;
+  const body = useTemplateRef<HTMLElement>('body');
+  let stepChangedAt = 0;
+  watch(step, async () => {
+    stepChangedAt = Date.now();
+    await nextTick();
+    body.value?.focus({ preventScroll: true });
+    body.value?.scrollTo?.({ top: 0 });
+  });
+  function guarded(action: () => unknown) {
+    return () => (Date.now() - stepChangedAt < STEP_SETTLE_MS ? undefined : action());
+  }
   function itemName(id: string) {
     return (
       result.value?.catalog.items.find((item) => item.id === id)?.name ??
@@ -422,9 +467,13 @@
     selectionInitialized = false;
     selected.value = [];
     pendingRegion.value = undefined;
+    blockedSource.value = false;
   }
   async function intake(files: File[]) {
-    if (saving.value || step.value === 'apply') return;
+    if (!canIntake.value) {
+      if (step.value === 'apply') notice.value = 'stash_import.go_back_for_image';
+      return;
+    }
     if (!(await leaveConflict())) return;
     resetImport();
     resetSelection();
@@ -493,6 +542,8 @@
   function goToApply() {
     if (!canContinue.value) return;
     importError.value = '';
+    error.value = '';
+    allowDecreases.value = false;
     step.value = 'apply';
   }
   function report(failure: unknown) {
@@ -503,31 +554,33 @@
   }
   const updatesOf = (changes: ImportChange[]) =>
     JSON.stringify(changes.map(({ id, type, count }) => [type, id, count]));
-  /** Reads the cloud baseline, then refuses to save numbers the player did not see. */
-  async function prepareShown(): Promise<PreviewData | undefined> {
+  /** Reads the cloud baseline, then refuses to save numbers other than the ones on screen. */
+  async function prepareShown(shown: string): Promise<PreviewData | undefined> {
     const prepared = await importer.prepare(
       result.value!.sourceHash,
       reviewedTotals(rows.value),
       selected.value,
       importMode.value
     );
-    if (updatesOf(prepared.changes) === updatesOf(liveChanges.value)) return prepared;
+    if (updatesOf(prepared.changes) === shown) return prepared;
     importError.value = 'stash_import.errors.stale';
     return undefined;
   }
   async function save() {
     if (!canSave.value) return;
+    // Captured before any await: this is exactly what the player is looking at.
+    const shown = updatesOf(liveChanges.value);
     saving.value = true;
     resetImport();
     try {
-      preview.value = await prepareShown();
+      preview.value = await prepareShown(shown);
       if (!preview.value) return;
       const receipt = await importer.commit(
         preview.value,
         reviewedTotals(rows.value),
         selected.value
       );
-      await showReceipt(receipt.status);
+      await showReceipt(receipt);
     } catch (failure) {
       report(failure);
       uncertain.value =
@@ -536,28 +589,36 @@
       saving.value = false;
     }
   }
-  async function showReceipt(status: string) {
-    if (status === 'conflict') {
+  /** Reasons a retry with this same screenshot can never succeed. */
+  const PERMANENT_CONFLICTS = ['progress_reset', 'import_id_reused'];
+  async function showReceipt(receipt: { status: string; reason?: string }) {
+    if (receipt.status === 'conflict') {
       conflicted.value = true;
-      await refreshAfterConflict();
+      await refreshAfterConflict(PERMANENT_CONFLICTS.includes(receipt.reason ?? ''));
       return;
     }
     importError.value = '';
     uncertain.value = false;
-    finished.value = status;
+    finished.value = receipt.status;
     step.value = 'done';
   }
-  /** Another device changed progress: pull it in, then let the player check the new numbers. */
-  async function refreshAfterConflict() {
+  /** Pull in the newer progress, then either ask for a fresh check or explain the dead end. */
+  async function refreshAfterConflict(permanent: boolean) {
     if (!(await runReconcile())) return;
     preview.value = undefined;
-    notice.value = 'stash_import.conflict_refreshed';
+    allowDecreases.value = false;
+    if (!permanent) {
+      notice.value = 'stash_import.conflict_refreshed';
+      return;
+    }
+    blockedSource.value = true;
+    importError.value = 'stash_import.errors.reimport_blocked';
   }
   async function checkReceipt() {
     if (!preview.value) return;
     saving.value = true;
     try {
-      if (await importer.recover(preview.value)) await showReceipt('applied');
+      if (await importer.recover(preview.value)) await showReceipt({ status: 'applied' });
       else importError.value = 'stash_import.errors.receipt_missing';
     } catch (failure) {
       report(failure);

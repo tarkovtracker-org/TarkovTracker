@@ -30,16 +30,21 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
     count (`distributeItems(..., { additive: true })`). Counts never decrease. Repeating it with
     another screenshot of the same items adds again; the identical-file receipt check below is
     the only duplicate protection.
-- Both modes allocate physical observations once across the selection. The save step shows the
-  live per-requirement before/after counts for the chosen mode; Save re-reads the cloud baseline
-  and refuses to send numbers that differ from the ones shown.
+- Both modes allocate physical observations once across the selection. A hideout part ticked
+  complete without a stored count counts as full, as on the Hideout page, so add mode skips it
+  and set mode shows any lower count as a decrease. The save step shows the live
+  per-requirement before/after counts for the chosen mode. Save snapshots those numbers before
+  reading the cloud baseline and refuses to send anything different. Any change to the
+  decreasing requirements clears the decrease acknowledgement.
 - Unobserved items and unselected requirements remain unchanged. Completed tasks/modules,
   teammate-only needs, weapon builds, alternative-item objectives, and non-handover task
   objectives are excluded. Closed containers and off-screen inventory cannot be inferred.
 - Scanning is available to guests, but saving requires a signed-in, synchronized account.
   Saving fixes the owner, game mode, active season, import mode, selected targets, and progress
-  snapshot. If another device changed progress first, the dialog reconciles, refreshes the shown
-  counts and asks the player to save again.
+  snapshot. If another device changed progress first (`baseline_changed`), the dialog
+  reconciles, refreshes the shown counts and asks the player to save again. A screenshot
+  imported before a progress reset (`progress_reset`) can never be saved again, so the dialog
+  explains that and disables Save instead of looping.
 
 ### Persistence
 
