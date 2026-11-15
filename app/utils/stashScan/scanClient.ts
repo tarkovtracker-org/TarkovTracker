@@ -38,6 +38,7 @@ export function createStashScanner(
     pending = undefined;
   }
   worker.onmessage = ({ data }: MessageEvent<ScanReply>) => {
+    if (closed) return;
     if (data.type === 'progress') {
       onProgress(data);
       return;

@@ -216,6 +216,16 @@ describe('reviewed stash import persistence', () => {
     const preview = await importer.prepare('a'.repeat(64), unknown, [key(), key(unrelated)]);
     expect(preview.changes).toEqual([expect.objectContaining({ id: unrelated, count: 2 })]);
   });
+  it('keeps confirmed FIR units available when another stack has unknown FIR status', async () => {
+    const importer = useStashImport([need(objective, { foundInRaid: true }), need(unrelated)]);
+    const mixed = [{ itemId: 'item', fir: 2, nonFir: 0, unknown: 2 }];
+    expect(importer.targets(mixed).map((target) => target.key)).toEqual([key(), key(unrelated)]);
+    const preview = await importer.prepare('a'.repeat(64), mixed, [key(), key(unrelated)]);
+    expect(preview.changes).toEqual([
+      expect.objectContaining({ id: objective, count: 2 }),
+      expect.objectContaining({ id: unrelated, count: 2 }),
+    ]);
+  });
   it('does not declare concurrent edits in another mode or metadata saved', async () => {
     const importer = useStashImport([need()]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()]);

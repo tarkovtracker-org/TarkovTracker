@@ -5,6 +5,8 @@ import type { RgbImage } from '@/utils/stashScan/core/grid';
 export function validateRect(rect: ScanRect, image: { width: number; height: number }): void {
   const integers = [rect.x, rect.y, rect.width, rect.height, rect.slotsWide, rect.slotsHigh];
   if (!integers.every(Number.isSafeInteger)) throw scanError('region_invalid');
+  if (![rect.slotsWide, rect.slotsHigh].every((slots) => slots >= 1 && slots <= 10))
+    throw scanError('region_invalid');
   validateRectBounds(rect, image);
 }
 function validateRectBounds(rect: ScanRect, image: { width: number; height: number }): void {

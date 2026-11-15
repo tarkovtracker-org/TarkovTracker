@@ -50,6 +50,7 @@ interface ImportReceipt {
 type ImportBaseline = Pick<StashImportPreview, 'owner' | 'mode' | 'season' | 'local'>;
 const validNeededCount = (count: number) =>
   Number.isSafeInteger(count) && count >= 1 && count <= 1_000_000;
+const lacksConfirmedFir = (total: ObservedTotals) => total.fir === 0 && total.unknown > 0;
 const receiptApplied = (receipt: ImportReceipt) => ['applied', 'replayed'].includes(receipt.status);
 const expectedFrom = (data: { progress_data: unknown } | null) =>
   (data?.progress_data ?? null) as Record<string, unknown> | null;
@@ -132,7 +133,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
       .flatMap((need) => {
         const itemId = getNeededItemId(need)!;
         const total = byItem.get(itemId);
-        if (!total || (need.foundInRaid && total.unknown > 0)) return [];
+        if (!total || (need.foundInRaid && lacksConfirmedFir(total))) return [];
         return [
           {
             key: keyOf(need),

@@ -89,6 +89,28 @@ test('same-named spoofed, wrong-head, stale, incomplete and blocking checks cann
   runs.push({ ...runs[1], id: 100, conclusion: 'failure' });
   assert.throws(() => evaluateSocket(runs, head, [], NOW), /blocking/);
 });
+test('Socket no-net-change reports pass only with their exact attested output', () => {
+  const runs = checks();
+  runs[1].output = {
+    title: 'Pull Request #1464 Alerts: Skipped',
+    summary:
+      "|Report|Status|Message|\n|---|---|---|\n|PR #1464 Alerts|✅|Pull request contains no net changes to dependencies|\n\nPull request alerts notify when new issues are detected between the diff of the pull request and it's target branch.",
+    text: '**No dependency changes detected.** Learn more about [Socket for GitHub](https://socket.dev?utm_medium=gh).\n\n👍 No dependency changes detected in pull request',
+  };
+  assert.deepEqual(evaluateSocket(runs, head, [], NOW), []);
+  for (const field of ['title', 'summary', 'text']) {
+    const altered = structuredClone(runs);
+    altered[1].output[field] += '\nFound 1 alert';
+    assert.throws(() => evaluateSocket(altered, head, [], NOW));
+  }
+  const mismatched = structuredClone(runs);
+  mismatched[1].output.summary = mismatched[1].output.summary.replace('#1464', '#1465');
+  assert.throws(() => evaluateSocket(mismatched, head, [], NOW));
+  const spoofed = structuredClone(runs);
+  spoofed[1].app.id = 1;
+  assert.throws(() => evaluateSocket(spoofed, head, [], NOW));
+  assert.throws(() => evaluateSocket(runs, 'b'.repeat(40), [], NOW));
+});
 test('green Socket warnings require exact-package, unexpired, substantive triage', () => {
   assert.deepEqual(socketWarnings(warned()[1]), [warning]);
   const triage = {

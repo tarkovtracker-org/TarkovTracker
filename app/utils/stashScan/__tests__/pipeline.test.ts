@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { featureShape, FEATURE_VERSION } from '@/utils/stashScan/core/features';
+import { validateRect } from '@/utils/stashScan/decodeImage';
 import { checkDimensions, imageDimensions } from '@/utils/stashScan/imageHeader';
 import { decodeScanShard, encodeScanShard } from '@/utils/stashScan/indexCodec';
 import { overlapsRegion, splitRegion } from '@/utils/stashScan/regions';
@@ -146,6 +147,22 @@ describe('observation review and quantity accounting', () => {
 });
 describe('region correction geometry', () => {
   const whole: ScanRect = { x: 10, y: 20, width: 127, height: 127, slotsWide: 2, slotsHigh: 2 };
+  it.each([
+    [0, 1],
+    [1, 0],
+    [11, 1],
+    [1, 11],
+  ])(
+    'rejects unsupported slot dimensions %s by %s as an invalid region',
+    (slotsWide, slotsHigh) => {
+      expect(() =>
+        validateRect(
+          { ...whole, slotsWide: slotsWide!, slotsHigh: slotsHigh! },
+          { width: 200, height: 200 }
+        )
+      ).toThrow(error('region_invalid'));
+    }
+  );
   it('splits row-major cells that share only their border pixels', () => {
     const parts = splitRegion(whole, 2, 2);
     expect(parts).toEqual([

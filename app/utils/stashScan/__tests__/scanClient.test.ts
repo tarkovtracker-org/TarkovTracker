@@ -20,6 +20,13 @@ describe('scan worker transport', () => {
     vi.stubGlobal('createImageBitmap', vi.fn());
   });
   afterEach(() => vi.unstubAllGlobals());
+  it('ignores progress replies queued before cancellation', () => {
+    const progress = vi.fn();
+    const scanner = createStashScanner(progress);
+    scanner.cancel();
+    instance.onmessage?.({ data: { type: 'progress', stage: 'match', done: 3, total: 5 } });
+    expect(progress).not.toHaveBeenCalled();
+  });
   it('serializes reactive corrections and manual first-image regions', async () => {
     const scanner = createStashScanner(vi.fn());
     const correction = scanner.request({ op: 'rects', rects: [rect()] });
