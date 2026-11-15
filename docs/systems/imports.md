@@ -4,9 +4,10 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 ## Stash screenshot import
 
-Needed Items → Import stash screenshot reads one PNG, JPEG, or WebP on the device. A
-dedicated worker decodes bounded pixels, detects grid regions, and matches the MIT-licensed
-Cultist Circle recognition features against static, hashed catalog shards. Screenshots,
+Needed Items → Import items from a screenshot reads one PNG, JPEG, or WebP on the device. Players
+drop, paste (Ctrl+V or the clipboard button) or choose the image, check the detected items, then
+pick how to save them. A dedicated worker decodes bounded pixels, detects grid regions, and
+matches the MIT-licensed Cultist Circle recognition features against static, hashed catalog shards. Screenshots,
 pixel features, and corrections are neither uploaded nor persisted. The save contains
 reviewed requirement counts, an image fingerprint, and an idempotency key.
 
@@ -20,14 +21,25 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.
   Redrawing replaces overlapping regions; quantity corrections preserve requirement selections.
-- Each import reconciles explicitly selected requirements using the existing Smart Fill
-  priority/allocation policy. It does not add screenshot totals to existing counts. Physical
-  observations are allocated once across the selection. Decreases require confirmation.
+- Each import updates explicitly selected requirements using the existing Smart Fill
+  priority/allocation policy, in one of two player-chosen modes:
+  - **Set counts from screenshot** (default) replaces each selected requirement's count with its
+    allocation from the screenshot. Re-running it with the same totals is idempotent. Decreases
+    require confirmation.
+  - **Add to current counts** fills only each requirement's missing units on top of its current
+    count (`distributeItems(..., { additive: true })`). Counts never decrease. Repeating it with
+    another screenshot of the same items adds again; the identical-file receipt check below is
+    the only duplicate protection.
+- Both modes allocate physical observations once across the selection. The save step shows the
+  live per-requirement before/after counts for the chosen mode; Save re-reads the cloud baseline
+  and refuses to send numbers that differ from the ones shown.
 - Unobserved items and unselected requirements remain unchanged. Completed tasks/modules,
   teammate-only needs, weapon builds, alternative-item objectives, and non-handover task
   objectives are excluded. Closed containers and off-screen inventory cannot be inferred.
 - Scanning is available to guests, but saving requires a signed-in, synchronized account.
-  Preview fixes the owner, game mode, active season, selected targets, and progress snapshot.
+  Saving fixes the owner, game mode, active season, import mode, selected targets, and progress
+  snapshot. If another device changed progress first, the dialog reconciles, refreshes the shown
+  counts and asks the player to save again.
 
 ### Persistence
 
@@ -37,7 +49,9 @@ transaction. A changed destination rejects the preview. Replayed import IDs retu
 progress snapshot; identical pixel fingerprints are recognized within the same mode/season
 and reset epoch. Receipts retain the latest 100 imports per account. They are usable for 90
 days; expired rows are pruned lazily on a later import call and may remain stored until then.
-Reconciliation does not inflate counts even after receipt expiry or a differently compressed screenshot.
+Set-counts mode does not inflate counts even after receipt expiry or a differently compressed screenshot.
+The RPC always writes absolute counts; add mode computes them in the browser from the
+snapshot the RPC checks, so a stale baseline is rejected rather than added to.
 Commit and receipt lookup share an owner-scoped limit of 60 calls per minute, enforced before
 request hashing and owner locks. Replays, duplicates, and conflicts also consume this budget.
 

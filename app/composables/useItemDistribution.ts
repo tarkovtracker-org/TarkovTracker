@@ -16,12 +16,17 @@ export interface DistributionResult {
   remainingFir: number;
   remainingNonFir: number;
 }
+export interface DistributionOptions {
+  /** Top up existing counts instead of replacing them with the distributed totals. */
+  additive?: boolean;
+}
 export type UseItemDistributionReturn = {
   distributeItems: (
     firCount: number,
     nonFirCount: number,
     taskObjectives: NeededItemTaskObjective[],
-    hideoutModules: NeededItemHideoutModule[]
+    hideoutModules: NeededItemHideoutModule[],
+    options?: DistributionOptions
   ) => DistributionResult;
   applyDistribution: (result: DistributionResult) => void;
   resetObjectives: (
@@ -92,10 +97,10 @@ export function useItemDistribution(): UseItemDistributionReturn {
     pool.nonFir -= taken;
     return taken + takeFir(pool, needed - taken);
   };
-  const takeFor = (need: NeedEntry, pool: ItemPool): number =>
-    need.foundInRaid
-      ? takeFir(pool, neededCountOf(need))
-      : takeNonFirThenFir(pool, neededCountOf(need));
+  const takeFor = (need: NeedEntry, pool: ItemPool, room: number): number =>
+    need.foundInRaid ? takeFir(pool, room) : takeNonFirThenFir(pool, room);
+  /** Replacement starts every need from zero; additive tops up only the missing units. */
+  const startingCount = (current: number, additive: boolean): number => (additive ? current : 0);
   const firFirst = <T extends NeedEntry>(needs: T[]): T[] => [
     ...needs.filter((need) => need.foundInRaid),
     ...needs.filter((need) => !need.foundInRaid),
@@ -106,12 +111,16 @@ export function useItemDistribution(): UseItemDistributionReturn {
    * fall back to FIR items). Counts are totals, not additions to current
    * progress, so re-running with the same totals is idempotent (#867). Only
    * needs whose count changes produce an update.
+   *
+   * With `additive`, the same order fills only each need's missing units on top
+   * of its current count; counts never decrease and re-running adds again.
    */
   function distributeItems(
     firCount: number,
     nonFirCount: number,
     taskObjectives: NeededItemTaskObjective[],
-    hideoutModules: NeededItemHideoutModule[]
+    hideoutModules: NeededItemHideoutModule[],
+    options: DistributionOptions = {}
   ): DistributionResult {
     const pool: ItemPool = { fir: firCount, nonFir: nonFirCount };
     const ordered: NeedEntry[] = [
@@ -120,8 +129,10 @@ export function useItemDistribution(): UseItemDistributionReturn {
     ];
     const updates: ObjectiveUpdate[] = [];
     for (const need of ordered) {
-      const count = takeFor(need, pool);
-      if (count === getObjectiveCurrentCount(need)) continue;
+      const current = getObjectiveCurrentCount(need);
+      const start = startingCount(current, Boolean(options.additive));
+      const count = start + takeFor(need, pool, Math.max(0, neededCountOf(need) - start));
+      if (count === current) continue;
       const type = need.needType === 'taskObjective' ? 'task' : 'hideout';
       updates.push({ id: need.id, type, count, needed: neededCountOf(need) });
     }

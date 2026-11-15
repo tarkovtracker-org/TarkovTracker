@@ -202,6 +202,30 @@ describe('reviewed stash import persistence', () => {
     ]);
     expect(state.pvp.level).toBe(9);
   });
+  it('adds screenshot units on top of tracked counts in add mode', async () => {
+    state.pvp.taskObjectives[objective] = { count: 1, timestamp: 5 };
+    remote = copy(state);
+    controller.acknowledgeExternalSave!(copy(state));
+    recordAcknowledgedModes('owner-a', {
+      pvp: state.pvp,
+      pve: state.pve,
+      seasonal: state.seasonal,
+    });
+    const importer = useStashImport([need()]);
+    expect(importer.estimate(total, [key()], 'add').changes).toEqual([
+      expect.objectContaining({ id: objective, before: 1, count: 3, needed: 3 }),
+    ]);
+    expect(importer.estimate(total, [key()], 'replace').changes).toEqual([
+      expect.objectContaining({ id: objective, before: 1, count: 2 }),
+    ]);
+    const preview = await importer.prepare('a'.repeat(64), total, [key()], 'add');
+    expect(preview.importMode).toBe('add');
+    await importer.commit(preview, total, [key()]);
+    expect(h.rpc).toHaveBeenCalledWith(
+      'commit_stash_item_import',
+      expect.objectContaining({ p_updates: [{ id: objective, type: 'task', count: 3, needed: 3 }] })
+    );
+  });
   it('uses selected-scope Smart Fill and preserves unrelated progress', async () => {
     const importer = useStashImport([need(), need(unrelated)]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()]);

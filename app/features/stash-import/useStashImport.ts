@@ -18,6 +18,8 @@ import { scanError } from '@/utils/stashScan/types';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 import type { ObservedTotals } from '@/utils/stashScan/review';
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
+/** `add` tops up current counts; `replace` sets them to the screenshot totals. */
+export type ImportMode = 'add' | 'replace';
 export type ImportTarget = {
   key: string;
   need: Need;
@@ -39,9 +41,14 @@ export interface StashImportPreview {
   expected: Record<string, unknown> | null;
   local: UserProgressData;
   scope: string;
+  importMode: ImportMode;
   changes: ImportChange[];
   excess: number;
   unknown: number;
+}
+export interface ImportEstimate {
+  changes: ImportChange[];
+  excess: number;
 }
 interface ImportReceipt {
   status: 'applied' | 'replayed' | 'duplicate' | 'conflict';
@@ -153,7 +160,11 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
     JSON.stringify(
       selected.map(({ key, itemId, need }) => [key, itemId, need.count, need.foundInRaid])
     );
-  function plan(totals: ObservedTotals[], selected: ImportTarget[]) {
+  function plan(
+    totals: ObservedTotals[],
+    selected: ImportTarget[],
+    importMode: ImportMode
+  ): ImportEstimate {
     const changes: ImportChange[] = [];
     let excess = 0;
     for (const total of totals) {
@@ -163,7 +174,8 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
         total.fir,
         total.nonFir + total.unknown,
         itemNeeds.filter(taskNeed),
-        itemNeeds.filter((need): need is NeededItemHideoutModule => !taskNeed(need))
+        itemNeeds.filter((need): need is NeededItemHideoutModule => !taskNeed(need)),
+        { additive: importMode === 'add' }
       );
       excess += result.remainingFir + result.remainingNonFir;
       changes.push(
@@ -176,6 +188,15 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
       );
     }
     return { changes, excess };
+  }
+  /** Local, synchronous preview of what `prepare` will compute against the same progress. */
+  function estimate(
+    totals: ObservedTotals[],
+    selection: string[],
+    importMode: ImportMode
+  ): ImportEstimate {
+    const selected = targets(totals).filter((target) => selection.includes(target.key));
+    return plan(totals, selected, importMode);
   }
   const sameDestination = (
     preview: Pick<StashImportPreview, 'owner' | 'mode' | 'season'>
@@ -228,12 +249,13 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
   async function prepare(
     sourceHash: string,
     totals: ObservedTotals[],
-    selection: string[]
+    selection: string[],
+    importMode: ImportMode = 'replace'
   ): Promise<StashImportPreview> {
     const baseline = captureBaseline();
     const expected = await readExpected(baseline);
     const selected = targets(totals).filter((target) => selection.includes(target.key));
-    const result = plan(totals, selected);
+    const result = plan(totals, selected, importMode);
     if (result.changes.length > 256) throw scanError('too_many_targets');
     const preview: StashImportPreview = {
       ...baseline,
@@ -241,6 +263,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
       sourceHash,
       importId: crypto.randomUUID(),
       scope: scopeOf(selected),
+      importMode,
       ...result,
       unknown: totals.reduce((sum, total) => sum + total.unknown, 0),
     };
@@ -314,5 +337,5 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
     assertDestination(preview);
     return status === 'found';
   }
-  return { targets, prepare, commit, recover, sameLocal, signedIn };
+  return { targets, estimate, prepare, commit, recover, sameLocal, signedIn };
 }

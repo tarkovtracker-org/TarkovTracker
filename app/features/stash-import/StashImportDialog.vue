@@ -4,70 +4,80 @@
     :title="$t('stash_import.title')"
     :description="$t('stash_import.description')"
     :dismissible="!saving"
-    :ui="{ content: 'sm:max-w-6xl' }"
-    scrollable
+    :ui="{ content: modalContent }"
     @update:open="close"
   >
-    <template #body>
-      <div class="space-y-4" @dragover.prevent @drop.prevent="drop">
-        <div class="bg-primary-500/10 text-primary-200 rounded-lg p-3 text-sm">
-          {{ $t('stash_import.local_notice') }}
-          <span class="block">{{ $t('stash_import.visible_only') }}</span>
+    <template #content>
+      <div
+        class="bg-surface-900 border-surface-700 pointer-events-auto relative flex h-dvh w-full flex-col overflow-hidden sm:h-[min(92dvh,60rem)] sm:rounded-lg sm:border sm:shadow-xl"
+        @dragenter.prevent="dragEnter"
+        @dragover.prevent
+        @dragleave="dragLeave"
+        @drop.prevent="drop"
+      >
+        <header class="flex items-start gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+          <UIcon
+            name="i-mdi-image-search-outline"
+            class="text-primary-300 mt-0.5 size-6 shrink-0"
+          />
+          <div class="min-w-0 flex-1">
+            <h2 class="text-surface-50 text-base font-semibold sm:text-lg">
+              {{ $t('stash_import.title') }}
+            </h2>
+            <p class="text-surface-400 text-xs sm:text-sm">
+              {{ $t('stash_import.destination', { mode: modeLabel }) }}
+            </p>
+          </div>
+          <UButton
+            icon="i-mdi-close"
+            variant="ghost"
+            color="neutral"
+            :disabled="saving"
+            :aria-label="$t('common.close')"
+            @click="close(false)"
+          />
+        </header>
+        <div class="border-b border-white/10 px-4 py-2.5 sm:px-5">
+          <StashImportSteps :current="step" />
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <label
-            class="bg-surface-800 flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-white/20 px-4 py-3"
-          >
-            <UIcon name="i-mdi-image-plus" class="size-5" />
-            {{ $t('stash_import.choose_image') }}
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              class="sr-only"
-              :disabled="intakeLocked"
-              @change="fileChanged"
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5" :inert="bodyInert">
+          <div v-if="banner" class="mb-4">
+            <UAlert
+              :role="banner.role"
+              :color="banner.color"
+              variant="subtle"
+              :icon="banner.icon"
+              :description="$t(banner.text)"
             />
-          </label>
-          <span class="text-sm">
-            {{ $t('stash_import.destination') }}:
-            <strong>{{ store.currentGameMode.toUpperCase() }}</strong>
-          </span>
-        </div>
-        <p v-if="!source" class="text-surface-400 text-sm">{{ $t('stash_import.intake_help') }}</p>
-        <div v-if="busy" class="space-y-2" role="status" aria-live="polite">
-          <p>{{ $t(`stash_import.stage_${stage}`) }}</p>
-          <progress :value="completed" :max="total" class="w-full" />
-          <UButton variant="soft" @click="cancel">{{ $t('common.cancel') }}</UButton>
-        </div>
-        <p v-if="displayError" role="alert" class="text-error-300 bg-error-500/10 rounded p-3">
-          {{ $t(displayError) }}
-        </p>
-        <div
-          v-if="finished"
-          role="status"
-          class="bg-success-500/10 text-success-300 rounded-lg p-4"
-        >
-          <p class="font-semibold">
-            {{ $t(completionKey) }}
-          </p>
-          <p class="mt-1 text-sm">{{ $t('stash_import.saved_detail') }}</p>
-          <UButton class="mt-3" @click="$emit('close')">{{ $t('common.close') }}</UButton>
-        </div>
-        <div v-else-if="image && !busy && !preview" :inert="preparing" class="space-y-4">
-          <div class="grid gap-4 lg:grid-cols-2">
-            <div class="space-y-3">
+          </div>
+          <StashImportIntake
+            v-if="step === 'intake'"
+            :busy="busy"
+            :disabled="intakeLocked"
+            :dragging="dragging"
+            :stage="stage"
+            :completed="completed"
+            :total="total"
+            @files="intake"
+            @paste-request="pasteFromClipboard"
+            @cancel="cancel"
+          />
+          <div
+            v-else-if="step === 'review'"
+            class="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]"
+          >
+            <div class="flex min-h-0 flex-col gap-3">
               <StashScreenshot
-                :image="image"
+                :bitmap="bitmap"
+                :image-error="bitmapFailed"
                 :width="width"
                 :height="height"
                 :rows="rows"
                 :active="active"
                 @select="activeKey = $event"
-                @region="selectRegion"
+                @region="pendingRegion = $event"
+                @rescan="rescan"
               />
-              <UButton variant="link" size="sm" @click="rescan">
-                {{ $t('stash_import.rescan') }}
-              </UButton>
               <StashRegionEditor
                 v-if="pendingRegion"
                 v-model="pendingRegion"
@@ -76,6 +86,9 @@
                 @apply="applyRegion"
                 @cancel="pendingRegion = undefined"
               />
+              <p v-if="busy" role="status" class="text-surface-300 text-sm">
+                {{ $t(`stash_import.stage_${stage}`) }}
+              </p>
             </div>
             <StashImportReview
               v-if="result"
@@ -83,7 +96,7 @@
               :result="result"
               :rows="rows"
               :remaining="remaining"
-              :active="active"
+              :bitmap="bitmap"
               :item-name="itemName"
               @next="next"
               @split="split"
@@ -91,43 +104,56 @@
               @mark-fir="markAllFir"
             />
           </div>
-          <StashImportTargets
-            v-if="result"
-            v-model="selected"
-            :available-targets="availableTargets"
-            :valid-totals="totals !== undefined"
-            :remaining="remaining"
+          <StashImportApply
+            v-else-if="applyData"
+            v-model:import-mode="importMode"
+            v-model:selected="selected"
+            v-model:allow-decreases="allowDecreases"
+            :targets="availableTargets"
+            :totals="applyData.totals"
+            :estimates="applyData.estimates"
             :item-name="itemName"
-            :signed-in="importer.signedIn.value"
-            :preparing="preparing"
-            @preview="preparePreview"
+            :thumb-for="thumbFor"
+            :bitmap="bitmap"
+            :locked="applyLocked"
           />
+          <div
+            v-else-if="step === 'done'"
+            role="status"
+            class="mx-auto flex max-w-md flex-col items-center gap-3 py-10 text-center"
+          >
+            <UIcon :name="done.icon" class="size-14" :class="done.tone" />
+            <p class="text-surface-50 text-lg font-semibold">{{ done.title }}</p>
+            <p class="text-surface-300 text-sm">{{ $t('stash_import.saved_detail') }}</p>
+          </div>
         </div>
-        <StashImportPreview
-          v-if="preview && !finished"
-          v-model:allow-decreases="allowDecreases"
-          :preview="preview"
-          :item-name="itemName"
-          :has-decreases="hasDecreases"
-          :stale="stale"
-          :uncertain="uncertain"
-          :saving="saving"
-          @save="save"
-          @recover="checkReceipt"
-          @back="backToReview"
-        />
+        <StashImportFooter v-bind="footer" />
+        <div
+          v-if="dropOverlay"
+          class="bg-surface-950/85 border-primary-400 pointer-events-none absolute inset-2 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed"
+        >
+          <UIcon name="i-mdi-tray-arrow-down" class="text-primary-300 size-12" />
+          <p class="text-surface-50 font-semibold">{{ $t('stash_import.drop_replace') }}</p>
+        </div>
       </div>
     </template>
   </UModal>
 </template>
 <script setup lang="ts">
-  import StashImportPreview from '@/features/stash-import/StashImportPreview.vue';
+  import StashImportApply from '@/features/stash-import/StashImportApply.vue';
+  import StashImportFooter, {
+    type FooterAction,
+  } from '@/features/stash-import/StashImportFooter.vue';
+  import StashImportIntake from '@/features/stash-import/StashImportIntake.vue';
   import StashImportReview from '@/features/stash-import/StashImportReview.vue';
-  import StashImportTargets from '@/features/stash-import/StashImportTargets.vue';
+  import StashImportSteps from '@/features/stash-import/StashImportSteps.vue';
   import StashRegionEditor from '@/features/stash-import/StashRegionEditor.vue';
   import StashScreenshot from '@/features/stash-import/StashScreenshot.vue';
+  import { useScreenshotBitmap } from '@/features/stash-import/useScreenshotBitmap';
   import {
     useStashImport,
+    type ImportChange,
+    type ImportMode,
     type StashImportPreview as PreviewData,
   } from '@/features/stash-import/useStashImport';
   import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
@@ -135,11 +161,16 @@
   import { reviewedTotals } from '@/utils/stashScan/review';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   import type { ReviewedCell, ScanRect } from '@/utils/stashScan/types';
+  type Step = 'intake' | 'review' | 'apply' | 'done';
+  /** Full screen on phones; a large fixed-height panel from the sm breakpoint. */
+  const modalContent =
+    'pointer-events-none inset-auto top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-none max-h-none rounded-none bg-transparent p-0 shadow-none ring-0 divide-y-0 sm:w-[calc(100vw-2rem)] sm:max-w-6xl';
   const props = defineProps<{ needs: (NeededItemTaskObjective | NeededItemHideoutModule)[] }>();
   const emit = defineEmits<{ close: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const store = useTarkovStore();
   const {
+    clear,
     source,
     result,
     rows,
@@ -162,20 +193,25 @@
     next,
   } = useStashScanSession();
   const importer = useStashImport(() => props.needs);
+  const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(image);
+  const step = ref<Step>('intake');
+  const importMode = ref<ImportMode>('replace');
   const selected = ref<string[]>([]);
   const preview = shallowRef<PreviewData>();
-  const preparing = ref(false);
   const saving = ref(false);
   const uncertain = ref(false);
   const conflicted = ref(false);
   let selectionInitialized = false;
   const finished = ref('');
   const importError = ref('');
+  const notice = ref('');
+  const dragging = ref(false);
+  let dragDepth = 0;
   const displayError = computed(() => error.value || importError.value);
-  const intakeLocked = computed(() => busy.value || saving.value || preparing.value);
-  const completionKey = computed(() =>
-    finished.value === 'duplicate' ? 'stash_import.already_imported' : 'stash_import.saved'
-  );
+  const intakeLocked = computed(() => saving.value || (busy.value && step.value !== 'intake'));
+  const applyLocked = computed(() => saving.value || uncertain.value || conflicted.value);
+  const modeLabels = { pvp: 'common.pvp', pve: 'common.pve', seasonal: 'common.seasonal_pvp' };
+  const modeLabel = computed(() => t(modeLabels[store.currentGameMode]));
   const allowDecreases = ref(false);
   const pendingRegion = ref<ScanRect>();
   const totals = computed(() => {
@@ -201,16 +237,175 @@
     selected.value = selected.value.filter((key) => keys.includes(key));
   }
   watch([targetKeys, () => Boolean(totals.value)], syncSelection, { immediate: true });
-  const hasDecreases = computed(
-    () => preview.value?.changes.some((change) => change.count < change.before) ?? false
+  const estimates = computed(() => {
+    if (!totals.value) return undefined;
+    return {
+      add: importer.estimate(totals.value, selected.value, 'add'),
+      replace: importer.estimate(totals.value, selected.value, 'replace'),
+    };
+  });
+  const liveChanges = computed<ImportChange[]>(
+    () => estimates.value?.[importMode.value].changes ?? []
   );
-  const localStale = computed(() => (preview.value ? !importer.sameLocal(preview.value) : false));
-  const stale = computed(() => conflicted.value || localStale.value);
+  const decreaseCount = computed(
+    () => liveChanges.value.filter((change) => change.count < change.before).length
+  );
+  // A changed plan needs a fresh acknowledgement, never one given for different numbers.
+  watch([importMode, decreaseCount], () => {
+    allowDecreases.value = false;
+  });
+  const canContinue = computed(() => !busy.value && remaining.value === 0 && Boolean(totals.value));
+  const reviewHint = computed(() => {
+    if (remaining.value) return t('stash_import.review_first', { count: remaining.value });
+    if (!totals.value) return t('stash_import.errors.quantity');
+    return t('stash_import.ready_to_continue');
+  });
+  const reviewHintTone = computed(() =>
+    remaining.value || !totals.value ? 'text-warning-300' : 'text-surface-400'
+  );
+  const canSave = computed(
+    () =>
+      importer.signedIn.value &&
+      liveChanges.value.length > 0 &&
+      (decreaseCount.value === 0 || allowDecreases.value) &&
+      !applyLocked.value
+  );
+  const applyHint = computed(() => {
+    if (!importer.signedIn.value) return t('stash_import.errors.sign_in');
+    if (!liveChanges.value.length) return t('stash_import.no_changes');
+    if (decreaseCount.value && !allowDecreases.value) return t('stash_import.confirm_first');
+    return '';
+  });
+  const applyHintTone = computed(() =>
+    importer.signedIn.value ? 'text-surface-400' : 'text-warning-300'
+  );
+  const done = computed(() => {
+    if (finished.value === 'duplicate')
+      return {
+        icon: 'i-mdi-information-outline',
+        tone: 'text-info-400',
+        title: t('stash_import.already_imported'),
+      };
+    const count = preview.value?.changes.length ?? 0;
+    const title = t(`stash_import.saved_${preview.value?.importMode ?? 'replace'}`, { count });
+    return { icon: 'i-mdi-check-circle', tone: 'text-success-400', title };
+  });
+  const banner = computed(() => {
+    if (displayError.value)
+      return {
+        role: 'alert',
+        color: 'error' as const,
+        icon: 'i-mdi-alert-circle-outline',
+        text: displayError.value,
+      };
+    if (!notice.value) return undefined;
+    return {
+      role: 'status',
+      color: 'info' as const,
+      icon: 'i-mdi-information-outline',
+      text: notice.value,
+    };
+  });
+  function intakeFooter() {
+    return {
+      hint: t('stash_import.local_notice'),
+      hintTone: 'text-surface-400',
+      primary: { label: t('common.close'), variant: 'ghost' as const, run: () => close(false) },
+    };
+  }
+  function reviewFooter() {
+    return {
+      back: {
+        label: t('stash_import.other_image'),
+        icon: 'i-mdi-arrow-left',
+        disabled: busy.value,
+        run: startOver,
+      },
+      hint: reviewHint.value,
+      hintTone: reviewHintTone.value,
+      primary: {
+        label: t('stash_import.continue'),
+        trailingIcon: 'i-mdi-arrow-right',
+        testid: 'stash-continue',
+        disabled: !canContinue.value,
+        run: goToApply,
+      },
+    };
+  }
+  function savePrimary(): FooterAction {
+    return {
+      label: t(`stash_import.apply_${importMode.value}`, { count: liveChanges.value.length }),
+      icon: importMode.value === 'add' ? 'i-mdi-plus' : 'i-mdi-content-save-outline',
+      testid: 'stash-save',
+      loading: saving.value,
+      disabled: !canSave.value,
+      run: save,
+    };
+  }
+  function applyPrimary(): FooterAction {
+    if (uncertain.value)
+      return {
+        label: t('stash_import.check_receipt'),
+        icon: 'i-mdi-cloud-search-outline',
+        testid: 'stash-check-receipt',
+        loading: saving.value,
+        run: checkReceipt,
+      };
+    if (conflicted.value)
+      return {
+        label: t('stash_import.refresh_progress'),
+        icon: 'i-mdi-refresh',
+        loading: saving.value,
+        run: reconcileConflict,
+      };
+    return savePrimary();
+  }
+  function applyFooter() {
+    return {
+      back: {
+        label: t('stash_import.back'),
+        icon: 'i-mdi-arrow-left',
+        disabled: saving.value,
+        run: backToReview,
+      },
+      hint: applyHint.value,
+      hintTone: applyHintTone.value,
+      primary: applyPrimary(),
+    };
+  }
+  function doneFooter() {
+    return {
+      back: {
+        label: t('stash_import.import_another'),
+        icon: 'i-mdi-image-plus-outline',
+        run: startOver,
+      },
+      primary: { label: t('common.close'), run: () => emit('close') },
+    };
+  }
+  const footers = {
+    intake: intakeFooter,
+    review: reviewFooter,
+    apply: applyFooter,
+    done: doneFooter,
+  };
+  const footer = computed(() => footers[step.value]());
+  const applyData = computed(() => {
+    if (step.value !== 'apply' || !totals.value || !estimates.value) return undefined;
+    return { totals: totals.value, estimates: estimates.value };
+  });
+  const dropOverlay = computed(
+    () => dragging.value && ['review', 'done'].includes(step.value) && !intakeLocked.value
+  );
+  const bodyInert = computed(() => saving.value || undefined);
   function itemName(id: string) {
     return (
       result.value?.catalog.items.find((item) => item.id === id)?.name ??
       t('stash_import.unidentified')
     );
+  }
+  function thumbFor(itemId: string) {
+    return rows.value.find((row) => !row.excluded && row.itemId === itemId)?.cell;
   }
   function close(open: boolean) {
     if (!open && !saving.value) emit('close');
@@ -221,23 +416,42 @@
     conflicted.value = false;
     finished.value = '';
     importError.value = '';
+    notice.value = '';
   }
-  async function intake(files: File[]) {
-    if (saving.value || preparing.value) return;
-    if (!(await leaveConflict())) return;
-    resetImport();
+  function resetSelection() {
     selectionInitialized = false;
     selected.value = [];
     pendingRegion.value = undefined;
+  }
+  async function intake(files: File[]) {
+    if (saving.value || step.value === 'apply') return;
+    if (!(await leaveConflict())) return;
+    resetImport();
+    resetSelection();
+    step.value = 'intake';
     await select(files);
     syncSelection();
+    if (result.value) step.value = 'review';
   }
-  async function fileChanged(event: Event) {
-    const input = event.target as HTMLInputElement;
-    await intake(Array.from(input.files ?? []));
-    input.value = '';
+  async function startOver() {
+    if (!(await leaveConflict())) return;
+    clear();
+    resetImport();
+    resetSelection();
+    step.value = 'intake';
+  }
+  function dragEnter(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    dragDepth++;
+    dragging.value = true;
+  }
+  function dragLeave() {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) dragging.value = false;
   }
   async function drop(event: DragEvent) {
+    dragDepth = 0;
+    dragging.value = false;
     await intake(Array.from(event.dataTransfer?.files ?? []));
   }
   onMounted(() => document.addEventListener('paste', paste));
@@ -248,8 +462,22 @@
     event.preventDefault();
     await intake(files);
   }
-  function selectRegion(rect: ScanRect) {
-    pendingRegion.value = rect;
+  async function clipboardImage(): Promise<File | undefined> {
+    for (const entry of await navigator.clipboard.read()) {
+      const type = entry.types.find((candidate) => candidate.startsWith('image/'));
+      if (type) return new File([await entry.getType(type)], 'clipboard', { type });
+    }
+    return undefined;
+  }
+  async function pasteFromClipboard() {
+    importError.value = '';
+    try {
+      const file = await clipboardImage();
+      if (file) await intake([file]);
+      else importError.value = 'stash_import.errors.clipboard_empty';
+    } catch {
+      importError.value = 'stash_import.errors.clipboard_denied';
+    }
   }
   async function applyRegion() {
     const rect = pendingRegion.value;
@@ -262,65 +490,74 @@
   function markAllFir() {
     for (const row of rows.value.filter((entry) => !entry.excluded)) row.raidStatus = 'fir';
   }
+  function goToApply() {
+    if (!canContinue.value) return;
+    importError.value = '';
+    step.value = 'apply';
+  }
   function report(failure: unknown) {
     const message = failure instanceof Error ? failure.message : '';
     importError.value = message.startsWith('stash_import.errors.')
       ? message
       : 'stash_import.errors.save_unknown';
   }
-  async function preparePreview() {
-    if (conflicted.value) return;
-    preparing.value = true;
-    importError.value = '';
+  const updatesOf = (changes: ImportChange[]) =>
+    JSON.stringify(changes.map(({ id, type, count }) => [type, id, count]));
+  /** Reads the cloud baseline, then refuses to save numbers the player did not see. */
+  async function prepareShown(): Promise<PreviewData | undefined> {
+    const prepared = await importer.prepare(
+      result.value!.sourceHash,
+      reviewedTotals(rows.value),
+      selected.value,
+      importMode.value
+    );
+    if (updatesOf(prepared.changes) === updatesOf(liveChanges.value)) return prepared;
+    importError.value = 'stash_import.errors.stale';
+    return undefined;
+  }
+  async function save() {
+    if (!canSave.value) return;
+    saving.value = true;
+    resetImport();
     try {
-      preview.value = await importer.prepare(
-        result.value!.sourceHash,
+      preview.value = await prepareShown();
+      if (!preview.value) return;
+      const receipt = await importer.commit(
+        preview.value,
         reviewedTotals(rows.value),
         selected.value
       );
-      allowDecreases.value = false;
+      await showReceipt(receipt.status);
     } catch (failure) {
       report(failure);
+      uncertain.value =
+        Boolean(preview.value) && importError.value === 'stash_import.errors.save_unknown';
     } finally {
-      preparing.value = false;
+      saving.value = false;
     }
   }
-  const decreasesConfirmed = computed(() => !hasDecreases.value || allowDecreases.value);
-  function showReceipt(status: string) {
+  async function showReceipt(status: string) {
     if (status === 'conflict') {
       conflicted.value = true;
-      importError.value = 'stash_import.errors.stale';
+      await refreshAfterConflict();
       return;
     }
     importError.value = '';
     uncertain.value = false;
     finished.value = status;
+    step.value = 'done';
   }
-  const canApply = computed(() => !stale.value && !uncertain.value && !saving.value);
-  const readyToSave = computed(() => preview.value && decreasesConfirmed.value && canApply.value);
-  async function save() {
-    if (!readyToSave.value) return;
-    saving.value = true;
-    importError.value = '';
-    try {
-      const receipt = await importer.commit(
-        preview.value!,
-        reviewedTotals(rows.value),
-        selected.value
-      );
-      showReceipt(receipt.status);
-    } catch (failure) {
-      report(failure);
-      uncertain.value = importError.value === 'stash_import.errors.save_unknown';
-    } finally {
-      saving.value = false;
-    }
+  /** Another device changed progress: pull it in, then let the player check the new numbers. */
+  async function refreshAfterConflict() {
+    if (!(await runReconcile())) return;
+    preview.value = undefined;
+    notice.value = 'stash_import.conflict_refreshed';
   }
   async function checkReceipt() {
     if (!preview.value) return;
     saving.value = true;
     try {
-      if (await importer.recover(preview.value)) showReceipt('applied');
+      if (await importer.recover(preview.value)) await showReceipt('applied');
       else importError.value = 'stash_import.errors.receipt_missing';
     } catch (failure) {
       report(failure);
@@ -332,8 +569,7 @@
     if (!conflicted.value) return true;
     return reconcileConflict();
   }
-  async function reconcileConflict(): Promise<boolean> {
-    saving.value = true;
+  async function runReconcile(): Promise<boolean> {
     try {
       await importer.recover(preview.value!);
       conflicted.value = false;
@@ -341,6 +577,15 @@
     } catch (failure) {
       report(failure);
       return false;
+    }
+  }
+  async function reconcileConflict(): Promise<boolean> {
+    saving.value = true;
+    try {
+      if (!(await runReconcile())) return false;
+      preview.value = undefined;
+      importError.value = '';
+      return true;
     } finally {
       saving.value = false;
     }
@@ -348,5 +593,9 @@
   async function backToReview() {
     if (!(await leaveConflict())) return;
     resetImport();
+    step.value = 'review';
   }
+  watch(source, (file) => {
+    if (!file && step.value === 'review') step.value = 'intake';
+  });
 </script>

@@ -160,9 +160,11 @@ export function useStashScanSession() {
     image.value = undefined;
     source.value = result.value = undefined;
     rows.value = [];
+    error.value = '';
   }
   onScopeDispose(dispose);
   return {
+    clear: dispose,
     source,
     result,
     rows,

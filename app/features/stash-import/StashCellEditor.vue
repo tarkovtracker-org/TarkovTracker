@@ -1,97 +1,141 @@
 <template>
-  <div class="bg-surface-800 space-y-3 rounded-lg p-4">
-    <h3 class="font-semibold">{{ $t('stash_import.check_item') }} {{ row.cell.key + 1 }}</h3>
-    <label class="block text-sm">
-      {{ $t('stash_import.search_item') }}
-      <input
-        v-model="search"
-        type="search"
-        class="bg-surface-950 mt-1 w-full rounded border border-white/20 p-2"
-        :placeholder="$t('stash_import.search_item')"
-      />
-    </label>
-    <div
-      class="max-h-48 space-y-1 overflow-y-auto"
-      role="group"
-      :aria-label="$t('stash_import.matches')"
-    >
-      <button
-        v-for="item in choices"
-        :key="item.id"
-        type="button"
-        class="flex w-full items-center justify-between gap-2 rounded border px-3 py-2 text-left text-sm"
-        :class="
-          row.itemId === item.id
-            ? 'border-primary-400 bg-primary-500/10'
-            : 'border-white/10 hover:bg-white/5'
-        "
-        @click="choose(item)"
-      >
-        <span>{{ item.name }}</span>
-        <UIcon v-if="row.itemId === item.id" name="i-mdi-check" />
-      </button>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <label class="text-sm">
-        {{ $t('stash_import.quantity') }}
+  <div class="space-y-4">
+    <div class="space-y-2">
+      <p class="text-surface-300 text-xs font-semibold tracking-wide uppercase">
+        {{ $t('stash_import.which_item') }}
+      </p>
+      <div class="relative">
+        <UIcon
+          name="i-mdi-magnify"
+          class="text-surface-400 pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+        />
         <input
+          v-model="search"
+          type="search"
+          class="bg-surface-950 border-surface-600 focus:border-primary-400 w-full rounded-md border py-2 pr-2 pl-8 text-sm outline-none"
+          :placeholder="$t('stash_import.search_item')"
+          :aria-label="$t('stash_import.search_item')"
+        />
+      </div>
+      <div
+        class="max-h-44 space-y-1 overflow-y-auto"
+        role="group"
+        :aria-label="$t('stash_import.matches')"
+      >
+        <button
+          v-for="item in choices"
+          :key="item.id"
+          type="button"
+          class="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors"
+          :class="
+            row.itemId === item.id
+              ? 'border-primary-400 bg-primary-500/15 text-surface-50'
+              : 'border-surface-700 hover:bg-surface-700 text-surface-200'
+          "
+          :aria-pressed="row.itemId === item.id"
+          @click="choose(item)"
+        >
+          <span class="min-w-0 truncate">{{ item.name }}</span>
+          <UIcon v-if="row.itemId === item.id" name="i-mdi-check" class="text-primary-300" />
+        </button>
+        <p v-if="!choices.length" class="text-surface-400 px-1 py-2 text-sm">
+          {{ $t(search ? 'stash_import.no_search_results' : 'stash_import.no_suggestions') }}
+        </p>
+      </div>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div v-if="stackable" class="space-y-2">
+        <label
+          :for="quantityId"
+          class="text-surface-300 block text-xs font-semibold tracking-wide uppercase"
+        >
+          {{ $t('stash_import.quantity') }}
+        </label>
+        <input
+          :id="quantityId"
           :value="row.quantity"
           type="number"
           min="1"
           :max="maxQuantity"
           step="1"
           inputmode="numeric"
-          class="bg-surface-950 mt-1 w-full rounded border border-white/20 p-2"
+          class="bg-surface-950 focus:border-primary-400 w-full rounded-md border px-3 py-2 text-sm outline-none"
+          :class="row.quantity === null ? 'border-warning-400' : 'border-surface-600'"
+          :placeholder="$t('stash_import.quantity_placeholder')"
           @input="setQuantity"
         />
-      </label>
-      <label class="text-sm">
-        {{ $t('stash_import.raid_status') }}
-        <select
-          :value="row.raidStatus"
-          class="bg-surface-950 mt-1 w-full rounded border border-white/20 p-2"
-          @change="setRaidStatus"
-        >
-          <option value="unknown">{{ $t('stash_import.unknown') }}</option>
-          <option value="fir">{{ $t('common.fir') }}</option>
-          <option value="non_fir">{{ $t('stash_import.non_fir') }}</option>
-        </select>
-      </label>
+        <p class="text-surface-400 text-xs">{{ $t('stash_import.stack_help') }}</p>
+      </div>
+      <fieldset class="space-y-2" :class="stackable ? '' : 'sm:col-span-2'">
+        <legend class="text-surface-300 mb-2 text-xs font-semibold tracking-wide uppercase">
+          {{ $t('stash_import.raid_status') }}
+        </legend>
+        <div class="bg-surface-950 grid grid-cols-3 gap-1 rounded-md p-1">
+          <label
+            v-for="status in statuses"
+            :key="status"
+            class="has-focus-visible:ring-primary-400 cursor-pointer rounded px-2 py-1.5 text-center text-xs transition-colors has-focus-visible:ring-2"
+            :class="
+              row.raidStatus === status
+                ? 'bg-surface-700 text-surface-50 font-semibold'
+                : 'text-surface-400 hover:text-surface-200'
+            "
+          >
+            <input
+              type="radio"
+              class="sr-only"
+              :name="`raid-status-${row.cell.key}`"
+              :value="status"
+              :checked="row.raidStatus === status"
+              @change="setRaidStatus(status)"
+            />
+            {{ $t(`stash_import.raid_short_${status}`) }}
+          </label>
+        </div>
+        <p class="text-surface-400 text-xs">{{ $t('stash_import.unknown_help') }}</p>
+      </fieldset>
     </div>
-    <p v-if="row.quantity === null" class="text-warning-300 text-sm">
-      {{ $t('stash_import.stack_help') }}
-    </p>
-    <p class="text-surface-400 text-xs">{{ $t('stash_import.unknown_help') }}</p>
-    <div class="flex flex-wrap gap-2">
-      <UButton :disabled="!canConfirm" @click="confirm">
+    <div class="flex flex-wrap items-center gap-2">
+      <UButton icon="i-mdi-check" :disabled="!canConfirm" @click="confirm">
         {{ $t('stash_import.confirm_next') }}
       </UButton>
-      <UButton variant="soft" @click="exclude">{{ $t('stash_import.exclude') }}</UButton>
+      <UButton variant="soft" color="neutral" icon="i-mdi-close" @click="exclude">
+        {{ $t('stash_import.exclude') }}
+      </UButton>
     </div>
-    <details v-if="row.cell.slotsWide > 1 || row.cell.slotsHigh > 1" class="text-sm">
-      <summary class="cursor-pointer">{{ $t('stash_import.split') }}</summary>
-      <div class="mt-2 flex items-end gap-2">
-        <label>
+    <details
+      v-if="row.cell.slotsWide > 1 || row.cell.slotsHigh > 1"
+      class="border-surface-700 rounded-md border p-3 text-sm"
+    >
+      <summary class="text-surface-300 cursor-pointer">{{ $t('stash_import.split') }}</summary>
+      <p class="text-surface-400 mt-2 text-xs">{{ $t('stash_import.split_help') }}</p>
+      <div class="mt-2 flex flex-wrap items-end gap-2">
+        <label class="text-surface-300 text-xs">
           {{ $t('stash_import.columns') }}
           <input
             v-model.number="columns"
             type="number"
             min="1"
             :max="row.cell.slotsWide"
-            class="bg-surface-950 block w-20 rounded border border-white/20 p-2"
+            class="bg-surface-950 border-surface-600 mt-1 block w-20 rounded-md border p-2 text-sm"
           />
         </label>
-        <label>
+        <label class="text-surface-300 text-xs">
           {{ $t('stash_import.rows') }}
           <input
             v-model.number="rows"
             type="number"
             min="1"
             :max="row.cell.slotsHigh"
-            class="bg-surface-950 block w-20 rounded border border-white/20 p-2"
+            class="bg-surface-950 border-surface-600 mt-1 block w-20 rounded-md border p-2 text-sm"
           />
         </label>
-        <UButton variant="soft" :disabled="!canSplit" @click="$emit('split', columns, rows)">
+        <UButton
+          variant="soft"
+          color="neutral"
+          :disabled="!canSplit"
+          @click="$emit('split', columns, rows)"
+        >
           {{ $t('stash_import.split_apply') }}
         </UButton>
       </div>
@@ -113,6 +157,8 @@
     split: [columns: number, rows: number];
     change: [patch: Partial<ReviewedCell>];
   }>();
+  const statuses: RaidStatus[] = ['unknown', 'fir', 'non_fir'];
+  const quantityId = useId();
   const row = computed(() => props.row);
   const search = ref('');
   const columns = ref(1);
@@ -142,6 +188,8 @@
   const maxQuantity = computed(
     () => itemsById.value.get(props.row.itemId)?.maxStack || SCAN_LIMITS.quantity
   );
+  /** Unknown items stay editable; a non-stackable identity is always exactly one unit. */
+  const stackable = computed(() => !props.row.itemId || maxQuantity.value > 1);
   const canConfirm = computed(
     () =>
       Boolean(props.row.itemId) &&
@@ -162,8 +210,8 @@
     const input = event.target as HTMLInputElement;
     emit('change', { quantity: input.value === '' ? null : Number(input.value), reviewed: false });
   }
-  function setRaidStatus(event: Event) {
-    emit('change', { raidStatus: (event.target as HTMLSelectElement).value as RaidStatus });
+  function setRaidStatus(status: RaidStatus) {
+    emit('change', { raidStatus: status });
   }
   function confirm() {
     emit('change', { reviewed: true, excluded: false });

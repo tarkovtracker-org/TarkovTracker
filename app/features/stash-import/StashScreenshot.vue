@@ -1,103 +1,131 @@
 <template>
-  <div class="space-y-2">
-    <div class="flex flex-wrap gap-2">
-      <UButton size="sm" variant="soft" :disabled="!active" @click="zoomed = !zoomed">
+  <div class="flex min-h-0 flex-col gap-2">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <UButton
+        size="xs"
+        variant="soft"
+        color="neutral"
+        :icon="zoomed ? 'i-mdi-magnify-minus-outline' : 'i-mdi-magnify-plus-outline'"
+        :disabled="!active"
+        @click="zoomed = !zoomed"
+      >
         {{ $t(zoomed ? 'stash_import.whole_image' : 'stash_import.zoom_item') }}
       </UButton>
-      <UButton size="sm" :variant="drawing ? 'solid' : 'soft'" @click="drawing = !drawing">
+      <UButton
+        size="xs"
+        :variant="drawing ? 'solid' : 'soft'"
+        :color="drawing ? 'primary' : 'neutral'"
+        icon="i-mdi-selection-drag"
+        :aria-pressed="drawing"
+        @click="toggleDrawing"
+      >
         {{ $t('stash_import.draw_region') }}
       </UButton>
-      <UButton size="sm" variant="soft" @click="enterRegion">
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        icon="i-mdi-keyboard-outline"
+        @click="enterRegion"
+      >
         {{ $t('stash_import.enter_region') }}
       </UButton>
+      <UButton
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        icon="i-mdi-refresh"
+        @click="$emit('rescan')"
+      >
+        {{ $t('stash_import.rescan') }}
+      </UButton>
     </div>
-    <p v-if="drawing" class="text-warning-300 text-sm">{{ $t('stash_import.draw_help') }}</p>
-    <p v-if="paintError" role="alert" class="text-error-300 text-sm">
+    <p v-if="drawing" class="text-primary-200 bg-primary-500/10 rounded-md px-3 py-2 text-sm">
+      {{ $t('stash_import.draw_help') }}
+    </p>
+    <p v-if="imageError" role="alert" class="text-error-300 text-sm">
       {{ $t('stash_import.errors.image_invalid') }}
     </p>
-    <svg
-      ref="canvas"
-      :viewBox="viewBox"
-      class="bg-surface-950 max-h-160 w-full touch-none rounded border border-white/10"
-      :aria-label="$t('stash_import.screenshot')"
-      role="group"
-      @pointerdown="startRegion"
-      @pointermove="moveRegion"
-      @pointerup="finishRegion"
-      @pointercancel="origin = null"
-    >
-      <foreignObject :width="width" :height="height">
-        <canvas ref="raster" :width="width" :height="height" class="block" />
-      </foreignObject>
-      <rect
-        v-for="row in rows"
-        :key="row.cell.key"
-        :x="row.cell.x"
-        :y="row.cell.y"
-        :width="row.cell.width"
-        :height="row.cell.height"
-        class="cursor-pointer fill-transparent stroke-2 focus:stroke-white focus:outline-none"
-        :class="regionClass(row)"
-        tabindex="0"
-        role="button"
-        :aria-label="$t('stash_import.region_label', { number: row.cell.key + 1 })"
-        @click="pick(row)"
-        @keydown.enter.prevent="pick(row)"
-        @keydown.space.prevent="pick(row)"
-      />
-      <rect
-        v-if="selection"
-        v-bind="selection"
-        class="fill-primary-500/20 stroke-primary-400 stroke-2"
-      />
-    </svg>
+    <div class="bg-surface-950 min-h-0 overflow-auto rounded-md border border-white/10">
+      <svg
+        ref="canvas"
+        :viewBox="viewBox"
+        preserveAspectRatio="xMidYMin meet"
+        class="block max-h-[40dvh] w-full touch-none lg:max-h-none"
+        :class="drawing ? 'cursor-crosshair' : ''"
+        :aria-label="$t('stash_import.screenshot')"
+        role="group"
+        @pointerdown="startRegion"
+        @pointermove="moveRegion"
+        @pointerup="finishRegion"
+        @pointercancel="origin = null"
+      >
+        <foreignObject :width="width" :height="height">
+          <canvas ref="raster" :width="width" :height="height" class="block" />
+        </foreignObject>
+        <rect
+          v-for="row in rows"
+          :key="row.cell.key"
+          :x="row.cell.x + 1"
+          :y="row.cell.y + 1"
+          :width="Math.max(1, row.cell.width - 2)"
+          :height="Math.max(1, row.cell.height - 2)"
+          rx="2"
+          class="cursor-pointer outline-none focus-visible:stroke-white"
+          :class="regionClass(row)"
+          :stroke-width="isActive(row) ? 4 : 2"
+          vector-effect="non-scaling-stroke"
+          tabindex="0"
+          role="button"
+          :aria-label="$t('stash_import.region_label', { number: row.cell.key + 1 })"
+          :aria-pressed="isActive(row)"
+          @click="pick(row)"
+          @keydown.enter.prevent="pick(row)"
+          @keydown.space.prevent="pick(row)"
+        />
+        <rect
+          v-if="selection"
+          v-bind="selection"
+          vector-effect="non-scaling-stroke"
+          class="fill-primary-500/25 stroke-primary-300 stroke-2"
+        />
+      </svg>
+    </div>
+    <ul class="text-surface-400 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-hidden="true">
+      <li v-for="entry in legend" :key="entry.key" class="flex items-center gap-1.5">
+        <span class="size-3 rounded-sm border-2" :class="entry.swatch" />
+        {{ $t(`stash_import.legend_${entry.key}`) }}
+      </li>
+    </ul>
   </div>
 </template>
 <script setup lang="ts">
   import { needsReview } from '@/utils/stashScan/review';
   import type { ReviewedCell, ScanRect } from '@/utils/stashScan/types';
   const props = defineProps<{
-    image: Blob;
+    bitmap?: ImageBitmap;
+    imageError?: boolean;
     width: number;
     height: number;
     rows: ReviewedCell[];
     active?: ReviewedCell;
   }>();
-  const emit = defineEmits<{ select: [key: number]; region: [rect: ScanRect] }>();
+  const emit = defineEmits<{ select: [key: number]; region: [rect: ScanRect]; rescan: [] }>();
+  const legend = [
+    { key: 'check', swatch: 'border-warning-400 bg-warning-400/25' },
+    { key: 'ok', swatch: 'border-success-400' },
+    { key: 'selected', swatch: 'border-primary-300 bg-primary-400/20' },
+    { key: 'removed', swatch: 'border-surface-500 border-dashed' },
+  ];
   const raster = ref<HTMLCanvasElement>();
-  const paintError = ref(false);
-  let paintRevision = 0;
-  function drawBitmap(bitmap: ImageBitmap, revision: number) {
-    try {
-      if (revision !== paintRevision) return;
-      const context = raster.value?.getContext('2d');
-      context?.drawImage(bitmap, 0, 0);
-    } finally {
-      bitmap.close();
-    }
+  function paint() {
+    const context = raster.value?.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, props.width, props.height);
+    if (props.bitmap) context.drawImage(props.bitmap, 0, 0);
   }
-  async function paint() {
-    const revision = ++paintRevision;
-    paintError.value = false;
-    try {
-      drawBitmap(await createImageBitmap(props.image), revision);
-    } catch {
-      if (revision === paintRevision) paintError.value = true;
-    }
-  }
-  watch(
-    () => props.image,
-    () => {
-      void paint();
-    },
-    { flush: 'post' }
-  );
-  onMounted(() => {
-    void paint();
-  });
-  onBeforeUnmount(() => {
-    paintRevision++;
-  });
+  watch(() => [props.bitmap, props.width, props.height], paint, { flush: 'post' });
+  onMounted(paint);
   const canvas = ref<SVGSVGElement>();
   const zoomed = ref(false);
   const drawing = ref(false);
@@ -113,16 +141,22 @@
         }
       : null
   );
+  /** Zoom keeps neighbouring slots in view so the item can be compared with its surroundings. */
   const viewBox = computed(() => {
     const cell = props.active?.cell;
     if (!zoomed.value || !cell) return `0 0 ${props.width} ${props.height}`;
-    return `${cell.x} ${cell.y} ${cell.width} ${cell.height}`;
+    const pad = Math.max(cell.width, cell.height);
+    const x = Math.max(0, cell.x - pad);
+    const y = Math.max(0, cell.y - pad);
+    return `${x} ${y} ${cell.width + pad * 2} ${cell.height + pad * 2}`;
   });
   const isActive = (row: ReviewedCell) => row.cell.key === props.active?.cell.key;
   function regionClass(row: ReviewedCell) {
-    if (isActive(row)) return 'stroke-primary-400';
-    if (row.excluded) return 'stroke-surface-500/30';
-    return needsReview(row) ? 'stroke-warning-400' : 'stroke-success-400/60';
+    if (isActive(row)) return 'fill-primary-400/20 stroke-primary-300';
+    if (row.excluded) return 'fill-transparent stroke-surface-500/40 [stroke-dasharray:4_3]';
+    return needsReview(row)
+      ? 'fill-warning-400/25 stroke-warning-400'
+      : 'fill-transparent stroke-success-400/70';
   }
   function point(event: PointerEvent) {
     const matrix = canvas.value?.getScreenCTM();
@@ -132,6 +166,10 @@
       x: Math.round(Math.max(0, Math.min(props.width, pixel.x))),
       y: Math.round(Math.max(0, Math.min(props.height, pixel.y))),
     };
+  }
+  function toggleDrawing() {
+    drawing.value = !drawing.value;
+    if (drawing.value) zoomed.value = false;
   }
   function startRegion(event: PointerEvent) {
     if (!drawing.value) return;

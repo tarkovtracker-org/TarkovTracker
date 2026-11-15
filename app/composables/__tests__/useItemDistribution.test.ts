@@ -275,6 +275,26 @@ describe('useItemDistribution', () => {
         expect(entries.need).toMatchObject({ count: 0, complete: false });
       }
     );
+    it('tops up existing counts in additive mode without ever lowering them', async () => {
+      mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems } = useItemDistribution();
+      const tasks = [
+        createTaskObjective('partial', 'task-1', { count: 5, foundInRaid: false }),
+        createTaskObjective('full', 'task-1', { count: 2, foundInRaid: false }),
+        createTaskObjective('over', 'task-1', { count: 1, foundInRaid: false }),
+      ];
+      mockStoreState.objectiveCounts.partial = 2;
+      mockStoreState.objectiveCounts.full = 2;
+      mockStoreState.objectiveCounts.over = 3;
+      const added = distributeItems(0, 4, tasks, [], { additive: true });
+      expect(added.updates).toEqual([{ id: 'partial', type: 'task', count: 5, needed: 5 }]);
+      expect(added.remainingNonFir).toBe(1);
+      const replaced = distributeItems(0, 4, tasks, []);
+      expect(replaced.updates).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'over', count: 1 })])
+      );
+    });
     it('distributes FIR items to FIR task objectives first', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

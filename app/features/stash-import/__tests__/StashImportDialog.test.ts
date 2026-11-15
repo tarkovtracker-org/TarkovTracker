@@ -3,15 +3,18 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref } from 'vue';
+import StashImportApply from '@/features/stash-import/StashImportApply.vue';
 import StashImportDialog from '@/features/stash-import/StashImportDialog.vue';
 import StashImportReview from '@/features/stash-import/StashImportReview.vue';
-import StashImportTargets from '@/features/stash-import/StashImportTargets.vue';
+type Change = { id: string; type: string; before: number; count: number; needed: number };
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   commit: vi.fn(),
   recover: vi.fn(),
   select: vi.fn(),
+  clear: vi.fn(),
   current: true,
+  changes: {} as Record<'add' | 'replace', Change[]>,
 }));
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 vi.mock('@/stores/useTarkov', () => ({ useTarkovStore: () => ({ currentGameMode: 'pvp' }) }));
@@ -19,7 +22,7 @@ vi.mock('@/features/stash-import/useStashScanSession', () => ({
   useStashScanSession: () => {
     const rows = ref([
       {
-        cell: { key: 0 },
+        cell: { key: 0, x: 0, y: 0, width: 65, height: 65 },
         itemId: 'item',
         quantity: 1,
         reviewed: true,
@@ -28,6 +31,7 @@ vi.mock('@/features/stash-import/useStashScanSession', () => ({
       },
     ]);
     return {
+      clear: mocks.clear,
       source: ref({}),
       result: ref({
         sourceHash: 'hash',
@@ -44,11 +48,23 @@ vi.mock('@/features/stash-import/useStashScanSession', () => ({
       stage: ref('decode'),
       completed: ref(0),
       total: ref(1),
-      remaining: ref(0),
+      remaining: computed(() => rows.value.filter((row) => !row.reviewed).length),
       select: mocks.select,
+      cancel: vi.fn(),
+      rescan: vi.fn(),
+      region: vi.fn(),
+      split: vi.fn(),
+      next: vi.fn(),
     };
   },
 }));
+const target = (key: string, itemId: string, current: number) => ({
+  key,
+  itemId,
+  label: key,
+  current,
+  need: { id: key.split(':')[1], needType: 'hideoutModule', count: 4 },
+});
 vi.mock('@/features/stash-import/useStashImport', () => ({
   useStashImport: () => ({
     signedIn: ref(true),
@@ -56,44 +72,42 @@ vi.mock('@/features/stash-import/useStashImport', () => ({
     prepare: mocks.prepare,
     commit: mocks.commit,
     recover: mocks.recover,
+    estimate: (_totals: unknown, selection: string[], mode: 'add' | 'replace') => ({
+      changes: mocks.changes[mode].filter((change) => selection.includes(`hideout:${change.id}`)),
+      excess: 0,
+    }),
     targets: (totals: { itemId: string }[]) =>
       totals.length
         ? [
-            {
-              key: 'hideout:need',
-              itemId: 'item',
-              label: 'Workbench',
-              current: 3,
-              need: { count: 4 },
-            },
+            target('hideout:need', 'item', 3),
             ...totals
               .filter((total) => total.itemId === 'other')
-              .map(() => ({
-                key: 'hideout:other',
-                itemId: 'other',
-                label: 'Other',
-                current: 0,
-                need: { count: 1 },
-              })),
+              .map(() => target('hideout:other', 'other', 0)),
           ]
         : [],
   }),
 }));
 const button = (wrapper: ReturnType<typeof render>, key: string) => {
-  const found = wrapper.findAll('button').find((entry) => entry.text() === `stash_import.${key}`);
+  const found = wrapper
+    .findAll('button')
+    .find((entry) => entry.text().startsWith(`stash_import.${key}`));
   if (!found) throw new Error(`Missing ${key}`);
   return found;
 };
+const hasButton = (wrapper: ReturnType<typeof render>, key: string) =>
+  wrapper.findAll('button').some((entry) => entry.text().startsWith(`stash_import.${key}`));
 function render() {
   return mount(StashImportDialog, {
     props: { needs: [] },
     global: {
       mocks: { $t: (key: string) => key },
       stubs: {
-        UModal: { template: '<section><slot name="body" /></section>' },
+        UModal: { template: '<section><slot name="content" /></section>' },
         UIcon: true,
+        UAlert: { props: ['description'], template: '<div>{{ description }}</div>' },
         StashScreenshot: true,
         StashImportReview: true,
+        StashCellThumb: true,
         UButton: {
           props: ['disabled', 'loading'],
           template: '<button :disabled="disabled || loading"><slot /></button>',
@@ -102,186 +116,221 @@ function render() {
     },
   });
 }
-describe('stash import confirmation', () => {
+function pasteFile(name = 'stash.png') {
+  const event = new Event('paste', { cancelable: true });
+  const file = new File(['pixels'], name, { type: 'image/png' });
+  Object.defineProperty(event, 'clipboardData', { value: { files: [file] } });
+  document.dispatchEvent(event);
+  return file;
+}
+async function toApply(wrapper: ReturnType<typeof render>) {
+  pasteFile();
+  await flushPromises();
+  await button(wrapper, 'continue').trigger('click');
+  await flushPromises();
+}
+const save = (wrapper: ReturnType<typeof render>) => wrapper.get('[data-testid=stash-save]');
+describe('stash import flow', () => {
   beforeEach(() => {
     mocks.current = true;
-    mocks.prepare.mockReset().mockResolvedValue({
-      mode: 'pvp',
-      excess: 0,
-      changes: [
-        { id: 'need', type: 'hideout', before: 3, count: 1, label: 'Workbench', itemId: 'item' },
-      ],
-    });
+    mocks.changes = {
+      replace: [{ id: 'need', type: 'hideout', before: 3, count: 1, needed: 4 }],
+      add: [{ id: 'need', type: 'hideout', before: 3, count: 4, needed: 4 }],
+    };
+    mocks.select.mockReset().mockResolvedValue(undefined);
+    mocks.prepare
+      .mockReset()
+      .mockImplementation(async (_hash, _totals, selection: string[], mode: 'add' | 'replace') => ({
+        mode: 'pvp',
+        importMode: mode,
+        excess: 0,
+        changes: mocks.changes[mode].filter((change) => selection.includes(`hideout:${change.id}`)),
+      }));
     mocks.commit.mockReset().mockResolvedValue({ status: 'applied' });
     mocks.recover.mockReset().mockResolvedValue(true);
   });
-  it('accepts pasted images while modal controls have focus and removes the listener on close', async () => {
+  it('accepts pasted images and removes the listener on close', async () => {
     const wrapper = render();
-    const file = new File(['pixels'], 'stash.png', { type: 'image/png' });
-    const paste = () => {
-      const event = new Event('paste', { cancelable: true });
-      Object.defineProperty(event, 'clipboardData', { value: { files: [file] } });
-      document.dispatchEvent(event);
-    };
-    paste();
+    const file = pasteFile();
     await flushPromises();
     expect(mocks.select).toHaveBeenCalledExactlyOnceWith([file]);
+    expect(wrapper.findComponent(StashImportReview).exists()).toBe(true);
     wrapper.unmount();
-    paste();
+    pasteFile();
     expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+  it('starts on the upload step and offers drag, paste and file choices', () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-testid=stash-dropzone]').exists()).toBe(true);
+    expect(wrapper.find('input[type=file]').attributes('accept')).toContain('image/png');
+    expect(wrapper.text()).toContain('stash_import.drop_title');
+    wrapper.unmount();
   });
   it.each([true, false])(
     'preserves selected=%s through incomplete quantity review',
     async (selected) => {
       const wrapper = render();
-      const targets = wrapper.findComponent(StashImportTargets);
-      if (!selected) await targets.find('input[type=checkbox]').setValue(false);
+      await toApply(wrapper);
+      const apply = wrapper.findComponent(StashImportApply);
+      if (!selected) await apply.find('input[type=checkbox]').setValue(false);
+      await button(wrapper, 'back').trigger('click');
+      await flushPromises();
       const review = wrapper.findComponent(StashImportReview);
       review.vm.$emit('change', { quantity: 2, reviewed: false });
       await flushPromises();
+      expect(button(wrapper, 'continue').attributes('disabled')).toBeDefined();
       review.vm.$emit('change', { reviewed: true });
       await flushPromises();
-      expect(targets.props('modelValue')).toEqual(selected ? ['hideout:need'] : []);
+      await button(wrapper, 'continue').trigger('click');
+      await flushPromises();
+      expect(wrapper.findComponent(StashImportApply).props('selected')).toEqual(
+        selected ? ['hideout:need'] : []
+      );
       wrapper.unmount();
     }
   );
   it('retains a deselection when corrected rows reveal another target', async () => {
     const wrapper = render();
-    const targets = wrapper.findComponent(StashImportTargets);
-    await targets.find('input[type=checkbox]').setValue(false);
+    await toApply(wrapper);
+    await wrapper.findComponent(StashImportApply).find('input[type=checkbox]').setValue(false);
+    await button(wrapper, 'back').trigger('click');
+    await flushPromises();
     wrapper.findComponent(StashImportReview).vm.$emit('change', { itemId: 'other' });
     await flushPromises();
-    expect(targets.props('modelValue')).toEqual([]);
-    expect(targets.props('availableTargets')).toHaveLength(2);
+    await button(wrapper, 'continue').trigger('click');
+    await flushPromises();
+    const apply = wrapper.findComponent(StashImportApply);
+    expect(apply.props('selected')).toEqual([]);
+    expect(apply.props('targets')).toHaveLength(2);
     wrapper.unmount();
   });
-  it('blocks preview for aggregate overflow and restores selected targets after correction', async () => {
+  it('blocks continuing with invalid aggregate totals until corrected', async () => {
     const wrapper = render();
+    pasteFile();
+    await flushPromises();
     const review = wrapper.findComponent(StashImportReview);
-    const targets = wrapper.findComponent(StashImportTargets);
     review.vm.$emit('change', { quantity: 600_000, reviewed: true });
     const rows = review.props('rows');
     rows.push({ ...rows[0]!, cell: { ...rows[0]!.cell, key: 1 }, quantity: 600_000 });
     await flushPromises();
-    expect(targets.props('remaining')).toBe(0);
-    expect(button(wrapper, 'preview').attributes('disabled')).toBeDefined();
-    expect(wrapper.get('[role=alert]').text()).toBe('stash_import.errors.quantity');
-    await button(wrapper, 'preview').trigger('click');
-    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(button(wrapper, 'continue').attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('stash_import.errors.quantity');
     rows[1]!.quantity = 1;
     await flushPromises();
-    expect(button(wrapper, 'preview').attributes('disabled')).toBeUndefined();
-    expect(targets.props('modelValue')).toEqual(['hideout:need']);
-    expect(wrapper.find('[role=alert]').exists()).toBe(false);
+    expect(button(wrapper, 'continue').attributes('disabled')).toBeUndefined();
     wrapper.unmount();
   });
-  it('filters removed targets and explicitly resets selection for a new image', async () => {
+  it('resets the selection for a new image', async () => {
     const wrapper = render();
-    const targets = wrapper.findComponent(StashImportTargets);
-    expect(targets.props('modelValue')).toEqual(['hideout:need']);
-    wrapper.findComponent(StashImportReview).vm.$emit('change', { itemId: 'other' });
+    await toApply(wrapper);
+    await wrapper.findComponent(StashImportApply).find('input[type=checkbox]').setValue(false);
+    await button(wrapper, 'back').trigger('click');
     await flushPromises();
-    targets.vm.$emit('update:modelValue', ['hideout:other']);
-    await flushPromises();
-    wrapper.findComponent(StashImportReview).vm.$emit('change', { itemId: 'item' });
-    await flushPromises();
-    expect(targets.props('modelValue')).toEqual([]);
-    const event = new Event('paste', { cancelable: true });
-    Object.defineProperty(event, 'clipboardData', {
-      value: { files: [new File(['pixels'], 'new.png')] },
-    });
-    document.dispatchEvent(event);
-    await flushPromises();
-    expect(targets.props('modelValue')).toEqual(['hideout:need']);
+    await toApply(wrapper);
+    expect(wrapper.findComponent(StashImportApply).props('selected')).toEqual(['hideout:need']);
     wrapper.unmount();
   });
-  it('retains the conflicted preview when reconciliation fails', async () => {
+  it('requires acknowledging decreases in replace mode and saves the shown counts', async () => {
+    const wrapper = render();
+    await toApply(wrapper);
+    expect(wrapper.text()).toContain('3');
+    expect(save(wrapper).attributes('disabled')).toBeDefined();
+    const acknowledge = wrapper.findAll('input[type=checkbox]').at(-1)!;
+    await acknowledge.setValue(true);
+    await save(wrapper).trigger('click');
+    await flushPromises();
+    expect(mocks.prepare).toHaveBeenCalledWith(
+      'hash',
+      expect.any(Array),
+      ['hideout:need'],
+      'replace'
+    );
+    expect(mocks.commit).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('stash_import.saved_replace');
+    wrapper.unmount();
+  });
+  it('adds to current counts without a decrease prompt in add mode', async () => {
+    const wrapper = render();
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('stash_import.confirm_decreases');
+    await save(wrapper).trigger('click');
+    await flushPromises();
+    expect(mocks.prepare).toHaveBeenCalledWith('hash', expect.any(Array), ['hideout:need'], 'add');
+    expect(wrapper.text()).toContain('stash_import.saved_add');
+    wrapper.unmount();
+  });
+  it('refuses to save numbers that differ from what was shown', async () => {
+    const wrapper = render();
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    mocks.prepare.mockResolvedValueOnce({
+      importMode: 'add',
+      changes: [{ id: 'need', type: 'hideout', before: 3, count: 2, needed: 4 }],
+    });
+    await save(wrapper).trigger('click');
+    await flushPromises();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('stash_import.errors.stale');
+    wrapper.unmount();
+  });
+  it('reconciles a conflict and lets the player save again', async () => {
+    mocks.commit.mockResolvedValueOnce({ status: 'conflict' });
+    const wrapper = render();
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await save(wrapper).trigger('click');
+    await flushPromises();
+    expect(mocks.recover).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('stash_import.conflict_refreshed');
+    expect(save(wrapper).attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('keeps a conflicted import locked when reconciliation fails', async () => {
     mocks.commit.mockResolvedValueOnce({ status: 'conflict' });
     mocks.recover.mockRejectedValueOnce(new Error('stash_import.errors.unsynced'));
     const wrapper = render();
-    await button(wrapper, 'preview').trigger('click');
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await save(wrapper).trigger('click');
     await flushPromises();
-    await wrapper.find('input[type=checkbox]').setValue(true);
-    await button(wrapper, 'apply').trigger('click');
-    await flushPromises();
-    await button(wrapper, 'back').trigger('click');
-    await flushPromises();
-    expect(button(wrapper, 'apply').attributes('disabled')).toBeDefined();
     expect(wrapper.text()).toContain('stash_import.errors.unsynced');
-    expect(wrapper.findAll('button').some((entry) => entry.text() === 'stash_import.preview')).toBe(
-      false
-    );
-    wrapper.unmount();
-  });
-  it('locks a conflicted preview until returning through reconciliation', async () => {
-    mocks.commit.mockResolvedValueOnce({ status: 'conflict' });
-    let finish!: (value: boolean) => void;
-    mocks.recover.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        })
-    );
-    const wrapper = render();
-    await button(wrapper, 'preview').trigger('click');
-    await flushPromises();
-    await wrapper.find('input[type=checkbox]').setValue(true);
-    await button(wrapper, 'apply').trigger('click');
-    await flushPromises();
-    expect(button(wrapper, 'apply').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('[data-testid=stash-save]').exists()).toBe(false);
+    expect(hasButton(wrapper, 'refresh_progress')).toBe(true);
     await button(wrapper, 'back').trigger('click');
     await flushPromises();
-    expect(button(wrapper, 'back').attributes('disabled')).toBeDefined();
-    expect(button(wrapper, 'apply').attributes('disabled')).toBeDefined();
-    expect(mocks.prepare).toHaveBeenCalledTimes(1);
-    finish(false);
-    await flushPromises();
-    expect(mocks.recover).toHaveBeenCalledTimes(1);
-    expect(button(wrapper, 'preview').exists()).toBe(true);
+    expect(mocks.recover).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent(StashImportReview).exists()).toBe(true);
     expect(mocks.commit).toHaveBeenCalledTimes(1);
-    wrapper.unmount();
-  });
-  it('shows exact counts and requires acknowledgement before decreasing progress', async () => {
-    const wrapper = render();
-    await button(wrapper, 'preview').trigger('click');
-    await flushPromises();
-    expect(wrapper.find('tbody').text()).toContain('Item · Workbench31');
-    expect(button(wrapper, 'apply').attributes('disabled')).toBeDefined();
-    await wrapper.find('input[type=checkbox]').setValue(true);
-    await button(wrapper, 'apply').trigger('click');
-    await flushPromises();
-    expect(mocks.commit).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain('stash_import.saved');
     wrapper.unmount();
   });
   it('blocks a stale preview before sending any counts', async () => {
-    mocks.current = false;
+    mocks.prepare.mockRejectedValueOnce(new Error('stash_import.errors.stale'));
     const wrapper = render();
-    await button(wrapper, 'preview').trigger('click');
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await save(wrapper).trigger('click');
     await flushPromises();
-    await wrapper.find('input[type=checkbox]').setValue(true);
-    expect(button(wrapper, 'apply').attributes('disabled')).toBeDefined();
     expect(mocks.commit).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('stash_import.errors.stale');
+    expect(hasButton(wrapper, 'check_receipt')).toBe(false);
     wrapper.unmount();
   });
   it('offers receipt recovery after a lost response instead of repeating the write', async () => {
     mocks.commit.mockRejectedValueOnce(new Error('stash_import.errors.save_unknown'));
     const wrapper = render();
-    await button(wrapper, 'preview').trigger('click');
-    await flushPromises();
-    await wrapper.find('input[type=checkbox]').setValue(true);
-    await button(wrapper, 'apply').trigger('click');
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await save(wrapper).trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('stash_import.errors.save_unknown');
-    expect(wrapper.findAll('button').some((entry) => entry.text() === 'stash_import.apply')).toBe(
-      false
-    );
-    await button(wrapper, 'check_receipt').trigger('click');
+    expect(wrapper.find('[data-testid=stash-save]').exists()).toBe(false);
+    await wrapper.get('[data-testid=stash-check-receipt]').trigger('click');
     await flushPromises();
     expect(mocks.recover).toHaveBeenCalledTimes(1);
     expect(mocks.commit).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain('stash_import.saved');
-    expect(wrapper.find('[role=alert]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('stash_import.saved_add');
     wrapper.unmount();
   });
 });

@@ -29,7 +29,7 @@ describe('stack quantity review', () => {
     const wrapper = mount(StashCellEditor, {
       props: {
         row,
-        items: [{ id: 'item', name: 'Item', shortName: 'Item', maxStack: 1, width: 1, height: 1 }],
+        items: [{ id: 'item', name: 'Item', shortName: 'Item', maxStack: 60, width: 1, height: 1 }],
       },
       global: {
         mocks: { $t: (key: string) => key },
@@ -42,14 +42,34 @@ describe('stack quantity review', () => {
         },
       },
     });
-    await wrapper.find('input[type=number]').setValue('2');
+    await wrapper.find('input[type=number]').setValue('61');
     const patch = wrapper.emitted('change')?.[0]?.[0] as Partial<ReviewedCell>;
-    expect(patch).toMatchObject({ quantity: 2, reviewed: false });
+    expect(patch).toMatchObject({ quantity: 61, reviewed: false });
     await wrapper.setProps({ row: { ...row, ...patch } });
     const confirm = wrapper
       .findAll('button')
       .find((entry) => entry.text() === 'stash_import.confirm_next')!;
     expect(confirm.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+});
+describe('non-stackable items', () => {
+  it('does not ask for an amount when the identity can only be one unit', () => {
+    const row = {
+      cell: { key: 0, candidates: [], slotsWide: 1, slotsHigh: 1 },
+      itemId: 'item',
+      quantity: 1,
+      raidStatus: 'unknown',
+    } as unknown as ReviewedCell;
+    const wrapper = mount(StashCellEditor, {
+      props: {
+        row,
+        items: [{ id: 'item', name: 'Item', shortName: 'Item', maxStack: 1, width: 1, height: 1 }],
+      },
+      global: { mocks: { $t: (key: string) => key }, stubs: { UIcon: true, UButton: true } },
+    });
+    expect(wrapper.find('input[type=number]').exists()).toBe(false);
+    expect(wrapper.findAll('input[type=radio]')).toHaveLength(3);
     wrapper.unmount();
   });
 });
@@ -88,7 +108,7 @@ describe('screenshot region accessibility', () => {
       excluded: true,
     } as ReviewedCell;
     const wrapper = mount(StashScreenshot, {
-      props: { image: new Blob(['pixels']), width: 65, height: 65, rows: [row] },
+      props: { width: 65, height: 65, rows: [row] },
       global: { mocks: { $t: (key: string) => key }, stubs: { UButton: true } },
     });
     expect(wrapper.find('svg').attributes('role')).toBe('group');
@@ -102,7 +122,7 @@ describe('screenshot region accessibility', () => {
 describe('manual region controls', () => {
   it('offers coordinate entry without detected regions or a pointer', async () => {
     const wrapper = mount(StashScreenshot, {
-      props: { image: new Blob(['pixels']), width: 130, height: 130, rows: [] },
+      props: { width: 130, height: 130, rows: [] },
       global: {
         mocks: { $t: (key: string) => key },
         stubs: { UButton: { template: '<button><slot /></button>' } },
