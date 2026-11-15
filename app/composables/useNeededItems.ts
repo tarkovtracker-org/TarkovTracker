@@ -545,8 +545,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (item.needType === 'hideoutModule') return stationMatchesSearch(item);
     return false;
   };
-  // Every view filter except ownership. The grouped details modal uses this set so its
-  // Smart Fill targets do not disappear while counts change. The fuzzy search runs last.
+  // Every view filter except ownership and search. The fuzzy search is the costly check, so
+  // it always runs after these.
   const cheapViewFilters = [
     passesCompletionFilter,
     passesTypeFilter,
@@ -557,6 +557,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   ];
   const passesCheapViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
     cheapViewFilters.every((passes) => passes(item));
+  // Every view filter except ownership, with search last. The grouped details modal uses this
+  // set so its Smart Fill targets do not disappear while counts change.
   const passesViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
     passesCheapViewFilters(item) && passesSearchFilter(item);
   // One pass over the list instead of a chain of array copies; owned needs skip the search.
