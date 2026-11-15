@@ -6,27 +6,28 @@
       role="group"
       :aria-label="control.label"
       :data-testid="`needed-items-${control.key}`"
-      class="bg-surface-950 flex items-center rounded-md p-0.5 ring-1 ring-white/10"
+      class="bg-surface-950 flex items-center gap-0.5 rounded-md p-0.5 ring-1 ring-white/10"
     >
-      <button
+      <UButton
         v-for="option in control.options"
         :key="option.value"
-        type="button"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        :icon="option.icon"
         :aria-pressed="option.active"
         :aria-label="option.label"
         :title="option.hint"
         :data-testid="`needed-items-${control.key}-${option.value}`"
-        class="focus-visible:ring-primary-400 flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
         :class="
           option.active
-            ? 'bg-surface-700 text-surface-50'
+            ? 'bg-surface-700 text-surface-50 hover:bg-surface-700'
             : 'text-surface-400 hover:text-surface-100'
         "
         @click="option.select"
       >
-        <UIcon :name="option.icon" class="size-4 shrink-0" aria-hidden="true" />
-        <span v-if="control.showText">{{ option.label }}</span>
-      </button>
+        <template v-if="control.showText">{{ option.label }}</template>
+      </UButton>
     </div>
   </div>
 </template>

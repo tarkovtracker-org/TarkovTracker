@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { computed } from 'vue';
+import { computed, nextTick } from 'vue';
 import { createI18n } from 'vue-i18n';
 import {
   createDefaultNeededItemContext,
@@ -14,7 +14,7 @@ const store = vi.hoisted(() => ({ objectiveComplete: false }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     isTaskObjectiveComplete: () => store.objectiveComplete,
-    playerLevel: () => 1,
+    playerLevel: () => 5,
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({
@@ -27,9 +27,10 @@ const i18n = createI18n({
   missingWarn: false,
   fallbackWarn: false,
   messages: createTestLocaleMessages({
-    common: { lvl_level: 'Lvl {level}', item: 'Item' },
+    common: { lvl_level: 'Lvl {level}', item: 'Item', ready_to_hand_over: 'Ready to hand over' },
     needed_items: {
       for_teammates: 'For teammates',
+      locked_before: '{count} before',
       hidden_for_you: 'Hidden for you',
       handed_over: 'Handed over',
       collect: 'Collect',
@@ -64,9 +65,11 @@ function context(overrides: Partial<Record<keyof NeededItemContext, unknown>> = 
     neededCount: 3,
     ...overrides,
   };
+  // Values become computeds like the real provider; functions (actions) pass through as-is.
+  const wrap = (entry: unknown) => (typeof entry === 'function' ? entry : value(entry));
   return Object.fromEntries(
     Object.entries({ ...base }).map(([key, fallback]) =>
-      key in values ? [key, value(values[key as keyof NeededItemContext])] : [key, fallback]
+      key in values ? [key, wrap(values[key as keyof NeededItemContext])] : [key, fallback]
     )
   ) as NeededItemContext;
 }
@@ -145,5 +148,43 @@ describe.each(['row', 'tile'] as const)('NeededItemEntry %s', (layout) => {
     const wrapper = mountEntry(taskNeed, layout, { currentCount: 3 });
     store.objectiveComplete = false;
     expect(wrapper.text()).toContain('Handed over');
+  });
+  it('cues the hand-in once a quest item is collected', () => {
+    const wrapper = mountEntry(taskNeed, layout, { currentCount: 3 });
+    expect(wrapper.text()).toContain('Ready to hand over');
+    expect(mountEntry(hideoutNeed, layout, { currentCount: 3 }).text()).not.toContain(
+      'Ready to hand over'
+    );
+  });
+  it('explains level and quest locks only when they apply', () => {
+    const locked = mountEntry(taskNeed, layout, { levelRequired: 15, lockedBefore: 2 });
+    expect(locked.text()).toContain('Lvl 15');
+    expect(locked.text()).toContain('2 before');
+    const open = mountEntry(taskNeed, layout, { levelRequired: 5, lockedBefore: 0 });
+    expect(open.text()).not.toContain('Lvl 5');
+    expect(open.text()).not.toContain('before');
+  });
+  it('keeps the teammate note when an alternative quest already finished it', () => {
+    const wrapper = mountEntry({ ...taskNeed, hiddenForSelf: true }, layout, {
+      hiddenForSelf: true,
+      selfCompletedNeed: true,
+      currentCount: 3,
+    });
+    expect(wrapper.text()).toContain('For teammates');
+    expect(wrapper.text()).not.toContain('3/3');
+  });
+  it('pauses item cycling while the accepted items list is open', async () => {
+    const setCyclingPaused = vi.fn();
+    const wrapper = mountEntry(taskNeed, layout, {
+      hasAlternativeItems: true,
+      acceptedItems: [{ id: 'a' }, { id: 'b' }],
+      setCyclingPaused,
+    });
+    const popover = wrapper.findComponent({ name: 'AcceptedItemsPopover' });
+    popover.vm.$emit('update:open', true);
+    await nextTick();
+    popover.vm.$emit('update:open', false);
+    await nextTick();
+    expect(setCyclingPaused.mock.calls).toEqual([[true], [false]]);
   });
 });

@@ -6,7 +6,6 @@
   >
     <UIcon name="i-mdi-account-group" class="size-4" aria-hidden="true" />
     {{ $t('needed_items.for_teammates') }}
-    <span class="sr-only">{{ hiddenForSelfHint }}</span>
   </span>
   <span
     v-else-if="state === 'done'"

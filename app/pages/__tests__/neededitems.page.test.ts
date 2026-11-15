@@ -11,6 +11,7 @@ const createMockNeededItemsState = (options: {
   groupByItem?: boolean;
   itemsLoading?: boolean;
   emptyState?: boolean;
+  itemCount?: number;
 }) => {
   const {
     neededItem = createDefaultNeededItem(),
@@ -18,8 +19,15 @@ const createMockNeededItemsState = (options: {
     groupByItem = false,
     itemsLoading = false,
     emptyState = false,
+    itemCount = 1,
   } = options;
-  const items = emptyState || !neededItem ? [] : [neededItem];
+  const items =
+    emptyState || !neededItem
+      ? []
+      : Array.from({ length: itemCount }, (_, index) => ({
+          ...neededItem,
+          id: index ? `${neededItem.id}-${index}` : neededItem.id,
+        }));
   const groupedItems = computed(() =>
     emptyState
       ? []
@@ -76,28 +84,15 @@ const createMockNeededItemsState = (options: {
     viewMode: viewModeRef,
   };
 };
-const createMockUseNeededItems = (options: {
-  neededItem?: NeededItemTaskObjective | null;
-  viewMode?: 'list' | 'grid';
-  groupByItem?: boolean;
-  itemsLoading?: boolean;
-  emptyState?: boolean;
-}) => {
+type SetupOptions = Parameters<typeof createMockNeededItemsState>[0] & { belowMd?: boolean };
+const createMockUseNeededItems = (options: SetupOptions) => {
   const state = createMockNeededItemsState(options);
   return {
     state,
     useNeededItems: () => state,
   };
 };
-const setup = async (
-  options: {
-    neededItem?: NeededItemTaskObjective | null;
-    viewMode?: 'list' | 'grid';
-    groupByItem?: boolean;
-    itemsLoading?: boolean;
-    emptyState?: boolean;
-  } = {}
-) => {
+const setup = async (options: SetupOptions = {}) => {
   vi.resetModules();
   useInfiniteScrollMock = vi.fn(() => ({ checkAndLoadMore: vi.fn() }));
   trackNeededItemsViewMock = vi.fn();
@@ -113,8 +108,8 @@ const setup = async (
   }));
   vi.doMock('@/composables/useSharedBreakpoints', () => ({
     useSharedBreakpoints: () => ({
-      belowMd: ref(false),
-      lgAndUp: ref(true),
+      belowMd: ref(options.belowMd ?? false),
+      lgAndUp: ref(!options.belowMd),
       xs: ref(false),
     }),
   }));
@@ -268,6 +263,21 @@ describe('needed items page', () => {
       view: 'combined',
     });
   });
+  it.each([
+    { viewMode: 'list', belowMd: false, expected: 30 },
+    { viewMode: 'grid', belowMd: false, expected: 24 },
+    { viewMode: 'list', belowMd: true, expected: 15 },
+    { viewMode: 'grid', belowMd: true, expected: 12 },
+  ] as const)(
+    'renders $expected $viewMode entries first (narrow screen: $belowMd)',
+    async ({ viewMode, belowMd, expected }) => {
+      const { NeededItemsPage } = await setup({ viewMode, belowMd, itemCount: 60 });
+      const wrapper = await mountSuspended(NeededItemsPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(wrapper.findAll('[data-testid="needed-item"]')).toHaveLength(expected);
+    }
+  );
   it('keeps grid infinite-scroll incremental to avoid heavy eager loading', async () => {
     const { NeededItemsPage } = await setup({ viewMode: 'grid' });
     await mountSuspended(NeededItemsPage, {

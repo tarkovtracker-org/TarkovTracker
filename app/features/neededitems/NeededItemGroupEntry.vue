@@ -5,7 +5,13 @@
     class="relative flex items-center gap-3 px-3 py-2.5 transition-colors sm:px-4"
     :class="look.surface"
   >
-    <NeededItemThumb :image-item="group.item" :item="group.item" :complete="isComplete" />
+    <NeededItemThumb
+      class="z-10 cursor-pointer"
+      :image-item="group.item"
+      :item="group.item"
+      :complete="isComplete"
+      @click="open"
+    />
     <!-- Phones put the total under the name so it stays readable. -->
     <div class="flex min-w-0 flex-1 flex-col gap-x-3 gap-y-2 sm:flex-row sm:items-center">
       <div class="min-w-0 flex-1">
@@ -44,11 +50,12 @@
     :class="look.tile"
   >
     <NeededItemThumb
-      class="aspect-video w-full"
+      class="z-10 aspect-video w-full cursor-pointer"
       fill
       :image-item="group.item"
       :item="group.item"
       :complete="isComplete"
+      @click="open"
     />
     <ItemIndicators
       v-bind="indicators"
@@ -87,6 +94,7 @@
     neededCountOf,
     useNeededItemProgress,
   } from '@/features/neededitems/useNeededItemProgress';
+  import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
   import type {
     GroupedNeededItem,
     NeededItemHideoutModule,
@@ -108,13 +116,15 @@
   const emit = defineEmits<{ open: [itemId: string] }>();
   const { t } = useI18n({ useScope: 'global' });
   const progress = useNeededItemProgress();
+  const { isSelfCompleted } = useNeedSelfCompletion();
   const openLabel = computed(() =>
     t('needed_items.view_details_for', { name: props.group.item.name })
   );
   const { isCraftable, craftableIconClass, craftableTitle, goToCraftStation } = useCraftableItem(
     () => props.group.item.id
   );
-  // The whole entry opens the details; nested controls sit above this stretched target.
+  // The whole entry opens the details; nested controls sit above this stretched target. The
+  // thumbnail sits above it too so its context menu (wiki, tarkov.dev, copy name) still works.
   const openButtonClass =
     'text-sm leading-snug font-semibold text-surface-50 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
   const isComplete = computed(() => props.group.currentCount >= props.group.total);
@@ -169,14 +179,17 @@
     craftableTitle: craftableTitle.value,
     craftableIconClass: craftableIconClass.value,
   }));
-  /** A single need needs no breakdown: track it right here. */
+  /** A single need needs no breakdown: track it right here, read-only once it is finished. */
   const single = computed(() => {
     if (props.needs.length !== 1) return undefined;
     const need = props.needs[0]!;
+    const neededCount = neededCountOf(need);
+    const done = isSelfCompleted(need);
     return {
       counter: {
-        currentCount: Math.min(progress.storedCountOf(need), neededCountOf(need)),
-        neededCount: neededCountOf(need),
+        currentCount: done ? neededCount : Math.min(progress.storedCountOf(need), neededCount),
+        neededCount,
+        done,
       },
       events: {
         decrease: () => progress.decrease(need),

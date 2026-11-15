@@ -840,7 +840,8 @@ place; otherwise it opens the grouped details modal (per-need steppers and Smart
 affects rendering. The `needed_items_view` analytics event keeps `view_mode`
 (`combined`, `list` or `grid`) and adds `layout`; switching layout in Items mode is tracked.
 Entries render in batches of 24 after an initial 30 rows or 24 tiles (half on narrow screens).
-Task and station lookups use the metadata store's indexed getters rather than per-entry scans.
+Each entry looks up its task with the metadata store's indexed `getTaskById` instead of scanning
+every task; the station lookup scans the short hideout station list.
 
 ### Needed Items pooled objective search and grouping
 

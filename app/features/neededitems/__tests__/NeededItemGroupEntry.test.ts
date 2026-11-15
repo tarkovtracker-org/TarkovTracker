@@ -13,6 +13,10 @@ const progress = vi.hoisted(() => ({
   setCount: vi.fn(),
 }));
 const craft = vi.hoisted(() => ({ go: vi.fn() }));
+const completion = vi.hoisted(() => ({ done: false }));
+vi.mock('@/features/neededitems/useNeedSelfCompletion', () => ({
+  useNeedSelfCompletion: () => ({ isSelfCompleted: () => completion.done }),
+}));
 vi.mock('@/composables/useCraftableItem', () => ({
   useCraftableItem: () => ({
     isCraftable: computed(() => true),
@@ -33,7 +37,7 @@ vi.mock('@/features/neededitems/useNeededItemProgress', () => ({
 }));
 vi.mock('@/utils/formatters', () => ({ useLocaleNumberFormatter: () => String }));
 const group: GroupedNeededItem = {
-  item: { id: 'item', name: 'Bolts', backgroundColor: 'blue' },
+  item: { id: 'item', name: 'Bolts', backgroundColor: 'blue', iconLink: 'bolts.webp' },
   taskFir: 3,
   taskFirCurrent: 1,
   taskNonFir: 2,
@@ -71,6 +75,7 @@ const mountEntry = (props: Partial<InstanceType<typeof NeededItemGroupEntry>['$p
 describe('NeededItemGroupEntry', () => {
   beforeEach(() => {
     progress.count = 0;
+    completion.done = false;
     vi.clearAllMocks();
   });
   it.each(['row', 'tile'] as const)(
@@ -103,5 +108,18 @@ describe('NeededItemGroupEntry', () => {
     await wrapper.get('button[aria-label="Add one"]').trigger('click');
     expect(progress.increase).toHaveBeenCalledWith(need);
     expect(wrapper.emitted('open')).toBeUndefined();
+  });
+  it('shows a finished single need read-only, as Needs mode does', () => {
+    completion.done = true;
+    const wrapper = mountEntry({ needs: [need] });
+    expect(wrapper.text()).toContain('4/4');
+    expect(wrapper.find('button[aria-label="Add one"]').exists()).toBe(false);
+  });
+  it('opens the details from the thumbnail without hiding its context menu', async () => {
+    const wrapper = mountEntry();
+    const thumb = wrapper.get('[data-testid="thumb"]').element.parentElement!;
+    expect(thumb.className).toContain('z-10');
+    thumb.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(wrapper.emitted('open')).toEqual([['item']]);
   });
 });

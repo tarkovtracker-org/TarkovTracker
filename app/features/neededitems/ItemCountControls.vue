@@ -62,7 +62,6 @@
       class="flex items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       :title="toggleLabel"
       :aria-label="toggleLabel"
-      :aria-pressed="isComplete"
       :class="[
         sizeClasses.button,
         isComplete

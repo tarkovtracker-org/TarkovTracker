@@ -23,7 +23,7 @@
       <NeededItemStatusPill
         v-if="showStatus"
         :handed-over="handedOver"
-        :collected="false"
+        :collected="collected"
         :hidden-for-self="hiddenForSelf"
         :hint="hiddenForSelfHint"
       />
@@ -66,9 +66,11 @@
       hiddenForSelf: boolean;
       hiddenForSelfHint: string;
       handedOver: boolean;
+      /** Collected but not turned in yet: the cue to go hand it over. Quest needs only. */
+      collected?: boolean;
       centered?: boolean;
     }>(),
-    { centered: false }
+    { collected: false, centered: false }
   );
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
@@ -93,7 +95,7 @@
       to: { path: '/tasks', query: { task: task.id } },
       icon: task.trader?.imageLink || '/img/default-avatar.svg',
       round: true,
-      name: task.name,
+      name: task.name ?? t('needed_items.unknown_task'),
     };
   }
   function stationSource(need: NeededItemHideoutModule): SourceLink {
@@ -112,7 +114,7 @@
   const link = computed(() =>
     props.need.needType === 'taskObjective' ? taskSource() : stationSource(props.need)
   );
-  const showStatus = computed(() => props.hiddenForSelf || props.handedOver);
+  const showStatus = computed(() => props.hiddenForSelf || props.handedOver || props.collected);
   const isLevelLocked = computed(
     () => props.levelRequired > 0 && props.levelRequired > playerLevel.value
   );

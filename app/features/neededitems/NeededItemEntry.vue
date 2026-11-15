@@ -184,6 +184,7 @@
     hiddenForSelf: hiddenForSelf.value,
     hiddenForSelfHint: hiddenForSelfHint.value,
     handedOver: handedOver.value,
+    collected: props.need.needType === 'taskObjective' && currentCount.value >= neededCount.value,
   }));
   const counter = computed(() => ({
     currentCount: currentCount.value,

@@ -18,6 +18,7 @@
     neededCountOf,
     useNeededItemProgress,
   } from '@/features/neededitems/useNeededItemProgress';
+  import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -41,7 +42,6 @@
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
-  const alternativeTasks = computed(() => metadataStore.alternativeTasks);
   const progress = useNeededItemProgress();
   const decreaseCount = () => progress.decrease(props.need, currentCount.value);
   const increaseCount = () => progress.increase(props.need, currentCount.value);
@@ -81,8 +81,7 @@
     }
     return relatedTask.value?.lightkeeperRequired === true;
   });
-  const isTaskSuccessful = (taskId: string) =>
-    tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
+  const { isSelfCompleted, isTaskSuccessful } = useNeedSelfCompletion();
   const item = computed(() => {
     if (props.need.needType === 'hideoutModule') return props.need.item;
     return cyclingItem.value ?? props.need.item ?? props.need.markerItem ?? null;
@@ -95,16 +94,8 @@
     }
     return (relatedTask.value?.parents ?? []).filter((s) => !isTaskSuccessful(s)).length;
   });
-  const isAlternativeTaskSuccessful = (taskId: string) =>
-    alternativeTasks.value[taskId]?.some(isTaskSuccessful) ?? false;
   // A need is done once its parent task is turned in or its parent module is built.
-  const selfCompletedNeed = computed(() => {
-    const need = props.need;
-    if (need.needType === 'hideoutModule') {
-      return progressStore.moduleCompletions?.[need.hideoutModule.id]?.['self'] ?? false;
-    }
-    return isTaskSuccessful(need.taskId) || isAlternativeTaskSuccessful(need.taskId);
-  });
+  const selfCompletedNeed = computed(() => isSelfCompleted(props.need));
   // "Any of these" objectives rotate the displayed item; progress stays on the primary item.
   const acceptedItems = computed(() => {
     if (props.need.needType !== 'taskObjective') return [];

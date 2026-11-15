@@ -76,15 +76,23 @@
   const gridClass =
     'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6';
   const itemClass = computed(() =>
-    isGrid.value ? 'content-visibility-auto-280 h-full' : 'content-visibility-auto-72'
+    isGrid.value ? 'content-visibility-auto-280 h-full' : 'content-visibility-auto-88'
   );
   const EMPTY_OBJECTIVES: GroupObjectives = { taskObjectives: [], hideoutModules: [] };
+  const NO_NEEDS: (NeededItemTaskObjective | NeededItemHideoutModule)[] = [];
   const objectivesFor = (itemId: string | null) =>
     props.objectivesByItemId.get(itemId ?? '') ?? EMPTY_OBJECTIVES;
-  const needsFor = (itemId: string) => {
-    const { taskObjectives, hideoutModules } = objectivesFor(itemId);
-    return [...taskObjectives, ...hideoutModules];
-  };
+  // Built once per data change so every group entry keeps a stable `needs` prop between batches.
+  const needsByItemId = computed(
+    () =>
+      new Map(
+        [...props.objectivesByItemId].map(([itemId, { taskObjectives, hideoutModules }]) => [
+          itemId,
+          [...taskObjectives, ...hideoutModules],
+        ])
+      )
+  );
+  const needsFor = (itemId: string) => needsByItemId.value.get(itemId) ?? NO_NEEDS;
   const selectedItemId = ref<string | null>(null);
   const selectedGroup = computed(
     () => props.groupedItems.find((group) => group.item.id === selectedItemId.value) ?? null
