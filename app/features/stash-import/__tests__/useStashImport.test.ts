@@ -166,6 +166,15 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('reviewed stash import persistence', () => {
+  it('normalizes zero-count catalog requirements through the existing Smart Fill policy', async () => {
+    const importer = useStashImport([need(objective, { count: 0 })]);
+    expect(importer.targets(total).map((target) => target.key)).toEqual([key()]);
+    expect(importer.targets(total)[0]?.need.count).toBe(1);
+    const preview = await importer.prepare('a'.repeat(64), total, [key()]);
+    expect(preview.changes).toEqual([
+      expect.objectContaining({ id: objective, before: 0, count: 1, needed: 1 }),
+    ]);
+  });
   it('offers receipt recovery when realtime applies the import before its response', async () => {
     const importer = useStashImport([need()]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()]);
@@ -324,6 +333,24 @@ describe('reviewed stash import persistence', () => {
       await controller.syncToSupabase();
       expect(h.reconcile).toHaveBeenCalled();
       expect(h.cloudSave).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['commit', 'recover'] as const)(
+    'reports rate limiting for %s without claiming an unknown save',
+    async (operation) => {
+      const importer = useStashImport([need()]);
+      const preview = await importer.prepare('a'.repeat(64), total, [key()]);
+      h.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { code: 'PT429', message: 'Stash item import rate limit exceeded' },
+      });
+      const request =
+        operation === 'commit'
+          ? importer.commit(preview, total, [key()])
+          : importer.recover(preview);
+      await expect(request).rejects.toThrow('stash_import.errors.rate_limited');
+      expect(state.pvp.taskObjectives[objective]).toBeUndefined();
+      expect(h.rpc).toHaveBeenCalledOnce();
     }
   );
   it('keeps uncertain writes behind reconciliation and recovers via receipt without resending', async () => {

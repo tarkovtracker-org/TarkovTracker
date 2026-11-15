@@ -4,7 +4,8 @@ SELECT no_plan();
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-000000009401', 'stash-import-owner@example.invalid'),
   ('00000000-0000-0000-0000-000000009402', 'stash-import-other@example.invalid'),
-  ('00000000-0000-0000-0000-000000009403', 'stash-import-fresh@example.invalid');
+  ('00000000-0000-0000-0000-000000009403', 'stash-import-fresh@example.invalid'),
+  ('00000000-0000-0000-0000-000000009404', 'stash-import-bounded-work@example.invalid');
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000009401', true);
 SELECT public.sync_user_game_mode_progress('pvp', 1, NULL, '{"pvp":{
   "level":42,"progressEpoch":7,"manualActivityEpoch":3,
@@ -17,19 +18,24 @@ SELECT public.sync_user_game_mode_progress('pvp', 1, NULL, '{"pvp":{
   "skills":{"Endurance":3},"storyChapters":{"chapter-a":{"complete":true}},
   "manualActivityHistory":[],"apiUpdateHistory":[]},"pve":{"level":5},"seasonal":{"level":6}}',
   private.active_season_number());
+SELECT set_config('test.stash_import_active_season',private.active_season_number()::text,true);
 
 CREATE FUNCTION pg_temp.stash_progress(p_mode text DEFAULT 'pvp') RETURNS jsonb
 LANGUAGE sql AS $$ SELECT progress_data FROM public.user_game_mode_progress
   WHERE user_id = auth.uid() AND game_mode = p_mode
-    AND season_number = CASE WHEN p_mode = 'seasonal' THEN private.active_season_number() ELSE 0 END $$;
+    AND season_number = CASE WHEN p_mode = 'seasonal'
+      THEN current_setting('test.stash_import_active_season')::integer ELSE 0 END $$;
 CREATE TEMP TABLE stash_fixture (name text PRIMARY KEY, data jsonb);
 INSERT INTO stash_fixture VALUES ('before', pg_temp.stash_progress());
 CREATE FUNCTION pg_temp.stash_apply(p_updates jsonb,
   p_id uuid DEFAULT '00000000-0000-0000-0000-000000009411', p_hash text DEFAULT NULL,
   p_expected jsonb DEFAULT NULL, p_mode text DEFAULT 'pvp') RETURNS jsonb LANGUAGE sql AS $$
   SELECT public.commit_stash_item_import(p_mode,
-    CASE WHEN p_mode = 'seasonal' THEN private.active_season_number() ELSE 0 END,
+    CASE WHEN p_mode = 'seasonal' THEN current_setting('test.stash_import_active_season')::integer ELSE 0 END,
     p_id, coalesce(p_hash, repeat('a',64)), coalesce(p_expected, pg_temp.stash_progress(p_mode)), p_updates) $$;
+-- Production default privileges deny client execution, including functions in pg_temp.
+GRANT EXECUTE ON FUNCTION pg_temp.stash_progress(text),
+  pg_temp.stash_apply(jsonb, uuid, text, jsonb, text) TO authenticated;
 
 SELECT ok(NOT has_function_privilege('anon',
   'public.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb)', 'EXECUTE'), 'anon cannot call RPC');
@@ -104,6 +110,8 @@ SELECT is(pg_temp.stash_progress(), (SELECT data FROM stash_fixture WHERE name='
   'invalid batches leave all progress unchanged');
 SELECT is((SELECT count(*) FROM private.stash_item_import_receipts WHERE user_id=auth.uid()),0::bigint,
   'invalid batches leave no receipts');
+SELECT is(COALESCE((SELECT count FROM public.mutation_rate_limits WHERE scope='stash-item-import'
+  AND subject=auth.uid()::text),0),0,'malformed batches never consume a refundable admission slot');
 
 SELECT is(pg_temp.stash_apply('[{"id":"task-a","type":"task","count":3,"needed":3}]',
   p_expected := '{}'::jsonb)->>'reason','baseline_changed','whole snapshot must match');
@@ -218,6 +226,10 @@ SELECT is((SELECT count(*) FROM private.stash_item_import_receipts WHERE user_id
   'expired receipts are pruned even below the count cap');
 DO $$ BEGIN
   FOR n IN 1..101 LOOP
+    -- Advance the synthetic fixture's admission window; retention is tested independently
+    -- of the production 60/minute gate, which is exercised explicitly below.
+    UPDATE public.mutation_rate_limits SET reset_at=clock_timestamp()-interval '1 second'
+      WHERE scope='stash-item-import' AND subject=auth.uid()::text;
     PERFORM pg_temp.stash_apply('[{"id":"retention","type":"task","count":0,"needed":1}]',
       ('00000000-0000-0000-0001-'||lpad(n::text,12,'0'))::uuid,
       lpad(to_hex(n),64,'0'));
@@ -266,6 +278,165 @@ SELECT is(pg_temp.stash_progress() - 'hideoutParts', public.sanitize_user_progre
   'absent mode starts from canonical server defaults without client fields');
 SELECT throws_ok($$SELECT public.get_stash_item_import('pvp',1,'00000000-0000-0000-0000-000000009431')$$,
   '22023','Invalid import lookup','receipt lookup validates mode and season');
+
+-- A full bucket must reject before touching progress; lookup and commit share one owner
+-- budget, across modes. A denial remains a specific HTTP 429 signal to the browser.
+INSERT INTO public.mutation_rate_limits(scope,subject,count,reset_at)
+  VALUES('stash-item-import',auth.uid()::text,59,clock_timestamp()+interval '1 minute')
+  ON CONFLICT(scope,subject) DO UPDATE SET count=59,reset_at=EXCLUDED.reset_at;
+SELECT is(public.get_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009431')->>'status',
+  'found','the 60th owner admission remains available for recovery');
+INSERT INTO stash_fixture VALUES ('rate-limited',pg_temp.stash_progress());
+SELECT throws_ok($$SELECT public.commit_stash_item_import('pvp',0,
+  '00000000-0000-0000-0000-000000009432',repeat('d',64),NULL,
+  '[{"id":"brand-new","type":"hideout","count":0,"needed":2}]')$$,
+  'PT429','Stash item import rate limit exceeded','a full owner bucket rejects valid commit attempts');
+SELECT throws_ok($$SELECT public.get_stash_item_import('pve',0,'00000000-0000-0000-0000-000000009431')$$,
+  'PT429','Stash item import rate limit exceeded','lookup cannot bypass the shared owner limit through another mode');
+SELECT is(pg_temp.stash_progress(),(SELECT data FROM stash_fixture WHERE name='rate-limited'),
+  'rate denial changes no progress');
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000009402',true);
+SELECT is(public.get_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009421')->>'status',
+  'found','one owner cannot spend another owner admission budget');
+UPDATE public.mutation_rate_limits SET count=0,reset_at=clock_timestamp()+interval '1 minute'
+  WHERE scope='stash-item-import' AND subject=auth.uid()::text;
+SELECT is(public.commit_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009423',repeat('e',64),
+  NULL,'[{"id":"fresh","type":"task","count":1,"needed":2}]')->>'status','duplicate',
+  'duplicate source remains nonmutating under admission');
+SELECT is((SELECT count FROM public.mutation_rate_limits WHERE scope='stash-item-import'
+  AND subject=auth.uid()::text),1,'a duplicate consumes admission');
+SELECT is(public.commit_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009424',repeat('d',64),
+  '{}','[{"id":"fresh","type":"task","count":1,"needed":2}]')->>'status','conflict',
+  'a valid stale baseline returns conflict under admission');
+SELECT is((SELECT count FROM public.mutation_rate_limits WHERE scope='stash-item-import'
+  AND subject=auth.uid()::text),2,'a CAS conflict consumes admission');
+SELECT is(public.commit_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009421',repeat('e',64),
+  NULL,'[{"id":"fresh","type":"task","count":1,"needed":2}]')->>'status','replayed',
+  'an exact request retry remains idempotent under admission');
+SELECT is((SELECT count FROM public.mutation_rate_limits WHERE scope='stash-item-import'
+  AND subject=auth.uid()::text),3,'an exact retry consumes admission');
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000009403',true);
+UPDATE public.mutation_rate_limits SET reset_at=clock_timestamp()-interval '1 second'
+  WHERE scope='stash-item-import' AND subject=auth.uid()::text;
+SELECT is(public.get_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009431')->>'status',
+  'found','an elapsed admission window permits recovery again');
+SELECT is((SELECT count FROM public.mutation_rate_limits WHERE scope='stash-item-import'
+  AND subject=auth.uid()::text),1,'the renewed admission window starts at one');
+
+-- Measure hashes, not wall time: 100 receipts * 256 targets must not cause 25,600
+-- repeated hashes for one changed key. Only the touched key is hashed once.
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000009404',true);
+SELECT public.sync_user_game_mode_progress('pvp',1,NULL,jsonb_build_object('pvp',jsonb_build_object(
+  'taskObjectives',(SELECT jsonb_object_agg('load-'||n,jsonb_build_object('count',1,'complete',false,'timestamp',100))
+    FROM generate_series(1,256)n))),private.active_season_number());
+INSERT INTO private.stash_item_import_receipts
+  (user_id,game_mode,season_number,import_id,source_hash,request_hash,progress_epoch,protected_entries)
+  SELECT auth.uid(),'pvp',0,('00000000-0000-0000-0002-'||lpad(n::text,12,'0'))::uuid,
+    lpad(to_hex(n),64,'0'),repeat('a',64),0,
+    (SELECT jsonb_agg(jsonb_build_object('map','taskObjectives','id','load-'||k,
+      'before_hash',private.hash_stash_item_import_record('{"count":0,"complete":false,"timestamp":1}'),
+      'imported_timestamp',10)) FROM generate_series(1,256)k)
+  FROM generate_series(1,100)n;
+CREATE TEMP TABLE stash_hash_calls (called boolean);
+CREATE OR REPLACE FUNCTION private.hash_stash_item_import_record(p_record jsonb)
+RETURNS text LANGUAGE plpgsql VOLATILE SET search_path = '' AS $$
+BEGIN
+  INSERT INTO pg_temp.stash_hash_calls VALUES(true);
+  RETURN encode(sha256(convert_to(COALESCE(p_record::text,'__missing__'),'UTF8')),'hex');
+END $$;
+UPDATE public.user_game_mode_progress SET progress_data=jsonb_set(progress_data,'{taskObjectives,load-1}',
+  '{"count":2,"complete":false,"timestamp":101}') WHERE user_id=auth.uid() AND game_mode='pvp' AND season_number=0;
+SELECT is((SELECT count(*) FROM stash_hash_calls),1::bigint,
+  'one changed key is hashed once despite 25,600 retained protection entries');
+SELECT is(pg_temp.stash_progress()#>'{taskObjectives,load-1,count}','2'::jsonb,
+  'a timestamped manual edit still passes the bounded guard');
+TRUNCATE stash_hash_calls;
+UPDATE public.user_game_mode_progress SET progress_data=jsonb_set(progress_data,'{taskObjectives,load-1}',
+  '{"count":0,"complete":false,"timestamp":1}') WHERE user_id=auth.uid() AND game_mode='pvp' AND season_number=0;
+SELECT is((SELECT count(*) FROM stash_hash_calls),1::bigint,'matching stale entries are also hashed once per changed key');
+SELECT is(pg_temp.stash_progress()#>'{taskObjectives,load-1,count}','2'::jsonb,
+  'retained protection restores the latest current entry after a stale sync');
+SELECT public.sync_user_game_mode_progress('pvp',1,NULL,
+  '{"pve":{"taskObjectives":{"no-import":{"count":1,"complete":false,"timestamp":1}}}}',
+  private.active_season_number());
+TRUNCATE stash_hash_calls;
+UPDATE public.user_game_mode_progress SET progress_data=jsonb_set(progress_data,'{taskObjectives,no-import}',
+  '{"count":2,"complete":false,"timestamp":2}') WHERE user_id=auth.uid() AND game_mode='pve' AND season_number=0;
+SELECT is((SELECT count(*) FROM stash_hash_calls),0::bigint,'modes without import receipts do no guard hashing');
+
+-- Two successive imports must retain both protected baselines, rather than protecting
+-- only the newest before-image. This is the normal path, not a fabricated receipt.
+SELECT public.commit_stash_item_import('pvp',0,'00000000-0000-0000-0003-000000000001',repeat('e',64),
+  pg_temp.stash_progress(),'[{"id":"chain","type":"task","count":1,"needed":3}]');
+INSERT INTO stash_fixture VALUES ('chain-first',pg_temp.stash_progress());
+SELECT public.commit_stash_item_import('pvp',0,'00000000-0000-0000-0003-000000000002',repeat('f',64),
+  pg_temp.stash_progress(),'[{"id":"chain","type":"task","count":2,"needed":3}]');
+UPDATE public.user_game_mode_progress SET progress_data=progress_data#-'{taskObjectives,chain}'
+  WHERE user_id=auth.uid() AND game_mode='pvp' AND season_number=0;
+SELECT is(pg_temp.stash_progress()#>'{taskObjectives,chain,count}','2'::jsonb,
+  'older missing-key baseline stays protected after a newer import');
+UPDATE public.user_game_mode_progress SET progress_data=jsonb_set(progress_data,'{taskObjectives,chain}',
+  (SELECT data#>'{taskObjectives,chain}' FROM stash_fixture WHERE name='chain-first'))
+  WHERE user_id=auth.uid() AND game_mode='pvp' AND season_number=0;
+SELECT is(pg_temp.stash_progress()#>'{taskObjectives,chain,count}','2'::jsonb,
+  'the newer import baseline also stays protected');
+
+-- Rehearse emergency client RPC disablement in a subtransaction, then deliberately roll
+-- it back. PL/pgSQL variables survive the rollback; ACL/data changes do not. No production
+-- disable migration or grant weakening is introduced by this test.
+CREATE FUNCTION pg_temp.stash_disable_probe() RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE
+  v_result jsonb := '{}'::jsonb;
+  v_call record;
+  v_denied boolean;
+BEGIN
+  BEGIN
+    REVOKE EXECUTE ON FUNCTION public.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb),
+      private.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb),
+      public.get_stash_item_import(text,integer,uuid),private.get_stash_item_import(text,integer,uuid)
+      FROM authenticated,service_role;
+    SET LOCAL ROLE authenticated;
+    FOR v_call IN SELECT * FROM (VALUES
+      ('public_commit',$sql$SELECT public.commit_stash_item_import('pvp',0,
+        '00000000-0000-0000-0003-000000000003',repeat('a',64),'{}',
+        '[{"id":"chain","type":"task","count":0,"needed":3}]')$sql$),
+      ('private_commit',$sql$SELECT private.commit_stash_item_import('pvp',0,
+        '00000000-0000-0000-0003-000000000003',repeat('a',64),'{}',
+        '[{"id":"chain","type":"task","count":0,"needed":3}]')$sql$),
+      ('public_lookup',$sql$SELECT public.get_stash_item_import('pvp',0,'00000000-0000-0000-0003-000000000001')$sql$),
+      ('private_lookup',$sql$SELECT private.get_stash_item_import('pvp',0,'00000000-0000-0000-0003-000000000001')$sql$)
+    ) call(name,statement) LOOP
+      v_denied := false;
+      BEGIN EXECUTE v_call.statement;
+      EXCEPTION WHEN insufficient_privilege THEN v_denied := true;
+      END;
+      v_result := v_result || jsonb_build_object(v_call.name,v_denied);
+    END LOOP;
+    RESET ROLE;
+    v_result := v_result || jsonb_build_object('service_role_disabled',NOT EXISTS(
+      SELECT 1 FROM (VALUES
+        ('public.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb)'),
+        ('private.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb)'),
+        ('public.get_stash_item_import(text,integer,uuid)'),('private.get_stash_item_import(text,integer,uuid)')
+      ) signature(value) WHERE has_function_privilege('service_role',value,'EXECUTE')));
+    RAISE EXCEPTION 'Roll back the disable rehearsal' USING ERRCODE='ZST01';
+  EXCEPTION WHEN SQLSTATE 'ZST01' THEN NULL;
+  END;
+  RETURN v_result;
+END $$;
+INSERT INTO stash_fixture VALUES ('disable-proof',pg_temp.stash_disable_probe());
+SELECT is((SELECT data->probe.name FROM stash_fixture WHERE name='disable-proof'),'true'::jsonb,
+  'forward disable denies '||probe.name)
+  FROM (VALUES('public_commit'),('private_commit'),('public_lookup'),('private_lookup'),('service_role_disabled'))probe(name);
+SELECT ok(bool_and(has_function_privilege(client.role,signature.value,'EXECUTE')),
+  'rolling back the disable rehearsal restores both public/private client grants')
+  FROM (VALUES('authenticated'),('service_role'))client(role) CROSS JOIN (VALUES
+    ('public.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb)'),
+    ('private.commit_stash_item_import(text,integer,uuid,text,jsonb,jsonb)'),
+    ('public.get_stash_item_import(text,integer,uuid)'),('private.get_stash_item_import(text,integer,uuid)')
+  ) signature(value);
+SELECT is(pg_temp.stash_progress()#>'{taskObjectives,chain,count}','2'::jsonb,
+  'disabled RPC attempts do not modify existing progress');
 SELECT set_config('request.jwt.claim.sub','',true);
 SELECT throws_ok($$SELECT public.get_stash_item_import('pvp',0,'00000000-0000-0000-0000-000000009421')$$,
   '28000','Not authenticated','receipt lookup requires auth');

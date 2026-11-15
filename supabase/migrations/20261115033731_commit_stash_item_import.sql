@@ -19,10 +19,19 @@ CREATE TABLE private.stash_item_import_receipts (
 );
 CREATE INDEX stash_item_import_receipts_retention_idx
   ON private.stash_item_import_receipts (user_id, created_at DESC);
+CREATE INDEX stash_item_import_receipts_protection_idx
+  ON private.stash_item_import_receipts USING gin (protected_entries jsonb_path_ops);
 ALTER TABLE private.stash_item_import_receipts ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.stash_item_import_receipts FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON TABLE private.stash_item_import_receipts IS
   'Owner-scoped image/request hashes and touched objective IDs, before-record hashes and imported clocks; no image/OCR content or raw snapshots. No client reads. Bounded to 100 recent imports per account; 90-day expiry is pruned on committed import calls. Absolute counts remain non-additive after expiry.';
+
+CREATE FUNCTION private.hash_stash_item_import_record(p_record jsonb)
+RETURNS text LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
+  SELECT encode(sha256(convert_to(COALESCE(p_record::text, '__missing__'), 'UTF8')), 'hex');
+$$;
+REVOKE ALL ON FUNCTION private.hash_stash_item_import_record(jsonb)
+  FROM PUBLIC, anon, authenticated, service_role;
 
 -- Narrow protection against a delayed normal sync carrying the exact pre-import entry (or
 -- the exact prior absence). This is deliberately not a generic last-write-wins policy.
@@ -32,8 +41,8 @@ COMMENT ON TABLE private.stash_item_import_receipts IS
 CREATE FUNCTION private.guard_stash_item_import_sync()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_entry jsonb;
-  v_path text[];
+  v_map text;
+  v_id text;
   v_current jsonb;
 BEGIN
   IF ROW(NEW.progress_data->'taskObjectives', NEW.progress_data->'hideoutParts')
@@ -44,25 +53,45 @@ BEGIN
     IS DISTINCT FROM public.sanitize_manual_activity_epoch(OLD.progress_data->'progressEpoch') THEN
     RETURN NEW;
   END IF;
-  FOR v_entry IN SELECT entry.value FROM private.stash_item_import_receipts receipt
-    CROSS JOIN LATERAL jsonb_array_elements(receipt.protected_entries) entry
-    WHERE receipt.user_id = NEW.user_id AND receipt.game_mode = NEW.game_mode
-      AND receipt.season_number = NEW.season_number
-      AND receipt.progress_epoch = public.sanitize_manual_activity_epoch(NEW.progress_data->'progressEpoch')
-      AND receipt.created_at >= clock_timestamp() - interval '90 days'
-    ORDER BY receipt.created_at DESC, receipt.import_id DESC LOOP
-    v_path := ARRAY[v_entry->>'map', v_entry->>'id'];
-    v_current := OLD.progress_data#>v_path;
-    IF NEW.progress_data#>v_path IS NOT DISTINCT FROM v_current THEN CONTINUE; END IF;
-    IF jsonb_typeof(v_current->'timestamp') = 'number'
-      AND (v_current->>'timestamp')::numeric >= (v_entry->>'imported_timestamp')::numeric
-      AND encode(sha256(convert_to(COALESCE((NEW.progress_data#>v_path)::text, '__missing__'),
-        'UTF8')), 'hex') = v_entry->>'before_hash' THEN
-      IF jsonb_typeof(NEW.progress_data->(v_path[1])) IS DISTINCT FROM 'object' THEN
-        NEW.progress_data := jsonb_set(NEW.progress_data, ARRAY[v_path[1]], '{}'::jsonb);
-      END IF;
-      NEW.progress_data := jsonb_set(NEW.progress_data, v_path, v_current);
+  IF NOT EXISTS (SELECT 1 FROM private.stash_item_import_receipts receipt
+    WHERE receipt.user_id=NEW.user_id AND receipt.game_mode=NEW.game_mode
+      AND receipt.season_number=NEW.season_number
+      AND receipt.progress_epoch=public.sanitize_manual_activity_epoch(NEW.progress_data->'progressEpoch')
+      AND receipt.created_at>=clock_timestamp()-interval '90 days') THEN
+    RETURN NEW;
+  END IF;
+  -- Hash each changed stored key once, then probe receipt containment before expanding any
+  -- protected entries. A receipt cap is not a work budget: 100 * 256 entries must never
+  -- cause repeated hashing of an unchanged or nonmatching target. EXISTS stops after a
+  -- qualifying protection; older matching before-images remain valid after later imports.
+  FOR v_map, v_id, v_current IN
+    WITH changed AS MATERIALIZED (
+      SELECT field.map, entry.key AS id, entry.value AS current_record,
+        (entry.value->>'timestamp')::numeric AS current_timestamp,
+        private.hash_stash_item_import_record(NEW.progress_data#>ARRAY[field.map,entry.key]) AS before_hash
+      FROM (VALUES ('taskObjectives'),('hideoutParts')) field(map)
+      CROSS JOIN LATERAL jsonb_each(OLD.progress_data->field.map) entry
+      WHERE entry.value IS DISTINCT FROM NEW.progress_data#>ARRAY[field.map,entry.key]
+        AND jsonb_typeof(entry.value->'timestamp')='number'
+    )
+    SELECT changed.map,changed.id,changed.current_record FROM changed
+    WHERE EXISTS (
+      SELECT 1 FROM private.stash_item_import_receipts receipt
+      WHERE receipt.user_id=NEW.user_id AND receipt.game_mode=NEW.game_mode
+        AND receipt.season_number=NEW.season_number
+        AND receipt.progress_epoch=public.sanitize_manual_activity_epoch(NEW.progress_data->'progressEpoch')
+        AND receipt.created_at>=clock_timestamp()-interval '90 days'
+        AND receipt.protected_entries @> jsonb_build_array(jsonb_build_object(
+          'map',changed.map,'id',changed.id,'before_hash',changed.before_hash))
+        AND EXISTS (SELECT 1 FROM jsonb_array_elements(receipt.protected_entries) protection
+          WHERE protection->>'map'=changed.map AND protection->>'id'=changed.id
+            AND protection->>'before_hash'=changed.before_hash
+            AND (protection->>'imported_timestamp')::numeric<=changed.current_timestamp)
+    ) LOOP
+    IF jsonb_typeof(NEW.progress_data->v_map) IS DISTINCT FROM 'object' THEN
+      NEW.progress_data := jsonb_set(NEW.progress_data, ARRAY[v_map], '{}'::jsonb);
     END IF;
+    NEW.progress_data := jsonb_set(NEW.progress_data, ARRAY[v_map,v_id], v_current);
   END LOOP;
   RETURN NEW;
 END;
@@ -92,6 +121,7 @@ DECLARE
   v_protected jsonb := '[]'::jsonb;
   v_request_hash text;
   v_receipt private.stash_item_import_receipts%ROWTYPE;
+  v_rate_allowed boolean;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '28000';
@@ -144,6 +174,14 @@ BEGIN
   IF EXISTS (SELECT 1 FROM jsonb_array_elements(p_updates) entry
     GROUP BY entry->>'type', entry->>'id' HAVING count(*) > 1) THEN
     RAISE EXCEPTION 'Duplicate import objective' USING ERRCODE = '22023';
+  END IF;
+  -- Validate the bounded batch first: a later validation exception would refund an admitted
+  -- slot. Every valid attempt (including CAS conflicts/replays/duplicates) spends one owner
+  -- slot before hashing the full snapshot or acquiring feature/account/progress locks.
+  SELECT allowed INTO v_rate_allowed FROM public.consume_mutation_rate_limit(
+    'stash-item-import',v_user_id::text,60,60);
+  IF NOT COALESCE(v_rate_allowed,false) THEN
+    RAISE EXCEPTION 'Stash item import rate limit exceeded' USING ERRCODE='PT429';
   END IF;
   v_request_hash := encode(sha256(convert_to(
     jsonb_build_object('expected', p_expected, 'updates', p_updates)::text, 'UTF8')), 'hex');
@@ -209,8 +247,8 @@ BEGIN
       v_clock := greatest(v_clock, floor((v_record->>'timestamp')::numeric) + 1);
     END IF;
     v_protected := v_protected || jsonb_build_array(jsonb_build_object('map', v_map, 'id', v_id,
-      'before_hash', encode(sha256(convert_to(COALESCE((v_current#>ARRAY[v_map,v_id])::text,
-        '__missing__'), 'UTF8')), 'hex'), 'imported_timestamp', v_clock));
+      'before_hash', private.hash_stash_item_import_record(v_current#>ARRAY[v_map,v_id]),
+      'imported_timestamp', v_clock));
     -- Preserve FIR/other objective flags. Task collection never hands in an objective;
     -- hideout part completion reflects the absolute collected count, including decreases.
     v_record := v_record || jsonb_build_object('count', v_count, 'timestamp', v_clock,
@@ -268,6 +306,7 @@ DECLARE
   v_user_id uuid := (SELECT auth.uid());
   v_current jsonb;
   v_receipt_id uuid;
+  v_rate_allowed boolean;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '28000';
@@ -276,6 +315,13 @@ BEGIN
     OR p_season IS NULL OR p_season <> (CASE WHEN p_mode = 'seasonal'
       THEN private.active_season_number() ELSE 0 END) THEN
     RAISE EXCEPTION 'Invalid import lookup' USING ERRCODE = '22023';
+  END IF;
+  -- Recovery shares admission with commit; neither mode changes nor receipt polling may
+  -- bypass the per-account budget. This writes only admission metadata, never progress.
+  SELECT allowed INTO v_rate_allowed FROM public.consume_mutation_rate_limit(
+    'stash-item-import',v_user_id::text,60,60);
+  IF NOT COALESCE(v_rate_allowed,false) THEN
+    RAISE EXCEPTION 'Stash item import rate limit exceeded' USING ERRCODE='PT429';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtextextended('stash-import:' || v_user_id::text, 0));
   PERFORM 1 FROM public.user_progress WHERE user_id = v_user_id FOR UPDATE;

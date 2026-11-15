@@ -1,13 +1,8 @@
+import { decodeScanJsonObject, scanJsonObject } from '@/utils/stashScan/catalogJson';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
 import { createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
 import { decodeScanShard } from '@/utils/stashScan/indexCodec';
-import {
-  SCAN_LIMITS,
-  scanError,
-  type ScanCatalog,
-  type ScanItem,
-  type ScanShard,
-} from '@/utils/stashScan/types';
+import { SCAN_LIMITS, scanError, type ScanCatalog, type ScanShard } from '@/utils/stashScan/types';
 export async function digest(bytes: Uint8Array): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>);
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -48,27 +43,41 @@ async function readAsset(path: string, limit: number, cache: RequestCache): Prom
   if (!response.ok || !response.body) throw scanError('catalog_unavailable');
   return readBounded(response.body, limit);
 }
-function validItem(item: ScanItem): boolean {
+function validInteger(value: unknown, min: number, max: number): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;
+}
+function validItemNames(item: Record<string, unknown>): boolean {
   return (
-    /^[a-f0-9]{24}$/.test(item.id) &&
+    /^[a-f0-9]{24}$/.test(String(item.id)) &&
     typeof item.name === 'string' &&
     typeof item.shortName === 'string'
   );
 }
-function validateItems(items: ScanItem[]): void {
+function validItemDimensions(item: Record<string, unknown>): boolean {
+  return [item.width, item.height].every((value) => validInteger(value, 1, 10));
+}
+function validItem(value: unknown): boolean {
+  const item = scanJsonObject(value);
+  return (
+    validItemNames(item) &&
+    validItemDimensions(item) &&
+    validInteger(item.maxStack, 0, SCAN_LIMITS.quantity)
+  );
+}
+function validateItems(items: unknown): void {
   if (!Array.isArray(items) || items.length > 20_000 || !items.every(validItem))
     throw scanError('catalog_invalid');
 }
-function validateCatalog(value: ScanCatalog): ScanCatalog {
+function validateCatalog(value: Record<string, unknown>): ScanCatalog {
   if (value.version !== 1 || value.featureVersion !== FEATURE_VERSION)
     throw scanError('catalog_invalid');
   validateItems(value.items);
   validateCatalogAssets(value);
-  return value;
+  return value as unknown as ScanCatalog;
 }
 export async function readScanCatalog(): Promise<ScanCatalog> {
   const bytes = await readAsset('catalog.json', 4 * 1024 * 1024, 'no-cache');
-  return validateCatalog(JSON.parse(new TextDecoder().decode(bytes)) as ScanCatalog);
+  return validateCatalog(decodeScanJsonObject(bytes));
 }
 function validateShard(shard: ScanShard): void {
   if (!/^[a-f0-9]{64}$/.test(shard.sha256) || !/^\d+x\d+-[a-f0-9]{64}\.bin$/.test(shard.file))
@@ -121,6 +130,7 @@ export async function loadSizes(
   }
   return combined;
 }
-function validateCatalogAssets(value: ScanCatalog): void {
-  if (!value.shards || !Array.isArray(value.missing)) throw scanError('catalog_invalid');
+function validateCatalogAssets(value: Record<string, unknown>): void {
+  scanJsonObject(value.shards);
+  if (!Array.isArray(value.missing)) throw scanError('catalog_invalid');
 }

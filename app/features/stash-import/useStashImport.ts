@@ -1,5 +1,6 @@
 import { useItemDistribution, type ObjectiveUpdate } from '@/composables/useItemDistribution';
 import { getNeededItemId } from '@/features/neededitems/neededItemFilters';
+import { neededCountOf } from '@/features/neededitems/useNeededItemProgress';
 import { defaultState, type UserProgressData } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { executeProgressMutation } from '@/stores/tarkov/progressPersistence';
@@ -49,9 +50,11 @@ interface ImportReceipt {
 }
 type ImportBaseline = Pick<StashImportPreview, 'owner' | 'mode' | 'season' | 'local'>;
 const validNeededCount = (count: number) =>
-  Number.isSafeInteger(count) && count >= 1 && count <= 1_000_000;
+  Number.isSafeInteger(count) && count >= 0 && count <= 1_000_000;
 const lacksConfirmedFir = (total: ObservedTotals) => total.fir === 0 && total.unknown > 0;
 const receiptApplied = (receipt: ImportReceipt) => ['applied', 'replayed'].includes(receipt.status);
+const rpcFailure = (error: { code?: string }) =>
+  scanError(error.code === 'PT429' ? 'rate_limited' : 'save_unknown');
 const expectedFrom = (data: { progress_data: unknown } | null) =>
   (data?.progress_data ?? null) as Record<string, unknown> | null;
 const expectedLocal = (expected: Record<string, unknown> | null, mode: GameMode) =>
@@ -137,7 +140,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
         return [
           {
             key: keyOf(need),
-            need,
+            need: { ...need, count: neededCountOf(need) },
             itemId,
             label: labelFor(need),
             current: distribution.getObjectiveCurrentCount(need),
@@ -271,7 +274,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
         canContinue: () => sameLocal(preview),
         send: async () => {
           const result = await $supabase.client.rpc('commit_stash_item_import', argsFor(preview));
-          if (result.error) throw scanError('save_unknown');
+          if (result.error) throw rpcFailure(result.error);
           receipt = parseReceipt(result.data);
           if (!receiptApplied(receipt)) return { error: receipt.status };
           modes[preview.mode] = receiptProgress(receipt);
@@ -303,7 +306,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
       p_import_id: preview.importId,
     });
     assertDestination(preview);
-    if (error) throw scanError('save_unknown');
+    if (error) throw rpcFailure(error);
     const status = lookupStatus(data);
     // Missing is not retry permission. Reconcile through the normal three-way merge first.
     await reconcileRemoteSnapshot();

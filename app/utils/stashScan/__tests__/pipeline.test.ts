@@ -227,6 +227,13 @@ function jpeg(width = 640, height = 480): Uint8Array {
   view.setUint16(15, width);
   return bytes;
 }
+function jpegWithPrefix(prefix: Uint8Array): Uint8Array {
+  const bytes = new Uint8Array(2 + prefix.length + 30);
+  bytes.set([0xff, 0xd8]);
+  bytes.set(prefix, 2);
+  bytes.set(jpeg().subarray(8), 2 + prefix.length);
+  return bytes;
+}
 function webp(chunk: string, width = 640, height = 480): Uint8Array {
   const bytes = new Uint8Array(30);
   ascii(bytes, 0, 'RIFF');
@@ -286,6 +293,21 @@ describe('raster header allocation guards', () => {
     expect(() => imageDimensions(new Uint8Array(SCAN_LIMITS.fileBytes + 1))).toThrow(
       error('image_size')
     );
+  });
+  it('bounds JPEG marker and fill work before a late valid frame', () => {
+    expect(() => imageDimensions(jpegWithPrefix(new Uint8Array(8192).fill(0xff)))).toThrow(
+      error('image_invalid')
+    );
+    const segments = new Uint8Array(8192 * 4);
+    for (let offset = 0; offset < segments.length; offset += 4)
+      segments.set([0xff, 0xe1, 0, 2], offset);
+    expect(() => imageDimensions(jpegWithPrefix(segments))).toThrow(error('image_invalid'));
+  });
+  it('allows JPEG fill and a single maximum-length metadata segment without scanning its payload', () => {
+    expect(imageDimensions(jpegWithPrefix(new Uint8Array(12).fill(0xff)))).toEqual([640, 480]);
+    const segment = new Uint8Array(65_537);
+    segment.set([0xff, 0xe1, 0xff, 0xff]);
+    expect(imageDimensions(jpegWithPrefix(segment))).toEqual([640, 480]);
   });
   it('rejects broken PNG headers, truncated JPEG segments, and animated WebP', () => {
     const badPng = png();
@@ -407,10 +429,23 @@ describe('dimension shard serialization', () => {
     (header: ShardHeader) => {
       header.templates[0]![4][1]--;
     },
+    (header: ShardHeader) => {
+      header.templates[0]![0] = '';
+    },
   ])('rejects structurally tampered shard headers %#', (edit) => {
     const encoded = encodeScanShard(1, 1, [template()]);
-    expect(() => decodeScanShard(rewriteHeader(encoded, edit))).toThrow();
+    expect(() => decodeScanShard(rewriteHeader(encoded, edit))).toThrow(error('catalog_invalid'));
   });
+  it.each(['{', 'null', '[]', 'true'])(
+    'normalizes malformed shard JSON/header shape %s',
+    (json) => {
+      const header = new TextEncoder().encode(json);
+      const bytes = new Uint8Array(header.length + 4);
+      new DataView(bytes.buffer).setUint32(0, header.length, true);
+      bytes.set(header, 4);
+      expect(() => decodeScanShard(bytes)).toThrow(error('catalog_invalid'));
+    }
+  );
   it('rejects truncation, trailing bytes, oversized header declarations, and invalid UTF-8', () => {
     const encoded = encodeScanShard(1, 1, [template()]);
     expect(() => decodeScanShard(encoded.subarray(0, encoded.length - 1))).toThrow(
@@ -424,7 +459,7 @@ describe('dimension shard serialization', () => {
     expect(() => decodeScanShard(largeHeader)).toThrow(error('catalog_invalid'));
     const invalidUtf8 = encoded.slice();
     invalidUtf8[4] = 0xff;
-    expect(() => decodeScanShard(invalidUtf8)).toThrow();
+    expect(() => decodeScanShard(invalidUtf8)).toThrow(error('catalog_invalid'));
     expect(() => decodeScanShard(new Uint8Array(3))).toThrow(error('catalog_invalid'));
   });
 });

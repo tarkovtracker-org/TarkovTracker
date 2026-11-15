@@ -65,6 +65,7 @@
       <p class="mt-1">
         {{ $t('stash_import.coverage_detail', { count: result.catalog.missing.length }) }}
       </p>
+      <p class="mt-1">{{ $t('stash_import.coverage_limits') }}</p>
       <a
         href="/licenses/cultist-circle.txt"
         target="_blank"

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { cacheImage, publishScanCatalog } from '@@/scripts/stash-scan/build-assets';
 import sharp from 'sharp';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
 import { addCatalogIcon, createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
@@ -76,18 +77,11 @@ function imageUrl(item: CatalogEntry): URL {
     throw new Error(`Untrusted grid image: ${item.id}`);
   return url;
 }
-async function cacheImage(response: Response, file: string): Promise<Uint8Array> {
-  const next = new Uint8Array(await response.arrayBuffer());
-  if (next.length > 4 * 1024 * 1024) throw new Error('Oversized grid image');
-  await writeFile(file, next);
-  await writeFile(`${file}.etag`, response.headers.get('etag') ?? '');
-  return next;
-}
 async function imageBytes(item: CatalogEntry): Promise<Uint8Array> {
   const url = imageUrl(item);
   const file = join(cache, `${item.id}.webp`);
   const [bytes, etag] = await Promise.all([readCached(file), readCached(`${file}.etag`)]);
-  const headers = etag ? { 'If-None-Match': etag.toString() } : {};
+  const headers: Record<string, string> = etag ? { 'If-None-Match': etag.toString() } : {};
   const response = await request(url.href, bytes ? headers : {});
   if (response.status === 304) return bytes!;
   return cacheImage(response, file);
@@ -148,7 +142,7 @@ async function main() {
     shards,
   };
   // Publish the manifest last: failed builds never replace the previous complete manifest.
-  await writeFile(join(output, 'catalog.json'), JSON.stringify(manifest));
+  await publishScanCatalog(output, manifest);
   console.log(
     JSON.stringify({
       items: items.length,

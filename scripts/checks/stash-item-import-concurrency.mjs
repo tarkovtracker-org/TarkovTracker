@@ -107,12 +107,47 @@ const hold = () =>
     `BEGIN; SELECT user_id FROM public.user_progress WHERE user_id=${literal(user)} FOR UPDATE`,
     true
   );
+let created = false;
+let cleaned = false;
+function attemptCleanup(operation) {
+  try {
+    operation();
+  } catch (error) {
+    console.error('Stash import fixture cleanup failed:', error);
+    process.exitCode = 1;
+  }
+}
+function cleanup() {
+  if (cleaned) return;
+  cleaned = true;
+  attemptCleanup(() =>
+    query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+    WHERE application_name LIKE ${literal(`${prefix}%`)} AND pid<>pg_backend_pid()`)
+  );
+  for (const child of children) attemptCleanup(() => child.kill());
+  if (created)
+    attemptCleanup(() =>
+      query(`
+    DELETE FROM public.mutation_rate_limits WHERE subject=${literal(user)}
+      AND scope IN ('stash-item-import','progress-sync');
+    DELETE FROM auth.users WHERE id=${literal(user)}`)
+    );
+}
+function interrupted(code) {
+  cleanup();
+  process.exit(code);
+}
+const onSigint = () => interrupted(130);
+const onSigterm = () => interrupted(143);
+process.once('SIGINT', onSigint);
+process.once('SIGTERM', onSigterm);
 try {
   query(`INSERT INTO auth.users(id,email) VALUES(${literal(user)},${literal(`${user}@example.invalid`)});
     SET request.jwt.claim.sub=${literal(user)};
     SELECT public.sync_user_game_mode_progress('pvp',1,NULL,
       '{"pvp":{"level":1,"taskObjectives":{"concurrent-objective":{"count":0,"complete":false,"timestamp":1}}}}',
       private.active_season_number())`);
+  created = true;
   const before = snapshot();
   const holder = hold();
   await observe(`${prefix}_holder`, "state='idle in transaction'", holder.done);
@@ -185,12 +220,29 @@ try {
   inFlight.child.stdin.end('COMMIT;\n');
   assert.equal((await inFlight.done).code, 0);
   assert.equal(status(await recovery.done), 'found', 'recovery waits for the in-flight commit');
+  query(`INSERT INTO public.mutation_rate_limits(scope,subject,count,reset_at)
+    VALUES('stash-item-import',${literal(user)},60,clock_timestamp()+interval '1 minute')
+    ON CONFLICT(scope,subject) DO UPDATE SET count=60,reset_at=EXCLUDED.reset_at`);
+  const admissionBlocker = hold();
+  await observe(`${prefix}_holder`, "state='idle in transaction'", admissionBlocker.done);
+  const overQuota = connection(
+    `${prefix}_over_quota`,
+    commit(snapshot(), randomUUID(), 'f'.repeat(64))
+  );
+  const denied = await overQuota.done;
+  assert.notEqual(denied.code, 0, 'over-quota import must fail');
+  assert.match(
+    denied.output,
+    /Stash item import rate limit exceeded/,
+    'admission must deny without waiting for the held account lock'
+  );
+  admissionBlocker.child.stdin.end('ROLLBACK;\n');
+  assert.equal((await admissionBlocker.done).code, 0);
   console.log(
-    'Stash import concurrency passed: stale CAS, duplicate image, absent baseline and receipt recovery.'
+    'Stash import concurrency passed: stale CAS, duplicate image, absent baseline, receipt recovery and early admission.'
   );
 } finally {
-  query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-    WHERE application_name LIKE ${literal(`${prefix}%`)} AND pid<>pg_backend_pid()`);
-  for (const child of children) child.kill();
-  query(`DELETE FROM auth.users WHERE id=${literal(user)}`);
+  cleanup();
+  process.removeListener('SIGINT', onSigint);
+  process.removeListener('SIGTERM', onSigterm);
 }

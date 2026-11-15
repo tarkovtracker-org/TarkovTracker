@@ -78,6 +78,7 @@ export interface UseNeededItemsReturn {
   >;
   filterTabsWithCounts: ComputedRef<FilterTab[]>;
   itemsReady: ComputedRef<boolean>;
+  stashImportReady: ComputedRef<boolean>;
   itemsError: ComputedRef<Error | null>;
   itemsFullLoaded: ComputedRef<boolean>;
   ensureNeededItemsData: () => void;
@@ -202,6 +203,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
+  const stashImportReady = computed(
+    () => itemsReady.value && metadataStore.tasksObjectivesHydrated
+  );
   const fullItemsQueued = ref(false);
   const { sortNeededItems, sortGroupedItems } = useNeededItemsSorting({
     sortBy,
@@ -791,6 +795,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     objectivesByItemId,
     filterTabsWithCounts,
     itemsReady,
+    stashImportReady,
     itemsError,
     itemsFullLoaded,
     ensureNeededItemsData,

@@ -124,12 +124,11 @@
     }
   );
   const itemsById = computed(() => new Map(props.items.map((item) => [item.id, item])));
+  const matchesSearch = (item: ScanItem, query: string) =>
+    [item.name, item.shortName, item.id].some((value) => value.toLocaleLowerCase().includes(query));
   const choices = computed(() => {
     const query = search.value.trim().toLocaleLowerCase();
-    if (query)
-      return props.items
-        .filter((item) => item.name.toLocaleLowerCase().includes(query))
-        .slice(0, 30);
+    if (query) return props.items.filter((item) => matchesSearch(item, query)).slice(0, 30);
     const ids = new Set([
       props.row.itemId,
       ...props.row.cell.candidates.map((candidate) => candidate.itemId),

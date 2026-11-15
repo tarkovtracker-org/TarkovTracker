@@ -1,3 +1,4 @@
+import { decodeScanJsonObject } from '@/utils/stashScan/catalogJson';
 import {
   artCoarsePx,
   artFinePx,
@@ -161,12 +162,21 @@ export function decodeScanShard(bytes: Uint8Array): {
   width: number;
   height: number;
 } {
+  try {
+    return decodeValidShard(bytes);
+  } catch {
+    throw scanError('catalog_invalid');
+  }
+}
+function decodeValidShard(bytes: Uint8Array): {
+  index: IconIndex;
+  width: number;
+  height: number;
+} {
   if (bytes.length < 4 || bytes.length > SCAN_LIMITS.decodedShardBytes)
     throw scanError('catalog_invalid');
   const headerSize = shardHeaderSize(bytes);
-  const header = JSON.parse(
-    new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(4, 4 + headerSize))
-  ) as ShardHeader;
+  const header = decodeScanJsonObject(bytes.subarray(4, 4 + headerSize)) as unknown as ShardHeader;
   validateHeader(header);
   return decodeTemplates(bytes, header, headerSize);
 }

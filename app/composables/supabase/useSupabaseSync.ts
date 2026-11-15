@@ -512,7 +512,7 @@ export function useSupabaseSync<
     // Capture each request before queuing: later mutations must not change an
     // earlier payload, and resumed writes must not overtake an in-flight save.
     if (!canQueueSync()) return Promise.resolve(null);
-    if (requiresReconciliation()) return reconcileThenSync();
+    if (requiresReconciliation()) return reconcileRequestedState(state);
     const version = localVersion;
     const reconciliation = reconciliationVersion;
     const acknowledge = pendingState.captureAcknowledgement(snapshotSyncState(state));
@@ -536,6 +536,15 @@ export function useSupabaseSync<
     if (requiresReconciliation() && !reconcileBeforeRetry)
       throw new Error('Remote progress snapshot reader unavailable');
     await reconcileBeforeRetry?.();
+  };
+  const reconcileRequestedState = (state: TState): Promise<TPayload | null> => {
+    // A detached snapshot cannot participate in the store's three-way reconciliation.
+    // Reject it explicitly instead of silently uploading a different snapshot.
+    if (state !== store.$state) {
+      logger.warn('[Sync] Detached snapshot rejected while remote reconciliation is required');
+      return Promise.resolve(null);
+    }
+    return reconcileThenSync();
   };
   /** A retry uploads only after the latest remote state was merged into the pending changes. */
   const reconcileThenSync = async (): Promise<TPayload | null> => {

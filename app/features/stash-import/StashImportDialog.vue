@@ -164,6 +164,8 @@
   const preparing = ref(false);
   const saving = ref(false);
   const uncertain = ref(false);
+  const conflicted = ref(false);
+  let selectionInitialized = false;
   const finished = ref('');
   const importError = ref('');
   const displayError = computed(() => error.value || importError.value);
@@ -182,17 +184,21 @@
   });
   const availableTargets = computed(() => importer.targets(totals.value));
   const targetKeys = computed(() => availableTargets.value.map((target) => target.key).join('|'));
-  watch(
-    targetKeys,
-    () => {
-      selected.value = availableTargets.value.map((target) => target.key);
-    },
-    { immediate: true }
-  );
+  function syncSelection() {
+    const keys = availableTargets.value.map((target) => target.key);
+    if (!selectionInitialized && keys.length) {
+      selected.value = keys;
+      selectionInitialized = true;
+      return;
+    }
+    selected.value = selected.value.filter((key) => keys.includes(key));
+  }
+  watch(targetKeys, syncSelection, { immediate: true });
   const hasDecreases = computed(
     () => preview.value?.changes.some((change) => change.count < change.before) ?? false
   );
-  const stale = computed(() => (preview.value ? !importer.sameLocal(preview.value) : false));
+  const localStale = computed(() => (preview.value ? !importer.sameLocal(preview.value) : false));
+  const stale = computed(() => conflicted.value || localStale.value);
   function itemName(id: string) {
     return (
       result.value?.catalog.items.find((item) => item.id === id)?.name ??
@@ -205,14 +211,19 @@
   function resetImport() {
     preview.value = undefined;
     uncertain.value = false;
+    conflicted.value = false;
     finished.value = '';
     importError.value = '';
   }
   async function intake(files: File[]) {
     if (saving.value || preparing.value) return;
+    if (!(await leaveConflict())) return;
     resetImport();
+    selectionInitialized = false;
+    selected.value = [];
     pendingRegion.value = undefined;
     await select(files);
+    syncSelection();
   }
   async function fileChanged(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -251,6 +262,7 @@
       : 'stash_import.errors.save_unknown';
   }
   async function preparePreview() {
+    if (conflicted.value) return;
     preparing.value = true;
     importError.value = '';
     try {
@@ -268,16 +280,24 @@
   }
   const decreasesConfirmed = computed(() => !hasDecreases.value || allowDecreases.value);
   function showReceipt(status: string) {
-    if (status === 'conflict') importError.value = 'stash_import.errors.stale';
-    else finished.value = status;
+    if (status === 'conflict') {
+      conflicted.value = true;
+      importError.value = 'stash_import.errors.stale';
+      return;
+    }
+    importError.value = '';
+    uncertain.value = false;
+    finished.value = status;
   }
+  const canApply = computed(() => !stale.value && !uncertain.value && !saving.value);
+  const readyToSave = computed(() => preview.value && decreasesConfirmed.value && canApply.value);
   async function save() {
-    if (!preview.value || !decreasesConfirmed.value) return;
+    if (!readyToSave.value) return;
     saving.value = true;
     importError.value = '';
     try {
       const receipt = await importer.commit(
-        preview.value,
+        preview.value!,
         reviewedTotals(rows.value),
         selected.value
       );
@@ -293,7 +313,7 @@
     if (!preview.value) return;
     saving.value = true;
     try {
-      if (await importer.recover(preview.value)) finished.value = 'applied';
+      if (await importer.recover(preview.value)) showReceipt('applied');
       else importError.value = 'stash_import.errors.receipt_missing';
     } catch (failure) {
       report(failure);
@@ -301,9 +321,25 @@
       saving.value = false;
     }
   }
-  function backToReview() {
-    preview.value = undefined;
-    importError.value = '';
-    uncertain.value = false;
+  async function leaveConflict(): Promise<boolean> {
+    if (!conflicted.value) return true;
+    return reconcileConflict();
+  }
+  async function reconcileConflict(): Promise<boolean> {
+    saving.value = true;
+    try {
+      await importer.recover(preview.value!);
+      conflicted.value = false;
+      return true;
+    } catch (failure) {
+      report(failure);
+      return false;
+    } finally {
+      saving.value = false;
+    }
+  }
+  async function backToReview() {
+    if (!(await leaveConflict())) return;
+    resetImport();
   }
 </script>

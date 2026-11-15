@@ -3,7 +3,7 @@
 import {
   assertCellFeatures,
   cellFeatures,
-  dot,
+  stashFeatureDot,
   featureShape,
   quantise,
   rotateClockwise,
@@ -87,7 +87,14 @@ function realignRow(
     if (sx >= 0 && sx < fromWidth) out[y * toWidth + x]! = text[y * fromWidth + sx]!;
   }
 }
+function recenterText(out: Float32Array): void {
+  let mean = 0;
+  for (const value of out) mean += value;
+  mean /= out.length;
+  for (let i = 0; i < out.length; i++) out[i]! -= mean;
+}
 function normaliseText(out: Float32Array): void {
+  recenterText(out);
   let norm = 0;
   for (const value of out) norm += value * value;
   if (norm <= 0) return;
@@ -182,13 +189,16 @@ function coarseShortlist(
   field: 'artCoarse' | 'text'
 ): IconTemplate[] {
   return templates
-    .map((template) => ({ template, score: dot(features[field], template.features[field]) }))
+    .map((template) => ({
+      template,
+      score: stashFeatureDot(features[field], template.features[field]),
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, COARSE_KEEP)
     .map(({ template }) => template);
 }
 function scoreTemplate(features: CellFeatures, template: IconTemplate): CellMatch {
-  const artScore = dot(features.artFine, template.features.artFine);
+  const artScore = stashFeatureDot(features.artFine, template.features.artFine);
   const textScore = shiftedTextScore(
     features.text,
     features.textWidth,

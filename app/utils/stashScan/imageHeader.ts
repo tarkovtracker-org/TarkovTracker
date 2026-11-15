@@ -41,8 +41,13 @@ function jpegFrame(view: DataView, offset: number, length: number): [number, num
 const isJpeg = (bytes: Uint8Array): boolean => bytes[0] === 0xff && bytes[1] === 0xd8;
 function jpegSize(bytes: Uint8Array, view: DataView): [number, number] | null {
   if (!isJpeg(bytes)) return null;
+  return scanJpegMarkers(view);
+}
+function scanJpegMarkers(view: DataView): [number, number] {
   let offset = 2;
-  while (offset + 9 < bytes.length) {
+  // Each fill byte or segment costs one step; large segment payloads are skipped.
+  let remaining = 4096;
+  while (offset + 9 < view.byteLength && remaining-- > 0) {
     const segment = jpegSegment(view, offset);
     if (segment.size) return segment.size;
     offset = segment.next;

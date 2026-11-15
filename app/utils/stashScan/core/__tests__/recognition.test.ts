@@ -37,6 +37,22 @@ function grid(pitch: number, thickness = 1): RgbImage {
   line(target, x(2) + thickness, y(2), x(4) - 1, y(2) + thickness - 1, 24);
   return target;
 }
+function croppedGrid(
+  source: RgbImage,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number
+): RgbImage {
+  const width = source.width - left - right;
+  const height = source.height - top - bottom;
+  const data = new Uint8Array(width * height * 3);
+  for (let y = 0; y < height; y++) {
+    const start = ((top + y) * source.width + left) * 3;
+    data.set(source.data.subarray(start, start + width * 3), y * width * 3);
+  }
+  return { data, width, height };
+}
 function paintIcon(target: RgbImage, seed: number): void {
   for (let y = 15; y < target.height - 16; y++) {
     for (let x = 1; x < target.width - 1; x++) {
@@ -84,6 +100,16 @@ describe('pinned cultist-circle grid detection', () => {
       expect(result.cells[0]).toMatchObject({ x: 8, y: 8, slotsWide: 1, slotsHigh: 1 });
     }
   );
+  it.each([
+    [8, 0, 0, 0],
+    [0, 8, 0, 0],
+    [0, 0, 8, 0],
+    [0, 0, 0, 8],
+    [8, 8, 8, 8],
+  ])('retains grid cells with borders at image edges %#', (left, top, right, bottom) => {
+    const cropped = croppedGrid(grid(63), left!, top!, right!, bottom!);
+    expect(detectGrid(cropped).cells).toHaveLength(45);
+  });
   it('detects fractional-scale two-pixel borders with the upstream subpixel refinement', () => {
     const result = detectGrid(grid(52.5, 2));
     expect(result.pitch).toBeCloseTo(52.5, 0);
@@ -180,6 +206,29 @@ describe('art and glyph matching', () => {
     expect(result.matches[0]).toMatchObject({ itemId: 'long', rotated: true });
     expect(result.matches[0]!.artScore).toBeGreaterThan(0.99);
   });
+  it('recenters a wide upright label after cropping it for a rotated narrow item', () => {
+    const source = image(190, 64);
+    paintIcon(source, 1);
+    for (let y = 3; y < 11; y++) {
+      for (let x = 130; x < 187; x += 3) pixel(source, x, y, [240, 240, 240]);
+    }
+    const index = createIconIndex();
+    add(index, 'wide', source, 3, 1);
+    const rotated = rotateClockwise(source);
+    for (let y = 1; y <= 13; y++) {
+      rotated.data.fill(24, (y * 64 + 1) * 3, (y * 64 + 63) * 3);
+      for (let x = 0; x < 61; x++) {
+        const start = (y * source.width + 128 + x) * 3;
+        rotated.data.set(source.data.subarray(start, start + 3), (y * 64 + 2 + x) * 3);
+      }
+    }
+    const text = index.bySize.get('1x3')![0]!.features.text;
+    const mean =
+      Array.from(text.values).reduce((sum, value) => sum + value * text.scale, 0) /
+      text.values.length;
+    expect(Math.abs(mean)).toBeLessThan(0.0005);
+    expect(matchCell(features(rotated, 1, 3), index).matches[0]!.textScore).toBeGreaterThan(0.99);
+  });
   it('recognizes empty regions and preserves occupied-but-unmatched regions', () => {
     const index = createIconIndex();
     expect(matchCell(features(image(64, 64)), index)).toEqual({
@@ -200,6 +249,9 @@ describe('art and glyph matching', () => {
 describe('fail-closed numeric and allocation bounds', () => {
   it.each([0, -1, NaN, Infinity, 1.5, 16_385])('rejects invalid image width %s', (width) => {
     expect(() => detectGrid({ width, height: 1, data: new Uint8Array(3) })).toThrow();
+  });
+  it.each([0, -1, NaN, Infinity, 1.5, 16_385])('rejects invalid image height %s', (height) => {
+    expect(() => detectGrid({ width: 1, height, data: new Uint8Array(3) })).toThrow();
   });
   it('rejects pixel budget overflow, byte mismatch, and non-byte storage before detection', () => {
     expect(() => detectGrid({ width: 8192, height: 8192, data: new Uint8Array(0) })).toThrow(

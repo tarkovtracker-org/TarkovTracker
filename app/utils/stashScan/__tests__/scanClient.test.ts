@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { isProxy, reactive } from 'vue';
 import { createStashScanner } from '@/utils/stashScan/scanClient';
 import type { ScanCommand, ScanReply } from '@/utils/stashScan/types';
 const instance = {
@@ -29,19 +29,36 @@ describe('scan worker transport', () => {
   });
   it('serializes reactive corrections and manual first-image regions', async () => {
     const scanner = createStashScanner(vi.fn());
-    const correction = scanner.request({ op: 'rects', rects: [rect()] });
+    const geometry = reactive({
+      ...rect(),
+      x: 12,
+      y: 34,
+      width: 127,
+      height: 64,
+      slotsWide: 2,
+      extra: 'never sent',
+    });
+    const plain = { x: 12, y: 34, width: 127, height: 64, slotsWide: 2, slotsHigh: 1 };
+    const correction = scanner.request({ op: 'rects', rects: [geometry] });
     const corrected = expect(correction).rejects.toThrow('finished');
     complete();
     await corrected;
+    const file = new File(['data'], 'image.png', { type: 'image/png' });
     const manual = scanner.request({
       op: 'scan',
-      file: new File(['data'], 'image.png'),
-      rects: [rect()],
+      file,
+      rects: [geometry],
     });
     const scanned = expect(manual).rejects.toThrow('finished');
     complete();
     await scanned;
     expect(instance.postMessage).toHaveBeenCalledTimes(2);
+    expect(instance.postMessage).toHaveBeenNthCalledWith(1, { op: 'rects', rects: [plain] });
+    expect(instance.postMessage).toHaveBeenNthCalledWith(2, { op: 'scan', file, rects: [plain] });
+    const sent = instance.postMessage.mock.calls[1]![0];
+    expect(sent.op === 'scan' && sent.file).toBe(file);
+    expect(isProxy(sent.rects![0])).toBe(false);
+    expect(Object.keys(sent.rects![0]!)).toEqual(Object.keys(plain));
     scanner.cancel();
   });
   it('clears a failed send so the next attempt is not permanently cancelled', async () => {

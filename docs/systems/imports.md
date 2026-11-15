@@ -15,7 +15,7 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
   and stack counts need correction. Quantities are units, never durability or remaining uses.
   FIR is user-confirmed; unknown FIR can fill only non-FIR requirements.
-- Users can search the full catalog, exclude regions, split merged detections, and draw a
+- Users can search the indexed catalog, exclude regions, split merged detections, and draw a
   manually sized item region when detection fails. Redrawing replaces overlapping regions.
 - Each import reconciles explicitly selected requirements using the existing Smart Fill
   priority/allocation policy. It does not add screenshot totals to existing counts. Physical
@@ -32,13 +32,22 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 expected JSON snapshot, validates bounded count updates, and saves counts and receipt in one
 transaction. A changed destination rejects the preview. Replayed import IDs return the live
 progress snapshot; identical pixel fingerprints are recognized within the same mode/season
-and reset epoch. Receipts retain the latest 100 imports for at most 90 days. Reconciliation
-does not inflate counts even after receipt expiry or a differently compressed screenshot.
+and reset epoch. Receipts retain the latest 100 imports per account. They are usable for 90
+days; expired rows are pruned lazily on a later import call and may remain stored until then.
+Reconciliation does not inflate counts even after receipt expiry or a differently compressed screenshot.
+Commit and receipt lookup share an owner-scoped limit of 60 calls per minute, enforced before
+request hashing and owner locks. Replays, duplicates, and conflicts also consume this budget.
 
 The migration also rejects an exact pre-import objective record arriving through stale
 ordinary sync while its receipt remains retained. New timestamped manual edits and explicit
 reset epochs remain valid. This guard is intentionally import-specific, not a replacement
-for the general sync merge policy. Receipt lookup is owner-only; raw receipts are private.
+for the general sync merge policy. It hashes only changed objective keys and uses indexed
+receipt containment, preserving protection from older retained imports. Receipt lookup is
+owner-only; raw receipts are private.
+
+While reconciliation is required, ordinary sync rejects detached imperative snapshots with
+`null` and a warning; callers must merge changes into the store and retry after reconciliation.
+It never silently substitutes the store for a caller-supplied detached snapshot.
 
 ### Files and validation
 
@@ -52,11 +61,36 @@ for the general sync merge policy. Receipt lookup is owner-only; raw receipts ar
 Rebuild assets with `pnpm stash-scan:build-index` using the current `json.tarkov.dev` regular
 item catalog and English names. Only `assets.tarkov.dev` grid images are accepted. The
 manifest lists items with unusable templates; they remain available for manual correction.
-The manifest is written last, so an interrupted build cannot publish an incomplete index.
+The manifest is atomically replaced last, so an interrupted build cannot publish an incomplete
+index. Successful publication prunes only obsolete content-addressed shard files; icon downloads
+are streamed with a 4 MB limit. Feature version 2 recenters cropped rotated-label templates.
 Catalog files are content-addressed and loaded by detected slot size. This first catalog is
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.
 Accuracy across languages, game updates, compression, UI scaling, and tooltips must be
 measured with representative labeled screenshots. Synthetic parity does not prove it.
+
+### Rollout and rollback
+
+Apply the additive migration before deploying the importing frontend. To roll back the feature,
+restore the previous frontend and retain receipts and the stale-sync guard so older queued writes
+cannot undo completed imports. No data backfill or destructive down migration is required.
+
+If the RPCs must also be disabled, ship this as a reviewed forward migration through the normal
+deployment pipeline. Revoke both public wrappers and private implementations; do not drop the
+trigger or receipt table. The database regression suite rehearses denied calls, preserved progress,
+and restoring the grants by rolling back the rehearsal transaction.
+
+```sql
+BEGIN;
+REVOKE EXECUTE ON FUNCTION
+  public.commit_stash_item_import(text, integer, uuid, text, jsonb, jsonb),
+  private.commit_stash_item_import(text, integer, uuid, text, jsonb, jsonb),
+  public.get_stash_item_import(text, integer, uuid),
+  private.get_stash_item_import(text, integer, uuid)
+FROM authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+```
 
 ## Tarkov.dev profile import
 

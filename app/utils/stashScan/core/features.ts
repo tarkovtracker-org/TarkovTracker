@@ -9,7 +9,8 @@ import {
   assertVector,
 } from '@/utils/stashScan/core/validation';
 import type { RgbImage } from '@/utils/stashScan/core/grid';
-export const FEATURE_VERSION = 1;
+// Version 2 recenters cropped/right-aligned rotated short-name templates.
+export const FEATURE_VERSION = 2;
 export const TEMPLATE_SLOT_PX = 63;
 export const TEXT_BAND_PX = 13;
 export const BADGE_BAND_PX = 15;
@@ -162,7 +163,7 @@ function vectorParts(vector: FeatureVector): { values: Float32Array | Int8Array;
   if (vector instanceof Float32Array) return { values: vector, scale: 1 };
   return vector;
 }
-export function dot(a: Float32Array, b: FeatureVector): number {
+export function stashFeatureDot(a: Float32Array, b: FeatureVector): number {
   const { values, scale } = vectorParts(b);
   if (a.length !== values.length) throw new RangeError('Feature vector lengths differ');
   let sum = 0;

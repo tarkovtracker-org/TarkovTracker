@@ -705,6 +705,21 @@ describe('useSupabaseSync', () => {
       expect(upsert).toHaveBeenLastCalledWith({ count: 3, user_id: 'user-1' });
       sync.cleanup();
     });
+    it('rejects detached imperative snapshots while reconciliation is required', async () => {
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 3;
+      sync.requireReconciliation!();
+      await expect(sync.syncToSupabase({ count: 9 })).resolves.toBeNull();
+      expect(reconcile).not.toHaveBeenCalled();
+      expect(upsert).not.toHaveBeenCalled();
+      expect(store.$state.count).toBe(3);
+      expect(sync.hasPendingChanges!()).toBe(true);
+      await sync.syncToSupabase();
+      expect(reconcile).toHaveBeenCalledOnce();
+      expect(upsert).toHaveBeenLastCalledWith({ count: 3, user_id: 'user-1' });
+      sync.cleanup();
+    });
     it('drops queued stale payloads and does not acknowledge an in-flight save after the gate changes', async () => {
       let release!: (result: { error: null }) => void;
       upsert.mockImplementationOnce(

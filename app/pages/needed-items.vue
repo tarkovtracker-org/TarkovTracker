@@ -5,9 +5,10 @@
         <slot name="header" />
         <div class="mb-3 flex justify-end">
           <UButton
+            data-testid="stash-import-open"
             icon="i-mdi-image-search"
             variant="soft"
-            :disabled="!itemsReady"
+            :disabled="!stashImportReady"
             @click="stashImportOpen = true"
           >
             {{ $t('stash_import.title') }}
@@ -196,6 +197,7 @@
     objectivesByItemId,
     filterTabsWithCounts,
     itemsReady,
+    stashImportReady,
     itemsError,
     ensureNeededItemsData,
   } = useNeededItems({ perfDebug, search, t });

@@ -1,0 +1,125 @@
+// @vitest-environment node
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { join, resolve, sep } from 'node:path';
+import { cacheImage, publishScanCatalog } from '@@/scripts/stash-scan/build-assets';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ScanCatalog } from '@/utils/stashScan/types';
+vi.mock('node:fs/promises', async (original) => {
+  const actual = await original<typeof import('node:fs/promises')>();
+  return { ...actual, writeFile: vi.fn(actual.writeFile), rename: vi.fn(actual.rename) };
+});
+const root = resolve('node_modules/.cache/stash-scan-build-tests');
+let directory: string;
+const oldName = `1x1-${'a'.repeat(64)}.bin`;
+const keptName = `1x1-${'b'.repeat(64)}.bin`;
+const manifest = (): ScanCatalog => ({
+  version: 1,
+  featureVersion: 1,
+  builtAt: 'test',
+  items: [],
+  missing: [],
+  shards: { '1x1': { file: keptName, sha256: 'b'.repeat(64), bytes: 1, decodedBytes: 1 } },
+});
+beforeEach(async () => {
+  await mkdir(root, { recursive: true });
+  directory = await mkdtemp(join(root, 'build-'));
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.mocked(writeFile).mockReset();
+  vi.mocked(rename).mockReset();
+  // Destructive cleanup is limited to this test's resolved workspace-owned directory.
+  expect(resolve(directory).startsWith(`${root}${sep}`)).toBe(true);
+  await rm(directory, { recursive: true });
+});
+describe('bounded builder image responses', () => {
+  it('streams at most 4MB and cancels overflow before writing a cache or ETag', async () => {
+    const cancelled = vi.fn();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(4 * 1024 * 1024));
+          controller.enqueue(new Uint8Array([1]));
+          controller.enqueue(new Uint8Array([2]));
+          controller.close();
+        },
+        cancel: cancelled,
+      })
+    );
+    const buffered = vi
+      .spyOn(response, 'arrayBuffer')
+      .mockRejectedValue(new Error('unbounded read'));
+    const file = join(directory, 'icon.webp');
+    await expect(cacheImage(response, file)).rejects.toThrow('Oversized grid image');
+    expect(buffered).not.toHaveBeenCalled();
+    expect(cancelled).toHaveBeenCalledOnce();
+    expect(await readdir(directory)).toEqual([]);
+  });
+  it('rejects a missing response body without publishing an empty cache entry', async () => {
+    await expect(cacheImage(new Response(null), join(directory, 'icon.webp'))).rejects.toThrow(
+      'Missing grid image body'
+    );
+    expect(await readdir(directory)).toEqual([]);
+  });
+  it('caches an exactly 4MB image and its ETag after the complete stream is read', async () => {
+    const bytes = new Uint8Array(4 * 1024 * 1024).fill(7);
+    const file = join(directory, 'icon.webp');
+    const result = await cacheImage(new Response(bytes, { headers: { etag: 'test-tag' } }), file);
+    expect(Buffer.from(result).equals(bytes)).toBe(true);
+    expect((await readFile(file)).equals(bytes)).toBe(true);
+    expect(await readFile(`${file}.etag`, 'utf8')).toBe('test-tag');
+  });
+});
+describe('atomic manifest publication and shard pruning', () => {
+  async function existing(): Promise<void> {
+    await writeFile(join(directory, 'catalog.json'), 'old complete manifest');
+    await writeFile(join(directory, oldName), 'old shard');
+    await writeFile(join(directory, keptName), 'new shard');
+  }
+  it('preserves the prior complete manifest and shards after a partial temporary write failure', async () => {
+    await existing();
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(writeFile).mockImplementationOnce(async (file, _data, options) => {
+      await actual.writeFile(file, 'partial', options);
+      throw new Error('disk full');
+    });
+    await expect(publishScanCatalog(directory, manifest())).rejects.toThrow('disk full');
+    expect(await readFile(join(directory, 'catalog.json'), 'utf8')).toBe('old complete manifest');
+    expect(await readFile(join(directory, oldName), 'utf8')).toBe('old shard');
+    expect((await readdir(directory)).sort()).toEqual([oldName, keptName, 'catalog.json'].sort());
+  });
+  it('does not prune on failed atomic replacement and removes its incomplete publication file', async () => {
+    await existing();
+    vi.mocked(rename).mockRejectedValueOnce(new Error('rename failed'));
+    await expect(publishScanCatalog(directory, manifest())).rejects.toThrow('rename failed');
+    expect(await readFile(join(directory, 'catalog.json'), 'utf8')).toBe('old complete manifest');
+    expect(await readFile(join(directory, oldName), 'utf8')).toBe('old shard');
+    expect((await readdir(directory)).sort()).toEqual([oldName, keptName, 'catalog.json'].sort());
+  });
+  it('publishes by replacement before pruning only unreferenced known shard files', async () => {
+    await existing();
+    const unrelated = 'notes.bin';
+    const oldFormat = `1x1-${'c'.repeat(64)}.bin.gz`;
+    const nested = `1x1-${'d'.repeat(64)}.bin`;
+    await writeFile(join(directory, unrelated), 'keep');
+    await writeFile(join(directory, oldFormat), 'keep');
+    await mkdir(join(directory, nested));
+    await writeFile(join(directory, nested, oldName), 'nested stays');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(rename).mockImplementationOnce(async (from, to) => {
+      expect(await readFile(join(directory, oldName), 'utf8')).toBe('old shard');
+      await actual.rename(from, to);
+    });
+    await publishScanCatalog(directory, manifest());
+    expect(vi.mocked(rename)).toHaveBeenCalledOnce();
+    const [from, to] = vi.mocked(rename).mock.calls[0]!;
+    expect(resolve(String(from))).not.toBe(resolve(String(to)));
+    expect(resolve(String(from)).startsWith(`${directory}${sep}`)).toBe(true);
+    expect(resolve(String(to))).toBe(join(directory, 'catalog.json'));
+    expect(JSON.parse(await readFile(join(directory, 'catalog.json'), 'utf8'))).toEqual(manifest());
+    expect((await readdir(directory)).sort()).toEqual(
+      [keptName, 'catalog.json', unrelated, oldFormat, nested].sort()
+    );
+    expect(await readFile(join(directory, nested, oldName), 'utf8')).toBe('nested stays');
+  });
+});

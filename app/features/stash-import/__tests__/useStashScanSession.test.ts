@@ -50,6 +50,24 @@ describe('stash scan session', () => {
     mocks.request.mockReset().mockResolvedValue(fixture());
     mocks.cancel.mockReset();
   });
+  it('ignores a rejected header read from an obsolete selection', async () => {
+    const { scope, session } = setup();
+    const obsolete = screenshot();
+    let rejectRead!: (error: Error) => void;
+    vi.spyOn(obsolete, 'arrayBuffer').mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject;
+        })
+    );
+    const reading = session.select([obsolete]);
+    await session.select([screenshot(), screenshot()]);
+    rejectRead(new Error('old read failed'));
+    await reading;
+    expect(session.error.value).toBe('stash_import.errors.one_image');
+    expect(session.result.value).toBeUndefined();
+    scope.stop();
+  });
   it('retains corrections on untouched regions and replaces overlapping detections', async () => {
     const { scope, session } = setup();
     await session.select([screenshot()]);

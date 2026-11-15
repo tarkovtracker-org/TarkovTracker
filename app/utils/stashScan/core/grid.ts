@@ -74,6 +74,31 @@ function ridgeBounds(width: number, height: number, vertical: boolean) {
   if (vertical) return { step: 1, xStart: 1, xEnd: width - 2, yStart: 0, yEnd: height };
   return { step: width, xStart: 0, xEnd: width, yStart: 1, yEnd: height - 2 };
 }
+/** A crop can retain a visible border while removing the outside comparison pixel. */
+function markBoundaryRidge(stats: PixelStats, p: number, step: number, mask: Uint8Array): void {
+  if (!stats.neutral[p]) return;
+  if (stats.brightness[p]! - stats.brightness[p + step]! >= RIDGE_CONTRAST) {
+    mask[p] = 1;
+    return;
+  }
+  markDoubleRidge(stats, p, step, mask);
+}
+function imageBoundaryRidges(
+  stats: PixelStats,
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  vertical: boolean
+): void {
+  const axis = scanAxis(width, height, !vertical);
+  if (axis.length < 3) return;
+  for (let lane = 0; lane < axis.lanes; lane++) {
+    const first = lane * axis.laneStep;
+    const last = first + (axis.length - 1) * axis.alongStep;
+    markBoundaryRidge(stats, first, axis.alongStep, mask);
+    markBoundaryRidge(stats, last, -axis.alongStep, mask);
+  }
+}
 function ridgeMask(
   stats: PixelStats,
   width: number,
@@ -86,6 +111,7 @@ function ridgeMask(
     for (let x = bounds.xStart; x < bounds.xEnd; x++)
       markRidge(stats, y * width + x, bounds.step, mask);
   }
+  imageBoundaryRidges(stats, mask, width, height, vertical);
   return mask;
 }
 interface Segment {

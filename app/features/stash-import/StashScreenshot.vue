@@ -17,7 +17,7 @@
       :viewBox="viewBox"
       class="bg-surface-950 max-h-160 w-full touch-none rounded border border-white/10"
       :aria-label="$t('stash_import.screenshot')"
-      role="img"
+      role="group"
       @pointerdown="startRegion"
       @pointermove="moveRegion"
       @pointerup="finishRegion"

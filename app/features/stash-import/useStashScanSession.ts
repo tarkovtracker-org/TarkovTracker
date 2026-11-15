@@ -115,6 +115,7 @@ export function useStashScanSession() {
   }
   async function select(files: File[]) {
     cancel();
+    const revision = generation;
     source.value = undefined;
     result.value = undefined;
     rows.value = [];
@@ -122,7 +123,6 @@ export function useStashScanSession() {
     error.value = '';
     try {
       const file = selectedFile(files);
-      const revision = generation;
       const size = imageDimensions(new Uint8Array(await file.arrayBuffer()));
       if (revision !== generation) return;
       [width.value, height.value] = size;
@@ -130,7 +130,7 @@ export function useStashScanSession() {
       setImage(file);
       await run({ op: 'scan', file });
     } catch (failure) {
-      error.value = messageOf(failure);
+      if (revision === generation) error.value = messageOf(failure);
     }
   }
   async function rescan() {

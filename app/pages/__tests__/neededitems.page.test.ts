@@ -70,6 +70,7 @@ const createMockNeededItemsState = (options: {
     itemsError: computed(() => null),
     itemsFullLoaded: computed(() => true),
     itemsReady: computed(() => !itemsLoading),
+    stashImportReady: ref(true),
     kappaOnly: ref(false),
     objectivesByItemId: computed(() => new Map()),
     queueFullItemsLoad: vi.fn(),
@@ -142,6 +143,19 @@ const defaultGlobalStubs = {
   UIcon: true,
 };
 describe('needed items page', () => {
+  it('waits for destination requirements before enabling screenshot imports', async () => {
+    const { NeededItemsPage, state } = await setup();
+    state.stashImportReady.value = false;
+    const wrapper = await mountSuspended(NeededItemsPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    const trigger = wrapper.find('[data-testid="stash-import-open"]');
+    expect(trigger.attributes('disabled')).toBeDefined();
+    state.stashImportReady.value = true;
+    await nextTick();
+    expect(trigger.attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
   it('renders needed items list view', async () => {
     const { NeededItemsPage } = await setup({ viewMode: 'list' });
     const wrapper = await mountSuspended(NeededItemsPage, {

@@ -9,6 +9,7 @@ const validations = [
   'exec supabase db reset --no-seed',
   'exec supabase test db supabase/tests/database',
   'run supabase:test:task-identity-concurrency',
+  'run supabase:test:stash-import-concurrency',
   'run supabase:test:concurrency',
   'run supabase:test:one-time-concurrency',
   'run supabase:test:owner-only-concurrency',
@@ -25,7 +26,7 @@ function assertDatabaseBoundary(workflow) {
   );
 }
 test('the database job uses the isolated CI entrypoint and cannot skip validation', () => {
-  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8').replaceAll('\r\n', '\n');
   assertDatabaseBoundary(workflow);
   const bypass = workflow.replace(
     'run: node scripts/checks/check-supabase-ci.mjs',
@@ -146,3 +147,52 @@ test('a pre-existing developer stack retains its existing lifecycle behavior', (
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(commands, ['exec supabase status', ...validations]);
 });
+for (const [signal, code] of [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+]) {
+  test(`stash import fixture cleans up its sessions and user on ${signal}`, () => {
+    // Exercise the actual runner/handlers in a child process. Only Docker is replaced;
+    // no database or production fixtures are needed to verify the signal cleanup path.
+    const docker = `
+      import { EventEmitter } from 'node:events';
+      export function spawnSync(_command,args) {
+        if(args.includes('context')) return {status:0,stdout:'unix:///local-test.sock',stderr:''};
+        const sql=args.at(-1);
+        if(sql.includes('pg_terminate_backend')) console.log('terminated-sessions');
+        if(sql.includes('DELETE FROM auth.users')) console.log('deleted-fixture-user');
+        const stdout=sql.includes('SELECT progress_data')?'{}':'1';
+        return {status:0,stdout,stderr:''};
+      }
+      export function spawn() {
+        const child=new EventEmitter(); child.stdout=new EventEmitter();child.stderr=new EventEmitter();
+        child.kill=()=>{console.log('stopped-child');return true;};
+        child.stdin={end(){},write(){queueMicrotask(()=>{
+          if(!process.emit(process.env.STASH_IMPORT_TEST_SIGNAL))process.exit(0);
+        });}};
+        return child;
+      }`;
+    const bootstrap = `
+      import { registerHooks } from 'node:module';
+      registerHooks({resolve(specifier,context,next){
+        return specifier==='node:child_process'
+          ? {url:${JSON.stringify(`data:text/javascript,${encodeURIComponent(docker)}`)},shortCircuit:true}
+          :next(specifier,context);
+      }});
+      await import('./scripts/checks/stash-item-import-concurrency.mjs');`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', bootstrap], {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        STASH_IMPORT_TEST_SIGNAL: signal,
+        DOCKER_HOST: 'unix:///local-test.sock',
+      },
+    });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, code, result.stderr);
+    assert.equal(result.stdout.split('terminated-sessions').length - 1, 1);
+    assert.equal(result.stdout.split('stopped-child').length - 1, 1);
+    assert.equal(result.stdout.split('deleted-fixture-user').length - 1, 1);
+  });
+}

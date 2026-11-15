@@ -2,7 +2,7 @@
   "stash_import": {
     "title": "Import stash screenshot",
     "description": "Recognize items on your device, review them, then preview changes to Needed Items.",
-    "local_notice": "Your screenshot stays on this device. Only the counts you confirm are saved.",
+    "local_notice": "Your screenshot stays on this device. Only the counts you confirm are saved to your cloud account.",
     "visible_only": "Only visible items can be scanned. Closed containers and off-screen rows are not included.",
     "choose_image": "Choose screenshot",
     "intake_help": "Drop or paste one PNG, JPEG or WebP screenshot. Maximum 32 MB and 16 megapixels. English game text works best.",
@@ -36,7 +36,7 @@
     "exclude": "Exclude this region",
     "split": "This region contains several items",
     "split_apply": "Split and match",
-    "review_count": "{count} regions need review",
+    "review_count": "No regions need review | 1 region needs review | {count} regions need review",
     "next_review": "Next uncertain item",
     "only_attention": "Show only items needing review",
     "set_fir": "Mark included items FIR…",
@@ -44,7 +44,8 @@
     "set_fir_yes": "Yes, all included items are FIR",
     "match_help": "Every match is a suggestion. Check the screenshot, including omitted or partially covered items. Select any region to correct it, even when it was not flagged.",
     "coverage": "Recognition coverage and credits",
-    "coverage_detail": "{count} catalog items have no compatible image template. Search to assign them manually. Modified weapons, obscured badges, other game languages and unusual UI scales may need correction. Stack counts and FIR marks require your confirmation.",
+    "coverage_detail": "All indexed items have compatible image templates. | 1 indexed item has no compatible image template. Search to assign it manually. | {count} indexed items have no compatible image template. Search to assign them manually.",
+    "coverage_limits": "Modified weapons, obscured badges, other game languages and unusual UI scales may need correction. Stack counts and FIR marks require your confirmation.",
     "attribution": "Recognition adapted from Cultist Circle — MIT license",
     "targets": "Choose requirements to reconcile",
     "reconcile_help": "These are replacement totals for this screenshot, not additions to your progress. Select only the requirements this screenshot should represent. Other items and unchecked requirements stay unchanged.",
@@ -62,10 +63,10 @@
     "confirm_decreases": "I reviewed the decreases above. This screenshot represents the totals I want for these selected requirements.",
     "apply": "Apply reviewed counts",
     "back": "Back to review",
-    "saved": "Reviewed counts saved",
+    "saved": "Reviewed counts saved to your cloud account",
     "saved_detail": "Only the selected counts were reconciled. Quest hand-ins, built stations and other progress were preserved.",
     "already_imported": "This screenshot was already imported. No counts were added or replaced.",
-    "check_receipt": "Check whether the import saved",
+    "check_receipt": "Check the cloud import receipt",
     "errors": {
       "one_image": "Choose one screenshot at a time. Overlapping screenshots must not be added together.",
       "image_size": "This image is too large or has invalid dimensions. Use a screenshot below 32 MB and 16 megapixels, or crop it first.",
@@ -82,12 +83,13 @@
       "quantity": "Enter a whole-number unit quantity from 1 to 1,000,000 for each included region.",
       "review_required": "Confirm or exclude uncertain matches and quantities before continuing.",
       "sign_in": "Sign in to save this import with duplicate protection across your devices. You can scan and review locally first.",
-      "unsynced": "Your local and saved progress do not yet match. Wait for progress sync to finish, then preview again. Nothing was overwritten.",
+      "unsynced": "Your device and cloud progress do not yet match. Wait for progress sync to finish, then preview again. Nothing was overwritten.",
       "catalog_loading": "Destination requirements are still loading. Wait a moment, then preview again.",
       "too_many_targets": "This import changes more than 256 requirements. Select fewer requirements and preview again.",
+      "rate_limited": "Too many import or receipt checks. Wait one minute, then retry the same action. Your review is preserved.",
       "stale": "Progress or the destination changed after this preview. Go back and generate a fresh preview before applying.",
-      "save_unknown": "The save response was interrupted. The import may have saved. Check its receipt before trying another import; do not add the counts manually.",
-      "receipt_missing": "No saved receipt was found. A delayed request may still finish. Your original review is retained; check again before starting another import. Reconciliation never adds counts on retry."
+      "save_unknown": "The cloud save response was interrupted. The import may have reached your cloud account. Check its receipt before trying another import; do not add the counts manually.",
+      "receipt_missing": "No cloud import receipt was found. A delayed request may still finish. Your original review is retained; check again before starting another import. Reconciliation never adds counts on retry."
     }
   },
   "admin": {
