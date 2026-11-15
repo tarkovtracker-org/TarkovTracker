@@ -396,6 +396,17 @@ describe('stash import flow', () => {
     expect(save(wrapper).attributes('disabled')).toBeDefined();
     wrapper.unmount();
   });
+  it('lets the player save again after a reused import ID, which a retry replaces', async () => {
+    mocks.commit.mockResolvedValueOnce({ status: 'conflict', reason: 'import_id_reused' });
+    const wrapper = render();
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await saveNow(wrapper);
+    expect(wrapper.text()).toContain('stash_import.conflict_refreshed');
+    expect(wrapper.text()).not.toContain('stash_import.errors.reimport_blocked');
+    expect(save(wrapper).attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
   it('tells the player to go back when an image is pasted on the save step', async () => {
     const wrapper = render();
     await toApply(wrapper);

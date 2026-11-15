@@ -112,6 +112,9 @@
   const filter = ref<Filter>(props.remaining ? 'check' : 'all');
   const allFir = ref(false);
   const includedCount = computed(() => props.rows.filter((row) => !row.excluded).length);
+  /** What the All filter lists: every detection except empty slots nobody restored. */
+  const listed = (row: ReviewedCell) => !row.cell.empty || !row.excluded;
+  const listedCount = computed(() => props.rows.filter(listed).length);
   const progress = computed(() =>
     props.remaining
       ? {
@@ -125,7 +128,7 @@
       value,
       active: filter.value === value,
       label: t(`stash_import.filter_${value}`, {
-        count: value === 'check' ? props.remaining : includedCount.value,
+        count: value === 'check' ? props.remaining : listedCount.value,
       }),
       tone:
         filter.value === value
@@ -140,7 +143,7 @@
   function visible(row: ReviewedCell) {
     if (row.cell.key === activeKey.value) return true;
     if (filter.value === 'check') return needsReview(row);
-    return !row.cell.empty || !row.excluded;
+    return listed(row);
   }
   const visibleRows = computed(() => props.rows.filter(visible));
   function toggle(key: number) {

@@ -146,7 +146,8 @@
       before: target.current,
       after,
       delta: after - target.current,
-      relevant: props.relevant.has(changeKey(target)),
+      // Rows the full plan would change, plus any the current selection shifts items onto.
+      relevant: props.relevant.has(changeKey(target)) || after !== target.current,
     };
   }
   const byRelevance = (a: TargetRow, b: TargetRow) => Number(b.relevant) - Number(a.relevant);

@@ -220,11 +220,21 @@ describe('reviewed stash import persistence', () => {
     ]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()], 'add');
     expect(preview.importMode).toBe('add');
+    h.rpc.mockImplementationOnce(async () => {
+      const receipt = applied();
+      (receipt.data.progress_data as UserState['pvp']).taskObjectives[objective] = {
+        count: 3,
+        complete: false,
+        timestamp: 100,
+      };
+      return receipt;
+    });
     await importer.commit(preview, total, [key()]);
     expect(h.rpc).toHaveBeenCalledWith(
       'commit_stash_item_import',
       expect.objectContaining({ p_updates: [{ id: objective, type: 'task', count: 3, needed: 3 }] })
     );
+    expect(state.pvp.taskObjectives[objective]?.count).toBe(3);
   });
   it('uses selected-scope Smart Fill and preserves unrelated progress', async () => {
     const importer = useStashImport([need(), need(unrelated)]);

@@ -51,11 +51,11 @@ export function useItemDistribution(): UseItemDistributionReturn {
     }
     return hideoutPartCurrentCount(objective);
   }
-  /** A part ticked complete without a count is full, as on the Hideout page. */
+  /** A part ticked complete without any stored count is full, as on the Hideout page. */
   function hideoutPartCurrentCount(part: NeededItemHideoutModule): number {
     const stored = tarkovStore.getHideoutPartCount(part.id) ?? 0;
-    if (!tarkovStore.isHideoutPartComplete(part.id)) return stored;
-    return Math.max(stored, neededCountOf(part));
+    if (stored > 0 || !tarkovStore.isHideoutPartComplete(part.id)) return stored;
+    return neededCountOf(part);
   }
   function sortTaskObjectives(objectives: NeededItemTaskObjective[]): NeededItemTaskObjective[] {
     const taskKey = (objective: NeededItemTaskObjective) =>

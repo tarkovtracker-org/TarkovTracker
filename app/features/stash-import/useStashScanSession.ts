@@ -139,6 +139,8 @@ export function useStashScanSession() {
     await run({ op: 'scan', file: source.value });
   }
   async function region(rect: ScanRect) {
+    // One correction at a time: a second request would cancel the worker handling the first.
+    if (busy.value) return;
     if (!result.value && source.value) {
       await run({ op: 'scan', file: source.value, rects: [rect] });
       return;
@@ -149,7 +151,7 @@ export function useStashScanSession() {
     await run({ op: 'rects', rects: [...others, rect] }, true);
   }
   async function split(columns: number, rowCount: number) {
-    if (!active.value) return;
+    if (!active.value || busy.value) return;
     const rects = rows.value.flatMap((row) =>
       row === active.value ? splitRegion(row.cell, columns, rowCount) : [row.cell]
     );

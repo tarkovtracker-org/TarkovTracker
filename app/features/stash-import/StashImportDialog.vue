@@ -55,6 +55,14 @@
               :description="$t(banner.text)"
             />
           </div>
+          <p
+            v-if="step === 'review' && busy"
+            role="status"
+            class="text-surface-200 mb-3 flex items-center gap-2 text-sm"
+          >
+            <UIcon name="i-mdi-loading" class="size-4 animate-spin" aria-hidden="true" />
+            {{ $t(`stash_import.stage_${stage}`) }}
+          </p>
           <StashImportIntake
             v-if="step === 'intake'"
             :busy="busy"
@@ -70,6 +78,9 @@
           <div
             v-else-if="step === 'review'"
             class="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]"
+            :class="busy ? 'opacity-60' : ''"
+            :inert="reviewInert"
+            :aria-busy="busy"
           >
             <div class="flex min-h-0 flex-col gap-3">
               <StashScreenshot
@@ -91,9 +102,6 @@
                 @apply="applyRegion"
                 @cancel="pendingRegion = undefined"
               />
-              <p v-if="busy" role="status" class="text-surface-300 text-sm">
-                {{ $t(`stash_import.stage_${stage}`) }}
-              </p>
             </div>
             <StashImportReview
               v-if="result"
@@ -426,6 +434,8 @@
   });
   const dropOverlay = computed(() => dragging.value && canIntake.value && step.value !== 'intake');
   const bodyInert = computed(() => saving.value || undefined);
+  // A rescan, redraw or split replaces the rows; edits made meanwhile would be lost.
+  const reviewInert = computed(() => busy.value || undefined);
   /**
    * Footer buttons keep their position across steps. Ignore activations right after a step
    * change, so a double-click on Continue cannot save and a double-click on Back cannot
@@ -589,8 +599,11 @@
       saving.value = false;
     }
   }
-  /** Reasons a retry with this same screenshot can never succeed. */
-  const PERMANENT_CONFLICTS = ['progress_reset', 'import_id_reused'];
+  /**
+   * Reasons a retry with this same screenshot cannot succeed while its receipt is retained.
+   * `import_id_reused` is not here: every save prepares a fresh import ID, so a retry is safe.
+   */
+  const PERMANENT_CONFLICTS = ['progress_reset'];
   async function showReceipt(receipt: { status: string; reason?: string }) {
     if (receipt.status === 'conflict') {
       conflicted.value = true;

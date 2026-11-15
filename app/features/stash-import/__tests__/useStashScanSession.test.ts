@@ -144,4 +144,23 @@ describe('stash scan session', () => {
     expect(session.image.value).toBeDefined();
     scope.stop();
   });
+  it('ignores a second correction while one is still being matched', async () => {
+    const { scope, session } = setup();
+    await session.select([screenshot()]);
+    let finish!: (result: ScanResult) => void;
+    mocks.request.mockImplementationOnce(
+      () => new Promise<ScanResult>((resolve) => (finish = resolve))
+    );
+    const rect = { x: 0, y: 0, width: 65, height: 65, slotsWide: 1, slotsHigh: 1 };
+    const first = session.region(rect);
+    await session.region({ ...rect, x: 65 });
+    session.activeKey.value = 0;
+    await session.split(1, 1);
+    expect(mocks.request).toHaveBeenCalledTimes(2);
+    finish(fixture());
+    await first;
+    expect(session.error.value).toBe('');
+    expect(mocks.cancel).not.toHaveBeenCalled();
+    scope.stop();
+  });
 });

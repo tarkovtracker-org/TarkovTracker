@@ -338,6 +338,17 @@ describe('useItemDistribution', () => {
         { id: 'done-part', type: 'hideout', count: 2, needed: 5 },
       ]);
     });
+    it('keeps a partial stored count on a completed part, as the Hideout page shows it', async () => {
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems, getObjectiveCurrentCount } = useItemDistribution();
+      const part = createHideoutModule('partial-part', { count: 5 });
+      mockStoreState.completeParts.add('partial-part');
+      mockStoreState.hideoutPartCounts['partial-part'] = 2;
+      expect(getObjectiveCurrentCount(part)).toBe(2);
+      expect(distributeItems(0, 2, [], [part], { additive: true }).updates).toEqual([
+        { id: 'partial-part', type: 'hideout', count: 4, needed: 5 },
+      ]);
+    });
     it('distributes FIR items to FIR task objectives first', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

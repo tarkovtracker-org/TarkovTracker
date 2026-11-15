@@ -4,6 +4,7 @@
       type="button"
       class="flex w-full items-center gap-3 px-2.5 py-2 text-left"
       :aria-expanded="open"
+      :aria-controls="editorId"
       @click="$emit('toggle')"
     >
       <StashCellThumb class="size-10" :bitmap="bitmap" :cell="row.cell" />
@@ -13,7 +14,7 @@
       </span>
       <UIcon :name="look.icon" class="size-5 shrink-0" :class="look.tone" />
     </button>
-    <div v-if="open" class="border-t border-white/10 p-3">
+    <div v-if="open" :id="editorId" class="border-t border-white/10 p-3">
       <StashCellEditor
         :row="row"
         :items="items"
@@ -43,6 +44,7 @@
     change: [patch: Partial<ReviewedCell>];
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const editorId = useId();
   const title = computed(() =>
     props.row.itemId ? props.itemName(props.row.itemId) : t('stash_import.unidentified')
   );

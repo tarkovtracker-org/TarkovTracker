@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import StashCellEditor from '@/features/stash-import/StashCellEditor.vue';
 import StashRegionEditor from '@/features/stash-import/StashRegionEditor.vue';
 import StashScreenshot from '@/features/stash-import/StashScreenshot.vue';
 import type { ReviewedCell } from '@/utils/stashScan/types';
+mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 describe('stack quantity review', () => {
   it('requires a new confirmation after editing a previously accepted quantity', async () => {
     const row: ReviewedCell = {
@@ -114,6 +116,8 @@ describe('screenshot region accessibility', () => {
     expect(wrapper.find('svg').attributes('role')).toBe('group');
     const region = wrapper.find('rect[role=button]');
     expect(region.attributes('tabindex')).toBe('0');
+    // The region names its review state, matching the visible colour legend.
+    expect(region.attributes('aria-label')).toBe('stash_import.region_label');
     await region.trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('select')).toEqual([[7]]);
     wrapper.unmount();

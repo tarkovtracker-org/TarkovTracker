@@ -77,7 +77,7 @@
           vector-effect="non-scaling-stroke"
           tabindex="0"
           role="button"
-          :aria-label="$t('stash_import.region_label', { number: row.cell.key + 1 })"
+          :aria-label="regionLabel(row)"
           :aria-pressed="isActive(row)"
           @click="pick(row)"
           @keydown.enter.prevent="pick(row)"
@@ -91,9 +91,9 @@
         />
       </svg>
     </div>
-    <ul class="text-surface-400 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-hidden="true">
+    <ul class="text-surface-400 flex flex-wrap gap-x-4 gap-y-1 text-xs">
       <li v-for="entry in legend" :key="entry.key" class="flex items-center gap-1.5">
-        <span class="size-3 rounded-sm border-2" :class="entry.swatch" />
+        <span class="size-3 rounded-sm border-2" :class="entry.swatch" aria-hidden="true" />
         {{ $t(`stash_import.legend_${entry.key}`) }}
       </li>
     </ul>
@@ -111,6 +111,7 @@
     active?: ReviewedCell;
   }>();
   const emit = defineEmits<{ select: [key: number]; region: [rect: ScanRect]; rescan: [] }>();
+  const { t } = useI18n({ useScope: 'global' });
   const legend = [
     { key: 'check', swatch: 'border-warning-400 bg-warning-400/25' },
     { key: 'ok', swatch: 'border-success-400' },
@@ -142,14 +143,35 @@
       : null
   );
   /** Zoom keeps neighbouring slots in view so the item can be compared with its surroundings. */
+  /**
+   * Zoom keeps neighbouring slots in view so the item can be compared with its surroundings.
+   * The window is clamped to the screenshot so edge items are never shown beside blank space.
+   */
+  const span = (size: number, pad: number, limit: number) => Math.min(limit, size + pad * 2);
+  const origin1d = (start: number, pad: number, length: number, limit: number) =>
+    Math.min(Math.max(0, start - pad), Math.max(0, limit - length));
   const viewBox = computed(() => {
     const cell = props.active?.cell;
     if (!zoomed.value || !cell) return `0 0 ${props.width} ${props.height}`;
     const pad = Math.max(cell.width, cell.height);
-    const x = Math.max(0, cell.x - pad);
-    const y = Math.max(0, cell.y - pad);
-    return `${x} ${y} ${cell.width + pad * 2} ${cell.height + pad * 2}`;
+    const width = span(cell.width, pad, props.width);
+    const height = span(cell.height, pad, props.height);
+    const x = origin1d(cell.x, pad, width, props.width);
+    const y = origin1d(cell.y, pad, height, props.height);
+    return `${x} ${y} ${width} ${height}`;
   });
+  /** Each region announces its review state, matching the colour legend. */
+  function regionLabel(row: ReviewedCell) {
+    return t('stash_import.region_label', {
+      number: row.cell.key + 1,
+      status: t(`stash_import.legend_${regionStatus(row)}`),
+    });
+  }
+  function regionStatus(row: ReviewedCell) {
+    if (isActive(row)) return 'selected';
+    if (row.excluded) return 'removed';
+    return needsReview(row) ? 'check' : 'ok';
+  }
   const isActive = (row: ReviewedCell) => row.cell.key === props.active?.cell.key;
   function regionClass(row: ReviewedCell) {
     if (isActive(row)) return 'fill-primary-400/20 stroke-primary-300';

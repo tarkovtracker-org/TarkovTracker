@@ -1,7 +1,7 @@
 <template>
   <label
     :data-testid="`stash-mode-${mode}`"
-    class="has-focus-visible:ring-primary-400 flex cursor-pointer gap-3 rounded-lg border-2 p-3 transition-colors has-focus-visible:ring-2"
+    class="has-focus-visible:ring-primary-400 flex cursor-pointer gap-3 rounded-lg border-2 p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:outline-hidden"
     :class="tone.card"
   >
     <input

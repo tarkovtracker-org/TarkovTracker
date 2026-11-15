@@ -43,8 +43,9 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   Saving fixes the owner, game mode, active season, import mode, selected targets, and progress
   snapshot. If another device changed progress first (`baseline_changed`), the dialog
   reconciles, refreshes the shown counts and asks the player to save again. A screenshot
-  imported before a progress reset (`progress_reset`) can never be saved again, so the dialog
-  explains that and disables Save instead of looping.
+  imported before a progress reset (`progress_reset`) cannot be saved again while its receipt is
+  retained (100 imports, 90 days), so the dialog explains that and disables Save instead of
+  looping. Other conflict reasons reconcile and allow a fresh save with a new import ID.
 
 ### Persistence
 
