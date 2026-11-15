@@ -11,21 +11,6 @@
       <div class="space-y-3 px-4 py-4 text-sm">
         <p class="text-surface-300">{{ t('settings.device_data.description') }}</p>
         <p class="text-surface-400">{{ t('settings.device_data.cloud_unaffected') }}</p>
-        <div v-if="supersededCopies.length" class="bg-surface-900/60 space-y-2 rounded-md p-3">
-          <p class="text-surface-300">
-            {{ t('settings.device_data.superseded_available', { count: supersededCopies.length }) }}
-          </p>
-          <UButton
-            color="neutral"
-            variant="soft"
-            size="sm"
-            icon="i-mdi-download"
-            data-testid="superseded-progress-export"
-            @click="handleSupersededExport"
-          >
-            {{ t('settings.device_data.superseded_export') }}
-          </UButton>
-        </div>
         <UButton
           color="error"
           variant="soft"
@@ -77,6 +62,13 @@
     <template #body>
       <div class="space-y-3 text-sm">
         <p class="text-surface-200">{{ t('settings.device_data.confirm_description') }}</p>
+        <p
+          v-if="recoveryCopyCount"
+          class="text-warning-300"
+          data-testid="device-data-recovery-copies"
+        >
+          {{ recoveryCopiesWarning }}
+        </p>
         <UAlert
           v-if="pendingCloudChanges"
           icon="i-mdi-cloud-alert"
@@ -137,6 +129,7 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useDataBackup } from '@/composables/useDataBackup';
   import { useSignOut } from '@/composables/useSignOut';
+  import { useSupersededCopies } from '@/features/settings/useRecoveryCopies';
   import {
     clearDeviceDataRemoval,
     incompleteDeviceDataRemovalOwner,
@@ -147,18 +140,30 @@
     isDeviceDataRemovalPending,
     retryIncompleteDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
+  import { legacyProgressRecoveryCount } from '@/stores/tarkov/progressAuthority';
   import {
     hasPendingCloudChanges,
     hasUnsavedProgressChanges,
   } from '@/stores/tarkov/progressSaveStatus';
-  import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
   import { logger } from '@/utils/logger';
   import { STORAGE_KEYS } from '@/utils/storageKeys';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { $supabase } = useNuxtApp();
-  const { exportProgress, exportSupersededProgress } = useDataBackup();
+  const { exportProgress } = useDataBackup();
   const { signOutNow, signOutThisDevice, lastFailure } = useSignOut();
+  /** Removal deletes these too; they are reviewed and downloaded under Backup & Restore. */
+  const { copies: supersededCopies } = useSupersededCopies();
+  const recoveryCopyCount = computed(
+    () => supersededCopies.value.length + legacyProgressRecoveryCount.value
+  );
+  const recoveryCopiesWarning = computed(() =>
+    t(
+      'settings.device_data.recovery_copies_warning',
+      { count: recoveryCopyCount.value },
+      recoveryCopyCount.value
+    )
+  );
   const confirmOpen = ref(false);
   const confirmationOwner = ref<string | null>(null);
   const removing = ref(false);
@@ -186,27 +191,11 @@
     confirmationOwner.value = $supabase.user.id;
     confirmOpen.value = true;
   };
-  const supersededCopies = ref(
-    $supabase.user.id ? listSupersededProgressCopies($supabase.user.id) : []
-  );
-  const refreshSupersededCopies = () => {
-    supersededCopies.value = $supabase.user.id
-      ? listSupersededProgressCopies($supabase.user.id)
-      : [];
-  };
-  watch(
-    () => [$supabase.user.id, $supabase.user.loggedIn],
-    () => {
-      closeRemovalConfirmation();
-      refreshSupersededCopies();
-    },
-    { flush: 'sync' }
-  );
-  /** Other tabs report superseded-copy and removal-marker changes only through storage events. */
-  const refreshOnSupersededStorageChange = (event: StorageEvent) => {
-    if (event.key === null || event.key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) {
-      refreshSupersededCopies();
-    }
+  watch(() => [$supabase.user.id, $supabase.user.loggedIn], closeRemovalConfirmation, {
+    flush: 'sync',
+  });
+  /** Other tabs report removal-marker changes only through storage events. */
+  const refreshOnRemovalMarkerChange = (event: StorageEvent) => {
     if (
       event.key === null ||
       event.key.startsWith(STORAGE_KEYS.deviceDataRemovalIncompletePrefix)
@@ -214,28 +203,14 @@
       refreshIncompleteDeviceDataRemovals();
     }
   };
-  onMounted(() => {
-    window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies);
-    window.addEventListener('storage', refreshOnSupersededStorageChange);
-  });
-  onUnmounted(() => {
-    window.removeEventListener('tt:superseded-progress-change', refreshSupersededCopies);
-    window.removeEventListener('storage', refreshOnSupersededStorageChange);
-  });
+  onMounted(() => window.addEventListener('storage', refreshOnRemovalMarkerChange));
+  onUnmounted(() => window.removeEventListener('storage', refreshOnRemovalMarkerChange));
   const handleExport = async () => {
     try {
       await exportProgress();
     } catch (error) {
       logger.error('[DeviceData] Export failed:', error);
       toast.add({ title: t('settings.data_management.export_error_title'), color: 'error' });
-    }
-  };
-  const handleSupersededExport = async () => {
-    try {
-      await exportSupersededProgress();
-    } catch (error) {
-      logger.error('[DeviceData] Superseded progress export failed:', error);
-      toast.add({ title: t('settings.device_data.superseded_export_error'), color: 'error' });
     }
   };
   const tryRemoveAccountDeviceData = async (userId: string): Promise<boolean> => {

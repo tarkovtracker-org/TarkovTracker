@@ -8,7 +8,6 @@ const {
   calls,
   deviceData,
   exportProgress,
-  exportSupersededProgress,
   lastFailure,
   signOutNow,
   signOutThisDevice,
@@ -37,7 +36,6 @@ const {
     }),
     lastFailure: { value: null as 'session_changed' | 'revocation_unavailable' | null },
     exportProgress: vi.fn(async () => undefined),
-    exportSupersededProgress: vi.fn(async () => undefined),
     toastAdd: vi.fn(),
     user: { id: 'user-1' as string | null, loggedIn: true },
   };
@@ -51,11 +49,14 @@ vi.mock('@/composables/useSignOut', () => ({
   useSignOut: () => ({ signOutNow, signOutThisDevice, lastFailure }),
 }));
 vi.mock('@/composables/useDataBackup', () => ({
-  useDataBackup: () => ({ exportProgress, exportSupersededProgress }),
+  useDataBackup: () => ({ exportProgress }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${JSON.stringify(params)}` : key,
+  }),
 }));
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -196,31 +197,36 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="device-data-pending-warning"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="device-data-export"]').exists()).toBe(true);
   });
+  it('warns that removal also deletes the account recovery copies', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-recovery-copies"]').exists()).toBe(false);
+    const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
+    saveSupersededProgressCopy('user-1', 'pvp', null, createDefaultOwnedProgressData(), 100);
+    await nextTick();
+    expect(wrapper.get('[data-testid="device-data-recovery-copies"]').text()).toBe(
+      'settings.device_data.recovery_copies_warning:{"count":1}'
+    );
+    // Older-tab copies are removed too, so they count toward the warning.
+    const { legacyProgressRecoveryCount } = await import('@/stores/tarkov/progressAuthority');
+    legacyProgressRecoveryCount.value = 2;
+    await nextTick();
+    expect(wrapper.get('[data-testid="device-data-recovery-copies"]').text()).toContain(
+      '{"count":3}'
+    );
+    legacyProgressRecoveryCount.value = 0;
+    reactiveUser.id = 'user-2';
+    await nextTick();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-recovery-copies"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('is unavailable while signed out', async () => {
     user.id = null;
     user.loggedIn = false;
     const wrapper = await mountCard();
     expect(wrapper.get('[data-testid="device-data-remove"]').attributes('disabled')).toBeDefined();
-  });
-  it('offers export for the signed-in owner’s superseded progress copies', async () => {
-    const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
-    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
-    saveSupersededProgressCopy('user-1', 'seasonal', 1, createDefaultOwnedProgressData(), 100);
-    const wrapper = await mountCard();
-    await wrapper.get('[data-testid="superseded-progress-export"]').trigger('click');
-    await flushPromises();
-    expect(exportSupersededProgress).toHaveBeenCalledOnce();
-  });
-  it('refreshes superseded-copy visibility when the signed-in owner changes', async () => {
-    const listSpy = vi.spyOn(
-      await import('@/stores/tarkov/supersededProgress'),
-      'listSupersededProgressCopies'
-    );
-    const wrapper = await mountCard();
-    reactiveUser.id = 'user-2';
-    await nextTick();
-    expect(listSpy).toHaveBeenLastCalledWith('user-2');
-    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
   });
   it('reports a storage cleanup failure instead of claiming removal succeeded', async () => {
     deviceData.removeAccountDeviceData.mockReturnValue(false);
@@ -273,19 +279,6 @@ describe('DeviceDataCard', () => {
     expect(toastAdd).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'settings.data_management.export_error_title',
-        color: 'error',
-      })
-    );
-    const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
-    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
-    saveSupersededProgressCopy('user-1', 'seasonal', 1, createDefaultOwnedProgressData(), 100);
-    await flushPromises();
-    exportSupersededProgress.mockRejectedValueOnce(new Error('Download unavailable'));
-    await wrapper.get('[data-testid="superseded-progress-export"]').trigger('click');
-    await flushPromises();
-    expect(toastAdd).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'settings.device_data.superseded_export_error',
         color: 'error',
       })
     );
@@ -395,32 +388,6 @@ describe('DeviceDataCard', () => {
     );
     expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(true);
   });
-  it('refreshes superseded copies when another tab changes them', async () => {
-    const wrapper = await mountCard();
-    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
-    const { STORAGE_KEYS } = await import('@/utils/storageKeys');
-    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
-    const key = `${STORAGE_KEYS.progressSupersededPrefix}user-1_100_other-tab`;
-    Storage.prototype.setItem.call(
-      localStorage,
-      key,
-      JSON.stringify({
-        id: '100_other-tab',
-        ownerId: 'user-1',
-        mode: 'pvp',
-        seasonNumber: null,
-        supersededAt: 100,
-        progress: createDefaultOwnedProgressData(),
-      })
-    );
-    window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated' }));
-    await nextTick();
-    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
-    window.dispatchEvent(new StorageEvent('storage', { key }));
-    await nextTick();
-    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(true);
-    wrapper.unmount();
-  });
   it('shows a removal retry recorded by another tab', async () => {
     const wrapper = await mountCard();
     expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
@@ -436,14 +403,13 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
     wrapper.unmount();
   });
-  it('clears owner-scoped export controls when the current account signs out', async () => {
+  it('closes the removal confirmation when the current account signs out', async () => {
     const wrapper = await mountCard();
     await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
     reactiveUser.id = null;
     reactiveUser.loggedIn = false;
     await nextTick();
     expect(wrapper.find('[data-testid="device-data-confirm"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
     expect(deviceData.removeAccountDeviceData).not.toHaveBeenCalled();
     wrapper.unmount();
   });

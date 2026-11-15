@@ -157,7 +157,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   read of an existing copy blocks sign-in, but a browser that refuses all storage access holds no
   copy to protect, so cloud-only sync still starts there.
 - **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
-  affected mode that differs from its defaults under an owner-scoped export-only key. A remote
+  affected mode that differs from its defaults under an owner-scoped key that is never restored or synced automatically. A remote
   reset delivered over Realtime while local changes await acknowledgement does the same before it
   replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
   blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
@@ -168,6 +168,14 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   reports failure. Removal is verified by reading the slot after deletion; failure status is fenced
   by the local write revision so an older clear cannot replace a newer pending save.
   The online profile reset logs such a failure for its still-current session.
+  Settings > Backup & Restore lists the owner's copies under Recovery copies, where each can be downloaded,
+  discarded, or restored after confirmation. A restore replaces only the copy's mode with a fresh reset
+  epoch, refuses Seasonal copies from another season, and first keeps that mode's current progress as a
+  new copy; when that copy cannot be saved, or while active progress writes are blocked, nothing changes.
+  Restoring a downloaded superseded-progress file validates its format and allow-listed entries,
+  rejects files over 16 MiB and guests, and adds valid copies back to the list instead of applying them.
+  Copies keep their exported ids, so restoring the same file again skips copies already present.
+  Restore and discard are disabled while any import is parsing or awaiting confirmation.
   Delayed signed-in reset responses are fenced by session generation and owner identity before
   applying local state, acknowledging the save, or clearing active storage, including A→B→A switches.
   Guest Settings resets instead replace the guest envelope in one write under the shared Web Lock.
@@ -220,9 +228,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   These guarantees require the current client; an older cached client that writes raw envelopes
   does not participate in this reconciliation. Fully blocked storage holds no copy. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
-  original mode and season, are available from Settings → Account for export, and are never loaded
-  into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
-  removal.
+  original mode and season, are listed under Settings → Backup & Restore → Recovery copies for download
+  (an old-season copy cannot be restored into the current season), and are never loaded into the
+  tracker or sent to Supabase automatically. They are removed only by an explicit discard or that
+  account's device-data removal.
 - **Storage pressure.** `relieveProgressStoragePressure` removes only legacy backups that are
   byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
   deliberate resets do not delete account recovery copies or unique legacy backups automatically.
@@ -269,7 +278,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   until that marker is deleted, so the retry survives a reload, covers owners recorded by other tabs, and no tab overwrites another's marker; account deletion records incomplete
   cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
-  A removal that throws is reported as incomplete, and the card's superseded-copy list follows
+  A removal that throws is reported as incomplete, and the card's removal retry follows
   changes made in other tabs. After account deletion, a failed local sign-out falls back to the
   device-only sign-out; the card does not redirect while the deleted account's session remains.
   Malformed active bytes that name the removing owner are deleted. Bytes with no provable owner are
@@ -291,7 +300,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   `app/shell/ProgressSaveStatusIndicator.vue`, `app/stores/tarkov/progressLiveStatus.ts` — truthful
   local/cloud save status, delayed live updates, bounded cloud retry, manual retry, and export guidance
 - `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/supersededProgress.ts`,
-  `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, export-only superseded progress,
+  `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, superseded progress (restored only by the owner),
   and redundancy-only storage cleanup
 - `app/composables/useSignOut.ts`, `app/shell/SignOutConfirmModal.vue`,
   `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue`,

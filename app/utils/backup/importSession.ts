@@ -2,15 +2,19 @@ import { BackupImportError } from '@/utils/backup/errors';
 import {
   MAX_BACKUP_SIZE,
   MAX_RECOVERY_ARCHIVE_SIZE,
+  MAX_SUPERSEDED_ARCHIVE_SIZE,
   validateBackup,
   resolveRecoveryArchive,
   defaultArchiveEntryIndex,
   parseRecoveryProgress,
   buildPreview,
   isDeviceRecoveryArchiveV1,
+  isSupersededArchive,
+  parseSupersededArchive,
   type RecoveryArchiveEntry,
   type RawRecoveryArchiveEntry,
   type BackupPreviewData,
+  type SupersededArchiveCopy,
   type ValidatedBackup,
 } from '@/utils/backup/parsing';
 import { backupTokens, readBackupBatch, type BackupToken } from '@/utils/backup/transfer';
@@ -29,10 +33,30 @@ export type BackupCommand =
   | { op: 'open'; file: File; owner: string | null }
   | { op: 'select'; index: number }
   | { op: 'read' };
-export type BackupReply = { summary: BackupSummary } | { tokens: BackupToken[]; done: boolean };
+export type BackupReply =
+  | { summary: BackupSummary }
+  | { tokens: BackupToken[]; done: boolean }
+  | { supersededCopies: SupersededArchiveCopy[] };
 const fail = (message: string): never => {
   throw new BackupImportError(message);
 };
+const fileSizeError = (size: number, value: unknown): string | null => {
+  if (isDeviceRecoveryArchiveV1(value)) return null;
+  if (isSupersededArchive(value)) {
+    return size > MAX_SUPERSEDED_ARCHIVE_SIZE
+      ? 'settings.data_management.superseded_archive_too_large'
+      : null;
+  }
+  return size > MAX_BACKUP_SIZE ? 'Backup file is too large (max 5 MB)' : null;
+};
+/** Copies belong to an account, so a guest file is refused before its copies are parsed. */
+function supersededReply(value: Record<string, unknown>, owner: string | null): BackupReply {
+  if (owner === null) return fail('settings.data_management.recovery_copies_sign_in');
+  const copies = parseSupersededArchive(value);
+  return copies
+    ? { supersededCopies: copies }
+    : fail('settings.data_management.invalid_superseded_archive');
+}
 // Only one file and one selected normalized snapshot are retained by each disposable worker.
 export function createBackupImportSession() {
   let entries: RawRecoveryArchiveEntry[] = [];
@@ -86,8 +110,8 @@ export function createBackupImportSession() {
     if (file.size > MAX_RECOVERY_ARCHIVE_SIZE)
       return fail('settings.data_management.recovery_archive_too_large');
     const value = parseJson(await file.text());
-    if (file.size > MAX_BACKUP_SIZE && !isDeviceRecoveryArchiveV1(value))
-      return fail('Backup file is too large (max 5 MB)');
+    const sizeError = fileSizeError(file.size, value);
+    if (sizeError) return fail(sizeError);
     return value;
   }
   async function open(file: File, owner: string | null): Promise<BackupReply> {
@@ -95,6 +119,7 @@ export function createBackupImportSession() {
     selected = undefined;
     stream = undefined;
     const value = await readFile(file);
+    if (isSupersededArchive(value)) return supersededReply(value, owner);
     const result = resolveRecoveryArchive(value, owner);
     if (!result.ok) return fail(`settings.data_management.${result.error}`);
     if (!result.entries) return summarize(result.value, null);

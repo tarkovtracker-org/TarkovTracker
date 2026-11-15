@@ -51,6 +51,10 @@ const {
     selectedRecoveryArchiveEntry: {} as Ref<number | null>,
     legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
     legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
+    recoveryCopiesImport: {
+      __v_isRef: true as const,
+      value: null as { added: number; alreadyPresent: number } | null,
+    },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -150,6 +154,7 @@ vi.mock('@/composables/useDataBackup', () => ({
     reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
     legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
+    recoveryCopiesImport: backupState.recoveryCopiesImport,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -262,6 +267,7 @@ describe('DataManagementCard', () => {
     });
     backupState.legacyProgressRecoveryCount.value = 0;
     backupState.legacyProgressRecoveryOverflow.value = false;
+    backupState.recoveryCopiesImport.value = null;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -1385,6 +1391,46 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper({ view: 'backup' });
     await wrapper.get('[data-testid="recovery-archive-entry-1"]').trigger('click');
     expect(backupFns.reviewRecoveryArchiveEntry).toHaveBeenCalledWith(1);
+  });
+  it('keeps the device archive behind a quiet link until older edits need recovery', async () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(wrapper.find('[data-testid="recovery-copies"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="device-progress-recovery-export"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="device-recovery-archive-download"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledOnce();
+    expect(wrapper.find('[data-testid="older-tab-cleanup-confirm"]').exists()).toBe(false);
+  });
+  it('announces recovery copies added from a superseded-progress file', async () => {
+    backupFns.parseBackupFile.mockImplementation(async () => {
+      backupState.recoveryCopiesImport.value = { added: 2, alreadyPresent: 0 };
+    });
+    const wrapper = createWrapper({ view: 'backup' });
+    await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
+      wrapper.vm
+    ).handleBackupFileChange({
+      target: { files: [new File(['{}'], 'copies.json')], value: 'selected' },
+    } as unknown as Event);
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'success',
+        title: 'settings.data_management.recovery_copies_added:{"count":2}',
+      })
+    );
+  });
+  it('says so when a superseded-progress file adds nothing new', async () => {
+    backupFns.parseBackupFile.mockImplementation(async () => {
+      backupState.recoveryCopiesImport.value = { added: 0, alreadyPresent: 3 };
+    });
+    const wrapper = createWrapper({ view: 'backup' });
+    await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
+      wrapper.vm
+    ).handleBackupFileChange({
+      target: { files: [new File(['{}'], 'copies.json')], value: 'selected' },
+    } as unknown as Event);
+    expect(toastAddMock).toHaveBeenCalledWith({
+      color: 'info',
+      title: 'settings.data_management.recovery_copies_already_present',
+    });
   });
   it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
     backupState.legacyProgressRecoveryOverflow.value = true;
