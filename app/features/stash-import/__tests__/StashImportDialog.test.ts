@@ -155,6 +155,26 @@ describe('stash import confirmation', () => {
     expect(targets.props('availableTargets')).toHaveLength(2);
     wrapper.unmount();
   });
+  it('blocks preview for aggregate overflow and restores selected targets after correction', async () => {
+    const wrapper = render();
+    const review = wrapper.findComponent(StashImportReview);
+    const targets = wrapper.findComponent(StashImportTargets);
+    review.vm.$emit('change', { quantity: 600_000, reviewed: true });
+    const rows = review.props('rows');
+    rows.push({ ...rows[0]!, cell: { ...rows[0]!.cell, key: 1 }, quantity: 600_000 });
+    await flushPromises();
+    expect(targets.props('remaining')).toBe(0);
+    expect(button(wrapper, 'preview').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[role=alert]').text()).toBe('stash_import.errors.quantity');
+    await button(wrapper, 'preview').trigger('click');
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    rows[1]!.quantity = 1;
+    await flushPromises();
+    expect(button(wrapper, 'preview').attributes('disabled')).toBeUndefined();
+    expect(targets.props('modelValue')).toEqual(['hideout:need']);
+    expect(wrapper.find('[role=alert]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('filters removed targets and explicitly resets selection for a new image', async () => {
     const wrapper = render();
     const targets = wrapper.findComponent(StashImportTargets);

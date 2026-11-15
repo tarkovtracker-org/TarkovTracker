@@ -95,6 +95,7 @@
             v-if="result"
             v-model="selected"
             :available-targets="availableTargets"
+            :valid-totals="totals !== undefined"
             :remaining="remaining"
             :item-name="itemName"
             :signed-in="importer.signedIn.value"

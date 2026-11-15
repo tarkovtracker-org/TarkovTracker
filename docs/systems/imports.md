@@ -15,6 +15,7 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
   and stack counts need correction. Quantities are units, never durability or remaining uses.
   FIR is user-confirmed; unknown FIR can fill only non-FIR requirements.
+  Totals above 1,000,000 units per item block Preview until quantities are corrected.
 - Users can search the indexed catalog, exclude regions, split merged detections, and draw a
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.

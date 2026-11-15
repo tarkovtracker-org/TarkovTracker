@@ -85,7 +85,7 @@
       "too_many_cells": "There are too many detected regions. Crop the screenshot to one stash or container area.",
       "scan_failed": "The scan could not finish. Try a smaller, clearer screenshot. Your progress is unchanged.",
       "cancelled": "Scan cancelled. No progress was changed.",
-      "quantity": "Enter a whole-number unit quantity from 1 to 1,000,000 for each included region.",
+      "quantity": "Enter whole-number unit quantities of at least 1. The total for each item across all included regions cannot exceed 1,000,000.",
       "review_required": "Confirm or exclude uncertain matches and quantities before continuing.",
       "sign_in": "Sign in to save this import with duplicate protection across your devices. You can scan and review locally first.",
       "unsynced": "Your device and cloud progress do not yet match. Wait for progress sync to finish, then preview again. Nothing was overwritten.",

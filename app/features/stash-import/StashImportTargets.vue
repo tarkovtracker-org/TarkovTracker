@@ -5,6 +5,9 @@
     <p v-if="remaining" class="text-warning-300 mt-2 text-sm">
       {{ $t('stash_import.review_first') }}
     </p>
+    <p v-else-if="!validTotals" role="alert" class="text-error-300 mt-2 text-sm">
+      {{ $t('stash_import.errors.quantity') }}
+    </p>
     <div v-else class="mt-3 max-h-64 overflow-y-auto rounded border border-white/10">
       <label
         v-for="target in availableTargets"
@@ -31,7 +34,7 @@
     <UButton
       class="mt-3"
       :loading="preparing"
-      :disabled="remaining > 0 || !selected.length || !signedIn"
+      :disabled="!validTotals || remaining > 0 || !selected.length || !signedIn"
       @click="$emit('preview')"
     >
       {{ $t('stash_import.preview') }}
@@ -42,6 +45,7 @@
   import type { ImportTarget } from '@/features/stash-import/useStashImport';
   defineProps<{
     availableTargets: ImportTarget[];
+    validTotals: boolean;
     remaining: number;
     itemName: (id: string) => string;
     signedIn: boolean;
