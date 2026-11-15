@@ -17,14 +17,14 @@ describe('private aggregate collector', () => {
     Object.assign(input.modes.pvp.counts, { rawKey: 42 });
     const response = await worker.fetch(request(input));
     expect(response.status).toBe(204);
-    expect(log).toHaveBeenCalledExactlyOnceWith(diagnosticEvent());
+    expect(log).toHaveBeenCalledExactlyOnceWith(JSON.stringify(diagnosticEvent()));
   });
   it.each(['pvp', 'pve', 'seasonal'])('accepts each supported mode', async (mode) => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const input = diagnosticEvent();
     const payload = { ...input, modes: { [mode]: input.modes.pvp }, batchModes: [mode] };
     expect((await worker.fetch(request(payload))).status).toBe(204);
-    expect(log).toHaveBeenCalledWith(payload);
+    expect(log).toHaveBeenCalledWith(JSON.stringify(payload));
   });
   it.each(['accepted', 'failed', 'superseded', 'payload_too_large'])(
     'accepts the known outcome %s',
@@ -59,7 +59,7 @@ describe('private aggregate collector', () => {
     expect((await worker.fetch(request({ ...diagnosticEvent(), buildCommit: '' }))).status).toBe(
       204
     );
-    expect(log).toHaveBeenCalledWith({ ...diagnosticEvent(), buildCommit: '' });
+    expect(log).toHaveBeenCalledWith(JSON.stringify({ ...diagnosticEvent(), buildCommit: '' }));
   });
   it.each([
     { buildCommit: 'private-id' },

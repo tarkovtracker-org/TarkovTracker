@@ -22,7 +22,10 @@ test('workerd logs only the reconstructed custom aggregate', async () => {
   });
   assert.equal(response.status, 204);
   await Promise.resolve();
-  const logs = JSON.stringify(harness.getLogs());
-  assert.match(logs, /progress_sync_payload/);
-  assert.doesNotMatch(logs, /private-sentinel/);
+  const logs = harness.getLogs();
+  const aggregates = logs
+    .filter(({ level }) => level === 'log')
+    .map(({ message }) => JSON.parse(message));
+  assert.deepEqual(aggregates, [diagnosticEvent()]);
+  assert.doesNotMatch(JSON.stringify(logs), /private-sentinel/);
 });

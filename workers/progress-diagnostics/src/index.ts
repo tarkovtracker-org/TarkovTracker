@@ -6,7 +6,7 @@ export default {
     try {
       const input = await readProgressDiagnosticBody(request.body);
       const payload = sanitizeProgressDiagnostic(input);
-      console.log(payload);
+      console.log(JSON.stringify(payload));
       return new Response(null, { status: 204 });
     } catch {
       return new Response(null, { status: 400 });

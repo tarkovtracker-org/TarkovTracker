@@ -21,6 +21,12 @@ describe('Pages collector isolation', () => {
     expect(root.services).toEqual([]);
     expect(preview.services).toEqual([]);
     expect(preview.durable_objects.bindings).toEqual([]);
+    expect(preview.kv_namespaces).toEqual([
+      expect.objectContaining({
+        binding: 'TARKOV_DATA',
+        id: expect.stringMatching(/^[0-9a-f]{32}$/i),
+      }),
+    ]);
     expect(preview.kv_namespaces[0]?.id).not.toBe(production.kv_namespaces[0]?.id);
     expect(preview.vars.NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL).toBe('');
   });

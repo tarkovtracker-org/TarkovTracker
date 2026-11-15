@@ -43,6 +43,12 @@ reject the event. No raw values, profile map keys, user IDs, credentials, browse
 location, referrer, arbitrary errors or client headers are forwarded. The service call uses
 a fresh constant URL and headers, not the incoming browser Request or its `cf` context.
 Pages awaits the private fetch before its invocation ends.
+The Worker emits one JSON-encoded aggregate, preserving all numeric values and fixed
+counts in the captured message. The workerd test parses that message and compares the
+complete aggregate with its independent fixture, alongside the private-field omission check.
+Cloudflare documents this JSON-string logging pattern as searchable/filterable
+[structured logging](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/#enable-workers-logs-and-traces).
+Hosted field extraction and the stored envelope still require the synthetic query gate below.
 
 The collector has `workers_dev = false`, `preview_urls = false` and no routes. Only
 validated custom logs persist: invocation logs and traces are explicitly disabled.
@@ -89,8 +95,12 @@ The installed Wrangler schema also defines `observability.logs.persist`,
    logs enabled, invocation logs and traces disabled. Do not enable tail/Logpush exports.
 4. Deploy Pages through its trusted production pipeline with the production-only service
    binding and unchanged limiter/KV/variables. Keep both sink settings empty. Verify the
-   live service target, canonical `APP_URL`, limiter binding and served commit.
-5. Send one **synthetic** valid body shaped like `clientDiagnosticBody()` in
+   live service target, canonical `APP_URL`, limiter binding and served commit. Inspect the
+   actual deployed effective `apiProtection.publicRoutes`, including every environment's
+   `API_PUBLIC_ROUTES` override. Every override used for activation must explicitly include
+   the exact `/api/logs/progress` route: overrides replace the default list and retain their
+   authority; this route is not an invariant silently added to them.
+5. Send one **unauthenticated synthetic** valid body shaped like `clientDiagnosticBody()` in
    `scripts/checks/progress-diagnostic-fixture.ts` to the canonical endpoint. No production profile
    contents or identifiers are needed. A 204 does not establish delivery: in Cloudflare
    dashboard → Workers & Pages → `tarkovtracker-progress-diagnostics` → Logs, filter custom
@@ -99,14 +109,20 @@ The installed Wrangler schema also defines `observability.logs.persist`,
    stored envelope for identifying request context. Check malformed, deep, oversized,
    rate-limited and forged-forwarded-host requests produce no collector event. Record
    only aggregate results and the deployment/configuration revisions in #960.
-6. Only after that evidence passes, set **only**
+6. Before activation, collect a **fresh, immediately preceding 24-hour PostgreSQL baseline**.
+   Record exact UTC start/end, total PostgreSQL log entries, and occurrences of the exact
+   `p_modes exceeds the maximum payload size` error; generic `P0001` errors are not size
+   rejections. Record the application commit, deployed RPC/migration revision, collector
+   version and effective configuration alongside these counts. Historical baseline or
+   short smoke snapshots in #960 are context, not a substitute for this fresh baseline.
+   Only after the unauthenticated delivery/privacy gate and fresh baseline pass, set **only**
    `NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL=/api/logs/progress` at production build time,
    rebuild and deploy. Keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty. Verify the served
    public setting and revision, then query the first real aggregate samples.
 7. Observe at least 24 hours after verified collection begins. Record exact UTC bounds,
    sample count, aggregate/per-mode wire sizes and counts, outcomes, and build commit.
    Compare PostgreSQL log entry count and the exact
-   `p_modes exceeds the maximum payload size` occurrences with #960's baseline; generic
+   `p_modes exceeds the maximum payload size` occurrences with the fresh pre-activation baseline recorded in #960; generic
    `P0001` errors are not size rejections. A low-volume zero-error window is inconclusive.
    Do not equate wire bytes with PostgreSQL JSONB size. Record the closure decision and
    any supported-profile failures in #960 before closing it.
