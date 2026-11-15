@@ -119,7 +119,9 @@ The installed Wrangler schema also defines `observability.logs.persist`,
    `NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL=/api/logs/progress` at production build time,
    rebuild and deploy. Keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty. Verify the served
    public setting and revision, then query the first real aggregate samples.
-7. Observe at least 24 hours after verified collection begins. Record exact UTC bounds,
+7. Observe at least 24 hours after verified collection begins. Use the first complete
+   24-hour post-activation window for comparison with the 24-hour pre-activation baseline;
+   report longer follow-up observations separately. Record exact UTC bounds,
    sample count, aggregate/per-mode wire sizes and counts, outcomes, and build commit.
    Compare PostgreSQL log entry count and the exact
    `p_modes exceeds the maximum payload size` occurrences with the fresh pre-activation baseline recorded in #960; generic
