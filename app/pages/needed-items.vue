@@ -3,6 +3,21 @@
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350">
         <slot name="header" />
+        <div class="mb-3 flex justify-end">
+          <UButton
+            icon="i-mdi-image-search"
+            variant="soft"
+            :disabled="!itemsReady"
+            @click="stashImportOpen = true"
+          >
+            {{ $t('stash_import.title') }}
+          </UButton>
+        </div>
+        <StashImportDialog
+          v-if="stashImportOpen"
+          :needs="allItems"
+          @close="stashImportOpen = false"
+        />
         <NeededItemsFilterBar
           v-model="activeFilter"
           v-model:view-mode="viewMode"
@@ -109,6 +124,10 @@
   import { logger } from '@/utils/logger';
   import { perfNow, roundPerfMs } from '@/utils/perf';
   const { t } = useI18n({ useScope: 'global' });
+  const stashImportOpen = ref(false);
+  const StashImportDialog = defineAsyncComponent(
+    () => import('@/features/stash-import/StashImportDialog.vue')
+  );
   const { trackNeededItemsView } = useProductAnalytics();
   const { isOpen: isHelpOpen } = usePageHelpState('needed_items');
   const { isDesktopHelpPanelOpen, isDesktopSideRailOpen, isMobileHelpPanelOpen } =
@@ -170,6 +189,7 @@
     viewMode,
     cardStyle,
     filteredItems,
+    allItems,
     groupedItems,
     groupedNeedCount,
     displayItems,

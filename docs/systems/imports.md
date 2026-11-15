@@ -2,6 +2,62 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Stash screenshot import
+
+Needed Items → Import stash screenshot reads one PNG, JPEG, or WebP on the device. A
+dedicated worker decodes bounded pixels, detects grid regions, and matches the MIT-licensed
+Cultist Circle recognition features against static, hashed catalog shards. Screenshots,
+pixel features, and corrections are neither uploaded nor persisted. The save contains
+reviewed requirement counts, an image fingerprint, and an idempotency key.
+
+### Review and allocation
+
+- Recognition scores route review attention; they are not probabilities. Uncertain identities
+  and stack counts need correction. Quantities are units, never durability or remaining uses.
+  FIR is user-confirmed; unknown FIR can fill only non-FIR requirements.
+- Users can search the full catalog, exclude regions, split merged detections, and draw a
+  manually sized item region when detection fails. Redrawing replaces overlapping regions.
+- Each import reconciles explicitly selected requirements using the existing Smart Fill
+  priority/allocation policy. It does not add screenshot totals to existing counts. Physical
+  observations are allocated once across the selection. Decreases require confirmation.
+- Unobserved items and unselected requirements remain unchanged. Completed tasks/modules,
+  teammate-only needs, weapon builds, alternative-item objectives, and non-handover task
+  objectives are excluded. Closed containers and off-screen inventory cannot be inferred.
+- Scanning is available to guests, but saving requires a signed-in, synchronized account.
+  Preview fixes the owner, game mode, active season, selected targets, and progress snapshot.
+
+### Persistence
+
+`commit_stash_item_import` locks the owner's account and destination mode, checks the full
+expected JSON snapshot, validates bounded count updates, and saves counts and receipt in one
+transaction. A changed destination rejects the preview. Replayed import IDs return the live
+progress snapshot; identical pixel fingerprints are recognized within the same mode/season
+and reset epoch. Receipts retain the latest 100 imports for at most 90 days. Reconciliation
+does not inflate counts even after receipt expiry or a differently compressed screenshot.
+
+The migration also rejects an exact pre-import objective record arriving through stale
+ordinary sync while its receipt remains retained. New timestamped manual edits and explicit
+reset epochs remain valid. This guard is intentionally import-specific, not a replacement
+for the general sync merge policy. Receipt lookup is owner-only; raw receipts are private.
+
+### Files and validation
+
+- `app/features/stash-import/` — review, selection, preview, and save adapter.
+- `app/workers/stashScan.worker.ts`, `app/utils/stashScan/` — local decoding and recognition.
+- `scripts/stash-scan/build-index.ts`, `public/stash-scan/` — offline catalog build and assets.
+- `supabase/migrations/20261115033731_commit_stash_item_import.sql` — atomic save and receipts.
+- `supabase/tests/database/stash_item_import.test.sql` and
+  `scripts/checks/stash-item-import-concurrency.mjs` — transaction and real-lock regressions.
+
+Rebuild assets with `pnpm stash-scan:build-index` using the current `json.tarkov.dev` regular
+item catalog and English names. Only `assets.tarkov.dev` grid images are accepted. The
+manifest lists items with unusable templates; they remain available for manual correction.
+The manifest is written last, so an interrupted build cannot publish an incomplete index.
+Catalog files are content-addressed and loaded by detected slot size. This first catalog is
+English and regular-mode based; mode-exclusive items absent from it cannot be identified.
+Accuracy across languages, game updates, compression, UI scaling, and tooltips must be
+measured with representative labeled screenshots. Synthetic parity does not prove it.
+
 ## Tarkov.dev profile import
 
 **Summary.** Settings → Data Management lets a user import their in-game profile (level derived

@@ -83,6 +83,7 @@ const archiveProgressDisplacedByRemoteReset = (
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
   acknowledgeExternalSave?: (saved: UserState) => void;
+  requireReconciliation?: () => void;
   captureRemoteMerge?: () => RemoteStateMerge;
   withSnapshot?: WithRemoteSnapshot;
   pause: () => void;
