@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { cacheImage, publishScanCatalog } from '@@/scripts/stash-scan/build-assets';
+import { cacheImage, publishScanCatalog, writeScanAsset } from '@@/scripts/stash-scan/build-assets';
 import sharp from 'sharp';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
 import { addCatalogIcon, createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
@@ -121,7 +121,7 @@ async function writeShards(index: IconIndex): Promise<Record<string, ScanShard>>
       throw new Error(`Shard budget exceeded: ${size}`);
     const hash = sha256(bytes);
     const file = `${size}-${hash}.bin`;
-    await writeFile(join(output, file), bytes);
+    await writeScanAsset(output, file, bytes);
     shards[size] = { file, sha256: hash, bytes: bytes.length, decodedBytes: raw.length };
   }
   return shards;

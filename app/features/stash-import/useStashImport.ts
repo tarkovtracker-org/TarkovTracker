@@ -192,6 +192,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
   function assertCatalog(mode: GameMode): void {
     if (metadata.currentGameMode !== mode || !metadata.tasksObjectivesHydrated)
       throw scanError('catalog_loading');
+    if (!metadata.hideoutStations.length) throw scanError('catalog_loading');
   }
   function captureBaseline(): ImportBaseline {
     if (!signedIn.value) throw scanError('sign_in');

@@ -61,8 +61,9 @@ It never silently substitutes the store for a caller-supplied detached snapshot.
 Rebuild assets with `pnpm stash-scan:build-index` using the current `json.tarkov.dev` regular
 item catalog and English names. Only `assets.tarkov.dev` grid images are accepted. The
 manifest lists items with unusable templates; they remain available for manual correction.
-The manifest is atomically replaced last, so an interrupted build cannot publish an incomplete
-index. Successful publication prunes only obsolete content-addressed shard files; icon downloads
+Each shard is written to a temporary file and atomically replaced; the manifest is replaced last,
+so an interrupted build preserves the last complete index. Successful publication prunes only
+obsolete content-addressed shard files; icon downloads
 are streamed with a 4 MB limit. Feature version 2 recenters cropped rotated-label templates.
 Catalog files are content-addressed and loaded by detected slot size. This first catalog is
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.

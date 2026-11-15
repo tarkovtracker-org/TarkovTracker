@@ -47,8 +47,9 @@ function validInteger(value: unknown, min: number, max: number): boolean {
   return Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;
 }
 function validItemNames(item: Record<string, unknown>): boolean {
+  if (typeof item.id !== 'string') return false;
   return (
-    /^[a-f0-9]{24}$/.test(String(item.id)) &&
+    /^[a-f0-9]{24}$/.test(item.id) &&
     typeof item.name === 'string' &&
     typeof item.shortName === 'string'
   );

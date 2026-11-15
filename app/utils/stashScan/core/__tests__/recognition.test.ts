@@ -106,6 +106,9 @@ describe('pinned cultist-circle grid detection', () => {
     [0, 0, 8, 0],
     [0, 0, 0, 8],
     [8, 8, 8, 8],
+    [0, 0, 7, 0],
+    [0, 0, 0, 7],
+    [7, 7, 7, 7],
   ])('retains grid cells with borders at image edges %#', (left, top, right, bottom) => {
     const cropped = croppedGrid(grid(63), left!, top!, right!, bottom!);
     expect(detectGrid(cropped).cells).toHaveLength(45);

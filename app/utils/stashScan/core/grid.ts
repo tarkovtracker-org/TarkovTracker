@@ -56,23 +56,35 @@ function isDoubleRidge(stats: PixelStats, p: number, step: number): boolean {
     after - stats.brightness[p + 2 * step]! >= RIDGE_CONTRAST
   );
 }
-function markRidge(stats: PixelStats, p: number, step: number, mask: Uint8Array): void {
+function markRidge(
+  stats: PixelStats,
+  p: number,
+  step: number,
+  mask: Uint8Array,
+  canDouble: boolean
+): void {
   if (!stats.neutral[p]!) return;
   if (stats.brightness[p]! - stats.brightness[p - step]! < RIDGE_CONTRAST) return;
   if (stats.brightness[p]! - stats.brightness[p + step]! >= RIDGE_CONTRAST) {
     mask[p]! = 1;
     return;
   }
-  markDoubleRidge(stats, p, step, mask);
+  markDoubleRidge(stats, p, step, mask, canDouble);
 }
-function markDoubleRidge(stats: PixelStats, p: number, step: number, mask: Uint8Array): void {
-  if (!isDoubleRidge(stats, p, step)) return;
+function markDoubleRidge(
+  stats: PixelStats,
+  p: number,
+  step: number,
+  mask: Uint8Array,
+  canDouble = true
+): void {
+  if (!canDouble || !isDoubleRidge(stats, p, step)) return;
   mask[p]! = 1;
   mask[p + step]! = 1;
 }
 function ridgeBounds(width: number, height: number, vertical: boolean) {
-  if (vertical) return { step: 1, xStart: 1, xEnd: width - 2, yStart: 0, yEnd: height };
-  return { step: width, xStart: 0, xEnd: width, yStart: 1, yEnd: height - 2 };
+  if (vertical) return { step: 1, xStart: 1, xEnd: width - 1, yStart: 0, yEnd: height };
+  return { step: width, xStart: 0, xEnd: width, yStart: 1, yEnd: height - 1 };
 }
 /** A crop can retain a visible border while removing the outside comparison pixel. */
 function markBoundaryRidge(stats: PixelStats, p: number, step: number, mask: Uint8Array): void {
@@ -109,7 +121,7 @@ function ridgeMask(
   const bounds = ridgeBounds(width, height, vertical);
   for (let y = bounds.yStart; y < bounds.yEnd; y++) {
     for (let x = bounds.xStart; x < bounds.xEnd; x++)
-      markRidge(stats, y * width + x, bounds.step, mask);
+      markRidge(stats, y * width + x, bounds.step, mask, vertical ? x + 2 < width : y + 2 < height);
   }
   imageBoundaryRidges(stats, mask, width, height, vertical);
   return mask;

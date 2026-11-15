@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { cacheImage, publishScanCatalog } from '@@/scripts/stash-scan/build-assets';
+import { cacheImage, publishScanCatalog, writeScanAsset } from '@@/scripts/stash-scan/build-assets';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 vi.mock('node:fs/promises', async (original) => {
@@ -71,6 +71,28 @@ describe('bounded builder image responses', () => {
   });
 });
 describe('atomic manifest publication and shard pruning', () => {
+  it('preserves a live shard when its replacement write is interrupted', async () => {
+    await writeFile(join(directory, keptName), 'complete shard');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(writeFile).mockImplementationOnce(async (file, _data, options) => {
+      await actual.writeFile(file, 'partial', options);
+      throw new Error('disk full');
+    });
+    await expect(writeScanAsset(directory, keptName, new Uint8Array([1]))).rejects.toThrow(
+      'disk full'
+    );
+    expect(await readFile(join(directory, keptName), 'utf8')).toBe('complete shard');
+    expect(await readdir(directory)).toEqual([keptName]);
+  });
+  it('preserves a live shard when atomic replacement fails', async () => {
+    await writeFile(join(directory, keptName), 'complete shard');
+    vi.mocked(rename).mockRejectedValueOnce(new Error('rename failed'));
+    await expect(writeScanAsset(directory, keptName, new Uint8Array([1]))).rejects.toThrow(
+      'rename failed'
+    );
+    expect(await readFile(join(directory, keptName), 'utf8')).toBe('complete shard');
+    expect(await readdir(directory)).toEqual([keptName]);
+  });
   async function existing(): Promise<void> {
     await writeFile(join(directory, 'catalog.json'), 'old complete manifest');
     await writeFile(join(directory, oldName), 'old shard');

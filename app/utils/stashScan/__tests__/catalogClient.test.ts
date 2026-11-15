@@ -48,6 +48,9 @@ describe('published recognition catalog', () => {
     }
   );
   it.each([
+    ['id', ['5448fee04bdc2dbc018b4567']],
+    ['id', null],
+    ['id', 123],
     ['width', 0],
     ['width', -1],
     ['width', 1.5],

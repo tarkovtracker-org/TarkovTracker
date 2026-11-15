@@ -3,6 +3,20 @@ import { readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+export async function writeScanAsset(
+  output: string,
+  name: string,
+  data: string | Uint8Array
+): Promise<void> {
+  const target = outputFile(output, name);
+  const temporary = outputFile(output, `${name}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporary, data, { flag: 'wx' });
+    await rename(temporary, target);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
 function joinImageChunks(chunks: Uint8Array[], length: number): Uint8Array {
   const result = new Uint8Array(length);
   let offset = 0;
@@ -65,13 +79,7 @@ async function pruneUnreferenced(
   await rm(outputFile(output, name));
 }
 export async function publishScanCatalog(output: string, manifest: ScanCatalog): Promise<void> {
-  const temporary = outputFile(output, `catalog.${randomUUID()}.tmp`);
-  try {
-    await writeFile(temporary, JSON.stringify(manifest), { flag: 'wx' });
-    await rename(temporary, outputFile(output, 'catalog.json'));
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await writeScanAsset(output, 'catalog.json', JSON.stringify(manifest));
   // A failed build/publication keeps every file used by the previous manifest.
   await pruneShards(output, manifest);
 }

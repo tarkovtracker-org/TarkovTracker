@@ -204,7 +204,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
   const stashImportReady = computed(
-    () => itemsReady.value && metadataStore.tasksObjectivesHydrated
+    () =>
+      itemsReady.value &&
+      metadataStore.tasksObjectivesHydrated &&
+      metadataStore.hideoutStations.length > 0
   );
   const fullItemsQueued = ref(false);
   const { sortNeededItems, sortGroupedItems } = useNeededItemsSorting({

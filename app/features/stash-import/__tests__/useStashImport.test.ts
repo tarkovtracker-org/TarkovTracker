@@ -27,7 +27,7 @@ const h = vi.hoisted(() => ({
   metadata: {
     currentGameMode: 'pvp',
     tasksObjectivesHydrated: true,
-    hideoutStations: [],
+    hideoutStations: [{ id: 'station', name: 'Station' }],
     getTaskById: (id: string) => ({ id, name: id, minPlayerLevel: 1 }),
   },
 }));
@@ -130,6 +130,7 @@ beforeEach(() => {
   h.context.user = reactive({ id: 'owner-a', loggedIn: true });
   h.metadata.currentGameMode = 'pvp';
   h.metadata.tasksObjectivesHydrated = true;
+  h.metadata.hideoutStations = [{ id: 'station', name: 'Station' }];
   state = reactive(copy(defaultState));
   state.pvp.taskObjectives[unrelated] = { count: 1, timestamp: 1 };
   remote = copy(state);
@@ -286,6 +287,22 @@ describe('reviewed stash import persistence', () => {
     const importer = useStashImport([need()]);
     const preview = await importer.prepare('a'.repeat(64), total, [key()]);
     h.metadata.currentGameMode = 'pve';
+    await expect(importer.commit(preview, total, [key()])).rejects.toThrow(
+      'stash_import.errors.catalog_loading'
+    );
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+  it('requires hideout metadata both before preview and before committing it', async () => {
+    const importer = useStashImport([need()]);
+    const stations = h.metadata.hideoutStations;
+    h.metadata.hideoutStations = [];
+    await expect(importer.prepare('a'.repeat(64), total, [key()])).rejects.toThrow(
+      'stash_import.errors.catalog_loading'
+    );
+    expect(h.read).not.toHaveBeenCalled();
+    h.metadata.hideoutStations = stations;
+    const preview = await importer.prepare('a'.repeat(64), total, [key()]);
+    h.metadata.hideoutStations = [];
     await expect(importer.commit(preview, total, [key()])).rejects.toThrow(
       'stash_import.errors.catalog_loading'
     );
