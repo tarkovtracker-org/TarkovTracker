@@ -500,7 +500,7 @@
     "needed_items": {
       "title": "Needed items guide",
       "summary": "Use needed items to combine task and hideout materials, then narrow the list to the exact items you still care about.",
-      "hint": "Get a quick explanation of the tabs, view modes, and the Filters button.",
+      "hint": "A quick look at scopes, the Items and Needs views, and filters.",
       "sections": {
         "scopes": {
           "title": "Choose a scope",
@@ -509,10 +509,10 @@
           "bullet_two": "Use completed when you want to review what you already satisfied instead of what is still missing."
         },
         "views": {
-          "title": "Change the layout",
-          "description": "List, grid, and combined views all show the same data but are optimized for different browsing styles.",
-          "bullet_one": "List view is fastest for scanning counts and names.",
-          "bullet_two": "Combined view groups repeated items together when you care more about totals than individual sources."
+          "title": "Pick a view",
+          "description": "Items adds every quest and hideout need for an item together. Needs lists each quest objective and hideout upgrade on its own. Both come as a list or a grid.",
+          "bullet_one": "Use Items to decide what to keep after a raid: each item shows its total and its FIR split.",
+          "bullet_two": "Use Needs to track one objective or upgrade at a time. Every entry has the same +/- or check control."
         },
         "filters": {
           "title": "Refine the list",
@@ -1350,7 +1350,7 @@
       "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items_count": "{count} item | {count} items",
-      "unique_items_count": "{unique} unique ({total} total)",
+      "unique_items_count": "{unique} items · {total} needs",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
       "filters": {
@@ -1391,9 +1391,14 @@
         "count": "Count"
       },
       "view": {
-        "list": "List view",
-        "grid": "Grid view",
-        "combined": "Combined view"
+        "list": "List",
+        "grid": "Grid",
+        "show": "Show",
+        "items": "Items",
+        "items_hint": "One entry per item, with quest and hideout needs added together",
+        "needs": "Needs",
+        "needs_hint": "One entry for every quest objective or hideout upgrade",
+        "layout": "Layout"
       },
       "teammates_needed": "Teammates need this"
     },
@@ -2691,8 +2696,6 @@
     "needed": "needed",
     "view_details_for": "View details for {name}",
     "locked_before": "{count} before",
-    "switch_to_expanded": "Switch to Expanded view",
-    "switch_to_compact": "Switch to Compact view",
     "collected": "Collected",
     "mark_collected": "Mark as collected",
     "handed_over": "Handed over",
@@ -2729,13 +2732,13 @@
     "not_collected": "Not collected",
     "hidden_for_you": "Hidden for you",
     "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
-    "click_to_collect": "Click to collect",
-    "click_to_uncollect": "Click to uncollect",
     "modal": {
       "smart_fill_error": "Unable to apply smart fill",
       "reset_error": "Unable to reset item progress",
       "unknown_error": "An unexpected error occurred"
-    }
+    },
+    "for_teammates": "For teammates",
+    "collect": "Collect"
   },
   "skills": {
     "req": "Req",

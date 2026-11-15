@@ -1,36 +1,45 @@
 <template>
-  <AppTooltip :text="label">
-    <button
-      type="button"
-      class="flex items-center justify-center rounded-lg border transition-colors"
-      :class="[
-        size === 'md' ? 'h-10 w-10' : 'h-8 w-8',
-        collected
-          ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
-          : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white',
-      ]"
-      :aria-label="label"
-      :aria-pressed="collected"
-      @click="$emit('toggle')"
-    >
-      <UIcon
-        :name="collected ? 'i-mdi-check-circle' : 'i-mdi-check-circle-outline'"
-        :class="['h-6 w-6', collected ? 'opacity-100' : 'opacity-60']"
-      />
-    </button>
-  </AppTooltip>
+  <button
+    type="button"
+    class="focus-visible:ring-primary-400 inline-flex h-8 items-center justify-center gap-1.5 rounded-md border text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+    :class="[
+      wide ? 'w-full px-3' : 'w-8',
+      collected
+        ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
+        : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/15 hover:text-white',
+    ]"
+    :title="label"
+    :aria-label="label"
+    :aria-pressed="collected"
+    :disabled="disabled"
+    @click="$emit('toggle')"
+  >
+    <UIcon
+      :name="collected ? 'i-mdi-check-circle' : 'i-mdi-check-circle-outline'"
+      class="size-5 shrink-0"
+      :class="collected ? '' : 'opacity-70'"
+      aria-hidden="true"
+    />
+    <span v-if="wide">{{ shortLabel }}</span>
+  </button>
 </template>
 <script setup lang="ts">
   const props = withDefaults(
     defineProps<{
       collected: boolean;
-      size?: 'sm' | 'md';
+      /** Full-width button with a visible label, used in grid tiles. */
+      wide?: boolean;
+      disabled?: boolean;
     }>(),
-    { size: 'sm' }
+    { wide: false, disabled: false }
   );
   defineEmits<{ toggle: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const label = computed(() =>
     props.collected ? t('needed_items.collected') : t('needed_items.mark_collected')
+  );
+  /** Visible text in narrow tiles; the accessible name stays the full action. */
+  const shortLabel = computed(() =>
+    props.collected ? t('needed_items.collected') : t('needed_items.collect')
   );
 </script>

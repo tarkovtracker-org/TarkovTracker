@@ -58,7 +58,6 @@ const createDefaultProps = () => ({
   sortBy: 'priority' as const,
   sortDirection: 'desc' as const,
   hideOwned: false,
-  cardStyle: 'expanded' as const,
 });
 const createDefaultGlobal = () => ({
   plugins: [i18n],
@@ -127,7 +126,7 @@ describe('NeededItemsFilterBar', () => {
     await tabs[1]?.trigger('click');
     expect(wrapper.emitted('update:modelValue')).toEqual([['tasks']]);
   });
-  it('emits update:viewMode after triggering list view button', async () => {
+  it('switches the layout from the labelled view controls', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: {
@@ -136,20 +135,27 @@ describe('NeededItemsFilterBar', () => {
       },
       global: createDefaultGlobal(),
     });
-    await wrapper.find('button[data-icon="i-mdi-view-list"]').trigger('click');
+    const list = wrapper.get('[data-testid="needed-items-layout-list"]');
+    expect(list.attributes('aria-pressed')).toBe('false');
+    expect(list.attributes('aria-label')).toBe('page.needed_items.view.list');
+    await list.trigger('click');
     expect(wrapper.emitted('update:viewMode')).toEqual([['list']]);
   });
-  it('emits update:groupByItem when toggle button is clicked', async () => {
+  it('switches between Items and Needs without touching the layout', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    // No initial emission on mount
     expect(wrapper.emitted('update:groupByItem')).toBeUndefined();
-    // Trigger toggle and check emission
-    await wrapper.find('button[data-icon="i-mdi-group"]').trigger('click');
+    const items = wrapper.get('[data-testid="needed-items-show-items"]');
+    expect(items.text()).toBe('page.needed_items.view.items');
+    expect(wrapper.get('[data-testid="needed-items-show-needs"]').attributes('aria-pressed')).toBe(
+      'true'
+    );
+    await items.trigger('click');
     expect(wrapper.emitted('update:groupByItem')).toEqual([[true]]);
+    expect(wrapper.emitted('update:viewMode')).toBeUndefined();
   });
   it('keeps the source tabs and the list controls on one bar', async () => {
     const NeededItemsFilterBar = await setup();
@@ -159,7 +165,20 @@ describe('NeededItemsFilterBar', () => {
     });
     const bar = wrapper.get('[role="group"]').element.parentElement;
     expect(bar?.contains(wrapper.get('[data-testid="sort-select"]').element)).toBe(true);
-    expect(bar?.contains(wrapper.get('button[data-icon="i-mdi-group"]').element)).toBe(true);
+    expect(bar?.contains(wrapper.get('[data-testid="needed-items-show"]').element)).toBe(true);
+  });
+  it.each([
+    { groupByItem: false, totalCount: 3, expected: null },
+    { groupByItem: false, totalCount: 2, expected: 'page.needed_items.items_count' },
+    { groupByItem: true, totalCount: 3, expected: 'page.needed_items.unique_items_count' },
+  ])('shows a result count only when it adds information (%o)', async (props) => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: { ...createDefaultProps(), ...props },
+      global: createDefaultGlobal(),
+    });
+    const count = wrapper.find('[data-testid="needed-items-count"]');
+    expect(count.exists() ? count.text() : null).toBe(props.expected);
   });
   it('shows the Completed tab only once something is done', async () => {
     const NeededItemsFilterBar = await setup();

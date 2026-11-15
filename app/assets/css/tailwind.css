@@ -673,6 +673,10 @@ html.no-smooth-scroll {
     outline: 2px solid var(--color-surface-600);
     outline-offset: 2px;
   }
+  .content-visibility-auto-72 {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 72px;
+  }
   .content-visibility-auto-128 {
     content-visibility: auto;
     contain-intrinsic-size: auto 128px;

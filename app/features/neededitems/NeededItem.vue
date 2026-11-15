@@ -1,33 +1,18 @@
 <template>
-  <template v-if="props.itemStyle === 'card'">
-    <div class="h-full">
-      <LazyNeededItemSmallCard
-        :need="props.need"
-        :card-style="props.cardStyle"
-        @decrease-count="decreaseCount()"
-        @toggle-count="toggleCount()"
-        @increase-count="increaseCount()"
-        @set-count="setCount"
-      />
-    </div>
-  </template>
-  <template v-else-if="props.itemStyle === 'row'">
-    <div class="w-full pt-1">
-      <LazyNeededItemRow
-        :need="props.need"
-        :initially-visible="props.initiallyVisible"
-        @decrease-count="decreaseCount()"
-        @toggle-count="toggleCount()"
-        @increase-count="increaseCount()"
-        @set-count="setCount"
-      />
-    </div>
-  </template>
+  <NeededItemEntry
+    :need="props.need"
+    :layout="props.layout"
+    @decrease-count="decreaseCount()"
+    @toggle-count="toggleCount()"
+    @increase-count="increaseCount()"
+    @set-count="setCount"
+  />
 </template>
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
   import { useCyclingItem } from '@/composables/useCyclingItem';
   import { neededItemKey, type NeededItemTeamNeed } from '@/features/neededitems/neededitem-keys';
+  import NeededItemEntry from '@/features/neededitems/NeededItemEntry.vue';
   import { findAcceptedItemMatchIndex } from '@/features/neededitems/neededItemFilters';
   import {
     neededCountOf,
@@ -38,21 +23,17 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
-  import type { NeededItemsCardStyle } from '@/features/neededitems/neededItemsFilterNormalization';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   const props = withDefaults(
     defineProps<{
       need: NeededItemTaskObjective | NeededItemHideoutModule;
-      itemStyle?: 'card' | 'row';
-      initiallyVisible?: boolean;
-      cardStyle?: NeededItemsCardStyle;
+      /** `row` for the list layout, `tile` for the grid layout. */
+      layout?: 'row' | 'tile';
       /** Active search term; pins pooled objectives to the matched accepted item. */
       search?: string;
     }>(),
     {
-      itemStyle: 'card',
-      initiallyVisible: false,
-      cardStyle: 'expanded',
+      layout: 'row',
       search: '',
     }
   );
@@ -60,8 +41,6 @@
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
-  const tasks = computed(() => metadataStore.tasks);
-  const hideoutStations = computed(() => metadataStore.hideoutStations);
   const alternativeTasks = computed(() => metadataStore.alternativeTasks);
   const progress = useNeededItemProgress();
   const decreaseCount = () => progress.decrease(props.need, currentCount.value);
@@ -84,12 +63,11 @@
   const currentCount = computed(() =>
     selfCompletedNeed.value ? neededCount.value : progress.storedCountOf(props.need)
   );
+  // Indexed lookups: a linear scan per entry was O(entries × tasks) on every list render.
   const relatedTask = computed(() => {
     const need = props.need;
-    if (need.needType === 'taskObjective') {
-      return tasks.value.find((t) => t.id === need.taskId) ?? null;
-    }
-    return null;
+    if (need.needType !== 'taskObjective') return null;
+    return metadataStore.getTaskById(need.taskId) ?? null;
   });
   const isKappaRequired = computed(() => {
     if (props.need.needType !== 'taskObjective') {
@@ -158,13 +136,8 @@
   );
   const relatedStation = computed(() => {
     const need = props.need;
-    if (need.needType === 'hideoutModule') {
-      return (
-        Object.values(hideoutStations.value).find((s) => s.id === need.hideoutModule.stationId) ??
-        null
-      );
-    }
-    return null;
+    if (need.needType !== 'hideoutModule') return null;
+    return metadataStore.getStationById(need.hideoutModule.stationId) ?? null;
   });
   const levelRequired = computed(() =>
     props.need.needType === 'taskObjective' ? (relatedTask.value?.minPlayerLevel ?? 0) : 0

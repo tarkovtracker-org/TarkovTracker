@@ -14,57 +14,48 @@
           v-model:sort-by="sortBy"
           v-model:sort-direction="sortDirection"
           v-model:hide-owned="hideOwned"
-          v-model:card-style="cardStyle"
           :filter-tabs="filterTabsWithCounts"
           :total-count="displayItems.length"
           :ungrouped-count="groupedNeedCount"
         />
-        <UCard class="bg-contentbackground border border-white/5">
-          <div
-            v-if="itemsError"
-            class="text-surface-400 flex flex-col items-center justify-center gap-4 p-8"
-            aria-live="polite"
-          >
-            <UIcon name="i-mdi-alert-circle" class="text-error-400 h-8 w-8" />
-            <span class="text-error-400">
-              {{ $t('page.needed_items.error') }}
-            </span>
-            <UButton color="primary" @click="ensureNeededItemsData">
-              {{ $t('common.refresh_button') }}
-            </UButton>
-          </div>
-          <div
-            v-else-if="!itemsReady"
-            class="text-surface-400 flex items-center justify-center gap-2 p-8"
-            aria-live="polite"
-          >
-            <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" />
-            <span>{{ $t('page.needed_items.loading') }}</span>
-          </div>
-          <template v-else>
-            <div
-              v-if="displayItems.length === 0"
-              class="text-surface-400 p-8 text-center"
-              aria-live="polite"
-            >
-              {{ $t('page.needed_items.empty') }}
-            </div>
-            <NeededItemsResults
-              v-else
-              ref="results"
-              :group-by-item="groupByItem"
-              :view-mode="viewMode"
-              :card-style="cardStyle"
-              :active-filter="activeFilter"
-              :grouped-items="visibleGroupedItems"
-              :items="visibleIndividualItems"
-              :objectives-by-item-id="objectivesByItemId"
-              :search="search"
-              :initially-visible-count="adjustedRenderCount"
-              :has-more="visibleCount < displayItems.length"
-            />
-          </template>
-        </UCard>
+        <div
+          v-if="itemsError"
+          :class="statePanelClass"
+          class="flex-col gap-4 text-center"
+          aria-live="polite"
+        >
+          <UIcon name="i-mdi-alert-circle" class="text-error-400 h-8 w-8" />
+          <span class="text-error-400">
+            {{ $t('page.needed_items.error') }}
+          </span>
+          <UButton color="primary" @click="ensureNeededItemsData">
+            {{ $t('common.refresh_button') }}
+          </UButton>
+        </div>
+        <div v-else-if="!itemsReady" :class="statePanelClass" class="gap-2" aria-live="polite">
+          <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" />
+          <span>{{ $t('page.needed_items.loading') }}</span>
+        </div>
+        <div
+          v-else-if="displayItems.length === 0"
+          :class="statePanelClass"
+          class="flex-col gap-1 text-center"
+          aria-live="polite"
+        >
+          <UIcon name="i-mdi-package-variant-closed-check" class="text-surface-500 mb-2 size-8" />
+          <span>{{ $t('page.needed_items.empty') }}</span>
+        </div>
+        <NeededItemsResults
+          v-else
+          ref="results"
+          :group-by-item="groupByItem"
+          :view-mode="viewMode"
+          :grouped-items="visibleGroupedItems"
+          :items="visibleIndividualItems"
+          :objectives-by-item-id="objectivesByItemId"
+          :search="search"
+          :has-more="visibleCount < displayItems.length"
+        />
       </div>
     </div>
     <Transition
@@ -98,11 +89,9 @@
   import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
   import {
-    DEFAULT_INITIAL_RENDER_COUNT,
     INFINITE_SCROLL_BATCH_SIZE,
     INFINITE_SCROLL_MARGIN,
-    MIN_RENDER_COUNTS,
-    SCREEN_SIZE_MULTIPLIERS,
+    INITIAL_RENDER_COUNT,
   } from '@/features/neededitems/neededitems-constants';
   import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
   import NeededItemsResults from '@/features/neededitems/NeededItemsResults.vue';
@@ -113,14 +102,6 @@
   const { isOpen: isHelpOpen } = usePageHelpState('needed_items');
   const { isDesktopHelpPanelOpen, isDesktopSideRailOpen, isMobileHelpPanelOpen } =
     usePageSideRailState({ helpOpen: isHelpOpen });
-  const props = withDefaults(
-    defineProps<{
-      baseRenderCount?: number;
-    }>(),
-    {
-      baseRenderCount: DEFAULT_INITIAL_RENDER_COUNT,
-    }
-  );
   const route = useRoute();
   // The app-bar search writes `?q=`; this page only reads it.
   const { searchQuery: search } = useRouteSearchQuery();
@@ -156,7 +137,7 @@
       logPerf('user-scroll-activated');
     }
   };
-  const { belowMd, xs } = useSharedBreakpoints();
+  const { belowMd } = useSharedBreakpoints();
   const {
     activeFilter,
     firFilter,
@@ -168,7 +149,6 @@
     sortBy,
     sortDirection,
     viewMode,
-    cardStyle,
     filteredItems,
     groupedItems,
     groupedNeedCount,
@@ -179,6 +159,8 @@
     itemsError,
     ensureNeededItemsData,
   } = useNeededItems({ perfDebug, search, t });
+  const statePanelClass =
+    'bg-surface-900 text-surface-400 flex items-center justify-center rounded-lg border border-white/10 p-8';
   const selectedNeededItemsView = computed<'combined' | 'grid' | 'list'>(() => {
     if (groupByItem.value) {
       return 'combined';
@@ -211,36 +193,9 @@
       window.removeEventListener('resize', updatePageScrollState);
     }
   });
-  const baseRenderCount = computed(() => {
-    const value = props.baseRenderCount;
-    return Number.isFinite(value) && value > 0 ? value : DEFAULT_INITIAL_RENDER_COUNT;
-  });
-  const adjustedRenderCount = computed(() => {
-    const baseCount = baseRenderCount.value;
-    const viewAdjusted =
-      viewMode.value === 'grid'
-        ? Math.max(baseCount, Math.ceil(baseCount * SCREEN_SIZE_MULTIPLIERS.gridView))
-        : baseCount;
-    if (xs.value) {
-      return Math.max(MIN_RENDER_COUNTS.xs, Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.xs));
-    }
-    if (belowMd.value) {
-      return Math.max(
-        MIN_RENDER_COUNTS.belowMd,
-        Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.belowMd)
-      );
-    }
-    return viewAdjusted;
-  });
   const initialVisibleCount = computed(() => {
-    if (groupByItem.value) {
-      const groupedMinimum = xs.value || belowMd.value ? INFINITE_SCROLL_BATCH_SIZE : 30;
-      return Math.max(adjustedRenderCount.value, groupedMinimum);
-    }
-    if (viewMode.value === 'list') {
-      return adjustedRenderCount.value;
-    }
-    return Math.max(adjustedRenderCount.value, INFINITE_SCROLL_BATCH_SIZE * 2);
+    const count = INITIAL_RENDER_COUNT[viewMode.value];
+    return belowMd.value ? Math.ceil(count / 2) : count;
   });
   const visibleCount = ref(initialVisibleCount.value);
   const visibleGroupedItems = computed(() => {
@@ -362,13 +317,14 @@
       totalItems: displayItems.value.length,
     });
   });
+  // Layout changes count as view changes too: Items and Needs both come as list or grid.
   watch(
-    selectedNeededItemsView,
-    (currentView, previousView) => {
+    () => [selectedNeededItemsView.value, viewMode.value] as const,
+    ([currentView, layout], previous) => {
       trackNeededItemsView({
-        cardStyle: currentView === 'grid' ? cardStyle.value : undefined,
-        previousView,
-        source: previousView ? 'change' : 'page_load',
+        layout,
+        previousView: previous?.[0],
+        source: previous ? 'change' : 'page_load',
         view: currentView,
       });
     },
