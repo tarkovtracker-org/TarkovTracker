@@ -58,13 +58,18 @@ const pressKey = (init: KeyboardEventInit, target: EventTarget = window) => {
 /** Screen point of a game position without the whole-pixel rounding Leaflet applies to markers. */
 const exactContainerPoint = (map: L.Map, x: number, z: number) =>
   map.layerPointToContainerPoint(map.project(gameToLatLng(x, z)).subtract(map.getPixelOrigin()));
+/** Real mouse input; the map's keyboard crosshair dispatches untrusted look-alikes. */
+const trusted = <T extends Event>(event: T): T =>
+  Object.defineProperty(event, 'isTrusted', { value: true });
 /** Moves the mouse over the screen point that shows a game position, above `target` if given. */
 const hoverGamePoint = (map: L.Map, x: number, z: number, target?: Element) => {
   const point = exactContainerPoint(map, x, z);
   (target ?? map.getContainer()).dispatchEvent(
-    new MouseEvent('mousemove', { bubbles: true, clientX: point.x, clientY: point.y })
+    trusted(new MouseEvent('mousemove', { bubbles: true, clientX: point.x, clientY: point.y }))
   );
 };
+const leaveMap = (map: L.Map) =>
+  map.getContainer().dispatchEvent(trusted(new MouseEvent('mouseleave')));
 const expectPosition = (actual: { x: number; z: number } | null, x: number, z: number) => {
   expect(actual).not.toBeNull();
   expect(actual!.x).toBeCloseTo(x, 6);
@@ -98,7 +103,7 @@ describe('useMapCursorCoordinates', () => {
     const moved = map.containerPointToLatLng(pointer);
     expectPosition(position.value, moved.lng, moved.lat);
     expect(position.value!.x).not.toBeCloseTo(10, 2);
-    map.getContainer().dispatchEvent(new MouseEvent('mouseleave'));
+    leaveMap(map);
     expect(position.value).toBeNull();
   });
   it('reads the keyboard crosshair when it appears and the mouse once it moves', async () => {
@@ -113,7 +118,7 @@ describe('useMapCursorCoordinates', () => {
     hoverGamePoint(map, -30, 40);
     expectPosition(position.value, -30, 40);
     // The crosshair still answers once the mouse leaves; hiding it clears the reading.
-    map.getContainer().dispatchEvent(new MouseEvent('mouseleave'));
+    leaveMap(map);
     expectPosition(position.value, center.lng, center.lat);
     crosshairShown.value = false;
     await nextTick();
@@ -143,6 +148,58 @@ describe('useMapCursorCoordinates', () => {
     expect(position.value).toBeNull();
     hoverGamePoint(map, 30, 40);
     expectPosition(position.value, 30, 40);
+  });
+  it('hides over a popup even while the keyboard crosshair is shown', async () => {
+    const leaflet = await loadLeaflet();
+    const map = await createMap(customs);
+    const { crosshairShown, position } = track(map);
+    crosshairShown.value = true;
+    await nextTick();
+    const popup = leaflet
+      .popup()
+      .setLatLng(gameToLatLng(10, 20))
+      .setContent('<button type="button">Details</button>')
+      .openOn(map);
+    hoverGamePoint(map, 10, 20, popup.getElement()!.querySelector('button')!);
+    expect(position.value).toBeNull();
+  });
+  it('rechecks a still pointer when a popup opens over it or closes', async () => {
+    const leaflet = await loadLeaflet();
+    const map = await createMap(customs);
+    const { position } = track(map);
+    // The test DOM has no layout: hit-testing returns the open popup, else the map.
+    vi.spyOn(document, 'elementFromPoint').mockImplementation(
+      () => map.getContainer().querySelector('.leaflet-popup button') ?? map.getContainer()
+    );
+    hoverGamePoint(map, 10, 20);
+    const popup = leaflet
+      .popup({ autoPan: false })
+      .setLatLng(gameToLatLng(10, 20))
+      .setContent('<button type="button">Details</button>')
+      .openOn(map);
+    expect(position.value).toBeNull();
+    // Browsers fade a closing popup out before Leaflet removes it; the test DOM has no 3D
+    // support, so take the browser's path. The fading card no longer hides the reading.
+    (map as unknown as { _fadeAnimated: boolean })._fadeAnimated = true;
+    map.closePopup(popup);
+    expect(map.getContainer().querySelector('.leaflet-popup button')).not.toBeNull();
+    expectPosition(position.value, 10, 20);
+  });
+  it('ignores the crosshair hover events, so they never take over C after focus leaves', async () => {
+    const map = await createMap(customs);
+    const { crosshairShown, focus, onCopy, position } = track(map);
+    focus.inside = true;
+    crosshairShown.value = true;
+    await nextTick();
+    const size = map.getSize();
+    const center = map.containerPointToLatLng([size.x / 2, size.y / 2]);
+    // What LeafletMap's keyboard loop dispatches at the crosshair while the mouse is elsewhere.
+    map.getContainer().dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 200 }));
+    map.getContainer().dispatchEvent(new MouseEvent('mouseleave'));
+    expectPosition(position.value, center.lng, center.lat);
+    focus.inside = false;
+    pressKey({ key: 'c' });
+    expect(onCopy).not.toHaveBeenCalled();
   });
   it('copies the reading with C, leaving typing and modified keys alone', async () => {
     const map = await createMap(customs);

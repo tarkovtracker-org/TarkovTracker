@@ -850,9 +850,7 @@
     initialFloor: props.initialFloor,
   });
   /** The floor named in copied coordinates, written as the floor panel shows it. */
-  const coordinatesFloor = computed(() =>
-    hasMultipleFloors.value ? selectedFloor.value.replace(/_/g, ' ') : null
-  );
+  const coordinatesFloor = computed(() => selectedFloor.value.replace(/_/g, ' ') || null);
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
   const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
   /** Hit-test dots are invisible: the chip above them is the visible marker. */
