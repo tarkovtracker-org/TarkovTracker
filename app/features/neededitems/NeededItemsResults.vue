@@ -10,7 +10,7 @@
         <component
           :is="isGrid ? 'div' : 'li'"
           v-for="(group, index) in groupedItems"
-          :key="group.item.id"
+          :key="`${trackingScope}:${group.item.id}`"
           :data-index="index"
           :class="itemClass"
         >
@@ -48,6 +48,7 @@
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedModal from '@/features/neededitems/NeededItemGroupedModal.vue';
   import NeededItemGroupEntry from '@/features/neededitems/NeededItemGroupEntry.vue';
+  import { useTarkovStore } from '@/stores/useTarkov';
   import type { NeededItemsViewMode } from '@/features/neededitems/neededItemsFilterNormalization';
   import type {
     GroupedNeededItem,
@@ -69,6 +70,9 @@
     hasMore: boolean;
   }>();
   const isGrid = computed(() => props.viewMode === 'grid');
+  const store = useTarkovStore();
+  const { $supabase } = useNuxtApp();
+  const trackingScope = computed(() => `${$supabase.user.id ?? null}:${store.currentGameMode}`);
   const entryLayout = computed(() => (isGrid.value ? 'tile' : 'row'));
   // Both layouts share one surface: a divided panel for rows, a responsive grid for tiles.
   const listClass =

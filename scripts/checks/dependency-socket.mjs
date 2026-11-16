@@ -21,9 +21,21 @@ export function latestSocketChecks(checks) {
 }
 const outputOf = (run) =>
   Object.fromEntries(['title', 'summary', 'text'].map((key) => [key, run.output?.[key] ?? '']));
+/** Socket skips diff alerts when a direct declaration reuses an already scanned artifact. */
+function unchangedDependencies({ title, summary, text }) {
+  const number = title.match(/^Pull Request #([1-9]\d*) Alerts: Skipped$/)?.[1];
+  if (!number) return false;
+  return [
+    summary ===
+      `|Report|Status|Message|\n|---|---|---|\n|PR #${number} Alerts|✅|Pull request contains no net changes to dependencies|\n\nPull request alerts notify when new issues are detected between the diff of the pull request and it's target branch.`,
+    text ===
+      '**No dependency changes detected.** Learn more about [Socket for GitHub](https://socket.dev?utm_medium=gh).\n\n👍 No dependency changes detected in pull request',
+  ].every(Boolean);
+}
 /** Unknown report formats fail closed, including a success status with warnings we cannot parse. */
 export function socketWarnings(run) {
   const { summary, text, title } = outputOf(run);
+  if (unchangedDependencies({ title, summary, text })) return [];
   const count = summary.match(/Found (\d+) (?:project |new )?alerts?/i);
   if (!count) {
     requireEvidence(

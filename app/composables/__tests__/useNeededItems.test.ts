@@ -875,6 +875,15 @@ describe('useNeededItems', () => {
     });
   });
   describe('loading state', () => {
+    it('keeps screenshot import disabled until hideout requirements are available', async () => {
+      const { metadataStore, neededItems } = await setup();
+      const stations = metadataStore.hideoutStations;
+      metadataStore.hideoutStations = [];
+      expect(neededItems.itemsReady.value).toBe(true);
+      expect(neededItems.stashImportReady.value).toBe(false);
+      metadataStore.hideoutStations = stations;
+      expect(neededItems.stashImportReady.value).toBe(true);
+    });
     it('reports items ready when loaded', async () => {
       const { neededItems } = await setup();
       expect(neededItems.itemsReady.value).toBe(true);
