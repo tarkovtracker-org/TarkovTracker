@@ -52,6 +52,8 @@ PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression 
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.
   Redrawing replaces overlapping regions; quantity corrections preserve requirement selections.
+  Redrawn or split rows get fresh review state even when their bounds stay the same; untouched
+  rows retain their corrections.
 - Each import updates explicitly selected requirements using the existing Smart Fill
   priority/allocation policy, in one of two player-chosen modes:
   - **Set counts from screenshot** (default) replaces each selected requirement's count with its
@@ -76,7 +78,8 @@ PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression 
   reconciles, refreshes the shown counts and asks the player to save again. A screenshot
   imported before a progress reset (`progress_reset`) cannot be saved again while its receipt is
   retained (100 imports, 90 days), so the dialog explains that and disables Save instead of
-  looping. Other conflict reasons reconcile and allow a fresh save with a new import ID.
+  looping. That block survives failed refreshes and later recovery retries. Other conflict reasons
+  reconcile and allow a fresh save with a new import ID.
 
 ### Persistence
 

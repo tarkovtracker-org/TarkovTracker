@@ -85,6 +85,34 @@ describe('stash scan session', () => {
     expect(session.rows.value[1]!.reviewed).toBe(false);
     scope.stop();
   });
+  it.each(['region', 'split'] as const)(
+    'resets corrected rows explicitly replaced by %s even with identical bounds',
+    async (operation) => {
+      const { scope, session } = setup();
+      await session.select([screenshot()]);
+      Object.assign(session.rows.value[0]!, {
+        itemId: 'manual item',
+        quantity: 7,
+        reviewed: true,
+        excluded: true,
+        raidStatus: 'fir',
+      });
+      session.rows.value[1]!.quantity = 5;
+      session.rows.value[1]!.reviewed = true;
+      session.activeKey.value = 0;
+      if (operation === 'region') await session.region(fixture().cells[0]!);
+      else await session.split(1, 1);
+      expect(session.rows.value[0]).toMatchObject({
+        itemId: 'item',
+        quantity: 1,
+        reviewed: false,
+        excluded: false,
+        raidStatus: 'unknown',
+      });
+      expect(session.rows.value[1]).toMatchObject({ quantity: 5, reviewed: true });
+      scope.stop();
+    }
+  );
   it('ignores a worker result after cancellation and releases its resources', async () => {
     const { scope, session } = setup();
     let finish!: (result: ScanResult) => void;

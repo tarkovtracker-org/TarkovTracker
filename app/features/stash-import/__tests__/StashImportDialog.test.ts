@@ -446,6 +446,28 @@ describe('stash import flow', () => {
     expect(save(wrapper).attributes('disabled')).toBeDefined();
     wrapper.unmount();
   });
+  it('retains a reset screenshot block through failed refresh retries', async () => {
+    mocks.commit.mockResolvedValueOnce({ status: 'conflict', reason: 'progress_reset' });
+    mocks.recover
+      .mockRejectedValueOnce(new Error('stash_import.errors.unsynced'))
+      .mockRejectedValueOnce(new Error('stash_import.errors.unsynced'));
+    const wrapper = render();
+    await toApply(wrapper);
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    await saveNow(wrapper);
+    expect(hasButton(wrapper, 'refresh_progress')).toBe(true);
+    await click(wrapper, 'refresh_progress');
+    expect(hasButton(wrapper, 'refresh_progress')).toBe(true);
+    await click(wrapper, 'refresh_progress');
+    expect(mocks.recover).toHaveBeenCalledTimes(3);
+    expect(wrapper.text()).toContain('stash_import.errors.reimport_blocked');
+    expect(save(wrapper).attributes('disabled')).toBeDefined();
+    await click(wrapper, 'back');
+    await click(wrapper, 'continue');
+    expect(save(wrapper).attributes('disabled')).toBeDefined();
+    expect(mocks.commit).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
   it('lets the player save again after a reused import ID, which a retry replaces', async () => {
     mocks.commit.mockResolvedValueOnce({ status: 'conflict', reason: 'import_id_reused' });
     const wrapper = render();

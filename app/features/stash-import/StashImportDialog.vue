@@ -670,6 +670,7 @@
   }
   /** Pull in the newer progress, then either ask for a fresh check or explain the dead end. */
   async function refreshAfterConflict(permanent: boolean) {
+    if (permanent) blockedSource.value = true;
     if (!(await runReconcile())) return;
     preview.value = undefined;
     allowDecreases.value = false;
@@ -677,7 +678,6 @@
       notice.value = 'stash_import.conflict_refreshed';
       return;
     }
-    blockedSource.value = true;
     importError.value = 'stash_import.errors.reimport_blocked';
   }
   async function checkReceipt() {
@@ -711,7 +711,7 @@
     try {
       if (!(await runReconcile())) return false;
       preview.value = undefined;
-      importError.value = '';
+      importError.value = blockedSource.value ? 'stash_import.errors.reimport_blocked' : '';
       return true;
     } finally {
       saving.value = false;

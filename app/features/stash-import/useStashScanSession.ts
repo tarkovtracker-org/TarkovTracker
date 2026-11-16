@@ -43,7 +43,7 @@ export function useStashScanSession() {
       unchecked.find((row) => row.cell.key > (activeKey.value ?? -1))?.cell.key ??
       unchecked[0]?.cell.key;
   }
-  function accept(nextResult: ScanResult, preserve = false) {
+  function accept(nextResult: ScanResult, preserve: ReadonlySet<string>) {
     const previous = new Map(rows.value.map((row) => [rectKey(row.cell), row]));
     result.value = nextResult;
     if (nextResult.cells.length === 0) error.value = 'stash_import.errors.no_grid';
@@ -51,7 +51,7 @@ export function useStashScanSession() {
     height.value = nextResult.height;
     setImage(nextResult.preview);
     rows.value = nextResult.cells.map((cell) => {
-      const prior = preserve ? previous.get(rectKey(cell)) : undefined;
+      const prior = preserve.has(rectKey(cell)) ? previous.get(rectKey(cell)) : undefined;
       return prior ? { ...prior, cell } : reviewCell(cell, currentItems.value);
     });
     activeKey.value = undefined;
@@ -80,7 +80,7 @@ export function useStashScanSession() {
     if (!source.value) return command;
     return { op: 'scan', file: source.value, rects: command.rects };
   }
-  function acceptCurrent(revision: number, scanned: ScanResult, preserve: boolean) {
+  function acceptCurrent(revision: number, scanned: ScanResult, preserve: ReadonlySet<string>) {
     if (generation === revision) accept(scanned, preserve);
   }
   function failCurrent(revision: number, failure: unknown) {
@@ -94,7 +94,7 @@ export function useStashScanSession() {
   }
   async function run(
     command: Parameters<ReturnType<typeof createStashScanner>['request']>[0],
-    preserve = false
+    preserve: ReadonlySet<string> = new Set()
   ) {
     const revision = generation;
     error.value = '';
@@ -150,14 +150,15 @@ export function useStashScanSession() {
     const others = rows.value
       .filter((row) => !overlapsRegion(rect, row.cell))
       .map((row) => row.cell);
-    await run({ op: 'rects', rects: [...others, rect] }, true);
+    await run({ op: 'rects', rects: [...others, rect] }, new Set(others.map(rectKey)));
   }
   async function split(columns: number, rowCount: number) {
     if (!active.value || busy.value) return;
     const rects = rows.value.flatMap((row) =>
       row === active.value ? splitRegion(row.cell, columns, rowCount) : [row.cell]
     );
-    await run({ op: 'rects', rects }, true);
+    const untouched = rows.value.filter((row) => row !== active.value);
+    await run({ op: 'rects', rects }, new Set(untouched.map((row) => rectKey(row.cell))));
   }
   function dispose() {
     cancel();
