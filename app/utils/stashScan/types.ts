@@ -46,6 +46,8 @@ export interface ScanCell extends ScanRect {
   empty: boolean;
   candidates: ScanCandidate[];
   margin: number;
+  /** A clear found-in-raid checkmark was seen on the item. */
+  fir: boolean;
 }
 export interface ScanResult {
   width: number;

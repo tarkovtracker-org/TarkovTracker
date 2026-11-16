@@ -29,6 +29,7 @@ function fixture(): ScanResult {
       empty: false,
       candidates: [{ itemId: 'item', score: 0.6 }],
       margin: 0.05,
+      fir: false,
     })),
   };
 }

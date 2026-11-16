@@ -38,6 +38,7 @@ const cell = (patch: Partial<ScanCell> = {}): ScanCell => ({
   empty: false,
   candidates: [{ itemId: 'single', score: 0.9 }],
   margin: 0.2,
+  fir: false,
   ...patch,
 });
 const row = (patch: Partial<ReviewedCell> = {}): ReviewedCell => ({
@@ -63,6 +64,17 @@ describe('observation review and quantity accounting', () => {
     expect(needsReview(reviewed)).toBe(false);
     expect(reviewedTotals([reviewed])).toEqual([
       { itemId: 'single', fir: 0, nonFir: 0, unknown: 1 },
+    ]);
+  });
+  it('marks an item FIR when the scan saw its checkmark, and it stays editable', () => {
+    const reviewed = reviewCell(cell({ fir: true }), new Map([['single', item()]]));
+    expect(reviewed.raidStatus).toBe('fir');
+    expect(reviewedTotals([reviewed])).toEqual([
+      { itemId: 'single', fir: 1, nonFir: 0, unknown: 0 },
+    ]);
+    reviewed.raidStatus = 'non_fir';
+    expect(reviewedTotals([reviewed])).toEqual([
+      { itemId: 'single', fir: 0, nonFir: 1, unknown: 0 },
     ]);
   });
   it('requires an explicit quantity for stackable items even with strong similarity', () => {

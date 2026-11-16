@@ -131,6 +131,44 @@ describe('pinned cultist-circle grid detection', () => {
     line(target, 71, 90, 72, 101, 24);
     expect(detectGrid(target).cells).toHaveLength(45);
   });
+  it('finds grey borders beside the brighter coloured frame newer clients draw', () => {
+    // Pixels measured across a 1440p border: teal slot, cyan glow, 2px grey line, then the
+    // slot again or, on some items only, a cyan frame. Glow and frame outshine the line.
+    const pitch = 84;
+    const at = (i: number) => 8 + i * pitch;
+    const target = image(at(8) + 9, at(6) + 9);
+    for (let p = 0; p < target.width * target.height; p++) target.data.set([26, 52, 62], p * 3);
+    const across = [
+      [-1, [56, 86, 96]],
+      [0, [73, 81, 84]],
+      [1, [73, 81, 84]],
+    ] as const;
+    for (const [offset, color] of across) {
+      for (let i = 0; i <= 8; i++) {
+        for (let y = at(0); y <= at(6) + 1; y++) pixel(target, at(i) + offset, y, [...color]);
+      }
+      for (let j = 0; j <= 6; j++) {
+        for (let x = at(0); x <= at(8) + 1; x++) pixel(target, x, at(j) + offset, [...color]);
+      }
+    }
+    for (let j = 0; j < 6; j++) {
+      for (let i = j % 2; i < 8; i += 2) {
+        for (let t = 2; t < pitch; t++) {
+          pixel(target, at(i) + 2, at(j) + t, [80, 126, 134]);
+          pixel(target, at(i) + t, at(j) + 2, [80, 126, 134]);
+        }
+      }
+    }
+    expect(detectGrid(target).cells).toHaveLength(48);
+  });
+  it('accepts a separator two pixels off its lattice line at 1080p scale and above', () => {
+    // JPEG chroma blur can move a ridge onto the item frame beside the grid line.
+    const target = grid(84);
+    const x = 8 + 5 * 84;
+    line(target, x, 8 + 4 * 84 + 1, x, 8 + 5 * 84 - 1, 24);
+    line(target, x + 2, 8 + 4 * 84 + 1, x + 2, 8 + 5 * 84 - 1, 160);
+    expect(detectGrid(target).cells).toHaveLength(45);
+  });
   it('returns no cells for flat or tiny valid images', () => {
     expect(detectGrid(image(320, 240))).toEqual({ pitch: 0, cells: [] });
     expect(detectGrid(image(1, 1))).toEqual({ pitch: 0, cells: [] });
@@ -240,6 +278,38 @@ describe('art and glyph matching', () => {
       margin: 0,
     });
     expect(matchCell(features(icon()), index)).toEqual({ empty: false, matches: [], margin: 0 });
+  });
+  it('keeps a dark, unlabelled item occupied instead of treating it as an empty slot', () => {
+    // A downscaled dark item: no readable label and about 8 levels of art contrast.
+    const target = image(64, 64);
+    for (let y = 16; y < 48; y++) {
+      for (let x = 1; x < 63; x++) {
+        const v = 24 + ((Math.floor(x / 4) + Math.floor(y / 4)) % 2 ? 12 : -12);
+        pixel(target, x, y, [v, v, v]);
+      }
+    }
+    const cell = features(target);
+    expect(cell.artContrast).toBeGreaterThan(5);
+    expect(cell.artContrast).toBeLessThan(12);
+    expect(matchCell(cell, createIconIndex()).empty).toBe(false);
+  });
+  it('matches a short name drawn higher in game than in the catalog icon', () => {
+    const index = createIconIndex();
+    const source = icon();
+    add(index, 'target', source);
+    add(index, 'other', icon(1, 1, 5));
+    const raised = image(64, 64);
+    raised.data.set(source.data);
+    // In-game labels sit about two template pixels above the Tarkov.dev label.
+    for (let y = 1; y < 13; y++) {
+      for (let x = 1; x < 63; x++) {
+        const from = ((y + 2) * 64 + x) * 3;
+        pixel(raised, x, y, y + 2 < 13 ? [...source.data.subarray(from, from + 3)] : [24, 24, 24]);
+      }
+    }
+    const result = matchCell(features(raised), index);
+    expect(result.matches[0]).toMatchObject({ itemId: 'target' });
+    expect(result.matches[0]!.textScore).toBeGreaterThan(0.95);
   });
   it('rejects wrong catalog dimensions without mutating the index', () => {
     const index = createIconIndex();

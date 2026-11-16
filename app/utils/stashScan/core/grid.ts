@@ -27,14 +27,22 @@ const MIN_SHORT_RUN = 6;
 const MAX_PITCH = 260;
 const RIDGE_CONTRAST = 14;
 const MAX_LINE_SATURATION = 110;
+/**
+ * Newer clients draw a coloured inner frame on many items. It can be brighter than the grey
+ * grid line beside it, so a line also counts when its neighbour is this much more saturated.
+ */
+const CHROMA_CONTRAST = 48;
 const SEPARATOR_COVERAGE = 0.35;
 const BORDER_COVERAGE = 0.6;
 interface PixelStats {
   brightness: Uint8Array;
+  /** (max - min) / max on a 0-255 scale. */
+  saturation: Uint8Array;
   neutral: Uint8Array;
 }
 function pixelStats(image: RgbImage): PixelStats {
   const brightness = new Uint8Array(image.width * image.height);
+  const saturation = new Uint8Array(brightness.length);
   const neutral = new Uint8Array(brightness.length);
   for (let p = 0; p < brightness.length; p++) {
     const r = image.data[p * 3]!;
@@ -43,9 +51,17 @@ function pixelStats(image: RgbImage): PixelStats {
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     brightness[p]! = max;
-    neutral[p]! = Number(max > 0 && (max - min) * 255 <= MAX_LINE_SATURATION * max);
+    saturation[p]! = max > 0 ? Math.round(((max - min) * 255) / max) : 0;
+    neutral[p]! = Number(max > 0 && saturation[p]! <= MAX_LINE_SATURATION);
   }
-  return { brightness, neutral };
+  return { brightness, saturation, neutral };
+}
+/** The line pixel stands out from its neighbour: brighter, or neutral beside a coloured frame. */
+function separates(stats: PixelStats, line: number, side: number): boolean {
+  return (
+    stats.brightness[line]! - stats.brightness[side]! >= RIDGE_CONTRAST ||
+    stats.saturation[side]! - stats.saturation[line]! >= CHROMA_CONTRAST
+  );
 }
 function isDoubleRidge(stats: PixelStats, p: number, step: number): boolean {
   const here = stats.brightness[p]!;
@@ -53,7 +69,7 @@ function isDoubleRidge(stats: PixelStats, p: number, step: number): boolean {
   return (
     Math.abs(here - after) < RIDGE_CONTRAST &&
     stats.neutral[p + step]! === 1 &&
-    after - stats.brightness[p + 2 * step]! >= RIDGE_CONTRAST
+    separates(stats, p + step, p + 2 * step)
   );
 }
 function markRidge(
@@ -64,8 +80,8 @@ function markRidge(
   canDouble: boolean
 ): void {
   if (!stats.neutral[p]!) return;
-  if (stats.brightness[p]! - stats.brightness[p - step]! < RIDGE_CONTRAST) return;
-  if (stats.brightness[p]! - stats.brightness[p + step]! >= RIDGE_CONTRAST) {
+  if (!separates(stats, p, p - step)) return;
+  if (separates(stats, p, p + step)) {
     mask[p]! = 1;
     return;
   }
@@ -89,7 +105,7 @@ function ridgeBounds(width: number, height: number, vertical: boolean) {
 /** A crop can retain a visible border while removing the outside comparison pixel. */
 function markBoundaryRidge(stats: PixelStats, p: number, step: number, mask: Uint8Array): void {
   if (!stats.neutral[p]) return;
-  if (stats.brightness[p]! - stats.brightness[p + step]! >= RIDGE_CONTRAST) {
+  if (separates(stats, p, p + step)) {
     mask[p] = 1;
     return;
   }
@@ -426,37 +442,47 @@ function coveredAt(
   mask: Uint8Array,
   width: number,
   height: number,
-  vertical: boolean,
-  position: number,
+  line: GridLine,
   t: number
 ): boolean {
-  const x = vertical ? position : t;
-  const y = vertical ? t : position;
-  const stepX = Number(vertical);
-  const stepY = Number(!vertical);
-  return [-1, 0, 1].some((d) => hitAt(mask, width, height, x + d * stepX, y + d * stepY));
+  const x = line.vertical ? line.position : t;
+  const y = line.vertical ? t : line.position;
+  const stepX = Number(line.vertical);
+  const stepY = Number(!line.vertical);
+  for (let d = -line.reach; d <= line.reach; d++)
+    if (hitAt(mask, width, height, x + d * stepX, y + d * stepY)) return true;
+  return false;
+}
+interface GridLine {
+  vertical: boolean;
+  position: number;
+  /**
+   * Pixels either side of the lattice line that still count as on it. JPEG chroma blur can
+   * move a ridge onto the item's coloured inner frame, two pixels from the line at 1080p+.
+   */
+  reach: number;
 }
 function coverage(
   mask: Uint8Array,
   width: number,
   height: number,
-  vertical: boolean,
-  position: number,
+  line: GridLine,
   from: number,
   to: number
 ): number {
-  const end = Math.min(to, vertical ? height : width);
+  const end = Math.min(to, line.vertical ? height : width);
   let hits = 0;
   let total = 0;
   for (let t = Math.max(0, from); t < end; t++) {
     total++;
-    hits += Number(coveredAt(mask, width, height, vertical, position, t));
+    hits += Number(coveredAt(mask, width, height, line, t));
   }
   return total ? hits / total : 0;
 }
 interface Lattice {
   columns: number;
   rows: number;
+  reach: number;
   lineX: (i: number) => number;
   lineY: (j: number) => number;
   left: (i: number, j: number) => number;
@@ -484,8 +510,7 @@ function leftEdges(
         mask,
         width,
         height,
-        true,
-        lattice.lineX(i),
+        { vertical: true, position: lattice.lineX(i), reach: lattice.reach },
         lattice.lineY(j) + margin,
         lattice.lineY(j + 1) - margin
       );
@@ -506,8 +531,7 @@ function topEdges(
         mask,
         width,
         height,
-        false,
-        lattice.lineY(j),
+        { vertical: false, position: lattice.lineY(j), reach: lattice.reach },
         lattice.lineX(i) + margin,
         lattice.lineX(i + 1) - margin
       );
@@ -529,6 +553,8 @@ function createLattice(
   const lattice: Lattice = {
     columns: x.count,
     rows: y.count,
+    // 1px below 1080p, 2px at 1080p and 1440p, 3px at 4K.
+    reach: Math.max(1, Math.round(pitch / 40)),
     lineX: x.line,
     lineY: y.line,
     left: () => 0,

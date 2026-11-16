@@ -15,8 +15,15 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
   and stack counts need correction. Quantities are units, never durability or remaining uses.
-  FIR is user-confirmed; unknown FIR can fill only non-FIR requirements.
+  FIR comes from the found-in-raid checkmark: each region's bottom-right corner, including the
+  spot above a stack or uses count, is correlated with the measured mark (`firMark.ts`). A
+  clear mark sets FIR; a covered mark, or slots under 40 px, leave FIR unknown, which can fill
+  only non-FIR requirements. Players can change any status.
   Totals above 1,000,000 units per item block Preview until quantities are corrected.
+- Grid detection also accepts a grey border beside a brighter coloured item frame (newer
+  clients at 1440p) and a ridge up to `pitch / 40` pixels off its lattice line (JPEG blur).
+  Short-name text is compared both as captured and two template rows lower, where in-game
+  labels sit relative to Tarkov.dev icons.
 - Users can search the indexed catalog, exclude regions, split merged detections, and draw a
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.

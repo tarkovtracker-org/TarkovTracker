@@ -1,5 +1,6 @@
 import { loadSizes, readScanCatalog } from '@/utils/stashScan/catalogClient';
 import { cellFeatures } from '@/utils/stashScan/core/features';
+import { detectFirMark } from '@/utils/stashScan/core/firMark';
 import { detectGrid, type RgbImage } from '@/utils/stashScan/core/grid';
 import { matchCell, type IconIndex } from '@/utils/stashScan/core/matcher';
 import { decodeScreenshot, validateRect } from '@/utils/stashScan/decodeImage';
@@ -37,6 +38,7 @@ function matchRegion(image: RgbImage, rect: ScanRect, index: IconIndex, key: num
     empty: matched.empty,
     margin: matched.margin,
     candidates: matched.matches.map(({ itemId, score }) => ({ itemId, score })),
+    fir: !matched.empty && detectFirMark(image, rect),
   };
 }
 async function run(command: ScanCommand): Promise<void> {

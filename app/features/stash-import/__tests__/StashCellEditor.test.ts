@@ -21,6 +21,7 @@ describe('stack quantity review', () => {
         candidates: [],
         margin: 1,
         empty: false,
+        fir: false,
       },
       itemId: 'item',
       quantity: 1,

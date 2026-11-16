@@ -17,7 +17,9 @@ export function reviewCell(cell: ScanCell, items: Map<string, ScanItem>): Review
     cell,
     itemId,
     quantity: items.get(itemId)?.maxStack === 1 ? 1 : null,
-    raidStatus: 'unknown',
+    // A detected checkmark is FIR. Without one the status stays unknown, which only fills
+    // non-FIR needs, because a covered or tiny mark is not proof the item lacks it.
+    raidStatus: cell.fir ? 'fir' : 'unknown',
     reviewed: strongSuggestion(cell),
     excluded: cell.empty,
   };

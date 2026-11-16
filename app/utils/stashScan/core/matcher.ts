@@ -67,8 +67,33 @@ const COARSE_KEEP = 25;
 const ART_WEIGHT = 0.35;
 const TEXT_WEIGHT = 0.65;
 const EMPTY_TEXT_INK = 0.01;
-const EMPTY_ART_CONTRAST = 12;
+/**
+ * Empty slots measure under 2; dark items on downscaled screenshots measure 8 or more.
+ * Upstream used 12, which silently excluded those items. A wrong "occupied" only asks for
+ * review, so the threshold sits near the empty end.
+ */
+const EMPTY_ART_CONTRAST = 5;
+/**
+ * In-game short names sit about two template pixels higher than in the Tarkov.dev icons the
+ * templates come from (measured at 1080p and 1440p). Text is compared both as captured and
+ * moved down by this much, each with a one-row search, and the better alignment counts.
+ */
+const TEXT_ROW_LIFT = 2;
+const TEXT_SHIFT_X = 2;
+const TEXT_SHIFT_Y = 1;
 const sizeKey = (w: number, h: number) => `${w}x${h}`;
+/**
+ * Moves a text map down by `rows`. The bottom rows drop off and the new top rows take the
+ * blank-background level (the map minimum), so a label that only moves keeps its shape.
+ */
+function lowerText(text: Float32Array, width: number, rows: number): Float32Array {
+  let background = Infinity;
+  for (const value of text) background = Math.min(background, value);
+  const out = new Float32Array(text.length).fill(Number.isFinite(background) ? background : 0);
+  out.set(text.subarray(0, text.length - rows * width), rows * width);
+  normaliseText(out);
+  return out;
+}
 function templateFeatures(image: RgbImage, w: number, h: number): CellFeatures {
   return cellFeatures(image, 0, 0, image.width, image.height, w, h);
 }
@@ -197,15 +222,25 @@ function coarseShortlist(
     .slice(0, COARSE_KEEP)
     .map(({ template }) => template);
 }
-function scoreTemplate(features: CellFeatures, template: IconTemplate): CellMatch {
-  const artScore = stashFeatureDot(features.artFine, template.features.artFine);
-  const textScore = shiftedTextScore(
-    features.text,
-    features.textWidth,
+function textScoreFor(text: Float32Array, width: number, template: IconTemplate): number {
+  return shiftedTextScore(
+    text,
+    width,
     template.features.text,
     template.features.textWidth,
-    2,
-    1
+    TEXT_SHIFT_X,
+    TEXT_SHIFT_Y
+  );
+}
+function scoreTemplate(
+  features: CellFeatures,
+  lowered: Float32Array,
+  template: IconTemplate
+): CellMatch {
+  const artScore = stashFeatureDot(features.artFine, template.features.artFine);
+  const textScore = Math.max(
+    textScoreFor(features.text, features.textWidth, template),
+    textScoreFor(lowered, features.textWidth, template)
   );
   return {
     itemId: template.itemId,
@@ -236,12 +271,14 @@ function isEmpty(features: CellFeatures): boolean {
 export function matchCell(features: CellFeatures, index: IconIndex): CellResult {
   assertCellFeatures(features);
   if (isEmpty(features)) return { empty: true, matches: [], margin: 0 };
+  const lowered = lowerText(features.text, features.textWidth, TEXT_ROW_LIFT);
   const templates = index.bySize.get(sizeKey(features.slotsWide, features.slotsHigh)) ?? [];
+  // The art list finds labels that already line up; the text list uses the usual offset.
   const coarse = new Set([
     ...coarseShortlist(features, templates, 'artCoarse'),
-    ...coarseShortlist(features, templates, 'text'),
+    ...coarseShortlist({ ...features, text: lowered }, templates, 'text'),
   ]);
-  const scored = [...coarse].map((template) => scoreTemplate(features, template));
+  const scored = [...coarse].map((template) => scoreTemplate(features, lowered, template));
   for (const match of scored) assertFinite(match.score);
   const matches = distinctMatches(scored.sort((a, b) => b.score - a.score));
   return { empty: false, matches: matches.slice(0, 5), margin: matchMargin(matches) };
